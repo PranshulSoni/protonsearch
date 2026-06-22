@@ -119,11 +119,20 @@ impl SearchEngine {
 
                 // Title-level matching
                 if name_lower == q_lower {
-                    lex_score += 0.8;
+                    lex_score += 1.0;
                 } else if name_lower.starts_with(&q_lower) {
-                    lex_score += 0.5;
+                    lex_score += 0.7;
                 } else if name_lower.contains(&q_lower) {
-                    lex_score += 0.3;
+                    lex_score += 0.4;
+                }
+
+                // Position-based boost in Title
+                if let Some(idx) = name_lower.find(&q_lower) {
+                    let char_idx = name_lower[..idx].chars().count();
+                    let total_chars = name_lower.chars().count();
+                    if total_chars > 0 {
+                        lex_score += 0.5 * (1.0 - (char_idx as f32 / total_chars as f32));
+                    }
                 }
 
                 // Word overlap in title
@@ -135,33 +144,55 @@ impl SearchEngine {
                             matched_words += 1;
                         }
                     }
-                    lex_score += 0.4 * (matched_words as f32 / q_words.len() as f32);
+                    lex_score += 0.5 * (matched_words as f32 / q_words.len() as f32);
                 }
 
-                // Synonyms matching
+                // Synonyms matching (split by pipe '|')
                 let syn_lower = entry.synonyms.to_lowercase();
-                if syn_lower.contains(&q_lower) {
-                    lex_score += 0.3;
-                } else if !q_words.is_empty() {
-                    let mut matched_syns = 0;
+                let syn_list: Vec<&str> = syn_lower.split('|').collect();
+                let mut syn_boost = 0.0f32;
+                for syn in &syn_list {
+                    let s_trimmed = syn.trim();
+                    if s_trimmed == q_lower {
+                        syn_boost = syn_boost.max(0.8);
+                    } else if s_trimmed.starts_with(&q_lower) {
+                        syn_boost = syn_boost.max(0.6);
+                    } else if s_trimmed.contains(&q_lower) {
+                        syn_boost = syn_boost.max(0.4);
+                    }
+                }
+
+                // Word match in synonyms
+                if !q_words.is_empty() {
+                    let mut matched_words_in_syn = 0;
                     for qw in &q_words {
-                        if syn_lower.contains(qw) {
-                            matched_syns += 1;
+                        for syn in &syn_list {
+                            let syn_words: Vec<&str> = syn.split_whitespace().collect();
+                            if syn_words.contains(qw) {
+                                matched_words_in_syn += 1;
+                                break;
+                            }
                         }
                     }
-                    lex_score += 0.2 * (matched_syns as f32 / q_words.len() as f32);
+                    syn_boost += 0.3 * (matched_words_in_syn as f32 / q_words.len() as f32);
                 }
+                lex_score += syn_boost;
 
                 // Breadcrumb matching
                 let breadcrumb_lower = entry.breadcrumb_path.to_lowercase();
                 if breadcrumb_lower.contains(&q_lower) {
-                    lex_score += 0.15;
+                    lex_score += 0.2;
                 }
 
                 // Description matching
                 let desc_lower = entry.description.to_lowercase();
                 if desc_lower.contains(&q_lower) {
-                    lex_score += 0.05;
+                    lex_score += 0.1;
+                }
+
+                // Boost legacy control panel options if they have any match
+                if entry.source.to_lowercase().contains("legacy") && lex_score > 0.0 {
+                    lex_score += 0.25;
                 }
 
                 (i, sem_score + lex_score)
