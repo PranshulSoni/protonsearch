@@ -118,12 +118,11 @@ unsafe fn run(engine: SearchEngine) {
     let sw = GetSystemMetrics(SM_CXSCREEN);
     let sh = GetSystemMetrics(SM_CYSCREEN);
 
-    let windir = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());
-    let shell32_path = format!("{}\\System32\\shell32.dll", windir);
-    let control_path = format!("{}\\System32\\control.exe", windir);
+    const SETTINGS_ICO: &[u8] = include_bytes!("../../assets/logo/settings.ico");
+    const CONTROL_PANEL_ICO: &[u8] = include_bytes!("../../assets/logo/control_panel.ico");
 
-    let icon_settings = load_system_icon(&shell32_path, 274, 24);
-    let icon_control_panel = load_system_icon(&control_path, 0, 24);
+    let icon_settings = load_icon_from_memory(SETTINGS_ICO, 24);
+    let icon_control_panel = load_icon_from_memory(CONTROL_PANEL_ICO, 24);
 
     let state = Box::new(State {
         engine,
@@ -535,26 +534,55 @@ unsafe fn badge(hdc: HDC, s: &State, source: &str, x: i32, y: i32) {
     DrawTextW(hdc, &mut t, &mut r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 }
 
-unsafe fn load_system_icon(file: &str, index: i32, size: i32) -> HICON {
-    let mut path_arr = [0u16; 260];
-    let path_u16: Vec<u16> = file.encode_utf16().collect();
-    let copy_len = path_u16.len().min(259);
-    path_arr[..copy_len].copy_from_slice(&path_u16[..copy_len]);
-
-    let mut hicons = [HICON(null_mut())];
-    let mut id = 0u32;
-    let n = PrivateExtractIconsW(
-        &path_arr,
-        index,
-        size,
-        size,
-        Some(&mut hicons),
-        Some(&mut id as *mut u32),
-        0,
-    );
-    if n > 0 && !hicons[0].0.is_null() {
-        hicons[0]
-    } else {
-        HICON(null_mut())
+unsafe fn load_icon_from_memory(bytes: &[u8], size: i32) -> HICON {
+    if bytes.len() < 6 { return HICON(null_mut()); }
+    let count = u16::from_le_bytes([bytes[4], bytes[5]]) as usize;
+    let mut best_idx = 0;
+    let mut best_diff = i32::MAX;
+    
+    for i in 0..count {
+        let offset = 6 + i * 16;
+        if offset + 16 > bytes.len() { break; }
+        let mut w = bytes[offset] as i32;
+        let mut h = bytes[offset + 1] as i32;
+        if w == 0 { w = 256; }
+        if h == 0 { h = 256; }
+        let diff = (w - size).abs() + (h - size).abs();
+        if diff < best_diff {
+            best_diff = diff;
+            best_idx = i;
+        }
     }
+    
+    let entry_offset = 6 + best_idx * 16;
+    if entry_offset + 16 <= bytes.len() {
+        let img_size = u32::from_le_bytes([
+            bytes[entry_offset + 8],
+            bytes[entry_offset + 9],
+            bytes[entry_offset + 10],
+            bytes[entry_offset + 11],
+        ]) as usize;
+        let img_offset = u32::from_le_bytes([
+            bytes[entry_offset + 12],
+            bytes[entry_offset + 13],
+            bytes[entry_offset + 14],
+            bytes[entry_offset + 15],
+        ]) as usize;
+        
+        if img_offset + img_size <= bytes.len() {
+            let img_bytes = &bytes[img_offset .. img_offset + img_size];
+            let hicon = CreateIconFromResourceEx(
+                img_bytes,
+                TRUE,
+                0x00030000,
+                size,
+                size,
+                IMAGE_FLAGS(0),
+            );
+            if let Ok(h) = hicon {
+                return h;
+            }
+        }
+    }
+    HICON(null_mut())
 }
