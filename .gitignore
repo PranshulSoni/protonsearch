@@ -35,3 +35,11 @@ desktop.ini
 # Env / secrets
 .env
 *.env.local
+
+# Dev scratch / debug files
+scratch/
+graphify-out/cache/
+graphify-out/graph.json
+VISIBLE_RESULTS
+bytes.len()
+opensearch-os/bytes.len()
