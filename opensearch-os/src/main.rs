@@ -162,7 +162,15 @@ unsafe fn run(engine: SearchEngine) {
         &corner as *const _ as _, 4,
     );
 
-    RegisterHotKey(hwnd, HOTKEY_ID, MOD_WIN | MOD_NOREPEAT, VK_SPACE.0 as u32).unwrap();
+    // Win+Space is reserved by Windows IME; Alt+Space is the conventional launcher hotkey.
+    if RegisterHotKey(hwnd, HOTKEY_ID, MOD_ALT | MOD_NOREPEAT, VK_SPACE.0 as u32).is_err() {
+        use windows::Win32::UI::WindowsAndMessaging::MessageBoxW;
+        let msg: Vec<u16> = "Failed to register Alt+Space hotkey.\nAnother app may be using it.\0"
+            .encode_utf16().collect();
+        let title: Vec<u16> = "OpenSearch OS\0".encode_utf16().collect();
+        MessageBoxW(HWND(null_mut()), PCWSTR(msg.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | MB_ICONERROR);
+        return;
+    }
 
     let mut msg = MSG::default();
     while GetMessageW(&mut msg, HWND(null_mut()), 0, 0).as_bool() {
