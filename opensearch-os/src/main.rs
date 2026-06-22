@@ -62,6 +62,8 @@ struct State {
     font_n: HFONT,
     font_c: HFONT,
     font_b: HFONT,
+    icon_settings: HICON,
+    icon_control_panel: HICON,
 }
 
 #[derive(PartialEq)]
@@ -116,6 +118,13 @@ unsafe fn run(engine: SearchEngine) {
     let sw = GetSystemMetrics(SM_CXSCREEN);
     let sh = GetSystemMetrics(SM_CYSCREEN);
 
+    let windir = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());
+    let shell32_path = format!("{}\\System32\\shell32.dll", windir);
+    let control_path = format!("{}\\System32\\control.exe", windir);
+
+    let icon_settings = load_system_icon(&shell32_path, 274, 24);
+    let icon_control_panel = load_system_icon(&control_path, 0, 24);
+
     let state = Box::new(State {
         engine,
         query: String::new(),
@@ -128,6 +137,8 @@ unsafe fn run(engine: SearchEngine) {
         font_n: mk_font(-15, 600),
         font_c: mk_font(-12, 400),
         font_b: mk_font(-10, 600),
+        icon_settings,
+        icon_control_panel,
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
@@ -324,6 +335,8 @@ unsafe extern "system" fn wnd_proc(
                 DeleteObject(s.font_n);
                 DeleteObject(s.font_c);
                 DeleteObject(s.font_b);
+                if !s.icon_settings.0.is_null() { let _ = DestroyIcon(s.icon_settings); }
+                if !s.icon_control_panel.0.is_null() { let _ = DestroyIcon(s.icon_control_panel); }
             }
             PostQuitMessage(0);
             LRESULT(0)
@@ -459,6 +472,19 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
             let cy = ry + (RESULT_H - 34) / 2;
 
+            // Draw Icon
+            let icon_to_draw = if res.entry.launch_command.starts_with("ms-settings:") {
+                s.icon_settings
+            } else {
+                s.icon_control_panel
+            };
+
+            if !icon_to_draw.0.is_null() {
+                let icon_x = PAD_L + (ICON_W - 24) / 2;
+                let icon_y = ry + (RESULT_H - 24) / 2;
+                let _ = DrawIconEx(mdc, icon_x, icon_y, icon_to_draw, 24, 24, 0, HBRUSH(null_mut()), DI_NORMAL);
+            }
+
             // Name
             SelectObject(mdc, s.font_n);
             SetTextColor(mdc, CLR_WHITE);
@@ -507,4 +533,28 @@ unsafe fn badge(hdc: HDC, s: &State, source: &str, x: i32, y: i32) {
     let mut t: Vec<u16> = label.encode_utf16().collect();
     let mut r = RECT { left: x, top: y, right: x + 64, bottom: y + 18 };
     DrawTextW(hdc, &mut t, &mut r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+}
+
+unsafe fn load_system_icon(file: &str, index: i32, size: i32) -> HICON {
+    let mut path_arr = [0u16; 260];
+    let path_u16: Vec<u16> = file.encode_utf16().collect();
+    let copy_len = path_u16.len().min(259);
+    path_arr[..copy_len].copy_from_slice(&path_u16[..copy_len]);
+
+    let mut hicons = [HICON(null_mut())];
+    let mut id = 0u32;
+    let n = PrivateExtractIconsW(
+        &path_arr,
+        index,
+        size,
+        size,
+        Some(&mut hicons),
+        Some(&mut id as *mut u32),
+        0,
+    );
+    if n > 0 && !hicons[0].0.is_null() {
+        hicons[0]
+    } else {
+        HICON(null_mut())
+    }
 }
