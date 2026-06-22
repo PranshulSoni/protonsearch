@@ -33,21 +33,31 @@ fn run_browser_indexer(db_path: &Path) -> anyhow::Result<()> {
 
     let profiles = get_browser_profiles();
     for (browser, profile_path) in profiles {
-        // 1. Bookmarks
-        let bookmarks_path = profile_path.join("Bookmarks");
-        if bookmarks_path.exists() {
-            let source_type = format!("{}_bookmark", browser);
-            if let Err(e) = parse_bookmarks(&bookmarks_path, &source_type, &conn) {
-                eprintln!("Error parsing bookmarks for {}/{:?}: {:?}", browser, bookmarks_path, e);
+        if browser == "firefox" {
+            let places_path = profile_path.join("places.sqlite");
+            if places_path.exists() {
+                if let Err(e) = parse_firefox(&places_path, &conn) {
+                    eprintln!("Error parsing Firefox places for {:?}: {:?}", places_path, e);
+                }
             }
-        }
+        } else {
+            // Chromium (Chrome, Edge, Brave)
+            // 1. Bookmarks
+            let bookmarks_path = profile_path.join("Bookmarks");
+            if bookmarks_path.exists() {
+                let source_type = format!("{}_bookmark", browser);
+                if let Err(e) = parse_bookmarks(&bookmarks_path, &source_type, &conn) {
+                    eprintln!("Error parsing bookmarks for {}/{:?}: {:?}", browser, bookmarks_path, e);
+                }
+            }
 
-        // 2. History
-        let history_path = profile_path.join("History");
-        if history_path.exists() {
-            let source_type = format!("{}_history", browser);
-            if let Err(e) = parse_history(&history_path, &source_type, &conn) {
-                eprintln!("Error parsing history for {}/{:?}: {:?}", browser, history_path, e);
+            // 2. History
+            let history_path = profile_path.join("History");
+            if history_path.exists() {
+                let source_type = format!("{}_history", browser);
+                if let Err(e) = parse_history(&history_path, &source_type, &conn) {
+                    eprintln!("Error parsing history for {}/{:?}: {:?}", browser, history_path, e);
+                }
             }
         }
     }
@@ -102,6 +112,37 @@ fn get_browser_profiles() -> Vec<(String, PathBuf)> {
         }
     }
 
+    // Brave
+    let brave_dir = PathBuf::from(&local_app_data).join("BraveSoftware").join("Brave-Browser").join("User Data");
+    if brave_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&brave_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if name == "Default" || name.starts_with("Profile ") {
+                        profiles.push(("brave".to_string(), path));
+                    }
+                }
+            }
+        }
+    }
+
+    // Firefox
+    if let Ok(app_data) = std::env::var("APPDATA") {
+        let firefox_dir = PathBuf::from(&app_data).join("Mozilla").join("Firefox").join("Profiles");
+        if firefox_dir.exists() {
+            if let Ok(entries) = std::fs::read_dir(&firefox_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        profiles.push(("firefox".to_string(), path));
+                    }
+                }
+            }
+        }
+    }
+
     profiles
 }
 
@@ -124,7 +165,13 @@ fn parse_bookmarks(path: &Path, source_type: &str, conn: &Connection) -> anyhow:
              last_visit_time = MAX(last_visit_time, excluded.last_visit_time),
              source = CASE 
                  WHEN source LIKE '%bookmark%' OR excluded.source LIKE '%bookmark%' THEN 
-                     CASE WHEN source LIKE 'chrome%' THEN 'chrome_bookmark' ELSE 'edge_bookmark' END
+                     CASE 
+                         WHEN source LIKE 'chrome%' THEN 'chrome_bookmark' 
+                         WHEN source LIKE 'edge%' THEN 'edge_bookmark'
+                         WHEN source LIKE 'brave%' THEN 'brave_bookmark'
+                         WHEN source LIKE 'firefox%' THEN 'firefox_bookmark'
+                         ELSE excluded.source 
+                     END
                  ELSE excluded.source
              END"
     )?;
@@ -191,7 +238,13 @@ fn parse_history(path: &Path, source_type: &str, conn: &Connection) -> anyhow::R
                  last_visit_time = MAX(last_visit_time, excluded.last_visit_time),
                  source = CASE 
                      WHEN source LIKE '%bookmark%' OR excluded.source LIKE '%bookmark%' THEN 
-                         CASE WHEN source LIKE 'chrome%' THEN 'chrome_bookmark' ELSE 'edge_bookmark' END
+                         CASE 
+                             WHEN source LIKE 'chrome%' THEN 'chrome_bookmark' 
+                             WHEN source LIKE 'edge%' THEN 'edge_bookmark'
+                             WHEN source LIKE 'brave%' THEN 'brave_bookmark'
+                             WHEN source LIKE 'firefox%' THEN 'firefox_bookmark'
+                             ELSE excluded.source 
+                         END
                      ELSE excluded.source
                  END"
         )?;
@@ -200,6 +253,92 @@ fn parse_history(path: &Path, source_type: &str, conn: &Connection) -> anyhow::R
             let (url, title, visit_count, last_visit_time) = row;
             if url.starts_with("http://") || url.starts_with("https://") {
                 let _ = insert_stmt.execute(params![url, title, source_type, visit_count, last_visit_time]);
+            }
+        }
+    }
+
+    let _ = std::fs::remove_file(&temp_path);
+    Ok(())
+}
+
+fn parse_firefox(path: &Path, conn: &Connection) -> anyhow::Result<()> {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join(format!("firefox_places_temp_{}.db", timestamp));
+
+    std::fs::copy(path, &temp_path)?;
+
+    // Scope for connection closure
+    {
+        let temp_conn = Connection::open(&temp_path)?;
+        
+        // 1. Parse Bookmarks
+        let mut stmt_bookmarks = temp_conn.prepare(
+            "SELECT p.url, b.title, p.visit_count, p.last_visit_date 
+             FROM moz_bookmarks b 
+             JOIN moz_places p ON b.fk = p.id 
+             WHERE b.type = 1 AND b.title IS NOT NULL AND b.title != ''"
+        )?;
+        
+        let bookmark_rows = stmt_bookmarks.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?;
+        
+        let mut insert_stmt = conn.prepare(
+            "INSERT INTO browser_items (url, title, source, visit_count, last_visit_time)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(url) DO UPDATE SET
+                 visit_count = MAX(visit_count, excluded.visit_count),
+                 last_visit_time = MAX(last_visit_time, excluded.last_visit_time),
+                 source = CASE 
+                     WHEN source LIKE '%bookmark%' OR excluded.source LIKE '%bookmark%' THEN 
+                         CASE 
+                             WHEN source LIKE 'chrome%' THEN 'chrome_bookmark' 
+                             WHEN source LIKE 'edge%' THEN 'edge_bookmark'
+                             WHEN source LIKE 'brave%' THEN 'brave_bookmark'
+                             WHEN source LIKE 'firefox%' THEN 'firefox_bookmark'
+                             ELSE excluded.source 
+                         END
+                     ELSE excluded.source
+                 END"
+        )?;
+
+        for row in bookmark_rows.flatten() {
+            let (url, title, visit_count, last_visit_date) = row;
+            if url.starts_with("http://") || url.starts_with("https://") {
+                let _ = insert_stmt.execute(params![url, title, "firefox_bookmark", visit_count.max(100), last_visit_date]);
+            }
+        }
+
+        // 2. Parse History
+        let mut stmt_history = temp_conn.prepare(
+            "SELECT url, title, visit_count, last_visit_date 
+             FROM moz_places 
+             WHERE visit_count > 0 AND title IS NOT NULL AND title != '' 
+             ORDER BY last_visit_date DESC LIMIT 2000"
+        )?;
+        
+        let history_rows = stmt_history.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?;
+
+        for row in history_rows.flatten() {
+            let (url, title, visit_count, last_visit_date) = row;
+            if url.starts_with("http://") || url.starts_with("https://") {
+                let _ = insert_stmt.execute(params![url, title, "firefox_history", visit_count, last_visit_date]);
             }
         }
     }

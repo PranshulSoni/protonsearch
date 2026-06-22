@@ -9,7 +9,7 @@
       "source_file": "opensearch-os\\build.rs",
       "source_location": "L1",
       "id": "build",
-      "community": 7
+      "community": 6
     },
     {
       "label": "main()",
@@ -17,7 +17,7 @@
       "source_file": "opensearch-os\\build.rs",
       "source_location": "L1",
       "id": "build_main",
-      "community": 7
+      "community": 6
     },
     {
       "label": "copy_model()",
@@ -25,7 +25,7 @@
       "source_file": "opensearch-os\\build.rs",
       "source_location": "L8",
       "id": "build_copy_model",
-      "community": 7
+      "community": 6
     },
     {
       "label": "copy_directml()",
@@ -33,7 +33,7 @@
       "source_file": "opensearch-os\\build.rs",
       "source_location": "L29",
       "id": "build_copy_directml",
-      "community": 7
+      "community": 6
     },
     {
       "label": "find_directml()",
@@ -41,7 +41,7 @@
       "source_file": "opensearch-os\\build.rs",
       "source_location": "L75",
       "id": "build_find_directml",
-      "community": 7
+      "community": 6
     },
     {
       "label": "browser_indexer.rs",
@@ -49,7 +49,7 @@
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
       "source_location": "L1",
       "id": "browser_indexer",
-      "community": 4
+      "community": 3
     },
     {
       "label": "start_browser_indexer()",
@@ -57,7 +57,7 @@
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
       "source_location": "L5",
       "id": "browser_indexer_start_browser_indexer",
-      "community": 4
+      "community": 3
     },
     {
       "label": "run_browser_indexer()",
@@ -65,39 +65,47 @@
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
       "source_location": "L19",
       "id": "browser_indexer_run_browser_indexer",
-      "community": 4
+      "community": 3
     },
     {
       "label": "get_browser_profiles()",
       "file_type": "code",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L66",
+      "source_location": "L76",
       "id": "browser_indexer_get_browser_profiles",
-      "community": 4
+      "community": 3
     },
     {
       "label": "parse_bookmarks()",
       "file_type": "code",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L108",
+      "source_location": "L149",
       "id": "browser_indexer_parse_bookmarks",
-      "community": 4
+      "community": 3
     },
     {
       "label": "traverse_bookmarks()",
       "file_type": "code",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L141",
+      "source_location": "L188",
       "id": "browser_indexer_traverse_bookmarks",
-      "community": 4
+      "community": 3
     },
     {
       "label": "parse_history()",
       "file_type": "code",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L157",
+      "source_location": "L204",
       "id": "browser_indexer_parse_history",
-      "community": 4
+      "community": 3
+    },
+    {
+      "label": "parse_firefox()",
+      "file_type": "code",
+      "source_file": "opensearch-os\\src\\browser_indexer.rs",
+      "source_location": "L264",
+      "id": "browser_indexer_parse_firefox",
+      "community": 3
     },
     {
       "label": "indexer.rs",
@@ -105,7 +113,7 @@
       "source_file": "opensearch-os\\src\\indexer.rs",
       "source_location": "L1",
       "id": "indexer",
-      "community": 8
+      "community": 7
     },
     {
       "label": "start_indexer()",
@@ -113,7 +121,7 @@
       "source_file": "opensearch-os\\src\\indexer.rs",
       "source_location": "L7",
       "id": "indexer_start_indexer",
-      "community": 8
+      "community": 7
     },
     {
       "label": "run_indexer()",
@@ -121,7 +129,7 @@
       "source_file": "opensearch-os\\src\\indexer.rs",
       "source_location": "L21",
       "id": "indexer_run_indexer",
-      "community": 8
+      "community": 7
     },
     {
       "label": "get_scan_folders()",
@@ -129,7 +137,7 @@
       "source_file": "opensearch-os\\src\\indexer.rs",
       "source_location": "L132",
       "id": "indexer_get_scan_folders",
-      "community": 8
+      "community": 7
     },
     {
       "label": "read_text_file()",
@@ -137,7 +145,7 @@
       "source_file": "opensearch-os\\src\\indexer.rs",
       "source_location": "L167",
       "id": "indexer_read_text_file",
-      "community": 8
+      "community": 7
     },
     {
       "label": "launcher.rs",
@@ -145,7 +153,7 @@
       "source_file": "opensearch-os\\src\\launcher.rs",
       "source_location": "L1",
       "id": "launcher",
-      "community": 9
+      "community": 8
     },
     {
       "label": "launch()",
@@ -153,7 +161,7 @@
       "source_file": "opensearch-os\\src\\launcher.rs",
       "source_location": "L13",
       "id": "launcher_launch",
-      "community": 9
+      "community": 8
     },
     {
       "label": "handle_action()",
@@ -161,7 +169,7 @@
       "source_file": "opensearch-os\\src\\launcher.rs",
       "source_location": "L73",
       "id": "launcher_handle_action",
-      "community": 9
+      "community": 8
     },
     {
       "label": "get_known_folder_path()",
@@ -169,7 +177,7 @@
       "source_file": "opensearch-os\\src\\launcher.rs",
       "source_location": "L145",
       "id": "launcher_get_known_folder_path",
-      "community": 9
+      "community": 8
     },
     {
       "label": "main.rs",
@@ -177,7 +185,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L1",
       "id": "main",
-      "community": 1
+      "community": 2
     },
     {
       "label": "State",
@@ -185,7 +193,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L59",
       "id": "main_state",
-      "community": 6
+      "community": 10
     },
     {
       "label": "Anim",
@@ -193,7 +201,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L83",
       "id": "main_anim",
-      "community": 1
+      "community": 2
     },
     {
       "label": "SendHwnd",
@@ -201,7 +209,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L86",
       "id": "main_sendhwnd",
-      "community": 1
+      "community": 9
     },
     {
       "label": ".win_h()",
@@ -209,7 +217,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L91",
       "id": "main_state_win_h",
-      "community": 6
+      "community": 10
     },
     {
       "label": ".result_rect()",
@@ -217,7 +225,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L95",
       "id": "main_state_result_rect",
-      "community": 6
+      "community": 10
     },
     {
       "label": "main()",
@@ -225,7 +233,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L102",
       "id": "main_main",
-      "community": 1
+      "community": 2
     },
     {
       "label": "run()",
@@ -233,7 +241,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L111",
       "id": "main_run",
-      "community": 1
+      "community": 2
     },
     {
       "label": "wnd_proc()",
@@ -241,7 +249,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L253",
       "id": "main_wnd_proc",
-      "community": 2
+      "community": 4
     },
     {
       "label": "do_show()",
@@ -249,7 +257,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L584",
       "id": "main_do_show",
-      "community": 2
+      "community": 9
     },
     {
       "label": "do_hide()",
@@ -257,7 +265,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L608",
       "id": "main_do_hide",
-      "community": 2
+      "community": 4
     },
     {
       "label": "start_hide()",
@@ -265,7 +273,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L616",
       "id": "main_start_hide",
-      "community": 2
+      "community": 4
     },
     {
       "label": "reposition()",
@@ -273,7 +281,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L621",
       "id": "main_reposition",
-      "community": 2
+      "community": 10
     },
     {
       "label": "kick_debounce()",
@@ -281,7 +289,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L628",
       "id": "main_kick_debounce",
-      "community": 2
+      "community": 4
     },
     {
       "label": "tick()",
@@ -289,7 +297,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L634",
       "id": "main_tick",
-      "community": 2
+      "community": 4
     },
     {
       "label": "ease_out()",
@@ -297,7 +305,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L666",
       "id": "main_ease_out",
-      "community": 2
+      "community": 4
     },
     {
       "label": "resolve_lnk()",
@@ -305,7 +313,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L669",
       "id": "main_resolve_lnk",
-      "community": 1
+      "community": 2
     },
     {
       "label": "get_app_icon()",
@@ -313,7 +321,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L688",
       "id": "main_get_app_icon",
-      "community": 1
+      "community": 2
     },
     {
       "label": "get_file_icon()",
@@ -321,7 +329,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L811",
       "id": "main_get_file_icon",
-      "community": 1
+      "community": 9
     },
     {
       "label": "trigger_icon_loading()",
@@ -329,7 +337,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L825",
       "id": "main_trigger_icon_loading",
-      "community": 1
+      "community": 9
     },
     {
       "label": "paint()",
@@ -337,7 +345,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L865",
       "id": "main_paint",
-      "community": 6
+      "community": 13
     },
     {
       "label": "fill()",
@@ -345,7 +353,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L1035",
       "id": "main_fill",
-      "community": 6
+      "community": 13
     },
     {
       "label": "badge()",
@@ -353,7 +361,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L1041",
       "id": "main_badge",
-      "community": 6
+      "community": 13
     },
     {
       "label": "load_icon_from_memory()",
@@ -361,7 +369,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L1077",
       "id": "main_load_icon_from_memory",
-      "community": 1
+      "community": 2
     },
     {
       "label": "copy_to_clipboard()",
@@ -369,7 +377,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L1130",
       "id": "main_copy_to_clipboard",
-      "community": 2
+      "community": 4
     },
     {
       "label": "paste_from_clipboard()",
@@ -377,7 +385,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L1150",
       "id": "main_paste_from_clipboard",
-      "community": 2
+      "community": 4
     },
     {
       "label": "test_antigravity_icons()",
@@ -385,7 +393,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L1184",
       "id": "main_test_antigravity_icons",
-      "community": 1
+      "community": 2
     },
     {
       "label": "test_image_factory_cast()",
@@ -393,7 +401,7 @@
       "source_file": "opensearch-os\\src\\main.rs",
       "source_location": "L1203",
       "id": "main_test_image_factory_cast",
-      "community": 1
+      "community": 2
     },
     {
       "label": "search.rs",
@@ -457,7 +465,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L62",
       "id": "search_searchengine",
-      "community": 3
+      "community": 1
     },
     {
       "label": ".new()",
@@ -465,7 +473,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L76",
       "id": "search_searchengine_new",
-      "community": 3
+      "community": 1
     },
     {
       "label": ".search_local_files()",
@@ -473,7 +481,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L174",
       "id": "search_searchengine_search_local_files",
-      "community": 3
+      "community": 1
     },
     {
       "label": ".search_browser_items()",
@@ -481,7 +489,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L289",
       "id": "search_searchengine_search_browser_items",
-      "community": 3
+      "community": 1
     },
     {
       "label": ".search()",
@@ -489,7 +497,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L366",
       "id": "search_searchengine_search",
-      "community": 3
+      "community": 1
     },
     {
       "label": ".embed()",
@@ -497,7 +505,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L712",
       "id": "search_searchengine_embed",
-      "community": 3
+      "community": 1
     },
     {
       "label": ".get_conversational_results()",
@@ -505,7 +513,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L739",
       "id": "search_searchengine_get_conversational_results",
-      "community": 3
+      "community": 1
     },
     {
       "label": "url_encode()",
@@ -513,7 +521,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L777",
       "id": "search_url_encode",
-      "community": 3
+      "community": 1
     },
     {
       "label": "mean_pool_norm()",
@@ -529,7 +537,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L815",
       "id": "search_test_hybrid_search_accuracy",
-      "community": 3
+      "community": 1
     },
     {
       "label": "test_enumerate_apps_folder()",
@@ -609,7 +617,7 @@
       "source_file": "opensearch-os\\src\\search.rs",
       "source_location": "L1485",
       "id": "search_get_quick_actions",
-      "community": 3
+      "community": 1
     },
     {
       "label": "try_calc()",
@@ -689,7 +697,7 @@
       "source_file": "scratch\\test_ico_load.py",
       "source_location": "L1",
       "id": "test_ico_load",
-      "community": 12
+      "community": 14
     },
     {
       "label": "test_ico_load()",
@@ -697,7 +705,7 @@
       "source_file": "scratch\\test_ico_load.py",
       "source_location": "L28",
       "id": "test_ico_load_test_ico_load",
-      "community": 12
+      "community": 14
     },
     {
       "label": "main()",
@@ -705,7 +713,7 @@
       "source_file": "scratch\\test_ico_load.py",
       "source_location": "L86",
       "id": "test_ico_load_main",
-      "community": 12
+      "community": 14
     },
     {
       "label": "benchmark_embeddings.py",
@@ -769,7 +777,7 @@
       "source_file": "scripts\\convert_logos.py",
       "source_location": "L1",
       "id": "convert_logos",
-      "community": 10
+      "community": 11
     },
     {
       "label": "generate_search_png()",
@@ -777,7 +785,7 @@
       "source_file": "scripts\\convert_logos.py",
       "source_location": "L4",
       "id": "convert_logos_generate_search_png",
-      "community": 10
+      "community": 11
     },
     {
       "label": "convert_to_ico()",
@@ -785,7 +793,7 @@
       "source_file": "scripts\\convert_logos.py",
       "source_location": "L20",
       "id": "convert_logos_convert_to_ico",
-      "community": 10
+      "community": 11
     },
     {
       "label": "main()",
@@ -793,7 +801,7 @@
       "source_file": "scripts\\convert_logos.py",
       "source_location": "L40",
       "id": "convert_logos_main",
-      "community": 10
+      "community": 11
     },
     {
       "label": "embed_catalog.py",
@@ -801,7 +809,7 @@
       "source_file": "scripts\\embed_catalog.py",
       "source_location": "L1",
       "id": "embed_catalog",
-      "community": 11
+      "community": 12
     },
     {
       "label": "load_catalog()",
@@ -809,7 +817,7 @@
       "source_file": "scripts\\embed_catalog.py",
       "source_location": "L20",
       "id": "embed_catalog_load_catalog",
-      "community": 11
+      "community": 12
     },
     {
       "label": "main()",
@@ -817,7 +825,7 @@
       "source_file": "scripts\\embed_catalog.py",
       "source_location": "L31",
       "id": "embed_catalog_main",
-      "community": 11
+      "community": 12
     },
     {
       "label": "Build-time embedding pipeline. Run once to produce catalog.bin. Usage: python sc",
@@ -825,7 +833,7 @@
       "source_file": "scripts\\embed_catalog.py",
       "source_location": "L1",
       "id": "embed_catalog_rationale_1",
-      "community": 11
+      "community": 12
     },
     {
       "label": "export_bge_base.py",
@@ -833,7 +841,7 @@
       "source_file": "scripts\\export_bge_base.py",
       "source_location": "L1",
       "id": "export_bge_base",
-      "community": 13
+      "community": 15
     },
     {
       "label": "main()",
@@ -841,7 +849,7 @@
       "source_file": "scripts\\export_bge_base.py",
       "source_location": "L7",
       "id": "export_bge_base_main",
-      "community": 13
+      "community": 15
     }
   ],
   "links": [
@@ -957,7 +965,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L66",
+      "source_location": "L76",
       "weight": 1.0,
       "_src": "browser_indexer",
       "_tgt": "browser_indexer_get_browser_profiles",
@@ -969,7 +977,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L108",
+      "source_location": "L149",
       "weight": 1.0,
       "_src": "browser_indexer",
       "_tgt": "browser_indexer_parse_bookmarks",
@@ -981,7 +989,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L141",
+      "source_location": "L188",
       "weight": 1.0,
       "_src": "browser_indexer",
       "_tgt": "browser_indexer_traverse_bookmarks",
@@ -993,12 +1001,24 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L157",
+      "source_location": "L204",
       "weight": 1.0,
       "_src": "browser_indexer",
       "_tgt": "browser_indexer_parse_history",
       "source": "browser_indexer",
       "target": "browser_indexer_parse_history",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "opensearch-os\\src\\browser_indexer.rs",
+      "source_location": "L264",
+      "weight": 1.0,
+      "_src": "browser_indexer",
+      "_tgt": "browser_indexer_parse_firefox",
+      "source": "browser_indexer",
+      "target": "browser_indexer_parse_firefox",
       "confidence_score": 1.0
     },
     {
@@ -1029,7 +1049,19 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L40",
+      "source_location": "L39",
+      "weight": 1.0,
+      "_src": "browser_indexer_run_browser_indexer",
+      "_tgt": "browser_indexer_parse_firefox",
+      "source": "browser_indexer_run_browser_indexer",
+      "target": "browser_indexer_parse_firefox",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "opensearch-os\\src\\browser_indexer.rs",
+      "source_location": "L49",
       "weight": 1.0,
       "_src": "browser_indexer_run_browser_indexer",
       "_tgt": "browser_indexer_parse_bookmarks",
@@ -1041,7 +1073,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L49",
+      "source_location": "L58",
       "weight": 1.0,
       "_src": "browser_indexer_run_browser_indexer",
       "_tgt": "browser_indexer_parse_history",
@@ -1053,7 +1085,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "opensearch-os\\src\\browser_indexer.rs",
-      "source_location": "L115",
+      "source_location": "L156",
       "weight": 1.0,
       "_src": "browser_indexer_parse_bookmarks",
       "_tgt": "browser_indexer_traverse_bookmarks",
