@@ -14,6 +14,16 @@ pub fn launch(cmd: &str) {
     let cmd = cmd.trim();
     if cmd.is_empty() { return; }
 
+    // Map breadcrumbs and non-executable control panel applets to valid commands
+    let cmd = match cmd {
+        "Windows Defender Firewall > Customize settings > Private network settings" |
+        "Windows Defender Firewall > Customize settings > Public network settings" => "control.exe /name Microsoft.WindowsFirewall",
+        "System > Set priority notifications > Calls and reminders > Show incoming calls" |
+        "System > Set priority notifications > Calls and reminders > Show reminders" => "ms-settings:notifications",
+        "inetcpl.cpl" => "control.exe inetcpl.cpl",
+        _ => cmd,
+    };
+
     // ── Action commands ────────────────────────────────────────────────────
     if let Some(action) = cmd.strip_prefix("action:") {
         handle_action(action);
