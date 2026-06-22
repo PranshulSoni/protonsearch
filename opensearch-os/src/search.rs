@@ -184,6 +184,20 @@ impl SearchEngine {
                     lex_score += 0.2;
                 }
 
+                // Parent category matching (boost if search words match the parent category path, excluding the item itself)
+                if let Some(last_arrow_idx) = breadcrumb_lower.rfind('>') {
+                    let parent_categories = &breadcrumb_lower[..last_arrow_idx];
+                    let mut matched_words_in_parent = 0;
+                    for qw in &q_words {
+                        if parent_categories.contains(qw) {
+                            matched_words_in_parent += 1;
+                        }
+                    }
+                    if !q_words.is_empty() {
+                        lex_score += 0.3 * (matched_words_in_parent as f32 / q_words.len() as f32);
+                    }
+                }
+
                 // Description matching
                 let desc_lower = entry.description.to_lowercase();
                 if desc_lower.contains(&q_lower) {
