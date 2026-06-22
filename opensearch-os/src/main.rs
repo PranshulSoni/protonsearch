@@ -64,6 +64,7 @@ struct State {
     font_b: HFONT,
     icon_settings: HICON,
     icon_control_panel: HICON,
+    icon_search: HICON,
 }
 
 #[derive(PartialEq)]
@@ -120,9 +121,11 @@ unsafe fn run(engine: SearchEngine) {
 
     const SETTINGS_ICO: &[u8] = include_bytes!("../../assets/logo/settings.ico");
     const CONTROL_PANEL_ICO: &[u8] = include_bytes!("../../assets/logo/control_panel.ico");
+    const SEARCH_ICO: &[u8] = include_bytes!("../../assets/logo/search.ico");
 
     let icon_settings = load_icon_from_memory(SETTINGS_ICO, 24);
     let icon_control_panel = load_icon_from_memory(CONTROL_PANEL_ICO, 24);
+    let icon_search = load_icon_from_memory(SEARCH_ICO, 20);
 
     let state = Box::new(State {
         engine,
@@ -138,6 +141,7 @@ unsafe fn run(engine: SearchEngine) {
         font_b: mk_font(-10, 600),
         icon_settings,
         icon_control_panel,
+        icon_search,
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
@@ -336,6 +340,7 @@ unsafe extern "system" fn wnd_proc(
                 DeleteObject(s.font_b);
                 if !s.icon_settings.0.is_null() { let _ = DestroyIcon(s.icon_settings); }
                 if !s.icon_control_panel.0.is_null() { let _ = DestroyIcon(s.icon_control_panel); }
+                if !s.icon_search.0.is_null() { let _ = DestroyIcon(s.icon_search); }
             }
             PostQuitMessage(0);
             LRESULT(0)
@@ -435,11 +440,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     // ── Search row ────────────────────────────────────────────────────────
     SetBkMode(mdc, TRANSPARENT);
 
-    // Icon
-    let icon: Vec<u16> = "⌕".encode_utf16().collect();
-    SelectObject(mdc, s.font_q);
-    SetTextColor(mdc, CLR_GRAY);
-    TextOutW(mdc, PAD_L, (SEARCH_H - 20) / 2, &icon);
+    // Draw Search Icon
+    if !s.icon_search.0.is_null() {
+        let icon_y = (SEARCH_H - 20) / 2;
+        let _ = DrawIconEx(mdc, PAD_L, icon_y, s.icon_search, 20, 20, 0, HBRUSH(null_mut()), DI_NORMAL);
+    }
 
     // Text / placeholder
     let tx = PAD_L + ICON_W + 8;
