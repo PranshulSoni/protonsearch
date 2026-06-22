@@ -18,6 +18,9 @@ target/
 *.bin
 !assets/catalog.bin
 
+# Large model files (use model_int8.onnx instead)
+assets/model/model.onnx
+
 # IDE
 .vscode/
 .idea/
