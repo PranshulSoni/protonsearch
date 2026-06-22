@@ -712,10 +712,10 @@ unsafe fn get_app_icon(path: &str) -> HICON {
     }
 
     // Format virtual paths properly for SHCreateItemFromParsingName
-    let parsing_path = if target_path.starts_with('{') {
-        format!("::{}", target_path)
+    let parsing_path = if target_path.starts_with("shell:AppsFolder\\") {
+        target_path.clone()
     } else if !target_path.contains(":\\") && !target_path.starts_with("\\\\") {
-        format!("::{{4234d49b-0245-4df3-b780-3893943456e1}}\\{}", target_path)
+        format!("shell:AppsFolder\\{}", target_path)
     } else {
         target_path.clone()
     };
