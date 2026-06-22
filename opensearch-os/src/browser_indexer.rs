@@ -1,0 +1,209 @@
+use std::path::{Path, PathBuf};
+use std::thread;
+use rusqlite::{Connection, params};
+
+pub fn start_browser_indexer(db_path: PathBuf) {
+    thread::spawn(move || {
+        // Initial delay to let the app start up completely lag-free
+        thread::sleep(std::time::Duration::from_secs(10));
+        loop {
+            if let Err(e) = run_browser_indexer(&db_path) {
+                eprintln!("Browser Indexer error: {:?}", e);
+            }
+            // Re-scan every 10 minutes
+            thread::sleep(std::time::Duration::from_secs(600));
+        }
+    });
+}
+
+fn run_browser_indexer(db_path: &Path) -> anyhow::Result<()> {
+    let conn = Connection::open(db_path)?;
+    conn.execute("PRAGMA journal_mode=WAL;", [])?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS browser_items (
+            url TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            source TEXT NOT NULL,
+            visit_count INTEGER NOT NULL,
+            last_visit_time INTEGER NOT NULL
+        );",
+        [],
+    )?;
+
+    let profiles = get_browser_profiles();
+    for (browser, profile_path) in profiles {
+        // 1. Bookmarks
+        let bookmarks_path = profile_path.join("Bookmarks");
+        if bookmarks_path.exists() {
+            let source_type = format!("{}_bookmark", browser);
+            if let Err(e) = parse_bookmarks(&bookmarks_path, &source_type, &conn) {
+                eprintln!("Error parsing bookmarks for {}/{:?}: {:?}", browser, bookmarks_path, e);
+            }
+        }
+
+        // 2. History
+        let history_path = profile_path.join("History");
+        if history_path.exists() {
+            let source_type = format!("{}_history", browser);
+            if let Err(e) = parse_history(&history_path, &source_type, &conn) {
+                eprintln!("Error parsing history for {}/{:?}: {:?}", browser, history_path, e);
+            }
+        }
+    }
+
+    // Prune old history to keep database size small and search fast (keep top 5000)
+    let _ = conn.execute(
+        "DELETE FROM browser_items WHERE url NOT IN (
+            SELECT url FROM browser_items ORDER BY last_visit_time DESC LIMIT 5000
+        ) AND source LIKE '%history%'",
+        [],
+    );
+
+    Ok(())
+}
+
+fn get_browser_profiles() -> Vec<(String, PathBuf)> {
+    let mut profiles = Vec::new();
+    let local_app_data = match std::env::var("LOCALAPPDATA") {
+        Ok(d) => d,
+        Err(_) => return profiles,
+    };
+
+    // Chrome
+    let chrome_dir = PathBuf::from(&local_app_data).join("Google").join("Chrome").join("User Data");
+    if chrome_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&chrome_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if name == "Default" || name.starts_with("Profile ") {
+                        profiles.push(("chrome".to_string(), path));
+                    }
+                }
+            }
+        }
+    }
+
+    // Edge
+    let edge_dir = PathBuf::from(&local_app_data).join("Microsoft").join("Edge").join("User Data");
+    if edge_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&edge_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if name == "Default" || name.starts_with("Profile ") {
+                        profiles.push(("edge".to_string(), path));
+                    }
+                }
+            }
+        }
+    }
+
+    profiles
+}
+
+fn parse_bookmarks(path: &Path, source_type: &str, conn: &Connection) -> anyhow::Result<()> {
+    let content = std::fs::read_to_string(path)?;
+    let json: serde_json::Value = serde_json::from_str(&content)?;
+
+    let mut bookmarks = Vec::new();
+    if let Some(roots) = json.get("roots").and_then(|v| v.as_object()) {
+        for (_, root_val) in roots {
+            traverse_bookmarks(root_val, &mut bookmarks);
+        }
+    }
+
+    let mut stmt = conn.prepare(
+        "INSERT INTO browser_items (url, title, source, visit_count, last_visit_time)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(url) DO UPDATE SET
+             visit_count = MAX(visit_count, excluded.visit_count),
+             last_visit_time = MAX(last_visit_time, excluded.last_visit_time),
+             source = CASE 
+                 WHEN source LIKE '%bookmark%' OR excluded.source LIKE '%bookmark%' THEN 
+                     CASE WHEN source LIKE 'chrome%' THEN 'chrome_bookmark' ELSE 'edge_bookmark' END
+                 ELSE excluded.source
+             END"
+    )?;
+
+    for (name, url) in bookmarks {
+        if url.starts_with("http://") || url.starts_with("https://") {
+            let _ = stmt.execute(params![url, name, source_type, 100, 0]);
+        }
+    }
+
+    Ok(())
+}
+
+fn traverse_bookmarks(val: &serde_json::Value, list: &mut Vec<(String, String)>) {
+    if let Some(obj) = val.as_object() {
+        let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let item_type = obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        if item_type == "url" {
+            if let Some(url) = obj.get("url").and_then(|v| v.as_str()) {
+                list.push((name, url.to_string()));
+            }
+        } else if let Some(children) = obj.get("children").and_then(|v| v.as_array()) {
+            for child in children {
+                traverse_bookmarks(child, list);
+            }
+        }
+    }
+}
+
+fn parse_history(path: &Path, source_type: &str, conn: &Connection) -> anyhow::Result<()> {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join(format!("browser_history_temp_{}.db", timestamp));
+
+    std::fs::copy(path, &temp_path)?;
+
+    // Scope for temp connection so it is closed before we remove the file
+    {
+        let temp_conn = Connection::open(&temp_path)?;
+        let mut stmt = temp_conn.prepare(
+            "SELECT url, title, visit_count, last_visit_time 
+             FROM urls 
+             WHERE hidden = 0 AND title IS NOT NULL AND title != '' 
+             ORDER BY last_visit_time DESC LIMIT 2000"
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })?;
+
+        let mut insert_stmt = conn.prepare(
+            "INSERT INTO browser_items (url, title, source, visit_count, last_visit_time)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(url) DO UPDATE SET
+                 visit_count = MAX(visit_count, excluded.visit_count),
+                 last_visit_time = MAX(last_visit_time, excluded.last_visit_time),
+                 source = CASE 
+                     WHEN source LIKE '%bookmark%' OR excluded.source LIKE '%bookmark%' THEN 
+                         CASE WHEN source LIKE 'chrome%' THEN 'chrome_bookmark' ELSE 'edge_bookmark' END
+                     ELSE excluded.source
+                 END"
+        )?;
+
+        for row in rows.flatten() {
+            let (url, title, visit_count, last_visit_time) = row;
+            if url.starts_with("http://") || url.starts_with("https://") {
+                let _ = insert_stmt.execute(params![url, title, source_type, visit_count, last_visit_time]);
+            }
+        }
+    }
+
+    let _ = std::fs::remove_file(&temp_path);
+    Ok(())
+}

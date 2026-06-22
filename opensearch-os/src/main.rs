@@ -3,6 +3,7 @@
 mod launcher;
 mod search;
 mod indexer;
+mod browser_indexer;
 
 use std::ptr::null_mut;
 use search::{SearchEngine, SearchResult};
@@ -206,6 +207,7 @@ unsafe fn run() {
             Err(_) => std::path::PathBuf::from("file_index.db"),
         };
         indexer::start_indexer(db_path.clone());
+        browser_indexer::start_browser_indexer(db_path.clone());
 
         let model_path = std::env::current_exe().ok()
             .and_then(|p| p.parent().map(|d| d.join("model_int8.onnx")));
@@ -967,7 +969,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     .unwrap_or(s.icon_control_panel)
             } else if res.entry.launch_command.starts_with("ms-settings:") {
                 s.icon_settings
-            } else if res.entry.source == "web" {
+            } else if res.entry.source == "web" || res.entry.source == "BROWSER" {
                 s.icon_web
             } else {
                 s.icon_control_panel
@@ -1054,6 +1056,8 @@ unsafe fn badge(hdc: HDC, s: &State, source: &str, x: i32, y: i32) {
         ("RECENT", COLORREF(0x00_7A_1F_7A), CLR_WHITE)
     } else if src_lc == "file" {
         ("FILE", COLORREF(0x00_90_40_00), CLR_WHITE)
+    } else if src_lc == "browser" {
+        ("BROWSER", COLORREF(0x00_2A_8F_C6), CLR_WHITE)
     } else if src_lc.contains("legacy") {
         ("LEGACY", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc.contains("native") {

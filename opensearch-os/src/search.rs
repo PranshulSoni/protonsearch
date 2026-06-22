@@ -286,6 +286,83 @@ impl SearchEngine {
         results
     }
 
+    fn search_browser_items(&self, query: &str) -> Vec<SearchResult> {
+        let mut results = Vec::new();
+        let conn = match Connection::open(&self.db_path) {
+            Ok(c) => c,
+            Err(_) => return results,
+        };
+
+        let q_lower = query.to_lowercase();
+        let q_words: Vec<&str> = q_lower.split_whitespace().collect();
+        if q_words.is_empty() { return results; }
+
+        let name_query = format!("%{}%", q_lower);
+        let mut stmt = match conn.prepare(
+            "SELECT url, title, source, visit_count FROM browser_items 
+             WHERE title LIKE ? OR url LIKE ? 
+             ORDER BY visit_count DESC LIMIT 25"
+        ) {
+            Ok(s) => s,
+            Err(_) => return results,
+        };
+
+        let rows = stmt.query_map([&name_query, &name_query], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        });
+
+        if let Ok(rows) = rows {
+            for row in rows.filter_map(|r| r.ok()) {
+                let (url, title, source, visit_count) = row;
+                
+                let title_lower = title.to_lowercase();
+                let url_lower = url.to_lowercase();
+                
+                let mut score = 0.0f32;
+                
+                if title_lower == q_lower || url_lower == q_lower {
+                    score = 2.0;
+                } else if title_lower.starts_with(&q_lower) || url_lower.starts_with(&q_lower) {
+                    score = 1.6;
+                } else if title_lower.contains(&q_lower) || url_lower.contains(&q_lower) {
+                    score = 1.2;
+                } else {
+                    let matched = q_words.iter().filter(|w| title_lower.contains(*w) || url_lower.contains(*w)).count();
+                    if matched > 0 {
+                        score = 0.5 + 0.5 * (matched as f32 / q_words.len() as f32);
+                    }
+                }
+
+                // Boost bookmarks
+                if source.contains("bookmark") {
+                    score += 0.4;
+                }
+
+                if score > 0.0 {
+                    results.push(SearchResult {
+                        entry: CatalogEntry {
+                            id: format!("browser.{}", url),
+                            control_name: title.clone(),
+                            breadcrumb_path: format!("Browser > {}", url),
+                            launch_command: url.clone(),
+                            source: "BROWSER".to_string(),
+                            description: format!("Bookmark/History from {}", if source.contains("chrome") { "Chrome" } else { "Edge" }),
+                            synonyms: title.to_lowercase(),
+                        },
+                        score,
+                    });
+                }
+            }
+        }
+
+        results
+    }
+
     pub fn search(&mut self, query: &str, top_k: usize) -> Vec<SearchResult> {
         let q = query.trim();
         if q.is_empty() || q.to_lowercase() == "recent" || q.to_lowercase() == "recents" {
@@ -592,10 +669,15 @@ impl SearchEngine {
         file_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         file_matches.truncate(10); // Cap at 10 file results
 
+        let mut browser_matches = self.search_browser_items(q);
+        browser_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        browser_matches.truncate(15); // Cap at 15 browser results
+
         let mut merged = Vec::new();
         merged.append(&mut app_matches);
         merged.append(&mut recent_matches);
         merged.append(&mut file_matches);
+        merged.append(&mut browser_matches);
         merged.append(&mut vec_results);
         merged.push(web_search.clone());
         merged.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
