@@ -495,7 +495,13 @@ mod tests {
     #[test]
     fn test_hybrid_search_accuracy() {
         DISABLE_LIVE_RESULTS.store(true, Ordering::Relaxed);
-        let mut engine = SearchEngine::new().expect("Failed to initialize engine");
+        let exe = std::env::current_exe().expect("failed to get current exe");
+        let parent = exe.parent().expect("failed to get parent");
+        let mut model_path = parent.join("model_int8.onnx");
+        if !model_path.exists() {
+            model_path = parent.parent().expect("failed to get grandparent").join("model_int8.onnx");
+        }
+        let mut engine = SearchEngine::new(&model_path).expect("Failed to initialize engine");
         
         let queries = vec![
             ("stop mouse from jumping", vec!["pointer precision", "pointer speed", "mouse"]),
@@ -847,7 +853,55 @@ fn scan_apps() -> Vec<AppInfo> {
                 windows::Win32::System::Com::CoTaskMemFree(Some(parsing_name_ptr.0 as *const _));
                 
                 let display_name_lower = display_name.to_lowercase();
-                if display_name_lower.contains("uninstall") || display_name_lower.contains("help") || display_name_lower.contains("documentation") {
+                if display_name_lower.contains("uninstall")
+                    || display_name_lower.contains("help")
+                    || display_name_lower.contains("documentation")
+                    || display_name_lower.contains("readme")
+                    || display_name_lower.contains("read me")
+                    || display_name_lower.contains("release notes")
+                    || display_name_lower.contains("whats new")
+                    || display_name_lower.contains("what's new")
+                    || display_name_lower.contains("license")
+                    || display_name_lower.contains("changelog")
+                    || display_name_lower.contains("website")
+                    || display_name_lower.contains("manual")
+                    || display_name_lower.contains("visit")
+                    || display_name_lower.contains("about")
+                {
+                    continue;
+                }
+
+                let path_lower = parsing_name.to_lowercase();
+                let is_document = path_lower.ends_with(".txt")
+                    || path_lower.ends_with(".url")
+                    || path_lower.ends_with(".chm")
+                    || path_lower.ends_with(".hlp")
+                    || path_lower.ends_with(".pdf")
+                    || path_lower.ends_with(".html")
+                    || path_lower.ends_with(".htm")
+                    || path_lower.ends_with(".png")
+                    || path_lower.ends_with(".jpg")
+                    || path_lower.ends_with(".jpeg")
+                    || path_lower.ends_with(".gif")
+                    || path_lower.ends_with(".ico")
+                    || path_lower.ends_with(".ini")
+                    || path_lower.ends_with(".cfg")
+                    || path_lower.ends_with(".xml")
+                    || path_lower.ends_with(".json")
+                    || path_lower.ends_with(".md")
+                    || path_lower.ends_with(".rtf")
+                    || path_lower.ends_with(".log")
+                    || path_lower.ends_with(".doc")
+                    || path_lower.ends_with(".docx")
+                    || path_lower.ends_with(".xls")
+                    || path_lower.ends_with(".xlsx")
+                    || path_lower.ends_with(".ppt")
+                    || path_lower.ends_with(".pptx")
+                    || path_lower.ends_with(".zip")
+                    || path_lower.ends_with(".rar")
+                    || path_lower.ends_with(".7z");
+                
+                if is_document {
                     continue;
                 }
                 

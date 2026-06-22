@@ -12,7 +12,7 @@ from sentence_transformers import SentenceTransformer
 
 CATALOG_PATH = Path(__file__).parent.parent / "settings_catalog.csv"
 OUTPUT_PATH  = Path(__file__).parent.parent / "assets" / "catalog.bin"
-MODEL_NAME   = "sentence-transformers/all-MiniLM-L6-v2"
+MODEL_NAME   = "BAAI/bge-base-en-v1.5"
 
 KEEP_FIELDS = {"id", "control_name", "breadcrumb_path", "launch_command", "description", "source", "synonyms"}
 

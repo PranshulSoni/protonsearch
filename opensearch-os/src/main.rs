@@ -69,6 +69,7 @@ struct State {
     icon_settings: HICON,
     icon_control_panel: HICON,
     icon_search: HICON,
+    icon_web: HICON,
     text_selected: bool,
     scroll_offset: usize,
     last_mouse_x: i32,
@@ -123,10 +124,12 @@ unsafe fn run() {
     const SETTINGS_ICO: &[u8] = include_bytes!("../../assets/logo/settings.ico");
     const CONTROL_PANEL_ICO: &[u8] = include_bytes!("../../assets/logo/control_panel.ico");
     const SEARCH_ICO: &[u8] = include_bytes!("../../assets/logo/search.ico");
+    const WEB_ICO: &[u8] = include_bytes!("../../assets/logo/web.ico");
 
     let icon_settings = load_icon_from_memory(SETTINGS_ICO, 32);
     let icon_control_panel = load_icon_from_memory(CONTROL_PANEL_ICO, 32);
     let icon_search = load_icon_from_memory(SEARCH_ICO, 24);
+    let icon_web = load_icon_from_memory(WEB_ICO, 32);
 
     let state = Box::new(State {
         engine: None,
@@ -143,6 +146,7 @@ unsafe fn run() {
         icon_settings,
         icon_control_panel,
         icon_search,
+        icon_web,
         text_selected: false,
         scroll_offset: 0,
         last_mouse_x: -1,
@@ -190,7 +194,6 @@ unsafe fn run() {
     );
 
     // Load the search engine in a background thread so the window appears instantly.
-    // Capture hwnd as usize (Send) rather than HWND (*mut c_void, !Send).
     let hwnd_usize = hwnd.0 as usize;
     std::thread::spawn(move || {
         let model_path = std::env::current_exe().ok()
@@ -582,6 +585,7 @@ unsafe extern "system" fn wnd_proc(
                 if !s.icon_settings.0.is_null() { let _ = DestroyIcon(s.icon_settings); }
                 if !s.icon_control_panel.0.is_null() { let _ = DestroyIcon(s.icon_control_panel); }
                 if !s.icon_search.0.is_null() { let _ = DestroyIcon(s.icon_search); }
+                if !s.icon_web.0.is_null() { let _ = DestroyIcon(s.icon_web); }
                 for &hicon in s.app_icons.values() {
                     if !hicon.0.is_null() {
                         let _ = DestroyIcon(hicon);
@@ -707,7 +711,16 @@ unsafe fn get_app_icon(path: &str) -> HICON {
         }
     }
 
-    let path_wide: Vec<u16> = target_path.encode_utf16().chain(std::iter::once(0)).collect();
+    // Format virtual paths properly for SHCreateItemFromParsingName
+    let parsing_path = if target_path.starts_with('{') {
+        format!("::{}", target_path)
+    } else if !target_path.contains(":\\") && !target_path.starts_with("\\\\") {
+        format!("::{{4234d49b-0245-4df3-b780-3893943456e1}}\\{}", target_path)
+    } else {
+        target_path.clone()
+    };
+
+    let path_wide: Vec<u16> = parsing_path.encode_utf16().chain(std::iter::once(0)).collect();
 
     // Try parsing as a shell item to get icon from virtual Applications folder or normal file
     let shell_item: Option<windows::Win32::UI::Shell::IShellItem> = windows::Win32::UI::Shell::SHCreateItemFromParsingName(
@@ -737,8 +750,9 @@ unsafe fn get_app_icon(path: &str) -> HICON {
     if hicon.0.is_null() {
         let mut shfi = windows::Win32::UI::Shell::SHFILEINFOW::default();
         let flags = windows::Win32::UI::Shell::SHGFI_ICON | windows::Win32::UI::Shell::SHGFI_LARGEICON;
+        let fallback_wide: Vec<u16> = target_path.encode_utf16().chain(std::iter::once(0)).collect();
         let _ = windows::Win32::UI::Shell::SHGetFileInfoW(
-            PCWSTR(path_wide.as_ptr()),
+            PCWSTR(fallback_wide.as_ptr()),
             windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES(0),
             Some(&mut shfi),
             std::mem::size_of::<windows::Win32::UI::Shell::SHFILEINFOW>() as u32,
@@ -857,6 +871,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     .unwrap_or(s.icon_control_panel)
             } else if res.entry.launch_command.starts_with("ms-settings:") {
                 s.icon_settings
+            } else if res.entry.source == "web" {
+                s.icon_web
             } else {
                 s.icon_control_panel
             };
