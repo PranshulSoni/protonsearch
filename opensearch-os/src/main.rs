@@ -479,16 +479,15 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             };
 
             if !icon_to_draw.0.is_null() {
-                let icon_x = PAD_L + (ICON_W - 24) / 2;
                 let icon_y = ry + (RESULT_H - 24) / 2;
-                let _ = DrawIconEx(mdc, icon_x, icon_y, icon_to_draw, 24, 24, 0, HBRUSH(null_mut()), DI_NORMAL);
+                let _ = DrawIconEx(mdc, PAD_L, icon_y, icon_to_draw, 24, 24, 0, HBRUSH(null_mut()), DI_NORMAL);
             }
 
             // Name
             SelectObject(mdc, s.font_n);
             SetTextColor(mdc, CLR_WHITE);
             let mut name: Vec<u16> = res.entry.control_name.encode_utf16().collect();
-            let mut r = RECT { left: PAD_L + ICON_W, top: cy, right: WIN_W - 88, bottom: cy + 20 };
+            let mut r = RECT { left: tx, top: cy, right: WIN_W - 88, bottom: cy + 20 };
             DrawTextW(mdc, &mut name, &mut r,
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
@@ -496,7 +495,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             SelectObject(mdc, s.font_c);
             SetTextColor(mdc, CLR_GRAY);
             let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
-            let mut r2 = RECT { left: PAD_L + ICON_W, top: cy + 19, right: WIN_W - 88, bottom: cy + 34 };
+            let mut r2 = RECT { left: tx, top: cy + 19, right: WIN_W - 88, bottom: cy + 34 };
             DrawTextW(mdc, &mut crumb, &mut r2,
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 

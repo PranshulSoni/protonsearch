@@ -2,14 +2,22 @@ from PIL import Image
 import os
 
 def convert_to_ico(png_path, ico_path):
-    print(f"Converting {png_path} to {ico_path}...")
+    print(f"Converting {png_path} to {ico_path} with square padding...")
     if not os.path.exists(png_path):
         print(f"  Error: {png_path} not found.")
         return False
     
-    img = Image.open(png_path)
+    img = Image.open(png_path).convert("RGBA")
+    w, h = img.size
+    max_dim = max(w, h)
+    
+    # Create square canvas with transparency
+    square_img = Image.new("RGBA", (max_dim, max_dim), (0, 0, 0, 0))
+    # Center the original image
+    square_img.paste(img, ((max_dim - w) // 2, (max_dim - h) // 2))
+    
     # Save with multiple standard sizes, including 24x24 for our UI
-    img.save(ico_path, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (256, 256)])
+    square_img.save(ico_path, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (256, 256)])
     print(f"  Successfully saved {ico_path}.")
     return True
 
