@@ -65,6 +65,7 @@ struct State {
     icon_settings: HICON,
     icon_control_panel: HICON,
     icon_search: HICON,
+    text_selected: bool,
 }
 
 #[derive(PartialEq)]
@@ -142,6 +143,7 @@ unsafe fn run(engine: SearchEngine) {
         icon_settings,
         icon_control_panel,
         icon_search,
+        text_selected: false,
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
@@ -249,6 +251,10 @@ unsafe extern "system" fn wnd_proc(
             let s = &mut *sp;
             if let Some(c) = char::from_u32(wp.0 as u32) {
                 if !c.is_control() {
+                    if s.text_selected {
+                        s.query.clear();
+                        s.text_selected = false;
+                    }
                     s.query.push(c);
                     s.selected = 0;
                     kick_debounce(hwnd);
@@ -262,10 +268,60 @@ unsafe extern "system" fn wnd_proc(
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
             let vk = VIRTUAL_KEY(wp.0 as u16);
+            
+            // Check if Ctrl is pressed
+            let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
+            
+            if ctrl_down {
+                match vk.0 as u32 {
+                    0x41 => { // Ctrl + A (Select All)
+                        if !s.query.is_empty() {
+                            s.text_selected = true;
+                            InvalidateRect(hwnd, None, FALSE);
+                        }
+                        return LRESULT(0);
+                    }
+                    0x43 => { // Ctrl + C (Copy)
+                        if !s.query.is_empty() {
+                            copy_to_clipboard(hwnd, &s.query);
+                        }
+                        return LRESULT(0);
+                    }
+                    0x56 => { // Ctrl + V (Paste)
+                        if let Some(text) = paste_from_clipboard(hwnd) {
+                            let clean_text: String = text.chars().filter(|c| !c.is_control()).collect();
+                            if s.text_selected {
+                                s.query = clean_text;
+                                s.text_selected = false;
+                            } else {
+                                s.query.push_str(&clean_text);
+                            }
+                            s.selected = 0;
+                            kick_debounce(hwnd);
+                            InvalidateRect(hwnd, None, FALSE);
+                        }
+                        return LRESULT(0);
+                    }
+                    _ => {}
+                }
+            }
+
             match vk {
-                VK_ESCAPE => start_hide(hwnd, s),
+                VK_ESCAPE => {
+                    if s.text_selected {
+                        s.text_selected = false;
+                        InvalidateRect(hwnd, None, FALSE);
+                    } else {
+                        start_hide(hwnd, s);
+                    }
+                }
                 VK_BACK => {
-                    s.query.pop();
+                    if s.text_selected {
+                        s.query.clear();
+                        s.text_selected = false;
+                    } else {
+                        s.query.pop();
+                    }
                     s.selected = 0;
                     kick_debounce(hwnd);
                     InvalidateRect(hwnd, None, FALSE);
@@ -452,15 +508,29 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let tw = WIN_W - tx - PAD_L;
     let mut tr = RECT { left: tx, top: ty, right: tx + tw, bottom: ty + 22 };
 
+    SelectObject(mdc, s.font_q);
+
     if s.query.is_empty() {
         let mut ph: Vec<u16> = "Search Windows settings...".encode_utf16().collect();
         SetTextColor(mdc, CLR_PH);
         DrawTextW(mdc, &mut ph, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     } else {
-        let display = format!("{}_", s.query);
-        let mut dw: Vec<u16> = display.encode_utf16().collect();
-        SetTextColor(mdc, CLR_WHITE);
-        DrawTextW(mdc, &mut dw, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        let mut dw: Vec<u16> = s.query.encode_utf16().collect();
+        if s.text_selected {
+            let mut size = SIZE::default();
+            GetTextExtentPoint32W(mdc, &dw, &mut size);
+            let text_h = size.cy;
+            let sel_top = tr.top + (tr.bottom - tr.top - text_h) / 2;
+            fill(mdc, tx, sel_top, size.cx, text_h, COLORREF(0x00_C5_6A_00)); // Accent blue (#006AC5)
+            
+            SetTextColor(mdc, CLR_WHITE);
+            DrawTextW(mdc, &mut dw, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        } else {
+            let display = format!("{}_", s.query);
+            let mut dw_cursor: Vec<u16> = display.encode_utf16().collect();
+            SetTextColor(mdc, CLR_WHITE);
+            DrawTextW(mdc, &mut dw_cursor, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        }
     }
 
     // ── Results ───────────────────────────────────────────────────────────
@@ -589,4 +659,53 @@ unsafe fn load_icon_from_memory(bytes: &[u8], size: i32) -> HICON {
         }
     }
     HICON(null_mut())
+}
+
+unsafe fn copy_to_clipboard(hwnd: HWND, text: &str) {
+    use windows::Win32::System::DataExchange::{OpenClipboard, CloseClipboard, EmptyClipboard, SetClipboardData};
+    use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+    
+    if OpenClipboard(hwnd).is_ok() {
+        let _ = EmptyClipboard();
+        let utf16: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        let size = utf16.len() * 2;
+        if let Ok(h_mem) = GlobalAlloc(GMEM_MOVEABLE, size) {
+            let ptr = GlobalLock(h_mem);
+            if !ptr.is_null() {
+                std::ptr::copy_nonoverlapping(utf16.as_ptr() as *const u8, ptr as *mut u8, size);
+                let _ = GlobalUnlock(h_mem);
+                let _ = SetClipboardData(13, HANDLE(h_mem.0));
+            }
+        }
+        let _ = CloseClipboard();
+    }
+}
+
+unsafe fn paste_from_clipboard(hwnd: HWND) -> Option<String> {
+    use windows::Win32::System::DataExchange::{OpenClipboard, CloseClipboard, GetClipboardData};
+    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+    
+    let mut result = None;
+    if OpenClipboard(hwnd).is_ok() {
+        if let Ok(h_mem) = GetClipboardData(13) {
+            if !h_mem.0.is_null() {
+                let h_global = HGLOBAL(h_mem.0);
+                let ptr = GlobalLock(h_global);
+                if !ptr.is_null() {
+                    let mut len = 0;
+                    let ptr_u16 = ptr as *const u16;
+                    while *ptr_u16.add(len) != 0 {
+                        len += 1;
+                    }
+                    let slice = std::slice::from_raw_parts(ptr_u16, len);
+                    if let Ok(s) = String::from_utf16(slice) {
+                        result = Some(s);
+                    }
+                    let _ = GlobalUnlock(h_global);
+                }
+            }
+        }
+        let _ = CloseClipboard();
+    }
+    result
 }
