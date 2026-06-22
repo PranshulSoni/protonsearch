@@ -354,10 +354,9 @@ impl SearchEngine {
         if !final_results.is_empty() {
             vec_results.retain(|vr| {
                 !final_results.iter().any(|fr| {
-                    // Check if control_name has substantial overlap or exact match
                     let fr_name = fr.entry.control_name.to_lowercase();
                     let vr_name = vr.entry.control_name.to_lowercase();
-                    fr_name == vr_name || (fr_name.contains("battery") && vr_name.contains("battery"))
+                    fr_name == vr_name
                 })
             });
         }
