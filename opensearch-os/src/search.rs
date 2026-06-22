@@ -13,6 +13,8 @@ pub struct CatalogEntry {
     pub breadcrumb_path: String,
     pub launch_command: String,
     pub source: String,
+    pub description: String,
+    pub synonyms: String,
 }
 
 #[derive(Clone)]
@@ -29,8 +31,8 @@ struct MetaJson {
     source: String,
     #[allow(dead_code)]
     id: String,
-    #[allow(dead_code)]
     description: String,
+    synonyms: String,
 }
 
 pub struct SearchEngine {
@@ -69,6 +71,8 @@ impl SearchEngine {
                 breadcrumb_path: m.breadcrumb_path,
                 launch_command: m.launch_command,
                 source: m.source,
+                description: m.description,
+                synonyms: m.synonyms,
             });
         }
 
@@ -93,6 +97,9 @@ impl SearchEngine {
         let q = query.trim();
         if q.is_empty() { return vec![]; }
 
+        let q_lower = q.to_lowercase();
+        let q_words: Vec<&str> = q_lower.split_whitespace().collect();
+
         let qvec = match self.embed(q) {
             Ok(v) => v,
             Err(_) => return vec![],
@@ -100,16 +107,71 @@ impl SearchEngine {
 
         let mut scores: Vec<(usize, f32)> = (0..self.n)
             .map(|i| {
-                let s = self.vecs[i * self.dim..][..self.dim]
+                let entry = &self.meta[i];
+
+                // 1. Semantic score
+                let sem_score: f32 = self.vecs[i * self.dim..][..self.dim]
                     .iter().zip(&qvec).map(|(a, b)| a * b).sum();
-                (i, s)
+
+                // 2. Lexical score
+                let mut lex_score = 0.0f32;
+                let name_lower = entry.control_name.to_lowercase();
+
+                // Title-level matching
+                if name_lower == q_lower {
+                    lex_score += 0.8;
+                } else if name_lower.starts_with(&q_lower) {
+                    lex_score += 0.5;
+                } else if name_lower.contains(&q_lower) {
+                    lex_score += 0.3;
+                }
+
+                // Word overlap in title
+                if !q_words.is_empty() {
+                    let name_words: Vec<&str> = name_lower.split_whitespace().collect();
+                    let mut matched_words = 0;
+                    for qw in &q_words {
+                        if name_words.contains(qw) {
+                            matched_words += 1;
+                        }
+                    }
+                    lex_score += 0.4 * (matched_words as f32 / q_words.len() as f32);
+                }
+
+                // Synonyms matching
+                let syn_lower = entry.synonyms.to_lowercase();
+                if syn_lower.contains(&q_lower) {
+                    lex_score += 0.3;
+                } else if !q_words.is_empty() {
+                    let mut matched_syns = 0;
+                    for qw in &q_words {
+                        if syn_lower.contains(qw) {
+                            matched_syns += 1;
+                        }
+                    }
+                    lex_score += 0.2 * (matched_syns as f32 / q_words.len() as f32);
+                }
+
+                // Breadcrumb matching
+                let breadcrumb_lower = entry.breadcrumb_path.to_lowercase();
+                if breadcrumb_lower.contains(&q_lower) {
+                    lex_score += 0.15;
+                }
+
+                // Description matching
+                let desc_lower = entry.description.to_lowercase();
+                if desc_lower.contains(&q_lower) {
+                    lex_score += 0.05;
+                }
+
+                (i, sem_score + lex_score)
             })
             .collect();
 
         scores.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         scores.into_iter().take(top_k)
-            .filter(|(_, s)| *s > 0.25)
+            .filter(|(_, s)| *s > 0.3)
             .map(|(i, score)| SearchResult { entry: self.meta[i].clone(), score })
             .collect()
     }
@@ -155,4 +217,107 @@ fn mean_pool_norm(hidden: &[f32], mask: &[i64], seq: usize, dim: usize) -> Vec<f
     let norm = sum.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 1e-8 { for x in &mut sum { *x /= norm; } }
     sum
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hybrid_search_accuracy() {
+        let mut engine = SearchEngine::new().expect("Failed to initialize engine");
+        
+        let queries = vec![
+            ("stop mouse from jumping", vec!["pointer precision", "pointer speed", "mouse"]),
+            ("disable startup programs", vec!["startup", "autostart"]),
+            ("change time zone", vec!["time zone", "timezone"]),
+            ("turn off notifications", vec!["notification"]),
+            ("fix blurry text", vec!["ccd cleartype", "cleartype", "dpi", "blurry", "scale"]),
+            ("allow apps through firewall", vec!["firewall"]),
+            ("make text bigger", vec!["text size", "font size", "scale", "display"]),
+            ("change display brightness", vec!["brightness"]),
+            ("connect to wifi", vec!["wi-fi", "wifi", "wireless"]),
+            ("remove a printer", vec!["printer", "print"]),
+            ("enable dark mode", vec!["dark", "color mode", "theme", "appearance"]),
+            ("change screen resolution", vec!["resolution", "display"]),
+            ("set default browser", vec!["default app", "default browser", "browser"]),
+            ("disable auto updates", vec!["update", "windows update"]),
+            ("sleep settings", vec!["sleep", "power"]),
+            ("change wallpaper", vec!["wallpaper", "background", "desktop background"]),
+            ("enable bluetooth", vec!["bluetooth"]),
+            ("disable touchpad", vec!["touchpad", "trackpad"]),
+            ("configure microphone", vec!["microphone", "input device"]),
+            ("change language", vec!["language", "region"]),
+            ("set up fingerprint login", vec!["fingerprint", "biometric", "windows hello"]),
+            ("clear storage space", vec!["storage", "disk cleanup", "disk space"]),
+            ("rename this computer", vec!["computer name", "rename pc", "device name"]),
+            ("change sound output device", vec!["sound output", "audio output", "speaker", "playback"]),
+            ("reduce eye strain at night", vec!["night light", "blue light", "color temperature"]),
+            ("stop apps from running in background", vec!["background app"]),
+            ("speed up animations", vec!["animation", "visual effect", "transition"]),
+            ("uninstall a program", vec!["uninstall", "remove app", "apps & features"]),
+            ("disable cortana", vec!["cortana", "search"]),
+            ("set proxy settings", vec!["proxy"]),
+            ("change mouse speed", vec!["pointer speed", "mouse speed", "cursor speed"]),
+            ("flip screen upside down", vec!["rotation", "orientation", "display"]),
+            ("enable remote desktop", vec!["remote desktop", "rdp"]),
+            ("set up vpn", vec!["vpn", "virtual private"]),
+            ("configure parental controls", vec!["parental", "family safety", "child"]),
+            ("map network drive", vec!["network drive", "map drive"]),
+            ("change power plan", vec!["power plan", "battery saver", "performance"]),
+            ("set up email account", vec!["email", "mail", "account"]),
+            ("configure taskbar", vec!["taskbar"]),
+            ("disable location services", vec!["location"]),
+            ("change keyboard layout", vec!["keyboard layout", "input method", "language"]),
+            ("enable magnifier", vec!["magnifier"]),
+            ("set up multiple monitors", vec!["multiple display", "second screen", "extend"]),
+            ("change user account picture", vec!["account picture", "profile picture", "user photo"]),
+            ("disable password requirement", vec!["password", "sign-in", "sign in option"]),
+            ("configure storage sense", vec!["storage sense"]),
+            ("enable developer mode", vec!["developer mode"]),
+            ("sync settings between devices", vec!["sync", "backup", "cloud"]),
+            ("change default search engine", vec!["search", "default search"]),
+        ];
+
+        let mut hits = 0;
+        let mut misses = vec![];
+
+        for (q, keywords) in &queries {
+            let results = engine.search(q, 3);
+            let mut hit = false;
+            for r in &results {
+                let haystack = format!(
+                    "{} {} {}",
+                    r.entry.control_name,
+                    r.entry.breadcrumb_path,
+                    r.entry.synonyms
+                ).to_lowercase();
+                if keywords.iter().any(|kw| haystack.contains(&kw.to_lowercase())) {
+                    hit = true;
+                    break;
+                }
+            }
+            if hit {
+                hits += 1;
+            } else {
+                let got = if results.is_empty() {
+                    "None".to_string()
+                } else {
+                    format!("{} ({})", results[0].entry.control_name, results[0].entry.breadcrumb_path)
+                };
+                misses.push((q, got));
+            }
+        }
+
+        let hit_rate = (hits as f32 / queries.len() as f32) * 100.0;
+        println!("Rust Hit@3 rate: {}/{} = {:.1}%", hits, queries.len(), hit_rate);
+        if !misses.is_empty() {
+            println!("Misses:");
+            for (q, got) in misses {
+                println!("  Query '{}' -> got: {}", q, got);
+            }
+        }
+
+        assert!(hit_rate >= 70.0, "Hit rate was only {:.1}% (target: >= 70.0%)", hit_rate);
+    }
 }

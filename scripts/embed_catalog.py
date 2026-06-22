@@ -14,7 +14,7 @@ CATALOG_PATH = Path(__file__).parent.parent / "settings_catalog.csv"
 OUTPUT_PATH  = Path(__file__).parent.parent / "assets" / "catalog.bin"
 MODEL_NAME   = "sentence-transformers/all-MiniLM-L6-v2"
 
-KEEP_FIELDS = {"id", "control_name", "breadcrumb_path", "launch_command", "description", "source"}
+KEEP_FIELDS = {"id", "control_name", "breadcrumb_path", "launch_command", "description", "source", "synonyms"}
 
 
 def load_catalog():
