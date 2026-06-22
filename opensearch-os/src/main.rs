@@ -23,7 +23,7 @@ use windows::{
 const WIN_W: i32 = 640;
 const SEARCH_H: i32 = 56;
 const RESULT_H: i32 = 68;
-const MAX_RESULTS: usize = 5;
+const MAX_RESULTS: usize = 8;
 const PAD_L: i32 = 20;
 const ICON_W: i32 = 28;
 
