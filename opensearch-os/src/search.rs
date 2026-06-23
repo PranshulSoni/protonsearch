@@ -157,6 +157,7 @@ impl SearchEngine {
         ];
 
         let conn = Connection::open(&db_path)?;
+        let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         // Add columns if they don't exist
         let _ = conn.execute("ALTER TABLE clipboard_history ADD COLUMN is_image INTEGER DEFAULT 0;", []);
