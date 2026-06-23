@@ -44,6 +44,40 @@ pub fn launch(cmd: &str) {
     }
 
     let cmd_lower = cmd.to_lowercase();
+
+    // ── ChatGPT: open URL (fills box via ?q=) then auto-submit with Enter ─
+    if cmd.starts_with("https://chatgpt.com/?q=") {
+        let cmd_wide: Vec<u16> = cmd.encode_utf16().chain(std::iter::once(0)).collect();
+        unsafe {
+            ShellExecuteW(
+                HWND::default(),
+                w!("open"),
+                PCWSTR(cmd_wide.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            );
+        }
+        // Spawn a thread: wait for page to load, then use PowerShell AppActivate to focus
+        // the ChatGPT browser window and send Enter to submit the filled prompt
+        std::thread::spawn(|| {
+            std::thread::sleep(std::time::Duration::from_millis(3000));
+            let _ = Command::new("powershell")
+                .args([
+                    "-WindowStyle", "Hidden",
+                    "-Command",
+                    "Add-Type -AssemblyName Microsoft.VisualBasic; \
+                     Add-Type -AssemblyName System.Windows.Forms; \
+                     try { [Microsoft.VisualBasic.Interaction]::AppActivate('ChatGPT') } catch {}; \
+                     Start-Sleep -Milliseconds 400; \
+                     [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')",
+                ])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .spawn();
+        });
+        return;
+    }
+
     if cmd.starts_with("http://") || cmd.starts_with("https://") || cmd_lower.ends_with(".lnk") || std::path::Path::new(cmd).exists() {
         let cmd_wide: Vec<u16> = cmd.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
