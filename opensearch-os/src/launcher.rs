@@ -37,6 +37,15 @@ pub fn launch(cmd: &str) {
         return;
     }
 
+    // ── Kill process by PID ────────────────────────────────────────────────
+    if let Some(pid) = cmd.strip_prefix("kill:") {
+        let _ = Command::new("taskkill")
+            .args(["/F", "/PID", pid.trim()])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .spawn();
+        return;
+    }
+
     // ── Action commands ────────────────────────────────────────────────────
     if let Some(action) = cmd.strip_prefix("action:") {
         handle_action(action);

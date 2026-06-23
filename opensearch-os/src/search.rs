@@ -1710,7 +1710,32 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             }
         });
 
+        // ── Unit Converter: runs alongside calc ─────────────────────────────
+        let unit_result: Option<SearchResult> = if calc_result.is_none() {
+            try_unit_convert(q).map(|(label, value)| SearchResult {
+                entry: CatalogEntry {
+                    id: "unit_convert".to_string(),
+                    control_name: label.clone(),
+                    breadcrumb_path: format!("Converter > Press Enter to copy  {}", value),
+                    launch_command: format!("copy:{}", value),
+                    source: "CALC".to_string(),
+                    description: "Unit conversion — press Enter to copy result".to_string(),
+                    synonyms: String::new(),
+                },
+                score: 10.0,
+            })
+        } else { None };
+
+        // ── Process Kill: triggered by 'kill <name>' prefix ─────────────────
         let q_lower = q.to_lowercase();
+        let kill_results: Vec<SearchResult> = if q_lower.starts_with("kill ") {
+            let proc_query = q_lower.strip_prefix("kill ").unwrap_or("").trim();
+            search_processes(proc_query)
+        } else { vec![] };
+        if !kill_results.is_empty() {
+            return kill_results;
+        }
+
         let stop_words = ["what", "is", "a", "the", "to", "for", "in", "of", "and", "or", "with", "on", "at", "by", "from", "about", "how", "this", "it", "my", "your"];
         let q_words: Vec<&str> = q_lower.split_whitespace()
             .filter(|w| !stop_words.contains(w))
@@ -2080,10 +2105,11 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         }
         action_matches.append(&mut final_results);
         final_results = action_matches;
-
-        // Prepend calc result if we got one
+        
         if let Some(calc) = calc_result {
             final_results.insert(0, calc);
+        } else if let Some(unit) = unit_result {
+            final_results.insert(0, unit);
         }
 
         // Ensure web_search is always in the list as a fallback
@@ -2895,7 +2921,205 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         launch_command: "action:hosts",
         description: "Open the system hosts file in Notepad.",
     },
+    // ── Windows Settings ────────────────────────────────────────────────────
+    QuickAction {
+        triggers: &["wifi", "wifi settings", "wireless", "network settings", "connect wifi"],
+        name: "Wi-Fi Settings",
+        breadcrumb: "Settings > Network & Internet > Wi-Fi",
+        launch_command: "ms-settings:network-wifi",
+        description: "Manage Wi-Fi connections.",
+    },
+    QuickAction {
+        triggers: &["bluetooth", "bluetooth settings", "pair device", "bluetooth devices"],
+        name: "Bluetooth Settings",
+        breadcrumb: "Settings > Bluetooth & Devices",
+        launch_command: "ms-settings:bluetooth",
+        description: "Pair and manage Bluetooth devices.",
+    },
+    QuickAction {
+        triggers: &["display settings", "screen resolution", "resolution", "display", "monitor", "brightness"],
+        name: "Display Settings",
+        breadcrumb: "Settings > System > Display",
+        launch_command: "ms-settings:display",
+        description: "Change display resolution, brightness and orientation.",
+    },
+    QuickAction {
+        triggers: &["night light", "blue light", "night mode", "warm colors"],
+        name: "Night Light",
+        breadcrumb: "Settings > System > Display > Night Light",
+        launch_command: "ms-settings:nightlight",
+        description: "Reduce blue light with Night Light.",
+    },
+    QuickAction {
+        triggers: &["sound settings", "audio settings", "volume settings", "sound output", "speaker", "microphone"],
+        name: "Sound Settings",
+        breadcrumb: "Settings > System > Sound",
+        launch_command: "ms-settings:sound",
+        description: "Manage audio output and input devices.",
+    },
+    QuickAction {
+        triggers: &["notifications", "notification settings", "do not disturb", "focus assist", "app notifications"],
+        name: "Notification Settings",
+        breadcrumb: "Settings > System > Notifications",
+        launch_command: "ms-settings:notifications",
+        description: "Control app notifications and Do Not Disturb.",
+    },
+    QuickAction {
+        triggers: &["power settings", "battery settings", "sleep settings", "power plan", "battery saver"],
+        name: "Power & Battery Settings",
+        breadcrumb: "Settings > System > Power & Battery",
+        launch_command: "ms-settings:powersleep",
+        description: "Configure power plan and battery saver.",
+    },
+    QuickAction {
+        triggers: &["apps settings", "installed apps", "uninstall app", "remove app", "add remove programs"],
+        name: "Installed Apps",
+        breadcrumb: "Settings > Apps > Installed Apps",
+        launch_command: "ms-settings:appsfeatures",
+        description: "View, modify or uninstall installed apps.",
+    },
+    QuickAction {
+        triggers: &["default apps", "default browser", "set default", "default programs"],
+        name: "Default Apps",
+        breadcrumb: "Settings > Apps > Default Apps",
+        launch_command: "ms-settings:defaultapps",
+        description: "Set default apps for file types and protocols.",
+    },
+    QuickAction {
+        triggers: &["startup apps", "startup programs", "autostart", "apps on startup"],
+        name: "Startup Apps",
+        breadcrumb: "Settings > Apps > Startup",
+        launch_command: "ms-settings:startupapps",
+        description: "Control which apps launch on startup.",
+    },
+    QuickAction {
+        triggers: &["accounts", "account settings", "your info", "microsoft account", "user account"],
+        name: "Your Account",
+        breadcrumb: "Settings > Accounts > Your Info",
+        launch_command: "ms-settings:yourinfo",
+        description: "View your Microsoft account info.",
+    },
+    QuickAction {
+        triggers: &["sign in options", "pin", "windows hello", "fingerprint", "face recognition", "password settings"],
+        name: "Sign-In Options",
+        breadcrumb: "Settings > Accounts > Sign-In Options",
+        launch_command: "ms-settings:signinoptions",
+        description: "Manage PIN, password and Windows Hello.",
+    },
+    QuickAction {
+        triggers: &["vpn", "vpn settings", "virtual private network"],
+        name: "VPN Settings",
+        breadcrumb: "Settings > Network & Internet > VPN",
+        launch_command: "ms-settings:network-vpn",
+        description: "Configure VPN connections.",
+    },
+    QuickAction {
+        triggers: &["proxy settings", "proxy", "network proxy"],
+        name: "Proxy Settings",
+        breadcrumb: "Settings > Network & Internet > Proxy",
+        launch_command: "ms-settings:network-proxy",
+        description: "Configure proxy for network connections.",
+    },
+    QuickAction {
+        triggers: &["windows update", "check updates", "update windows", "updates"],
+        name: "Windows Update",
+        breadcrumb: "Settings > Windows Update",
+        launch_command: "ms-settings:windowsupdate",
+        description: "Check for and install Windows updates.",
+    },
+    QuickAction {
+        triggers: &["storage settings", "disk space", "storage", "storage sense", "free up space"],
+        name: "Storage Settings",
+        breadcrumb: "Settings > System > Storage",
+        launch_command: "ms-settings:storagesense",
+        description: "Manage disk storage and Storage Sense.",
+    },
+    QuickAction {
+        triggers: &["privacy settings", "privacy", "location", "camera access", "microphone access", "app permissions"],
+        name: "Privacy Settings",
+        breadcrumb: "Settings > Privacy & Security",
+        launch_command: "ms-settings:privacy",
+        description: "Control privacy and app permissions.",
+    },
+    QuickAction {
+        triggers: &["location settings", "location access", "location privacy"],
+        name: "Location Settings",
+        breadcrumb: "Settings > Privacy & Security > Location",
+        launch_command: "ms-settings:privacy-location",
+        description: "Control which apps can access your location.",
+    },
+    QuickAction {
+        triggers: &["camera settings", "camera access", "camera privacy"],
+        name: "Camera Settings",
+        breadcrumb: "Settings > Privacy & Security > Camera",
+        launch_command: "ms-settings:privacy-webcam",
+        description: "Control which apps can access your camera.",
+    },
+    QuickAction {
+        triggers: &["date time settings", "date and time", "clock settings", "time zone", "set time"],
+        name: "Date & Time Settings",
+        breadcrumb: "Settings > Time & Language > Date & Time",
+        launch_command: "ms-settings:dateandtime",
+        description: "Set date, time and time zone.",
+    },
+    QuickAction {
+        triggers: &["language settings", "region settings", "keyboard language", "input language", "add language"],
+        name: "Language & Region",
+        breadcrumb: "Settings > Time & Language > Language & Region",
+        launch_command: "ms-settings:regionlanguage",
+        description: "Add or change display and input language.",
+    },
+    QuickAction {
+        triggers: &["mouse settings", "pointer speed", "scroll speed", "mouse buttons"],
+        name: "Mouse Settings",
+        breadcrumb: "Settings > Bluetooth & Devices > Mouse",
+        launch_command: "ms-settings:mousetouchpad",
+        description: "Configure mouse pointer and scroll settings.",
+    },
+    QuickAction {
+        triggers: &["touchpad settings", "trackpad", "gestures", "touchpad sensitivity"],
+        name: "Touchpad Settings",
+        breadcrumb: "Settings > Bluetooth & Devices > Touchpad",
+        launch_command: "ms-settings:devices-touchpad",
+        description: "Configure touchpad gestures and sensitivity.",
+    },
+    QuickAction {
+        triggers: &["personalization", "wallpaper", "desktop background", "theme", "dark mode", "light mode", "colors"],
+        name: "Personalization",
+        breadcrumb: "Settings > Personalization",
+        launch_command: "ms-settings:personalization",
+        description: "Change wallpaper, theme, colors and lock screen.",
+    },
+    QuickAction {
+        triggers: &["taskbar settings", "taskbar", "taskbar icons"],
+        name: "Taskbar Settings",
+        breadcrumb: "Settings > Personalization > Taskbar",
+        launch_command: "ms-settings:taskbar",
+        description: "Customize the taskbar.",
+    },
+    QuickAction {
+        triggers: &["accessibility", "ease of access", "narrator", "magnifier", "high contrast", "color filters"],
+        name: "Accessibility Settings",
+        breadcrumb: "Settings > Accessibility",
+        launch_command: "ms-settings:easeofaccess-display",
+        description: "Accessibility features like Narrator, Magnifier.",
+    },
+    QuickAction {
+        triggers: &["developer mode", "developer settings", "sideload"],
+        name: "Developer Settings",
+        breadcrumb: "Settings > System > For Developers",
+        launch_command: "ms-settings:developers",
+        description: "Enable developer mode and sideloading.",
+    },
+    QuickAction {
+        triggers: &["activate windows", "windows activation", "product key", "license"],
+        name: "Windows Activation",
+        breadcrumb: "Settings > System > Activation",
+        launch_command: "ms-settings:activation",
+        description: "Check or change Windows activation.",
+    },
 ];
+
 
 fn get_quick_actions(query: &str) -> Vec<SearchResult> {
     let q = query.trim().to_lowercase();
@@ -3325,4 +3549,131 @@ fn extract_path_or_url(text: &str) -> Option<String> {
         }
     }
     None
+}
+
+// ── Unit Converter ─────────────────────────────────────────────────────────
+// "5 km to miles", "100 lbs to kg", "32 f to c", "1 gb to mb", etc.
+pub fn try_unit_convert(input: &str) -> Option<(String, String)> {
+    let s = input.trim().to_lowercase();
+    let sep = if s.contains(" to ") { " to " } else if s.contains(" in ") { " in " } else { return None; };
+    let parts: Vec<&str> = s.splitn(2, sep).collect();
+    if parts.len() != 2 { return None; }
+    let left = parts[0].trim();
+    let to_unit = parts[1].trim();
+    let num_end = left.find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-').unwrap_or(left.len());
+    if num_end == 0 { return None; }
+    let num: f64 = left[..num_end].parse().ok()?;
+    let from_unit = left[num_end..].trim();
+
+    // Temperature
+    let tc = |u: &str| -> Option<&str> { match u { "c"|"celsius" => Some("C"), "f"|"fahrenheit" => Some("F"), "k"|"kelvin" => Some("K"), _ => None } };
+    if let (Some(tf), Some(tt)) = (tc(from_unit), tc(to_unit)) {
+        let c = match tf { "C" => num, "F" => (num-32.0)*5.0/9.0, "K" => num-273.15, _ => return None };
+        let r = match tt { "C" => c, "F" => c*9.0/5.0+32.0, "K" => c+273.15, _ => return None };
+        let d = fmt_conv(r);
+        return Some((format!("{} {} = {} {}", num, tf, d, tt), d));
+    }
+
+    // Linear unit table: (aliases, base_unit, to_base_multiplier, category)
+    let table: &[(&[&str], &str, f64, &str)] = &[
+        (&["mm","millimeter","millimeters"],    "m",   0.001,              "len"),
+        (&["cm","centimeter","centimeters"],    "m",   0.01,               "len"),
+        (&["m","meter","meters"],               "m",   1.0,                "len"),
+        (&["km","kilometer","kilometers"],      "m",   1000.0,             "len"),
+        (&["in","inch","inches"],               "m",   0.0254,             "len"),
+        (&["ft","foot","feet"],                 "m",   0.3048,             "len"),
+        (&["yd","yard","yards"],                "m",   0.9144,             "len"),
+        (&["mi","mile","miles"],                "m",   1609.344,           "len"),
+        (&["mg","milligram","milligrams"],      "kg",  0.000001,           "mass"),
+        (&["g","gram","grams"],                 "kg",  0.001,              "mass"),
+        (&["kg","kilogram","kilograms"],        "kg",  1.0,                "mass"),
+        (&["lb","lbs","pound","pounds"],        "kg",  0.453592,           "mass"),
+        (&["oz","ounce","ounces"],              "kg",  0.0283495,          "mass"),
+        (&["t","tonne","metric ton"],           "kg",  1000.0,             "mass"),
+        (&["b","byte","bytes"],                 "b",   1.0,                "data"),
+        (&["kb","kilobyte","kilobytes"],        "b",   1024.0,             "data"),
+        (&["mb","megabyte","megabytes"],        "b",   1048576.0,          "data"),
+        (&["gb","gigabyte","gigabytes"],        "b",   1073741824.0,       "data"),
+        (&["tb","terabyte","terabytes"],        "b",   1099511627776.0,    "data"),
+        (&["kph","kmh","km/h"],                 "ms",  0.277778,           "speed"),
+        (&["mph"],                              "ms",  0.44704,            "speed"),
+        (&["m/s","mps"],                        "ms",  1.0,                "speed"),
+        (&["s","sec","second","seconds"],       "s",   1.0,                "time"),
+        (&["min","minute","minutes"],           "s",   60.0,               "time"),
+        (&["h","hr","hour","hours"],            "s",   3600.0,             "time"),
+        (&["d","day","days"],                   "s",   86400.0,            "time"),
+        (&["week","weeks"],                     "s",   604800.0,           "time"),
+    ];
+
+    let lookup = |u: &str| -> Option<(f64, &str, &str)> {
+        table.iter().find(|(aliases,_,_,_)| aliases.contains(&u)).map(|(_,base,f,cat)| (*f, *base, *cat))
+    };
+
+    let (ff, fb, fc) = lookup(from_unit)?;
+    let (tf2, tb, tc2) = lookup(to_unit)?;
+    if fb != tb || fc != tc2 { return None; }
+    let result = (num * ff) / tf2;
+    let d = fmt_conv(result);
+    Some((format!("{} {} = {} {}", num, from_unit, d, to_unit), d))
+}
+
+fn fmt_conv(v: f64) -> String {
+    if v.fract() == 0.0 && v.abs() < 1e12 { return format!("{}", v as i64); }
+    let s = format!("{:.6}", v);
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
+// ── Process Search & Kill ──────────────────────────────────────────────────
+pub fn search_processes(query: &str) -> Vec<SearchResult> {
+    #[cfg(target_os = "windows")]
+    use std::os::windows::process::CommandExt;
+    let q = query.trim().to_lowercase();
+    if q.len() < 2 { return vec![]; }
+
+    let output = match std::process::Command::new("tasklist")
+        .args(["/FO", "CSV", "/NH"])
+        .creation_flags(0x08000000)
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return vec![],
+    };
+
+    let protected = ["system","smss.exe","csrss.exe","wininit.exe","services.exe",
+                     "lsass.exe","svchost.exe","dwm.exe","winlogon.exe","registry"];
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut results = Vec::new();
+
+    for line in stdout.lines() {
+        let fields: Vec<&str> = line.split(',').collect();
+        if fields.len() < 2 { continue; }
+        let name = fields[0].trim_matches('"');
+        let pid_str = fields[1].trim_matches('"');
+        let name_lower = name.to_lowercase();
+        if !name_lower.contains(&q) { continue; }
+        if protected.iter().any(|p| name_lower == *p) { continue; }
+        let pid: u32 = pid_str.parse().unwrap_or(0);
+        let score = if name_lower == q { 3.0 } else if name_lower.starts_with(&q) { 2.0 } else { 1.0 };
+        let mem_mb = fields.get(4)
+            .map(|m| m.trim_matches('"').replace(",", "").replace(" K", ""))
+            .and_then(|kb| kb.parse::<u64>().ok())
+            .map(|kb| format!("{:.0} MB", kb as f64 / 1024.0))
+            .unwrap_or_default();
+        let display = name.trim_end_matches(".exe");
+        results.push(SearchResult {
+            entry: CatalogEntry {
+                id: format!("proc.{}.{}", name_lower.replace(' ', "_"), pid),
+                control_name: format!("Kill {} (PID {})", display, pid),
+                breadcrumb_path: format!("Process > {} > {}", name, mem_mb),
+                launch_command: format!("kill:{}", pid),
+                source: "ACTION".to_string(),
+                description: format!("Force-terminate {} (PID {})", name, pid),
+                synonyms: format!("kill terminate stop end process {}", name_lower),
+            },
+            score,
+        });
+    }
+    results.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.truncate(8);
+    results
 }
