@@ -1957,23 +1957,31 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         fill(mdc, 0, footer_y, win_w, 24, COLORREF(0x00_15_15_15));
         fill(mdc, 0, footer_y, win_w, 1, CLR_DIV);
         
-        SelectObject(mdc, s.font_c);
-        SetTextColor(mdc, CLR_GRAY);
-        let inst_text = if s.delete_confirm {
-            format!(" ⚠️ Delete {} selected items? Press Enter to confirm, Escape to cancel", s.selected_clip_ids.len())
-        } else if s.editing_item.is_some() {
-            " 📝 Editing snippet: Press Enter to save to database & clipboard, Escape to cancel".to_string()
+        if s.delete_confirm {
+            badge(mdc, s, "confirm", PAD_L, footer_y + 2);
+            SelectObject(mdc, s.font_c);
+            SetTextColor(mdc, CLR_GRAY);
+            let inst_text = format!(" Press Delete again to delete {} selected items, Escape to cancel", s.selected_clip_ids.len());
+            let mut inst_wide: Vec<u16> = inst_text.encode_utf16().collect();
+            let mut r_inst = RECT { left: PAD_L + 68, top: footer_y, right: win_w - PAD_L, bottom: win_h };
+            let _ = DrawTextW(mdc, &mut inst_wide, &mut r_inst, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         } else {
-            let sel_count = s.selected_clip_ids.len();
-            if sel_count > 0 {
-                format!(" Tab: Deselect  |  Enter: Paste combined ({})  |  Delete: Bulk Delete  |  Ctrl+P: Pin/Unpin", sel_count)
+            SelectObject(mdc, s.font_c);
+            SetTextColor(mdc, CLR_GRAY);
+            let inst_text = if s.editing_item.is_some() {
+                " 📝 Editing snippet: Press Enter to save to database & clipboard, Escape to cancel".to_string()
             } else {
-                " Tab: Select  |  Enter: Copy & Paste  |  Ctrl+P: Pin/Unpin  |  Ctrl+E: Edit  |  Delete: Delete".to_string()
-            }
-        };
-        let mut inst_wide: Vec<u16> = inst_text.encode_utf16().collect();
-        let mut r_inst = RECT { left: PAD_L, top: footer_y, right: win_w - PAD_L, bottom: win_h };
-        let _ = DrawTextW(mdc, &mut inst_wide, &mut r_inst, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                let sel_count = s.selected_clip_ids.len();
+                if sel_count > 0 {
+                    format!(" Tab: Deselect  |  Enter: Paste combined ({})  |  Delete: Bulk Delete  |  Ctrl+P: Pin/Unpin", sel_count)
+                } else {
+                    " Tab: Select  |  Enter: Copy & Paste  |  Ctrl+P: Pin/Unpin  |  Ctrl+E: Edit  |  Delete: Delete".to_string()
+                }
+            };
+            let mut inst_wide: Vec<u16> = inst_text.encode_utf16().collect();
+            let mut r_inst = RECT { left: PAD_L, top: footer_y, right: win_w - PAD_L, bottom: win_h };
+            let _ = DrawTextW(mdc, &mut inst_wide, &mut r_inst, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        }
     }
 
     // Restore clipping
