@@ -40,10 +40,9 @@ const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
 // ── Animation ─────────────────────────────────────────────────────────────────
 const ANIM_TICK_MS: u32 = 16;
-const APPEAR_FRAMES: f32 = 10.0; // ~160ms (Apple-like liquid animation speed)
-const HIDE_FRAMES: f32 = 10.0;   // ~160ms
+const APPEAR_FRAMES: f32 = 6.0;  // Snappy 96ms (Apple-like transition speed)
+const HIDE_FRAMES: f32 = 6.0;    // Snappy 96ms
 const MAX_ALPHA: u8 = 255;
-const SLIDE_PX: i32 = 14;
 
 // ── Genie Morph Dimensions ────────────────────────────────────────────────────
 const PILL_W: i32 = 150;
@@ -189,12 +188,16 @@ unsafe fn run() {
     };
     RegisterClassExW(&wc);
 
+    let sw = GetSystemMetrics(SM_CXSCREEN);
+    let sh = GetSystemMetrics(SM_CYSCREEN);
+    let start_x = sw / 2 - WIN_W / 2;
+
     let hwnd = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
         PCWSTR(class.as_ptr()),
         PCWSTR::null(),
         WS_POPUP,
-        -4000, -4000, WIN_W, SEARCH_H,
+        start_x, 0, WIN_W, sh,
         HWND(null_mut()), HMENU(null_mut()), hinst,
         Some(Box::into_raw(state) as _),
     ).unwrap();
@@ -445,7 +448,6 @@ unsafe extern "system" fn wnd_proc(
                     trigger_icon_loading(hwnd, s);
                     s.selected = 0;
                     s.scroll_offset = 0;
-                    reposition_animated(hwnd, s, 1.0);
                     InvalidateRect(hwnd, None, FALSE);
                 }
                 TIMER_ANIM => tick(hwnd, s),
@@ -559,7 +561,6 @@ unsafe extern "system" fn wnd_proc(
                                 vec![]
                             };
                             trigger_icon_loading(hwnd, s);
-                            reposition_animated(hwnd, s, 1.0);
                             InvalidateRect(hwnd, None, FALSE);
                         } else {
                             if let Some(text) = cmd.strip_prefix("copy:") {
@@ -649,7 +650,6 @@ unsafe extern "system" fn wnd_proc(
                             vec![]
                         };
                         trigger_icon_loading(hwnd, s);
-                        reposition_animated(hwnd, s, 1.0);
                         InvalidateRect(hwnd, None, FALSE);
                     } else {
                         if let Some(text) = cmd.strip_prefix("copy:") {
@@ -753,14 +753,17 @@ unsafe fn do_show(hwnd: HWND, s: &mut State) {
     let sw = GetSystemMetrics(SM_CXSCREEN);
     let sh = GetSystemMetrics(SM_CYSCREEN);
     s.cx = sw / 2;
-    s.cy = sh / 3;
+    s.cy = (sh as f32 / 2.5) as i32; // Brought down somewhat as requested
     s.last_mouse_x = pt.x;
     s.last_mouse_y = pt.y;
     
-    s.anim = Anim::Appearing(0);
-    reposition_animated(hwnd, s, 0.0);
+    // Reposition static window once to current monitor
+    let start_x = sw / 2 - WIN_W / 2;
+    let _ = SetWindowPos(hwnd, HWND_TOPMOST, start_x, 0, WIN_W, sh, SWP_NOACTIVATE);
     
-    let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, 255, LWA_COLORKEY | LWA_ALPHA);
+    s.anim = Anim::Appearing(0);
+    
+    let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, 0, LWA_COLORKEY | LWA_ALPHA);
     let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     let _ = SetForegroundWindow(hwnd);
     let _ = SetFocus(hwnd);
@@ -780,23 +783,6 @@ unsafe fn start_hide(hwnd: HWND, s: &mut State) {
     let _ = SetTimer(hwnd, TIMER_ANIM, ANIM_TICK_MS, None);
 }
 
-unsafe fn reposition_animated(hwnd: HWND, s: &State, t: f32) {
-    let sw = GetSystemMetrics(SM_CXSCREEN);
-    let search_w = WIN_W;
-    let search_h = s.win_h();
-
-    let start_x = sw / 2 - search_w / 2;
-    let start_y = 0; // Starts at top center
-
-    let end_x = s.cx - search_w / 2;
-    let end_y = s.cy - search_h / 2;
-
-    let x = (start_x as f32 + (end_x - start_x) as f32 * t) as i32;
-    let y = (start_y as f32 + (end_y - start_y) as f32 * t) as i32;
-
-    let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y, search_w, search_h, SWP_NOACTIVATE | SWP_NOCOPYBITS);
-}
-
 unsafe fn kick_debounce(hwnd: HWND) {
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
     let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 120, None);
@@ -809,7 +795,8 @@ unsafe fn tick(hwnd: HWND, s: &mut State) {
             *f += 1;
             let progress = (*f as f32 / APPEAR_FRAMES).min(1.0);
             let t = ease_out(progress);
-            reposition_animated(hwnd, s, t);
+            let alpha = (t * 255.0) as u8;
+            let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
             if progress >= 1.0 {
                 s.anim = Anim::Visible;
                 let _ = KillTimer(hwnd, TIMER_ANIM);
@@ -821,7 +808,8 @@ unsafe fn tick(hwnd: HWND, s: &mut State) {
             *f += 1;
             let progress = (*f as f32 / HIDE_FRAMES).min(1.0);
             let t = 1.0 - ease_in(progress);
-            reposition_animated(hwnd, s, t);
+            let alpha = (t * 255.0) as u8;
+            let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
             if progress >= 1.0 {
                 do_hide(hwnd, s);
             }
@@ -1079,23 +1067,33 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     // Morphing shape dimensions
     let pill_w = PILL_W as f32;
     let pill_h = PILL_H as f32;
+    let target_w = WIN_W as f32;
+    let target_h = s.win_h() as f32;
 
-    let w_t = pill_w + (win_w as f32 - pill_w) * t;
-    let h_t = pill_h + (win_h as f32 - pill_h) * t;
-    let left_t = (win_w as f32 - w_t) / 2.0;
-    let top_t = 0.0;
+    let w_t = pill_w + (target_w - pill_w) * t;
+    let h_t = pill_h + (target_h - pill_h) * t;
+    let left_t = (target_w - w_t) / 2.0;
+    
+    // Calculate sliding vertical position top_t
+    let y_start = 8.0f32;
+    let y_end = (s.cy - s.win_h() / 2) as f32;
+    let top_t = y_start + (y_end - y_start) * t;
 
     // Interpolate corner radius from pill_h/2 (6px) to 12px
     let r_t = (pill_h / 2.0) + (12.0 - (pill_h / 2.0)) * t;
 
+    // Temporarily offset the GDI viewport origin so all relative paint calls shift down to top_t
+    let _ = SetViewportOrgEx(mdc, 0, top_t as i32, None);
+
     // Draw the outer border of the morphing shape
     let border_color = CLR_DIV;
-    fill_rounded(mdc, left_t as i32, top_t as i32, w_t as i32, h_t as i32, r_t as i32, border_color);
+    fill_rounded(mdc, left_t as i32, 0, w_t as i32, h_t as i32, r_t as i32, border_color);
 
     // Draw the inner background of the morphing shape
-    fill_rounded(mdc, (left_t + 1.0) as i32, (top_t + 1.0) as i32, (w_t - 2.0) as i32, (h_t - 2.0) as i32, (r_t - 1.0).max(0.0) as i32, BG);
+    fill_rounded(mdc, (left_t + 1.0) as i32, 1, (w_t - 2.0) as i32, (h_t - 2.0) as i32, (r_t - 1.0).max(0.0) as i32, BG);
 
     // Set up GDI clipping region to clip all content to the inner morphed shape
+    // CreateRoundRectRgn expects absolute (device) coordinates on the DC
     let rgn = CreateRoundRectRgn(
         (left_t + 1.0) as i32,
         (top_t + 1.0) as i32,
@@ -1215,7 +1213,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         let total_results = s.results.len();
         if total_results > VISIBLE_RESULTS {
             let track_top = SEARCH_H + 8;
-            let track_bottom = win_h - 8;
+            let track_bottom = s.win_h() - 8;
             let track_h = track_bottom - track_top;
             
             // Thumb height proportional to ratio of visible results, capped at min 24px
@@ -1236,8 +1234,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         }
     }
 
-    // Reset clipping region
+    // Reset clipping region and viewport origin
     let _ = SelectClipRgn(mdc, HRGN(null_mut()));
+    let _ = SetViewportOrgEx(mdc, 0, 0, None);
 
     let _ = BitBlt(hdc, 0, 0, win_w, win_h, mdc, 0, 0, SRCCOPY);
     let _ = SelectObject(mdc, old);
