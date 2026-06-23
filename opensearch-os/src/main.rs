@@ -1241,6 +1241,16 @@ unsafe extern "system" fn wnd_proc(
         WM_MOUSEWHEEL => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
+            if s.voice_listening {
+                s.voice_listening = false;
+                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
+                let _ = InvalidateRect(hwnd, None, FALSE);
+            }
+            if s.voice_triggered {
+                s.voice_triggered = false;
+                let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
+                let _ = InvalidateRect(hwnd, None, FALSE);
+            }
             if !s.results.is_empty() {
                 let delta = (wp.0 >> 16) as i16;
                 if delta > 0 {
