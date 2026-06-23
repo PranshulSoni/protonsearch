@@ -976,12 +976,14 @@ unsafe fn get_file_icon(path: &str) -> HICON {
 unsafe fn trigger_icon_loading(hwnd: HWND, s: &mut State) {
     for res in &s.results {
         let (source, key) = (res.entry.source.as_str(), res.entry.launch_command.clone());
-        let needs_icon = (source == "app" || source == "RECENT" || source == "FILE" || source == "CODE")
+        // For FOLDER source: only load icon if it's a real filesystem path (not virtual folders like bookmarks:)
+        let is_real_folder = source == "FOLDER" && !key.ends_with(':') && std::path::Path::new(&key).exists();
+        let needs_icon = (source == "app" || source == "RECENT" || source == "FILE" || source == "CODE" || is_real_folder)
             && !s.app_icons.contains_key(&key);
         if needs_icon {
             // Placeholder so we don't spawn multiple threads for same path
             s.app_icons.insert(key.clone(), HICON(std::ptr::null_mut()));
-            let is_recent = source == "RECENT" || source == "FILE" || source == "CODE";
+            let is_recent = source == "RECENT" || source == "FILE" || source == "CODE" || is_real_folder;
             let hwnd_clone = SendHwnd(hwnd);
             std::thread::spawn(move || {
                 let hwnd_raw = hwnd_clone;
