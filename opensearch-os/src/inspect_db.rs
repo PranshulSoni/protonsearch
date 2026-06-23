@@ -31,11 +31,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     println!("Total images in 'files' table: {}", total_images);
 
-    // 4. Print latest 10 images
-    println!("\n--- Latest 10 images in DB ---");
+    // Total files in Pictures
+    let total_pictures_files: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM files WHERE path LIKE '%Pictures%'",
+        [],
+        |row| row.get(0),
+    )?;
+    println!("Total files containing 'Pictures' in path: {}", total_pictures_files);
+
+    // 4. Print latest 10 images in Pictures
+    println!("\n--- Latest 10 Pictures in DB ---");
     let mut stmt = conn.prepare(
         "SELECT path, name, extension, modified, size FROM files \
-         WHERE extension IN ('png', 'jpg', 'jpeg', 'bmp', 'gif') \
+         WHERE path LIKE '%Pictures%' \
          ORDER BY modified DESC LIMIT 10",
     )?;
     let rows = stmt.query_map([], |row| {
