@@ -147,17 +147,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("Total FTS matches found: {}", match_count);
 
-    // WalkDir test on Pictures
-    println!("\n--- WalkDir test on Pictures ---");
-    let pictures_path = std::path::PathBuf::from("C:\\Users\\Pranshul Soni\\Pictures");
-    if pictures_path.exists() {
-        let walker = walkdir::WalkDir::new(&pictures_path)
-            .into_iter()
-            .take(20);
+    // WalkDir test on Downloads with extraction
+    println!("\n--- WalkDir test on Downloads with extraction ---");
+    let downloads_path = std::path::PathBuf::from("C:\\Users\\Pranshul Soni\\Downloads");
+    if downloads_path.exists() {
+        let walker = walkdir::WalkDir::new(&downloads_path)
+            .into_iter();
         for (i, entry) in walker.enumerate() {
             match entry {
                 Ok(e) => {
-                    println!("Entry {}: {:?} (is_file={})", i, e.path(), e.path().is_file());
+                    let path = e.path();
+                    let is_file = path.is_file();
+                    println!("Found entry {}: {:?} (is_file={})", i, path, is_file);
+                    if is_file {
+                        let ext = path.extension().and_then(|ex| ex.to_str()).unwrap_or("").to_lowercase();
+                        if ext == "docx" {
+                            println!("  Testing DOCX extraction on {:?}", path);
+                            match docx_lite::extract_text(path) {
+                                Ok(t) => println!("  DOCX extraction succeeded! Length: {}", t.len()),
+                                Err(err) => println!("  DOCX extraction failed: {:?}", err),
+                            }
+                        } else if ext == "pdf" {
+                            println!("  Testing PDF extraction on {:?}", path);
+                            match pdf_extract::extract_text(path) {
+                                Ok(t) => println!("  PDF extraction succeeded! Length: {}", t.len()),
+                                Err(err) => println!("  PDF extraction failed: {:?}", err),
+                            }
+                        } else if ["png", "jpg", "jpeg", "bmp", "gif"].contains(&ext.as_str()) {
+                            println!("  Testing image OCR on {:?}", path);
+                            // We won't run full WinRT OCR here yet to keep it simple, but let's see if we can resolve it
+                        }
+                    }
                 }
                 Err(err) => {
                     println!("Entry {} error: {:?}", i, err);
@@ -165,7 +185,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     } else {
-        println!("Pictures path does not exist!");
+        println!("Downloads path does not exist!");
     }
 
     Ok(())
