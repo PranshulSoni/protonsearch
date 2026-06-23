@@ -270,6 +270,17 @@ unsafe fn run() {
                 let is_file_icon = req.source == "RECENT" || req.source == "FILE" || req.source == "CODE" || is_real_folder || is_real_project;
                 let hicon = if is_file_icon {
                     get_file_icon(&req.key)
+                } else if req.source == "ACTION" && req.key.starts_with("kill:") {
+                    let pid_str = req.key.strip_prefix("kill:").unwrap_or("");
+                    if let Ok(pid) = pid_str.parse::<u32>() {
+                        if let Some(path) = get_process_path(pid) {
+                            get_app_icon(&path)
+                        } else {
+                            get_app_icon("C:\\Windows\\System32\\cmd.exe")
+                        }
+                    } else {
+                        HICON(std::ptr::null_mut())
+                    }
                 } else {
                     get_app_icon(&req.key)
                 };
@@ -1342,6 +1353,25 @@ unsafe fn get_app_icon(path: &str) -> HICON {
     hicon
 }
 
+unsafe fn get_process_path(pid: u32) -> Option<String> {
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    use windows::Win32::System::Threading::{QueryFullProcessImageNameW, PROCESS_NAME_WIN32};
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::core::PWSTR;
+
+    let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+    let mut buffer = [0u16; 1024];
+    let mut size = buffer.len() as u32;
+    let res = QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, PWSTR(buffer.as_mut_ptr()), &mut size);
+    let _ = CloseHandle(handle);
+
+    if res.is_ok() && size > 0 {
+        Some(String::from_utf16_lossy(&buffer[..size as usize]))
+    } else {
+        None
+    }
+}
+
 unsafe fn get_file_icon(path: &str) -> HICON {
     let mut shfi = windows::Win32::UI::Shell::SHFILEINFOW::default();
     let path_wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
@@ -1365,7 +1395,8 @@ unsafe fn trigger_icon_loading(_hwnd: HWND, s: &mut State) {
         let is_real_folder = source == "FOLDER" && !key.ends_with(':');
         // For PROJECT source: load folder icon if the launch_command is a real filesystem path
         let is_real_project = source == "PROJECT" && !key.is_empty() && !key.starts_with("http");
-        let needs_icon = (source == "app" || source == "RECENT" || source == "FILE" || source == "CODE" || is_real_folder || is_real_project)
+        let is_kill_action = source == "ACTION" && key.starts_with("kill:");
+        let needs_icon = (source == "app" || source == "RECENT" || source == "FILE" || source == "CODE" || is_real_folder || is_real_project || is_kill_action)
             && !s.app_icons.contains_key(&key);
         if needs_icon {
             // Placeholder so we don't spawn multiple threads for same path
