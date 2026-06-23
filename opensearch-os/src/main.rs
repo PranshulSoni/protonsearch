@@ -540,7 +540,11 @@ unsafe extern "system" fn wnd_proc(
                         do_hide(hwnd, s);
                     } else if let Some(r) = s.results.get(s.selected) {
                         let cmd = r.entry.launch_command.clone();
-                        if r.entry.source == "FOLDER" {
+                        let is_action_folder = r.entry.source == "FOLDER" && (
+                            cmd == "bookmarks:" || cmd == "history:" || cmd == "commits:" ||
+                            cmd == "todos:" || cmd == "clip:" || cmd == "file:" || cmd == "code:"
+                        );
+                        if is_action_folder {
                             s.query = cmd;
                             s.selected = 0;
                             s.scroll_offset = 0;
@@ -626,7 +630,11 @@ unsafe extern "system" fn wnd_proc(
                 if my >= r.top && my < r.bottom {
                     let actual_idx = s.scroll_offset + i;
                     let cmd = s.results[actual_idx].entry.launch_command.clone();
-                    if s.results[actual_idx].entry.source == "FOLDER" {
+                    let is_action_folder = s.results[actual_idx].entry.source == "FOLDER" && (
+                        cmd == "bookmarks:" || cmd == "history:" || cmd == "commits:" ||
+                        cmd == "todos:" || cmd == "clip:" || cmd == "file:" || cmd == "code:"
+                    );
+                    if is_action_folder {
                         s.query = cmd;
                         s.selected = 0;
                         s.scroll_offset = 0;
