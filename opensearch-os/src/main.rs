@@ -524,12 +524,18 @@ unsafe extern "system" fn wnd_proc(
                     std::thread::spawn(move || {
                         if let Ok(conn) = rusqlite::Connection::open(&db_path_clone) {
                             let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                            let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
                             let now = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .unwrap_or_default()
                                 .as_secs() as i64;
                             let _ = conn.execute(
-                                "INSERT OR REPLACE INTO clipboard_history (content, timestamp, source_app, is_image) VALUES (?, ?, ?, 0);",
+                                "INSERT INTO clipboard_history (content, timestamp, source_app, is_image, pinned) \
+                                 VALUES (?, ?, ?, 0, 0) \
+                                 ON CONFLICT(content) DO UPDATE SET \
+                                     timestamp = excluded.timestamp, \
+                                     source_app = excluded.source_app, \
+                                     is_image = excluded.is_image;",
                                 rusqlite::params![trimmed, now, app_name_clone],
                             );
                             let _ = conn.execute(
@@ -558,8 +564,14 @@ unsafe extern "system" fn wnd_proc(
                             if write_bmp_file(&img_path, &buf, bih).is_ok() {
                                 if let Ok(conn) = rusqlite::Connection::open(&db_path_clone) {
                                     let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                                    let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
                                     let _ = conn.execute(
-                                        "INSERT OR REPLACE INTO clipboard_history (content, timestamp, source_app, is_image) VALUES (?, ?, ?, 1);",
+                                        "INSERT INTO clipboard_history (content, timestamp, source_app, is_image, pinned) \
+                                         VALUES (?, ?, ?, 1, 0) \
+                                         ON CONFLICT(content) DO UPDATE SET \
+                                             timestamp = excluded.timestamp, \
+                                             source_app = excluded.source_app, \
+                                             is_image = excluded.is_image;",
                                         rusqlite::params![img_path_str, now, app_name],
                                     );
                                     let _ = conn.execute(
