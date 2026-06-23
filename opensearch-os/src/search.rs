@@ -191,7 +191,7 @@ impl SearchEngine {
 fn get_path_score_modifier(full_path: &str) -> f32 {
     let path_lower = full_path.to_lowercase();
     
-    // Penalize ignored/system/hidden folders
+    // Penalize system/tool/hidden directories
     if path_lower.contains("\\node_modules\\") ||
        path_lower.contains("\\target\\") ||
        path_lower.contains("\\.git\\") ||
@@ -200,11 +200,12 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
        path_lower.contains("\\.rustup\\") ||
        path_lower.contains("\\.npm\\") ||
        path_lower.contains("\\.antigravity") ||
+       path_lower.contains("\\.cursor\\") ||
        path_lower.contains("\\bin\\") ||
        path_lower.contains("\\obj\\") ||
        path_lower.contains("\\temp\\") ||
        path_lower.contains("\\tmp\\") {
-        return -2.0; // Significant penalty
+        return -2.0; // Significant penalty → excluded from results
     }
 
     // Boost user's active/primary directories
@@ -481,8 +482,10 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                         .replace('\n', " ").replace('\r', " ").replace('\t', " ")
                         .split_whitespace().collect::<Vec<&str>>().join(" ");
                     let source = if only_code || code_exts.contains(&ext.as_str()) { "CODE" } else { "FILE" };
-                    // Score: base 2.0 for content match + name match bonus + path modifier
-                    let mut score = 2.0 + score_name(&name).min(1.0) + path_modifier;
+                    // Score: content-only matches intentionally score lower than filename matches.
+                    // Base 0.8 + up to 1.5 name bonus keeps content matches below pure filename hits (score 1.8+).
+                    let name_bonus = score_name(&name).min(1.5);
+                    let mut score = 0.8 + name_bonus + path_modifier;
                     if score <= 0.0 { continue; }
                     let parent_dir = std::path::Path::new(&path)
                         .parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()).unwrap_or("");
