@@ -70,6 +70,7 @@ struct State {
     current_query_id: usize,
     db_path: std::path::PathBuf,
     query: String,
+    cursor_pos: usize,
     results: Vec<SearchResult>,
     selected: usize,
     anim: Anim,
@@ -201,6 +202,7 @@ unsafe fn run() {
         current_query_id: 0,
         db_path: db_path.clone(),
         query: String::new(),
+        cursor_pos: 0,
         results: vec![],
         selected: 0,
         anim: Anim::Hidden,
@@ -583,9 +585,11 @@ unsafe extern "system" fn wnd_proc(
                 if !c.is_control() {
                     if s.text_selected {
                         s.query.clear();
+                        s.cursor_pos = 0;
                         s.text_selected = false;
                     }
-                    s.query.push(c);
+                    s.query.insert(s.cursor_pos, c);
+                    s.cursor_pos += 1;
                     s.selected = 0;
                     kick_debounce(hwnd);
                     reset_cursor_blink(hwnd, s);
@@ -623,9 +627,11 @@ unsafe extern "system" fn wnd_proc(
                             let clean_text: String = text.chars().filter(|c| !c.is_control()).collect();
                             if s.text_selected {
                                 s.query = clean_text;
+                                s.cursor_pos = s.query.len();
                                 s.text_selected = false;
                             } else {
-                                s.query.push_str(&clean_text);
+                                s.query.insert_str(s.cursor_pos, &clean_text);
+                                s.cursor_pos += clean_text.len();
                             }
                             s.selected = 0;
                             kick_debounce(hwnd);
@@ -648,24 +654,54 @@ unsafe extern "system" fn wnd_proc(
                         start_hide(hwnd, s);
                     }
                 }
+                VK_LEFT => {
+                    if ctrl_down {
+                        s.cursor_pos = word_left(&s.query, s.cursor_pos);
+                    } else if s.cursor_pos > 0 {
+                        s.cursor_pos -= 1;
+                    }
+                    reset_cursor_blink(hwnd, s);
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+                VK_RIGHT => {
+                    if ctrl_down {
+                        s.cursor_pos = word_right(&s.query, s.cursor_pos);
+                    } else if s.cursor_pos < s.query.len() {
+                        s.cursor_pos += 1;
+                    }
+                    reset_cursor_blink(hwnd, s);
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
                 VK_BACK => {
                     if ctrl_down {
                         if s.text_selected {
                             s.query.clear();
+                            s.cursor_pos = 0;
                             s.text_selected = false;
                         } else {
                             delete_word_before(s);
                         }
                     } else if s.text_selected {
                         s.query.clear();
+                        s.cursor_pos = 0;
                         s.text_selected = false;
-                    } else {
-                        s.query.pop();
+                    } else if s.cursor_pos > 0 {
+                        s.query.remove(s.cursor_pos - 1);
+                        s.cursor_pos -= 1;
                     }
                     s.selected = 0;
                     kick_debounce(hwnd);
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+                VK_DELETE => {
+                    if s.cursor_pos < s.query.len() {
+                        s.query.remove(s.cursor_pos);
+                        s.selected = 0;
+                        kick_debounce(hwnd);
+                        reset_cursor_blink(hwnd, s);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    }
                 }
                 VK_RETURN => {
                     let is_shift = (GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
@@ -683,6 +719,7 @@ unsafe extern "system" fn wnd_proc(
                         );
                         if is_action_folder {
                             s.query = cmd;
+                            s.cursor_pos = s.query.len();
                             s.selected = 0;
                             s.scroll_offset = 0;
                             s.text_selected = false;
@@ -770,6 +807,7 @@ unsafe extern "system" fn wnd_proc(
                     );
                     if is_action_folder {
                         s.query = cmd;
+                        s.cursor_pos = s.query.len();
                         s.selected = 0;
                         s.scroll_offset = 0;
                         s.text_selected = false;
@@ -1012,14 +1050,28 @@ unsafe fn fill_rounded(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, c: COLO
     let _ = DeleteObject(br);
 }
 
-fn delete_word_before(s: &mut State) {
-    let bytes = s.query.as_bytes();
-    let mut i = bytes.len();
-    // Skip trailing whitespace
+fn word_left(s: &str, pos: usize) -> usize {
+    let bytes = s.as_bytes();
+    let mut i = pos.min(bytes.len());
     while i > 0 && bytes[i-1].is_ascii_whitespace() { i -= 1; }
-    // Skip the word
     while i > 0 && !bytes[i-1].is_ascii_whitespace() { i -= 1; }
-    s.query.truncate(i);
+    i
+}
+
+fn word_right(s: &str, pos: usize) -> usize {
+    let bytes = s.as_bytes();
+    let mut i = pos;
+    while i < bytes.len() && !bytes[i].is_ascii_whitespace() { i += 1; }
+    while i < bytes.len() && bytes[i].is_ascii_whitespace() { i += 1; }
+    i
+}
+
+fn delete_word_before(s: &mut State) {
+    let new_pos = word_left(&s.query, s.cursor_pos);
+    let rest = s.query[s.cursor_pos..].to_string();
+    s.query.truncate(new_pos);
+    s.query.push_str(&rest);
+    s.cursor_pos = new_pos;
 }
 
 // ── Painting ──────────────────────────────────────────────────────────────────
@@ -1261,28 +1313,40 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let mut tr = RECT { left: tx, top: ty, right: tx + tw, bottom: ty + 26 };
 
     SelectObject(mdc, s.font_q);
+    SetTextColor(mdc, CLR_WHITE);
 
     if s.query.is_empty() {
         let mut ph: Vec<u16> = "Search Windows settings...".encode_utf16().collect();
         SetTextColor(mdc, CLR_PH);
         let _ = DrawTextW(mdc, &mut ph, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-    } else {
-        let mut dw: Vec<u16> = s.query.encode_utf16().collect();
-        if s.text_selected {
-            let mut size = SIZE::default();
-            let _ = GetTextExtentPoint32W(mdc, &dw, &mut size);
-            let text_h = size.cy;
-            let sel_top = tr.top + (tr.bottom - tr.top - text_h) / 2;
-            fill(mdc, tx, sel_top, size.cx, text_h, COLORREF(0x00_C5_6A_00)); // Accent blue (#006AC5)
-            
-            SetTextColor(mdc, CLR_WHITE);
-            let _ = DrawTextW(mdc, &mut dw, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        } else {
-            let display = if s.cursor_visible { format!("{}|", s.query) } else { s.query.clone() };
-            let mut dw_cursor: Vec<u16> = display.encode_utf16().collect();
-            SetTextColor(mdc, CLR_WHITE);
-            let _ = DrawTextW(mdc, &mut dw_cursor, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        }
+        SetTextColor(mdc, CLR_WHITE);
+    }
+
+    // Draw text before cursor
+    let before = &s.query[..s.cursor_pos];
+    let mut dw_before: Vec<u16> = before.encode_utf16().collect();
+    let mut before_rect = tr;
+    if !dw_before.is_empty() {
+        let _ = DrawTextW(mdc, &mut dw_before, &mut before_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
+        let _ = DrawTextW(mdc, &mut dw_before, &mut before_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    }
+
+    // Draw cursor
+    if s.cursor_visible {
+        let cursor_x = before_rect.right;
+        let mut size = SIZE::default();
+        let _ = GetTextExtentPoint32W(mdc, &[0], &mut size);
+        let text_h = size.cy;
+        let cursor_top = tr.top + (tr.bottom - tr.top - text_h) / 2;
+        fill(mdc, cursor_x, cursor_top, 1, text_h, CLR_WHITE);
+    }
+
+    // Draw text after cursor
+    let after = &s.query[s.cursor_pos..];
+    if !after.is_empty() {
+        let mut dw_after: Vec<u16> = after.encode_utf16().collect();
+        let mut after_rect = RECT { left: before_rect.right, top: tr.top, right: tr.right, bottom: tr.bottom };
+        let _ = DrawTextW(mdc, &mut dw_after, &mut after_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     }
 
     // ── Results ───────────────────────────────────────────────────────────
