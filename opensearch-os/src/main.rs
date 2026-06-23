@@ -41,10 +41,15 @@ const WM_ENGINE_READY: u32 = WM_USER + 2;
 
 // ── Animation ─────────────────────────────────────────────────────────────────
 const ANIM_TICK_MS: u32 = 16;
-const APPEAR_FRAMES: f32 = 9.0;  // ~144ms
-const HIDE_FRAMES: f32 = 6.0;   // ~96ms
+const APPEAR_FRAMES: f32 = 8.0;  // ~130ms
+const HIDE_FRAMES: f32 = 8.0;    // ~130ms
 const MAX_ALPHA: u8 = 255;       // 100% opacity for solid backdrop
 const SLIDE_PX: i32 = 14;
+
+// ── Pill Dimensions ───────────────────────────────────────────────────────────
+const PILL_W: i32 = 150;
+const PILL_H: i32 = 12;
+const PILL_Y: i32 = 8;
 
 // ── Colors (COLORREF = 0x00BBGGRR) ───────────────────────────────────────────
 const BG: COLORREF        = COLORREF(0x00_24_21_21);
@@ -86,7 +91,7 @@ struct State {
 }
 
 #[derive(PartialEq)]
-enum Anim { Hidden, Appearing(i32), Visible, Hiding(i32) }
+enum Anim { Pill, Appearing(i32), Visible, Hiding(i32) }
 
 #[derive(Clone, Copy)]
 struct SendHwnd(HWND);
@@ -149,7 +154,7 @@ unsafe fn run() {
         query: String::new(),
         results: vec![],
         selected: 0,
-        anim: Anim::Hidden,
+        anim: Anim::Pill,
         cx: sw / 2,
         cy: sh / 3,
         font_q: mk_font(-19, 400),
@@ -185,19 +190,24 @@ unsafe fn run() {
     };
     RegisterClassExW(&wc);
 
+    let sw = GetSystemMetrics(SM_CXSCREEN);
+    let pill_x = sw / 2 - PILL_W / 2;
+    let pill_y = PILL_Y;
+
     let hwnd = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
         PCWSTR(class.as_ptr()),
         PCWSTR::null(),
         WS_POPUP,
-        -4000, -4000, WIN_W, SEARCH_H,
+        pill_x, pill_y, PILL_W, PILL_H,
         HWND(null_mut()), HMENU(null_mut()), hinst,
         Some(Box::into_raw(state) as _),
     ).unwrap();
 
     let _ = unsafe { windows::Win32::System::DataExchange::AddClipboardFormatListener(hwnd) };
 
-    SetLayeredWindowAttributes(hwnd, COLORREF(0), 0, LWA_ALPHA).unwrap();
+    SetLayeredWindowAttributes(hwnd, COLORREF(0), 240, LWA_ALPHA).unwrap();
+    let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
 
     // DWM rounded corners (Windows 11)
     let corner = DWMWCP_ROUND;
@@ -293,8 +303,8 @@ unsafe extern "system" fn wnd_proc(
         WM_HOTKEY if wp.0 as i32 == HOTKEY_ID => {
             let s = &mut *sp;
             match s.anim {
-                Anim::Hidden | Anim::Hiding(_) => do_show(hwnd, s),
-                _ => do_hide(hwnd, s),
+                Anim::Pill | Anim::Hiding(_) => do_show(hwnd, s),
+                _ => start_hide(hwnd, s),
             }
             LRESULT(0)
         }
@@ -302,7 +312,7 @@ unsafe extern "system" fn wnd_proc(
         WM_KILLFOCUS => {
             if !sp.is_null() {
                 let s = &mut *sp;
-                if !matches!(s.anim, Anim::Hidden | Anim::Hiding(_)) {
+                if !matches!(s.anim, Anim::Pill | Anim::Hiding(_)) {
                     start_hide(hwnd, s);
                 }
             }
@@ -441,7 +451,7 @@ unsafe extern "system" fn wnd_proc(
                     trigger_icon_loading(hwnd, s);
                     s.selected = 0;
                     s.scroll_offset = 0;
-                    reposition(hwnd, s, 0);
+                    reposition_animated(hwnd, s, 1.0);
                     InvalidateRect(hwnd, None, FALSE);
                 }
                 TIMER_ANIM => tick(hwnd, s),
@@ -555,7 +565,7 @@ unsafe extern "system" fn wnd_proc(
                                 vec![]
                             };
                             trigger_icon_loading(hwnd, s);
-                            reposition(hwnd, s, 0);
+                            reposition_animated(hwnd, s, 1.0);
                             InvalidateRect(hwnd, None, FALSE);
                         } else {
                             if let Some(text) = cmd.strip_prefix("copy:") {
@@ -623,6 +633,10 @@ unsafe extern "system" fn wnd_proc(
         WM_LBUTTONDOWN => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
+            if s.anim == Anim::Pill {
+                do_show(hwnd, s);
+                return LRESULT(0);
+            }
             let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
             let n = s.results.len().min(VISIBLE_RESULTS);
             for i in 0..n {
@@ -645,7 +659,7 @@ unsafe extern "system" fn wnd_proc(
                             vec![]
                         };
                         trigger_icon_loading(hwnd, s);
-                        reposition(hwnd, s, 0);
+                        reposition_animated(hwnd, s, 1.0);
                         InvalidateRect(hwnd, None, FALSE);
                     } else {
                         if let Some(text) = cmd.strip_prefix("copy:") {
@@ -749,9 +763,9 @@ unsafe fn do_show(hwnd: HWND, s: &mut State) {
     s.last_mouse_y = pt.y;
     
     s.anim = Anim::Appearing(0);
-    reposition(hwnd, s, SLIDE_PX);
-    let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+    reposition_animated(hwnd, s, 0.0);
     let _ = SetForegroundWindow(hwnd);
+    let _ = SetFocus(hwnd);
     let _ = SetTimer(hwnd, TIMER_ANIM, ANIM_TICK_MS, None);
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
@@ -759,21 +773,48 @@ unsafe fn do_show(hwnd: HWND, s: &mut State) {
 unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     KillTimer(hwnd, TIMER_ANIM);
     KillTimer(hwnd, TIMER_DEBOUNCE);
-    SetLayeredWindowAttributes(hwnd, COLORREF(0), 0, LWA_ALPHA).unwrap();
-    ShowWindow(hwnd, SW_HIDE);
-    s.anim = Anim::Hidden;
+    
+    // Hide the window so Windows naturally restores focus to the previously active window
+    let _ = ShowWindow(hwnd, SW_HIDE);
+    
+    s.anim = Anim::Pill;
+    
+    // Reposition to pill size and position at top center
+    let sw = GetSystemMetrics(SM_CXSCREEN);
+    let pill_x = sw / 2 - PILL_W / 2;
+    let pill_y = PILL_Y;
+    let _ = SetWindowPos(hwnd, HWND_TOPMOST, pill_x, pill_y, PILL_W, PILL_H, SWP_NOACTIVATE);
+    
+    // Reset to pill opacity
+    let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 240, LWA_ALPHA);
+    
+    // Show window as pill without focus
+    let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
 }
 
 unsafe fn start_hide(hwnd: HWND, s: &mut State) {
     s.anim = Anim::Hiding(0);
-    SetTimer(hwnd, TIMER_ANIM, ANIM_TICK_MS, None);
+    let _ = SetTimer(hwnd, TIMER_ANIM, ANIM_TICK_MS, None);
 }
 
-unsafe fn reposition(hwnd: HWND, s: &State, y_up: i32) {
-    let h = s.win_h();
-    let x = s.cx - WIN_W / 2;
-    let y = s.cy - SEARCH_H / 2 - y_up;
-    let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y, WIN_W, h, SWP_NOACTIVATE);
+unsafe fn reposition_animated(hwnd: HWND, s: &State, t: f32) {
+    let sw = GetSystemMetrics(SM_CXSCREEN);
+    let pill_x = sw / 2 - PILL_W / 2;
+    let pill_y = PILL_Y;
+    let pill_w = PILL_W;
+    let pill_h = PILL_H;
+
+    let search_w = WIN_W;
+    let search_h = s.win_h();
+    let search_x = s.cx - WIN_W / 2;
+    let search_y = s.cy - search_h / 2;
+
+    let x = (pill_x as f32 + (search_x - pill_x) as f32 * t) as i32;
+    let y = (pill_y as f32 + (search_y - pill_y) as f32 * t) as i32;
+    let w = (pill_w as f32 + (search_w - pill_w) as f32 * t) as i32;
+    let h = (pill_h as f32 + (search_h - pill_h) as f32 * t) as i32;
+
+    let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE | SWP_NOCOPYBITS);
 }
 
 unsafe fn kick_debounce(hwnd: HWND) {
@@ -788,33 +829,48 @@ unsafe fn tick(hwnd: HWND, s: &mut State) {
             *f += 1;
             let progress = (*f as f32 / APPEAR_FRAMES).min(1.0);
             let t = ease_out(progress);
-            let alpha = (t * MAX_ALPHA as f32) as u8;
-            let slide = ((1.0 - t) * SLIDE_PX as f32) as i32;
-            SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha, LWA_ALPHA).unwrap();
-            reposition(hwnd, s, slide);
+            let alpha = (240.0 + (255.0 - 240.0) * t) as u8;
+            let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha, LWA_ALPHA);
+            reposition_animated(hwnd, s, t);
             if progress >= 1.0 {
                 s.anim = Anim::Visible;
                 KillTimer(hwnd, TIMER_ANIM);
+                let _ = SetForegroundWindow(hwnd);
+                let _ = SetFocus(hwnd);
             }
         }
         Anim::Hiding(f) => {
             *f += 1;
             let progress = (*f as f32 / HIDE_FRAMES).min(1.0);
-            let t = 1.0 - ease_out(progress);
-            let alpha = (t * MAX_ALPHA as f32) as u8;
-            let slide = ((1.0 - t) * SLIDE_PX as f32) as i32;
-            SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha, LWA_ALPHA).unwrap();
-            reposition(hwnd, s, slide);
+            let t = 1.0 - ease_in(progress);
+            let alpha = (240.0 + (255.0 - 240.0) * t) as u8;
+            let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha, LWA_ALPHA);
+            reposition_animated(hwnd, s, t);
             if progress >= 1.0 {
                 do_hide(hwnd, s);
             }
         }
         _ => { KillTimer(hwnd, TIMER_ANIM); }
     }
-    InvalidateRect(hwnd, None, FALSE);
+    let _ = InvalidateRect(hwnd, None, FALSE);
 }
 
 fn ease_out(t: f32) -> f32 { 1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(3) }
+fn ease_in(t: f32) -> f32 { t.clamp(0.0, 1.0).powi(3) }
+
+unsafe fn fill_rounded(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, c: COLORREF) {
+    let br = CreateSolidBrush(c);
+    let old_brush = SelectObject(hdc, br);
+    let pen = CreatePen(PS_NULL, 0, COLORREF(0));
+    let old_pen = SelectObject(hdc, pen);
+    
+    let _ = RoundRect(hdc, x, y, x + w + 1, y + h + 1, r, r);
+    
+    let _ = SelectObject(hdc, old_pen);
+    let _ = DeleteObject(pen);
+    let _ = SelectObject(hdc, old_brush);
+    let _ = DeleteObject(br);
+}
 
 // ── Painting ──────────────────────────────────────────────────────────────────
 unsafe fn resolve_lnk(path: &str) -> Option<String> {
@@ -1018,12 +1074,27 @@ unsafe fn trigger_icon_loading(hwnd: HWND, s: &mut State) {
 unsafe fn paint(hwnd: HWND, s: &State) {
     let mut ps = PAINTSTRUCT::default();
     let hdc = BeginPaint(hwnd, &mut ps);
-    let h = s.win_h();
+    
+    let mut rc = RECT::default();
+    let _ = GetClientRect(hwnd, &mut rc);
+    let win_w = rc.right - rc.left;
+    let win_h = rc.bottom - rc.top;
 
     // Double-buffer
     let mdc = CreateCompatibleDC(hdc);
-    let bmp = CreateCompatibleBitmap(hdc, WIN_W, h);
+    let bmp = CreateCompatibleBitmap(hdc, win_w, win_h);
     let old = SelectObject(mdc, bmp);
+
+    if win_h < SEARCH_H {
+        // Draw simple rounded notch/pill for Dynamic Island state
+        fill_rounded(mdc, 0, 0, win_w, win_h, 8, COLORREF(0x00_15_12_12));
+        let _ = BitBlt(hdc, 0, 0, win_w, win_h, mdc, 0, 0, SRCCOPY);
+        let _ = SelectObject(mdc, old);
+        let _ = DeleteObject(bmp);
+        let _ = DeleteDC(mdc);
+        EndPaint(hwnd, &ps);
+        return;
+    }
 
     // Fill background / Draw Glowing Border
     let has_results = s.results.len().min(MAX_RESULTS) > 0;
@@ -1039,8 +1110,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 Alpha: 0x0000,
             },
             TRIVERTEX {
-                x: WIN_W,
-                y: h,
+                x: win_w,
+                y: win_h,
                 Red: 0x7f00,
                 Green: 0x0000,
                 Blue: 0xff00,
@@ -1052,11 +1123,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             LowerRight: 1,
         }];
         let _ = GradientFill(mdc, &vertices, g_rect.as_ptr() as *const _, 1, GRADIENT_FILL(0)); // Horizontal gradient
-        fill(mdc, 1, 1, WIN_W - 2, h - 2, BG);
+        fill(mdc, 1, 1, win_w - 2, win_h - 2, BG);
     } else {
         // Draw subtle solid gray border
-        fill(mdc, 0, 0, WIN_W, h, CLR_DIV);
-        fill(mdc, 1, 1, WIN_W - 2, h - 2, BG);
+        fill(mdc, 0, 0, win_w, win_h, CLR_DIV);
+        fill(mdc, 1, 1, win_w - 2, win_h - 2, BG);
     }
 
     // ── Search row ────────────────────────────────────────────────────────
@@ -1071,7 +1142,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     // Text / placeholder
     let tx = PAD_L + ICON_W + 8;
     let ty = (SEARCH_H - 26) / 2;
-    let tw = WIN_W - tx - PAD_L;
+    let tw = win_w - tx - PAD_L;
     let mut tr = RECT { left: tx, top: ty, right: tx + tw, bottom: ty + 26 };
 
     SelectObject(mdc, s.font_q);
@@ -1079,38 +1150,38 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     if s.query.is_empty() {
         let mut ph: Vec<u16> = "Search Windows settings...".encode_utf16().collect();
         SetTextColor(mdc, CLR_PH);
-        DrawTextW(mdc, &mut ph, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        let _ = DrawTextW(mdc, &mut ph, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     } else {
         let mut dw: Vec<u16> = s.query.encode_utf16().collect();
         if s.text_selected {
             let mut size = SIZE::default();
-            GetTextExtentPoint32W(mdc, &dw, &mut size);
+            let _ = GetTextExtentPoint32W(mdc, &dw, &mut size);
             let text_h = size.cy;
             let sel_top = tr.top + (tr.bottom - tr.top - text_h) / 2;
             fill(mdc, tx, sel_top, size.cx, text_h, COLORREF(0x00_C5_6A_00)); // Accent blue (#006AC5)
             
             SetTextColor(mdc, CLR_WHITE);
-            DrawTextW(mdc, &mut dw, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            let _ = DrawTextW(mdc, &mut dw, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         } else {
             let display = format!("{}_", s.query);
             let mut dw_cursor: Vec<u16> = display.encode_utf16().collect();
             SetTextColor(mdc, CLR_WHITE);
-            DrawTextW(mdc, &mut dw_cursor, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            let _ = DrawTextW(mdc, &mut dw_cursor, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         }
     }
 
     // ── Results ───────────────────────────────────────────────────────────
     let n = s.results.len().min(VISIBLE_RESULTS);
     if n > 0 {
-        fill(mdc, 0, SEARCH_H, WIN_W, 1, CLR_DIV);
+        fill(mdc, 0, SEARCH_H, win_w, 1, CLR_DIV);
 
         for i in 0..n {
             let res_idx = s.scroll_offset + i;
             let res = &s.results[res_idx];
             let ry = SEARCH_H + 1 + i as i32 * RESULT_H;
 
-            if res_idx == s.selected { fill(mdc, 0, ry, WIN_W, RESULT_H, BG_SEL); }
-            if i > 0 { fill(mdc, PAD_L, ry, WIN_W - PAD_L * 2, 1, CLR_DIV); }
+            if res_idx == s.selected { fill(mdc, 0, ry, win_w, RESULT_H, BG_SEL); }
+            if i > 0 { fill(mdc, PAD_L, ry, win_w - PAD_L * 2, 1, CLR_DIV); }
 
             let cy = ry + (RESULT_H - 40) / 2;
 
@@ -1147,27 +1218,27 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             SelectObject(mdc, s.font_n);
             SetTextColor(mdc, CLR_WHITE);
             let mut name: Vec<u16> = res.entry.control_name.encode_utf16().collect();
-            let mut r = RECT { left: tx, top: cy, right: WIN_W - 96, bottom: cy + 22 };
-            DrawTextW(mdc, &mut name, &mut r,
+            let mut r = RECT { left: tx, top: cy, right: win_w - 96, bottom: cy + 22 };
+            let _ = DrawTextW(mdc, &mut name, &mut r,
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
             // Breadcrumb
             SelectObject(mdc, s.font_c);
             SetTextColor(mdc, CLR_GRAY);
             let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
-            let mut r2 = RECT { left: tx, top: cy + 24, right: WIN_W - 96, bottom: cy + 40 };
-            DrawTextW(mdc, &mut crumb, &mut r2,
+            let mut r2 = RECT { left: tx, top: cy + 24, right: win_w - 96, bottom: cy + 40 };
+            let _ = DrawTextW(mdc, &mut crumb, &mut r2,
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
             // Badge
-            badge(mdc, s, &res.entry.source, WIN_W - 88, ry + (RESULT_H - 20) / 2);
+            badge(mdc, s, &res.entry.source, win_w - 88, ry + (RESULT_H - 20) / 2);
         }
 
         // Draw scrollbar if there are more results than visible
         let total_results = s.results.len();
         if total_results > VISIBLE_RESULTS {
             let track_top = SEARCH_H + 8;
-            let track_bottom = h - 8;
+            let track_bottom = win_h - 8;
             let track_h = track_bottom - track_top;
             
             // Thumb height proportional to ratio of visible results, capped at min 24px
@@ -1179,7 +1250,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             let thumb_y = track_top + (s.scroll_offset as f32 / max_offset as f32 * (track_h - thumb_h) as f32) as i32;
             
             // Draw subtle track
-            let sb_x = WIN_W - 10;
+            let sb_x = win_w - 10;
             let sb_w = 4;
             fill(mdc, sb_x, track_top, sb_w, track_h, COLORREF(0x00_2A_2A_2A));
             
@@ -1188,10 +1259,10 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         }
     }
 
-    BitBlt(hdc, 0, 0, WIN_W, h, mdc, 0, 0, SRCCOPY);
-    SelectObject(mdc, old);
-    DeleteObject(bmp);
-    DeleteDC(mdc);
+    let _ = BitBlt(hdc, 0, 0, win_w, win_h, mdc, 0, 0, SRCCOPY);
+    let _ = SelectObject(mdc, old);
+    let _ = DeleteObject(bmp);
+    let _ = DeleteDC(mdc);
     EndPaint(hwnd, &ps);
 }
 
