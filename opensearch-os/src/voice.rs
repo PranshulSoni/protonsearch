@@ -101,8 +101,7 @@ pub fn start_wake_word_listener(hwnd: HWND) {
         let _ = unsafe {
             windows::Win32::System::Com::CoInitializeEx(
                 None,
-                windows::Win32::System::Com::COINIT_APARTMENTTHREADED
-                    | windows::Win32::System::Com::COINIT_DISABLE_OLE1DDE,
+                windows::Win32::System::Com::COINIT_MULTITHREADED,
             )
         };
         if let Err(e) = run_wake_word_loop(h) {
@@ -164,8 +163,7 @@ pub fn start_query_listener(hwnd: HWND) {
         let _ = unsafe {
             windows::Win32::System::Com::CoInitializeEx(
                 None,
-                windows::Win32::System::Com::COINIT_APARTMENTTHREADED
-                    | windows::Win32::System::Com::COINIT_DISABLE_OLE1DDE,
+                windows::Win32::System::Com::COINIT_MULTITHREADED,
             )
         };
 
