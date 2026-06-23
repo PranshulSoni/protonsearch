@@ -554,6 +554,13 @@ unsafe extern "system" fn wnd_proc(
                 let s = &mut *sp;
                 if query_id == s.current_query_id {
                     s.results = results;
+                    if s.results.is_empty() {
+                        s.selected = 0;
+                        s.scroll_offset = 0;
+                    } else {
+                        s.selected = s.selected.min(s.results.len() - 1);
+                        s.scroll_offset = s.scroll_offset.min(s.results.len().saturating_sub(VISIBLE_RESULTS));
+                    }
                     trigger_icon_loading(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
@@ -591,6 +598,7 @@ unsafe extern "system" fn wnd_proc(
                     s.query.insert(s.cursor_pos, c);
                     s.cursor_pos += c.len_utf8();
                     s.selected = 0;
+                    s.scroll_offset = 0;
                     kick_debounce(hwnd);
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
@@ -634,6 +642,7 @@ unsafe extern "system" fn wnd_proc(
                                 s.cursor_pos += clean_text.len();
                             }
                             s.selected = 0;
+                            s.scroll_offset = 0;
                             kick_debounce(hwnd);
                             reset_cursor_blink(hwnd, s);
                             let _ = InvalidateRect(hwnd, None, FALSE);
@@ -702,6 +711,7 @@ unsafe extern "system" fn wnd_proc(
                         s.cursor_pos = p;
                     }
                     s.selected = 0;
+                    s.scroll_offset = 0;
                     kick_debounce(hwnd);
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
@@ -710,6 +720,7 @@ unsafe extern "system" fn wnd_proc(
                     if s.cursor_pos < s.query.len() {
                         s.query.remove(s.cursor_pos);
                         s.selected = 0;
+                        s.scroll_offset = 0;
                         kick_debounce(hwnd);
                         reset_cursor_blink(hwnd, s);
                         let _ = InvalidateRect(hwnd, None, FALSE);
@@ -807,7 +818,7 @@ unsafe extern "system" fn wnd_proc(
             let s = &mut *sp;
             reset_cursor_blink(hwnd, s);
             let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
-            let n = s.results.len().min(VISIBLE_RESULTS);
+            let n = (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS);
             for i in 0..n {
                 let r = s.result_rect(i);
                 if my >= r.top && my < r.bottom {
@@ -853,7 +864,7 @@ unsafe extern "system" fn wnd_proc(
                 s.last_mouse_x = pt.x;
                 s.last_mouse_y = pt.y;
                 
-                let n = s.results.len().min(VISIBLE_RESULTS);
+                let n = (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS);
                 for i in 0..n {
                     let r = s.result_rect(i);
                     if my >= r.top && my < r.bottom {
@@ -1168,9 +1179,21 @@ fn word_right(s: &str, pos: usize) -> usize {
     len
 }
 
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    let mut i = index;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 fn delete_word_before(s: &mut State) {
-    let new_pos = word_left(&s.query, s.cursor_pos);
-    let rest = s.query[s.cursor_pos..].to_string();
+    let cur = floor_char_boundary(&s.query, s.cursor_pos);
+    let new_pos = word_left(&s.query, cur);
+    let rest = s.query[cur..].to_string();
     s.query.truncate(new_pos);
     s.query.push_str(&rest);
     s.cursor_pos = new_pos;
@@ -1429,7 +1452,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
     // Draw cursor
     if s.cursor_visible {
-        let before = &s.query[..s.cursor_pos];
+        let cur = floor_char_boundary(&s.query, s.cursor_pos);
+        let before = &s.query[..cur];
         let dw_before: Vec<u16> = before.encode_utf16().collect();
         let mut size = SIZE::default();
         if !dw_before.is_empty() {
@@ -1445,7 +1469,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     }
 
     // ── Results ───────────────────────────────────────────────────────────
-    let n = s.results.len().min(VISIBLE_RESULTS);
+    let n = (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS);
     if n > 0 {
         fill(mdc, x, y + SEARCH_H, w, 1, CLR_DIV);
 
