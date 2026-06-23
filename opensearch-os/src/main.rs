@@ -2071,6 +2071,8 @@ unsafe fn badge(hdc: HDC, s: &State, source: &str, x: i32, y: i32) {
         ("CLIP", COLORREF(0x00_A6_6A_0A), CLR_WHITE)
     } else if src_lc == "pinned_clip" {
         ("PINNED", COLORREF(0x00_00_C5_D6), CLR_WHITE)
+    } else if src_lc == "confirm" {
+        ("CONFIRM", COLORREF(0x00_00_00_00), CLR_WHITE)
     } else if src_lc == "bookmark" {
         ("BOOKMARK", COLORREF(0x00_00_A5_D6), CLR_WHITE)
     } else if src_lc == "history" {
