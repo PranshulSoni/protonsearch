@@ -188,6 +188,90 @@ impl SearchEngine {
         Ok(engine)
     }
 
+    fn query_everything(&self, query: &str, only_code: bool, max_results: usize) -> Option<Vec<SearchResult>> {
+        use everything_ipc::wm::{EverythingClient, RequestFlags};
+        
+        let client = EverythingClient::new().ok()?;
+        
+        let code_exts = [
+            "rs", "py", "js", "ts", "json", "html", "css",
+            "c", "cpp", "h", "hpp", "cs", "go", "java", "kt", "sh", "bat",
+            "ps1", "yaml", "yml", "toml", "ini", "sql", "xml"
+        ];
+        
+        let full_query = if only_code {
+            format!("{} ext:{}", query, code_exts.join(";"))
+        } else {
+            query.to_string()
+        };
+        
+        let list = client
+            .query_wait(&full_query)
+            .request_flags(RequestFlags::FileName | RequestFlags::Path | RequestFlags::Size)
+            .max_results(max_results as u32)
+            .call()
+            .ok()?;
+            
+        let mut results = Vec::new();
+        for item in list.iter() {
+            let filename = item.get_string(RequestFlags::FileName).unwrap_or_else(|| "Unknown".to_string());
+            let path = item.get_string(RequestFlags::Path).unwrap_or_else(|| "Unknown".to_string());
+            let size = item.get_size(RequestFlags::Size).unwrap_or(0);
+            
+            let full_path = std::path::Path::new(&path).join(&filename).to_string_lossy().into_owned();
+            let ext = std::path::Path::new(&filename)
+                .extension()
+                .map(|e| e.to_string_lossy().to_string().to_lowercase())
+                .unwrap_or_default();
+                
+            let source = if only_code || code_exts.contains(&ext.as_str()) { "CODE" } else { "FILE" };
+            
+            let q_lower = query.to_lowercase();
+            let name_lower = filename.to_lowercase();
+            let name_no_ext = if let Some(dot) = name_lower.rfind('.') {
+                &name_lower[..dot]
+            } else {
+                &name_lower
+            };
+            
+            let mut score = 0.0f32;
+            if name_lower == q_lower || name_no_ext == q_lower {
+                score = 2.5;
+            } else if name_lower.starts_with(&q_lower) || name_no_ext.starts_with(&q_lower) {
+                score = 2.0;
+            } else if name_lower.contains(&q_lower) {
+                score = 1.5;
+            } else {
+                score = 1.0;
+            }
+            
+            let size_str = if size < 1024 {
+                format!("{} B", size)
+            } else if size < 1024 * 1024 {
+                format!("{:.1} KB", size as f64 / 1024.0)
+            } else if size < 1024 * 1024 * 1024 {
+                format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
+            } else {
+                format!("{:.1} GB", size as f64 / (1024.0 * 1024.0 * 1024.0))
+            };
+            
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: format!("{}.{}", source.to_lowercase(), full_path),
+                    control_name: filename.clone(),
+                    breadcrumb_path: format!("{} > {}", if source == "CODE" { "Code" } else { "File" }, full_path),
+                    launch_command: full_path.clone(),
+                    source: source.to_string(),
+                    description: format!("Local {} file ({})", ext.to_uppercase(), size_str),
+                    synonyms: filename.to_lowercase(),
+                },
+                score,
+            });
+        }
+        
+        Some(results)
+    }
+
     fn search_files_generic(&self, query: &str, only_code: bool, max_results: usize) -> Vec<SearchResult> {
         let mut results = Vec::new();
         let conn = match Connection::open(&self.db_path) {
@@ -208,83 +292,89 @@ impl SearchEngine {
             "ps1", "yaml", "yml", "toml", "ini", "sql", "xml"
         ];
 
-        // 1. Metadata Search
-        let name_query = format!("%{}%", q_lower);
+        // 1. Metadata Search (Try Everything first, fallback to SQLite if unavailable)
+        let mut metadata_results = self.query_everything(query, only_code, max_results);
         
-        let query_str = if only_code {
-            let placeholders: Vec<String> = code_exts.iter().map(|_| "?".to_string()).collect();
-            format!(
-                "SELECT path, name, extension, modified FROM files WHERE name LIKE ? AND extension IN ({}) LIMIT ?",
-                placeholders.join(",")
-            )
+        if let Some(ref mut ev_results) = metadata_results {
+            results.append(ev_results);
         } else {
-            "SELECT path, name, extension, modified FROM files WHERE name LIKE ? LIMIT ?".to_string()
-        };
+            let name_query = format!("%{}%", q_lower);
+            
+            let query_str = if only_code {
+                let placeholders: Vec<String> = code_exts.iter().map(|_| "?".to_string()).collect();
+                format!(
+                    "SELECT path, name, extension, modified FROM files WHERE name LIKE ? AND extension IN ({}) LIMIT ?",
+                    placeholders.join(",")
+                )
+            } else {
+                "SELECT path, name, extension, modified FROM files WHERE name LIKE ? LIMIT ?".to_string()
+            };
 
-        let mut stmt = match conn.prepare(&query_str) {
-            Ok(s) => s,
-            Err(_) => return results,
-        };
+            let mut stmt = match conn.prepare(&query_str) {
+                Ok(s) => s,
+                Err(_) => return results,
+            };
 
-        let mut params_vec: Vec<rusqlite::types::Value> = Vec::new();
-        params_vec.push(rusqlite::types::Value::Text(name_query));
-        if only_code {
-            for ext in code_exts.iter() {
-                params_vec.push(rusqlite::types::Value::Text(ext.to_string()));
-            }
-        }
-        params_vec.push(rusqlite::types::Value::Integer(max_results as i64));
-
-        let params_ref = rusqlite::params_from_iter(params_vec.iter());
-        let metadata_rows = stmt.query_map(params_ref, |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, i64>(3)?,
-            ))
-        });
-
-        if let Ok(rows) = metadata_rows {
-            for row in rows.filter_map(|r| r.ok()) {
-                let (path, name, ext, _modified) = row;
-                
-                let name_lower = name.to_lowercase();
-                let name_no_ext = if let Some(dot) = name_lower.rfind('.') {
-                    &name_lower[..dot]
-                } else {
-                    &name_lower
-                };
-                
-                let mut score = 0.0f32;
-                if name_lower == q_lower || name_no_ext == q_lower {
-                    score = 2.5;
-                } else if name_lower.starts_with(&q_lower) || name_no_ext.starts_with(&q_lower) {
-                    score = 2.0;
-                } else if name_lower.contains(&q_lower) {
-                    score = 1.5;
-                } else {
-                    let name_words: Vec<&str> = name_no_ext.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
-                    let matched = q_words.iter().filter(|w| name_words.contains(w)).count();
-                    if matched > 0 {
-                        score = 0.8 + 0.4 * (matched as f32 / q_words.len() as f32);
-                    }
+            let mut params_vec: Vec<rusqlite::types::Value> = Vec::new();
+            params_vec.push(rusqlite::types::Value::Text(name_query));
+            if only_code {
+                for ext in code_exts.iter() {
+                    params_vec.push(rusqlite::types::Value::Text(ext.to_string()));
                 }
+            }
+            params_vec.push(rusqlite::types::Value::Integer(max_results as i64));
 
-                if score > 0.0 {
-                    let source = if only_code || code_exts.contains(&ext.as_str()) { "CODE" } else { "FILE" };
-                    results.push(SearchResult {
-                        entry: CatalogEntry {
-                            id: format!("{}.{}", source.to_lowercase(), path),
-                            control_name: name.clone(),
-                            breadcrumb_path: format!("{} > {}", if source == "CODE" { "Code" } else { "File" }, path),
-                            launch_command: path.clone(),
-                            source: source.to_string(),
-                            description: format!("Local {} file", ext.to_uppercase()),
-                            synonyms: name.to_lowercase(),
-                        },
-                        score,
-                    });
+            let params_ref = rusqlite::params_from_iter(params_vec.iter());
+            let metadata_rows = stmt.query_map(params_ref, |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            });
+
+            if let Ok(rows) = metadata_rows {
+                for row in rows.filter_map(|r| r.ok()) {
+                    let (path, name, ext, _modified) = row;
+                    
+                    let name_lower = name.to_lowercase();
+                    let name_no_ext = if let Some(dot) = name_lower.rfind('.') {
+                        &name_lower[..dot]
+                    } else {
+                        &name_lower
+                    };
+                    
+                    let mut score = 0.0f32;
+                    if name_lower == q_lower || name_no_ext == q_lower {
+                        score = 2.5;
+                    } else if name_lower.starts_with(&q_lower) || name_no_ext.starts_with(&q_lower) {
+                        score = 2.0;
+                    } else if name_lower.contains(&q_lower) {
+                        score = 1.5;
+                    } else {
+                        let name_words: Vec<&str> = name_no_ext.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
+                        let matched = q_words.iter().filter(|w| name_words.contains(w)).count();
+                        if matched > 0 {
+                            score = 0.8 + 0.4 * (matched as f32 / q_words.len() as f32);
+                        }
+                    }
+
+                    if score > 0.0 {
+                        let source = if only_code || code_exts.contains(&ext.as_str()) { "CODE" } else { "FILE" };
+                        results.push(SearchResult {
+                            entry: CatalogEntry {
+                                id: format!("{}.{}", source.to_lowercase(), path),
+                                control_name: name.clone(),
+                                breadcrumb_path: format!("{} > {}", if source == "CODE" { "Code" } else { "File" }, path),
+                                launch_command: path.clone(),
+                                source: source.to_string(),
+                                description: format!("Local {} file", ext.to_uppercase()),
+                                synonyms: name.to_lowercase(),
+                            },
+                            score,
+                        });
+                    }
                 }
             }
         }
