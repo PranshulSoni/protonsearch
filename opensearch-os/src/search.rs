@@ -70,6 +70,7 @@ pub struct SearchEngine {
     apps: Vec<AppInfo>,
     recent_files: Vec<RecentFileInfo>,
     db_path: std::path::PathBuf,
+    conn: Connection,
 }
 
 impl SearchEngine {
@@ -155,21 +156,7 @@ impl SearchEngine {
             },
         ];
 
-        let mut engine = Self { vecs, meta, n, dim, session, tokenizer, anchor_categories: vec![], apps: vec![], recent_files: vec![], db_path };
-        for cat in &mut anchor_categories {
-            for phrase in cat.phrases {
-                let phrase_with_prefix = format!("query: {}", phrase);
-                if let Ok(v) = engine.embed(&phrase_with_prefix) {
-                    cat.vecs.push(v);
-                }
-            }
-        }
-        engine.anchor_categories = anchor_categories;
-        engine.apps = scan_apps();
-        engine.recent_files = scan_recent_files();
-        
-        // Initialize clipboard_history table
-        let conn = Connection::open(&engine.db_path)?;
+        let conn = Connection::open(&db_path)?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         // Add is_image column if it doesn't exist
         let _ = conn.execute("ALTER TABLE clipboard_history ADD COLUMN is_image INTEGER DEFAULT 0;", []);
@@ -195,6 +182,19 @@ impl SearchEngine {
             [],
         )?;
         let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp);", []);
+
+        let mut engine = Self { vecs, meta, n, dim, session, tokenizer, anchor_categories: vec![], apps: vec![], recent_files: vec![], db_path, conn };
+        for cat in &mut anchor_categories {
+            for phrase in cat.phrases {
+                let phrase_with_prefix = format!("query: {}", phrase);
+                if let Ok(v) = engine.embed(&phrase_with_prefix) {
+                    cat.vecs.push(v);
+                }
+            }
+        }
+        engine.anchor_categories = anchor_categories;
+        engine.apps = scan_apps();
+        engine.recent_files = scan_recent_files();
 
         let _ = engine.search("settings", 1);
         Ok(engine)
@@ -252,7 +252,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         
         let list = client
             .query_wait(&full_query)
-            .request_flags(RequestFlags::FileName | RequestFlags::Path | RequestFlags::Size)
+            .request_flags(RequestFlags::FileName | RequestFlags::Path | RequestFlags::Size | RequestFlags::Attributes)
             .max_results(max_results as u32)
             .call()
             .ok()?;
@@ -276,7 +276,8 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 continue; // Skip system/hidden/ignored files
             }
 
-            let is_dir = std::path::Path::new(&full_path).is_dir();
+            let attrs = item.get_u32(RequestFlags::Attributes).unwrap_or(0);
+            let is_dir = (attrs & 0x10) != 0;
             
             let ext = if is_dir {
                 "folder".to_string()
@@ -353,13 +354,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
     // with_fts_content: if false (general search), skips content-only matches — only filename hits shown.
     //                   if true  (file:/code: prefix), full content search is included.
     fn search_files_generic(&self, query: &str, only_code: bool, max_results: usize, with_fts_content: bool) -> Vec<SearchResult> {
-        let conn = match Connection::open(&self.db_path) {
-            Ok(c) => {
-                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
-                c
-            }
-            Err(_) => return Vec::new(),
-        };
+        let conn = &self.conn;
 
         let q_lower = query.to_lowercase();
         let q_words: Vec<&str> = q_lower.split_whitespace().collect();
@@ -451,25 +446,25 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         }
 
         // ── 3. FTS5 content search — only in dedicated prefix searches (file:/code:)
-        // In general search (with_fts_content=false), we only boost already-found filename matches.
+        // In general search (with_fts_content=false), we skip content-only matches to prevent UI stutters.
         if !with_fts_content {
-            // Still boost score of metadata hits that also match content
-            let clean_fts_query = q_words.join(" ");
-            let fts_check = format!(
-                "SELECT f.path FROM files f JOIN files_fts fts ON f.path = fts.path WHERE files_fts MATCH ? LIMIT 50"
-            );
-            if let Ok(mut stmt_fts) = conn.prepare(&fts_check) {
-                if let Ok(rows) = stmt_fts.query_map([&clean_fts_query], |row| row.get::<_, String>(0)) {
-                    for row in rows.filter_map(|r| r.ok()) {
-                        if let Some(existing) = results.iter_mut().find(|r| r.entry.launch_command == row) {
-                            existing.score += 0.5; // content match bonus on top of filename match
-                        }
-                    }
-                }
-            }
             return results;
         }
-        let clean_fts_query = q_words.join(" ");
+
+        // Build prefix-based FTS matching query: each word matches as prefix (e.g. "gene*" or "hello* world*")
+        let clean_fts_query = q_words.iter()
+            .map(|w| {
+                let clean: String = w.chars().filter(|c| c.is_alphanumeric()).collect();
+                format!("{}*", clean)
+            })
+            .filter(|w| w.len() > 1) // exclude empty or single "*"
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        if clean_fts_query.is_empty() {
+            return results;
+        }
+
         let fts_query_str = if only_code {
             let placeholders: Vec<String> = code_exts.iter().map(|_| "?".to_string()).collect();
             format!(
@@ -561,13 +556,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
     pub fn search_timeline(&self, start_time: i64, end_time: i64, keyword: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
-        let conn = match Connection::open(&self.db_path) {
-            Ok(c) => {
-                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
-                c
-            }
-            Err(_) => return results,
-        };
+        let conn = &self.conn;
 
         let select_query = if keyword.is_empty() {
             "SELECT timestamp, duration, app_name, window_title FROM timeline_events \
@@ -651,13 +640,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
     pub fn search_project(&self, project_keyword: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
-        let conn = match Connection::open(&self.db_path) {
-            Ok(c) => {
-                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
-                c
-            }
-            Err(_) => return results,
-        };
+        let conn = &self.conn;
 
         let kw_lower = project_keyword.to_lowercase();
         let kw_pattern = format!("%{}%", kw_lower);
@@ -904,13 +887,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
     pub fn search_clipboard_history(&self, query: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
-        let conn = match Connection::open(&self.db_path) {
-            Ok(c) => {
-                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
-                c
-            }
-            Err(_) => return results,
-        };
+        let conn = &self.conn;
 
         let q_lower = query.to_lowercase();
         
@@ -1021,13 +998,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
     pub fn search_bookmarks_only(&self, sub_query: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
-        let conn = match Connection::open(&self.db_path) {
-            Ok(c) => {
-                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
-                c
-            }
-            Err(_) => return results,
-        };
+        let conn = &self.conn;
 
         let q_lower = sub_query.trim().to_lowercase();
         let q_words: Vec<&str> = q_lower.split_whitespace().collect();
@@ -1135,13 +1106,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
     pub fn search_history_only(&self, sub_query: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
-        let conn = match Connection::open(&self.db_path) {
-            Ok(c) => {
-                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
-                c
-            }
-            Err(_) => return results,
-        };
+        let conn = &self.conn;
 
         let q_lower = sub_query.trim().to_lowercase();
         let q_words: Vec<&str> = q_lower.split_whitespace().collect();
@@ -1251,13 +1216,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
     pub fn search_commits_only(&self, sub_query: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
-        let conn = match Connection::open(&self.db_path) {
-            Ok(c) => {
-                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
-                c
-            }
-            Err(_) => return results,
-        };
+        let conn = &self.conn;
 
         let q_lower = sub_query.trim().to_lowercase();
         let q_words: Vec<&str> = q_lower.split_whitespace().collect();
@@ -1366,13 +1325,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
     pub fn search_todos_only(&self, sub_query: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
-        let conn = match Connection::open(&self.db_path) {
-            Ok(c) => {
-                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
-                c
-            }
-            Err(_) => return results,
-        };
+        let conn = &self.conn;
 
         let q_lower = sub_query.trim().to_lowercase();
         let q_words: Vec<&str> = q_lower.split_whitespace().collect();
@@ -1954,8 +1907,8 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         // ── Cross-Source Entity Linker ("Project Auto-Entity") ──────────────
         let mut matched_project_name = None;
         if q.len() >= 3 {
-            if let Ok(conn) = Connection::open(&self.db_path) {
-                let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+            {
+                let conn = &self.conn;
                 
                 // Check git repos first
                 if let Ok(mut s) = conn.prepare("SELECT name FROM git_repos") {
@@ -1994,8 +1947,8 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         let mut project_results = Vec::new();
         if let Some(ref project_name) = matched_project_name {
             let mut repo_path = String::new();
-            if let Ok(conn) = Connection::open(&self.db_path) {
-                let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+            {
+                let conn = &self.conn;
                 if let Ok(mut s) = conn.prepare("SELECT path FROM git_repos WHERE name = ? LIMIT 1") {
                     if let Ok(p) = s.query_row([project_name], |row| row.get::<_, String>(0)) {
                         repo_path = p;

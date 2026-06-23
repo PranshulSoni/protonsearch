@@ -38,6 +38,12 @@ const TIMER_DEBOUNCE: usize = 1;
 const TIMER_ANIM: usize = 2;
 const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
+const WM_SEARCH_RESULTS: u32 = WM_USER + 3;
+
+struct SearchRequest {
+    query: String,
+    query_id: usize,
+}
 // ── Animation ─────────────────────────────────────────────────────────────────
 const ANIM_TICK_MS: u32 = 1;
 const ANIM_DURATION_SEC: f32 = 0.160; // 160ms
@@ -59,7 +65,10 @@ const COLOR_KEY: COLORREF = COLORREF(0x00_12_34_56);
 
 // ── App state ─────────────────────────────────────────────────────────────────
 struct State {
-    engine: Option<SearchEngine>,
+    search_tx: Option<std::sync::mpsc::Sender<SearchRequest>>,
+    icon_tx: Option<std::sync::mpsc::Sender<IconRequest>>,
+    current_query_id: usize,
+    db_path: std::path::PathBuf,
     query: String,
     results: Vec<SearchResult>,
     selected: usize,
@@ -100,6 +109,11 @@ enum Anim {
 struct SendHwnd(HWND);
 unsafe impl Send for SendHwnd {}
 unsafe impl Sync for SendHwnd {}
+
+struct IconRequest {
+    key: String,
+    source: String,
+}
 
 impl State {
     fn win_h(&self) -> i32 {
@@ -153,6 +167,15 @@ unsafe fn run() {
     let sw = GetSystemMetrics(SM_CXSCREEN);
     let sh = GetSystemMetrics(SM_CYSCREEN);
 
+    let db_path = match std::env::var("APPDATA") {
+        Ok(d) => {
+            let path = std::path::PathBuf::from(d).join("opensearch-os");
+            let _ = std::fs::create_dir_all(&path);
+            path.join("file_index.db")
+        }
+        Err(_) => std::path::PathBuf::from("file_index.db"),
+    };
+
     const SETTINGS_ICO: &[u8] = include_bytes!("../../assets/logo/settings.ico");
     const CONTROL_PANEL_ICO: &[u8] = include_bytes!("../../assets/logo/control_panel.ico");
     const SEARCH_ICO: &[u8] = include_bytes!("../../assets/logo/search.ico");
@@ -169,8 +192,13 @@ unsafe fn run() {
     let icon_clipboard = load_icon_from_dll("shell32.dll", 260, 32);
     let icon_memory = load_icon_from_dll("shell32.dll", 238, 32);
 
+    let (icon_tx, icon_rx) = std::sync::mpsc::channel::<IconRequest>();
+
     let state = Box::new(State {
-        engine: None,
+        search_tx: None,
+        icon_tx: Some(icon_tx),
+        current_query_id: 0,
+        db_path: db_path.clone(),
         query: String::new(),
         results: vec![],
         selected: 0,
@@ -224,6 +252,39 @@ unsafe fn run() {
         Some(Box::into_raw(state) as _),
     ).unwrap();
 
+    let hwnd_icon = SendHwnd(hwnd);
+    std::thread::spawn(move || {
+        let hwnd_raw = hwnd_icon;
+        let _ = unsafe { windows::Win32::System::Com::CoInitializeEx(
+            None,
+            windows::Win32::System::Com::COINIT_APARTMENTTHREADED | windows::Win32::System::Com::COINIT_DISABLE_OLE1DDE
+        ) };
+        while let Ok(req) = icon_rx.recv() {
+            unsafe {
+                let is_real_folder = req.source == "FOLDER" && !req.key.ends_with(':') && std::path::Path::new(&req.key).exists();
+                let is_real_project = req.source == "PROJECT" && !req.key.is_empty() && !req.key.starts_with("http") && std::path::Path::new(&req.key).exists();
+                let is_file_icon = req.source == "RECENT" || req.source == "FILE" || req.source == "CODE" || is_real_folder || is_real_project;
+                let hicon = if is_file_icon {
+                    get_file_icon(&req.key)
+                } else {
+                    get_app_icon(&req.key)
+                };
+                if !hicon.0.is_null() {
+                    let key_ptr = Box::into_raw(Box::new(req.key));
+                    if PostMessageW(
+                        hwnd_raw.0,
+                        WM_ICON_LOADED,
+                        WPARAM(hicon.0 as usize),
+                        LPARAM(key_ptr as isize),
+                    ).is_err() {
+                        let _ = Box::from_raw(key_ptr);
+                        let _ = DestroyIcon(hicon);
+                    }
+                }
+            }
+        }
+    });
+
     let _ = unsafe { windows::Win32::System::DataExchange::AddClipboardFormatListener(hwnd) };
 
     SetLayeredWindowAttributes(hwnd, COLOR_KEY, 255, LWA_COLORKEY).unwrap();
@@ -244,15 +305,9 @@ unsafe fn run() {
 
     // Load the search engine in a background thread so the window appears instantly.
     let hwnd_usize = hwnd.0 as usize;
+    let db_path_for_thread = db_path.clone();
     std::thread::spawn(move || {
-        let db_path = match std::env::var("APPDATA") {
-            Ok(d) => {
-                let path = std::path::PathBuf::from(d).join("opensearch-os");
-                let _ = std::fs::create_dir_all(&path);
-                path.join("file_index.db")
-            }
-            Err(_) => std::path::PathBuf::from("file_index.db"),
-        };
+        let db_path = db_path_for_thread;
         indexer::start_indexer(db_path.clone());
         browser_indexer::start_browser_indexer(db_path.clone());
         git_indexer::start_git_indexer(db_path.clone());
@@ -275,7 +330,7 @@ unsafe fn run() {
         let hwnd_bg = HWND(hwnd_usize as *mut std::ffi::c_void);
         unsafe {
             match result {
-                Ok(engine) => {
+                Ok(mut engine) => {
                     // Import Windows Clipboard History in background
                     let db_path_clone = db_path.clone();
                     std::thread::spawn(move || {
@@ -284,8 +339,33 @@ unsafe fn run() {
                         unsafe { windows::Win32::System::Com::CoUninitialize(); }
                     });
 
-                    let ptr = Box::into_raw(Box::new(engine)) as isize;
-                    let _ = PostMessageW(hwnd_bg, WM_ENGINE_READY, WPARAM(1), LPARAM(ptr));
+                    // Spawn worker channels
+                    let (tx, rx) = std::sync::mpsc::channel::<SearchRequest>();
+                    let hwnd_worker = SendHwnd(hwnd_bg);
+
+                    // Spawn search worker thread
+                    std::thread::spawn(move || {
+                        let hwnd_target = hwnd_worker;
+                        while let Ok(req) = rx.recv() {
+                            // Drain queued requests to keep only the latest one
+                            let mut latest_req = req;
+                            while let Ok(next_req) = rx.try_recv() {
+                                latest_req = next_req;
+                            }
+
+                            let results = engine.search(&latest_req.query, MAX_RESULTS);
+                            let results_ptr = Box::into_raw(Box::new(results)) as isize;
+                            let _ = PostMessageW(
+                                hwnd_target.0,
+                                WM_SEARCH_RESULTS,
+                                WPARAM(latest_req.query_id),
+                                LPARAM(results_ptr),
+                            );
+                        }
+                    });
+
+                    let tx_ptr = Box::into_raw(Box::new(tx)) as isize;
+                    let _ = PostMessageW(hwnd_bg, WM_ENGINE_READY, WPARAM(1), LPARAM(tx_ptr));
                 }
                 Err(e) => {
                     let msg = Box::into_raw(Box::new(e.to_string())) as isize;
@@ -381,65 +461,63 @@ unsafe extern "system" fn wnd_proc(
                 return LRESULT(0);
             }
 
-            let db_path = s.engine.as_ref().map(|e| e.db_path());
-            if let Some(db_path) = db_path {
-                let app_name = unsafe { get_active_app_name() };
+            let db_path = s.db_path.clone();
+            let app_name = unsafe { get_active_app_name() };
 
-                // Try text format
-                if let Some(text) = unsafe { paste_from_clipboard(hwnd) } {
-                    let trimmed = text.trim().to_string();
-                    if !trimmed.is_empty() {
-                        let db_path_clone = db_path.clone();
-                        let app_name_clone = app_name.clone();
-                        std::thread::spawn(move || {
-                            if let Ok(conn) = rusqlite::Connection::open(&db_path_clone) {
-                                let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-                                let now = std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_secs() as i64;
-                                let _ = conn.execute(
-                                    "INSERT OR REPLACE INTO clipboard_history (content, timestamp, source_app, is_image) VALUES (?, ?, ?, 0);",
-                                    rusqlite::params![trimmed, now, app_name_clone],
-                                );
-                                let _ = conn.execute(
-                                    "DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY timestamp DESC LIMIT 500);",
-                                    [],
-                                );
-                            }
-                        });
-                    }
-                } else {
-                    // Try image format (CF_BITMAP)
-                    unsafe {
-                        if let Some((buf, bih)) = capture_clipboard_image_data(hwnd) {
+            // Try text format
+            if let Some(text) = unsafe { paste_from_clipboard(hwnd) } {
+                let trimmed = text.trim().to_string();
+                if !trimmed.is_empty() {
+                    let db_path_clone = db_path.clone();
+                    let app_name_clone = app_name.clone();
+                    std::thread::spawn(move || {
+                        if let Ok(conn) = rusqlite::Connection::open(&db_path_clone) {
+                            let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
                             let now = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .unwrap_or_default()
                                 .as_secs() as i64;
-                            let filename = format!("image_{}.bmp", now);
-                            let img_dir = db_path.parent().unwrap().join("clipboard_images");
-                            let _ = std::fs::create_dir_all(&img_dir);
-                            let img_path = img_dir.join(&filename);
-                            let img_path_str = img_path.to_string_lossy().to_string();
-                            
-                            let db_path_clone = db_path.clone();
-                            std::thread::spawn(move || {
-                                if write_bmp_file(&img_path, &buf, bih).is_ok() {
-                                    if let Ok(conn) = rusqlite::Connection::open(&db_path_clone) {
-                                        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-                                        let _ = conn.execute(
-                                            "INSERT OR REPLACE INTO clipboard_history (content, timestamp, source_app, is_image) VALUES (?, ?, ?, 1);",
-                                            rusqlite::params![img_path_str, now, app_name],
-                                        );
-                                        let _ = conn.execute(
-                                            "DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY timestamp DESC LIMIT 500);",
-                                            [],
-                                        );
-                                    }
-                                }
-                            });
+                            let _ = conn.execute(
+                                "INSERT OR REPLACE INTO clipboard_history (content, timestamp, source_app, is_image) VALUES (?, ?, ?, 0);",
+                                rusqlite::params![trimmed, now, app_name_clone],
+                            );
+                            let _ = conn.execute(
+                                "DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY timestamp DESC LIMIT 500);",
+                                [],
+                            );
                         }
+                    });
+                }
+            } else {
+                // Try image format (CF_BITMAP)
+                unsafe {
+                    if let Some((buf, bih)) = capture_clipboard_image_data(hwnd) {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs() as i64;
+                        let filename = format!("image_{}.bmp", now);
+                        let img_dir = db_path.parent().unwrap().join("clipboard_images");
+                        let _ = std::fs::create_dir_all(&img_dir);
+                        let img_path = img_dir.join(&filename);
+                        let img_path_str = img_path.to_string_lossy().to_string();
+                        
+                        let db_path_clone = db_path.clone();
+                        std::thread::spawn(move || {
+                            if write_bmp_file(&img_path, &buf, bih).is_ok() {
+                                if let Ok(conn) = rusqlite::Connection::open(&db_path_clone) {
+                                    let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                                    let _ = conn.execute(
+                                        "INSERT OR REPLACE INTO clipboard_history (content, timestamp, source_app, is_image) VALUES (?, ?, ?, 1);",
+                                        rusqlite::params![img_path_str, now, app_name],
+                                    );
+                                    let _ = conn.execute(
+                                        "DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY timestamp DESC LIMIT 500);",
+                                        [],
+                                    );
+                                }
+                            }
+                        });
                     }
                 }
             }
@@ -448,13 +526,11 @@ unsafe extern "system" fn wnd_proc(
 
         WM_ENGINE_READY => {
             if wp.0 == 1 {
-                let engine = *Box::from_raw(lp.0 as *mut SearchEngine);
+                let tx = unsafe { *Box::from_raw(lp.0 as *mut std::sync::mpsc::Sender<SearchRequest>) };
                 if !sp.is_null() {
                     let s = &mut *sp;
-                    s.engine = Some(engine);
-                    s.results = s.engine.as_mut().unwrap().search(&s.query, MAX_RESULTS);
-                    trigger_icon_loading(hwnd, s);
-                    InvalidateRect(hwnd, None, FALSE);
+                    s.search_tx = Some(tx);
+                    trigger_search(hwnd, s);
                 }
             } else {
                 let err = *Box::from_raw(lp.0 as *mut String);
@@ -466,21 +542,28 @@ unsafe extern "system" fn wnd_proc(
             LRESULT(0)
         }
 
+        WM_SEARCH_RESULTS => {
+            let query_id = wp.0;
+            let results_ptr = lp.0 as *mut Vec<SearchResult>;
+            let results = unsafe { *Box::from_raw(results_ptr) };
+            if !sp.is_null() {
+                let s = &mut *sp;
+                if query_id == s.current_query_id {
+                    s.results = results;
+                    trigger_icon_loading(hwnd, s);
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+            }
+            LRESULT(0)
+        }
+
         WM_TIMER => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
             match wp.0 {
                 TIMER_DEBOUNCE => {
                     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
-                    s.results = if let Some(ref mut engine) = s.engine {
-                        engine.search(&s.query, MAX_RESULTS)
-                    } else {
-                        vec![]
-                    };
-                    trigger_icon_loading(hwnd, s);
-                    s.selected = 0;
-                    s.scroll_offset = 0;
-                    let _ = InvalidateRect(hwnd, None, FALSE);
+                    trigger_search(hwnd, s);
                 }
                 _ => {}
             }
@@ -586,13 +669,7 @@ unsafe extern "system" fn wnd_proc(
                             s.selected = 0;
                             s.scroll_offset = 0;
                             s.text_selected = false;
-                            s.results = if let Some(ref mut engine) = s.engine {
-                                engine.search(&s.query, MAX_RESULTS)
-                            } else {
-                                vec![]
-                            };
-                            trigger_icon_loading(hwnd, s);
-                            let _ = InvalidateRect(hwnd, None, FALSE);
+                            trigger_search(hwnd, s);
                         } else {
                             if let Some(text) = cmd.strip_prefix("copy:") {
                                 copy_to_clipboard(hwnd, text);
@@ -675,13 +752,7 @@ unsafe extern "system" fn wnd_proc(
                         s.selected = 0;
                         s.scroll_offset = 0;
                         s.text_selected = false;
-                        s.results = if let Some(ref mut engine) = s.engine {
-                            engine.search(&s.query, MAX_RESULTS)
-                        } else {
-                            vec![]
-                        };
-                        trigger_icon_loading(hwnd, s);
-                        let _ = InvalidateRect(hwnd, None, FALSE);
+                        trigger_search(hwnd, s);
                     } else {
                         if let Some(text) = cmd.strip_prefix("copy:") {
                             copy_to_clipboard(hwnd, text);
@@ -792,12 +863,7 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         s.query.clear();
         s.selected = 0;
         s.scroll_offset = 0;
-        s.results = if let Some(ref mut engine) = s.engine {
-            engine.search("", MAX_RESULTS)
-        } else {
-            vec![]
-        };
-        trigger_icon_loading(hwnd, s);
+        trigger_search(hwnd, s);
 
         let mut pt = POINT::default();
         let _ = GetCursorPos(&mut pt);
@@ -887,6 +953,17 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
 unsafe fn kick_debounce(hwnd: HWND) {
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
     let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 120, None);
+}
+
+unsafe fn trigger_search(hwnd: HWND, s: &mut State) {
+    s.current_query_id += 1;
+    let req = SearchRequest {
+        query: s.query.clone(),
+        query_id: s.current_query_id,
+    };
+    if let Some(ref tx) = s.search_tx {
+        let _ = tx.send(req);
+    }
 }
 
 fn ease_out(t: f32) -> f32 { 1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(4) }
@@ -1064,44 +1141,22 @@ unsafe fn get_file_icon(path: &str) -> HICON {
 }
 
 unsafe fn trigger_icon_loading(hwnd: HWND, s: &mut State) {
+    if s.icon_tx.is_none() { return; }
+    let tx = s.icon_tx.as_ref().unwrap();
     for res in &s.results {
         let (source, key) = (res.entry.source.as_str(), res.entry.launch_command.clone());
         // For FOLDER source: only load icon if it's a real filesystem path (not virtual folders like bookmarks:)
-        let is_real_folder = source == "FOLDER" && !key.ends_with(':') && std::path::Path::new(&key).exists();
+        let is_real_folder = source == "FOLDER" && !key.ends_with(':');
         // For PROJECT source: load folder icon if the launch_command is a real filesystem path
-        let is_real_project = source == "PROJECT" && !key.is_empty() && !key.starts_with("http") && std::path::Path::new(&key).exists();
+        let is_real_project = source == "PROJECT" && !key.is_empty() && !key.starts_with("http");
         let needs_icon = (source == "app" || source == "RECENT" || source == "FILE" || source == "CODE" || is_real_folder || is_real_project)
             && !s.app_icons.contains_key(&key);
         if needs_icon {
             // Placeholder so we don't spawn multiple threads for same path
             s.app_icons.insert(key.clone(), HICON(std::ptr::null_mut()));
-            let is_file_icon = source == "RECENT" || source == "FILE" || source == "CODE" || is_real_folder || is_real_project;
-            let hwnd_clone = SendHwnd(hwnd);
-            std::thread::spawn(move || {
-                let hwnd_raw = hwnd_clone;
-                unsafe {
-                    let _ = windows::Win32::System::Com::CoInitializeEx(
-                        None,
-                        windows::Win32::System::Com::COINIT_APARTMENTTHREADED | windows::Win32::System::Com::COINIT_DISABLE_OLE1DDE
-                    );
-                    let hicon = if is_file_icon {
-                        get_file_icon(&key)
-                    } else {
-                        get_app_icon(&key)
-                    };
-                    if !hicon.0.is_null() {
-                        let key_ptr = Box::into_raw(Box::new(key));
-                        if PostMessageW(
-                            hwnd_raw.0,
-                            WM_ICON_LOADED,
-                            WPARAM(hicon.0 as usize),
-                            LPARAM(key_ptr as isize),
-                        ).is_err() {
-                            let _ = Box::from_raw(key_ptr);
-                            let _ = DestroyIcon(hicon);
-                        }
-                    }
-                }
+            let _ = tx.send(IconRequest {
+                key,
+                source: source.to_string(),
             });
         }
     }
