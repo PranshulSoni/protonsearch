@@ -102,6 +102,8 @@ struct State {
     selected_clip_ids: std::collections::HashSet<String>,
     delete_confirm: bool,
     editing_item: Option<String>,
+    submenu_active: bool,
+    submenu_selected: usize,
 }
 
 #[derive(PartialEq)]
@@ -242,6 +244,8 @@ unsafe fn run() {
         selected_clip_ids: std::collections::HashSet::new(),
         delete_confirm: false,
         editing_item: None,
+        submenu_active: false,
+        submenu_selected: 0,
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
