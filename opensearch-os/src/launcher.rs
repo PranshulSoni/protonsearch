@@ -37,6 +37,24 @@ pub fn launch(cmd: &str) {
         return;
     }
 
+    // ── Window switcher: Focus window by HWND ──────────────────────────────
+    if let Some(hwnd_str) = cmd.strip_prefix("window:") {
+        if let Ok(hwnd_val) = hwnd_str.trim().parse::<isize>() {
+            let target_hwnd = windows::Win32::Foundation::HWND(hwnd_val as *mut std::ffi::c_void);
+            unsafe {
+                use windows::Win32::UI::WindowsAndMessaging::{
+                    ShowWindow, SetForegroundWindow, SetActiveWindow, SW_RESTORE, IsIconic
+                };
+                if IsIconic(target_hwnd).as_bool() {
+                    let _ = ShowWindow(target_hwnd, SW_RESTORE);
+                }
+                let _ = SetForegroundWindow(target_hwnd);
+                let _ = SetActiveWindow(target_hwnd);
+            }
+        }
+        return;
+    }
+
     // ── Kill process by PID ────────────────────────────────────────────────
     if let Some(pid) = cmd.strip_prefix("kill:") {
         let _ = Command::new("taskkill")
