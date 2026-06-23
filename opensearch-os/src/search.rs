@@ -1862,6 +1862,19 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                     lex_score += 0.1;
                 }
 
+                if lex_score == 0.0 {
+                    let name_len = name_lower.chars().count();
+                    let q_len = q_lower.chars().count();
+                    if name_len > 0 && q_len > 0 {
+                        let dist = levenshtein_distance(&q_lower, &name_lower);
+                        let max_len = name_len.max(q_len);
+                        let similarity = 1.0 - (dist as f32 / max_len as f32);
+                        if similarity >= 0.7 {
+                            lex_score += 0.3 * similarity;
+                        }
+                    }
+                }
+
                 // Boost legacy control panel options if they have any match
                 if entry.source.to_lowercase().contains("legacy") && lex_score > 0.0 {
                     lex_score += 0.25;
@@ -1924,6 +1937,19 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                     let ratio = matched as f32 / q_words.len() as f32;
                     if ratio >= 0.5 {
                         score = 0.8 + 0.4 * ratio;
+                    }
+                }
+            }
+
+            if score == 0.0 {
+                let app_len = app_lower.chars().count();
+                let q_len = q_lower.chars().count();
+                if app_len > 0 && q_len > 0 {
+                    let dist = levenshtein_distance(&q_lower, &app_lower);
+                    let max_len = app_len.max(q_len);
+                    let similarity = 1.0 - (dist as f32 / max_len as f32);
+                    if similarity >= 0.7 {
+                        score = 0.6 + 0.8 * similarity;
                     }
                 }
             }
@@ -2658,7 +2684,33 @@ fn scan_recent_files() -> Vec<RecentFileInfo> {
     results
 }
 
-fn resolve_lnk_path(lnk_path: &std::path::Path) -> Option<String> {
+fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+    let len1 = s1.chars().count();
+    let len2 = s2.chars().count();
+    if len1 == 0 { return len2; }
+    if len2 == 0 { return len1; }
+
+    let mut row: Vec<usize> = (0..=len2).collect();
+    let s1_chars: Vec<char> = s1.chars().collect();
+    let s2_chars: Vec<char> = s2.chars().collect();
+
+    for i in 0..len1 {
+        let mut prev = i + 1;
+        for j in 0..len2 {
+            let cost = if s1_chars[i] == s2_chars[j] { 0 } else { 1 };
+            let val = std::cmp::min(
+                std::cmp::min(row[j + 1] + 1, prev + 1),
+                row[j] + cost
+            );
+            row[j] = prev;
+            prev = val;
+        }
+        row[len2] = prev;
+    }
+    row[len2]
+}
+
+pub fn resolve_lnk_path(lnk_path: &std::path::Path) -> Option<String> {
     use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER, IPersistFile, STGM_READ};
     use windows::Win32::UI::Shell::{ShellLink, IShellLinkW, SLGP_UNCPRIORITY};
     use windows::core::{PCWSTR, Interface};
