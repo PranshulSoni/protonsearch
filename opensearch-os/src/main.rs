@@ -762,6 +762,16 @@ unsafe extern "system" fn wnd_proc(
         WM_KEYDOWN => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
+            if s.voice_listening {
+                s.voice_listening = false;
+                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
+                let _ = InvalidateRect(hwnd, None, FALSE);
+            }
+            if s.voice_triggered {
+                s.voice_triggered = false;
+                let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
+                let _ = InvalidateRect(hwnd, None, FALSE);
+            }
             let vk = VIRTUAL_KEY(wp.0 as u16);
             
             // Check if Ctrl is pressed
