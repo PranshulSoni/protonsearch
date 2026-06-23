@@ -1758,7 +1758,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             }
 
             if !drawn_custom_thumbnail {
-                let icon_to_draw = if res.entry.source == "app" || res.entry.source == "RECENT" || res.entry.source == "FILE" || res.entry.source == "CODE" {
+                let icon_to_draw = if res.entry.source == "app" || res.entry.source == "RECENT" || res.entry.source == "FILE" || res.entry.source == "CODE"
+                    || (res.entry.source == "ACTION" && res.entry.launch_command.starts_with("kill:")) {
                     s.app_icons.get(&res.entry.launch_command)
                         .copied()
                         .filter(|h| !h.0.is_null())
