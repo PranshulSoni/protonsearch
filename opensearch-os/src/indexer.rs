@@ -5,9 +5,24 @@ use std::collections::HashMap;
 use walkdir::WalkDir;
 use rusqlite::{Connection, params};
 
+fn log_indexer(msg: &str) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    let log_dir = match std::env::var("APPDATA") {
+        Ok(d) => PathBuf::from(d).join("opensearch-os"),
+        Err(_) => PathBuf::from("."),
+    };
+    let _ = std::fs::create_dir_all(&log_dir);
+    let log_path = log_dir.join("indexer.log");
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
+        let _ = writeln!(file, "{}", msg);
+    }
+}
+
 pub fn start_indexer(db_path: PathBuf) {
     let db_path_clone = db_path.clone();
     thread::spawn(move || {
+        log_indexer("Indexer thread started");
         // Initialize COM for WinRT OCR
         let _ = unsafe { windows::Win32::System::Com::CoInitializeEx(
             None,
@@ -20,10 +35,12 @@ pub fn start_indexer(db_path: PathBuf) {
             let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
         }
 
-        // ── Phase 1: Priority folders (Desktop, Documents, Downloads) ──────
+        // ── Phase 1: Priority folders (Desktop, Downloads, Pictures, Documents) ──────
         // Indexed within ~1 second of launch so common files are instantly searchable.
         thread::sleep(std::time::Duration::from_millis(500));
+        log_indexer("Starting Phase 1 priority scan...");
         if let Err(e) = run_indexer_folders(&db_path_clone, get_priority_folders()) {
+            log_indexer(&format!("Priority indexer error: {:?}", e));
             eprintln!("Priority indexer error: {:?}", e);
         }
 
@@ -31,15 +48,18 @@ pub fn start_indexer(db_path: PathBuf) {
         // Runs 10s after launch, then every 10 minutes.
         thread::sleep(std::time::Duration::from_secs(10));
         loop {
+            log_indexer("Starting Phase 2 full crawl...");
             if let Err(e) = run_indexer_folders(&db_path_clone, get_scan_folders()) {
+                log_indexer(&format!("Indexer error: {:?}", e));
                 eprintln!("Indexer error: {:?}", e);
             }
+            log_indexer("Phase 2 crawl finished. Sleeping 10 minutes.");
             thread::sleep(std::time::Duration::from_secs(600));
         }
     });
 }
 
-/// Returns Desktop, Documents, Downloads — fast to scan, highest value to user.
+/// Returns Desktop, Downloads, Pictures, Documents — fast to scan, highest value to user.
 fn get_priority_folders() -> Vec<PathBuf> {
     let mut folders = Vec::new();
     unsafe {
@@ -59,7 +79,8 @@ fn get_priority_folders() -> Vec<PathBuf> {
             Some(PathBuf::from(s))
         };
 
-        for guid in [&FOLDERID_Desktop, &FOLDERID_Documents, &FOLDERID_Downloads, &FOLDERID_Pictures] {
+        // Put Documents last so it doesn't block Desktop/Downloads/Pictures from being indexed immediately
+        for guid in [&FOLDERID_Desktop, &FOLDERID_Downloads, &FOLDERID_Pictures, &FOLDERID_Documents] {
             if let Some(p) = get_folder(guid) {
                 folders.push(p);
             }
@@ -143,6 +164,7 @@ fn flush_updates(conn: &mut Connection, updates: &mut Vec<PendingUpdate>) -> any
 }
 
 fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<()> {
+    log_indexer(&format!("run_indexer_folders started with folders: {:?}", folders));
     let mut conn = Connection::open(db_path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
     conn.execute_batch("PRAGMA journal_mode=WAL;")?;
@@ -203,15 +225,22 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
     let mut pending_updates = Vec::new();
 
     for folder in folders {
-        if !folder.exists() { continue; }
-        let walker = WalkDir::new(folder)
+        log_indexer(&format!("Evaluating folder for index: {:?}", folder));
+        if !folder.exists() {
+            log_indexer(&format!("Folder does not exist, skipping: {:?}", folder));
+            continue;
+        }
+        log_indexer(&format!("Folder exists, starting WalkDir: {:?}", folder));
+        let walker = WalkDir::new(&folder)
             .into_iter()
             .filter_entry(|e| {
                 let name = e.file_name().to_string_lossy();
                 !is_ignored_dir(&name)
             });
             
+        let mut folder_file_count = 0;
         for entry in walker.filter_map(|e| e.ok()) {
+            folder_file_count += 1;
             let path = entry.path();
             let is_file = path.is_file();
             let is_dir = path.is_dir();
@@ -271,6 +300,10 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
             let should_fts = is_text_or_doc || is_image;
             let needs_fts_check = should_fts && !fts_paths.contains(&path_str);
 
+            if is_image {
+                log_indexer(&format!("Found image in WalkDir: {} (modified={}, db_mod={:?}, needs_fts={})", path_str, modified, db_modified, needs_fts_check));
+            }
+
             if db_modified.is_none() || db_modified.unwrap() != modified || needs_fts_check {
                 let mut content = None;
                 if is_file && should_fts {
@@ -312,7 +345,9 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
                             thread::sleep(std::time::Duration::from_millis(50));
                         }
                     } else if is_image {
+                        log_indexer(&format!("Extracting OCR text from image: {}", path_str));
                         let extracted = extract_ocr_text(path);
+                        log_indexer(&format!("OCR finished for: {}. Text found: {:?}", path_str, extracted));
                         content = Some(extracted.unwrap_or_default());
                         thread::sleep(std::time::Duration::from_millis(100));
                     }
@@ -329,6 +364,7 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
                 });
 
                 if pending_updates.len() >= 1000 {
+                    log_indexer("Flushing 1000 index updates to database...");
                     flush_updates(&mut conn, &mut pending_updates)?;
                 }
             }
@@ -339,8 +375,10 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
                 thread::sleep(std::time::Duration::from_millis(5));
             }
         }
+        log_indexer(&format!("Finished WalkDir for {:?}: scanned {} total entries", folder, folder_file_count));
     }
 
+    log_indexer("Flushing remaining index updates to database...");
     flush_updates(&mut conn, &mut pending_updates)?;
 
     // Clean up deleted files from the database in a single transaction
@@ -352,6 +390,7 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
     }
 
     if !to_delete.is_empty() {
+        log_indexer(&format!("Cleaning up {} deleted files from database...", to_delete.len()));
         let tx = conn.transaction()?;
         for p_str in to_delete {
             tx.execute("DELETE FROM files WHERE path = ?", [&p_str])?;
@@ -360,6 +399,7 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
         tx.commit()?;
     }
 
+    log_indexer("run_indexer_folders completed successfully");
     Ok(())
 }
 
@@ -437,45 +477,68 @@ fn extract_ocr_text(path: &Path) -> Option<String> {
     let path_str = path.to_str()?;
     let path_wide = HSTRING::from(path_str);
     
-    let file = match StorageFile::GetFileFromPathAsync(&path_wide).ok()?.get() {
-        Ok(f) => f,
-        Err(_) => return None,
+    let file = match StorageFile::GetFileFromPathAsync(&path_wide).ok().and_then(|async_op| async_op.get().ok()) {
+        Some(f) => f,
+        None => {
+            log_indexer(&format!("OCR: Failed to get StorageFile for {:?}", path_str));
+            return None;
+        }
     };
     
-    let stream = match file.OpenAsync(windows::Storage::FileAccessMode::Read).ok()?.get() {
-        Ok(s) => s,
-        Err(_) => return None,
+    let stream = match file.OpenAsync(windows::Storage::FileAccessMode::Read).ok().and_then(|async_op| async_op.get().ok()) {
+        Some(s) => s,
+        None => {
+            log_indexer(&format!("OCR: Failed to open stream for {:?}", path_str));
+            return None;
+        }
     };
     
-    let decoder = match BitmapDecoder::CreateAsync(&stream).ok()?.get() {
-        Ok(d) => d,
-        Err(_) => return None,
+    let decoder = match BitmapDecoder::CreateAsync(&stream).ok().and_then(|async_op| async_op.get().ok()) {
+        Some(d) => d,
+        None => {
+            log_indexer(&format!("OCR: Failed to create BitmapDecoder for {:?}", path_str));
+            return None;
+        }
     };
     
-    let software_bitmap = match decoder.GetSoftwareBitmapAsync().ok()?.get() {
-        Ok(b) => b,
-        Err(_) => return None,
+    let software_bitmap = match decoder.GetSoftwareBitmapAsync().ok().and_then(|async_op| async_op.get().ok()) {
+        Some(b) => b,
+        None => {
+            log_indexer(&format!("OCR: Failed to get SoftwareBitmap for {:?}", path_str));
+            return None;
+        }
     };
     
     let ocr_engine = match OcrEngine::TryCreateFromUserProfileLanguages() {
         Ok(engine) => engine,
-        Err(_) => return None,
+        Err(e) => {
+            log_indexer(&format!("OCR: Failed to create OcrEngine: {:?}", e));
+            return None;
+        }
     };
     
-    let ocr_result = match ocr_engine.RecognizeAsync(&software_bitmap).ok()?.get() {
-        Ok(res) => res,
-        Err(_) => return None,
+    let ocr_result = match ocr_engine.RecognizeAsync(&software_bitmap).ok().and_then(|async_op| async_op.get().ok()) {
+        Some(res) => res,
+        None => {
+            log_indexer(&format!("OCR: RecognizeAsync failed for {:?}", path_str));
+            return None;
+        }
     };
     
     let text = match ocr_result.Text() {
         Ok(t) => t.to_string(),
-        Err(_) => return None,
+        Err(e) => {
+            log_indexer(&format!("OCR: Failed to get text from result: {:?}", e));
+            return None;
+        }
     };
     
     let trimmed = text.trim();
     if trimmed.is_empty() {
+        log_indexer(&format!("OCR: No text found in {:?}", path_str));
         None
     } else {
+        log_indexer(&format!("OCR: Successfully extracted {} chars from {:?}", trimmed.len(), path_str));
         Some(trimmed.to_string())
     }
 }
