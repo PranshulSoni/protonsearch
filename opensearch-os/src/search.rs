@@ -708,6 +708,92 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         results
     }
 
+    pub fn search_timeline_sequential(&self, anchor_app: &str, direction: &str, start_time: i64, end_time: i64) -> Vec<SearchResult> {
+        let mut results = Vec::new();
+        let conn = &self.conn;
+
+        let anchor_pattern = format!("%{}%", anchor_app.to_lowercase());
+
+        let anchor_query = "SELECT timestamp FROM timeline_events \
+             WHERE (LOWER(app_name) LIKE ? OR LOWER(window_title) LIKE ?) \
+             AND timestamp >= ? AND timestamp <= ? \
+             ORDER BY timestamp DESC LIMIT 1";
+
+        let anchor_ts: Option<i64> = conn.query_row(
+            anchor_query,
+            rusqlite::params![anchor_pattern, anchor_pattern, start_time, end_time],
+            |row| row.get::<_, i64>(0),
+        ).ok();
+
+        let Some(anchor_ts) = anchor_ts else { return results; };
+
+        let window_secs: i64 = 600;
+
+        let seq_query = if direction == "after" {
+            "SELECT timestamp, duration, app_name, window_title FROM timeline_events \
+             WHERE timestamp > ? AND timestamp <= ? \
+             AND (LOWER(app_name) NOT LIKE ? AND LOWER(window_title) NOT LIKE ?) \
+             ORDER BY timestamp ASC LIMIT 20"
+        } else {
+            "SELECT timestamp, duration, app_name, window_title FROM timeline_events \
+             WHERE timestamp >= ? AND timestamp < ? \
+             AND (LOWER(app_name) NOT LIKE ? AND LOWER(window_title) NOT LIKE ?) \
+             ORDER BY timestamp DESC LIMIT 20"
+        };
+
+        let (range_start, range_end) = if direction == "after" {
+            (anchor_ts, anchor_ts + window_secs)
+        } else {
+            (anchor_ts - window_secs, anchor_ts)
+        };
+
+        let mut stmt = match conn.prepare(seq_query) {
+            Ok(s) => s,
+            Err(_) => return results,
+        };
+
+        let rows: Vec<(i64, i64, String, String)> = stmt.query_map(
+            rusqlite::params![range_start, range_end, anchor_pattern, anchor_pattern],
+            |row| Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            )),
+        ).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
+
+        let dir_label = if direction == "after" { "After" } else { "Before" };
+
+        for (i, (timestamp, duration, app_name, window_title)) in rows.into_iter().enumerate() {
+            let time_str = format_timestamp_local(timestamp);
+            let dur_str = if duration < 60 {
+                format!("{}s", duration)
+            } else {
+                format!("{}m {}s", duration / 60, duration % 60)
+            };
+
+            let display_app = std::path::Path::new(&app_name)
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| app_name.clone());
+
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: format!("timeline.seq.{}", timestamp),
+                    control_name: format!("{} ({})", window_title, display_app),
+                    breadcrumb_path: format!("Timeline > {} {}: {} ({})", dir_label, anchor_app, time_str, dur_str),
+                    launch_command: app_name.clone(),
+                    source: "MEMORY".to_string(),
+                    description: format!("{} {}: {} at {}", dir_label.to_lowercase(), anchor_app, display_app, time_str),
+                    synonyms: format!("{} {} {} timeline sequential", display_app.to_lowercase(), window_title.to_lowercase(), direction),
+                },
+                score: 4.5 - (i as f32 * 0.1),
+            });
+        }
+
+        results
+    }
+
     pub fn search_project(&self, project_keyword: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
         let conn = &self.conn;
@@ -1512,6 +1598,23 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         // Intercept temporal context queries (e.g. yesterday before lunch)
         if let Some((start_time, end_time, clean_q)) = parse_time_range(q) {
             return self.search_timeline(start_time, end_time, &clean_q);
+        }
+
+        // Intercept sequential queries (e.g. "after chrome yesterday", "before vscode today")
+        if let Some((anchor, direction, start_time, end_time)) = parse_sequential_query(q) {
+            let time_range = if start_time > 0 && end_time > 0 {
+                (start_time, end_time)
+            } else {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64;
+                let local_time = unsafe { windows::Win32::System::SystemInformation::GetLocalTime() };
+                let seconds_since_midnight = (local_time.wHour as i64 * 3600) + (local_time.wMinute as i64 * 60) + local_time.wSecond as i64;
+                let today_start = now - seconds_since_midnight;
+                (today_start - 7 * 86400, now)
+            };
+            return self.search_timeline_sequential(&anchor, &direction, time_range.0, time_range.1);
         }
 
         if q.is_empty() {
@@ -3730,6 +3833,81 @@ fn parse_time_range(query: &str) -> Option<(i64, i64, String)> {
     }
     
     None
+}
+
+fn parse_sequential_query(query: &str) -> Option<(String, String, i64, i64)> {
+    let q = query.to_lowercase();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let local_time = unsafe { windows::Win32::System::SystemInformation::GetLocalTime() };
+    let seconds_since_midnight = (local_time.wHour as i64 * 3600) + (local_time.wMinute as i64 * 60) + local_time.wSecond as i64;
+    let today_start = now - seconds_since_midnight;
+    let yesterday_start = today_start - 86400;
+
+    let (direction, anchor, time_start, time_end) = if let Some(rest) = q.strip_prefix("after ") {
+        let (app, ts, te) = parse_sequential_anchor_and_time(rest.trim(), today_start, yesterday_start, now);
+        ("after".to_string(), app, ts, te)
+    } else if let Some(rest) = q.strip_prefix("before ") {
+        let (app, ts, te) = parse_sequential_anchor_and_time(rest.trim(), today_start, yesterday_start, now);
+        ("before".to_string(), app, ts, te)
+    } else if let Some(rest) = q.strip_prefix("what did i use after ") {
+        let (app, ts, te) = parse_sequential_anchor_and_time(rest.trim(), today_start, yesterday_start, now);
+        ("after".to_string(), app, ts, te)
+    } else if let Some(rest) = q.strip_prefix("what did i use before ") {
+        let (app, ts, te) = parse_sequential_anchor_and_time(rest.trim(), today_start, yesterday_start, now);
+        ("before".to_string(), app, ts, te)
+    } else if let Some(rest) = q.strip_prefix("what was i doing after ") {
+        let (app, ts, te) = parse_sequential_anchor_and_time(rest.trim(), today_start, yesterday_start, now);
+        ("after".to_string(), app, ts, te)
+    } else if let Some(rest) = q.strip_prefix("what was i doing before ") {
+        let (app, ts, te) = parse_sequential_anchor_and_time(rest.trim(), today_start, yesterday_start, now);
+        ("before".to_string(), app, ts, te)
+    } else if let Some(idx) = q.find(" after ") {
+        let app = q[idx + 7..].trim().to_string();
+        let (clean_app, ts, te) = parse_sequential_anchor_and_time(&app, today_start, yesterday_start, now);
+        ("after".to_string(), clean_app, ts, te)
+    } else if let Some(idx) = q.find(" before ") {
+        let app = q[idx + 8..].trim().to_string();
+        let (clean_app, ts, te) = parse_sequential_anchor_and_time(&app, today_start, yesterday_start, now);
+        ("before".to_string(), clean_app, ts, te)
+    } else if let Some(idx) = q.find(" then ") {
+        let after_app = q[..idx].trim().to_string();
+        let (clean_app, ts, te) = parse_sequential_anchor_and_time(&after_app, today_start, yesterday_start, now);
+        ("after".to_string(), clean_app, ts, te)
+    } else {
+        return None;
+    };
+
+    if anchor.is_empty() { return None; }
+    Some((anchor, direction, time_start, time_end))
+}
+
+fn parse_sequential_anchor_and_time(s: &str, today_start: i64, yesterday_start: i64, now: i64) -> (String, i64, i64) {
+    let s = s.trim();
+    if s.contains("yesterday") {
+        let app = s.replace("yesterday", "").trim().to_string();
+        (app, yesterday_start, today_start)
+    } else if s.contains("today") {
+        let app = s.replace("today", "").trim().to_string();
+        (app, today_start, now)
+    } else if s.contains("this morning") {
+        let app = s.replace("this morning", "").trim().to_string();
+        (app, today_start + 6 * 3600, today_start + 12 * 3600)
+    } else if s.contains("this afternoon") {
+        let app = s.replace("this afternoon", "").trim().to_string();
+        (app, today_start + 12 * 3600, today_start + 17 * 3600)
+    } else if s.contains("last week") {
+        let app = s.replace("last week", "").trim().to_string();
+        (app, today_start - 7 * 86400, now)
+    } else {
+        let now_local = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        (s.to_string(), today_start - 7 * 86400, now_local)
+    }
 }
 
 fn format_timestamp_local(timestamp: i64) -> String {

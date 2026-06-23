@@ -112,6 +112,7 @@ struct State {
     // Voice activation
     voice_listening: bool,   // true = currently recording query
     voice_triggered: bool,   // launcher opened via voice (auto-execute on result)
+    voice_pending_exec: bool, // true = waiting for search results to auto-execute
     voice_dot_tick: u32,     // animation frame counter for pulsing mic dot
 }
 
@@ -257,6 +258,7 @@ unsafe fn run() {
         submenu_selected: 0,
         voice_listening: false,
         voice_triggered: false,
+        voice_pending_exec: false,
         voice_dot_tick: 0,
     });
 
@@ -638,6 +640,12 @@ unsafe extern "system" fn wnd_proc(
                         s.selected = s.selected.min(s.results.len() - 1);
                         s.scroll_offset = s.scroll_offset.min(s.results.len().saturating_sub(VISIBLE_RESULTS));
                     }
+                    if s.voice_pending_exec && !s.results.is_empty() {
+                        s.voice_pending_exec = false;
+                        s.voice_triggered = false;
+                        let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
+                        execute_selected(hwnd, s);
+                    }
                     trigger_icon_loading(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
@@ -686,12 +694,14 @@ unsafe extern "system" fn wnd_proc(
                     s.cursor_pos = s.query.len();
                     s.selected = 0;
                     s.scroll_offset = 0;
+                    s.voice_pending_exec = s.voice_triggered;
                     trigger_search(hwnd, s);
                     if s.voice_triggered {
-                        let _ = SetTimer(hwnd, TIMER_VOICE_AUTOEXEC, 1500, None);
+                        let _ = SetTimer(hwnd, TIMER_VOICE_AUTOEXEC, 5000, None);
                     }
                 } else {
                     s.voice_triggered = false;
+                    s.voice_pending_exec = false;
                 }
                 let _ = InvalidateRect(hwnd, None, FALSE);
             }
@@ -716,9 +726,12 @@ unsafe extern "system" fn wnd_proc(
                 }
                 TIMER_VOICE_AUTOEXEC => {
                     let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-                    if s.voice_triggered {
+                    if s.voice_triggered || s.voice_pending_exec {
                         s.voice_triggered = false;
-                        execute_selected(hwnd, s);
+                        s.voice_pending_exec = false;
+                        if !s.results.is_empty() {
+                            execute_selected(hwnd, s);
+                        }
                     }
                 }
                 _ => {}
@@ -736,6 +749,7 @@ unsafe extern "system" fn wnd_proc(
             }
             if s.voice_triggered {
                 s.voice_triggered = false;
+                s.voice_pending_exec = false;
                 let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
                 let _ = InvalidateRect(hwnd, None, FALSE);
             }
@@ -769,6 +783,7 @@ unsafe extern "system" fn wnd_proc(
             }
             if s.voice_triggered {
                 s.voice_triggered = false;
+                s.voice_pending_exec = false;
                 let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
                 let _ = InvalidateRect(hwnd, None, FALSE);
             }
@@ -1248,6 +1263,7 @@ unsafe extern "system" fn wnd_proc(
             }
             if s.voice_triggered {
                 s.voice_triggered = false;
+                s.voice_pending_exec = false;
                 let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
                 let _ = InvalidateRect(hwnd, None, FALSE);
             }
@@ -1286,6 +1302,7 @@ unsafe extern "system" fn wnd_proc(
             }
             if s.voice_triggered {
                 s.voice_triggered = false;
+                s.voice_pending_exec = false;
                 let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
                 let _ = InvalidateRect(hwnd, None, FALSE);
             }
@@ -1540,6 +1557,7 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
     s.voice_triggered = false;
     s.voice_listening = false;
+    s.voice_pending_exec = false;
     let _ = ShowWindow(hwnd, SW_HIDE);
     s.anim = Anim::Hidden;
 }
@@ -2031,7 +2049,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     }
 
     // Draw "▶ Executing..." hint when auto-executing
-    if s.voice_triggered && !s.voice_listening {
+    if (s.voice_triggered || s.voice_pending_exec) && !s.voice_listening {
         SelectObject(mdc, s.font_c);
         SetTextColor(mdc, COLORREF(0x00_3C_B4_00)); // green
         let mut hint: Vec<u16> = "▶ Executing...".encode_utf16().collect();

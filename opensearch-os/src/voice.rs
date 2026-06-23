@@ -114,7 +114,7 @@ pub fn start_wake_word_listener(hwnd: HWND) {
 fn run_wake_word_loop(h: HwndPtr) -> windows_core::Result<()> {
     let recognizer = SpeechRecognizer::new()?;
 
-    let phrases = make_phrase_iterable(&["hey search", "open search", "hey open search"]);
+    let phrases = make_phrase_iterable(&["hey search", "open search", "hey open search", "hey speech", "hey launch"]);
     let constraint = SpeechRecognitionListConstraint::CreateWithTag(
         &phrases,
         &HSTRING::from("wakeword"),
