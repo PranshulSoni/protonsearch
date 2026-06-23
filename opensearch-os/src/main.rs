@@ -651,6 +651,7 @@ unsafe extern "system" fn wnd_proc(
         WM_CHAR => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
+            s.submenu_active = false;
             if let Some(c) = char::from_u32(wp.0 as u32) {
                 if !c.is_control() {
                     if s.text_selected {
@@ -804,6 +805,12 @@ unsafe extern "system" fn wnd_proc(
 
             match vk {
                 VK_ESCAPE => {
+                    if s.submenu_active {
+                        s.submenu_active = false;
+                        s.submenu_selected = 0;
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                        return LRESULT(0);
+                    }
                     if s.delete_confirm {
                         s.delete_confirm = false;
                         s.selected_clip_ids.clear();
@@ -822,6 +829,12 @@ unsafe extern "system" fn wnd_proc(
                     }
                 }
                 VK_LEFT => {
+                    if s.submenu_active {
+                        s.submenu_active = false;
+                        s.submenu_selected = 0;
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                        return LRESULT(0);
+                    }
                     if ctrl_down {
                         s.cursor_pos = word_left(&s.query, s.cursor_pos);
                     } else if s.cursor_pos > 0 {
@@ -835,7 +848,9 @@ unsafe extern "system" fn wnd_proc(
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
                 VK_RIGHT => {
-                    if ctrl_down {
+                    if s.submenu_active {
+                        // ignore
+                    } else if ctrl_down {
                         s.cursor_pos = word_right(&s.query, s.cursor_pos);
                     } else if s.cursor_pos < s.query.len() {
                         let mut p = s.cursor_pos + 1;
@@ -843,6 +858,13 @@ unsafe extern "system" fn wnd_proc(
                             p += 1;
                         }
                         s.cursor_pos = p;
+                    } else {
+                        if let Some(r) = s.results.get(s.selected) {
+                            if r.entry.source == "app" {
+                                s.submenu_active = true;
+                                s.submenu_selected = 0;
+                            }
+                        }
                     }
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
@@ -886,6 +908,14 @@ unsafe extern "system" fn wnd_proc(
                                     s.selected_clip_ids.insert(id);
                                 }
                                 s.delete_confirm = false;
+                                let _ = InvalidateRect(hwnd, None, FALSE);
+                            }
+                        }
+                    } else {
+                        if let Some(r) = s.results.get(s.selected) {
+                            if r.entry.source == "app" {
+                                s.submenu_active = !s.submenu_active;
+                                s.submenu_selected = 0;
                                 let _ = InvalidateRect(hwnd, None, FALSE);
                             }
                         }
@@ -954,6 +984,10 @@ unsafe extern "system" fn wnd_proc(
                     }
                 }
                 VK_RETURN => {
+                    if s.submenu_active {
+                        execute_submenu_action(hwnd, s);
+                        return LRESULT(0);
+                    }
                     if s.delete_confirm {
                         s.delete_confirm = false;
                         let db_path = s.db_path.clone();
@@ -1098,7 +1132,10 @@ unsafe extern "system" fn wnd_proc(
                     }
                 }
                 VK_DOWN => {
-                    if !s.results.is_empty() {
+                    if s.submenu_active {
+                        s.submenu_selected = (s.submenu_selected + 1).min(2);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    } else if !s.results.is_empty() {
                         s.selected = (s.selected + 1).min(s.results.len() - 1);
                         if s.selected >= s.scroll_offset + VISIBLE_RESULTS {
                             s.scroll_offset = s.selected - (VISIBLE_RESULTS - 1);
@@ -1108,7 +1145,10 @@ unsafe extern "system" fn wnd_proc(
                     }
                 }
                 VK_UP => {
-                    if s.selected > 0 {
+                    if s.submenu_active {
+                        s.submenu_selected = s.submenu_selected.saturating_sub(1);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    } else if s.selected > 0 {
                         s.selected -= 1;
                         if s.selected < s.scroll_offset {
                             s.scroll_offset = s.selected;
@@ -1155,6 +1195,31 @@ unsafe extern "system" fn wnd_proc(
             let s = &mut *sp;
             reset_cursor_blink(hwnd, s);
             let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
+            let mx = (lp.0 & 0xFFFF) as i16 as i32;
+            
+            let mut rc_client = RECT::default();
+            let _ = GetClientRect(hwnd, &mut rc_client);
+            let win_w = rc_client.right - rc_client.left;
+            let x_start = (win_w - WIN_W) / 2;
+            
+            if s.submenu_active && mx >= x_start + (WIN_W - 240) {
+                let end_h = s.win_h();
+                let end_y = s.cy - end_h / 2;
+                let start_y = end_y + SEARCH_H + 16;
+                let action_h = 44;
+                for idx in 0..3 {
+                    let ay = start_y + idx as i32 * (action_h + 8);
+                    if my >= ay && my < ay + action_h {
+                        s.submenu_selected = idx;
+                        execute_submenu_action(hwnd, s);
+                        return LRESULT(0);
+                    }
+                }
+                return LRESULT(0);
+            } else if s.submenu_active {
+                s.submenu_active = false;
+                let _ = InvalidateRect(hwnd, None, FALSE);
+            }
             let n = (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS);
             for i in 0..n {
                 let r = s.result_rect(i);
@@ -1384,6 +1449,7 @@ unsafe fn kick_debounce(hwnd: HWND) {
 }
 
 unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
+    s.submenu_active = false;
     if s.editing_item.is_some() {
         return;
     }
@@ -2734,6 +2800,94 @@ mod tests {
                 if let Some(h) = hicon {
                     let _ = windows::Win32::UI::WindowsAndMessaging::DestroyIcon(h);
                 }
+            }
+        }
+    }
+}
+
+
+fn get_app_path(launch_command: &str) -> &str {
+    if let Some(rest) = launch_command.strip_prefix("shell:AppsFolder\\") {
+        rest
+    } else {
+        launch_command
+    }
+}
+
+unsafe fn execute_submenu_action(hwnd: HWND, s: &mut State) {
+    if let Some(r) = s.results.get(s.selected) {
+        if r.entry.source == "app" {
+            let launch_cmd = &r.entry.launch_command;
+            let parsing_name = get_app_path(launch_cmd);
+            
+            let lnk_path = std::path::Path::new(parsing_name);
+            let resolved_path = if parsing_name.to_lowercase().ends_with(".lnk") {
+                crate::search::resolve_lnk_path(lnk_path)
+            } else {
+                None
+            };
+            
+            match s.submenu_selected {
+                0 => {
+                    // Run as Administrator
+                    let run_cmd = if parsing_name.to_lowercase().ends_with(".lnk") {
+                        resolved_path.unwrap_or_else(|| parsing_name.to_string())
+                    } else {
+                        format!("shell:AppsFolder\\{}", parsing_name)
+                    };
+                    
+                    let run_cmd_wide: Vec<u16> = run_cmd.encode_utf16().chain(std::iter::once(0)).collect();
+                    use windows::Win32::UI::Shell::ShellExecuteW;
+                    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+                    use windows::core::{w, PCWSTR};
+                    let _ = ShellExecuteW(
+                        HWND::default(),
+                        w!("runas"),
+                        PCWSTR(run_cmd_wide.as_ptr()),
+                        PCWSTR::null(),
+                        PCWSTR::null(),
+                        SW_SHOWNORMAL,
+                    );
+                    
+                    s.submenu_active = false;
+                    do_hide(hwnd, s);
+                }
+                1 => {
+                    // Open File Location
+                    let select_path = if parsing_name.to_lowercase().ends_with(".lnk") {
+                        if let Some(ref res) = resolved_path {
+                            res.clone()
+                        } else {
+                            parsing_name.to_string()
+                        }
+                    } else {
+                        parsing_name.to_string()
+                    };
+                    
+                    if std::path::Path::new(&select_path).exists() {
+                        use std::os::windows::process::CommandExt;
+                        let _ = std::process::Command::new("explorer.exe")
+                            .arg(format!(r#"/select,"{}""#, select_path))
+                            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                            .spawn();
+                    }
+                    
+                    s.submenu_active = false;
+                    do_hide(hwnd, s);
+                }
+                2 => {
+                    // Copy Path
+                    let copy_val = if parsing_name.to_lowercase().ends_with(".lnk") {
+                        resolved_path.unwrap_or_else(|| parsing_name.to_string())
+                    } else {
+                        parsing_name.to_string()
+                    };
+                    
+                    copy_to_clipboard(hwnd, &copy_val);
+                    s.submenu_active = false;
+                    do_hide(hwnd, s);
+                }
+                _ => {}
             }
         }
     }
