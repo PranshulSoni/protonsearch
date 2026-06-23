@@ -613,24 +613,282 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 format!("{}m {}s", duration / 60, duration % 60)
             };
 
-            let launch_command = if window_title.contains(":\\") || window_title.contains(":/") {
+            let launch_command = if window_title.contains(":\\") || window_title.contains(":/") || window_title.contains("http://") || window_title.contains("https://") {
                 extract_path_or_url(&window_title).unwrap_or_else(|| app_name.clone())
             } else {
                 app_name.clone()
             };
 
+            let display_app = std::path::Path::new(&app_name)
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| app_name.clone());
+
             results.push(SearchResult {
                 entry: CatalogEntry {
                     id: format!("timeline.{}", timestamp),
-                    control_name: format!("{} ({})", window_title, app_name),
+                    control_name: format!("{} ({})", window_title, display_app),
                     breadcrumb_path: format!("Timeline > {} ({})", time_str, dur_str),
                     launch_command,
                     source: "MEMORY".to_string(),
-                    description: format!("Active app: {} at {}", app_name, time_str),
-                    synonyms: format!("{} {} timeline memory", app_name.to_lowercase(), window_title.to_lowercase()),
+                    description: format!("Active app: {} at {}", display_app, time_str),
+                    synonyms: format!("{} {} timeline memory", display_app.to_lowercase(), window_title.to_lowercase()),
                 },
                 score: 4.0,
             });
+        }
+
+        results
+    }
+
+    pub fn search_project(&self, project_keyword: &str) -> Vec<SearchResult> {
+        let mut results = Vec::new();
+        let conn = match Connection::open(&self.db_path) {
+            Ok(c) => {
+                let _ = c.busy_timeout(std::time::Duration::from_secs(5));
+                c
+            }
+            Err(_) => return results,
+        };
+
+        let kw_lower = project_keyword.to_lowercase();
+        let kw_pattern = format!("%{}%", kw_lower);
+
+        // 1. Find the Git repositories matching the keyword
+        let mut stmt = match conn.prepare("SELECT name, path, head_branch FROM git_repos WHERE name LIKE ? OR path LIKE ?") {
+            Ok(s) => s,
+            Err(_) => return results,
+        };
+        let repos: Vec<(String, String, String)> = stmt.query_map([&kw_pattern, &kw_pattern], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+        }).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
+
+        let mut project_paths = Vec::new();
+        for (name, path, head) in &repos {
+            project_paths.push(path.clone());
+            
+            // Add git repo itself as a result
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: format!("project.repo.{}", name),
+                    control_name: format!("📁 Code Directory: {} (Git Repo)", name),
+                    breadcrumb_path: format!("Project > Code > {} [branch: {}]", name, head),
+                    launch_command: path.clone(),
+                    source: "PROJECT".to_string(),
+                    description: format!("Project repository located at {}", path),
+                    synonyms: format!("{} project repo git code", name.to_lowercase()),
+                },
+                score: 9.5,
+            });
+        }
+
+        // 2. Query matching recent files or folders
+        let mut stmt = match conn.prepare("SELECT path, size, is_dir FROM files WHERE path LIKE ? LIMIT 20") {
+            Ok(s) => s,
+            Err(_) => return results,
+        };
+        let files: Vec<(String, i64, i32)> = stmt.query_map([&kw_pattern], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i32>(2)?))
+        }).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
+
+        for (path, size, is_dir) in files {
+            let name = std::path::Path::new(&path).file_name()
+                .map(|f| f.to_string_lossy().into_owned())
+                .unwrap_or_else(|| path.clone());
+            
+            let is_code = path.contains("\\target\\") || path.contains("\\node_modules\\");
+            if is_code { continue; } // skip build targets
+
+            let control_name = if is_dir == 1 {
+                format!("📁 Folder: {}", name)
+            } else {
+                format!("📄 Document: {}", name)
+            };
+
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: format!("project.file.{}", path),
+                    control_name,
+                    breadcrumb_path: format!("Project > Files > {}", path),
+                    launch_command: path.clone(),
+                    source: "PROJECT".to_string(),
+                    description: format!("Related file ({} bytes)", size),
+                    synonyms: format!("{} project file", name.to_lowercase()),
+                },
+                score: 9.0,
+            });
+        }
+
+        // 3. Query browser history / bookmarks matching the keyword
+        let mut stmt = match conn.prepare("SELECT url, title, source FROM browser_items WHERE title LIKE ? OR url LIKE ? LIMIT 20") {
+            Ok(s) => s,
+            Err(_) => return results,
+        };
+        let urls: Vec<(String, String, String)> = stmt.query_map([&kw_pattern, &kw_pattern], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+        }).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
+
+        for (url, title, src) in urls {
+            let is_figma = url.contains("figma.com");
+            let control_name = if is_figma {
+                format!("🎨 Figma Design: {}", title)
+            } else {
+                format!("🔗 Link: {}", title)
+            };
+
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: format!("project.url.{}", url),
+                    control_name,
+                    breadcrumb_path: format!("Project > {} > {}", src.to_uppercase(), url),
+                    launch_command: url,
+                    source: "PROJECT".to_string(),
+                    description: "Related browser link".to_string(),
+                    synonyms: format!("{} project url link figma design", title.to_lowercase()),
+                },
+                score: 8.8,
+            });
+        }
+
+        // 4. Query recent Git commits matching the keyword
+        let mut stmt = match conn.prepare("SELECT repo_path, hash, message, timestamp FROM git_commits WHERE message LIKE ? ORDER BY timestamp DESC LIMIT 5") {
+            Ok(s) => s,
+            Err(_) => return results,
+        };
+        let commits: Vec<(String, String, String, i64)> = stmt.query_map([&kw_pattern], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, i64>(3)?))
+        }).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
+
+        for (repo_path, hash, message, ts) in commits {
+            let repo_name = std::path::Path::new(&repo_path).file_name()
+                .map(|f| f.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "repo".to_string());
+
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: format!("project.commit.{}", hash),
+                    control_name: format!("💻 Commit: {} (in {})", message, repo_name),
+                    breadcrumb_path: format!("Project > Commit > {} [hash: {}]", repo_name, &hash[..7.min(hash.len())]),
+                    launch_command: repo_path.clone(),
+                    source: "PROJECT".to_string(),
+                    description: format!("Git commit at {}", format_timestamp_local(ts)),
+                    synonyms: format!("{} project commit git", message.to_lowercase()),
+                },
+                score: 8.5,
+            });
+        }
+
+        // 5. Query clipboard items matching the keyword
+        let mut stmt = match conn.prepare("SELECT content, source_app, is_image FROM clipboard_history WHERE content LIKE ? LIMIT 5") {
+            Ok(s) => s,
+            Err(_) => return results,
+        };
+        let clips: Vec<(String, String, i32)> = stmt.query_map([&kw_pattern], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, i32>(2)?))
+        }).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
+
+        for (content, app, is_image) in clips {
+            let display_app = std::path::Path::new(&app)
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| app.clone());
+
+            if is_image == 1 {
+                let filename = std::path::Path::new(&content).file_name()
+                    .map(|f| f.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "image.bmp".to_string());
+                results.push(SearchResult {
+                    entry: CatalogEntry {
+                        id: format!("project.clip.{}", content),
+                        control_name: format!("🎨 Screenshot (Copied from {})", display_app),
+                        breadcrumb_path: format!("Project > Clipboard > Screenshot"),
+                        launch_command: format!("copy_image:{}", content),
+                        source: "PROJECT".to_string(),
+                        description: format!("Project screenshot: {}", filename),
+                        synonyms: "project image figma figma_screenshot clipboard".to_string(),
+                    },
+                    score: 8.0,
+                });
+            } else {
+                let mut preview = content.replace("\r\n", " ").replace('\n', " ");
+                if preview.len() > 100 {
+                    preview.truncate(97);
+                    preview.push_str("...");
+                }
+                results.push(SearchResult {
+                    entry: CatalogEntry {
+                        id: format!("project.clip.{}", content),
+                        control_name: format!("📋 Clipboard: {}", preview),
+                        breadcrumb_path: format!("Project > Clipboard > Text"),
+                        launch_command: format!("copy:{}", content),
+                        source: "PROJECT".to_string(),
+                        description: format!("Text copied from {}", display_app),
+                        synonyms: format!("{} project clip", content.to_lowercase()),
+                    },
+                    score: 7.8,
+                });
+            }
+        }
+
+        // 6. Temporal proximity connections (Worked on simultaneously)
+        let mut stmt = match conn.prepare("SELECT timestamp FROM timeline_events WHERE window_title LIKE ? OR app_name LIKE ?") {
+            Ok(s) => s,
+            Err(_) => return results,
+        };
+        let activity_timestamps: Vec<i64> = stmt.query_map([&kw_pattern, &kw_pattern], |row| {
+            row.get::<_, i64>(0)
+        }).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
+
+        if !activity_timestamps.is_empty() {
+            let mut min_ts = i64::MAX;
+            let mut max_ts = i64::MIN;
+            for ts in activity_timestamps {
+                if ts < min_ts { min_ts = ts; }
+                if ts > max_ts { max_ts = ts; }
+            }
+
+            if max_ts >= min_ts {
+                let mut stmt = match conn.prepare(
+                    "SELECT url, title, source FROM browser_items \
+                     WHERE ( \
+                         CASE \
+                             WHEN last_visit_time > 10000000000000000 THEN (last_visit_time / 1000000) - 11644473600 \
+                             WHEN last_visit_time > 10000000000 THEN last_visit_time / 1000000 \
+                             ELSE last_visit_time \
+                         END \
+                     ) >= ? - 600 AND ( \
+                         CASE \
+                             WHEN last_visit_time > 10000000000000000 THEN (last_visit_time / 1000000) - 11644473600 \
+                             WHEN last_visit_time > 10000000000 THEN last_visit_time / 1000000 \
+                             ELSE last_visit_time \
+                         END \
+                     ) <= ? + 600 \
+                     AND url NOT IN (SELECT url FROM browser_items WHERE title LIKE ? OR url LIKE ?) \
+                     LIMIT 5"
+                ) {
+                    Ok(s) => s,
+                    Err(_) => return results,
+                };
+                let temp_urls: Vec<(String, String, String)> = stmt.query_map(
+                    rusqlite::params![min_ts, max_ts, kw_pattern, kw_pattern],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+                ).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
+
+                for (url, title, src) in temp_urls {
+                    results.push(SearchResult {
+                        entry: CatalogEntry {
+                            id: format!("project.temp_url.{}", url),
+                            control_name: format!("🔗 Context Link: {}", title),
+                            breadcrumb_path: format!("Project > Context > Browser > {}", url),
+                            launch_command: url,
+                            source: "PROJECT".to_string(),
+                            description: "Opened during project work window".to_string(),
+                            synonyms: format!("{} project context url link", title.to_lowercase()),
+                        },
+                        score: 7.5,
+                    });
+                }
+            }
         }
 
         results
@@ -681,6 +939,11 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         };
 
         for (content, source_app, timestamp, is_image) in rows {
+            let display_app = std::path::Path::new(&source_app)
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| source_app.clone());
+
             if is_image == 1 {
                 let filename = std::path::Path::new(&content)
                     .file_name()
@@ -689,20 +952,20 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
                 let dims = get_bmp_dimensions(&content);
                 let control_name = if let Some((w, h)) = dims {
-                    format!("[Image] {}x{} (Copied from {})", w, h, source_app)
+                    format!("[Image] {}x{} (Copied from {})", w, h, display_app)
                 } else {
-                    format!("[Image] Copied from {}", source_app)
+                    format!("[Image] Copied from {}", display_app)
                 };
 
                 results.push(SearchResult {
                     entry: CatalogEntry {
                         id: format!("clip.{}", timestamp),
                         control_name,
-                        breadcrumb_path: format!("Clipboard > {}", source_app),
+                        breadcrumb_path: format!("Clipboard > {}", display_app),
                         launch_command: format!("copy_image:{}", content),
                         source: "CLIPBOARD".to_string(),
                         description: format!("Image history (Saved as {})", filename),
-                        synonyms: format!("image {} clipboard copy", source_app.to_lowercase()),
+                        synonyms: format!("image {} clipboard copy", display_app.to_lowercase()),
                     },
                     score: 3.0,
                 });
@@ -724,7 +987,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                     entry: CatalogEntry {
                         id: format!("clip.{}", timestamp),
                         control_name: display_name,
-                        breadcrumb_path: format!("Clipboard > {}", source_app),
+                        breadcrumb_path: format!("Clipboard > {}", display_app),
                         launch_command: format!("copy:{}", content),
                         source: "CLIPBOARD".to_string(),
                         description: desc,
@@ -1660,17 +1923,105 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         file_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         file_matches.truncate(15); // Cap at 15 file results
 
+        // ── Cross-Source Entity Linker ("Project Auto-Entity") ──────────────
+        let mut matched_project_name = None;
+        if q.len() >= 3 {
+            if let Ok(conn) = Connection::open(&self.db_path) {
+                let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                
+                // Check git repos first
+                if let Ok(mut s) = conn.prepare("SELECT name FROM git_repos") {
+                    let names: Vec<String> = s.query_map([], |row| row.get::<_, String>(0))
+                        .map(|m| m.filter_map(|r| r.ok()).collect())
+                        .unwrap_or_default();
+                    for name in names {
+                        let name_lc = name.to_lowercase();
+                        if q_lower_trimmed == name_lc || q_lower_trimmed.contains(&name_lc) || name_lc.contains(&q_lower_trimmed) {
+                            matched_project_name = Some(name);
+                            break;
+                        }
+                    }
+                }
+                
+                // If not found in git repos, check folder names in indexed files
+                if matched_project_name.is_none() {
+                    if let Ok(mut s) = conn.prepare("SELECT path FROM files WHERE is_dir = 1") {
+                        let paths: Vec<String> = s.query_map([], |row| row.get::<_, String>(0))
+                            .map(|m| m.filter_map(|r| r.ok()).collect())
+                            .unwrap_or_default();
+                        for path in paths {
+                            if let Some(folder_name) = std::path::Path::new(&path).file_name() {
+                                let folder_name_lc = folder_name.to_string_lossy().to_lowercase();
+                                if !folder_name_lc.is_empty() && (q_lower_trimmed == folder_name_lc || q_lower_trimmed.contains(&folder_name_lc) || folder_name_lc.contains(&q_lower_trimmed)) {
+                                    matched_project_name = Some(folder_name.to_string_lossy().into_owned());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut project_results = Vec::new();
+        if let Some(ref project_name) = matched_project_name {
+            let mut repo_path = String::new();
+            if let Ok(conn) = Connection::open(&self.db_path) {
+                let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                if let Ok(mut s) = conn.prepare("SELECT path FROM git_repos WHERE name = ? LIMIT 1") {
+                    if let Ok(p) = s.query_row([project_name], |row| row.get::<_, String>(0)) {
+                        repo_path = p;
+                    }
+                }
+            }
+
+            let workspace_card = SearchResult {
+                entry: CatalogEntry {
+                    id: format!("project.workspace.{}", project_name),
+                    control_name: format!("📁 PROJECT WORKSPACE: {}", project_name),
+                    breadcrumb_path: format!("Project > Dashboard > {}", project_name),
+                    launch_command: repo_path,
+                    source: "PROJECT".to_string(),
+                    description: format!("Active workspace for project '{}'", project_name),
+                    synonyms: format!("{} project workspace dashboard card", project_name.to_lowercase()),
+                },
+                score: 10.0,
+            };
+
+            project_results.push(workspace_card);
+            project_results.append(&mut self.search_project(project_name));
+        }
+
         let mut merged = Vec::new();
         merged.append(&mut app_matches);
         merged.append(&mut recent_matches);
         merged.append(&mut file_matches);
         merged.append(&mut vec_results);
+        merged.append(&mut project_results);
         merged.push(web_search.clone());
         merged.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
         conv_results.append(&mut final_results);
         final_results = conv_results;
         final_results.append(&mut merged);
+        
+        // Deduplicate final_results by id or non-empty launch_command
+        let mut unique_results = Vec::new();
+        let mut seen_ids = std::collections::HashSet::new();
+        let mut seen_launches = std::collections::HashSet::new();
+
+        for r in final_results {
+            let is_duplicate = seen_ids.contains(&r.entry.id) || 
+                (!r.entry.launch_command.is_empty() && seen_launches.contains(&r.entry.launch_command));
+            if !is_duplicate {
+                seen_ids.insert(r.entry.id.clone());
+                if !r.entry.launch_command.is_empty() {
+                    seen_launches.insert(r.entry.launch_command.clone());
+                }
+                unique_results.push(r);
+            }
+        }
+        final_results = unique_results;
         
         final_results.truncate(top_k);
 
@@ -2875,6 +3226,33 @@ fn extract_path_or_url(text: &str) -> Option<String> {
             }
             return Some(path_part.trim().to_string());
         }
+    }
+    if let Some(idx) = text.find(":/") {
+        if idx >= 1 {
+            let start = idx - 1;
+            let path_part = &text[start..];
+            if let Some(sep_idx) = path_part.find(" - ") {
+                return Some(path_part[..sep_idx].trim().to_string());
+            }
+            if let Some(sep_idx) = path_part.find(" | ") {
+                return Some(path_part[..sep_idx].trim().to_string());
+            }
+            return Some(path_part.trim().to_string());
+        }
+    }
+    if let Some(idx) = text.find("http://") {
+        let part = &text[idx..];
+        if let Some(sep_idx) = part.find(' ') {
+            return Some(part[..sep_idx].trim().to_string());
+        }
+        return Some(part.trim().to_string());
+    }
+    if let Some(idx) = text.find("https://") {
+        let part = &text[idx..];
+        if let Some(sep_idx) = part.find(' ') {
+            return Some(part[..sep_idx].trim().to_string());
+        }
+        return Some(part.trim().to_string());
     }
     None
 }

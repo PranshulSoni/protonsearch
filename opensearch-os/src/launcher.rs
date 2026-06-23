@@ -76,7 +76,23 @@ pub fn launch(cmd: &str) {
             for arg in parts {
                 c.arg(arg);
             }
-            c.spawn()
+            match c.spawn() {
+                Ok(child) => Ok(child),
+                Err(_) => {
+                    let cmd_wide: Vec<u16> = cmd.encode_utf16().chain(std::iter::once(0)).collect();
+                    unsafe {
+                        let _ = ShellExecuteW(
+                            HWND::default(),
+                            w!("open"),
+                            PCWSTR(cmd_wide.as_ptr()),
+                            PCWSTR::null(),
+                            PCWSTR::null(),
+                            SW_SHOWNORMAL,
+                        );
+                    }
+                    Err(std::io::Error::new(std::io::ErrorKind::Other, "fallback to ShellExecuteW"))
+                }
+            }
         } else {
             return;
         }

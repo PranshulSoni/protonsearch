@@ -1367,6 +1367,8 @@ unsafe fn badge(hdc: HDC, s: &State, source: &str, x: i32, y: i32) {
     let src_lc = source.to_lowercase();
     let (label, bg_color, tx_color) = if src_lc == "live" {
         ("LIVE", COLORREF(0x00_1F_A6_0A), CLR_WHITE)
+    } else if src_lc == "project" {
+        ("PROJECT", COLORREF(0x00_B5_25_9E), CLR_WHITE)
     } else if src_lc == "action" {
         ("ACTION", COLORREF(0x00_B5_25_9E), CLR_WHITE)
     } else if src_lc == "translated" {
@@ -1523,11 +1525,7 @@ unsafe fn get_active_app_name() -> String {
         let _ = CloseHandle(handle);
 
         if res.is_ok() && size > 0 {
-            let path_str = String::from_utf16_lossy(&buffer[..size as usize]);
-            if let Some(filename) = std::path::Path::new(&path_str).file_name() {
-                return filename.to_string_lossy().into_owned();
-            }
-            return path_str;
+            return String::from_utf16_lossy(&buffer[..size as usize]);
         }
     }
 
@@ -1849,12 +1847,7 @@ unsafe fn start_timeline_tracker(db_path: std::path::PathBuf, launcher_hwnd: Sen
                 );
                 let _ = CloseHandle(handle);
                 if res.is_ok() && size > 0 {
-                    let path_str = String::from_utf16_lossy(&buffer[..size as usize]);
-                    if let Some(filename) = std::path::Path::new(&path_str).file_name() {
-                        filename.to_string_lossy().into_owned()
-                    } else {
-                        path_str
-                    }
+                    String::from_utf16_lossy(&buffer[..size as usize])
                 } else {
                     "Unknown".to_string()
                 }
