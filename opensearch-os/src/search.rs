@@ -201,18 +201,21 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
        path_lower.contains("\\.npm\\") ||
        path_lower.contains("\\.antigravity") ||
        path_lower.contains("\\.cursor\\") ||
+       path_lower.contains("\\venv\\") ||
+       path_lower.contains("\\.venv\\") ||
+       path_lower.contains("\\__macosx\\") ||
        path_lower.contains("\\bin\\") ||
        path_lower.contains("\\obj\\") ||
        path_lower.contains("\\temp\\") ||
        path_lower.contains("\\tmp\\") {
-        return -2.0; // Significant penalty → excluded from results
+        return -2.0; // Excluded from results
     }
 
     // Boost user's active/primary directories
     if path_lower.contains("\\desktop\\") ||
        path_lower.contains("\\documents\\") ||
        path_lower.contains("\\downloads\\") {
-        return 1.5; // Significant boost
+        return 1.5;
     }
 
     0.0
@@ -334,7 +337,9 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
 
 
-    fn search_files_generic(&self, query: &str, only_code: bool, max_results: usize) -> Vec<SearchResult> {
+    // with_fts_content: if false (general search), skips content-only matches — only filename hits shown.
+    //                   if true  (file:/code: prefix), full content search is included.
+    fn search_files_generic(&self, query: &str, only_code: bool, max_results: usize, with_fts_content: bool) -> Vec<SearchResult> {
         let conn = match Connection::open(&self.db_path) {
             Ok(c) => {
                 let _ = c.busy_timeout(std::time::Duration::from_secs(5));
@@ -432,7 +437,25 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             }
         }
 
-        // ── 3. FTS5 content search — always run, dedup by path ─────────────
+        // ── 3. FTS5 content search — only in dedicated prefix searches (file:/code:)
+        // In general search (with_fts_content=false), we only boost already-found filename matches.
+        if !with_fts_content {
+            // Still boost score of metadata hits that also match content
+            let clean_fts_query = q_words.join(" ");
+            let fts_check = format!(
+                "SELECT f.path FROM files f JOIN files_fts fts ON f.path = fts.path WHERE files_fts MATCH ? LIMIT 50"
+            );
+            if let Ok(mut stmt_fts) = conn.prepare(&fts_check) {
+                if let Ok(rows) = stmt_fts.query_map([&clean_fts_query], |row| row.get::<_, String>(0)) {
+                    for row in rows.filter_map(|r| r.ok()) {
+                        if let Some(existing) = results.iter_mut().find(|r| r.entry.launch_command == row) {
+                            existing.score += 0.5; // content match bonus on top of filename match
+                        }
+                    }
+                }
+            }
+            return results;
+        }
         let clean_fts_query = q_words.join(" ");
         let fts_query_str = if only_code {
             let placeholders: Vec<String> = code_exts.iter().map(|_| "?".to_string()).collect();
@@ -515,7 +538,8 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
     }
 
     fn search_local_files(&self, query: &str) -> Vec<SearchResult> {
-        self.search_files_generic(query, false, 15)
+        // General search: filename matches only (no FTS content-only results)
+        self.search_files_generic(query, false, 15, false)
     }
 
     pub fn db_path(&self) -> std::path::PathBuf {
@@ -618,11 +642,13 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
     }
 
     pub fn search_files_only(&self, query: &str) -> Vec<SearchResult> {
-        self.search_files_generic(query, false, 50)
+        // Dedicated file: prefix — include full content search
+        self.search_files_generic(query, false, 50, true)
     }
 
     pub fn search_code_only(&self, query: &str) -> Vec<SearchResult> {
-        self.search_files_generic(query, true, 50)
+        // Dedicated code: prefix — include full content search
+        self.search_files_generic(query, true, 50, true)
     }
 
     pub fn search_bookmarks_only(&self, sub_query: &str) -> Vec<SearchResult> {
