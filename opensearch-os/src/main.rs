@@ -18,7 +18,6 @@ use windows::{
             HiDpi::*,
             Input::KeyboardAndMouse::*,
             WindowsAndMessaging::*,
-            Shell::*,
         },
     },
 };
@@ -35,7 +34,7 @@ const ICON_W: i32 = 36;
 // ── Win32 IDs ─────────────────────────────────────────────────────────────────
 const HOTKEY_ID: i32 = 1;
 const TIMER_DEBOUNCE: usize = 1;
-const TIMER_ANIM: usize = 2;
+// const TIMER_ANIM: usize = 2;
 const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
 const WM_SEARCH_RESULTS: u32 = WM_USER + 3;
@@ -45,12 +44,12 @@ struct SearchRequest {
     query_id: usize,
 }
 // ── Animation ─────────────────────────────────────────────────────────────────
-const ANIM_TICK_MS: u32 = 1;
+// const ANIM_TICK_MS: u32 = 1;
 const ANIM_DURATION_SEC: f32 = 0.160; // 160ms
-const MAX_ALPHA: u8 = 255;
+// const MAX_ALPHA: u8 = 255;
 
 // ── Genie Morph Dimensions ────────────────────────────────────────────────────
-const PILL_H: i32 = 12; // Starting height at top center
+// const PILL_H: i32 = 12; // Starting height at top center
 
 // ── Colors (COLORREF = 0x00BBGGRR) ───────────────────────────────────────────
 const BG: COLORREF        = COLORREF(0x00_24_21_21);
@@ -334,9 +333,9 @@ unsafe fn run() {
                     // Import Windows Clipboard History in background
                     let db_path_clone = db_path.clone();
                     std::thread::spawn(move || {
-                        let _ = unsafe { windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_MULTITHREADED) };
-                        unsafe { import_windows_clipboard_history(&db_path_clone); }
-                        unsafe { windows::Win32::System::Com::CoUninitialize(); }
+                        let _ = windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_MULTITHREADED);
+                        import_windows_clipboard_history(&db_path_clone);
+                        windows::Win32::System::Com::CoUninitialize();
                     });
 
                     // Spawn worker channels
@@ -389,11 +388,11 @@ unsafe fn run() {
 
     let mut msg = MSG::default();
     while GetMessageW(&mut msg, HWND(null_mut()), 0, 0).as_bool() {
-        TranslateMessage(&msg);
+        let _ = TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
 
-    UnregisterHotKey(hwnd, HOTKEY_ID);
+    let _ = UnregisterHotKey(hwnd, HOTKEY_ID);
 }
 
 // ── WndProc ───────────────────────────────────────────────────────────────────
@@ -582,7 +581,7 @@ unsafe extern "system" fn wnd_proc(
                     s.query.push(c);
                     s.selected = 0;
                     kick_debounce(hwnd);
-                    InvalidateRect(hwnd, None, FALSE);
+                    let _ = InvalidateRect(hwnd, None, FALSE);
                 }
             }
             LRESULT(0)
@@ -601,7 +600,7 @@ unsafe extern "system" fn wnd_proc(
                     0x41 => { // Ctrl + A (Select All)
                         if !s.query.is_empty() {
                             s.text_selected = true;
-                            InvalidateRect(hwnd, None, FALSE);
+                            let _ = InvalidateRect(hwnd, None, FALSE);
                         }
                         return LRESULT(0);
                     }
@@ -622,7 +621,7 @@ unsafe extern "system" fn wnd_proc(
                             }
                             s.selected = 0;
                             kick_debounce(hwnd);
-                            InvalidateRect(hwnd, None, FALSE);
+                            let _ = InvalidateRect(hwnd, None, FALSE);
                         }
                         return LRESULT(0);
                     }
@@ -634,7 +633,7 @@ unsafe extern "system" fn wnd_proc(
                 VK_ESCAPE => {
                     if s.text_selected {
                         s.text_selected = false;
-                        InvalidateRect(hwnd, None, FALSE);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
                     } else {
                         start_hide(hwnd, s);
                     }
@@ -648,7 +647,7 @@ unsafe extern "system" fn wnd_proc(
                     }
                     s.selected = 0;
                     kick_debounce(hwnd);
-                    InvalidateRect(hwnd, None, FALSE);
+                    let _ = InvalidateRect(hwnd, None, FALSE);
                 }
                 VK_RETURN => {
                     let is_shift = (GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
@@ -688,7 +687,7 @@ unsafe extern "system" fn wnd_proc(
                         if s.selected >= s.scroll_offset + VISIBLE_RESULTS {
                             s.scroll_offset = s.selected - (VISIBLE_RESULTS - 1);
                         }
-                        InvalidateRect(hwnd, None, FALSE);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
                     }
                 }
                 VK_UP => {
@@ -697,7 +696,7 @@ unsafe extern "system" fn wnd_proc(
                         if s.selected < s.scroll_offset {
                             s.scroll_offset = s.selected;
                         }
-                        InvalidateRect(hwnd, None, FALSE);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
                     }
                 }
                 _ => return DefWindowProcW(hwnd, msg, wp, lp),
@@ -717,7 +716,7 @@ unsafe extern "system" fn wnd_proc(
                         if s.selected >= s.scroll_offset + VISIBLE_RESULTS {
                             s.selected = s.scroll_offset + VISIBLE_RESULTS - 1;
                         }
-                        InvalidateRect(hwnd, None, FALSE);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
                     }
                 } else {
                     // Scroll down
@@ -726,7 +725,7 @@ unsafe extern "system" fn wnd_proc(
                         if s.selected < s.scroll_offset {
                             s.selected = s.scroll_offset;
                         }
-                        InvalidateRect(hwnd, None, FALSE);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
                     }
                 }
             }
@@ -812,10 +811,10 @@ unsafe extern "system" fn wnd_proc(
                 let s = Box::from_raw(sp);
                 if !s.icon_clipboard.0.is_null() { let _ = DestroyIcon(s.icon_clipboard); }
                 if !s.icon_memory.0.is_null() { let _ = DestroyIcon(s.icon_memory); }
-                DeleteObject(s.font_q);
-                DeleteObject(s.font_n);
-                DeleteObject(s.font_c);
-                DeleteObject(s.font_b);
+                let _ = DeleteObject(s.font_q);
+                let _ = DeleteObject(s.font_n);
+                let _ = DeleteObject(s.font_c);
+                let _ = DeleteObject(s.font_b);
                 if !s.icon_settings.0.is_null() { let _ = DestroyIcon(s.icon_settings); }
                 if !s.icon_control_panel.0.is_null() { let _ = DestroyIcon(s.icon_control_panel); }
                 if !s.icon_search.0.is_null() { let _ = DestroyIcon(s.icon_search); }
@@ -936,11 +935,11 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
     IN_ANIMATION = false;
 }
 
-unsafe fn do_show(hwnd: HWND, s: &mut State) {
+unsafe fn do_show(hwnd: HWND, _s: &mut State) {
     animate_window(hwnd, true);
 }
 
-unsafe fn start_hide(hwnd: HWND, s: &mut State) {
+unsafe fn start_hide(hwnd: HWND, _s: &mut State) {
     animate_window(hwnd, false);
 }
 
@@ -955,7 +954,7 @@ unsafe fn kick_debounce(hwnd: HWND) {
     let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 120, None);
 }
 
-unsafe fn trigger_search(hwnd: HWND, s: &mut State) {
+unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
     s.current_query_id += 1;
     let req = SearchRequest {
         query: s.query.clone(),
@@ -967,7 +966,7 @@ unsafe fn trigger_search(hwnd: HWND, s: &mut State) {
 }
 
 fn ease_out(t: f32) -> f32 { 1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(4) }
-fn ease_in(t: f32) -> f32 { t.clamp(0.0, 1.0).powi(4) }
+// fn ease_in(t: f32) -> f32 { t.clamp(0.0, 1.0).powi(4) }
 
 unsafe fn fill_rounded(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, c: COLORREF) {
     let br = CreateSolidBrush(c);
@@ -1140,7 +1139,7 @@ unsafe fn get_file_icon(path: &str) -> HICON {
     if res != 0 { shfi.hIcon } else { HICON(null_mut()) }
 }
 
-unsafe fn trigger_icon_loading(hwnd: HWND, s: &mut State) {
+unsafe fn trigger_icon_loading(_hwnd: HWND, s: &mut State) {
     if s.icon_tx.is_none() { return; }
     let tx = s.icon_tx.as_ref().unwrap();
     for res in &s.results {
@@ -1204,7 +1203,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
     // Create rounded clipping region matching the inner background area of the morphing shape
     let clip_rgn = CreateRoundRectRgn(x + 1, y + 1, x + w - 1, y + h - 1, r - 1, r - 1);
-    let old_clip = SelectClipRgn(mdc, clip_rgn);
+    let _ = SelectClipRgn(mdc, clip_rgn);
 
     // ── Search row ────────────────────────────────────────────────────────
     SetBkMode(mdc, TRANSPARENT);
@@ -1367,20 +1366,20 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let _ = SelectObject(mdc, old);
     let _ = DeleteObject(bmp);
     let _ = DeleteDC(mdc);
-    EndPaint(hwnd, &ps);
+    let _ = EndPaint(hwnd, &ps);
 }
 
 unsafe fn fill(hdc: HDC, x: i32, y: i32, w: i32, h: i32, c: COLORREF) {
     let br = CreateSolidBrush(c);
-    FillRect(hdc, &RECT { left: x, top: y, right: x + w, bottom: y + h }, br);
-    DeleteObject(br);
+    let _ = FillRect(hdc, &RECT { left: x, top: y, right: x + w, bottom: y + h }, br);
+    let _ = DeleteObject(br);
 }
 
 unsafe fn draw_rounded_border_and_bg(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, gradient: bool) {
     if gradient {
         // Create a rounded region for the border
         let rgn = CreateRoundRectRgn(x, y, x + w + 1, y + h + 1, r, r);
-        let old_rgn = SelectClipRgn(hdc, rgn);
+        let _ = SelectClipRgn(hdc, rgn);
         
         // Draw horizontal gradient over the outer bounds
         let vertices = [

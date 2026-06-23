@@ -40,7 +40,7 @@ struct MetaJson {
 
 #[derive(Clone)]
 pub struct AnchorCategory {
-    pub name: &'static str,
+    pub _name: &'static str,
     pub target_id: &'static str,
     pub translation_tip: &'static str,
     pub phrases: &'static [&'static str],
@@ -69,7 +69,7 @@ pub struct SearchEngine {
     anchor_categories: Vec<AnchorCategory>,
     apps: Vec<AppInfo>,
     recent_files: Vec<RecentFileInfo>,
-    db_path: std::path::PathBuf,
+    _db_path: std::path::PathBuf,
     conn: Connection,
 }
 
@@ -120,35 +120,35 @@ impl SearchEngine {
 
         let mut anchor_categories = vec![
             AnchorCategory {
-                name: "eyes_hurt",
+                _name: "eyes_hurt",
                 target_id: "system.night_light",
                 translation_tip: "Translation Tip: Eye strain? Filter blue light or adjust display brightness. | System > Display > Brightness & color > Night light",
                 phrases: &["my eyes hurt", "eye strain", "screen too bright", "reduce blue light", "eyes hurt", "blue light filter"],
                 vecs: vec![],
             },
             AnchorCategory {
-                name: "internet_slow",
+                _name: "internet_slow",
                 target_id: "system.troubleshoot.network-internet-troubleshooter",
                 translation_tip: "Translation Tip: Slow connection? Diagnose network adapter and DNS. | System > Troubleshoot > Other troubleshooters > Network and Internet",
                 phrases: &["internet is slow", "wi-fi is slow", "wifi is slow", "slow network", "connection speed", "slow internet", "slow wifi"],
                 vecs: vec![],
             },
             AnchorCategory {
-                name: "mouse_flying",
+                _name: "mouse_flying",
                 target_id: "bluetooth-devices.mouse.enhance-pointer-precision",
                 translation_tip: "Translation Tip: Erratic mouse? Adjust cursor speed and pointer precision. | Bluetooth & devices > Mouse > Enhance pointer precision",
                 phrases: &["mouse is flying", "cursor moving too fast", "erratic mouse speed", "mouse speed too high", "pointer speed is fast"],
                 vecs: vec![],
             },
             AnchorCategory {
-                name: "battery_dying",
+                _name: "battery_dying",
                 target_id: "system.power.energy_saver",
                 translation_tip: "Translation Tip: Battery low? Enable Energy Saver to extend power. | System > Power & battery > Energy saver",
                 phrases: &["battery is dying", "battery low", "running out of power", "extend battery life", "battery saver", "laptop dying"],
                 vecs: vec![],
             },
             AnchorCategory {
-                name: "cant_see_text",
+                _name: "cant_see_text",
                 target_id: "text_size.text_size",
                 translation_tip: "Translation Tip: Text too small? Adjust scale or make text bigger. | Text size > Text size",
                 phrases: &["can't see text", "text is too small", "make font size bigger", "increase UI scale", "font is tiny", "screen is too small"],
@@ -183,7 +183,7 @@ impl SearchEngine {
         )?;
         let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp);", []);
 
-        let mut engine = Self { vecs, meta, n, dim, session, tokenizer, anchor_categories: vec![], apps: vec![], recent_files: vec![], db_path, conn };
+        let mut engine = Self { vecs, meta, n, dim, session, tokenizer, anchor_categories: vec![], apps: vec![], recent_files: vec![], _db_path: db_path, conn };
         for cat in &mut anchor_categories {
             for phrase in cat.phrases {
                 let phrase_with_prefix = format!("query: {}", phrase);
@@ -516,7 +516,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                     // Score: content-only matches intentionally score lower than filename matches.
                     // Base 0.8 + up to 1.5 name bonus keeps content matches below pure filename hits (score 1.8+).
                     let name_bonus = score_name(&name).min(1.5);
-                    let mut score = 0.8 + name_bonus + path_modifier;
+                    let score = 0.8 + name_bonus + path_modifier;
                     if score <= 0.0 { continue; }
                     let parent_dir = std::path::Path::new(&path)
                         .parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()).unwrap_or("");
@@ -550,9 +550,11 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         self.search_files_generic(query, false, 15, false)
     }
 
+    /*
     pub fn db_path(&self) -> std::path::PathBuf {
-        self.db_path.clone()
+        self._db_path.clone()
     }
+    */
 
     pub fn search_timeline(&self, start_time: i64, end_time: i64, keyword: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
@@ -865,7 +867,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                     |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
                 ).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
 
-                for (url, title, src) in temp_urls {
+                for (url, title, _src) in temp_urls {
                     results.push(SearchResult {
                         entry: CatalogEntry {
                             id: format!("project.temp_url.{}", url),
@@ -1053,7 +1055,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             let title_lower = title.to_lowercase();
             let url_lower = url.to_lowercase();
 
-            let mut score = 1.0f32;
+            let score;
             if !q_lower.is_empty() {
                 if title_lower == q_lower || url_lower == q_lower {
                     score = 2.0;
@@ -1161,7 +1163,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             let title_lower = title.to_lowercase();
             let url_lower = url.to_lowercase();
 
-            let mut score = 1.0f32;
+            let score;
             if !q_lower.is_empty() {
                 if title_lower == q_lower || url_lower == q_lower {
                     score = 2.0;
@@ -3094,7 +3096,7 @@ fn parse_time_range(query: &str) -> Option<(i64, i64, String)> {
     
     let mut time_zone_info = windows::Win32::System::Time::TIME_ZONE_INFORMATION::default();
     let _ = unsafe { windows::Win32::System::Time::GetTimeZoneInformation(&mut time_zone_info) };
-    let bias_minutes = time_zone_info.Bias;
+    let _bias_minutes = time_zone_info.Bias;
     
     let seconds_since_midnight = (local_time.wHour as i64 * 3600) + (local_time.wMinute as i64 * 60) + local_time.wSecond as i64;
     let today_start = now - seconds_since_midnight;
