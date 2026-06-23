@@ -5,6 +5,7 @@ mod search;
 mod indexer;
 mod browser_indexer;
 mod git_indexer;
+mod voice;
 
 use std::ptr::null_mut;
 use search::{SearchEngine, SearchResult};
@@ -35,12 +36,16 @@ const ICON_W: i32 = 36;
 const HOTKEY_ID: i32 = 1;
 const TIMER_DEBOUNCE: usize = 1;
 const TIMER_CURSOR_BLINK: usize = 2;
+const TIMER_VOICE_AUTOEXEC: usize = 3;
+const TIMER_VOICE_ANIM: usize = 4;
 const CURSOR_BLINK_MS: u32 = 530;
 const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
 const WM_SEARCH_RESULTS: u32 = WM_USER + 3;
 const WM_START_EDITING: u32 = WM_USER + 4;
 const WM_REFRESH_SEARCH: u32 = WM_USER + 5;
+const WM_VOICE_WAKEWORD: u32 = WM_USER + 100;
+const WM_VOICE_QUERY_READY: u32 = WM_USER + 101;
 
 struct SearchRequest {
     query: String,
@@ -104,6 +109,10 @@ struct State {
     editing_item: Option<String>,
     submenu_active: bool,
     submenu_selected: usize,
+    // Voice activation
+    voice_listening: bool,   // true = currently recording query
+    voice_triggered: bool,   // launcher opened via voice (auto-execute on result)
+    voice_dot_tick: u32,     // animation frame counter for pulsing mic dot
 }
 
 #[derive(PartialEq)]
@@ -246,6 +255,9 @@ unsafe fn run() {
         editing_item: None,
         submenu_active: false,
         submenu_selected: 0,
+        voice_listening: false,
+        voice_triggered: false,
+        voice_dot_tick: 0,
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
