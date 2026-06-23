@@ -643,6 +643,59 @@ unsafe extern "system" fn wnd_proc(
             LRESULT(0)
         }
 
+        WM_VOICE_WAKEWORD => {
+            if sp.is_null() { return LRESULT(0); }
+            let s = &mut *sp;
+            if !s.voice_listening {
+                match s.anim {
+                    Anim::Hidden | Anim::Hiding { .. } => do_show(hwnd, s),
+                    _ => {}
+                }
+                s.voice_triggered = true;
+                s.voice_listening = true;
+                s.voice_dot_tick = 0;
+                let _ = SetTimer(hwnd, TIMER_VOICE_ANIM, 80, None);
+                voice::start_query_listener(hwnd);
+                let _ = InvalidateRect(hwnd, None, FALSE);
+            }
+            LRESULT(0)
+        }
+
+        WM_VOICE_QUERY_READY => {
+            if sp.is_null() {
+                if wp.0 == 1 && lp.0 != 0 {
+                    let _ = unsafe { Box::from_raw(lp.0 as *mut String) };
+                }
+                return LRESULT(0);
+            }
+            let s = &mut *sp;
+            let text = if wp.0 == 1 && lp.0 != 0 {
+                let text_box = unsafe { Box::from_raw(lp.0 as *mut String) };
+                *text_box
+            } else {
+                String::new()
+            };
+            if s.voice_listening {
+                s.voice_listening = false;
+                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
+                let text = text.trim().to_string();
+                if !text.is_empty() {
+                    s.query = text;
+                    s.cursor_pos = s.query.len();
+                    s.selected = 0;
+                    s.scroll_offset = 0;
+                    trigger_search(hwnd, s);
+                    if s.voice_triggered {
+                        let _ = SetTimer(hwnd, TIMER_VOICE_AUTOEXEC, 1500, None);
+                    }
+                } else {
+                    s.voice_triggered = false;
+                }
+                let _ = InvalidateRect(hwnd, None, FALSE);
+            }
+            LRESULT(0)
+        }
+
         WM_TIMER => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
@@ -654,6 +707,17 @@ unsafe extern "system" fn wnd_proc(
                 TIMER_CURSOR_BLINK => {
                     s.cursor_visible = !s.cursor_visible;
                     let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+                TIMER_VOICE_ANIM => {
+                    s.voice_dot_tick = (s.voice_dot_tick + 1) % 100;
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+                TIMER_VOICE_AUTOEXEC => {
+                    let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
+                    if s.voice_triggered {
+                        s.voice_triggered = false;
+                        execute_selected(hwnd, s);
+                    }
                 }
                 _ => {}
             }
