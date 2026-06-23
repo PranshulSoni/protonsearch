@@ -495,7 +495,7 @@ fn read_text_file(path: &Path) -> std::io::Result<String> {
 fn extract_ocr_text(path: &Path) -> Option<String> {
     use windows::core::HSTRING;
     use windows::Storage::StorageFile;
-    use windows::Graphics::Imaging::BitmapDecoder;
+    use windows::Graphics::Imaging::{BitmapDecoder, BitmapPixelFormat, BitmapAlphaMode, SoftwareBitmap};
     use windows::Media::Ocr::OcrEngine;
 
     let path_str = path.to_str()?;
@@ -525,11 +525,34 @@ fn extract_ocr_text(path: &Path) -> Option<String> {
         }
     };
     
-    let software_bitmap = match decoder.GetSoftwareBitmapAsync().ok().and_then(|async_op| async_op.get().ok()) {
+
+    // Get raw decoded bitmap (any pixel format)
+    let raw_bitmap = match decoder.GetSoftwareBitmapAsync().ok().and_then(|async_op| async_op.get().ok()) {
         Some(b) => b,
         None => {
             log_indexer(&format!("OCR: Failed to get SoftwareBitmap for {:?}", path_str));
             return None;
+        }
+    };
+
+    // WinRT OCR requires Bgra8 + Premultiplied alpha — convert if needed
+    let software_bitmap = {
+        let fmt_ok = raw_bitmap.BitmapPixelFormat().ok() == Some(BitmapPixelFormat::Bgra8);
+        let alpha_ok = raw_bitmap.BitmapAlphaMode().ok() == Some(BitmapAlphaMode::Premultiplied);
+        if fmt_ok && alpha_ok {
+            raw_bitmap
+        } else {
+            match SoftwareBitmap::ConvertWithAlpha(
+                &raw_bitmap,
+                BitmapPixelFormat::Bgra8,
+                BitmapAlphaMode::Premultiplied,
+            ) {
+                Ok(converted) => converted,
+                Err(e) => {
+                    log_indexer(&format!("OCR: Bitmap conversion failed for {:?}: {:?}", path_str, e));
+                    return None;
+                }
+            }
         }
     };
     
@@ -541,7 +564,10 @@ fn extract_ocr_text(path: &Path) -> Option<String> {
         }
     };
     
-    let ocr_result = match ocr_engine.RecognizeAsync(&software_bitmap).ok().and_then(|async_op| async_op.get().ok()) {
+    let ocr_result = match ocr_engine.RecognizeAsync(&software_bitmap)
+        .ok()
+        .and_then(|async_op: windows::Foundation::IAsyncOperation<windows::Media::Ocr::OcrResult>| async_op.get().ok())
+    {
         Some(res) => res,
         None => {
             log_indexer(&format!("OCR: RecognizeAsync failed for {:?}", path_str));
