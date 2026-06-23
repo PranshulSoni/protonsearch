@@ -104,24 +104,36 @@ fn run_indexer(db_path: &Path) -> anyhow::Result<()> {
             
         for entry in walker.filter_map(|e| e.ok()) {
             let path = entry.path();
-            if !path.is_file() { continue; }
+            let is_file = path.is_file();
+            let is_dir = path.is_dir();
+            if !is_file && !is_dir { continue; }
             
             let path_str = match path.to_str() {
                 Some(s) => s.to_string(),
                 None => continue,
             };
 
-            let ext = path.extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_lowercase();
+            let ext = if is_dir {
+                "folder".to_string()
+            } else {
+                path.extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("")
+                    .to_lowercase()
+            };
 
             let name = path.file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("")
                 .to_string();
 
-            if is_ignored_file(&name, &ext) { continue; }
+            let name = if name.is_empty() {
+                path_str.clone()
+            } else {
+                name
+            };
+
+            if is_file && is_ignored_file(&name, &ext) { continue; }
 
             seen_paths.insert(path_str.clone());
 
@@ -141,54 +153,56 @@ fn run_indexer(db_path: &Path) -> anyhow::Result<()> {
                     params![path_str, name, ext, modified],
                 )?;
 
-                // Only perform content extraction for FTS5 on text documents and source code files
-                let text_extensions = [
-                    "txt", "md", "rs", "py", "js", "ts", "json", "html", "css",
-                    "c", "cpp", "h", "hpp", "cs", "go", "java", "kt", "sh", "bat",
-                    "ps1", "yaml", "yml", "toml", "ini", "sql", "xml"
-                ];
-                let is_pdf = ext == "pdf";
-                let is_docx = ext == "docx";
+                if is_file {
+                    // Only perform content extraction for FTS5 on text documents and source code files
+                    let text_extensions = [
+                        "txt", "md", "rs", "py", "js", "ts", "json", "html", "css",
+                        "c", "cpp", "h", "hpp", "cs", "go", "java", "kt", "sh", "bat",
+                        "ps1", "yaml", "yml", "toml", "ini", "sql", "xml"
+                    ];
+                    let is_pdf = ext == "pdf";
+                    let is_docx = ext == "docx";
 
-                if text_extensions.contains(&ext.as_str()) || is_pdf || is_docx {
-                    let extracted = if is_pdf {
-                        match pdf_extract::extract_text(path) {
-                            Ok(text) => {
-                                let mut truncated = text;
-                                truncated.truncate(50 * 1024);
-                                Some(truncated)
+                    if text_extensions.contains(&ext.as_str()) || is_pdf || is_docx {
+                        let extracted = if is_pdf {
+                            match pdf_extract::extract_text(path) {
+                                Ok(text) => {
+                                    let mut truncated = text;
+                                    truncated.truncate(50 * 1024);
+                                    Some(truncated)
+                                }
+                                Err(e) => {
+                                    eprintln!("PDF extract failed for {:?}: {:?}", path, e);
+                                    None
+                                }
                             }
-                            Err(e) => {
-                                eprintln!("PDF extract failed for {:?}: {:?}", path, e);
-                                None
+                        } else if is_docx {
+                            match docx_lite::extract_text(path) {
+                                Ok(text) => {
+                                    let mut truncated = text;
+                                    truncated.truncate(50 * 1024);
+                                    Some(truncated)
+                                }
+                                Err(e) => {
+                                    eprintln!("DOCX extract failed for {:?}: {:?}", path, e);
+                                    None
+                                }
                             }
+                        } else {
+                            read_text_file(path).ok()
+                        };
+
+                        if let Some(content) = extracted {
+                            conn.execute("DELETE FROM files_fts WHERE path = ?", [&path_str])?;
+                            conn.execute(
+                                "INSERT INTO files_fts (path, content) VALUES (?, ?)",
+                                params![path_str, content],
+                            )?;
                         }
-                    } else if is_docx {
-                        match docx_lite::extract_text(path) {
-                            Ok(text) => {
-                                let mut truncated = text;
-                                truncated.truncate(50 * 1024);
-                                Some(truncated)
-                            }
-                            Err(e) => {
-                                eprintln!("DOCX extract failed for {:?}: {:?}", path, e);
-                                None
-                            }
+
+                        if is_pdf || is_docx {
+                            thread::sleep(std::time::Duration::from_millis(50));
                         }
-                    } else {
-                        read_text_file(path).ok()
-                    };
-
-                    if let Some(content) = extracted {
-                        conn.execute("DELETE FROM files_fts WHERE path = ?", [&path_str])?;
-                        conn.execute(
-                            "INSERT INTO files_fts (path, content) VALUES (?, ?)",
-                            params![path_str, content],
-                        )?;
-                    }
-
-                    if is_pdf || is_docx {
-                        thread::sleep(std::time::Duration::from_millis(50));
                     }
                 }
             }
