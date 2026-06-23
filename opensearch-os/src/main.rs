@@ -890,17 +890,56 @@ unsafe extern "system" fn wnd_proc(
                 VK_DELETE => {
                     let is_clip_view = s.query.starts_with("clip:") || s.query.starts_with("clipboard:");
                     if is_clip_view {
-                        if s.selected_clip_ids.is_empty() {
-                            if let Some(r) = s.results.get(s.selected) {
-                                if r.entry.source == "CLIPBOARD" {
-                                    s.selected_clip_ids.insert(r.entry.id.clone());
+                        if s.delete_confirm {
+                            // Second Delete confirms the deletion!
+                            s.delete_confirm = false;
+                            let db_path = s.db_path.clone();
+                            let selected_ids: Vec<String> = s.selected_clip_ids.iter().cloned().collect();
+                            let selected_set: std::collections::HashSet<String> = selected_ids.iter().cloned().collect();
+                            s.selected_clip_ids.clear();
+                            let hwnd_notify = SendHwnd(hwnd);
+                            std::thread::spawn(move || {
+                                let hwnd_notify = hwnd_notify;
+                                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                                    let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                                    let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+                                    let mut deleted_any = false;
+                                    for id in &selected_ids {
+                                        let parts: Vec<&str> = id.split('.').collect();
+                                        if let Some(ts_str) = parts.last() {
+                                            if let Ok(ts) = ts_str.parse::<i64>() {
+                                                if conn.execute("DELETE FROM clipboard_history WHERE timestamp = ?;", [ts]).is_ok() {
+                                                    deleted_any = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if deleted_any {
+                                        let _ = PostMessageW(
+                                            hwnd_notify.0,
+                                            WM_REFRESH_SEARCH,
+                                            WPARAM(0),
+                                            LPARAM(0),
+                                        );
+                                    }
+                                }
+                            });
+                            s.results.retain(|r| !selected_set.contains(&r.entry.id));
+                            let _ = InvalidateRect(hwnd, None, FALSE);
+                        } else {
+                            if s.selected_clip_ids.is_empty() {
+                                if let Some(r) = s.results.get(s.selected) {
+                                    if r.entry.source == "CLIPBOARD" {
+                                        s.selected_clip_ids.insert(r.entry.id.clone());
+                                    }
                                 }
                             }
+                            if !s.selected_clip_ids.is_empty() {
+                                s.delete_confirm = true;
+                                let _ = InvalidateRect(hwnd, None, FALSE);
+                            }
                         }
-                        if !s.selected_clip_ids.is_empty() {
-                            s.delete_confirm = true;
-                            let _ = InvalidateRect(hwnd, None, FALSE);
-                        }
+                        return LRESULT(0);
                     } else if s.cursor_pos < s.query.len() {
                         s.query.remove(s.cursor_pos);
                         s.selected = 0;
@@ -915,20 +954,37 @@ unsafe extern "system" fn wnd_proc(
                         s.delete_confirm = false;
                         let db_path = s.db_path.clone();
                         let selected_ids: Vec<String> = s.selected_clip_ids.iter().cloned().collect();
+                        let selected_set: std::collections::HashSet<String> = selected_ids.iter().cloned().collect();
                         s.selected_clip_ids.clear();
+                        let hwnd_notify = SendHwnd(hwnd);
                         std::thread::spawn(move || {
+                            let hwnd_notify = hwnd_notify;
                             if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                                for id in selected_ids {
+                                let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                                let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+                                let mut deleted_any = false;
+                                for id in &selected_ids {
                                     let parts: Vec<&str> = id.split('.').collect();
                                     if let Some(ts_str) = parts.last() {
                                         if let Ok(ts) = ts_str.parse::<i64>() {
-                                            let _ = conn.execute("DELETE FROM clipboard_history WHERE timestamp = ?;", [ts]);
+                                            if conn.execute("DELETE FROM clipboard_history WHERE timestamp = ?;", [ts]).is_ok() {
+                                                deleted_any = true;
+                                            }
                                         }
                                     }
                                 }
+                                if deleted_any {
+                                    let _ = PostMessageW(
+                                        hwnd_notify.0,
+                                        WM_REFRESH_SEARCH,
+                                        WPARAM(0),
+                                        LPARAM(0),
+                                    );
+                                }
                             }
                         });
-                        trigger_search(hwnd, s);
+                        s.results.retain(|r| !selected_set.contains(&r.entry.id));
+                        let _ = InvalidateRect(hwnd, None, FALSE);
                         return LRESULT(0);
                     }
                     if let Some(ref id) = s.editing_item {
@@ -938,12 +994,23 @@ unsafe extern "system" fn wnd_proc(
                                 let db_path = s.db_path.clone();
                                 let new_content = s.query.clone();
                                 let new_content_for_thread = new_content.clone();
+                                let hwnd_notify = SendHwnd(hwnd);
                                 std::thread::spawn(move || {
+                                    let hwnd_notify = hwnd_notify;
                                     if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                                        let _ = conn.execute(
+                                        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                                        let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+                                        if conn.execute(
                                             "UPDATE clipboard_history SET content = ? WHERE timestamp = ?;",
                                             rusqlite::params![new_content_for_thread, ts],
-                                        );
+                                        ).is_ok() {
+                                            let _ = PostMessageW(
+                                                hwnd_notify.0,
+                                                WM_REFRESH_SEARCH,
+                                                WPARAM(0),
+                                                LPARAM(0),
+                                            );
+                                        }
                                     }
                                 });
                                 copy_to_clipboard(hwnd, &new_content);
