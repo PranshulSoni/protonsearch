@@ -2243,6 +2243,20 @@ unsafe fn fill(hdc: HDC, x: i32, y: i32, w: i32, h: i32, c: COLORREF) {
     let _ = DeleteObject(br);
 }
 
+unsafe fn fill_circle(hdc: HDC, cx: i32, cy: i32, r: i32, color: COLORREF) {
+    let br = CreateSolidBrush(color);
+    let old_brush = SelectObject(hdc, br);
+    let pen = CreatePen(windows::Win32::Graphics::Gdi::PS_NULL, 0, COLORREF(0));
+    let old_pen = SelectObject(hdc, pen);
+    
+    let _ = Ellipse(hdc, cx - r, cy - r, cx + r, cy + r);
+    
+    let _ = SelectObject(hdc, old_pen);
+    let _ = DeleteObject(pen);
+    let _ = SelectObject(hdc, old_brush);
+    let _ = DeleteObject(br);
+}
+
 unsafe fn draw_rounded_border_and_bg(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, gradient: bool) {
     if gradient {
         // Create a rounded region for the border
