@@ -39,6 +39,7 @@ const CURSOR_BLINK_MS: u32 = 530;
 const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
 const WM_SEARCH_RESULTS: u32 = WM_USER + 3;
+const WM_START_EDITING: u32 = WM_USER + 4;
 
 struct SearchRequest {
     query: String,
@@ -97,6 +98,9 @@ struct State {
     last_mouse_y: i32,
     app_icons: std::collections::HashMap<String, HICON>,
     clipboard_thumbnails: std::cell::RefCell<std::collections::HashMap<String, HBITMAP>>,
+    selected_clip_ids: std::collections::HashSet<String>,
+    delete_confirm: bool,
+    editing_item: Option<String>,
 }
 
 #[derive(PartialEq)]
@@ -120,7 +124,12 @@ struct IconRequest {
 impl State {
     fn win_h(&self) -> i32 {
         let n = self.results.len().min(VISIBLE_RESULTS) as i32;
-        if n == 0 { SEARCH_H } else { SEARCH_H + 1 + n * RESULT_H }
+        let base_h = if n == 0 { SEARCH_H } else { SEARCH_H + 1 + n * RESULT_H };
+        if self.query.starts_with("clip:") || self.query.starts_with("clipboard:") {
+            base_h + 24
+        } else {
+            base_h
+        }
     }
     fn result_rect(&self, i: usize) -> RECT {
         let end_h = self.win_h();
@@ -229,6 +238,9 @@ unsafe fn run() {
         last_mouse_y: -1,
         app_icons: std::collections::HashMap::new(),
         clipboard_thumbnails: std::cell::RefCell::new(std::collections::HashMap::new()),
+        selected_clip_ids: std::collections::HashSet::new(),
+        delete_confirm: false,
+        editing_item: None,
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
@@ -433,6 +445,21 @@ unsafe extern "system" fn wnd_proc(
             LRESULT(0)
         }
 
+        WM_START_EDITING => {
+            let ptr = lp.0 as *mut (String, String);
+            let (id, content) = unsafe { *Box::from_raw(ptr) };
+            if !sp.is_null() {
+                let s = unsafe { &mut *sp };
+                s.editing_item = Some(id);
+                s.query = content;
+                s.cursor_pos = s.query.len();
+                s.selected = 0;
+                s.scroll_offset = 0;
+                let _ = unsafe { InvalidateRect(hwnd, None, FALSE) };
+            }
+            LRESULT(0)
+        }
+
         WM_KILLFOCUS => {
             if !sp.is_null() {
                 let s = &mut *sp;
@@ -497,7 +524,7 @@ unsafe extern "system" fn wnd_proc(
                                 rusqlite::params![trimmed, now, app_name_clone],
                             );
                             let _ = conn.execute(
-                                "DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY timestamp DESC LIMIT 500);",
+                                "DELETE FROM clipboard_history WHERE pinned = 0 AND id NOT IN (SELECT id FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 500);",
                                 [],
                             );
                         }
@@ -527,7 +554,7 @@ unsafe extern "system" fn wnd_proc(
                                         rusqlite::params![img_path_str, now, app_name],
                                     );
                                     let _ = conn.execute(
-                                        "DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY timestamp DESC LIMIT 500);",
+                                        "DELETE FROM clipboard_history WHERE pinned = 0 AND id NOT IN (SELECT id FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 500);",
                                         [],
                                     );
                                 }
@@ -660,13 +687,93 @@ unsafe extern "system" fn wnd_proc(
                         }
                         return LRESULT(0);
                     }
+                    0x50 => { // Ctrl + P (Pin/Unpin toggle)
+                        if let Some(r) = s.results.get(s.selected) {
+                            if r.entry.source == "CLIPBOARD" {
+                                let id = r.entry.id.clone();
+                                let parts: Vec<&str> = id.split('.').collect();
+                                if let Some(ts_str) = parts.last() {
+                                    if let Ok(ts) = ts_str.parse::<i64>() {
+                                        let db_path = s.db_path.clone();
+                                        std::thread::spawn(move || {
+                                            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                                                let _ = conn.execute(
+                                                    "UPDATE clipboard_history SET pinned = (CASE WHEN pinned = 1 THEN 0 ELSE 1 END) WHERE timestamp = ?;",
+                                                    [ts],
+                                                );
+                                            }
+                                        });
+                                        let is_pinned = id.starts_with("clip.pinned.");
+                                        let new_id = if is_pinned {
+                                            format!("clip.{}", ts)
+                                        } else {
+                                            format!("clip.pinned.{}", ts)
+                                        };
+                                        if s.selected_clip_ids.contains(&id) {
+                                            s.selected_clip_ids.remove(&id);
+                                            s.selected_clip_ids.insert(new_id);
+                                        }
+                                        trigger_search(hwnd, s);
+                                    }
+                                }
+                             }
+                         }
+                         return LRESULT(0);
+                    }
+                    0x45 => { // Ctrl + E (Edit selected clipboard item)
+                         if s.editing_item.is_some() {
+                             s.editing_item = None;
+                             s.query = "clip:".to_string();
+                             s.cursor_pos = s.query.len();
+                             trigger_search(hwnd, s);
+                         } else if let Some(r) = s.results.get(s.selected) {
+                             if r.entry.source == "CLIPBOARD" && !r.entry.launch_command.starts_with("copy_image:") {
+                                 let id = r.entry.id.clone();
+                                 let parts: Vec<&str> = id.split('.').collect();
+                                 if let Some(ts_str) = parts.last() {
+                                     if let Ok(ts) = ts_str.parse::<i64>() {
+                                         let db_path = s.db_path.clone();
+                                         let hwnd_notify = SendHwnd(hwnd);
+                                         std::thread::spawn(move || {
+                                             let hwnd_notify = hwnd_notify;
+                                             if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                                                 if let Ok(content) = conn.query_row(
+                                                     "SELECT content FROM clipboard_history WHERE timestamp = ?;",
+                                                     [ts],
+                                                     |row| row.get::<_, String>(0),
+                                                 ) {
+                                                     let content_ptr = Box::into_raw(Box::new((id, content)));
+                                                     let _ = PostMessageW(
+                                                         hwnd_notify.0,
+                                                         WM_START_EDITING,
+                                                         WPARAM(0),
+                                                         LPARAM(content_ptr as isize),
+                                                     );
+                                                 }
+                                             }
+                                         });
+                                     }
+                                 }
+                             }
+                         }
+                         return LRESULT(0);
+                    }
                     _ => {}
                 }
             }
 
             match vk {
                 VK_ESCAPE => {
-                    if s.text_selected {
+                    if s.delete_confirm {
+                        s.delete_confirm = false;
+                        s.selected_clip_ids.clear();
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    } else if s.editing_item.is_some() {
+                        s.editing_item = None;
+                        s.query = "clip:".to_string();
+                        s.cursor_pos = s.query.len();
+                        trigger_search(hwnd, s);
+                    } else if s.text_selected {
                         s.text_selected = false;
                         reset_cursor_blink(hwnd, s);
                         let _ = InvalidateRect(hwnd, None, FALSE);
@@ -727,8 +834,38 @@ unsafe extern "system" fn wnd_proc(
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
+                VK_TAB => {
+                    let is_clip_view = s.query.starts_with("clip:") || s.query.starts_with("clipboard:");
+                    if is_clip_view {
+                        if let Some(r) = s.results.get(s.selected) {
+                            if r.entry.source == "CLIPBOARD" {
+                                let id = r.entry.id.clone();
+                                if s.selected_clip_ids.contains(&id) {
+                                    s.selected_clip_ids.remove(&id);
+                                } else {
+                                    s.selected_clip_ids.insert(id);
+                                }
+                                s.delete_confirm = false;
+                                let _ = InvalidateRect(hwnd, None, FALSE);
+                            }
+                        }
+                    }
+                }
                 VK_DELETE => {
-                    if s.cursor_pos < s.query.len() {
+                    let is_clip_view = s.query.starts_with("clip:") || s.query.starts_with("clipboard:");
+                    if is_clip_view {
+                        if s.selected_clip_ids.is_empty() {
+                            if let Some(r) = s.results.get(s.selected) {
+                                if r.entry.source == "CLIPBOARD" {
+                                    s.selected_clip_ids.insert(r.entry.id.clone());
+                                }
+                            }
+                        }
+                        if !s.selected_clip_ids.is_empty() {
+                            s.delete_confirm = true;
+                            let _ = InvalidateRect(hwnd, None, FALSE);
+                        }
+                    } else if s.cursor_pos < s.query.len() {
                         s.query.remove(s.cursor_pos);
                         s.selected = 0;
                         s.scroll_offset = 0;
@@ -738,6 +875,88 @@ unsafe extern "system" fn wnd_proc(
                     }
                 }
                 VK_RETURN => {
+                    if s.delete_confirm {
+                        s.delete_confirm = false;
+                        let db_path = s.db_path.clone();
+                        let selected_ids: Vec<String> = s.selected_clip_ids.iter().cloned().collect();
+                        s.selected_clip_ids.clear();
+                        std::thread::spawn(move || {
+                            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                                for id in selected_ids {
+                                    let parts: Vec<&str> = id.split('.').collect();
+                                    if let Some(ts_str) = parts.last() {
+                                        if let Ok(ts) = ts_str.parse::<i64>() {
+                                            let _ = conn.execute("DELETE FROM clipboard_history WHERE timestamp = ?;", [ts]);
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        trigger_search(hwnd, s);
+                        return LRESULT(0);
+                    }
+                    if let Some(ref id) = s.editing_item {
+                        let parts: Vec<&str> = id.split('.').collect();
+                        if let Some(ts_str) = parts.last() {
+                            if let Ok(ts) = ts_str.parse::<i64>() {
+                                let db_path = s.db_path.clone();
+                                let new_content = s.query.clone();
+                                let new_content_for_thread = new_content.clone();
+                                std::thread::spawn(move || {
+                                    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                                        let _ = conn.execute(
+                                            "UPDATE clipboard_history SET content = ? WHERE timestamp = ?;",
+                                            rusqlite::params![new_content_for_thread, ts],
+                                        );
+                                    }
+                                });
+                                copy_to_clipboard(hwnd, &new_content);
+                            }
+                        }
+                        s.editing_item = None;
+                        s.query = "clip:".to_string();
+                        s.cursor_pos = s.query.len();
+                        trigger_search(hwnd, s);
+                        return LRESULT(0);
+                    }
+                    if !s.selected_clip_ids.is_empty() {
+                        let db_path = s.db_path.clone();
+                        let selected_ids: Vec<String> = s.selected_clip_ids.iter().cloned().collect();
+                        s.selected_clip_ids.clear();
+                        let hwnd_copy = SendHwnd(hwnd);
+                        std::thread::spawn(move || {
+                            let hwnd_copy = hwnd_copy;
+                            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                                let mut contents = Vec::new();
+                                let mut timestamps = Vec::new();
+                                for id in &selected_ids {
+                                    let parts: Vec<&str> = id.split('.').collect();
+                                    if let Some(ts_str) = parts.last() {
+                                        if let Ok(ts) = ts_str.parse::<i64>() {
+                                            timestamps.push(ts);
+                                        }
+                                    }
+                                }
+                                timestamps.sort();
+                                for ts in timestamps {
+                                    if let Ok(content) = conn.query_row(
+                                        "SELECT content FROM clipboard_history WHERE timestamp = ?;",
+                                        [ts],
+                                        |row| row.get::<_, String>(0),
+                                    ) {
+                                        contents.push(content);
+                                    }
+                                }
+                                if !contents.is_empty() {
+                                    let combined = contents.join("\r\n");
+                                    copy_to_clipboard(hwnd_copy.0, &combined);
+                                }
+                            }
+                        });
+                        do_hide(hwnd, s);
+                        return LRESULT(0);
+                    }
+
                     let is_shift = (GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
                     let is_ctrl = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
                     if (is_shift || is_ctrl) && !s.query.is_empty() {
@@ -1058,6 +1277,9 @@ unsafe fn kick_debounce(hwnd: HWND) {
 }
 
 unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
+    if s.editing_item.is_some() {
+        return;
+    }
     s.current_query_id += 1;
     let req = SearchRequest {
         query: s.query.clone(),
@@ -1570,7 +1792,15 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             // Name
             SelectObject(mdc, s.font_n);
             SetTextColor(mdc, CLR_WHITE);
-            let mut name: Vec<u16> = res.entry.control_name.encode_utf16().collect();
+            let has_selections = !s.selected_clip_ids.is_empty();
+            let display_name = if s.selected_clip_ids.contains(&res.entry.id) {
+                format!(" [✓] {}", res.entry.control_name)
+            } else if has_selections && res.entry.source == "CLIPBOARD" {
+                format!(" [ ] {}", res.entry.control_name)
+            } else {
+                res.entry.control_name.clone()
+            };
+            let mut name: Vec<u16> = display_name.encode_utf16().collect();
             let mut r = RECT { left: tx, top: cy, right: x + w - 96, bottom: cy + 22 };
             let _ = DrawTextW(mdc, &mut name, &mut r,
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
@@ -1584,7 +1814,12 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
             // Badge
-            badge(mdc, s, &res.entry.source, x + w - 88, ry + (RESULT_H - 20) / 2);
+            let badge_source = if res.entry.id.starts_with("clip.pinned.") {
+                "pinned_clip"
+            } else {
+                &res.entry.source
+            };
+            badge(mdc, s, badge_source, x + w - 88, ry + (RESULT_H - 20) / 2);
         }
 
         // Draw scrollbar if there are more results than visible
@@ -1610,6 +1845,31 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             // Draw thumb
             fill(mdc, sb_x, thumb_y, sb_w, thumb_h, CLR_GRAY);
         }
+    }
+
+    // Draw footer instructions if showing clipboard
+    if s.query.starts_with("clip:") || s.query.starts_with("clipboard:") {
+        let footer_y = win_h - 24;
+        fill(mdc, 0, footer_y, win_w, 24, COLORREF(0x00_15_15_15));
+        fill(mdc, 0, footer_y, win_w, 1, CLR_DIV);
+        
+        SelectObject(mdc, s.font_c);
+        SetTextColor(mdc, CLR_GRAY);
+        let inst_text = if s.delete_confirm {
+            format!(" ⚠️ Delete {} selected items? Press Enter to confirm, Escape to cancel", s.selected_clip_ids.len())
+        } else if s.editing_item.is_some() {
+            " 📝 Editing snippet: Press Enter to save to database & clipboard, Escape to cancel".to_string()
+        } else {
+            let sel_count = s.selected_clip_ids.len();
+            if sel_count > 0 {
+                format!(" Tab: Deselect  |  Enter: Paste combined ({})  |  Delete: Bulk Delete  |  Ctrl+P: Pin/Unpin", sel_count)
+            } else {
+                " Tab: Select  |  Enter: Copy & Paste  |  Ctrl+P: Pin/Unpin  |  Ctrl+E: Edit  |  Delete: Delete".to_string()
+            }
+        };
+        let mut inst_wide: Vec<u16> = inst_text.encode_utf16().collect();
+        let mut r_inst = RECT { left: PAD_L, top: footer_y, right: win_w - PAD_L, bottom: win_h };
+        let _ = DrawTextW(mdc, &mut inst_wide, &mut r_inst, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     }
 
     // Restore clipping
@@ -1697,6 +1957,8 @@ unsafe fn badge(hdc: HDC, s: &State, source: &str, x: i32, y: i32) {
         ("CODE", COLORREF(0x00_70_20_70), CLR_WHITE)
     } else if src_lc == "clipboard" {
         ("CLIP", COLORREF(0x00_A6_6A_0A), CLR_WHITE)
+    } else if src_lc == "pinned_clip" {
+        ("PINNED", COLORREF(0x00_00_C5_D6), CLR_WHITE)
     } else if src_lc == "bookmark" {
         ("BOOKMARK", COLORREF(0x00_00_A5_D6), CLR_WHITE)
     } else if src_lc == "history" {
