@@ -589,7 +589,7 @@ unsafe extern "system" fn wnd_proc(
                         s.text_selected = false;
                     }
                     s.query.insert(s.cursor_pos, c);
-                    s.cursor_pos += 1;
+                    s.cursor_pos += c.len_utf8();
                     s.selected = 0;
                     kick_debounce(hwnd);
                     reset_cursor_blink(hwnd, s);
@@ -658,7 +658,11 @@ unsafe extern "system" fn wnd_proc(
                     if ctrl_down {
                         s.cursor_pos = word_left(&s.query, s.cursor_pos);
                     } else if s.cursor_pos > 0 {
-                        s.cursor_pos -= 1;
+                        let mut p = s.cursor_pos - 1;
+                        while p > 0 && !s.query.is_char_boundary(p) {
+                            p -= 1;
+                        }
+                        s.cursor_pos = p;
                     }
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
@@ -667,7 +671,11 @@ unsafe extern "system" fn wnd_proc(
                     if ctrl_down {
                         s.cursor_pos = word_right(&s.query, s.cursor_pos);
                     } else if s.cursor_pos < s.query.len() {
-                        s.cursor_pos += 1;
+                        let mut p = s.cursor_pos + 1;
+                        while p < s.query.len() && !s.query.is_char_boundary(p) {
+                            p += 1;
+                        }
+                        s.cursor_pos = p;
                     }
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
@@ -686,8 +694,12 @@ unsafe extern "system" fn wnd_proc(
                         s.cursor_pos = 0;
                         s.text_selected = false;
                     } else if s.cursor_pos > 0 {
-                        s.query.remove(s.cursor_pos - 1);
-                        s.cursor_pos -= 1;
+                        let mut p = s.cursor_pos - 1;
+                        while p > 0 && !s.query.is_char_boundary(p) {
+                            p -= 1;
+                        }
+                        s.query.remove(p);
+                        s.cursor_pos = p;
                     }
                     s.selected = 0;
                     kick_debounce(hwnd);
@@ -920,6 +932,7 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
 
     if appearing {
         s.query.clear();
+        s.cursor_pos = 0;
         s.selected = 0;
         s.scroll_offset = 0;
         trigger_search(hwnd, s);
@@ -1051,19 +1064,108 @@ unsafe fn fill_rounded(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, c: COLO
 }
 
 fn word_left(s: &str, pos: usize) -> usize {
-    let bytes = s.as_bytes();
-    let mut i = pos.min(bytes.len());
-    while i > 0 && bytes[i-1].is_ascii_whitespace() { i -= 1; }
-    while i > 0 && !bytes[i-1].is_ascii_whitespace() { i -= 1; }
-    i
+    let i = pos.min(s.len());
+    if i == 0 {
+        return 0;
+    }
+
+    let mut chars = s[..i].char_indices().rev();
+    
+    let mut next_char = chars.next();
+    while let Some((_, c)) = next_char {
+        if c.is_whitespace() {
+            next_char = chars.next();
+        } else {
+            break;
+        }
+    }
+    
+    let (idx, c) = match next_char {
+        Some(pair) => pair,
+        None => return 0,
+    };
+    
+    let start_class = if c.is_alphanumeric() || c == '_' {
+        1 // Word
+    } else {
+        2 // Punctuation
+    };
+    
+    let mut last_idx = idx;
+    for (idx, c) in chars {
+        let class = if c.is_alphanumeric() || c == '_' {
+            1
+        } else if c.is_whitespace() {
+            break; // Stop at whitespace
+        } else {
+            2
+        };
+        
+        if class == start_class {
+            last_idx = idx;
+        } else {
+            break; // Stop when class changes
+        }
+    }
+    
+    last_idx
 }
 
 fn word_right(s: &str, pos: usize) -> usize {
-    let bytes = s.as_bytes();
-    let mut i = pos;
-    while i < bytes.len() && !bytes[i].is_ascii_whitespace() { i += 1; }
-    while i < bytes.len() && bytes[i].is_ascii_whitespace() { i += 1; }
-    i
+    let len = s.len();
+    let i = pos.min(len);
+    if i >= len {
+        return len;
+    }
+
+    let mut chars = s[i..].char_indices();
+    let (_, first_char) = chars.next().unwrap();
+    
+    if first_char.is_whitespace() {
+        for (idx, c) in chars {
+            if !c.is_whitespace() {
+                return i + idx;
+            }
+        }
+        return len;
+    }
+    
+    let start_class = if first_char.is_alphanumeric() || first_char == '_' {
+        1
+    } else {
+        2
+    };
+    
+    let mut next_pos = len;
+    let mut chars_loop = s[i..].char_indices();
+    let _ = chars_loop.next();
+    
+    for (idx, c) in chars_loop {
+        let class = if c.is_alphanumeric() || c == '_' {
+            1
+        } else if c.is_whitespace() {
+            next_pos = i + idx;
+            break;
+        } else {
+            2
+        };
+        
+        if class != start_class {
+            next_pos = i + idx;
+            break;
+        }
+    }
+    
+    if next_pos < len {
+        let follow_chars = s[next_pos..].char_indices();
+        for (idx, c) in follow_chars {
+            if !c.is_whitespace() {
+                return next_pos + idx;
+            }
+        }
+    }
+    
+    len
 }
 
 fn delete_word_before(s: &mut State) {
@@ -1308,9 +1410,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
     // Text / placeholder
     let tx = x + PAD_L + ICON_W + 8;
-    let ty = y + (SEARCH_H - 26) / 2;
     let tw = w - (PAD_L + ICON_W + 8) - PAD_L;
-    let mut tr = RECT { left: tx, top: ty, right: tx + tw, bottom: ty + 26 };
+    let mut tr = RECT { left: tx, top: y, right: tx + tw, bottom: y + SEARCH_H };
 
     SelectObject(mdc, s.font_q);
     SetTextColor(mdc, CLR_WHITE);
@@ -1320,33 +1421,27 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         SetTextColor(mdc, CLR_PH);
         let _ = DrawTextW(mdc, &mut ph, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         SetTextColor(mdc, CLR_WHITE);
-    }
-
-    // Draw text before cursor
-    let before = &s.query[..s.cursor_pos];
-    let mut dw_before: Vec<u16> = before.encode_utf16().collect();
-    let mut before_rect = tr;
-    if !dw_before.is_empty() {
-        let _ = DrawTextW(mdc, &mut dw_before, &mut before_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
-        let _ = DrawTextW(mdc, &mut dw_before, &mut before_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    } else {
+        let mut dw_query: Vec<u16> = s.query.encode_utf16().collect();
+        let mut text_rect = tr;
+        let _ = DrawTextW(mdc, &mut dw_query, &mut text_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     }
 
     // Draw cursor
     if s.cursor_visible {
-        let cursor_x = before_rect.right;
+        let before = &s.query[..s.cursor_pos];
+        let dw_before: Vec<u16> = before.encode_utf16().collect();
         let mut size = SIZE::default();
-        let _ = GetTextExtentPoint32W(mdc, &[0], &mut size);
-        let text_h = size.cy;
+        if !dw_before.is_empty() {
+            let _ = GetTextExtentPoint32W(mdc, &dw_before, &mut size);
+        }
+        let cursor_x = tr.left + size.cx;
+        
+        let mut dummy_size = SIZE::default();
+        let _ = GetTextExtentPoint32W(mdc, &['A' as u16], &mut dummy_size);
+        let text_h = dummy_size.cy;
         let cursor_top = tr.top + (tr.bottom - tr.top - text_h) / 2;
-        fill(mdc, cursor_x, cursor_top, 1, text_h, CLR_WHITE);
-    }
-
-    // Draw text after cursor
-    let after = &s.query[s.cursor_pos..];
-    if !after.is_empty() {
-        let mut dw_after: Vec<u16> = after.encode_utf16().collect();
-        let mut after_rect = RECT { left: before_rect.right, top: tr.top, right: tr.right, bottom: tr.bottom };
-        let _ = DrawTextW(mdc, &mut dw_after, &mut after_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        fill(mdc, cursor_x, cursor_top, 2, text_h, CLR_WHITE);
     }
 
     // ── Results ───────────────────────────────────────────────────────────
