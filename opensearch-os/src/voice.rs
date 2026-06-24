@@ -86,7 +86,7 @@ pub fn start_query_listener(hwnd: HWND) {
         unsafe {
             match text {
                 Some(t) if !t.trim().is_empty() => {
-                    let q = normalize_voice_query(&t);
+                    let q = crate::search::clean_prompt(&t).1;
                     log_voice(format!("query: '{}' → '{}'", t, q));
                     let ptr = Box::into_raw(Box::new(q)) as isize;
                     let _ = PostMessageW(h.hwnd(), WM_VOICE_QUERY_READY, WPARAM(1), LPARAM(ptr));
@@ -127,52 +127,3 @@ fn run_dictation() -> Option<String> {
     }
 }
 
-/// Clean a dictated query so search isn't thrown off by conversational filler.
-fn normalize_voice_query(raw: &str) -> String {
-    let mut q = raw.to_lowercase();
-    q = q.trim().trim_end_matches(|c: char| matches!(c, '.' | '?' | '!' | ',')).trim().to_string();
-
-    const LEADING: &[&str] = &[
-        "please ", "can you ", "could you ", "would you ", "will you ",
-        "i want to ", "i wanna ", "i want ", "i need to ", "i need ",
-        "i would like to ", "let's ", "lets ", "go ahead and ", "just ",
-        "open up ", "open ", "launch ", "start ", "show me ", "show ", "find me ", "find ",
-    ];
-    loop {
-        let before = q.clone();
-        for p in LEADING {
-            if let Some(rest) = q.strip_prefix(p) {
-                q = rest.trim_start().to_string();
-            }
-        }
-        if q == before { break; }
-    }
-
-    const TRAILING: &[&str] = &[" right now", " for me", " please", " now", " thanks", " thank you"];
-    loop {
-        let before = q.clone();
-        for s in TRAILING {
-            if let Some(stripped) = q.strip_suffix(s) {
-                q = stripped.trim_end().to_string();
-            }
-        }
-        if q == before { break; }
-    }
-
-    q.trim()
-        .trim_end_matches(|c: char| matches!(c, '.' | '?' | '!' | ','))
-        .trim()
-        .to_string()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::normalize_voice_query;
-    #[test]
-    fn strips_filler() {
-        assert_eq!(normalize_voice_query("Open Chrome, please"), "chrome");
-        assert_eq!(normalize_voice_query("can you launch spotify"), "spotify");
-        assert_eq!(normalize_voice_query("show me my downloads right now"), "my downloads");
-        assert_eq!(normalize_voice_query("settings"), "settings");
-    }
-}

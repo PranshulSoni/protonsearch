@@ -1823,8 +1823,20 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             }
         }
 
-        // ── Calculator: inject instantly if query is a math expression ──────
-        let calc_result: Option<SearchResult> = try_calc(q).map(|val| {
+        // Clean conversational filler + detect command intent (typed or dictated).
+        let (intent, q_clean) = clean_prompt(q);
+
+        // ── Calculator: try the raw query, then the cleaned one ("what is 2+2") ─
+        let calc_hit = try_calc(q)
+            .map(|v| (q.to_string(), v))
+            .or_else(|| {
+                if !q_clean.is_empty() && q_clean != q.to_lowercase() {
+                    try_calc(&q_clean).map(|v| (q_clean.clone(), v))
+                } else {
+                    None
+                }
+            });
+        let calc_result: Option<SearchResult> = calc_hit.map(|(expr, val)| {
             let display = if val.fract() == 0.0 && val.abs() < 1e15 {
                 format!("{}", val as i64)
             } else {
@@ -1835,7 +1847,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             SearchResult {
                 entry: CatalogEntry {
                     id: "calc".to_string(),
-                    control_name: format!("{} = {}", q, display),
+                    control_name: format!("{} = {}", expr, display),
                     breadcrumb_path: format!("Calculator > Press Enter to copy  {}", display),
                     launch_command: format!("copy:{}", display),
                     source: "CALC".to_string(),
@@ -1876,13 +1888,18 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             return kill_results;
         }
 
+        // Match on the cleaned, intent-stripped query so filler ("can you open …")
+        // doesn't dilute the name/word matching below. Falls back to raw if cleaning
+        // emptied it.
+        let q_lower = if q_clean.is_empty() { q_lower } else { q_clean.clone() };
+
         let stop_words = ["what", "is", "a", "the", "to", "for", "in", "of", "and", "or", "with", "on", "at", "by", "from", "about", "how", "this", "it", "my", "your"];
         let q_words: Vec<&str> = q_lower.split_whitespace()
             .filter(|w| !stop_words.contains(w))
             .collect();
 
         // BAAI models require queries to be prefixed with "query: "
-        let query_with_prefix = format!("query: {}", q);
+        let query_with_prefix = format!("query: {}", q_lower);
         let qvec = match self.embed(&query_with_prefix) {
             Ok(v) => v,
             Err(_) => return vec![],
@@ -2097,6 +2114,10 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         
         app_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
+        if intent == Intent::LaunchApp {
+            for m in &mut app_matches { m.score += 1.5; }
+        }
+
         // Recent files matching
         let mut recent_matches = Vec::new();
         for rf in &self.recent_files {
@@ -2144,23 +2165,29 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         recent_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         recent_matches.truncate(5); // Cap at 5 recent file results
 
-        let encoded_query = url_encode(q);
+        let web_query = if intent == Intent::WebSearch && !q_clean.is_empty() { q_clean.as_str() } else { q };
+        let encoded_query = url_encode(web_query);
         let web_search = SearchResult {
             entry: CatalogEntry {
                 id: "web_search".to_string(),
-                control_name: format!("Search Google for \"{}\"", q),
+                control_name: format!("Search Google for \"{}\"", web_query),
                 breadcrumb_path: "Web > Google Search > Open in default browser".to_string(),
                 launch_command: format!("https://www.google.com/search?q={}", encoded_query),
                 source: "web".to_string(),
-                description: format!("Opens default browser and searches Google for '{}'.", q),
+                description: format!("Opens default browser and searches Google for '{}'.", web_query),
                 synonyms: "google search web internet online".to_string(),
             },
-            score: 1.1,
+            score: if intent == Intent::WebSearch { 9.0 } else { 1.1 },
         };
 
-        let mut file_matches = self.search_local_files(q);
+        let mut file_matches = self.search_local_files(&q_lower);
         file_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         file_matches.truncate(15); // Cap at 15 file results
+
+        if intent == Intent::FindFile {
+            for m in &mut file_matches { m.score += 1.5; }
+            for m in &mut recent_matches { m.score += 1.5; }
+        }
 
         // ── Cross-Source Entity Linker ("Project Auto-Entity") ──────────────
         let mut matched_project_name = None;
@@ -2348,6 +2375,133 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             }
         }
         vec![]
+    }
+}
+
+// ── Prompt NLP: strip conversational filler + detect command intent ─────────────
+// Deterministic, offline preprocessing. The leading politeness/verb and trailing
+// fluff are stripped so the core phrase survives ("visual studio code"); the detected
+// intent biases ranking in `search`. Embeddings still do the semantic matching.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Intent {
+    General,
+    LaunchApp,
+    FindFile,
+    WebSearch,
+}
+
+pub fn clean_prompt(raw: &str) -> (Intent, String) {
+    let mut q = raw.trim().to_lowercase();
+    q = q.trim_matches(|c: char| matches!(c, '.' | '?' | '!' | ',')).trim().to_string();
+
+    // 1. Peel leading politeness / framing / question words (no source intent).
+    const LEAD_FILLER: &[&str] = &[
+        "please ", "can you ", "could you ", "would you ", "will you ", "can u ",
+        "i want to ", "i wanna ", "i want ", "i need to ", "i need ", "i'd like to ",
+        "i would like to ", "let's ", "lets ", "go ahead and ", "just ", "um ", "uh ",
+        "hey ", "ok ", "okay ", "yeah ", "so ", "well ", "help me ",
+        "what is the ", "what's the ", "whats the ", "what is ", "what's ", "whats ",
+        "what are ", "how much is ", "how many ", "calculate ", "compute ", "tell me ",
+    ];
+    q = peel_prefixes(q, LEAD_FILLER);
+
+    // 2. Detect + strip a leading intent verb (most specific first: web > file > app).
+    const WEB_CUES: &[&str] = &[
+        "search the web for ", "search the web ", "search online for ",
+        "search the internet for ", "google for ", "look up ", "web search ",
+    ];
+    const FILE_CUES: &[&str] = &[
+        "open the file ", "find the file ", "show me the file ", "where is the file ",
+        "i'm looking for ", "im looking for ", "looking for ",
+        "find my ", "find me ", "find ", "where is ", "where's ", "wheres ", "locate ",
+    ];
+    const APP_CUES: &[&str] = &[
+        "open up ", "open ", "launch ", "fire up ", "boot up ", "run ", "start ", "go to ",
+    ];
+
+    let mut intent = Intent::General;
+    if let Some(rest) = strip_any_prefix(&q, WEB_CUES) {
+        intent = Intent::WebSearch;
+        q = rest;
+    } else if let Some(rest) = strip_any_prefix(&q, FILE_CUES) {
+        intent = Intent::FindFile;
+        q = rest;
+    } else if let Some(rest) = strip_any_prefix(&q, APP_CUES) {
+        intent = Intent::LaunchApp;
+        q = rest;
+    }
+
+    // 3. Peel generic verbs with no source intent, then any re-exposed filler.
+    const LEAD_GENERIC: &[&str] = &[
+        "show me ", "show ", "give me ", "get me ", "bring up ", "pull up ", "take me to ",
+    ];
+    q = peel_prefixes(q, LEAD_GENERIC);
+    q = peel_prefixes(q, LEAD_FILLER);
+
+    // 4. Trailing fluff.
+    const TRAIL_FILLER: &[&str] = &[
+        " right now", " for me", " please", " now", " thanks", " thank you",
+        " on my computer", " on my pc", " quickly", " real quick",
+    ];
+    loop {
+        let before = q.clone();
+        for s in TRAIL_FILLER {
+            if let Some(stripped) = q.strip_suffix(s) {
+                q = stripped.trim_end().to_string();
+            }
+        }
+        if q == before {
+            break;
+        }
+    }
+
+    q = q
+        .trim()
+        .trim_end_matches(|c: char| matches!(c, '.' | '?' | '!' | ','))
+        .trim()
+        .to_string();
+    (intent, q)
+}
+
+fn peel_prefixes(mut q: String, prefixes: &[&str]) -> String {
+    loop {
+        let before = q.clone();
+        for p in prefixes {
+            if let Some(rest) = q.strip_prefix(p) {
+                q = rest.trim_start().to_string();
+            }
+        }
+        if q == before {
+            break;
+        }
+    }
+    q
+}
+
+fn strip_any_prefix(q: &str, prefixes: &[&str]) -> Option<String> {
+    for p in prefixes {
+        if let Some(rest) = q.strip_prefix(p) {
+            return Some(rest.trim_start().to_string());
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod nlp_tests {
+    use super::{clean_prompt, Intent};
+    #[test]
+    fn cleans_and_classifies() {
+        assert_eq!(clean_prompt("Open Chrome, please"), (Intent::LaunchApp, "chrome".to_string()));
+        assert_eq!(clean_prompt("can you launch spotify"), (Intent::LaunchApp, "spotify".to_string()));
+        assert_eq!(clean_prompt("find my budget spreadsheet"), (Intent::FindFile, "budget spreadsheet".to_string()));
+        assert_eq!(clean_prompt("look up rust lifetimes"), (Intent::WebSearch, "rust lifetimes".to_string()));
+        assert_eq!(clean_prompt("show me my downloads right now"), (Intent::General, "my downloads".to_string()));
+        assert_eq!(clean_prompt("settings"), (Intent::General, "settings".to_string()));
+        // "google chrome" must stay an app query, not a web search.
+        assert_eq!(clean_prompt("google chrome"), (Intent::General, "google chrome".to_string()));
+        // question-word framing exposes a math expression for the calc fallback.
+        assert_eq!(clean_prompt("what is 2+2"), (Intent::General, "2+2".to_string()));
     }
 }
 
