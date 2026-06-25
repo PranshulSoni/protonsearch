@@ -27,6 +27,29 @@ pub struct SearchResult {
     pub score: f32,
 }
 
+struct CatalogEntryIndex {
+    name: String,
+    name_chars: usize,
+    breadcrumb: String,
+    description: String,
+    source: String,
+    synonyms: String,
+}
+
+impl CatalogEntryIndex {
+    fn from_entry(entry: &CatalogEntry) -> Self {
+        let name = entry.control_name.to_lowercase();
+        Self {
+            name_chars: name.chars().count(),
+            name,
+            breadcrumb: entry.breadcrumb_path.to_lowercase(),
+            description: entry.description.to_lowercase(),
+            source: entry.source.to_lowercase(),
+            synonyms: entry.synonyms.to_lowercase(),
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct MetaJson {
     control_name: String,
@@ -62,6 +85,7 @@ pub struct RecentFileInfo {
 pub struct SearchEngine {
     vecs: Vec<f32>,
     meta: Vec<CatalogEntry>,
+    meta_index: Vec<CatalogEntryIndex>,
     n: usize,
     dim: usize,
     session: Session,
@@ -236,7 +260,8 @@ impl SearchEngine {
             );
         }
 
-        let mut engine = Self { vecs, meta, n, dim, session, tokenizer, anchor_categories: vec![], apps: vec![], recent_files: vec![], _db_path: db_path, conn };
+        let meta_index = meta.iter().map(CatalogEntryIndex::from_entry).collect();
+        let mut engine = Self { vecs, meta, meta_index, n, dim, session, tokenizer, anchor_categories: vec![], apps: vec![], recent_files: vec![], _db_path: db_path, conn };
         for cat in &mut anchor_categories {
             for phrase in cat.phrases {
                 let phrase_with_prefix = format!("query: {}", phrase);
@@ -2154,6 +2179,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         let q_words: Vec<&str> = q_lower.split_whitespace()
             .filter(|w| !stop_words.contains(w))
             .collect();
+        let q_char_count = q_lower.chars().count();
 
         // BAAI models require queries to be prefixed with "query: "
         let query_with_prefix = format!("query: {}", q_lower);
@@ -2164,7 +2190,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
         let mut scores: Vec<(usize, f32)> = (0..self.n)
             .map(|i| {
-                let entry = &self.meta[i];
+                let entry_idx = &self.meta_index[i];
 
                 // 1. Semantic score
                 let sem_score: f32 = self.vecs[i * self.dim..][..self.dim]
@@ -2172,7 +2198,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
 
                 // 2. Lexical score
                 let mut lex_score = 0.0f32;
-                let name_lower = entry.control_name.to_lowercase();
+                let name_lower = entry_idx.name.as_str();
 
                 // Title-level matching
                 if name_lower == q_lower {
@@ -2205,10 +2231,8 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 }
 
                 // Synonyms matching (split by pipe '|')
-                let syn_lower = entry.synonyms.to_lowercase();
-                let syn_list: Vec<&str> = syn_lower.split('|').collect();
                 let mut syn_boost = 0.0f32;
-                for syn in &syn_list {
+                for syn in entry_idx.synonyms.split('|') {
                     let s_trimmed = syn.trim();
                     if s_trimmed == q_lower {
                         syn_boost = syn_boost.max(0.8);
@@ -2223,7 +2247,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 if !q_words.is_empty() {
                     let mut matched_words_in_syn = 0;
                     for qw in &q_words {
-                        for syn in &syn_list {
+                        for syn in entry_idx.synonyms.split('|') {
                             let syn_words: Vec<&str> = syn.split_whitespace().collect();
                             if syn_words.contains(qw) {
                                 matched_words_in_syn += 1;
@@ -2236,7 +2260,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 lex_score += syn_boost;
 
                 // Breadcrumb matching
-                let breadcrumb_lower = entry.breadcrumb_path.to_lowercase();
+                let breadcrumb_lower = entry_idx.breadcrumb.as_str();
                 if breadcrumb_lower.contains(&q_lower) {
                     lex_score += 0.2;
                 }
@@ -2256,17 +2280,15 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 }
 
                 // Description matching
-                let desc_lower = entry.description.to_lowercase();
-                if desc_lower.contains(&q_lower) {
+                if entry_idx.description.contains(&q_lower) {
                     lex_score += 0.1;
                 }
 
-                if lex_score == 0.0 {
-                    let name_len = name_lower.chars().count();
-                    let q_len = q_lower.chars().count();
-                    if name_len > 0 && q_len > 0 {
+                if lex_score == 0.0 && q_char_count >= 3 {
+                    let name_len = entry_idx.name_chars;
+                    if name_len > 0 && name_len.abs_diff(q_char_count) <= 8 {
                         let dist = levenshtein_distance(&q_lower, &name_lower);
-                        let max_len = name_len.max(q_len);
+                        let max_len = name_len.max(q_char_count);
                         let similarity = 1.0 - (dist as f32 / max_len as f32);
                         if similarity >= 0.7 {
                             lex_score += 0.3 * similarity;
@@ -2275,7 +2297,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 }
 
                 // Boost legacy control panel options if they have any match
-                if entry.source.to_lowercase().contains("legacy") && lex_score > 0.0 {
+                if entry_idx.source.contains("legacy") && lex_score > 0.0 {
                     lex_score += 0.25;
                 }
 
@@ -2803,6 +2825,28 @@ fn mean_pool_norm(hidden: &[f32], mask: &[i64], seq: usize, dim: usize) -> Vec<f
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn catalog_index_caches_lowercase_fields() {
+        let entry = CatalogEntry {
+            id: "id".to_string(),
+            control_name: "Display Settings".to_string(),
+            breadcrumb_path: "System > Display".to_string(),
+            launch_command: "ms-settings:display".to_string(),
+            source: "MODERN".to_string(),
+            description: "Adjust Screen".to_string(),
+            synonyms: "Monitor|Brightness".to_string(),
+        };
+
+        let index = CatalogEntryIndex::from_entry(&entry);
+
+        assert_eq!(index.name, "display settings");
+        assert_eq!(index.name_chars, 16);
+        assert_eq!(index.breadcrumb, "system > display");
+        assert_eq!(index.description, "adjust screen");
+        assert_eq!(index.source, "modern");
+        assert_eq!(index.synonyms, "monitor|brightness");
+    }
 
     #[test]
     fn test_hybrid_search_accuracy() {

@@ -26,11 +26,13 @@ use windows::{
 // ── Layout ────────────────────────────────────────────────────────────────────
 const WIN_W: i32 = 720;
 const SEARCH_H: i32 = 64;
-const RESULT_H: i32 = 76;
+const RESULT_H: i32 = 72;
 const MAX_RESULTS: usize = 30;
 const VISIBLE_RESULTS: usize = 5;
 const PAD_L: i32 = 24;
 const ICON_W: i32 = 36;
+const BADGE_W: i32 = 54;
+const BADGE_H: i32 = 18;
 
 // ── Win32 IDs ─────────────────────────────────────────────────────────────────
 const HOTKEY_ID: i32 = 1;
@@ -53,21 +55,21 @@ struct SearchRequest {
 }
 // ── Animation ─────────────────────────────────────────────────────────────────
 // const ANIM_TICK_MS: u32 = 1;
-const ANIM_DURATION_SEC: f32 = 0.160; // 160ms
+const ANIM_DURATION_SEC: f32 = 0.115; // 115ms
 // const MAX_ALPHA: u8 = 255;
 
 // ── Genie Morph Dimensions ────────────────────────────────────────────────────
 // const PILL_H: i32 = 12; // Starting height at top center
 
 // ── Colors (COLORREF = 0x00BBGGRR) ───────────────────────────────────────────
-const BG: COLORREF        = COLORREF(0x00_24_21_21);
-const BG_SEL: COLORREF    = COLORREF(0x00_3E_38_38);
-const CLR_DIV: COLORREF   = COLORREF(0x00_40_3A_3A);
+const BG: COLORREF        = COLORREF(0x00_1F_1D_1C);
+const BG_SEL: COLORREF    = COLORREF(0x00_36_31_2F);
+const CLR_DIV: COLORREF   = COLORREF(0x00_35_31_30);
 const CLR_WHITE: COLORREF = COLORREF(0x00_FF_FF_FF);
-const CLR_GRAY: COLORREF  = COLORREF(0x00_9A_94_94);
-const CLR_PH: COLORREF    = COLORREF(0x00_5A_55_55);
-const CLR_BDGBG: COLORREF = COLORREF(0x00_50_48_48);
-const CLR_BDGTX: COLORREF = COLORREF(0x00_C0_BB_BB);
+const CLR_GRAY: COLORREF  = COLORREF(0x00_A7_A1_9F);
+const CLR_PH: COLORREF    = COLORREF(0x00_70_6A_68);
+const CLR_BDGBG: COLORREF = COLORREF(0x00_38_34_33);
+const CLR_BDGTX: COLORREF = COLORREF(0x00_B4_AD_AA);
 const COLOR_KEY: COLORREF = COLORREF(0x00_12_34_56);
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1745,7 +1747,7 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         let sw = GetSystemMetrics(SM_CXSCREEN);
         let sh = GetSystemMetrics(SM_CYSCREEN);
         s.cx = sw / 2;
-        s.cy = (sh as f32 / 2.5) as i32;
+        s.cy = sh / 2;
         s.last_mouse_x = pt.x;
         s.last_mouse_y = pt.y;
 
@@ -1973,7 +1975,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
 
 unsafe fn kick_debounce(hwnd: HWND) {
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
-    let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 120, None);
+    let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 55, None);
 }
 
 unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
@@ -2353,19 +2355,17 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let p = s.current_p();
     let t = ease_out(p);
 
-    let pill_w = 150;
-    let pill_h = 28;
-    let pill_y = 8;
-    let pill_r = 28;
+    let pill_w = 96;
+    let pill_h = SEARCH_H;
+    let pill_r = 32;
 
     let end_w = WIN_W;
     let end_h = s.win_h();
-    let end_y = s.cy - end_h / 2;
 
     let w = (pill_w as f32 + (end_w - pill_w) as f32 * t) as i32;
     let h = (pill_h as f32 + (end_h - pill_h) as f32 * t) as i32;
     let x = (win_w - w) / 2;
-    let y = (pill_y as f32 + (end_y - pill_y) as f32 * t) as i32;
+    let y = s.cy - h / 2;
     let r = (pill_r as f32 + (12 - pill_r) as f32 * t) as i32;
 
     // Fill background / Draw Glowing Border around the morphing rounded rect
@@ -2592,7 +2592,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 res.entry.control_name.clone()
             };
             let mut name: Vec<u16> = display_name.encode_utf16().collect();
-            let mut r = RECT { left: tx, top: cy, right: x + list_w - 96, bottom: cy + 22 };
+            let badge_left = x + list_w - PAD_L - BADGE_W;
+            let mut r = RECT { left: tx, top: cy, right: badge_left - 14, bottom: cy + 22 };
             let _ = DrawTextW(mdc, &mut name, &mut r,
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
@@ -2600,7 +2601,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             SelectObject(mdc, s.font_c);
             SetTextColor(mdc, CLR_GRAY);
             let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
-            let mut r2 = RECT { left: tx, top: cy + 24, right: x + list_w - 96, bottom: cy + 40 };
+            let mut r2 = RECT { left: tx, top: cy + 24, right: badge_left - 14, bottom: cy + 40 };
             let _ = DrawTextW(mdc, &mut crumb, &mut r2,
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
@@ -2610,7 +2611,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             } else {
                 &res.entry.source
             };
-            badge(mdc, s, badge_source, x + list_w - 88, ry + (RESULT_H - 20) / 2);
+            badge(mdc, s, badge_source, badge_left, ry + (RESULT_H - BADGE_H) / 2);
         }
 
         // Draw scrollbar if there are more results than visible
@@ -2764,17 +2765,17 @@ unsafe fn draw_rounded_border_and_bg(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r
             TRIVERTEX {
                 x,
                 y,
-                Red: 0x0000,
-                Green: 0xb400,
-                Blue: 0xdb00,
+                Red: 0x4200,
+                Green: 0x4a00,
+                Blue: 0x5600,
                 Alpha: 0x0000,
             },
             TRIVERTEX {
                 x: x + w,
                 y: y + h,
-                Red: 0x7f00,
-                Green: 0x0000,
-                Blue: 0xff00,
+                Red: 0x3f00,
+                Green: 0x5d00,
+                Blue: 0x6200,
                 Alpha: 0x0000,
             },
         ];
@@ -2800,60 +2801,60 @@ unsafe fn draw_rounded_border_and_bg(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r
 unsafe fn badge(hdc: HDC, s: &State, source: &str, x: i32, y: i32) {
     let src_lc = source.to_lowercase();
     let (label, bg_color, tx_color) = if src_lc == "window" {
-        ("WINDOW", COLORREF(0x00_8C_3F_13), CLR_WHITE)
+        ("WIN", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "live" {
-        ("LIVE", COLORREF(0x00_1F_A6_0A), CLR_WHITE)
+        ("LIVE", COLORREF(0x00_35_46_31), CLR_BDGTX)
     } else if src_lc == "project" {
-        ("PROJECT", COLORREF(0x00_B5_25_9E), CLR_WHITE)
+        ("PROJ", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "action" {
-        ("ACTION", COLORREF(0x00_B5_25_9E), CLR_WHITE)
+        ("ACT", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "translated" {
-        ("RESOLVED", COLORREF(0x00_00_7F_FF), CLR_WHITE)
+        ("OK", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "web" {
-        ("WEB", COLORREF(0x00_C5_6A_00), CLR_WHITE)
+        ("WEB", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "app" {
-        ("APP", COLORREF(0x00_A6_8F_0A), CLR_WHITE)
+        ("APP", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "calc" {
-        ("CALC", COLORREF(0x00_9B_4D_00), CLR_WHITE)
+        ("CALC", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "recent" {
-        ("RECENT", COLORREF(0x00_7A_1F_7A), CLR_WHITE)
+        ("REC", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "file" {
-        ("FILE", COLORREF(0x00_90_40_00), CLR_WHITE)
+        ("FILE", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "code" {
-        ("CODE", COLORREF(0x00_70_20_70), CLR_WHITE)
+        ("CODE", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "clipboard" {
-        ("CLIP", COLORREF(0x00_A6_6A_0A), CLR_WHITE)
+        ("CLIP", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "pinned_clip" {
-        ("PINNED", COLORREF(0x00_00_C5_D6), CLR_WHITE)
+        ("PIN", COLORREF(0x00_46_43_31), CLR_BDGTX)
     } else if src_lc == "confirm" {
-        ("CONFIRM", COLORREF(0x00_00_00_00), CLR_WHITE)
+        ("DEL", COLORREF(0x00_30_30_55), CLR_WHITE)
     } else if src_lc == "bookmark" {
-        ("BOOKMARK", COLORREF(0x00_00_A5_D6), CLR_WHITE)
+        ("MARK", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "history" {
-        ("HISTORY", COLORREF(0x00_90_60_20), CLR_WHITE)
+        ("HIST", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "folder" {
-        ("FOLDER", COLORREF(0x00_13_45_8B), CLR_WHITE)
+        ("DIR", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "commit" {
-        ("COMMIT", COLORREF(0x00_20_7A_D6), CLR_WHITE)
+        ("GIT", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "todo" {
-        ("TODO", COLORREF(0x00_2A_3E_E6), CLR_WHITE)
+        ("TODO", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "memory" {
-        ("MEMORY", COLORREF(0x00_0B_5C_2C), CLR_WHITE)
+        ("MEM", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc == "browser" {
-        ("BROWSER", COLORREF(0x00_2A_8F_C6), CLR_WHITE)
+        ("BROW", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc.contains("legacy") {
-        ("LEGACY", CLR_BDGBG, CLR_BDGTX)
+        ("OLD", CLR_BDGBG, CLR_BDGTX)
     } else if src_lc.contains("native") {
-        ("NATIVE", CLR_BDGBG, CLR_BDGTX)
+        ("SYS", CLR_BDGBG, CLR_BDGTX)
     } else {
-        ("MODERN", CLR_BDGBG, CLR_BDGTX)
+        ("SET", CLR_BDGBG, CLR_BDGTX)
     };
-    fill(hdc, x, y, 64, 20, bg_color);
+    fill_rounded(hdc, x, y, BADGE_W, BADGE_H, 8, bg_color);
     SelectObject(hdc, s.font_b);
     SetTextColor(hdc, tx_color);
     SetBkMode(hdc, TRANSPARENT);
     let mut t: Vec<u16> = label.encode_utf16().collect();
-    let mut r = RECT { left: x, top: y, right: x + 64, bottom: y + 20 };
+    let mut r = RECT { left: x, top: y, right: x + BADGE_W, bottom: y + BADGE_H };
     DrawTextW(hdc, &mut t, &mut r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 }
 
