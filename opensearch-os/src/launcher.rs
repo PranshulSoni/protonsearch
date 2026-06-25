@@ -462,10 +462,7 @@ fn handle_window_action(action: &str) {
         let sw = work.right - work.left;
         let sh = work.bottom - work.top;
 
-        let mut x = work.left;
-        let mut y = work.top;
-        let mut w = sw;
-        let mut h = sh;
+        let (x, y, w, h);
 
         match action {
             "center" => {
