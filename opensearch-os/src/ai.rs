@@ -345,7 +345,7 @@ pub fn start_hermes_gateway_daemon() {
         let log_file = log_dir.join("hermes_gateway.log");
         if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(log_file) {
             let _ = std::process::Command::new(&hermes_cmd)
-                .arg("gateway")
+                .args(["gateway", "run", "--replace", "--accept-hooks"])
                 .stdout(file.try_clone().unwrap())
                 .stderr(file)
                 .creation_flags(0x08000000) // CREATE_NO_WINDOW
@@ -353,7 +353,7 @@ pub fn start_hermes_gateway_daemon() {
         }
     } else {
         let _ = std::process::Command::new(&hermes_cmd)
-            .arg("gateway")
+            .args(["gateway", "run", "--replace", "--accept-hooks"])
             .creation_flags(0x08000000)
             .spawn();
     }
