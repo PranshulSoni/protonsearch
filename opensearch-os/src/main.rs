@@ -996,8 +996,11 @@ unsafe extern "system" fn wnd_proc(
                         return LRESULT(0);
                     }
                     VK_BACK => {
-                        close_ai_panel(hwnd, s);
-                        return LRESULT(0);
+                        if s.query.is_empty() {
+                            close_ai_panel(hwnd, s);
+                            return LRESULT(0);
+                        }
+                        // Let it fall through to normal backspace handling if there is text to edit!
                     }
                     VK_RETURN => {
                         let q_trim = s.query.trim().to_string();
@@ -2151,6 +2154,41 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     s.anim = Anim::Hidden;
 }
 
+fn format_conversation(prompt: &str, response: &str) -> String {
+    let prompts: Vec<&str> = prompt.split("\n---\n").map(|p| {
+        p.strip_prefix("User: ").unwrap_or(p).trim()
+    }).collect();
+    let responses: Vec<&str> = response.split("\n\n---\n\n").collect();
+
+    let mut conversation = String::new();
+    for i in 0..prompts.len() {
+        if i > 0 {
+            conversation.push_str("\n\n---\n\n");
+        }
+        let p = prompts[i];
+        if !p.is_empty() {
+            conversation.push_str("User: ");
+            conversation.push_str(p);
+            conversation.push_str("\n\n");
+        }
+        if i < responses.len() {
+            let r = responses[i].trim();
+            if !r.is_empty() {
+                conversation.push_str(r);
+            }
+        }
+    }
+    if responses.len() > prompts.len() {
+        for i in prompts.len()..responses.len() {
+            if i > 0 {
+                conversation.push_str("\n\n---\n\n");
+            }
+            conversation.push_str(responses[i].trim());
+        }
+    }
+    conversation
+}
+
 fn store_ai_chat(db_path: &std::path::Path, command: &str, title: &str, prompt: &str, response: &str) -> Option<i64> {
     if let Ok(conn) = rusqlite::Connection::open(db_path) {
         let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
@@ -2248,7 +2286,7 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
             if let Some(name) = title.strip_prefix('@').and_then(|t| t.split_once(':')).map(|(n, _)| n.trim()) {
                 if let Ok(conn) = rusqlite::Connection::open(&db_path) {
                     let _ = conn.query_row(
-                        "SELECT system_prompt FROM agents WHERE name = ?",
+                        "SELECT system_prompt FROM agents WHERE lower(name) = lower(?)",
                         [name],
                         |row| {
                             let sp: String = row.get(0)?;
@@ -2286,7 +2324,9 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
 
         let payload: (bool, String) = match result {
             Ok(ref new_response) => {
-                let full_history_resp = format!("{}\n\n---\n\n{}", original_response, new_response);
+                let updated_prompt = format!("{}\n---\nUser: {}", original_prompt, new_prompt);
+                let updated_response = format!("{}\n\n---\n\n{}", original_response, new_response);
+                let full_history_resp = format_conversation(&updated_prompt, &updated_response);
                 (true, full_history_resp)
             }
             Err(e) => (false, e.to_string()),
@@ -2371,7 +2411,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     }
                 }
                 let payload: (bool, String) = match result {
-                    Ok(text) => (true, text),
+                    Ok(text) => (true, format_conversation(&input_clone, &text)),
                     Err(e) => (false, e.to_string()),
                 };
                 let ptr = Box::into_raw(Box::new(payload)) as isize;
@@ -2384,13 +2424,13 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             // Reopen a stored chat in the panel (no API call).
             if let Ok(id) = id_str.parse::<i64>() {
                 if let Ok(conn) = rusqlite::Connection::open(&s.db_path) {
-                    if let Ok((title, response)) = conn.query_row(
-                        "SELECT title, response FROM ai_chats WHERE id = ?",
+                    if let Ok((title, prompt, response)) = conn.query_row(
+                        "SELECT title, prompt, response FROM ai_chats WHERE id = ?",
                         [id],
-                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
                     ) {
                         s.ai_pending = false;
-                        s.ai_answer = Some(response);
+                        s.ai_answer = Some(format_conversation(&prompt, &response));
                         s.ai_title = title;
                         s.ai_scroll = 0;
                         s.active_chat_id = Some(id);
@@ -2480,7 +2520,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     }
                 }
                 let payload: (bool, String) = match result {
-                    Ok(text) => (true, text),
+                    Ok(text) => (true, format_conversation(&msg_clone, &text)),
                     Err(e) => (false, e.to_string()),
                 };
                 let ptr = Box::into_raw(Box::new(payload)) as isize;
@@ -3328,7 +3368,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     }
 
     // ── Results ───────────────────────────────────────────────────────────
-    let n = (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS);
+    let n = if s.ai_pending || s.ai_answer.is_some() {
+        0
+    } else {
+        (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS)
+    };
     if n > 0 {
         let list_w = if s.submenu_active { w - 240 } else { w };
         fill(mdc, x, y + SEARCH_H, list_w, 1, CLR_DIV);
@@ -4039,18 +4083,20 @@ unsafe fn copy_to_clipboard(hwnd: HWND, text: &str) {
 
 unsafe fn paste_from_clipboard(hwnd: HWND) -> Option<String> {
     use windows::Win32::System::DataExchange::{OpenClipboard, CloseClipboard, GetClipboardData};
-    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+    use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock, GlobalSize};
     
     let mut result = None;
     if OpenClipboard(hwnd).is_ok() {
         if let Ok(h_mem) = GetClipboardData(13) {
             if !h_mem.0.is_null() {
                 let h_global = HGLOBAL(h_mem.0);
+                let size = GlobalSize(h_global);
+                let max_len = size / 2;
                 let ptr = GlobalLock(h_global);
                 if !ptr.is_null() {
                     let mut len = 0;
                     let ptr_u16 = ptr as *const u16;
-                    while *ptr_u16.add(len) != 0 {
+                    while len < max_len && *ptr_u16.add(len) != 0 {
                         len += 1;
                     }
                     let slice = std::slice::from_raw_parts(ptr_u16, len);
