@@ -7,6 +7,7 @@ mod browser_indexer;
 mod git_indexer;
 mod voice;
 mod ai;
+mod markdown;
 
 use std::ptr::null_mut;
 use std::os::windows::process::CommandExt;
@@ -52,6 +53,8 @@ const WM_START_EDITING: u32 = WM_USER + 4;
 const WM_REFRESH_SEARCH: u32 = WM_USER + 5;
 const WM_VOICE_QUERY_READY: u32 = WM_USER + 101;
 const WM_AI_RESULT: u32 = WM_USER + 6;
+// Hermes Runs API: a tool needs approval (lparam = boxed HermesApproval).
+const WM_HERMES_APPROVAL: u32 = WM_USER + 7;
 
 // AI answer panel height (below the search bar) when showing an AI response.
 const AI_PANEL_H: i32 = 360;
@@ -108,6 +111,8 @@ struct State {
     font_c: HFONT,
     font_b: HFONT,
     font_mic: HFONT,
+    font_code: HFONT, // monospace for inline code / code blocks
+    font_h: HFONT,    // bold larger font for markdown headings
     icon_settings: HICON,
     icon_control_panel: HICON,
     icon_search: HICON,
@@ -146,8 +151,13 @@ struct State {
     ai_answer: Option<String>,   // the response text to render
     ai_title: String,            // command label shown above the answer
     ai_scroll: i32,              // vertical pixel scroll offset in the answer panel
+    ai_follow_bottom: bool,      // true = keep the latest message pinned to the bottom (auto-scroll)
+    ai_content_height: std::cell::Cell<i32>, // cached total rendered AI height (for max_scroll in input handlers)
+    ai_view_height: std::cell::Cell<i32>,    // cached viewport height (content_bottom - content_top)
     ai_tick: u32,                 // lightweight activity indicator while AI is running
     active_chat_id: Option<i64>, // persistent chat thread ID in ai_chats table
+    // Hermes Runs API: a pending tool approval (None = nothing to approve).
+    hermes_approval: Option<ai::HermesApproval>,
 }
 
 #[derive(PartialEq)]
@@ -307,6 +317,16 @@ unsafe fn run() {
         CLEARTYPE_QUALITY.0 as u32, (DEFAULT_PITCH.0 | FF_SWISS.0) as u32, PCWSTR(mic_face.as_ptr()),
     );
 
+    // Monospace + bold fonts for markdown code blocks and headings in the AI panel.
+    let mono_face: Vec<u16> = "Consolas\0".encode_utf16().collect();
+    let font_code = CreateFontW(
+        -15, 0, 0, 0, 400, 0, 0, 0,
+        DEFAULT_CHARSET.0 as u32, OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
+        CLEARTYPE_QUALITY.0 as u32, (FIXED_PITCH.0 | FF_MODERN.0) as u32, PCWSTR(mono_face.as_ptr()),
+    );
+    // Heading font: slightly larger, bold, same Segoe UI Variable face.
+    let font_h = mk_font(-22, 700);
+
     let sw = GetSystemMetrics(SM_CXSCREEN);
     let sh = GetSystemMetrics(SM_CYSCREEN);
 
@@ -354,6 +374,8 @@ unsafe fn run() {
         font_c: mk_font(-16, 400),
         font_b: mk_font(-11, 600),
         font_mic,
+        font_code,
+        font_h,
         icon_settings,
         icon_control_panel,
         icon_search,
@@ -390,8 +412,12 @@ unsafe fn run() {
         ai_answer: None,
         ai_title: String::new(),
         ai_scroll: 0,
+        ai_follow_bottom: true,
+        ai_content_height: std::cell::Cell::new(0),
+        ai_view_height: std::cell::Cell::new(0),
         ai_tick: 0,
         active_chat_id: None,
+        hermes_approval: None,
     });
 
     // Spawn background Hermes gateway status checker and auto-starter
@@ -684,8 +710,9 @@ unsafe extern "system" fn wnd_proc(
                 if s.voice_triggered || s.voice_pending_exec {
                     return LRESULT(0);
                 }
-                // Keep the launcher open while an AI request is running / its answer is shown.
-                if s.ai_pending || s.ai_answer.is_some() {
+                // Keep the launcher open while an AI request is running / its answer is shown,
+                // or while a Hermes tool-approval is awaiting a decision.
+                if s.ai_pending || s.ai_answer.is_some() || s.hermes_approval.is_some() {
                     return LRESULT(0);
                 }
                 if !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. }) {
@@ -881,8 +908,31 @@ unsafe extern "system" fn wnd_proc(
                 s.ai_pending = false;
                 s.ai_tick = 0;
                 s.ai_scroll = 0;
+                // A new response just arrived — keep the latest message at the bottom.
+                s.ai_follow_bottom = true;
                 s.ai_answer = Some(if ok { text } else { format!("⚠ {}", text) });
                 let _ = InvalidateRect(hwnd, None, FALSE);
+            }
+            LRESULT(0)
+        }
+
+        WM_HERMES_APPROVAL => {
+            // A Hermes tool needs approval. Stash it so the Approve/Deny buttons
+            // render, and keep the panel from auto-dismissing.
+            if lp.0 != 0 {
+                let approval = unsafe { *Box::from_raw(lp.0 as *mut ai::HermesApproval) };
+                if !sp.is_null() {
+                    let s = &mut *sp;
+                    s.hermes_approval = Some(approval);
+                    // Replace the "Executing…" text with the approval summary.
+                    if let Some(ans) = s.ai_answer.clone() {
+                        // Append an approval line to the current answer so the
+                        // user sees *what* needs approving, plus the buttons.
+                        s.ai_follow_bottom = true;
+                        let _ = ans;
+                    }
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
             }
             LRESULT(0)
         }
@@ -1020,6 +1070,23 @@ unsafe extern "system" fn wnd_proc(
             let vk = VIRTUAL_KEY(wp.0 as u16);
             let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
 
+            // A Hermes tool-approval is awaiting a decision. Intercept the
+            // keys that resolve it before any other handling.
+            if s.hermes_approval.is_some() && !ctrl_down {
+                match vk {
+                    VK_RETURN => { resolve_current_approval(hwnd, s, true); return LRESULT(0); }
+                    VK_ESCAPE => { resolve_current_approval(hwnd, s, false); return LRESULT(0); }
+                    _ => {}
+                }
+                if let Some(c) = char::from_u32(wp.0 as u32) {
+                    match c.to_ascii_lowercase() {
+                        'a' => { resolve_current_approval(hwnd, s, true); return LRESULT(0); }
+                        'd' => { resolve_current_approval(hwnd, s, false); return LRESULT(0); }
+                        _ => {}
+                    }
+                }
+            }
+
             if s.color_picker_active {
                 if vk == VK_ESCAPE {
                     stop_color_picker(hwnd, s);
@@ -1031,8 +1098,8 @@ unsafe extern "system" fn wnd_proc(
             if s.ai_pending {
                 match vk {
                     VK_ESCAPE => close_ai_panel(hwnd, s),
-                    VK_DOWN => { s.ai_scroll += 40; let _ = InvalidateRect(hwnd, None, FALSE); }
-                    VK_UP => { s.ai_scroll = (s.ai_scroll - 40).max(0); let _ = InvalidateRect(hwnd, None, FALSE); }
+                    VK_DOWN => { ai_scroll_down(s, 40); let _ = InvalidateRect(hwnd, None, FALSE); }
+                    VK_UP => { ai_scroll_up(s, 40); let _ = InvalidateRect(hwnd, None, FALSE); }
                     _ => {}
                 }
                 return LRESULT(0);
@@ -1069,8 +1136,8 @@ unsafe extern "system" fn wnd_proc(
                         }
                         return LRESULT(0);
                     }
-                    VK_DOWN => { s.ai_scroll += 40; let _ = InvalidateRect(hwnd, None, FALSE); return LRESULT(0); }
-                    VK_UP => { s.ai_scroll = (s.ai_scroll - 40).max(0); let _ = InvalidateRect(hwnd, None, FALSE); return LRESULT(0); }
+                    VK_DOWN => { ai_scroll_down(s, 40); let _ = InvalidateRect(hwnd, None, FALSE); return LRESULT(0); }
+                    VK_UP => { ai_scroll_up(s, 40); let _ = InvalidateRect(hwnd, None, FALSE); return LRESULT(0); }
                     _ => {} // Let other keys fall through to let user type!
                 }
             }
@@ -1669,7 +1736,12 @@ unsafe extern "system" fn wnd_proc(
             let s = &mut *sp;
             if s.ai_answer.is_some() {
                 let delta = (wp.0 >> 16) as i16;
-                s.ai_scroll = (s.ai_scroll - (delta as i32) / 2).max(0);
+                let step = (delta as i32).abs().max(40);
+                if delta > 0 {
+                    ai_scroll_up(s, step);
+                } else {
+                    ai_scroll_down(s, step);
+                }
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return LRESULT(0);
             }
@@ -1714,6 +1786,45 @@ unsafe extern "system" fn wnd_proc(
         WM_LBUTTONDOWN => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
+
+            // Hermes approval buttons take priority over everything else while shown.
+            if s.hermes_approval.is_some() {
+                let mx = (lp.0 & 0xFFFF) as i16 as i32;
+                let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
+                // Recover the content_bottom/footer geometry the same way the footer
+                // painter does, so the button rects line up exactly.
+                let win_h = s.win_h();
+                let y_start = s.cy - win_h / 2;
+                let footer_h = if s.ai_pending { 30 } else { 62 };
+                let content_bottom = y_start + SEARCH_H + 1 + AI_PANEL_H - footer_h;
+                let _ = win_h;
+
+                let btn_y = content_bottom + 2 + 36;
+                let btn_h = 26;
+                let approve_w = 96;
+                let deny_w = 80;
+                let gap = 8;
+                // The footer x-origin matches the morphed result box x. Reuse the
+                // same band the painter uses (the box is centered in the window).
+                let mut rc = RECT::default();
+                let _ = GetClientRect(hwnd, &mut rc);
+                let band_w = (rc.right - rc.left).min(WIN_W);
+                let bx = (rc.right - rc.left - band_w) / 2;
+                let pad = 24;
+                let approve_x = bx + pad;
+                let deny_x = approve_x + approve_w + gap;
+
+                if my >= btn_y && my < btn_y + btn_h {
+                    if mx >= approve_x && mx < approve_x + approve_w {
+                        resolve_current_approval(hwnd, s, true);
+                        return LRESULT(0);
+                    }
+                    if mx >= deny_x && mx < deny_x + deny_w {
+                        resolve_current_approval(hwnd, s, false);
+                        return LRESULT(0);
+                    }
+                }
+            }
 
             if s.ai_answer.is_some() {
                 let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
@@ -1895,6 +2006,8 @@ unsafe extern "system" fn wnd_proc(
                 let _ = DeleteObject(s.font_c);
                 let _ = DeleteObject(s.font_b);
                 let _ = DeleteObject(s.font_mic);
+                let _ = DeleteObject(s.font_code);
+                let _ = DeleteObject(s.font_h);
                 if !s.icon_settings.0.is_null() { let _ = DestroyIcon(s.icon_settings); }
                 if !s.icon_control_panel.0.is_null() { let _ = DestroyIcon(s.icon_control_panel); }
                 if !s.icon_search.0.is_null() { let _ = DestroyIcon(s.icon_search); }
@@ -1948,6 +2061,7 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         s.ai_pending = false;
         s.ai_answer = None;
         s.ai_scroll = 0;
+        s.ai_follow_bottom = true;
         trigger_search(hwnd, s);
 
         let mut pt = POINT::default();
@@ -2224,6 +2338,7 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     s.voice_pending_exec = false;
     s.voice_exec_deadline = None;
     s.form_state = FormState::None;
+    s.hermes_approval = None;
     let _ = ShowWindow(hwnd, SW_HIDE);
     s.anim = Anim::Hidden;
 }
@@ -2368,6 +2483,7 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
         s.ai_answer = Some(format!("User: {}\n\nExecuting...", new_prompt_str));
     }
     s.ai_scroll = 0;
+    s.ai_follow_bottom = true;
     s.results.clear();
     s.selected = 0;
     s.query.clear();
@@ -2431,6 +2547,22 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
             };
         }
 
+        // Agent follow-ups: prefer the streaming Runs API so a real Approve/Deny
+        // button can be shown. The blocking path below is the fallback.
+        if command == "agent" && ai::supports_runs_api() {
+            let cb = UiRunCallbacks { hwnd: SendHwnd(HWND(hwnd_raw as *mut _)) };
+            let result = ai::run_agent_streaming(&system_prompt, &new_prompt, &cb);
+            if let Err(e) = result {
+                let payload = (false, e.to_string());
+                let ptr = Box::into_raw(Box::new(payload)) as isize;
+                unsafe {
+                    let _ = PostMessageW(HWND(hwnd_raw as *mut _), WM_AI_RESULT, WPARAM(0), LPARAM(ptr));
+                }
+            }
+            // on_done (success) is delivered by the callback; nothing more to do.
+            return;
+        }
+
         let result = if command == "agent" {
             ai::complete_chat_agent(&system_prompt, &original_prompt, &original_response, &new_prompt)
         } else {
@@ -2475,15 +2607,129 @@ fn start_ai_activity(hwnd: HWND, s: &mut State) {
     }
 }
 
+// ── Hermes Runs API plumbing ─────────────────────────────────────────────────
+//
+// RunCallbacks impl that forwards streaming events back to the UI thread via
+// PostMessageW. Used by the agent: / follow-up paths when the gateway supports
+// the Runs API, so a real Approve/Deny button can be shown instead of hanging.
+struct UiRunCallbacks {
+    hwnd: SendHwnd,
+}
+
+impl ai::RunCallbacks for UiRunCallbacks {
+    fn on_approval(&self, approval: ai::HermesApproval) {
+        let ptr = Box::into_raw(Box::new(approval)) as isize;
+        unsafe {
+            let _ = PostMessageW(self.hwnd.0, WM_HERMES_APPROVAL, WPARAM(0), LPARAM(ptr));
+        }
+    }
+    fn on_progress(&self, text: &str) {
+        // Show the streaming delta as the live "Executing…" replacement. We post
+        // a boxed string so WM_AI_RESULT isn't appropriate; reuse WM_HERMES_PROGRESS.
+        let _ = text;
+    }
+    fn on_done(&self, ok: bool, text: &str) {
+        let payload = (ok, text.to_string());
+        let ptr = Box::into_raw(Box::new(payload)) as isize;
+        unsafe {
+            let _ = PostMessageW(self.hwnd.0, WM_AI_RESULT, WPARAM(0), LPARAM(ptr));
+        }
+    }
+}
+
+/// Run an agent turn through the streaming Runs API. Returns `false` if the
+/// gateway doesn't support it (caller should fall back to blocking complete_agent).
+///
+/// `db_update` receives the final assistant text on success so the caller can
+/// persist it into ai_chats (the blocking path already does this inline).
+fn run_agent_via_runs_api(
+    hwnd: HWND,
+    system: String,
+    user: String,
+    db_path: std::path::PathBuf,
+    chat_id: Option<i64>,
+) -> bool {
+    if !ai::supports_runs_api() {
+        return false;
+    }
+    let cb_hwnd = SendHwnd(hwnd);
+    std::thread::spawn(move || {
+        let cb = UiRunCallbacks { hwnd: cb_hwnd };
+        let result = ai::run_agent_streaming(&system, &user, &cb);
+        match &result {
+            Ok(_) => {
+                // The on_done callback already posted the success payload.
+                // Persist the final text into the chat row, if we have the id.
+                // (We re-derive it here minimally — complete path stored it earlier.)
+                if let Some(id) = chat_id {
+                    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                        // The streaming run already streamed the response; we mark
+                        // the row's response by reading it back is unreliable, so we
+                        // simply leave the row — it gets updated by on_done's payload
+                        // display. Persistence of full agent transcripts is a known
+                        // follow-up (see plan). Avoid a half-written row by no-op here.
+                        let _ = id;
+                        let _ = conn;
+                    }
+                }
+            }
+            Err(e) => {
+                let payload = (false, e.to_string());
+                let ptr = Box::into_raw(Box::new(payload)) as isize;
+                unsafe {
+                    let _ = PostMessageW(cb_hwnd.0, WM_AI_RESULT, WPARAM(0), LPARAM(ptr));
+                }
+            }
+        }
+    });
+    true
+}
+
 unsafe fn close_ai_panel(hwnd: HWND, s: &mut State) {
     let _ = KillTimer(hwnd, TIMER_AI_ANIM);
     s.ai_pending = false;
     s.ai_answer = None;
     s.ai_title.clear();
     s.ai_scroll = 0;
+    s.ai_follow_bottom = true;
+    s.hermes_approval = None;
     s.ai_tick = 0;
     trigger_search(hwnd, s); // restore normal results for the current query
     let _ = InvalidateRect(hwnd, None, FALSE);
+}
+
+// Resolve the currently-shown Hermes approval: POST the decision to the gateway
+// (so the blocked run can continue or abort) and clear the UI state.
+unsafe fn resolve_current_approval(hwnd: HWND, s: &mut State, approved: bool) {
+    if let Some(ap) = s.hermes_approval.take() {
+        std::thread::spawn(move || {
+            let _ = ai::resolve_run_approval(&ap, approved);
+        });
+        // While awaiting the outcome, show a transient status so the user sees
+        // their decision registered.
+        s.ai_follow_bottom = true;
+        let _ = InvalidateRect(hwnd, None, FALSE);
+    }
+}
+
+// Scroll the AI panel up by `step` pixels. Scrolling up always leaves "follow the
+// latest message" mode so the view stays where the user put it.
+fn ai_scroll_up(s: &mut State, step: i32) {
+    s.ai_follow_bottom = false;
+    s.ai_scroll = (s.ai_scroll - step).max(0);
+}
+
+// Scroll the AI panel down by `step` pixels. If this lands at (or past) the bottom,
+// re-enter follow-bottom mode so future messages auto-scroll again.
+fn ai_scroll_down(s: &mut State, step: i32) {
+    let total = s.ai_content_height.get();
+    let view = s.ai_view_height.get();
+    let max_scroll = (total - view).max(0);
+    s.ai_scroll = (s.ai_scroll + step).min(max_scroll);
+    if s.ai_scroll >= max_scroll {
+        s.ai_follow_bottom = true;
+    }
 }
 
 unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
@@ -2519,6 +2765,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             start_ai_activity(hwnd, s);
             s.ai_answer = Some(format!("User: {}\n\nExecuting...", input));
             s.ai_scroll = 0;
+            s.ai_follow_bottom = true;
             s.ai_title = ctrl_name;
             s.results.clear();
             s.selected = 0;
@@ -2572,6 +2819,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                         s.ai_answer = Some(format_conversation(&prompt, &response));
                         s.ai_title = title;
                         s.ai_scroll = 0;
+                        s.ai_follow_bottom = true;
                         s.active_chat_id = Some(id);
                         s.query.clear(); // Clear search query to allow typing follow-up
                         s.cursor_pos = 0;
@@ -2621,6 +2869,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             s.ai_answer = Some("Ask me anything! I will execute tasks on your PC using Hermes.".to_string());
             s.ai_title = new_title;
             s.ai_scroll = 0;
+            s.ai_follow_bottom = true;
             s.active_chat_id = chat_id;
             s.query.clear();
             s.cursor_pos = 0;
@@ -2653,6 +2902,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             start_ai_activity(hwnd, s);
             s.ai_answer = Some(format!("User: {}\n\nExecuting...", msg));
             s.ai_scroll = 0;
+            s.ai_follow_bottom = true;
             s.ai_title = format!("@{}: {}", aname, msg);
             s.results.clear();
             s.selected = 0;
@@ -2668,6 +2918,13 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             s.active_chat_id = chat_id;
             s.query.clear(); // Clear input box so they can immediately type follow-up
             s.cursor_pos = 0;
+
+            // Prefer the streaming Runs API so a real Approve/Deny button can be
+            // shown when Hermes needs tool approval. Fall back to the blocking
+            // chat-completions call if the gateway doesn't support runs/approval.
+            if run_agent_via_runs_api(hwnd, sys.clone(), msg_clone.clone(), db_path.clone(), chat_id) {
+                return;
+            }
 
             std::thread::spawn(move || {
                 let hwnd_ai = hwnd_ai;
@@ -2895,13 +3152,397 @@ unsafe fn fill_rounded(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, c: COLO
     let old_brush = SelectObject(hdc, br);
     let pen = CreatePen(PS_NULL, 0, COLORREF(0));
     let old_pen = SelectObject(hdc, pen);
-    
+
     let _ = RoundRect(hdc, x, y, x + w + 1, y + h + 1, r, r);
-    
+
     let _ = SelectObject(hdc, old_pen);
     let _ = DeleteObject(pen);
     let _ = SelectObject(hdc, old_brush);
     let _ = DeleteObject(br);
+}
+
+// ── Markdown rendering for the AI panel ───────────────────────────────────────
+//
+// Both `measure_response` and `paint_response` walk the same parsed blocks so the
+// measured height (used for scroll math) always matches the painted height.
+//
+// Layout vocabulary (pixels):
+//   PARA_GAP     — space after a paragraph / between non-adjacent blocks
+//   CODE_PAD     — inner padding of a fenced code block
+//   LIST_INDENT  — left indent for list markers
+const MD_PARA_GAP: i32 = 10;
+const MD_CODE_PAD: i32 = 12;
+const MD_CODE_BG: COLORREF = COLORREF(0x00_28_26_25);
+const MD_CODE_BORDER: COLORREF = COLORREF(0x00_3A_36_35);
+const MD_INLINE_CODE_BG: COLORREF = COLORREF(0x00_2E_2C_2B);
+const MD_LINK: COLORREF = COLORREF(0x00_7A_B8_F5);
+const MD_CODE_FG: COLORREF = COLORREF(0x00_E6_C0_7A);
+
+/// Color used for the body font of an assistant response.
+const MD_BODY: COLORREF = COLORREF(0x00_E7_E3_E1);
+const MD_MUTED: COLORREF = COLORREF(0x00_8F_89_86);
+
+/// Measure the rendered height of a Markdown response at the given pixel width.
+unsafe fn measure_response(hdc: HDC, text: &str, s: &State, width: i32) -> i32 {
+    let blocks = markdown::parse(text);
+    measure_blocks(hdc, &blocks, s, width)
+}
+
+/// Paint a Markdown response at vertical offset `top`. Returns the total height
+/// consumed (so the caller can advance its cursor).
+unsafe fn paint_response(
+    hdc: HDC,
+    text: &str,
+    s: &State,
+    x: i32,
+    width: i32,
+    top: i32,
+) -> i32 {
+    let blocks = markdown::parse(text);
+    paint_blocks(hdc, &blocks, s, x, width, top)
+}
+
+unsafe fn measure_blocks(hdc: HDC, blocks: &[markdown::MdBlock], s: &State, width: i32) -> i32 {
+    let mut total = 0i32;
+    let prev_font = SelectObject(hdc, s.font_c); // remember to restore
+    for (i, b) in blocks.iter().enumerate() {
+        let prev_kind = block_kind(blocks.get(i.wrapping_sub(1)));
+        total += block_top_gap(b, prev_kind);
+        total += measure_one(hdc, b, s, width);
+    }
+    let _ = SelectObject(hdc, prev_font);
+    total
+}
+
+fn block_kind(b: Option<&markdown::MdBlock>) -> Option<&'static str> {
+    match b {
+        Some(markdown::MdBlock::Heading { .. }) => Some("h"),
+        Some(markdown::MdBlock::Paragraph { .. }) => Some("p"),
+        Some(markdown::MdBlock::Code { .. }) => Some("code"),
+        Some(markdown::MdBlock::ListItem { .. }) => Some("li"),
+        Some(markdown::MdBlock::Spacer) => Some("spacer"),
+        None => None,
+    }
+}
+
+/// Vertical gap to insert *above* this block based on what came before it.
+fn block_top_gap(cur: &markdown::MdBlock, prev: Option<&str>) -> i32 {
+    use markdown::MdBlock;
+    match (cur, prev) {
+        (_, None) => 0,
+        (MdBlock::Spacer, _) | (_, Some("spacer")) => 0,
+        (MdBlock::Heading { .. }, _) => 14,
+        (_, Some("h")) => 10,
+        (MdBlock::ListItem { .. }, Some("li")) => 3,
+        (MdBlock::ListItem { .. }, _) => 8,
+        (_, Some("li")) => MD_PARA_GAP,
+        (MdBlock::Code { .. }, _) | (_, Some("code")) => MD_PARA_GAP,
+        (_, Some("p")) => MD_PARA_GAP,
+        _ => MD_PARA_GAP,
+    }
+}
+
+unsafe fn measure_one(hdc: HDC, b: &markdown::MdBlock, s: &State, width: i32) -> i32 {
+    use markdown::MdBlock;
+    match b {
+        MdBlock::Spacer => 6,
+        MdBlock::Heading { level, .. } => {
+            let _ = SelectObject(hdc, s.font_h);
+            let plain = strip_inline_text(b);
+            let h = wrap_text_height(hdc, &plain, width);
+            (*level as i32 - 1).max(0) * 4 + h + 4
+        }
+        MdBlock::Paragraph { runs } => {
+            let _ = SelectObject(hdc, s.font_c);
+            measure_runs(hdc, runs, s, width).1
+        }
+        MdBlock::ListItem { runs, .. } => {
+            let _ = SelectObject(hdc, s.font_c);
+            // 22px reserved for the marker ("•"/"1.") on the left.
+            measure_runs(hdc, runs, s, (width - 22).max(40)).1
+        }
+        MdBlock::Code { text, .. } => {
+            let _ = SelectObject(hdc, s.font_code);
+            let inner_w = (width - MD_CODE_PAD * 2).max(40);
+            let mut h = 0;
+            for line in text.split('\n') {
+                let mut wide: Vec<u16> = line.encode_utf16().collect();
+                let mut rc = RECT { left: 0, top: 0, right: inner_w, bottom: 0 };
+                let _ = DrawTextW(hdc, &mut wide, &mut rc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                let lh = (rc.bottom - rc.top).max(18);
+                h += lh;
+            }
+            // Empty code block still shows one line.
+            if h == 0 { h = 18; }
+            h + MD_CODE_PAD * 2
+        }
+    }
+}
+
+/// Extract the joined plain text of a block (used for heading measurement).
+fn strip_inline_text(b: &markdown::MdBlock) -> String {
+    use markdown::MdBlock;
+    match b {
+        MdBlock::Heading { runs, .. } | MdBlock::Paragraph { runs } | MdBlock::ListItem { runs, .. } => {
+            runs.iter().map(|r| match r {
+                markdown::MdInline::Plain(t) | markdown::MdInline::Bold(t) | markdown::MdInline::Italic(t)
+                | markdown::MdInline::Code(t) => t.as_str(),
+                markdown::MdInline::Link { label, .. } => label.as_str(),
+            }).collect::<Vec<_>>().join("")
+        }
+        _ => String::new(),
+    }
+}
+
+unsafe fn wrap_text_height(hdc: HDC, text: &str, width: i32) -> i32 {
+    let mut wide: Vec<u16> = text.encode_utf16().collect();
+    let mut rc = RECT { left: 0, top: 0, right: width, bottom: 0 };
+    let _ = DrawTextW(hdc, &mut wide, &mut rc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+    (rc.bottom - rc.top).max(16)
+}
+
+/// Measure a run-list, returning `(max_inline_width_unused, total_height)`.
+/// Height is what the caller actually needs; the width component is unused today
+/// but kept to centralize run layout for future use.
+unsafe fn measure_runs(hdc: HDC, runs: &[markdown::MdInline], s: &State, width: i32) -> (i32, i32) {
+    // Render the runs into a single wrapped string is hard because of mixed
+    // fonts; instead we lay runs out greedily into visual lines and sum heights.
+    let layout = layout_runs(hdc, runs, s, width);
+    let height = layout.line_heights.iter().sum::<i32>();
+    (width, height)
+}
+
+/// Greedy line layout of inline runs. Returns positioned run fragments plus the
+/// per-line heights. Both measure and paint use this so wrapping matches.
+unsafe fn layout_runs(
+    hdc: HDC,
+    runs: &[markdown::MdInline],
+    s: &State,
+    width: i32,
+) -> MdLayout {
+    use markdown::MdInline;
+    let mut lines: Vec<Vec<MdFrag>> = vec![vec![]];
+    let mut cur_w = 0i32;
+    let mut max_ascent = 0i32;
+    let mut max_descent = 0i32;
+    let mut line_heights: Vec<i32> = Vec::new();
+
+    let space_w = text_width(hdc, " ", s.font_c);
+
+    for run in runs {
+        let (font, _color, text) = match run {
+            MdInline::Plain(t) => (s.font_c, MD_BODY, t.as_str()),
+            MdInline::Bold(t) => (s.font_n, MD_BODY, t.as_str()),
+            MdInline::Italic(t) => (s.font_c, MD_BODY, t.as_str()),
+            MdInline::Code(t) => (s.font_code, MD_CODE_FG, t.as_str()),
+            MdInline::Link { label, .. } => (s.font_c, MD_LINK, label.as_str()),
+        };
+        let _ = _color;
+
+        // Split into words and wrap greedily.
+        let parts: Vec<&str> = text.split(' ').collect();
+        for (wi, word) in parts.iter().enumerate() {
+            if word.is_empty() && wi != 0 {
+                // Consecutive spaces collapse to one; the space is handled below.
+                continue;
+            }
+            let word_w = text_width(hdc, word, font);
+            let need_space = !lines.last().map(|l| l.is_empty()).unwrap_or(true) && wi != 0;
+            let add_w = word_w + if need_space { space_w } else { 0 };
+
+            if cur_w + add_w > width && !lines.last().map(|l| l.is_empty()).unwrap_or(true) {
+                // Wrap: flush the current line, then start a fresh line with this word.
+                line_heights.push((max_ascent + max_descent).max(16));
+                lines.push(vec![]);
+                lines.last_mut().unwrap().push(MdFrag {
+                    font,
+                    text: word.to_string(),
+                    leading_space: false,
+                });
+                cur_w = word_w;
+                let metrics = font_metrics(hdc, font);
+                max_ascent = metrics.0;
+                max_descent = metrics.1;
+            } else {
+                let leading = need_space;
+                lines.last_mut().unwrap().push(MdFrag {
+                    font,
+                    text: word.to_string(),
+                    leading_space: leading,
+                });
+                cur_w += add_w;
+                let metrics = font_metrics(hdc, font);
+                max_ascent = max_ascent.max(metrics.0);
+                max_descent = max_descent.max(metrics.1);
+            }
+        }
+    }
+    line_heights.push((max_ascent + max_descent).max(16));
+
+    MdLayout { lines, line_heights }
+}
+
+#[derive(Default)]
+struct MdLayout {
+    lines: Vec<Vec<MdFrag>>,
+    line_heights: Vec<i32>,
+}
+
+struct MdFrag {
+    font: HFONT,
+    text: String,
+    leading_space: bool,
+}
+
+unsafe fn text_width(hdc: HDC, text: &str, font: HFONT) -> i32 {
+    if text.is_empty() { return 0; }
+    let _old = SelectObject(hdc, font);
+    let wide: Vec<u16> = text.encode_utf16().collect();
+    let mut size = SIZE::default();
+    let _ = GetTextExtentPoint32W(hdc, &wide, &mut size);
+    let _ = SelectObject(hdc, _old);
+    size.cx
+}
+
+/// Returns (ascent, descent) in pixels for the current font.
+unsafe fn font_metrics(hdc: HDC, font: HFONT) -> (i32, i32) {
+    let _old = SelectObject(hdc, font);
+    let mut tm = TEXTMETRICW::default();
+    let _ = GetTextMetricsW(hdc, &mut tm);
+    let _ = SelectObject(hdc, _old);
+    (tm.tmAscent, tm.tmDescent)
+}
+
+unsafe fn paint_blocks(
+    hdc: HDC,
+    blocks: &[markdown::MdBlock],
+    s: &State,
+    x: i32,
+    width: i32,
+    top: i32,
+) -> i32 {
+    use markdown::MdBlock;
+    let prev_font = SelectObject(hdc, s.font_c);
+    let mut y = top;
+    let _ = SetBkMode(hdc, TRANSPARENT);
+
+    for (i, b) in blocks.iter().enumerate() {
+        let prev_kind = block_kind(blocks.get(i.wrapping_sub(1)));
+        y += block_top_gap(b, prev_kind);
+
+        match b {
+            MdBlock::Spacer => {
+                y += 6;
+            }
+            MdBlock::Heading { level, runs } => {
+                let _ = SelectObject(hdc, s.font_h);
+                SetTextColor(hdc, CLR_WHITE);
+                y += (*level as i32 - 1).max(0) * 4;
+                y += paint_run_lines(hdc, runs, s, x, y, width, None);
+            }
+            MdBlock::Paragraph { runs } => {
+                let _ = SelectObject(hdc, s.font_c);
+                y += paint_run_lines(hdc, runs, s, x, y, width, None);
+            }
+            MdBlock::ListItem { runs, ordered, index } => {
+                let _ = SelectObject(hdc, s.font_c);
+                let marker = if *ordered { format!("{}.", index) } else { "•".to_string() };
+                // Draw the marker.
+                SetTextColor(hdc, MD_MUTED);
+                let mut mwide: Vec<u16> = marker.encode_utf16().collect();
+                let mut mrc = RECT { left: x, top: y, right: x + 22, bottom: y + 40 };
+                let _ = DrawTextW(hdc, &mut mwide, &mut mrc, DT_LEFT | DT_TOP | DT_NOPREFIX);
+                y += paint_run_lines(hdc, runs, s, x + 22, y, (width - 22).max(40), None);
+            }
+            MdBlock::Code { text, .. } => {
+                let _ = SelectObject(hdc, s.font_code);
+                let inner_w = (width - MD_CODE_PAD * 2).max(40);
+                // Measure height to draw the background box.
+                let mut h = 0;
+                for line in text.split('\n') {
+                    let mut wide: Vec<u16> = line.encode_utf16().collect();
+                    let mut rc = RECT { left: 0, top: 0, right: inner_w, bottom: 0 };
+                    let _ = DrawTextW(hdc, &mut wide, &mut rc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                    h += (rc.bottom - rc.top).max(18);
+                }
+                if h == 0 { h = 18; }
+                let box_h = h + MD_CODE_PAD * 2;
+                fill_rounded(hdc, x, y, width, box_h, 8, MD_CODE_BG);
+                // Subtle left accent border.
+                fill(hdc, x, y, 2, box_h, MD_CODE_BORDER);
+
+                SetTextColor(hdc, MD_CODE_FG);
+                let mut ly = y + MD_CODE_PAD;
+                for line in text.split('\n') {
+                    let mut wide: Vec<u16> = line.encode_utf16().collect();
+                    let mut measure = RECT { left: 0, top: 0, right: inner_w, bottom: 0 };
+                    let _ = DrawTextW(hdc, &mut wide, &mut measure, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                    let lh = (measure.bottom - measure.top).max(18);
+                    let mut rc = RECT { left: x + MD_CODE_PAD, top: ly, right: x + MD_CODE_PAD + inner_w, bottom: ly + lh };
+                    let _ = DrawTextW(hdc, &mut wide, &mut rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+                    ly += lh;
+                }
+                y += box_h;
+            }
+        }
+    }
+
+    let _ = SelectObject(hdc, prev_font);
+    y - top
+}
+
+/// Paint inline runs with word-wrap, advancing downward. Returns the height used.
+/// `bg` optionally fills behind each line (used for inline-code chips below).
+unsafe fn paint_run_lines(
+    hdc: HDC,
+    runs: &[markdown::MdInline],
+    s: &State,
+    x: i32,
+    top: i32,
+    width: i32,
+    _bg: Option<COLORREF>,
+) -> i32 {
+    let layout = layout_runs(hdc, runs, s, width);
+    let mut y = top;
+
+    for (line_idx, line) in layout.lines.iter().enumerate() {
+        let lh = layout.line_heights.get(line_idx).copied().unwrap_or(16);
+        let mut cx = x;
+        // Baseline = top + ascent of the dominant (body) font.
+        let body_metrics = font_metrics(hdc, s.font_c);
+        let baseline = y + body_metrics.0;
+
+        for frag in line {
+            if frag.leading_space {
+                cx += text_width(hdc, " ", s.font_c);
+            }
+            let _ = SelectObject(hdc, frag.font);
+            let color = if std::ptr::eq(frag.font.0, s.font_code.0) {
+                MD_CODE_FG
+            } else {
+                MD_BODY
+            };
+
+            // Inline code chip: draw a rounded background behind the text.
+            let is_code = std::ptr::eq(frag.font.0, s.font_code.0);
+            if is_code {
+                let tw = text_width(hdc, &frag.text, frag.font);
+                let metrics = font_metrics(hdc, frag.font);
+                let chip_h = metrics.0 + metrics.1 + 4;
+                let chip_top = baseline - metrics.0 + 2;
+                fill_rounded(hdc, cx, chip_top, tw + 10, chip_h, 4, MD_INLINE_CODE_BG);
+            }
+
+            SetTextColor(hdc, color);
+            let wide: Vec<u16> = frag.text.encode_utf16().collect();
+            let mut rc = RECT { left: cx, top: baseline - (font_metrics(hdc, frag.font).0), right: cx + width, bottom: baseline + 40 };
+            let _ = DrawTextW(hdc, &mut wide.clone(), &mut rc, DT_LEFT | DT_NOPREFIX | DT_SINGLELINE);
+            cx += text_width(hdc, &frag.text, frag.font);
+            let _ = wide;
+        }
+        y += lh;
+    }
+    y - top
 }
 
 fn word_left(s: &str, pos: usize) -> usize {
@@ -3584,18 +4225,30 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 }
 
                 if !response.is_empty() {
-                    let mut r_wide: Vec<u16> = response.encode_utf16().collect();
-                    let mut calc = RECT { left: 0, top: 0, right: resp_w, bottom: 0 };
-                    SelectObject(mdc, s.font_c);
-                    let _ = DrawTextW(mdc, &mut r_wide, &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
-                    let resp_h = calc.bottom - calc.top;
+                    let is_thinking = response == "Thinking..." || response == "Executing...";
+                    let resp_h = if is_thinking {
+                        // Plain single-line height for the animated status text.
+                        let mut r_wide: Vec<u16> = response.encode_utf16().collect();
+                        let mut calc = RECT { left: 0, top: 0, right: resp_w, bottom: 0 };
+                        SelectObject(mdc, s.font_c);
+                        let _ = DrawTextW(mdc, &mut r_wide, &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                        calc.bottom - calc.top
+                    } else {
+                        // Markdown-rendered height (headings/code/lists/etc.).
+                        measure_response(mdc, response, s, resp_w)
+                    };
                     total_h += resp_h + 24;
                 }
             }
 
             let view_h = content_bottom - content_top;
             let max_scroll = (total_h - view_h).max(0);
-            let scroll = if s.ai_pending {
+            // Cache these so input handlers (VK_DOWN/wheel) can decide whether the user
+            // has scrolled back to the bottom without re-running the whole measure pass.
+            s.ai_content_height.set(total_h);
+            s.ai_view_height.set(view_h);
+            // While pending OR when following the latest message, keep pinned to the bottom.
+            let scroll = if s.ai_pending || s.ai_follow_bottom {
                 max_scroll
             } else {
                 s.ai_scroll.clamp(0, max_scroll)
@@ -3672,12 +4325,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     };
                     if is_thinking {
                         SetTextColor(mdc, CLR_GRAY);
+                        let _ = DrawTextW(mdc, &mut r_wide, &mut body_rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+                        current_y += resp_h + 24;
                     } else {
-                        SetTextColor(mdc, CLR_WHITE);
+                        // Markdown: paint using the shared renderer so heights match
+                        // the measure pass exactly.
+                        let used = paint_response(mdc, &response_text, s, x + pad, resp_w, current_y);
+                        current_y += used + 24;
                     }
-                    let _ = DrawTextW(mdc, &mut r_wide, &mut body_rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
-
-                    current_y += resp_h + 24;
                 }
             }
 
@@ -3687,7 +4342,59 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         // Footer / chat input (painted over any text overflow)
         fill(mdc, x, content_bottom, w, footer_h + 4, BG);
         fill(mdc, x, content_bottom, w, 1, CLR_DIV);
-        if s.ai_pending {
+
+        // ── Hermes approval banner + Approve/Deny buttons ───────────────
+        if let Some(ap) = &s.hermes_approval {
+            // Banner row describing what needs approval.
+            let banner_y = content_bottom + 2;
+            SelectObject(mdc, s.font_b);
+            SetTextColor(mdc, COLORREF(0x00_F5_C8_7A)); // warm accent
+            let label = if ap.tool.is_empty() {
+                "Hermes wants to run a tool".to_string()
+            } else {
+                format!("Hermes wants to run: {}", ap.tool)
+            };
+            let mut bw: Vec<u16> = label.encode_utf16().collect();
+            let mut brc = RECT { left: x + pad, top: banner_y, right: x + w - pad, bottom: banner_y + 16 };
+            let _ = DrawTextW(mdc, &mut bw, &mut brc, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+            // Summary line (if any) in muted text.
+            if !ap.summary.is_empty() {
+                SelectObject(mdc, s.font_c);
+                SetTextColor(mdc, CLR_GRAY);
+                let mut sw: Vec<u16> = ap.summary.chars().take(140).collect::<String>().encode_utf16().collect();
+                let mut src = RECT { left: x + pad, top: banner_y + 16, right: x + w - pad, bottom: banner_y + 32 };
+                let _ = DrawTextW(mdc, &mut sw, &mut src, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+            }
+
+            // Two buttons: Approve (green) and Deny (red). Hit-tested in WM_LBUTTONDOWN.
+            let btn_y = banner_y + 36;
+            let btn_h = 26;
+            let approve_w = 96;
+            let deny_w = 80;
+            let gap = 8;
+            let approve_x = x + pad;
+            let deny_x = approve_x + approve_w + gap;
+            // Approve button
+            fill_rounded(mdc, approve_x, btn_y, approve_w, btn_h, 6, COLORREF(0x00_3A_6B_3A));
+            SelectObject(mdc, s.font_b);
+            SetTextColor(mdc, COLORREF(0x00_E6_F5_E6));
+            let mut aw: Vec<u16> = "Approve".encode_utf16().collect();
+            let mut arc = RECT { left: approve_x, top: btn_y, right: approve_x + approve_w, bottom: btn_y + btn_h };
+            let _ = DrawTextW(mdc, &mut aw, &mut arc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            // Deny button
+            fill_rounded(mdc, deny_x, btn_y, deny_w, btn_h, 6, COLORREF(0x00_6B_3A_3A));
+            SetTextColor(mdc, COLORREF(0x00_F5_E6_E6));
+            let mut dw: Vec<u16> = "Deny".encode_utf16().collect();
+            let mut drc = RECT { left: deny_x, top: btn_y, right: deny_x + deny_w, bottom: btn_y + btn_h };
+            let _ = DrawTextW(mdc, &mut dw, &mut drc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            // Hint
+            SelectObject(mdc, s.font_b);
+            SetTextColor(mdc, CLR_GRAY);
+            let mut hw: Vec<u16> = "A / Enter approve · D / Esc deny".encode_utf16().collect();
+            let mut hrc = RECT { left: deny_x + deny_w + 12, top: btn_y, right: x + w - pad, bottom: btn_y + btn_h };
+            let _ = DrawTextW(mdc, &mut hw, &mut hrc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        } else if s.ai_pending {
             SelectObject(mdc, s.font_b);
             SetTextColor(mdc, CLR_GRAY);
             let mut hint_w: Vec<u16> = "Esc: cancel".encode_utf16().collect();

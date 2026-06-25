@@ -505,6 +505,298 @@ pub fn complete_chat_agent(system: &str, prev_user: &str, prev_assistant: &str, 
     Ok(text.trim().to_string())
 }
 
+// ── Hermes Runs API (streaming + approval) ───────────────────────────────────
+//
+// The legacy `/v1/chat/completions` endpoint is blocking and stateless, so it
+// cannot surface tool-approval prompts — when Hermes wants to run a tool that
+// needs approval, the request just hangs until the timeout. The Runs API is the
+// intended path for UIs that need to show an approve/deny button:
+//
+//   POST   /v1/runs                 — start a run, returns { run_id }
+//   GET    /v1/runs/{id}/events     — SSE stream of run events
+//   POST   /v1/runs/{id}/approval   — resolve a pending approval
+//   GET    /v1/capabilities         — feature flags (run_submission, ...)
+//
+// The exact JSON shapes for the approval *request* event and the approval
+// *decision* body are not fully published, so we parse defensively and send a
+// body covering the likely shapes. If the live gateway doesn't match, callers
+// fall back to the blocking `complete_agent` path.
+
+const HERMES_BASE: &str = "http://127.0.0.1:8642";
+
+/// An approval prompt surfaced from a running agent.
+#[derive(Clone)]
+pub struct HermesApproval {
+    pub run_id: String,
+    pub approval_id: String,
+    pub tool: String,
+    pub summary: String,
+}
+
+/// Callbacks the streaming run uses to talk back to the UI thread. Each is a
+/// best-effort fire-and-forget (the UI owns its own message box / state).
+pub trait RunCallbacks: Send {
+    /// A tool needs approval. The UI shows an Approve/Deny button.
+    fn on_approval(&self, approval: HermesApproval);
+    /// Incremental progress text (assistant thinking/deltas). Replaces the
+    /// "Executing…" line.
+    fn on_progress(&self, text: &str);
+    /// Terminal result. `ok=false` means `text` is an error message.
+    fn on_done(&self, ok: bool, text: &str);
+}
+
+/// Returns true if the gateway advertises the runs + approval + SSE features.
+pub fn supports_runs_api() -> bool {
+    let cfg = get_hermes_config();
+    let resp = ureq::get(&format!("{HERMES_BASE}/v1/capabilities"))
+        .set("Authorization", &format!("Bearer {}", cfg.api_key))
+        .timeout(std::time::Duration::from_secs(4))
+        .call();
+    let v = match resp {
+        Ok(r) => r.into_json::<serde_json::Value>(),
+        Err(_) => return false,
+    };
+    let v = match v {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    // Tolerant: accept either a flat feature list or a nested { "features": {...} }.
+    let has = |key: &str| -> bool {
+        let k = [key, &format!("run_{key}"), &format!("features.{key}")];
+        k.iter().any(|path| {
+            let mut cur = &v;
+            for seg in path.split('.') {
+                match cur.get(seg) {
+                    Some(n) => cur = n,
+                    None => return false,
+                }
+            }
+            cur.as_bool().unwrap_or(cur.as_str().map_or(false, |s| s == "enabled"))
+                || cur.as_array().map_or(false, |_| true)
+        })
+    };
+    // If we can't find explicit flags but the endpoint exists, treat it as supported
+    // only when the approval-specific flag is present.
+    has("approval") || has("run_approval")
+}
+
+/// Resolve a pending approval for a run: `approved=true` continues, `false` denies.
+pub fn resolve_run_approval(approval: &HermesApproval, approved: bool) -> Result<()> {
+    let cfg = get_hermes_config();
+    let url = format!("{HERMES_BASE}/v1/runs/{}/approval", approval.run_id);
+    // Cover the likely decision shapes the gateway might expect.
+    let body = serde_json::json!({
+        "decision": if approved { "approved" } else { "denied" },
+        "approved": approved,
+        "approval_id": approval.approval_id,
+        "status": if approved { "approved" } else { "denied" },
+    });
+    let resp = ureq::post(&url)
+        .set("Authorization", &format!("Bearer {}", cfg.api_key))
+        .set("Content-Type", "application/json")
+        .timeout(std::time::Duration::from_secs(10))
+        .send_json(body);
+    match resp {
+        Ok(_) => Ok(()),
+        Err(ureq::Error::Status(code, r)) => {
+            // 409/404 can mean "already resolved" — treat as success so the UI clears.
+            if code == 409 || code == 404 {
+                Ok(())
+            } else {
+                let msg = r.into_string().unwrap_or_default();
+                Err(anyhow!("approval error {code}: {}", msg.chars().take(200).collect::<String>()))
+            }
+        }
+        Err(e) => Err(anyhow!("approval request failed: {e}")),
+    }
+}
+
+/// Start a run and stream its events. Blocks until the run completes (or fails),
+/// invoking the callbacks along the way. Should run on a worker thread.
+pub fn run_agent_streaming(system: &str, user: &str, cb: &dyn RunCallbacks) -> Result<()> {
+    let cfg = get_hermes_config();
+    ensure_hermes_gateway_running()?;
+
+    // 1. Start the run.
+    let start_body = serde_json::json!({
+        "input": user,
+        "instructions": system,
+        "stream": true,
+    });
+    let start = ureq::post(&format!("{HERMES_BASE}/v1/runs"))
+        .set("Authorization", &format!("Bearer {}", cfg.api_key))
+        .set("Content-Type", "application/json")
+        .timeout(std::time::Duration::from_secs(30))
+        .send_json(start_body);
+    let start_v: serde_json::Value = match start {
+        Ok(r) => r.into_json().map_err(|e| anyhow!("bad run start response: {e}"))?,
+        Err(ureq::Error::Status(code, r)) => {
+            let msg = r.into_string().unwrap_or_default();
+            return Err(anyhow!("run start {code}: {}", msg.chars().take(300).collect::<String>()));
+        }
+        Err(e) => return Err(anyhow!("run start failed: {e}")),
+    };
+    let run_id = start_v
+        .get("run_id").or_else(|| start_v.get("id"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("run start response had no run_id"))?
+        .to_string();
+
+    // 2. Open the SSE event stream.
+    let events_url = format!("{HERMES_BASE}/v1/runs/{}/events", run_id);
+    let resp = ureq::get(&events_url)
+        .set("Authorization", &format!("Bearer {}", cfg.api_key))
+        .set("Accept", "text/event-stream")
+        .timeout(std::time::Duration::from_secs(300))
+        .call();
+    let resp = match resp {
+        Ok(r) => r,
+        Err(ureq::Error::Status(code, r)) => {
+            let msg = r.into_string().unwrap_or_default();
+            return Err(anyhow!("events {code}: {}", msg.chars().take(300).collect::<String>()));
+        }
+        Err(e) => return Err(anyhow!("events request failed: {e}")),
+    };
+
+    // 3. Read the stream line by line, parsing SSE `data:` payloads.
+    use std::io::{BufRead, BufReader};
+    let reader = BufReader::new(resp.into_reader());
+    let mut final_text = String::new();
+    let mut done_ok: Option<bool> = None;
+
+    for line in reader.lines() {
+        let line = match line { Ok(l) => l, Err(_) => break };
+        let payload = if let Some(d) = line.strip_prefix("data:") {
+            d.trim().to_string()
+        } else if line.starts_with("event:") || line.is_empty() {
+            continue;
+        } else {
+            continue;
+        };
+        if payload == "[DONE]" {
+            break;
+        }
+        let v: serde_json::Value = match serde_json::from_str(&payload) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        if let Some(approval) = extract_approval(&v, &run_id) {
+            cb.on_approval(approval);
+            continue;
+        }
+
+        // Progress / delta text: accumulate whatever content we can find.
+        let kind = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        match kind {
+            "completed" | "run.completed" | "response.completed" => {
+                if let Some(t) = v.get("output").and_then(|o| o.as_str()) {
+                    final_text = t.to_string();
+                } else if let Some(t) = v.get("result").and_then(|o| o.as_str()) {
+                    final_text = t.to_string();
+                } else if let Some(t) = v.get("response").and_then(|o| o.as_str()) {
+                    final_text = t.to_string();
+                }
+                done_ok = Some(true);
+            }
+            "failed" | "error" | "run.failed" => {
+                let msg = v.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str())
+                    .or_else(|| v.get("message").and_then(|m| m.as_str()))
+                    .unwrap_or("agent run failed");
+                cb.on_done(false, msg);
+                return Ok(());
+            }
+            _ => {
+                // Streaming delta: append any text fragment we can find.
+                if let Some(delta) = v.get("delta").and_then(|d| d.as_str()) {
+                    final_text.push_str(delta);
+                    cb.on_progress(&final_text);
+                } else if let Some(text) = v.get("text").and_then(|t| t.as_str()) {
+                    final_text.push_str(text);
+                    cb.on_progress(&final_text);
+                } else if let Some(content) = v
+                    .pointer("/delta/content")
+                    .and_then(|c| c.as_str())
+                {
+                    final_text.push_str(content);
+                    cb.on_progress(&final_text);
+                }
+            }
+        }
+    }
+
+    match done_ok {
+        Some(true) => {
+            cb.on_done(true, final_text.trim());
+            Ok(())
+        }
+        _ => {
+            // Stream ended without an explicit completion event. If we collected
+            // any text, treat that as success; otherwise it's an error.
+            if !final_text.trim().is_empty() {
+                cb.on_done(true, final_text.trim());
+                Ok(())
+            } else {
+                Err(anyhow!("agent run ended without a result"))
+            }
+        }
+    }
+}
+
+/// Heuristically detect an approval-request event in an SSE payload and pull out
+/// the fields the UI needs. Defensive: returns `None` if the payload doesn't
+/// look like an approval request.
+fn extract_approval(v: &serde_json::Value, run_id: &str) -> Option<HermesApproval> {
+    // Type-based detection first.
+    let kind = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    let approval_types = [
+        "approval_required", "approval.requested", "tool_call_pending",
+        "approval_pending", "requires_approval", "permission_request",
+    ];
+    let mut looks_like_approval = approval_types.contains(&kind);
+
+    // Key-based detection: presence of any of these keys signals approval.
+    let approval_keys = ["approval_id", "approval", "permission_id", "needs_approval", "requires_approval"];
+    for k in approval_keys {
+        if v.get(k).is_some() {
+            looks_like_approval = true;
+            break;
+        }
+    }
+    if !looks_like_approval {
+        return None;
+    }
+
+    // opt(key) returns the first non-empty string value found at `key`.
+    let opt = |key: &str| -> Option<String> {
+        v.get(key).and_then(|x| x.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string())
+    };
+    let approval_id = opt("approval_id")
+        .or_else(|| opt("approval"))
+        .or_else(|| opt("permission_id"))
+        .or_else(|| opt("id"))
+        .unwrap_or_default();
+
+    let tool = opt("tool").or_else(|| opt("tool_name")).or_else(|| opt("command")).or_else(|| opt("name")).unwrap_or_default();
+    let summary = opt("summary")
+        .or_else(|| opt("description"))
+        .or_else(|| opt("message"))
+        .or_else(|| opt("reason"))
+        .or_else(|| {
+            // Some payloads nest the tool call under "data" / "payload".
+            let d = v.get("data").or_else(|| v.get("payload"))?;
+            d.get("command").and_then(|c| c.as_str()).map(|c| c.to_string())
+        })
+        .unwrap_or_default();
+
+    Some(HermesApproval {
+        run_id: run_id.to_string(),
+        approval_id,
+        tool,
+        summary,
+    })
+}
+
 /// Map a command + input to a (system prompt, user content) and run it.
 /// Commands: ask, explain, grammar, translate, summarize.
 pub fn run(cmd: &str, input: &str) -> Result<String> {
