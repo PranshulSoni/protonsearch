@@ -2602,43 +2602,34 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             let _agent_id: i64 = parts.next().and_then(|v| v.parse().ok()).unwrap_or(-1);
             let name = parts.next().unwrap_or("").to_string();
             if !name.is_empty() {
-                let db_path = s.db_path.clone();
-                let search_title_prefix = format!("@{}:%", name);
-                
-                let mut loaded_chat = None;
-                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                    if let Ok(row) = conn.query_row(
-                        "SELECT id, title, prompt, response FROM ai_chats WHERE command = 'agent' AND title LIKE ? ORDER BY ts DESC LIMIT 1",
-                        [search_title_prefix],
-                        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?))
-                    ) {
-                        loaded_chat = Some(row);
-                    }
-                }
-                
-                if let Some((id, title, prompt, response)) = loaded_chat {
-                    s.ai_pending = false;
-                    s.ai_answer = Some(format_conversation(&prompt, &response));
-                    s.ai_title = title;
-                    s.ai_scroll = 0;
-                    s.active_chat_id = Some(id);
-                } else {
-                    let new_title = format!("@{}: [New Conversation]", name);
-                    let chat_id = store_ai_chat(&db_path, "agent", &new_title, "", "");
-                    s.ai_pending = false;
-                    s.ai_answer = Some("Ask me anything! I will execute tasks on your PC using Hermes.".to_string());
-                    s.ai_title = new_title;
-                    s.ai_scroll = 0;
-                    s.active_chat_id = chat_id;
-                }
-                
-                s.query.clear();
-                s.cursor_pos = 0;
+                s.query = format!("agentchats:@{}", name);
+                s.cursor_pos = s.query.len();
                 s.results.clear();
                 s.selected = 0;
+                s.scroll_offset = 0;
+                s.text_selected = false;
                 reset_cursor_blink(hwnd, s);
+                trigger_search(hwnd, s);
                 let _ = InvalidateRect(hwnd, None, FALSE);
             }
+            return;
+        } else if let Some(name) = cmd.strip_prefix("startnewagent:") {
+            let db_path = s.db_path.clone();
+            let new_title = format!("@{}: [New Conversation]", name);
+            let chat_id = store_ai_chat(&db_path, "agent", &new_title, "", "");
+            s.ai_pending = false;
+            s.ai_answer = Some("Ask me anything! I will execute tasks on your PC using Hermes.".to_string());
+            s.ai_title = new_title;
+            s.ai_scroll = 0;
+            s.active_chat_id = chat_id;
+            s.query.clear();
+            s.cursor_pos = 0;
+            s.results.clear();
+            s.selected = 0;
+            s.scroll_offset = 0;
+            s.text_selected = false;
+            reset_cursor_blink(hwnd, s);
+            let _ = InvalidateRect(hwnd, None, FALSE);
             return;
         } else if let Some(rest) = cmd.strip_prefix("agent:") {
             // Message an agent: run the AI with the agent's persona, show in the panel.
