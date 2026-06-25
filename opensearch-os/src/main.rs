@@ -271,7 +271,7 @@ fn register_startup() {
                     &mut hkey,
                 );
                 if err.is_err() { return Err("open key failed".into()); }
-                windows::Win32::System::Registry::RegSetValueExW(
+                let _ = windows::Win32::System::Registry::RegSetValueExW(
                     hkey,
                     windows::core::PCWSTR(value_name.as_ptr()),
                     0,
@@ -281,7 +281,7 @@ fn register_startup() {
                         (exe_wide.len() - 1) * 2,
                     )),
                 );
-                windows::Win32::System::Registry::RegCloseKey(hkey);
+                let _ = windows::Win32::System::Registry::RegCloseKey(hkey);
             }
             Ok(())
         })();
