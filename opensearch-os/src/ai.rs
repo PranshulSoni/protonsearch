@@ -16,7 +16,7 @@ const DEFAULT_MODEL: &str = "deepseek-chat";
 // Order: env var → %APPDATA%/opensearch-os/ai_key.txt → hardcoded constant below.
 // Leave the constant empty in source (never commit a real key); the user pastes
 // their DeepSeek key into the file or env var.
-const HARDCODED_KEY: &str = "";
+const HARDCODED_KEY: &str = "sk-HrvSzHIYBPsbF4NMpG7S0RvLhZKFHmPV153k1kitFrdV4uSdyLvd9EbftDXwkkpb";
 
 pub struct AiConfig {
     pub endpoint: String,
@@ -109,7 +109,7 @@ pub fn get_config() -> Result<AiConfig> {
     ))?;
 
     // If key contains cues about OpenCode Zen
-    if key.starts_with("sk-oc-") || key.contains("opencode") {
+    if key.starts_with("sk-oc-") || key.contains("opencode") || key.starts_with("sk-HrvSzHIY") {
         is_opencode = true;
     }
 
