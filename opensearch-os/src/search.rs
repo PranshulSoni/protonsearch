@@ -1765,6 +1765,30 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 },
                 score: 3.1,
             });
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: "folder.quicklinks".to_string(),
+                    control_name: "Quicklinks".to_string(),
+                    breadcrumb_path: "Quicklinks > Web shortcuts".to_string(),
+                    launch_command: "ql:".to_string(),
+                    source: "FOLDER".to_string(),
+                    description: "Folder containing all custom web search shortcuts".to_string(),
+                    synonyms: "quicklinks ql web shortcuts links".to_string(),
+                },
+                score: 3.05,
+            });
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: "folder.snippets".to_string(),
+                    control_name: "Snippets".to_string(),
+                    breadcrumb_path: "Snippets > Text templates".to_string(),
+                    launch_command: "snip:".to_string(),
+                    source: "FOLDER".to_string(),
+                    description: "Folder containing all text snippet templates".to_string(),
+                    synonyms: "snippets snip templates text patterns".to_string(),
+                },
+                score: 3.01,
+            });
             for rf in self.recent_files.iter().take(top_k.min(20)) {
                 let ext = rf.name.rsplit('.').next().unwrap_or("").to_uppercase();
                 results.push(SearchResult {
@@ -1781,6 +1805,52 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                 });
             }
             return results;
+        }
+
+        if q_lower_trimmed.starts_with("quicklink:") {
+            let sub_query = q_lower_trimmed.strip_prefix("quicklink:").unwrap().trim();
+            return self.search_quicklinks_only(sub_query);
+        }
+        if q_lower_trimmed.starts_with("ql:") {
+            let sub_query = q_lower_trimmed.strip_prefix("ql:").unwrap().trim();
+            return self.search_quicklinks_only(sub_query);
+        }
+        if q_lower_trimmed.starts_with("snippet:") {
+            let sub_query = q_lower_trimmed.strip_prefix("snippet:").unwrap().trim();
+            return self.search_snippets_only(sub_query);
+        }
+        if q_lower_trimmed.starts_with("snip:") {
+            let sub_query = q_lower_trimmed.strip_prefix("snip:").unwrap().trim();
+            return self.search_snippets_only(sub_query);
+        }
+
+        // Quicklink keyword detection in general search
+        let query_trimmed = q.trim();
+        if !query_trimmed.is_empty() {
+            let mut parts = query_trimmed.splitn(2, |c: char| c.is_whitespace());
+            if let Some(first_word) = parts.next() {
+                let rest_query = parts.next().unwrap_or("").trim();
+                let has_space = query_trimmed.contains(|c: char| c.is_whitespace());
+                if has_space {
+                    if let Some((ql_name, ql_url)) = self.check_quicklink_keyword(first_word) {
+                        let encoded = url_encode(rest_query);
+                        let final_url = ql_url.replace("{query}", &encoded);
+                        let display_rest = if rest_query.is_empty() { "..." } else { rest_query };
+                        return vec![SearchResult {
+                            entry: CatalogEntry {
+                                id: format!("quicklink_trigger.{}", ql_name.to_lowercase().replace(' ', "_")),
+                                control_name: format!("Search {} for \"{}\"", ql_name, display_rest),
+                                breadcrumb_path: format!("Quicklink > Open in default browser"),
+                                launch_command: format!("open_quicklink:{}", final_url),
+                                source: "QUICKLINK".to_string(),
+                                description: format!("Perform quick search on {}", ql_name),
+                                synonyms: first_word.to_string(),
+                            },
+                            score: 12.0,
+                        }];
+                    }
+                }
+            }
         }
 
         if q_lower_trimmed == "recent" || q_lower_trimmed == "recents" {
@@ -2316,6 +2386,8 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         merged.append(&mut file_matches);
         merged.append(&mut vec_results);
         merged.append(&mut project_results);
+        merged.append(&mut self.search_quicklinks_name_matches(q));
+        merged.append(&mut self.search_snippets_name_matches(q));
         merged.push(web_search.clone());
         merged.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
