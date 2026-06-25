@@ -7,13 +7,10 @@ use std::thread;
 use std::time::Duration;
 use std::os::windows::process::CommandExt;
 
-use windows::{
-    core::w,
-    Win32::{
-        Foundation::HWND,
-        UI::WindowsAndMessaging::{
-            MessageBoxW, IDYES, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO,
-        },
+use windows::Win32::{
+    Foundation::HWND,
+    UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO,
     },
 };
 
