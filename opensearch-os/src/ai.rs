@@ -313,17 +313,31 @@ fn get_hermes_config() -> AiConfig {
 
 
 
-pub fn start_hermes_gateway_daemon() {
-    let hermes_cmd = if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
-        let path = std::path::Path::new(&localappdata).join("hermes").join("bin").join("hermes.cmd");
-        if path.exists() {
-            path.to_string_lossy().to_string()
-        } else {
-            "hermes".to_string()
+pub fn get_hermes_executable() -> String {
+    if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
+        let venv_path = std::path::Path::new(&localappdata)
+            .join("hermes")
+            .join("hermes-agent")
+            .join("venv")
+            .join("Scripts")
+            .join("hermes.exe");
+        if venv_path.exists() {
+            return venv_path.to_string_lossy().to_string();
         }
-    } else {
-        "hermes".to_string()
-    };
+
+        let cmd_path = std::path::Path::new(&localappdata)
+            .join("hermes")
+            .join("bin")
+            .join("hermes.cmd");
+        if cmd_path.exists() {
+            return cmd_path.to_string_lossy().to_string();
+        }
+    }
+    "hermes".to_string()
+}
+
+pub fn start_hermes_gateway_daemon() {
+    let hermes_cmd = get_hermes_executable();
 
     if let Ok(appdata) = std::env::var("APPDATA") {
         let log_dir = std::path::Path::new(&appdata).join("opensearch-os");
