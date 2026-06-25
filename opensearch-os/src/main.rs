@@ -2355,13 +2355,25 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                             "CREATE TABLE IF NOT EXISTS ai_settings (key TEXT PRIMARY KEY, value TEXT);",
                             [],
                         );
-                        let db_key = if k == "key" { "api_key" } else { k };
-                        let _ = conn.execute(
-                            "INSERT OR REPLACE INTO ai_settings (key, value) VALUES (?, ?);",
-                            rusqlite::params![db_key, v],
-                        );
+                        if k == "preset" {
+                            if v == "opencode" {
+                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('endpoint', 'https://opencode.ai/zen/v1/chat/completions');", []);
+                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('model', 'deepseek-v4-flash-free');", []);
+                                s.query = "AI Configured for OpenCode Zen!".to_string();
+                            } else if v == "deepseek" {
+                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('endpoint', 'https://api.deepseek.com/chat/completions');", []);
+                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('model', 'deepseek-chat');", []);
+                                s.query = "AI Configured for DeepSeek!".to_string();
+                            }
+                        } else {
+                            let db_key = if k == "key" { "api_key" } else { k };
+                            let _ = conn.execute(
+                                "INSERT OR REPLACE INTO ai_settings (key, value) VALUES (?, ?);",
+                                rusqlite::params![db_key, v],
+                            );
+                            s.query = format!("AI {} Saved!", k.to_uppercase());
+                        }
                     }
-                    s.query = format!("AI {} Saved!", k.to_uppercase());
                 }
                 s.cursor_pos = s.query.len();
                 s.results.clear();
