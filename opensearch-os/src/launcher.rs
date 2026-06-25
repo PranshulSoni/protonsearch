@@ -742,13 +742,13 @@ pub fn toggle_hidden_files() -> Result<bool, windows::core::Error> {
             1u32 // change to show
         };
         
+        let data_slice = std::slice::from_raw_parts(&new_val as *const u32 as *const u8, 4);
         let status = RegSetValueExW(
             hkey,
             PCWSTR(value_name.as_ptr()),
             0,
             REG_DWORD,
-            Some(&new_val as *const u32 as *const u8),
-            std::mem::size_of::<u32>() as u32,
+            Some(data_slice),
         );
         
         let _ = RegCloseKey(hkey);
@@ -769,7 +769,7 @@ pub fn send_media_key(vk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_K
         let inputs = [
             INPUT {
                 r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_ANONYMOUS {
+                Anonymous: INPUT_0 {
                     ki: KEYBDINPUT {
                         wVk: vk,
                         wScan: 0,
@@ -781,7 +781,7 @@ pub fn send_media_key(vk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_K
             },
             INPUT {
                 r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_ANONYMOUS {
+                Anonymous: INPUT_0 {
                     ki: KEYBDINPUT {
                         wVk: vk,
                         wScan: 0,
