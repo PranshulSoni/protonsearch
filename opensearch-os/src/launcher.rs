@@ -67,7 +67,11 @@ pub fn launch(cmd: &str) {
 
     // ── Action commands ────────────────────────────────────────────────────
     if let Some(action) = cmd.strip_prefix("action:") {
-        handle_action(action);
+        if let Some(window_action) = action.strip_prefix("window:") {
+            handle_window_action(window_action);
+        } else {
+            handle_action(action);
+        }
         return;
     }
 
@@ -363,5 +367,248 @@ fn get_known_folder_path(folder_id: &windows::core::GUID) -> Option<String> {
         let s = String::from_utf16_lossy(std::slice::from_raw_parts(result.0, len));
         windows::Win32::System::Com::CoTaskMemFree(Some(result.0 as *const _));
         Some(s)
+    }
+}
+
+fn get_target_window() -> Option<HWND> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, FindWindowW, GetWindow, GW_HWNDNEXT, IsWindowVisible,
+        GetClassNameW, GetWindowTextW
+    };
+    use windows::core::PCWSTR;
+
+    unsafe {
+        let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
+        let launcher_hwnd = FindWindowW(PCWSTR(class.as_ptr()), PCWSTR::null());
+        let fg = GetForegroundWindow();
+
+        if fg != launcher_hwnd && !fg.0.is_null() {
+            Some(fg)
+        } else if !launcher_hwnd.0.is_null() {
+            let mut curr = GetWindow(launcher_hwnd, GW_HWNDNEXT);
+            while let Ok(c) = curr {
+                if c.0.is_null() { break; }
+                if IsWindowVisible(c).as_bool() {
+                    let mut class_buf = [0u16; 256];
+                    let class_len = GetClassNameW(c, &mut class_buf) as usize;
+                    let class_name = String::from_utf16_lossy(&class_buf[..class_len]);
+                    if class_name != "Shell_TrayWnd" && class_name != "Progman" && class_name != "opensearch-os" {
+                        let mut title_buf = [0u16; 256];
+                        let title_len = GetWindowTextW(c, &mut title_buf) as usize;
+                        if title_len > 0 {
+                            return Some(c);
+                        }
+                    }
+                }
+                curr = GetWindow(c, GW_HWNDNEXT);
+            }
+            None
+        } else {
+            None
+        }
+    }
+}
+
+fn handle_window_action(action: &str) {
+    let target_hwnd = match get_target_window() {
+        Some(h) => h,
+        None => return,
+    };
+
+    use windows::Win32::UI::WindowsAndMessaging::{
+        IsZoomed, ShowWindow, SetWindowPos, GetWindowRect, GetWindowLongPtrW,
+        SW_RESTORE, SW_MAXIMIZE, SWP_NOZORDER, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        HWND_TOPMOST, HWND_NOTOPMOST, GWL_EXSTYLE, WS_EX_TOPMOST
+    };
+    use windows::Win32::Graphics::Gdi::{
+        MonitorFromWindow, GetMonitorInfoW, MONITORINFO, MONITOR_DEFAULTTONEAREST
+    };
+    use windows::Win32::Foundation::RECT;
+
+    unsafe {
+        // Restore if maximized, unless we are maximizing or toggling topmost
+        if action != "maximize" && action != "toggle_always_on_top" {
+            if IsZoomed(target_hwnd).as_bool() {
+                let _ = ShowWindow(target_hwnd, SW_RESTORE);
+            }
+        }
+
+        if action == "maximize" {
+            let _ = ShowWindow(target_hwnd, SW_MAXIMIZE);
+            return;
+        }
+
+        if action == "toggle_always_on_top" {
+            let ex_style = GetWindowLongPtrW(target_hwnd, GWL_EXSTYLE) as u32;
+            let is_topmost = (ex_style & WS_EX_TOPMOST.0) != 0;
+            let z_order = if is_topmost { HWND_NOTOPMOST } else { HWND_TOPMOST };
+            let _ = SetWindowPos(
+                target_hwnd,
+                z_order,
+                0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
+            return;
+        }
+
+        // Get monitor info
+        let monitor = MonitorFromWindow(target_hwnd, MONITOR_DEFAULTTONEAREST);
+        if monitor.0.is_null() { return; }
+        let mut info = MONITORINFO::default();
+        info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+        if !GetMonitorInfoW(monitor, &mut info).as_bool() { return; }
+
+        let work = info.rcWork;
+        let sw = work.right - work.left;
+        let sh = work.bottom - work.top;
+
+        let mut x = work.left;
+        let mut y = work.top;
+        let mut w = sw;
+        let mut h = sh;
+
+        match action {
+            "center" => {
+                let mut r = RECT::default();
+                if GetWindowRect(target_hwnd, &mut r).is_ok() {
+                    let cw = r.right - r.left;
+                    let ch = r.bottom - r.top;
+                    w = cw;
+                    h = ch;
+                    x = work.left + (sw - w) / 2;
+                    y = work.top + (sh - h) / 2;
+                } else {
+                    return;
+                }
+            }
+            "almost_maximize" => {
+                w = sw * 95 / 100;
+                h = sh * 95 / 100;
+                x = work.left + (sw - w) / 2;
+                y = work.top + (sh - h) / 2;
+            }
+            "reasonable_size" => {
+                w = sw * 70 / 100;
+                h = sh * 70 / 100;
+                x = work.left + (sw - w) / 2;
+                y = work.top + (sh - h) / 2;
+            }
+            "left_half" => {
+                w = sw / 2;
+                h = sh;
+                x = work.left;
+                y = work.top;
+            }
+            "right_half" => {
+                w = sw / 2;
+                h = sh;
+                x = work.left + sw / 2;
+                y = work.top;
+            }
+            "top_half" => {
+                w = sw;
+                h = sh / 2;
+                x = work.left;
+                y = work.top;
+            }
+            "bottom_half" => {
+                w = sw;
+                h = sh / 2;
+                x = work.left;
+                y = work.top + sh / 2;
+            }
+            "top_left_quarter" => {
+                w = sw / 2;
+                h = sh / 2;
+                x = work.left;
+                y = work.top;
+            }
+            "top_right_quarter" => {
+                w = sw / 2;
+                h = sh / 2;
+                x = work.left + sw / 2;
+                y = work.top;
+            }
+            "bottom_left_quarter" => {
+                w = sw / 2;
+                h = sh / 2;
+                x = work.left;
+                y = work.top + sh / 2;
+            }
+            "bottom_right_quarter" => {
+                w = sw / 2;
+                h = sh / 2;
+                x = work.left + sw / 2;
+                y = work.top + sh / 2;
+            }
+            "left_third" => {
+                w = sw / 3;
+                h = sh;
+                x = work.left;
+                y = work.top;
+            }
+            "center_third" => {
+                w = sw / 3;
+                h = sh;
+                x = work.left + sw / 3;
+                y = work.top;
+            }
+            "right_third" => {
+                w = sw / 3;
+                h = sh;
+                x = work.left + 2 * sw / 3;
+                y = work.top;
+            }
+            "left_two_thirds" => {
+                w = 2 * sw / 3;
+                h = sh;
+                x = work.left;
+                y = work.top;
+            }
+            "right_two_thirds" => {
+                w = 2 * sw / 3;
+                h = sh;
+                x = work.left + sw / 3;
+                y = work.top;
+            }
+            "make_larger" => {
+                let mut r = RECT::default();
+                if GetWindowRect(target_hwnd, &mut r).is_ok() {
+                    let cw = r.right - r.left;
+                    let ch = r.bottom - r.top;
+                    let cx = r.left + cw / 2;
+                    let cy = r.top + ch / 2;
+                    w = (cw as f32 * 1.1) as i32;
+                    h = (ch as f32 * 1.1) as i32;
+                    x = cx - w / 2;
+                    y = cy - h / 2;
+                } else {
+                    return;
+                }
+            }
+            "make_smaller" => {
+                let mut r = RECT::default();
+                if GetWindowRect(target_hwnd, &mut r).is_ok() {
+                    let cw = r.right - r.left;
+                    let ch = r.bottom - r.top;
+                    let cx = r.left + cw / 2;
+                    let cy = r.top + ch / 2;
+                    w = (cw as f32 * 0.9) as i32;
+                    h = (ch as f32 * 0.9) as i32;
+                    x = cx - w / 2;
+                    y = cy - h / 2;
+                } else {
+                    return;
+                }
+            }
+            _ => return,
+        }
+
+        let _ = SetWindowPos(
+            target_hwnd,
+            windows::Win32::Foundation::HWND::default(),
+            x, y, w, h,
+            SWP_NOZORDER | SWP_NOACTIVATE,
+        );
     }
 }
