@@ -133,6 +133,7 @@ struct State {
     color_picker_active: bool,
     color_picker_mx: i32,
     color_picker_my: i32,
+    prev_foreground: HWND,  // Window that had focus before launcher appeared (for snippet auto-paste)
 }
 
 #[derive(PartialEq)]
@@ -367,6 +368,7 @@ unsafe fn run() {
         color_picker_active: false,
         color_picker_mx: 0,
         color_picker_my: 0,
+        prev_foreground: HWND(null_mut()),
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
@@ -792,6 +794,10 @@ unsafe extern "system" fn wnd_proc(
                         let _ = SetTimer(hwnd, TIMER_VOICE_ANIM, 100, None); // repaint countdown
                         s.voice_exec_deadline =
                             Some(std::time::Instant::now() + std::time::Duration::from_millis(3500));
+                    }
+                    // Clear stale WINDOW icon cache when new window results arrive
+                    if s.results.iter().any(|r| r.entry.source == "WINDOW") {
+                        s.app_icons.retain(|k, _| !k.starts_with("window:"));
                     }
                     trigger_icon_loading(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
@@ -1775,6 +1781,8 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
     let start_p = if appearing { 0.0 } else { 1.0 };
 
     if appearing {
+        // Save the current foreground window so snippet auto-paste can restore focus to it
+        s.prev_foreground = GetForegroundWindow();
         s.query.clear();
         s.cursor_pos = 0;
         s.selected = 0;
@@ -2100,7 +2108,71 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 return;
             } else if let Some(content) = cmd.strip_prefix("copy_snippet:") {
                 copy_to_clipboard(hwnd, content);
+                let prev_hwnd = s.prev_foreground;
                 do_hide(hwnd, s);
+                // Auto-paste into the previously focused window (Raycast-style snippet behavior)
+                if !prev_hwnd.0.is_null() {
+                    // Brief delay to let the launcher hide animation settle before sending input
+                    std::thread::sleep(std::time::Duration::from_millis(80));
+                    // Restore focus to the previous window
+                    let _ = SetForegroundWindow(prev_hwnd);
+                    // Send Ctrl+V
+                    use windows::Win32::UI::Input::KeyboardAndMouse::{
+                        SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+                        VK_CONTROL, KEYEVENTF_KEYUP,
+                    };
+                    let inputs = [
+                        INPUT {
+                            r#type: INPUT_KEYBOARD,
+                            Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                                ki: KEYBDINPUT {
+                                    wVk: VK_CONTROL,
+                                    wScan: 0,
+                                    dwFlags: KEYBD_EVENT_FLAGS(0),
+                                    time: 0,
+                                    dwExtraInfo: 0,
+                                },
+                            },
+                        },
+                        INPUT {
+                            r#type: INPUT_KEYBOARD,
+                            Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                                ki: KEYBDINPUT {
+                                    wVk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(0x56), // 'V'
+                                    wScan: 0,
+                                    dwFlags: KEYBD_EVENT_FLAGS(0),
+                                    time: 0,
+                                    dwExtraInfo: 0,
+                                },
+                            },
+                        },
+                        INPUT {
+                            r#type: INPUT_KEYBOARD,
+                            Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                                ki: KEYBDINPUT {
+                                    wVk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY(0x56),
+                                    wScan: 0,
+                                    dwFlags: KEYEVENTF_KEYUP,
+                                    time: 0,
+                                    dwExtraInfo: 0,
+                                },
+                            },
+                        },
+                        INPUT {
+                            r#type: INPUT_KEYBOARD,
+                            Anonymous: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_0 {
+                                ki: KEYBDINPUT {
+                                    wVk: VK_CONTROL,
+                                    wScan: 0,
+                                    dwFlags: KEYEVENTF_KEYUP,
+                                    time: 0,
+                                    dwExtraInfo: 0,
+                                },
+                            },
+                        },
+                    ];
+                    let _ = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+                }
                 return;
             } else if let Some(url) = cmd.strip_prefix("open_quicklink:") {
                 let url_w = format!("{}\0", url).encode_utf16().collect::<Vec<u16>>();
@@ -2486,6 +2558,17 @@ unsafe fn trigger_icon_loading(_hwnd: HWND, s: &mut State) {
     let tx = s.icon_tx.as_ref().unwrap();
     for res in &s.results {
         let (source, key) = (res.entry.source.as_str(), res.entry.launch_command.clone());
+        // For WINDOW source: fetch icon synchronously on the UI thread (fast, only called once
+        // when results arrive — not on every paint frame) and cache it in app_icons.
+        if source == "WINDOW" && !s.app_icons.contains_key(&key) {
+            let hwnd_val = key.strip_prefix("window:")
+                .and_then(|h| h.parse::<isize>().ok())
+                .unwrap_or(0);
+            let win_hwnd = HWND(hwnd_val as *mut std::ffi::c_void);
+            let hicon = get_window_icon(win_hwnd);
+            s.app_icons.insert(key.clone(), hicon);
+            continue;
+        }
         // For FOLDER source: only load icon if it's a real filesystem path (not virtual folders like bookmarks:)
         let is_real_folder = source == "FOLDER" && !key.ends_with(':');
         // For PROJECT source: load folder icon if the launch_command is a real filesystem path
@@ -2786,21 +2869,13 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             }
 
             if !drawn_custom_thumbnail {
-                let mut is_win_icon = false;
-                let mut win_icon_h = HICON(std::ptr::null_mut());
-                
+                // For WINDOW source: icon was pre-fetched into app_icons on result arrival.
+                // For all other async-loaded sources, also use app_icons.
                 let icon_to_draw = if res.entry.source == "WINDOW" {
-                    let hwnd_val = res.entry.launch_command.strip_prefix("window:")
-                        .and_then(|h| h.parse::<isize>().ok())
-                        .unwrap_or(0);
-                    let win_hwnd = HWND(hwnd_val as *mut std::ffi::c_void);
-                    win_icon_h = get_window_icon(win_hwnd);
-                    if !win_icon_h.0.is_null() {
-                        is_win_icon = true;
-                        win_icon_h
-                    } else {
-                        s.icon_control_panel
-                    }
+                    s.app_icons.get(&res.entry.launch_command)
+                        .copied()
+                        .filter(|h| !h.0.is_null())
+                        .unwrap_or(s.icon_control_panel)
                 } else if res.entry.source == "app" || res.entry.source == "RECENT" || res.entry.source == "FILE" || res.entry.source == "CODE"
                     || (res.entry.source == "ACTION" && res.entry.launch_command.starts_with("kill:")) {
                     s.app_icons.get(&res.entry.launch_command)
@@ -2830,12 +2905,6 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 if !icon_to_draw.0.is_null() {
                     let icon_y = ry + (RESULT_H - 32) / 2;
                     let _ = unsafe { DrawIconEx(mdc, x + PAD_L, icon_y, icon_to_draw, 32, 32, 0, HBRUSH(null_mut()), DI_NORMAL) };
-                }
-                
-                if is_win_icon && !win_icon_h.0.is_null() {
-                    unsafe {
-                        let _ = windows::Win32::UI::WindowsAndMessaging::DestroyIcon(win_icon_h);
-                    }
                 }
             }
 
