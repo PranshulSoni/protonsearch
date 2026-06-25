@@ -3483,7 +3483,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         }
 
         let content_top = body_top + 48;
-        let footer_h = 30;
+        let footer_h = if s.ai_pending { 30 } else { 62 };
         let content_bottom = y + SEARCH_H + 1 + AI_PANEL_H - footer_h;
 
         let has_answer = s.ai_answer.is_some();
@@ -3626,15 +3626,46 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             let _ = RestoreDC(mdc, dc_state);
         }
 
-        // Footer hint (painted over any text overflow)
+        // Footer / chat input (painted over any text overflow)
         fill(mdc, x, content_bottom, w, footer_h + 4, BG);
         fill(mdc, x, content_bottom, w, 1, CLR_DIV);
-        SelectObject(mdc, s.font_b);
-        SetTextColor(mdc, CLR_GRAY);
-        let hint = if s.ai_pending { "Esc: cancel" } else { "Enter: copy    ·    Esc: close    ·    ↑ ↓ / scroll" };
-        let mut hint_w: Vec<u16> = hint.encode_utf16().collect();
-        let mut hint_rc = RECT { left: x + pad, top: content_bottom + 2, right: x + w - pad, bottom: content_bottom + footer_h };
-        let _ = DrawTextW(mdc, &mut hint_w, &mut hint_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        if s.ai_pending {
+            SelectObject(mdc, s.font_b);
+            SetTextColor(mdc, CLR_GRAY);
+            let mut hint_w: Vec<u16> = "Esc: cancel".encode_utf16().collect();
+            let mut hint_rc = RECT { left: x + pad, top: content_bottom + 2, right: x + w - pad, bottom: content_bottom + footer_h };
+            let _ = DrawTextW(mdc, &mut hint_w, &mut hint_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        } else {
+            let input_y = content_bottom + 8;
+            fill_rounded(mdc, x + pad, input_y, w - pad * 2, 34, 10, COLORREF(0x00_2B_29_28));
+            SelectObject(mdc, s.font_c);
+            let input_text = if s.query.trim().is_empty() {
+                SetTextColor(mdc, CLR_PH);
+                "Message this chat...".to_string()
+            } else {
+                SetTextColor(mdc, CLR_WHITE);
+                s.query.clone()
+            };
+            let mut input_w: Vec<u16> = input_text.encode_utf16().collect();
+            let mut input_rc = RECT {
+                left: x + pad + 12,
+                top: input_y,
+                right: x + w - pad - 118,
+                bottom: input_y + 34,
+            };
+            let _ = DrawTextW(mdc, &mut input_w, &mut input_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+            SelectObject(mdc, s.font_b);
+            SetTextColor(mdc, CLR_GRAY);
+            let mut hint_w: Vec<u16> = "Enter send".encode_utf16().collect();
+            let mut hint_rc = RECT {
+                left: x + w - pad - 104,
+                top: input_y,
+                right: x + w - pad - 12,
+                bottom: input_y + 34,
+            };
+            let _ = DrawTextW(mdc, &mut hint_w, &mut hint_rc, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        }
 
         SelectObject(mdc, s.font_q);
     }
