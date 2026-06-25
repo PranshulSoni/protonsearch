@@ -150,6 +150,9 @@ struct IconRequest {
 
 impl State {
     fn win_h(&self) -> i32 {
+        if self.form_state != FormState::None {
+            return SEARCH_H + 24;
+        }
         let n = self.results.len().min(VISIBLE_RESULTS) as i32;
         let base_h = if n == 0 { SEARCH_H } else { SEARCH_H + 1 + n * RESULT_H };
         if self.query.starts_with("clip:") || self.query.starts_with("clipboard:") {
