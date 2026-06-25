@@ -1645,6 +1645,143 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         let q = query.trim();
         let q_lower_trimmed = q.to_lowercase();
         
+        // ── Phase 3: System Toggles & Audio Controls ─────────────────────────
+        if q_lower_trimmed.starts_with("volume ") || q_lower_trimmed.starts_with("vol ") {
+            let num_str = if q_lower_trimmed.starts_with("volume ") {
+                q_lower_trimmed.strip_prefix("volume ").unwrap().trim()
+            } else {
+                q_lower_trimmed.strip_prefix("vol ").unwrap().trim()
+            };
+            if let Ok(pct) = num_str.parse::<u32>() {
+                if pct <= 100 {
+                    return vec![SearchResult {
+                        entry: CatalogEntry {
+                            id: format!("action.volume.{}", pct),
+                            control_name: format!("Set Master Volume to {}%", pct),
+                            breadcrumb_path: "System > Audio > Set master volume".to_string(),
+                            launch_command: format!("action:volume:{}", pct),
+                            source: "ACTION".to_string(),
+                            description: format!("Set system volume level to {} percent.", pct),
+                            synonyms: format!("volume vol volume{} vol{}", pct, pct),
+                        },
+                        score: 11.5,
+                    }];
+                }
+            }
+        }
+        if q_lower_trimmed == "mute" {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.audio.mute".to_string(),
+                    control_name: "Mute Audio".to_string(),
+                    breadcrumb_path: "System > Audio > Mute sound output".to_string(),
+                    launch_command: "action:mute".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Mute master sound session.".to_string(),
+                    synonyms: "mute volume vol audio silence quiet".to_string(),
+                },
+                score: 11.5,
+            }];
+        }
+        if q_lower_trimmed == "unmute" {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.audio.unmute".to_string(),
+                    control_name: "Unmute Audio".to_string(),
+                    breadcrumb_path: "System > Audio > Unmute sound output".to_string(),
+                    launch_command: "action:unmute".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Restore master sound session volume.".to_string(),
+                    synonyms: "unmute volume vol audio sound speak loud".to_string(),
+                },
+                score: 11.5,
+            }];
+        }
+        if q_lower_trimmed == "toggle hidden files" || q_lower_trimmed == "show hidden files" || q_lower_trimmed == "hide hidden files" || q_lower_trimmed == "hidden files" {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.explorer.hidden_files".to_string(),
+                    control_name: "Toggle Hidden Files".to_string(),
+                    breadcrumb_path: "System > Explorer > Show or hide hidden files".to_string(),
+                    launch_command: "action:toggle_hidden_files".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Toggle visibility of hidden files and folders in Windows Explorer.".to_string(),
+                    synonyms: "hidden files folders show hidden toggle registry explorer".to_string(),
+                },
+                score: 11.5,
+            }];
+        }
+        if q_lower_trimmed == "play" || q_lower_trimmed == "pause" || q_lower_trimmed == "play/pause" || q_lower_trimmed == "play pause" {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.media.play_pause".to_string(),
+                    control_name: "Play/Pause Media".to_string(),
+                    breadcrumb_path: "System > Media > Media playback control".to_string(),
+                    launch_command: "action:media:play_pause".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Toggle playback state of media players.".to_string(),
+                    synonyms: "play pause music video media track toggle".to_string(),
+                },
+                score: 11.5,
+            }];
+        }
+        if q_lower_trimmed == "next" || q_lower_trimmed == "next track" || q_lower_trimmed == "skip track" {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.media.next".to_string(),
+                    control_name: "Next Track".to_string(),
+                    breadcrumb_path: "System > Media > Media playback control".to_string(),
+                    launch_command: "action:media:next".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Skip to the next media track.".to_string(),
+                    synonyms: "next track skip song music media forward".to_string(),
+                },
+                score: 11.5,
+            }];
+        }
+        if q_lower_trimmed == "prev" || q_lower_trimmed == "previous" || q_lower_trimmed == "prev track" || q_lower_trimmed == "previous track" {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.media.prev".to_string(),
+                    control_name: "Previous Track".to_string(),
+                    breadcrumb_path: "System > Media > Media playback control".to_string(),
+                    launch_command: "action:media:prev".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Return to the previous media track.".to_string(),
+                    synonyms: "prev previous track song music media backward rewind".to_string(),
+                },
+                score: 11.5,
+            }];
+        }
+        if q_lower_trimmed == "stop" || q_lower_trimmed == "stop track" || q_lower_trimmed == "stop music" {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.media.stop".to_string(),
+                    control_name: "Stop Playback".to_string(),
+                    breadcrumb_path: "System > Media > Media playback control".to_string(),
+                    launch_command: "action:media:stop".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Stop media playback.".to_string(),
+                    synonyms: "stop track song music media halt".to_string(),
+                },
+                score: 11.5,
+            }];
+        }
+        if q_lower_trimmed == "night light" || q_lower_trimmed == "nightlight" || q_lower_trimmed == "toggle night light" {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.display.night_light".to_string(),
+                    control_name: "Night Light Settings".to_string(),
+                    breadcrumb_path: "System > Display > Night Light settings".to_string(),
+                    launch_command: "ms-settings:nightlight".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Open the display settings page to toggle or adjust Night Light.".to_string(),
+                    synonyms: "night light settings display blue reduction color screen temp warmth".to_string(),
+                },
+                score: 11.5,
+            }];
+        }
+        
         // Intercept temporal context queries (e.g. yesterday before lunch)
         if let Some((start_time, end_time, clean_q)) = parse_time_range(q) {
             return self.search_timeline(start_time, end_time, &clean_q);
