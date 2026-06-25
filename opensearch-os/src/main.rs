@@ -2355,9 +2355,10 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                             "CREATE TABLE IF NOT EXISTS ai_settings (key TEXT PRIMARY KEY, value TEXT);",
                             [],
                         );
+                        let db_key = if k == "key" { "api_key" } else { k };
                         let _ = conn.execute(
                             "INSERT OR REPLACE INTO ai_settings (key, value) VALUES (?, ?);",
-                            rusqlite::params![k, v],
+                            rusqlite::params![db_key, v],
                         );
                     }
                     s.query = format!("AI {} Saved!", k.to_uppercase());
