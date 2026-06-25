@@ -133,7 +133,7 @@ pub fn launch(cmd: &str) {
     if cmd.starts_with("http://") || cmd.starts_with("https://") || cmd_lower.ends_with(".lnk") || std::path::Path::new(cmd).exists() {
         let cmd_wide: Vec<u16> = cmd.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
-            ShellExecuteW(
+            let res = ShellExecuteW(
                 HWND::default(),
                 w!("open"),
                 PCWSTR(cmd_wide.as_ptr()),
@@ -141,6 +141,22 @@ pub fn launch(cmd: &str) {
                 PCWSTR::null(),
                 SW_SHOWNORMAL,
             );
+            let hinstance = res.0 as isize;
+            if hinstance <= 32 {
+                let res_openas = ShellExecuteW(
+                    HWND::default(),
+                    w!("openas"),
+                    PCWSTR(cmd_wide.as_ptr()),
+                    PCWSTR::null(),
+                    PCWSTR::null(),
+                    SW_SHOWNORMAL,
+                );
+                if res_openas.0 as isize <= 32 {
+                    let _ = Command::new("notepad.exe")
+                        .arg(cmd)
+                        .spawn();
+                }
+            }
         }
         return;
     }
