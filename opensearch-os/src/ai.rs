@@ -326,32 +326,8 @@ fn fallback_config_from_key(key: &str) -> Option<AiConfig> {
     })
 }
 
-/// Decide where agentic work (`@Hermes:`) is routed.
-///
-/// - If the local Hermes gateway is up (or, later, once Hermes is embedded in
-///   the installer), send the request there so it can actually execute
-///   commands and control the PC.
-/// - Otherwise, fall back to the same DeepSeek / OpenCode Zen config the rest
-///   of the app uses (deepseek-v4-flash-free with the user's key), so `@Hermes:`
-///   keeps working today — it just reasons about the task instead of running
-///   it locally. The moment a gateway appears, requests switch back
-///   automatically.
 fn get_agent_config() -> AiConfig {
-    if HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
-        get_hermes_config()
-    } else if let Ok(cfg) = get_config() {
-        if cfg.model == "hermes-agent" {
-            // ponytail: Hermes preset stores a local sentinel; when the gateway
-            // is down, only a real external key can fall back to OpenCode/DeepSeek.
-            fallback_config_from_key(&cfg.api_key).unwrap_or_else(get_hermes_config)
-        } else {
-            cfg
-        }
-    } else {
-        // No key resolved either — still aim at the gateway so the error is
-        // explicit ("install/start Hermes") instead of a confusing auth failure.
-        get_hermes_config()
-    }
+    get_hermes_config()
 }
 
 /// Human-readable label for errors, based on which backend the request hit.
@@ -361,19 +337,12 @@ fn agent_label(cfg: &AiConfig) -> &'static str {
 
 pub fn complete_agent(system: &str, user: &str) -> Result<String> {
     let cfg = get_agent_config();
-    // Branch 3 of get_agent_config(): gateway is down AND no DeepSeek/OpenCode key
-    // is configured. Instead of firing the request at a dead port and surfacing a
-    // raw OS "connection refused", fail fast with an actionable message.
-    if cfg.model == "hermes-agent"
-        && !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed)
-    {
+    if !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
         return Err(anyhow!(
-            "Hermes gateway isn't running and no OpenCode Zen / DeepSeek key is set to fall back on. \
-             To run tasks on this PC: type 'hermes' and start the gateway. \
-             To use the free DeepSeek model for now: type 'ai config key <your-opencode-zen-key>'."
+            "Hermes gateway is not running. To execute tasks on this PC, please start the Hermes gateway (type 'hermes' in the search bar and click 'Start Hermes Gateway')."
         ));
     }
-    let timeout_secs = if cfg.model == "hermes-agent" { 300 } else { 60 };
+    let timeout_secs = 300;
     let body = serde_json::json!({
         "model": cfg.model,
         "messages": [
@@ -406,18 +375,12 @@ pub fn complete_agent(system: &str, user: &str) -> Result<String> {
 
 pub fn complete_chat_agent(system: &str, prev_user: &str, prev_assistant: &str, user: &str) -> Result<String> {
     let cfg = get_agent_config();
-    // Same guard as complete_agent: avoid a raw connection-refused when the
-    // gateway is down and no key is available to fall back on.
-    if cfg.model == "hermes-agent"
-        && !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed)
-    {
+    if !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
         return Err(anyhow!(
-            "Hermes gateway isn't running and no OpenCode Zen / DeepSeek key is set to fall back on. \
-             To run tasks on this PC: type 'hermes' and start the gateway. \
-             To use the free DeepSeek model for now: type 'ai config key <your-opencode-zen-key>'."
+            "Hermes gateway is not running. To execute tasks on this PC, please start the Hermes gateway (type 'hermes' in the search bar and click 'Start Hermes Gateway')."
         ));
     }
-    let timeout_secs = if cfg.model == "hermes-agent" { 300 } else { 60 };
+    let timeout_secs = 300;
     let body = serde_json::json!({
         "model": cfg.model,
         "messages": [
