@@ -221,7 +221,45 @@ pub fn complete(system: &str, user: &str) -> Result<String> {
     let resp = ureq::post(&cfg.endpoint)
         .set("Authorization", &format!("Bearer {}", cfg.api_key))
         .set("Content-Type", "application/json")
-        .timeout(std::time::Duration::from_secs(60))
+        .timeout(std::time::Duration::from_secs(30))
+        .send_json(body);
+
+    let resp = match resp {
+        Ok(r) => r,
+        Err(ureq::Error::Status(code, r)) => {
+            let msg = r.into_string().unwrap_or_default();
+            return Err(anyhow!("AI error {code}: {}", msg.chars().take(300).collect::<String>()));
+        }
+        Err(e) => return Err(anyhow!("AI request failed: {e}")),
+    };
+
+    let v: serde_json::Value = resp.into_json().map_err(|e| anyhow!("bad AI response: {e}"))?;
+    let text = v["choices"][0]["message"]["content"]
+        .as_str()
+        .ok_or_else(|| anyhow!("AI response had no content"))?;
+    Ok(text.trim().to_string())
+}
+
+/// Multi-turn chat completion. Passes conversation history to the API.
+pub fn complete_chat(system: &str, prev_user: &str, prev_assistant: &str, user: &str) -> Result<String> {
+    let cfg = get_config()?;
+
+    let body = serde_json::json!({
+        "model": cfg.model,
+        "messages": [
+            { "role": "system", "content": system },
+            { "role": "user", "content": prev_user },
+            { "role": "assistant", "content": prev_assistant },
+            { "role": "user", "content": user }
+        ],
+        "stream": false,
+        "temperature": 0.3,
+    });
+
+    let resp = ureq::post(&cfg.endpoint)
+        .set("Authorization", &format!("Bearer {}", cfg.api_key))
+        .set("Content-Type", "application/json")
+        .timeout(std::time::Duration::from_secs(30))
         .send_json(body);
 
     let resp = match resp {
