@@ -390,6 +390,18 @@ unsafe fn run() {
         active_chat_id: None,
     });
 
+    // Spawn background Hermes gateway status checker
+    std::thread::spawn(|| {
+        loop {
+            let running = std::net::TcpStream::connect_timeout(
+                &"127.0.0.1:8642".parse().unwrap(),
+                std::time::Duration::from_millis(500)
+            ).is_ok();
+            ai::HERMES_GATEWAY_RUNNING.store(running, std::sync::atomic::Ordering::Relaxed);
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+    });
+
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
     let wc = WNDCLASSEXW {
         cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
@@ -2568,6 +2580,12 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                                 let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('endpoint', 'https://api.deepseek.com/chat/completions');", []);
                                 let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('model', 'deepseek-chat');", []);
                                 s.query = "AI Configured for DeepSeek!".to_string();
+                            } else if v == "hermes" {
+                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('endpoint', 'http://127.0.0.1:8642/v1/chat/completions');", []);
+                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('model', 'hermes-agent');", []);
+                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('api_key', 'hermes');", []);
+                                create_agent(&db_path, "Hermes", "Execute commands and run autonomous tasks on this Windows PC");
+                                s.query = "@Hermes: ".to_string();
                             }
                         } else {
                             let db_key = if k == "key" { "api_key" } else { k };
@@ -2578,6 +2596,61 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                             s.query = format!("AI {} Saved!", k.to_uppercase());
                         }
                     }
+                }
+                s.cursor_pos = s.query.len();
+                s.results.clear();
+                s.selected = 0;
+                let _ = InvalidateRect(hwnd, None, FALSE);
+                return;
+            } else if let Some(hermes_action) = cmd.strip_prefix("action:hermes:") {
+                if hermes_action == "start" {
+                    std::thread::spawn(move || {
+                        let hermes_cmd = if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
+                            let path = std::path::Path::new(&localappdata).join("hermes").join("bin").join("hermes.cmd");
+                            if path.exists() {
+                                path.to_string_lossy().to_string()
+                            } else {
+                                "hermes".to_string()
+                            }
+                        } else {
+                            "hermes".to_string()
+                        };
+
+                        if let Ok(appdata) = std::env::var("APPDATA") {
+                            let log_dir = std::path::Path::new(&appdata).join("opensearch-os");
+                            let _ = std::fs::create_dir_all(&log_dir);
+                            let log_file = log_dir.join("hermes_gateway.log");
+                            if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(log_file) {
+                                let _ = std::process::Command::new("cmd")
+                                    .args(["/c", &format!("\"{}\" gateway", hermes_cmd)])
+                                    .stdout(file.try_clone().unwrap())
+                                    .stderr(file)
+                                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                                    .spawn();
+                            }
+                        } else {
+                            let _ = std::process::Command::new("cmd")
+                                .args(["/c", &format!("\"{}\" gateway", hermes_cmd)])
+                                .creation_flags(0x08000000)
+                                .spawn();
+                        }
+                    });
+                    s.query = "Starting Hermes Gateway...".to_string();
+                } else if hermes_action == "stop" {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/F", "/IM", "hermes.exe"])
+                        .creation_flags(0x08000000)
+                        .spawn();
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/F", "/IM", "uv.exe"])
+                        .creation_flags(0x08000000)
+                        .spawn();
+                    s.query = "Stopped Hermes Gateway!".to_string();
+                } else if hermes_action == "install" {
+                    let _ = std::process::Command::new("powershell")
+                        .args(["-NoExit", "-Command", "iex (irm https://hermes-agent.nousresearch.com/install.ps1)"])
+                        .spawn();
+                    s.query = "Installing Hermes Agent...".to_string();
                 }
                 s.cursor_pos = s.query.len();
                 s.results.clear();
