@@ -4205,6 +4205,13 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         launch_command: "ms-settings:nightlight",
         description: "Open the Display settings page to toggle or configure Night Light.",
     },
+    QuickAction {
+        triggers: &["color picker", "colorpicker", "picker", "hex picker", "eye dropper", "eyedropper", "pick color"],
+        name: "Color Picker",
+        breadcrumb: "System > GDI > Capture screen pixel color",
+        launch_command: "action:color_picker",
+        description: "Launch full-screen pixel color picker to copy Hex colors to clipboard.",
+    },
 ];
 
 
