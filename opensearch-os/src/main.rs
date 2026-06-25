@@ -685,6 +685,22 @@ unsafe extern "system" fn wnd_proc(
             LRESULT(0)
         }
 
+        WM_ACTIVATEAPP | WM_ACTIVATE => {
+            if !sp.is_null() {
+                let s = &mut *sp;
+                let app_inactive = msg == WM_ACTIVATEAPP && wp.0 == 0;
+                let window_inactive = msg == WM_ACTIVATE && (wp.0 & 0xffff) == 0;
+                if (app_inactive || window_inactive)
+                    && !s.voice_triggered
+                    && !s.voice_pending_exec
+                    && !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. })
+                {
+                    start_hide(hwnd, s);
+                }
+            }
+            LRESULT(0)
+        }
+
         WM_ICON_LOADED => {
             if sp.is_null() {
                 unsafe {
