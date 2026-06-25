@@ -357,7 +357,7 @@ fn handle_action(action: &str) {
     }
 }
 
-fn get_known_folder_path(folder_id: &windows::core::GUID) -> Option<String> {
+pub fn get_known_folder_path(folder_id: &windows::core::GUID) -> Option<String> {
     unsafe {
         use windows::Win32::UI::Shell::{SHGetKnownFolderPath, KF_FLAG_DEFAULT};
         use windows::Win32::Foundation::HANDLE;
