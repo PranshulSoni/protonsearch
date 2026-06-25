@@ -80,17 +80,15 @@ fn dictation_worker(h: HwndPtr, rx: std::sync::mpsc::Receiver<()>) {
         );
     }
 
-    // Build + compile up front so the first press is instant.
-    let mut recognizer = build_recognizer();
-    log_voice(format!("worker: pre-warmed (ready={})", recognizer.is_some()));
+    // We do NOT pre-warm at startup to prevent system-wide cursor flickering in the background.
+    // Instead, the recognizer is built on-demand when triggered and dropped immediately after.
 
     while rx.recv().is_ok() {
         // Collapse any double-press into one dictation.
         while rx.try_recv().is_ok() {}
 
-        if recognizer.is_none() {
-            recognizer = build_recognizer();
-        }
+        log_voice("query: building dictation recognizer on-demand".into());
+        let mut recognizer = build_recognizer();
 
         let mut text = None;
         for attempt in 1..=QUERY_ATTEMPTS {
@@ -106,11 +104,9 @@ fn dictation_worker(h: HwndPtr, rx: std::sync::mpsc::Receiver<()>) {
             }
         }
 
-        // A hard failure can wedge the recognizer; drop it so the next trigger
-        // rebuilds a fresh (still pre-warmed) one.
-        if text.is_none() {
-            recognizer = None;
-        }
+        // Drop the recognizer immediately to release system speech services
+        // and prevent cursor flickering/blink issues.
+        drop(recognizer);
 
         post_query(h, text);
     }
