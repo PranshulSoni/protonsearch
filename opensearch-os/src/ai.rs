@@ -339,6 +339,26 @@ pub fn get_hermes_executable() -> String {
 pub fn start_hermes_gateway_daemon() {
     let hermes_cmd = get_hermes_executable();
 
+    // Auto-configure the API server settings
+    if hermes_cmd != "hermes" {
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "platforms.api_server.enabled", "true"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .status();
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "platforms.api_server.extra.host", "127.0.0.1"])
+            .creation_flags(0x08000000)
+            .status();
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "platforms.api_server.extra.port", "8642"])
+            .creation_flags(0x08000000)
+            .status();
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "platforms.api_server.extra.key", "hermes"])
+            .creation_flags(0x08000000)
+            .status();
+    }
+
     if let Ok(appdata) = std::env::var("APPDATA") {
         let log_dir = std::path::Path::new(&appdata).join("opensearch-os");
         let _ = std::fs::create_dir_all(&log_dir);
