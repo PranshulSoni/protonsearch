@@ -2129,7 +2129,7 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     s.anim = Anim::Hidden;
 }
 
-fn store_ai_chat(db_path: &std::path::Path, command: &str, title: &str, prompt: &str, response: &str) {
+fn store_ai_chat(db_path: &std::path::Path, command: &str, title: &str, prompt: &str, response: &str) -> Option<i64> {
     if let Ok(conn) = rusqlite::Connection::open(db_path) {
         let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
         let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
@@ -2147,12 +2147,15 @@ fn store_ai_chat(db_path: &std::path::Path, command: &str, title: &str, prompt: 
             "INSERT INTO ai_chats (ts, command, title, prompt, response) VALUES (?,?,?,?,?);",
             rusqlite::params![now, command, title, prompt, response],
         );
+        let id = conn.last_insert_rowid();
         // Keep only the most recent 200 chats.
         let _ = conn.execute(
             "DELETE FROM ai_chats WHERE id NOT IN (SELECT id FROM ai_chats ORDER BY ts DESC LIMIT 200);",
             [],
         );
+        return Some(id);
     }
+    None
 }
 
 fn create_agent(db_path: &std::path::Path, name: &str, goal: &str) {
