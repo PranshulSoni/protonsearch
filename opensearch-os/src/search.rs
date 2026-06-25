@@ -1328,38 +1328,80 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         results
     }
 
+fn format_relative_time(ts: i64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let diff = now - ts;
+    if diff < 0 {
+        "Just now".to_string()
+    } else if diff < 60 {
+        format!("{}s ago", diff)
+    } else if diff < 3600 {
+        format!("{}m ago", diff / 60)
+    } else if diff < 86400 {
+        format!("{}h ago", diff / 3600)
+    } else {
+        format!("{}d ago", diff / 86400)
+    }
+}
+
     /// chats: prefix — browse stored AI chat history (newest first).
     pub fn search_ai_chats(&self, query: &str) -> Vec<SearchResult> {
         let conn = &self.conn;
         let q = query.trim().to_lowercase();
         let mut results = Vec::new();
         let sql = if q.is_empty() {
-            "SELECT id, title, response FROM ai_chats ORDER BY ts DESC LIMIT 50".to_string()
+            "SELECT id, title, prompt, response, ts, command FROM ai_chats ORDER BY ts DESC LIMIT 50".to_string()
         } else {
-            "SELECT id, title, response FROM ai_chats \
+            "SELECT id, title, prompt, response, ts, command FROM ai_chats \
              WHERE lower(title) LIKE ?1 OR lower(prompt) LIKE ?1 OR lower(response) LIKE ?1 \
              ORDER BY ts DESC LIMIT 50".to_string()
         };
         let mut stmt = match conn.prepare(&sql) { Ok(s) => s, Err(_) => return results };
         let like = format!("%{}%", q);
-        let map = |row: &rusqlite::Row| -> rusqlite::Result<(i64, String, String)> {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        let map = |row: &rusqlite::Row| -> rusqlite::Result<(i64, String, String, String, i64, String)> {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?))
         };
         let rows = if q.is_empty() { stmt.query_map([], map) } else { stmt.query_map([&like], map) };
         let rows = match rows { Ok(r) => r, Err(_) => return results };
         let mut score = 100.0f32;
         for row in rows.filter_map(|r| r.ok()) {
-            let (id, title, response) = row;
-            let snippet: String = response.replace('\n', " ").replace('\r', " ")
-                .split_whitespace().collect::<Vec<&str>>().join(" ").chars().take(80).collect();
+            let (id, title, prompt, response, ts, command) = row;
+
+            let clean_prompt = prompt.replace('\n', " ").replace('\r', " ");
+            let clean_prompt = clean_prompt.split_whitespace().collect::<Vec<&str>>().join(" ");
+            let prompt_display = if clean_prompt.len() > 65 {
+                format!("{}...", clean_prompt.chars().take(65).collect::<String>())
+            } else if clean_prompt.is_empty() {
+                if title.is_empty() { "Untitled Chat".to_string() } else { title }
+            } else {
+                clean_prompt
+            };
+
+            let clean_response = response.replace('\n', " ").replace('\r', " ");
+            let clean_response = clean_response.split_whitespace().collect::<Vec<&str>>().join(" ");
+            let response_snippet = if clean_response.len() > 80 {
+                format!("{}...", clean_response.chars().take(80).collect::<String>())
+            } else if clean_response.is_empty() {
+                "(Thinking or empty response)".to_string()
+            } else {
+                clean_response
+            };
+
+            let cmd_upper = command.to_uppercase();
+            let breadcrumb = format!("AI Chat [{}] > {}", cmd_upper, response_snippet);
+            let time_str = format_relative_time(ts);
+
             results.push(SearchResult {
                 entry: CatalogEntry {
                     id: format!("aichat.{}", id),
-                    control_name: if title.is_empty() { "AI Chat".to_string() } else { title },
-                    breadcrumb_path: format!("AI Chat > {}", snippet),
+                    control_name: prompt_display,
+                    breadcrumb_path: breadcrumb,
                     launch_command: format!("aichat:{}", id),
                     source: "AI".to_string(),
-                    description: "Stored AI chat — Enter to reopen".to_string(),
+                    description: format!("{} | Enter to select & continue talking", time_str),
                     synonyms: "ai chat history conversation".to_string(),
                 },
                 score,
