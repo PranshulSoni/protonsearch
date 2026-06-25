@@ -2332,7 +2332,42 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             });
             return;
         } else {
-            if let Some(text) = cmd.strip_prefix("copy:") {
+            if let Some(new_query) = cmd.strip_prefix("query:") {
+                s.query = new_query.to_string();
+                s.cursor_pos = s.query.len();
+                s.selected = 0;
+                s.scroll_offset = 0;
+                s.text_selected = false;
+                reset_cursor_blink(hwnd, s);
+                trigger_search(hwnd, s);
+                let _ = InvalidateRect(hwnd, None, FALSE);
+                return;
+            } else if let Some(config_action) = cmd.strip_prefix("action:ai_config:") {
+                let db_path = s.db_path.clone();
+                if config_action == "reset" {
+                    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                        let _ = conn.execute("DELETE FROM ai_settings", []);
+                    }
+                    s.query = "AI Config Reset!".to_string();
+                } else if let Some((k, v)) = config_action.split_once(':') {
+                    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                        let _ = conn.execute(
+                            "CREATE TABLE IF NOT EXISTS ai_settings (key TEXT PRIMARY KEY, value TEXT);",
+                            [],
+                        );
+                        let _ = conn.execute(
+                            "INSERT OR REPLACE INTO ai_settings (key, value) VALUES (?, ?);",
+                            rusqlite::params![k, v],
+                        );
+                    }
+                    s.query = format!("AI {} Saved!", k.to_uppercase());
+                }
+                s.cursor_pos = s.query.len();
+                s.results.clear();
+                s.selected = 0;
+                let _ = InvalidateRect(hwnd, None, FALSE);
+                return;
+            } else if let Some(text) = cmd.strip_prefix("copy:") {
                 copy_to_clipboard(hwnd, text);
             } else if let Some(path) = cmd.strip_prefix("copy_image:") {
                 copy_image_to_clipboard(hwnd, path);
