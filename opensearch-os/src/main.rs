@@ -43,6 +43,7 @@ const TIMER_DEBOUNCE: usize = 1;
 const TIMER_CURSOR_BLINK: usize = 2;
 const TIMER_VOICE_AUTOEXEC: usize = 3;
 const TIMER_VOICE_ANIM: usize = 4;
+const TIMER_AI_ANIM: usize = 5;
 const CURSOR_BLINK_MS: u32 = 530;
 const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
@@ -145,6 +146,7 @@ struct State {
     ai_answer: Option<String>,   // the response text to render
     ai_title: String,            // command label shown above the answer
     ai_scroll: i32,              // vertical pixel scroll offset in the answer panel
+    ai_tick: u32,                 // lightweight activity indicator while AI is running
     active_chat_id: Option<i64>, // persistent chat thread ID in ai_chats table
 }
 
@@ -388,6 +390,7 @@ unsafe fn run() {
         ai_answer: None,
         ai_title: String::new(),
         ai_scroll: 0,
+        ai_tick: 0,
         active_chat_id: None,
     });
 
@@ -867,7 +870,9 @@ unsafe extern "system" fn wnd_proc(
             if !sp.is_null() {
                 let s = &mut *sp;
                 let (ok, text) = payload;
+                let _ = KillTimer(hwnd, TIMER_AI_ANIM);
                 s.ai_pending = false;
+                s.ai_tick = 0;
                 s.ai_scroll = 0;
                 s.ai_answer = Some(if ok { text } else { format!("⚠ {}", text) });
                 let _ = InvalidateRect(hwnd, None, FALSE);
@@ -927,6 +932,10 @@ unsafe extern "system" fn wnd_proc(
                 }
                 TIMER_VOICE_ANIM => {
                     s.voice_dot_tick = (s.voice_dot_tick + 1) % 100;
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+                TIMER_AI_ANIM => {
+                    s.ai_tick = (s.ai_tick + 1) % 60;
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
                 TIMER_VOICE_AUTOEXEC => {
@@ -2322,13 +2331,13 @@ fn configure_hermes_llm(endpoint: &str, model: &str, api_key: &str) {
 }
 
 fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
-    s.ai_pending = true;
+    start_ai_activity(hwnd, s);
     let prev_ans = s.ai_answer.clone().unwrap_or_default();
     let new_prompt_str = follow_up.clone();
     if !prev_ans.is_empty() {
-        s.ai_answer = Some(format!("{}\n\n---\n\nUser: {}\n\nThinking...", prev_ans, new_prompt_str));
+        s.ai_answer = Some(format!("{}\n\n---\n\nUser: {}\n\nExecuting...", prev_ans, new_prompt_str));
     } else {
-        s.ai_answer = Some(format!("User: {}\n\nThinking...", new_prompt_str));
+        s.ai_answer = Some(format!("User: {}\n\nExecuting...", new_prompt_str));
     }
     s.ai_scroll = 0;
     s.results.clear();
@@ -2427,11 +2436,22 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
     });
 }
 
+fn start_ai_activity(hwnd: HWND, s: &mut State) {
+    s.ai_pending = true;
+    s.ai_tick = 0;
+    unsafe {
+        let _ = KillTimer(hwnd, TIMER_AI_ANIM);
+        let _ = SetTimer(hwnd, TIMER_AI_ANIM, 180, None);
+    }
+}
+
 unsafe fn close_ai_panel(hwnd: HWND, s: &mut State) {
+    let _ = KillTimer(hwnd, TIMER_AI_ANIM);
     s.ai_pending = false;
     s.ai_answer = None;
     s.ai_title.clear();
     s.ai_scroll = 0;
+    s.ai_tick = 0;
     trigger_search(hwnd, s); // restore normal results for the current query
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
@@ -2466,8 +2486,8 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             if input.len() > 30000 {
                 input = input.chars().take(30000).collect::<String>() + "\n\n[Truncated for length...]";
             }
-            s.ai_pending = true;
-            s.ai_answer = Some(format!("User: {}\n\nThinking...", input));
+            start_ai_activity(hwnd, s);
+            s.ai_answer = Some(format!("User: {}\n\nExecuting...", input));
             s.ai_scroll = 0;
             s.ai_title = ctrl_name;
             s.results.clear();
@@ -2576,8 +2596,8 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             if sys.is_empty() || msg.is_empty() {
                 return;
             }
-            s.ai_pending = true;
-            s.ai_answer = Some(format!("User: {}\n\nThinking...", msg));
+            start_ai_activity(hwnd, s);
+            s.ai_answer = Some(format!("User: {}\n\nExecuting...", msg));
             s.ai_scroll = 0;
             s.ai_title = format!("@{}: {}", aname, msg);
             s.results.clear();
@@ -3487,8 +3507,29 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         SelectObject(mdc, s.font_n);
         SetTextColor(mdc, CLR_WHITE);
         let mut title: Vec<u16> = s.ai_title.encode_utf16().collect();
-        let mut title_rc = RECT { left: x + pad, top: body_top + 12, right: x + w - pad, bottom: body_top + 42 };
+        let mut title_rc = RECT { left: x + pad, top: body_top + 12, right: x + w - pad - 116, bottom: body_top + 42 };
         let _ = DrawTextW(mdc, &mut title, &mut title_rc, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+        if s.ai_pending {
+            let dots = match s.ai_tick % 4 {
+                0 => "",
+                1 => ".",
+                2 => "..",
+                _ => "...",
+            };
+            fill_rounded(mdc, x + w - pad - 104, body_top + 11, 104, 24, 10, COLORREF(0x00_34_3C_32));
+            SelectObject(mdc, s.font_b);
+            SetTextColor(mdc, COLORREF(0x00_B8_D6_B4));
+            let mut status: Vec<u16> = format!("Executing{}", dots).encode_utf16().collect();
+            let mut status_rc = RECT {
+                left: x + w - pad - 96,
+                top: body_top + 11,
+                right: x + w - pad - 8,
+                bottom: body_top + 35,
+            };
+            let _ = DrawTextW(mdc, &mut status, &mut status_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            SelectObject(mdc, s.font_n);
+        }
 
         let content_top = body_top + 48;
         let footer_h = 30;
@@ -3596,8 +3637,19 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 }
 
                 if !response.is_empty() {
-                    let is_thinking = response == "Thinking...";
-                    let mut r_wide: Vec<u16> = response.encode_utf16().collect();
+                    let is_thinking = response == "Thinking..." || response == "Executing...";
+                    let response_text = if is_thinking && s.ai_pending {
+                        let dots = match s.ai_tick % 4 {
+                            0 => "",
+                            1 => ".",
+                            2 => "..",
+                            _ => "...",
+                        };
+                        format!("Executing task{}", dots)
+                    } else {
+                        response.to_string()
+                    };
+                    let mut r_wide: Vec<u16> = response_text.encode_utf16().collect();
                     let mut calc = RECT { left: 0, top: 0, right: resp_w, bottom: 0 };
                     SelectObject(mdc, s.font_c);
                     let _ = DrawTextW(mdc, &mut r_wide.clone(), &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
