@@ -9,6 +9,7 @@ mod voice;
 mod ai;
 
 use std::ptr::null_mut;
+use std::os::windows::process::CommandExt;
 use search::{SearchEngine, SearchResult};
 use windows::{
     core::{PCWSTR, Interface},
