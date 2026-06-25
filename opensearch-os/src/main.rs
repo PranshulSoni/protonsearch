@@ -2182,6 +2182,100 @@ fn create_agent(db_path: &std::path::Path, name: &str, goal: &str) {
     }
 }
 
+fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
+    s.ai_pending = true;
+    s.ai_answer = None;
+    s.ai_scroll = 0;
+    s.results.clear();
+    s.selected = 0;
+    let _ = unsafe { InvalidateRect(hwnd, None, FALSE) };
+
+    let hwnd_ai = SendHwnd(hwnd);
+    let db_path = s.db_path.clone();
+    let chat_id = s.active_chat_id;
+    let new_prompt = follow_up;
+
+    std::thread::spawn(move || {
+        let mut original_prompt = String::new();
+        let mut original_response = String::new();
+        let mut command = "ask".to_string();
+        let mut title = "Follow-up Chat".to_string();
+
+        if let Some(id) = chat_id {
+            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                let _ = conn.query_row(
+                    "SELECT command, title, prompt, response FROM ai_chats WHERE id = ?",
+                    [id],
+                    |row| {
+                        let cmd_str: String = row.get(0)?;
+                        let title_str: String = row.get(1)?;
+                        let p_str: String = row.get(2)?;
+                        let r_str: String = row.get(3)?;
+                        command = cmd_str;
+                        title = title_str;
+                        original_prompt = p_str;
+                        original_response = r_str;
+                        Ok(())
+                    }
+                );
+            }
+        }
+
+        let mut system_prompt = "You are a concise, helpful assistant. Answer directly in at most a few short paragraphs.".to_string();
+        if command == "agent" {
+            if let Some(name) = title.strip_prefix('@').and_then(|t| t.split_once(':')).map(|(n, _)| n.trim()) {
+                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                    let _ = conn.query_row(
+                        "SELECT system_prompt FROM agents WHERE name = ?",
+                        [name],
+                        |row| {
+                            let sp: String = row.get(0)?;
+                            system_prompt = sp;
+                            Ok(())
+                        }
+                    );
+                }
+            }
+        } else {
+            system_prompt = match command.as_str() {
+                "explain" => "Explain the following clearly and simply for a general audience. Be concise.".to_string(),
+                "grammar" => "Fix the spelling and grammar of the text. Output ONLY the corrected text, with no preamble or quotes.".to_string(),
+                "translate" => "You are a translator. If the input names a target language (e.g. 'X to Spanish'), translate X into it; otherwise translate the text to English. Output ONLY the translation.".to_string(),
+                "summarize" => "Summarize the following text concisely as a few short bullet points.".to_string(),
+                "bugs" => "You are a code reviewer. List likely bugs and issues in the following code as short bullet points. Be specific.".to_string(),
+                _ => system_prompt
+            };
+        }
+
+        let result = ai::complete_chat(&system_prompt, &original_prompt, &original_response, &new_prompt);
+
+        if let Ok(ref new_response) = result {
+            if let Some(id) = chat_id {
+                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                    let updated_prompt = format!("{}\n---\nUser: {}", original_prompt, new_prompt);
+                    let updated_response = format!("{}\n\n---\n\n{}", original_response, new_response);
+                    let _ = conn.execute(
+                        "UPDATE ai_chats SET prompt = ?, response = ? WHERE id = ?",
+                        rusqlite::params![updated_prompt, updated_response, id],
+                    );
+                }
+            }
+        }
+
+        let payload: (bool, String) = match result {
+            Ok(ref new_response) => {
+                let full_history_resp = format!("{}\n\n---\n\n{}", original_response, new_response);
+                (true, full_history_resp)
+            }
+            Err(e) => (false, e.to_string()),
+        };
+        let ptr = Box::into_raw(Box::new(payload)) as isize;
+        unsafe {
+            let _ = PostMessageW(hwnd_ai.0, WM_AI_RESULT, WPARAM(0), LPARAM(ptr));
+        }
+    });
+}
+
 unsafe fn close_ai_panel(hwnd: HWND, s: &mut State) {
     s.ai_pending = false;
     s.ai_answer = None;
