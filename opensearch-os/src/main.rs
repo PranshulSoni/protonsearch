@@ -394,8 +394,17 @@ unsafe fn run() {
         active_chat_id: None,
     });
 
-    // Spawn background Hermes gateway status checker
+    // Spawn background Hermes gateway status checker and auto-starter
     std::thread::spawn(|| {
+        // Quick initial check and start if not running
+        let running = std::net::TcpStream::connect_timeout(
+            &"127.0.0.1:8642".parse().unwrap(),
+            std::time::Duration::from_millis(500)
+        ).is_ok();
+        if !running {
+            ai::start_hermes_gateway_daemon();
+        }
+
         loop {
             let running = std::net::TcpStream::connect_timeout(
                 &"127.0.0.1:8642".parse().unwrap(),
@@ -1030,6 +1039,12 @@ unsafe extern "system" fn wnd_proc(
             }
 
             if s.ai_answer.is_some() {
+                if ctrl_down && vk.0 as u32 == 0x43 { // Ctrl+C
+                    if let Some(ans) = &s.ai_answer {
+                        copy_to_clipboard(hwnd, ans);
+                    }
+                    return LRESULT(0);
+                }
                 match vk {
                     VK_ESCAPE => {
                         close_ai_panel(hwnd, s);
@@ -1700,6 +1715,25 @@ unsafe extern "system" fn wnd_proc(
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
 
+            if s.ai_answer.is_some() {
+                let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
+                let _mx = (lp.0 & 0xFFFF) as i16 as i32;
+                let win_h = s.win_h();
+                let y_start = s.cy - win_h / 2;
+
+                let body_top = y_start + SEARCH_H + 1;
+                let footer_h = 50;
+                let content_bottom = y_start + win_h - footer_h;
+
+                // Click inside the chat history area (above bottom input box) copies the chat text
+                if my >= body_top && my < content_bottom {
+                    if let Some(ans) = &s.ai_answer {
+                        copy_to_clipboard(hwnd, ans);
+                    }
+                    return LRESULT(0);
+                }
+            }
+
             if s.color_picker_active {
                 let mut pt = POINT::default();
                 let _ = GetCursorPos(&mut pt);
@@ -2306,23 +2340,28 @@ fn configure_hermes_llm(endpoint: &str, model: &str, api_key: &str) {
             "hermes".to_string()
         };
 
-        let _ = std::process::Command::new("cmd")
-            .args(["/c", &format!("\"{}\" config set model.default {}", hermes_cmd, model)])
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "model.default", &model])
             .creation_flags(0x08000000)
             .status();
 
-        let _ = std::process::Command::new("cmd")
-            .args(["/c", &format!("\"{}\" config set model.provider custom", hermes_cmd)])
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "model.provider", "custom"])
             .creation_flags(0x08000000)
             .status();
 
-        let _ = std::process::Command::new("cmd")
-            .args(["/c", &format!("\"{}\" config set model.base_url {}", hermes_cmd, base_url)])
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "model.base_url", &base_url])
             .creation_flags(0x08000000)
             .status();
 
-        let _ = std::process::Command::new("cmd")
-            .args(["/c", &format!("\"{}\" config set model.api_key {}", hermes_cmd, api_key)])
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "model.api_key", &api_key])
+            .creation_flags(0x08000000)
+            .status();
+
+        let _ = std::process::Command::new(&hermes_cmd)
+            .args(["config", "set", "agent.tool_use_enforcement", "true"])
             .creation_flags(0x08000000)
             .status();
     });
@@ -2340,6 +2379,8 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
     s.ai_scroll = 0;
     s.results.clear();
     s.selected = 0;
+    s.query.clear();
+    s.cursor_pos = 0;
     let _ = unsafe { InvalidateRect(hwnd, None, FALSE) };
 
     let hwnd_raw = hwnd.0 as isize;
@@ -2566,14 +2607,47 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             trigger_search(hwnd, s);
             return;
         } else if let Some(rest) = cmd.strip_prefix("openagent:") {
-            // Selecting an agent seeds the query so the user can type a message.
-            let name = rest.splitn(2, '\u{1f}').nth(1).unwrap_or("").to_string();
-            s.query = format!("@{}: ", name);
-            s.cursor_pos = s.query.len();
-            s.selected = 0;
-            s.scroll_offset = 0;
-            reset_cursor_blink(hwnd, s);
-            trigger_search(hwnd, s);
+            let mut parts = rest.splitn(2, '\u{1f}');
+            let _agent_id: i64 = parts.next().and_then(|v| v.parse().ok()).unwrap_or(-1);
+            let name = parts.next().unwrap_or("").to_string();
+            if !name.is_empty() {
+                let db_path = s.db_path.clone();
+                let search_title_prefix = format!("@{}:%", name);
+                
+                let mut loaded_chat = None;
+                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                    if let Ok(row) = conn.query_row(
+                        "SELECT id, title, prompt, response FROM ai_chats WHERE command = 'agent' AND title LIKE ? ORDER BY ts DESC LIMIT 1",
+                        [search_title_prefix],
+                        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?))
+                    ) {
+                        loaded_chat = Some(row);
+                    }
+                }
+                
+                if let Some((id, title, prompt, response)) = loaded_chat {
+                    s.ai_pending = false;
+                    s.ai_answer = Some(format_conversation(&prompt, &response));
+                    s.ai_title = title;
+                    s.ai_scroll = 0;
+                    s.active_chat_id = Some(id);
+                } else {
+                    let new_title = format!("@{}: [New Conversation]", name);
+                    let chat_id = store_ai_chat(&db_path, "agent", &new_title, "", "");
+                    s.ai_pending = false;
+                    s.ai_answer = Some("Ask me anything! I will execute tasks on your PC using Hermes.".to_string());
+                    s.ai_title = new_title;
+                    s.ai_scroll = 0;
+                    s.active_chat_id = chat_id;
+                }
+                
+                s.query.clear();
+                s.cursor_pos = 0;
+                s.results.clear();
+                s.selected = 0;
+                reset_cursor_blink(hwnd, s);
+                let _ = InvalidateRect(hwnd, None, FALSE);
+            }
             return;
         } else if let Some(rest) = cmd.strip_prefix("agent:") {
             // Message an agent: run the AI with the agent's persona, show in the panel.
@@ -2705,35 +2779,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             } else if let Some(hermes_action) = cmd.strip_prefix("action:hermes:") {
                 if hermes_action == "start" {
                     std::thread::spawn(move || {
-                        let hermes_cmd = if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
-                            let path = std::path::Path::new(&localappdata).join("hermes").join("bin").join("hermes.cmd");
-                            if path.exists() {
-                                path.to_string_lossy().to_string()
-                            } else {
-                                "hermes".to_string()
-                            }
-                        } else {
-                            "hermes".to_string()
-                        };
-
-                        if let Ok(appdata) = std::env::var("APPDATA") {
-                            let log_dir = std::path::Path::new(&appdata).join("opensearch-os");
-                            let _ = std::fs::create_dir_all(&log_dir);
-                            let log_file = log_dir.join("hermes_gateway.log");
-                            if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(log_file) {
-                                let _ = std::process::Command::new("cmd")
-                                    .args(["/c", &format!("\"{}\" gateway", hermes_cmd)])
-                                    .stdout(file.try_clone().unwrap())
-                                    .stderr(file)
-                                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                                    .spawn();
-                            }
-                        } else {
-                            let _ = std::process::Command::new("cmd")
-                                .args(["/c", &format!("\"{}\" gateway", hermes_cmd)])
-                                .creation_flags(0x08000000)
-                                .spawn();
-                        }
+                        ai::start_hermes_gateway_daemon();
                     });
                     s.query = "Starting Hermes Gateway...".to_string();
                 } else if hermes_action == "stop" {
@@ -3396,7 +3442,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         SetTextColor(mdc, CLR_PH);
         let _ = DrawTextW(mdc, &mut ph, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         SetTextColor(mdc, CLR_WHITE);
-    } else if s.query.is_empty() {
+    } else if s.query.is_empty() || s.ai_pending || s.ai_answer.is_some() {
         let ph_str = match &s.form_state {
             FormState::CreateSnippetName => "Create Snippet: Enter Name...",
             FormState::CreateSnippetContent { .. } => "Create Snippet: Enter Content...",
@@ -3462,7 +3508,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     }
 
     // Draw cursor
-    if s.cursor_visible {
+    if s.cursor_visible && !(s.ai_pending || s.ai_answer.is_some()) {
         let cur = floor_char_boundary(&s.query, s.cursor_pos);
         let before = &s.query[..cur];
         let dw_before: Vec<u16> = before.encode_utf16().collect();
@@ -3684,6 +3730,22 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 bottom: input_y + 34,
             };
             let _ = DrawTextW(mdc, &mut input_w, &mut input_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+            if s.cursor_visible {
+                let cur = floor_char_boundary(&s.query, s.cursor_pos);
+                let before = &s.query[..cur];
+                let dw_before: Vec<u16> = before.encode_utf16().collect();
+                let mut size = SIZE::default();
+                if !dw_before.is_empty() {
+                    let _ = GetTextExtentPoint32W(mdc, &dw_before, &mut size);
+                }
+                let cursor_x = input_rc.left + size.cx;
+                let mut dummy_size = SIZE::default();
+                let _ = GetTextExtentPoint32W(mdc, &['A' as u16], &mut dummy_size);
+                let text_h = dummy_size.cy;
+                let cursor_top = input_rc.top + (input_rc.bottom - input_rc.top - text_h) / 2;
+                fill(mdc, cursor_x, cursor_top, 2, text_h, CLR_WHITE);
+            }
 
             SelectObject(mdc, s.font_b);
             SetTextColor(mdc, CLR_GRAY);

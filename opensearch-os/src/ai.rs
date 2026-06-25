@@ -4,6 +4,7 @@
 
 use anyhow::{anyhow, Result};
 use std::sync::atomic::AtomicBool;
+use std::os::windows::process::CommandExt;
 
 pub static HERMES_GATEWAY_RUNNING: AtomicBool = AtomicBool::new(false);
 
@@ -312,6 +313,73 @@ fn get_hermes_config() -> AiConfig {
 
 
 
+pub fn start_hermes_gateway_daemon() {
+    let hermes_cmd = if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
+        let path = std::path::Path::new(&localappdata).join("hermes").join("bin").join("hermes.cmd");
+        if path.exists() {
+            path.to_string_lossy().to_string()
+        } else {
+            "hermes".to_string()
+        }
+    } else {
+        "hermes".to_string()
+    };
+
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        let log_dir = std::path::Path::new(&appdata).join("opensearch-os");
+        let _ = std::fs::create_dir_all(&log_dir);
+        let log_file = log_dir.join("hermes_gateway.log");
+        if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(log_file) {
+            let _ = std::process::Command::new(&hermes_cmd)
+                .arg("gateway")
+                .stdout(file.try_clone().unwrap())
+                .stderr(file)
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .spawn();
+        }
+    } else {
+        let _ = std::process::Command::new(&hermes_cmd)
+            .arg("gateway")
+            .creation_flags(0x08000000)
+            .spawn();
+    }
+}
+
+fn ensure_hermes_gateway_running() -> Result<()> {
+    if !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
+        // Double check status
+        let running = std::net::TcpStream::connect_timeout(
+            &"127.0.0.1:8642".parse().unwrap(),
+            std::time::Duration::from_millis(300)
+        ).is_ok();
+        if running {
+            HERMES_GATEWAY_RUNNING.store(true, std::sync::atomic::Ordering::Relaxed);
+            return Ok(());
+        }
+
+        start_hermes_gateway_daemon();
+
+        let mut started = false;
+        for _ in 0..20 {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            let running = std::net::TcpStream::connect_timeout(
+                &"127.0.0.1:8642".parse().unwrap(),
+                std::time::Duration::from_millis(300)
+            ).is_ok();
+            if running {
+                HERMES_GATEWAY_RUNNING.store(true, std::sync::atomic::Ordering::Relaxed);
+                started = true;
+                break;
+            }
+        }
+
+        if !started {
+            return Err(anyhow!("Hermes gateway is not running and failed to start automatically. Please check your installation."));
+        }
+    }
+    Ok(())
+}
+
 fn get_agent_config() -> AiConfig {
     get_hermes_config()
 }
@@ -323,11 +391,7 @@ fn agent_label(cfg: &AiConfig) -> &'static str {
 
 pub fn complete_agent(system: &str, user: &str) -> Result<String> {
     let cfg = get_agent_config();
-    if !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
-        return Err(anyhow!(
-            "Hermes gateway is not running. To execute tasks on this PC, please start the Hermes gateway (type 'hermes' in the search bar and click 'Start Hermes Gateway')."
-        ));
-    }
+    ensure_hermes_gateway_running()?;
     let timeout_secs = 300;
     let body = serde_json::json!({
         "model": cfg.model,
@@ -361,11 +425,7 @@ pub fn complete_agent(system: &str, user: &str) -> Result<String> {
 
 pub fn complete_chat_agent(system: &str, prev_user: &str, prev_assistant: &str, user: &str) -> Result<String> {
     let cfg = get_agent_config();
-    if !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
-        return Err(anyhow!(
-            "Hermes gateway is not running. To execute tasks on this PC, please start the Hermes gateway (type 'hermes' in the search bar and click 'Start Hermes Gateway')."
-        ));
-    }
+    ensure_hermes_gateway_running()?;
     let timeout_secs = 300;
     let body = serde_json::json!({
         "model": cfg.model,
