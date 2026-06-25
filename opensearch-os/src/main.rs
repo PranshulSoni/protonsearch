@@ -2636,9 +2636,6 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                                 let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('model', 'deepseek-chat');", []);
                                 s.query = "AI Configured for DeepSeek!".to_string();
                             } else if v == "hermes" {
-                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('endpoint', 'http://127.0.0.1:8642/v1/chat/completions');", []);
-                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('model', 'hermes-agent');", []);
-                                let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('api_key', 'hermes');", []);
                                 create_agent(&db_path, "Hermes", "Execute commands and run autonomous tasks on this Windows PC");
                                 s.query = "@Hermes: ".to_string();
                             }
@@ -2648,6 +2645,17 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                                 "INSERT OR REPLACE INTO ai_settings (key, value) VALUES (?, ?);",
                                 rusqlite::params![db_key, v],
                             );
+                            if db_key == "api_key" {
+                                let current_model = conn.query_row(
+                                    "SELECT value FROM ai_settings WHERE key = 'model'",
+                                    [],
+                                    |row| row.get::<_, String>(0),
+                                ).unwrap_or_default();
+                                if v.trim().starts_with("sk-oc-") || current_model == "hermes-agent" {
+                                    let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('endpoint', 'https://opencode.ai/zen/v1/chat/completions');", []);
+                                    let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('model', 'deepseek-v4-flash-free');", []);
+                                }
+                            }
                             s.query = format!("AI {} Saved!", k.to_uppercase());
                         }
                     }

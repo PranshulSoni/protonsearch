@@ -310,8 +310,70 @@ fn get_hermes_config() -> AiConfig {
     }
 }
 
+fn is_hermes_sentinel_key(key: &str) -> bool {
+    key.trim().eq_ignore_ascii_case("hermes")
+}
+
+fn fallback_config_from_key(key: &str) -> Option<AiConfig> {
+    let key = key.trim();
+    if key.is_empty() || is_hermes_sentinel_key(key) {
+        return None;
+    }
+    Some(AiConfig {
+        endpoint: "https://opencode.ai/zen/v1/chat/completions".to_string(),
+        model: "deepseek-v4-flash-free".to_string(),
+        api_key: key.to_string(),
+    })
+}
+
+/// Decide where agentic work (`@Hermes:`) is routed.
+///
+/// - If the local Hermes gateway is up (or, later, once Hermes is embedded in
+///   the installer), send the request there so it can actually execute
+///   commands and control the PC.
+/// - Otherwise, fall back to the same DeepSeek / OpenCode Zen config the rest
+///   of the app uses (deepseek-v4-flash-free with the user's key), so `@Hermes:`
+///   keeps working today — it just reasons about the task instead of running
+///   it locally. The moment a gateway appears, requests switch back
+///   automatically.
+fn get_agent_config() -> AiConfig {
+    if HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
+        get_hermes_config()
+    } else if let Ok(cfg) = get_config() {
+        if cfg.model == "hermes-agent" {
+            // ponytail: Hermes preset stores a local sentinel; when the gateway
+            // is down, only a real external key can fall back to OpenCode/DeepSeek.
+            fallback_config_from_key(&cfg.api_key).unwrap_or_else(get_hermes_config)
+        } else {
+            cfg
+        }
+    } else {
+        // No key resolved either — still aim at the gateway so the error is
+        // explicit ("install/start Hermes") instead of a confusing auth failure.
+        get_hermes_config()
+    }
+}
+
+/// Human-readable label for errors, based on which backend the request hit.
+fn agent_label(cfg: &AiConfig) -> &'static str {
+    if cfg.model == "hermes-agent" { "Hermes" } else { "AI" }
+}
+
 pub fn complete_agent(system: &str, user: &str) -> Result<String> {
-    let cfg = get_hermes_config();
+    let cfg = get_agent_config();
+    // Branch 3 of get_agent_config(): gateway is down AND no DeepSeek/OpenCode key
+    // is configured. Instead of firing the request at a dead port and surfacing a
+    // raw OS "connection refused", fail fast with an actionable message.
+    if cfg.model == "hermes-agent"
+        && !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed)
+    {
+        return Err(anyhow!(
+            "Hermes gateway isn't running and no OpenCode Zen / DeepSeek key is set to fall back on. \
+             To run tasks on this PC: type 'hermes' and start the gateway. \
+             To use the free DeepSeek model for now: type 'ai config key <your-opencode-zen-key>'."
+        ));
+    }
+    let timeout_secs = if cfg.model == "hermes-agent" { 300 } else { 60 };
     let body = serde_json::json!({
         "model": cfg.model,
         "messages": [
@@ -324,25 +386,38 @@ pub fn complete_agent(system: &str, user: &str) -> Result<String> {
     let resp = ureq::post(&cfg.endpoint)
         .set("Authorization", &format!("Bearer {}", cfg.api_key))
         .set("Content-Type", "application/json")
-        .timeout(std::time::Duration::from_secs(300))
+        .timeout(std::time::Duration::from_secs(timeout_secs))
         .send_json(body);
+    let label = agent_label(&cfg);
     let resp = match resp {
         Ok(r) => r,
         Err(ureq::Error::Status(code, r)) => {
             let msg = r.into_string().unwrap_or_default();
-            return Err(anyhow!("Hermes error {code}: {}", msg.chars().take(300).collect::<String>()));
+            return Err(anyhow!("{label} error {code}: {}", msg.chars().take(300).collect::<String>()));
         }
-        Err(e) => return Err(anyhow!("Hermes request failed: {e}")),
+        Err(e) => return Err(anyhow!("{label} request failed: {e}")),
     };
-    let v: serde_json::Value = resp.into_json().map_err(|e| anyhow!("bad Hermes response: {e}"))?;
+    let v: serde_json::Value = resp.into_json().map_err(|e| anyhow!("bad {label} response: {e}"))?;
     let text = v["choices"][0]["message"]["content"]
         .as_str()
-        .ok_or_else(|| anyhow!("Hermes response had no content"))?;
+        .ok_or_else(|| anyhow!("{label} response had no content"))?;
     Ok(text.trim().to_string())
 }
 
 pub fn complete_chat_agent(system: &str, prev_user: &str, prev_assistant: &str, user: &str) -> Result<String> {
-    let cfg = get_hermes_config();
+    let cfg = get_agent_config();
+    // Same guard as complete_agent: avoid a raw connection-refused when the
+    // gateway is down and no key is available to fall back on.
+    if cfg.model == "hermes-agent"
+        && !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed)
+    {
+        return Err(anyhow!(
+            "Hermes gateway isn't running and no OpenCode Zen / DeepSeek key is set to fall back on. \
+             To run tasks on this PC: type 'hermes' and start the gateway. \
+             To use the free DeepSeek model for now: type 'ai config key <your-opencode-zen-key>'."
+        ));
+    }
+    let timeout_secs = if cfg.model == "hermes-agent" { 300 } else { 60 };
     let body = serde_json::json!({
         "model": cfg.model,
         "messages": [
@@ -357,20 +432,21 @@ pub fn complete_chat_agent(system: &str, prev_user: &str, prev_assistant: &str, 
     let resp = ureq::post(&cfg.endpoint)
         .set("Authorization", &format!("Bearer {}", cfg.api_key))
         .set("Content-Type", "application/json")
-        .timeout(std::time::Duration::from_secs(300))
+        .timeout(std::time::Duration::from_secs(timeout_secs))
         .send_json(body);
+    let label = agent_label(&cfg);
     let resp = match resp {
         Ok(r) => r,
         Err(ureq::Error::Status(code, r)) => {
             let msg = r.into_string().unwrap_or_default();
-            return Err(anyhow!("Hermes error {code}: {}", msg.chars().take(300).collect::<String>()));
+            return Err(anyhow!("{label} error {code}: {}", msg.chars().take(300).collect::<String>()));
         }
-        Err(e) => return Err(anyhow!("Hermes request failed: {e}")),
+        Err(e) => return Err(anyhow!("{label} request failed: {e}")),
     };
-    let v: serde_json::Value = resp.into_json().map_err(|e| anyhow!("bad Hermes response: {e}"))?;
+    let v: serde_json::Value = resp.into_json().map_err(|e| anyhow!("bad {label} response: {e}"))?;
     let text = v["choices"][0]["message"]["content"]
         .as_str()
-        .ok_or_else(|| anyhow!("Hermes response had no content"))?;
+        .ok_or_else(|| anyhow!("{label} response had no content"))?;
     Ok(text.trim().to_string())
 }
 
@@ -454,6 +530,38 @@ mod tests {
         std::env::remove_var("DEEPSEEK_API_KEY");
 
         // Restore APPDATA
+        if let Some(val) = old_appdata {
+            std::env::set_var("APPDATA", val);
+        } else {
+            std::env::remove_var("APPDATA");
+        }
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn hermes_falls_back_to_opencode_key_when_gateway_is_down() {
+        let old_appdata = std::env::var("APPDATA").ok();
+        let temp_dir = std::env::temp_dir().join("opensearch-os-test-hermes-fallback");
+        let app_dir = temp_dir.join("opensearch-os");
+        let _ = std::fs::create_dir_all(&app_dir);
+        std::env::set_var("APPDATA", &temp_dir);
+        std::env::remove_var("OPENCODE_API_KEY");
+        std::env::remove_var("DEEPSEEK_API_KEY");
+        std::env::remove_var("OPENSEARCH_AI_KEY");
+        HERMES_GATEWAY_RUNNING.store(false, std::sync::atomic::Ordering::Relaxed);
+
+        let conn = rusqlite::Connection::open(app_dir.join("file_index.db")).unwrap();
+        conn.execute("CREATE TABLE ai_settings (key TEXT PRIMARY KEY, value TEXT);", []).unwrap();
+        conn.execute("INSERT INTO ai_settings (key, value) VALUES ('model', 'hermes-agent');", []).unwrap();
+        conn.execute("INSERT INTO ai_settings (key, value) VALUES ('api_key', 'sk-H-test-key');", []).unwrap();
+        drop(conn);
+
+        let cfg = get_agent_config();
+
+        assert_eq!(cfg.endpoint, "https://opencode.ai/zen/v1/chat/completions");
+        assert_eq!(cfg.model, "deepseek-v4-flash-free");
+        assert_eq!(cfg.api_key, "sk-H-test-key");
+
         if let Some(val) = old_appdata {
             std::env::set_var("APPDATA", val);
         } else {
