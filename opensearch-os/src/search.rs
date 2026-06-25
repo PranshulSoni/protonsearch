@@ -256,6 +256,23 @@ impl SearchEngine {
             [],
         )?;
 
+        // Pre-populate AI settings if empty
+        let ai_count: i64 = conn.query_row("SELECT COUNT(*) FROM ai_settings", [], |row| row.get(0)).unwrap_or(0);
+        if ai_count == 0 {
+            let _ = conn.execute(
+                "INSERT INTO ai_settings (key, value) VALUES ('api_key', ?);",
+                ["sk-HrvSzHIYBPsbF4NMpG7S0RvLhZKFHmPV153k1kitFrdV4uSdyLvd9EbftDXwkkpb"],
+            );
+            let _ = conn.execute(
+                "INSERT INTO ai_settings (key, value) VALUES ('endpoint', 'https://opencode.ai/zen/v1/chat/completions');",
+                [],
+            );
+            let _ = conn.execute(
+                "INSERT INTO ai_settings (key, value) VALUES ('model', 'deepseek-v4-flash-free');",
+                [],
+            );
+        }
+
         // Pre-populate snippets if empty
         let sn_count: i64 = conn.query_row("SELECT COUNT(*) FROM snippets", [], |row| row.get(0)).unwrap_or(0);
         if sn_count == 0 {
