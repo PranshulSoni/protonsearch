@@ -444,11 +444,9 @@ unsafe fn run() {
         ) };
         while let Ok(req) = icon_rx.recv() {
             unsafe {
-                let is_real_folder = req.source == "FOLDER" && !req.key.ends_with(':') && std::path::Path::new(&req.key).exists();
-                let is_real_project = req.source == "PROJECT" && !req.key.is_empty() && !req.key.starts_with("http") && std::path::Path::new(&req.key).exists();
-                let is_file_icon = req.source == "RECENT" || req.source == "FILE" || req.source == "CODE" || is_real_folder || is_real_project;
-                let hicon = if is_file_icon {
-                    get_file_icon(&req.key)
+                let file_icon_path = icon_file_path(&req.source, &req.key);
+                let hicon = if let Some(path) = file_icon_path {
+                    get_file_icon(&path)
                 } else if req.source == "ACTION" && req.key.starts_with("kill:") {
                     let pid_str = req.key.strip_prefix("kill:").unwrap_or("");
                     if let Ok(pid) = pid_str.parse::<u32>() {
@@ -3195,12 +3193,8 @@ unsafe fn trigger_icon_loading(_hwnd: HWND, s: &mut State) {
             s.app_icons.insert(key.clone(), hicon);
             continue;
         }
-        // For FOLDER source: only load icon if it's a real filesystem path (not virtual folders like bookmarks:)
-        let is_real_folder = source == "FOLDER" && !key.ends_with(':');
-        // For PROJECT source: load folder icon if the launch_command is a real filesystem path
-        let is_real_project = source == "PROJECT" && !key.is_empty() && !key.starts_with("http");
         let is_kill_action = source == "ACTION" && key.starts_with("kill:");
-        let needs_icon = (source == "app" || source == "RECENT" || source == "FILE" || source == "CODE" || is_real_folder || is_real_project || is_kill_action)
+        let needs_icon = (source == "app" || icon_file_path(source, &key).is_some() || is_kill_action)
             && !s.app_icons.contains_key(&key);
         if needs_icon {
             // Placeholder so we don't spawn multiple threads for same path
@@ -3211,6 +3205,42 @@ unsafe fn trigger_icon_loading(_hwnd: HWND, s: &mut State) {
             });
         }
     }
+}
+
+fn known_folder_icon_path(key: &str) -> Option<String> {
+    let folder_name = key
+        .strip_prefix("folder:")
+        .or_else(|| key.strip_prefix("action:folder:"))?;
+    let folder_id = match folder_name {
+        "downloads" => &windows::Win32::UI::Shell::FOLDERID_Downloads,
+        "desktop" => &windows::Win32::UI::Shell::FOLDERID_Desktop,
+        "documents" => &windows::Win32::UI::Shell::FOLDERID_Documents,
+        "pictures" => &windows::Win32::UI::Shell::FOLDERID_Pictures,
+        "music" => &windows::Win32::UI::Shell::FOLDERID_Music,
+        "videos" => &windows::Win32::UI::Shell::FOLDERID_Videos,
+        _ => return None,
+    };
+    crate::launcher::get_known_folder_path(folder_id)
+}
+
+fn icon_file_path(source: &str, key: &str) -> Option<String> {
+    if source == "FOLDER" {
+        if let Some(path) = known_folder_icon_path(key) {
+            return Some(path);
+        }
+        if !key.ends_with(':') && std::path::Path::new(key).exists() {
+            return Some(key.to_string());
+        }
+    } else if source == "ACTION" && key.starts_with("action:folder:") {
+        return known_folder_icon_path(key);
+    } else if source == "RECENT" || source == "FILE" || source == "CODE" {
+        if std::path::Path::new(key).exists() {
+            return Some(key.to_string());
+        }
+    } else if source == "PROJECT" && !key.is_empty() && !key.starts_with("http") && std::path::Path::new(key).exists() {
+        return Some(key.to_string());
+    }
+    None
 }
 
 unsafe fn paint(hwnd: HWND, s: &State) {
@@ -3723,7 +3753,12 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             if !drawn_custom_thumbnail {
                 // For WINDOW source: icon was pre-fetched into app_icons on result arrival.
                 // For all other async-loaded sources, also use app_icons.
-                let icon_to_draw = if res.entry.source == "WINDOW" {
+                let cached_icon = s.app_icons.get(&res.entry.launch_command)
+                    .copied()
+                    .filter(|h| !h.0.is_null());
+                let icon_to_draw = if let Some(hicon) = cached_icon {
+                    hicon
+                } else if res.entry.source == "WINDOW" {
                     s.app_icons.get(&res.entry.launch_command)
                         .copied()
                         .filter(|h| !h.0.is_null())

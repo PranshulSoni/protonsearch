@@ -2939,17 +2939,17 @@ fn format_relative_time(ts: i64) -> String {
             let mut score = 0.0f32;
             
             if app_lower == q_lower {
-                score = 11.0; // Exact app name — wins over projects/files/web (issue 2)
+                score = 120.0; // Exact app name wins the launcher, like Raycast/Flow Launcher.
             } else if app_lower.starts_with(&q_lower) && q_lower.chars().count() >= 2 {
-                score = 10.5; // Strong prefix — also wins
+                score = 118.0;
             } else if app_lower.starts_with(&q_lower) {
-                score = 2.5; // 1-char prefix — modest, avoids single-letter domination
+                score = 20.5; // 1-char prefix stays modest, avoids single-letter domination.
             } else if q_lower.starts_with(&app_lower) {
-                score = 2.2; // App name is a prefix of the query
+                score = 114.0;
             } else if app_lower.contains(&q_lower) {
-                score = 1.8; // Substring match
+                score = 112.0;
             } else if q_lower.contains(&app_lower) {
-                score = 1.5; // Query contains app name
+                score = 110.0;
             } else {
                 let app_words: Vec<&str> = app_lower.split_whitespace().collect();
                 let mut matched = 0;
@@ -2961,7 +2961,7 @@ fn format_relative_time(ts: i64) -> String {
                 if matched > 0 && !q_words.is_empty() {
                     let ratio = matched as f32 / q_words.len() as f32;
                     if ratio >= 0.5 {
-                        score = 0.8 + 0.4 * ratio;
+                        score = 100.0 + ratio;
                     }
                 }
             }
@@ -2974,7 +2974,7 @@ fn format_relative_time(ts: i64) -> String {
                     let max_len = app_len.max(q_len);
                     let similarity = 1.0 - (dist as f32 / max_len as f32);
                     if similarity >= 0.7 {
-                        score = 0.6 + 0.8 * similarity;
+                        score = 95.0 + similarity;
                     }
                 }
             }
@@ -3013,11 +3013,11 @@ fn format_relative_time(ts: i64) -> String {
             };
             let mut score = 0.0f32;
             if name_lower == q_lower || name_no_ext == q_lower {
-                score = 2.8;
+                score = 89.0;
             } else if name_lower.starts_with(&q_lower) || name_no_ext.starts_with(&q_lower) {
-                score = 2.3;
+                score = 86.0;
             } else if name_lower.contains(&q_lower) {
-                score = 1.7;
+                score = 82.0;
             } else {
                 let name_words: Vec<&str> = name_no_ext.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
                 let mut matched = 0;
@@ -3026,7 +3026,7 @@ fn format_relative_time(ts: i64) -> String {
                 }
                 if matched > 0 && !q_words.is_empty() {
                     let ratio = matched as f32 / q_words.len() as f32;
-                    if ratio >= 0.5 { score = 0.6 + 0.4 * ratio; }
+                    if ratio >= 0.5 { score = 78.0 + ratio; }
                 }
             }
             if score > 0.0 {
@@ -3060,12 +3060,16 @@ fn format_relative_time(ts: i64) -> String {
                 description: format!("Opens default browser and searches Google for '{}'.", web_query),
                 synonyms: "google search web internet online".to_string(),
             },
-            score: if intent == Intent::WebSearch { 9.0 } else { 1.1 },
+            score: if intent == Intent::WebSearch { 92.0 } else { 50.0 },
         };
 
         let mut file_matches = self.search_local_files(&q_lower);
         file_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         file_matches.truncate(15); // Cap at 15 file results
+        for m in &mut file_matches {
+            // General file search only returns title/name hits; content-only search stays behind web in file:/code:/img: scopes.
+            m.score += 70.0;
+        }
 
         if intent == Intent::FindFile {
             for m in &mut file_matches { m.score += 1.5; }
