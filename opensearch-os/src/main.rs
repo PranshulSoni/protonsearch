@@ -2127,6 +2127,32 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     s.anim = Anim::Hidden;
 }
 
+fn store_ai_chat(db_path: &std::path::Path, command: &str, title: &str, prompt: &str, response: &str) {
+    if let Ok(conn) = rusqlite::Connection::open(db_path) {
+        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+        let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS ai_chats (\
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, \
+                command TEXT, title TEXT, prompt TEXT, response TEXT);",
+            [],
+        );
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let _ = conn.execute(
+            "INSERT INTO ai_chats (ts, command, title, prompt, response) VALUES (?,?,?,?,?);",
+            rusqlite::params![now, command, title, prompt, response],
+        );
+        // Keep only the most recent 200 chats.
+        let _ = conn.execute(
+            "DELETE FROM ai_chats WHERE id NOT IN (SELECT id FROM ai_chats ORDER BY ts DESC LIMIT 200);",
+            [],
+        );
+    }
+}
+
 unsafe fn close_ai_panel(hwnd: HWND, s: &mut State) {
     s.ai_pending = false;
     s.ai_answer = None;
@@ -2143,7 +2169,8 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
         let is_action_folder = r.entry.source == "FOLDER" && (
             cmd == "bookmarks:" || cmd == "history:" || cmd == "commits:" ||
             cmd == "todos:" || cmd == "clip:" || cmd == "file:" || cmd == "code:" ||
-            cmd == "switch:" || cmd == "window:" || cmd == "ql:" || cmd == "snip:" || cmd == "img:"
+            cmd == "switch:" || cmd == "window:" || cmd == "ql:" || cmd == "snip:" || cmd == "img:" ||
+            cmd == "chats:"
         );
         if is_action_folder {
             s.query = cmd;
@@ -2171,9 +2198,15 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             let _ = InvalidateRect(hwnd, None, FALSE);
 
             let hwnd_ai = SendHwnd(hwnd);
+            let db_path = s.db_path.clone();
+            let title = s.ai_title.clone();
             std::thread::spawn(move || {
                 let hwnd_ai = hwnd_ai;
-                let payload: (bool, String) = match ai::run(&aicmd, &input) {
+                let result = ai::run(&aicmd, &input);
+                if let Ok(ref text) = result {
+                    store_ai_chat(&db_path, &aicmd, &title, &input, text);
+                }
+                let payload: (bool, String) = match result {
                     Ok(text) => (true, text),
                     Err(e) => (false, e.to_string()),
                 };
@@ -2182,6 +2215,26 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     let _ = PostMessageW(hwnd_ai.0, WM_AI_RESULT, WPARAM(0), LPARAM(ptr));
                 }
             });
+            return;
+        } else if let Some(id_str) = cmd.strip_prefix("aichat:") {
+            // Reopen a stored chat in the panel (no API call).
+            if let Ok(id) = id_str.parse::<i64>() {
+                if let Ok(conn) = rusqlite::Connection::open(&s.db_path) {
+                    if let Ok((title, response)) = conn.query_row(
+                        "SELECT title, response FROM ai_chats WHERE id = ?",
+                        [id],
+                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                    ) {
+                        s.ai_pending = false;
+                        s.ai_answer = Some(response);
+                        s.ai_title = title;
+                        s.ai_scroll = 0;
+                        s.results.clear();
+                        s.selected = 0;
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    }
+                }
+            }
             return;
         } else {
             if let Some(text) = cmd.strip_prefix("copy:") {

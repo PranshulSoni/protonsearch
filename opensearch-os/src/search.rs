@@ -1319,6 +1319,47 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
         results
     }
 
+    /// chats: prefix — browse stored AI chat history (newest first).
+    pub fn search_ai_chats(&self, query: &str) -> Vec<SearchResult> {
+        let conn = &self.conn;
+        let q = query.trim().to_lowercase();
+        let mut results = Vec::new();
+        let sql = if q.is_empty() {
+            "SELECT id, title, response FROM ai_chats ORDER BY ts DESC LIMIT 50".to_string()
+        } else {
+            "SELECT id, title, response FROM ai_chats \
+             WHERE lower(title) LIKE ?1 OR lower(prompt) LIKE ?1 OR lower(response) LIKE ?1 \
+             ORDER BY ts DESC LIMIT 50".to_string()
+        };
+        let mut stmt = match conn.prepare(&sql) { Ok(s) => s, Err(_) => return results };
+        let like = format!("%{}%", q);
+        let map = |row: &rusqlite::Row| -> rusqlite::Result<(i64, String, String)> {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        };
+        let rows = if q.is_empty() { stmt.query_map([], map) } else { stmt.query_map([&like], map) };
+        let rows = match rows { Ok(r) => r, Err(_) => return results };
+        let mut score = 100.0f32;
+        for row in rows.filter_map(|r| r.ok()) {
+            let (id, title, response) = row;
+            let snippet: String = response.replace('\n', " ").replace('\r', " ")
+                .split_whitespace().collect::<Vec<&str>>().join(" ").chars().take(80).collect();
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: format!("aichat.{}", id),
+                    control_name: if title.is_empty() { "AI Chat".to_string() } else { title },
+                    breadcrumb_path: format!("AI Chat > {}", snippet),
+                    launch_command: format!("aichat:{}", id),
+                    source: "AI".to_string(),
+                    description: "Stored AI chat — Enter to reopen".to_string(),
+                    synonyms: "ai chat history conversation".to_string(),
+                },
+                score,
+            });
+            score -= 0.01; // preserve newest-first order
+        }
+        results
+    }
+
     pub fn search_bookmarks_only(&self, sub_query: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
         let conn = &self.conn;
@@ -2013,6 +2054,18 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             });
             results.push(SearchResult {
                 entry: CatalogEntry {
+                    id: "folder.aichats".to_string(),
+                    control_name: "AI Chat History".to_string(),
+                    breadcrumb_path: "AI > Past chats".to_string(),
+                    launch_command: "chats:".to_string(),
+                    source: "FOLDER".to_string(),
+                    description: "Browse and reopen your past AI chats".to_string(),
+                    synonyms: "ai chats history conversations past previous saved".to_string(),
+                },
+                score: 3.1,
+            });
+            results.push(SearchResult {
+                entry: CatalogEntry {
                     id: "folder.switch".to_string(),
                     control_name: "Window Switcher".to_string(),
                     breadcrumb_path: "Window > Switcher".to_string(),
@@ -2185,6 +2238,10 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             if let Some(sub) = q_lower_trimmed.strip_prefix(p) {
                 return self.search_images_only(sub.trim());
             }
+        }
+
+        if let Some(sub) = q_lower_trimmed.strip_prefix("chats:") {
+            return self.search_ai_chats(sub.trim());
         }
 
         // ── AI browser prefixes: "<provider> <prompt>" opens the AI with the ──
