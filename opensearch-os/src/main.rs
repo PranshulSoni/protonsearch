@@ -348,7 +348,7 @@ unsafe fn run() {
         cy: sh / 3,
         font_q: mk_font(-19, 400),
         font_n: mk_font(-17, 600),
-        font_c: mk_font(-13, 400),
+        font_c: mk_font(-16, 400),
         font_b: mk_font(-11, 600),
         font_mic,
         icon_settings,
@@ -2244,7 +2244,13 @@ fn create_agent(db_path: &std::path::Path, name: &str, goal: &str) {
 
 fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
     s.ai_pending = true;
-    s.ai_answer = None;
+    let prev_ans = s.ai_answer.clone().unwrap_or_default();
+    let new_prompt_str = follow_up.clone();
+    if !prev_ans.is_empty() {
+        s.ai_answer = Some(format!("{}\n\n---\n\nUser: {}\n\nThinking...", prev_ans, new_prompt_str));
+    } else {
+        s.ai_answer = Some(format!("User: {}\n\nThinking...", new_prompt_str));
+    }
     s.ai_scroll = 0;
     s.results.clear();
     s.selected = 0;
@@ -2378,7 +2384,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 input = input.chars().take(30000).collect::<String>() + "\n\n[Truncated for length...]";
             }
             s.ai_pending = true;
-            s.ai_answer = None;
+            s.ai_answer = Some(format!("User: {}\n\nThinking...", input));
             s.ai_scroll = 0;
             s.ai_title = ctrl_name;
             s.results.clear();
@@ -2488,7 +2494,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 return;
             }
             s.ai_pending = true;
-            s.ai_answer = None;
+            s.ai_answer = Some(format!("User: {}\n\nThinking...", msg));
             s.ai_scroll = 0;
             s.ai_title = format!("@{}: {}", aname, msg);
             s.results.clear();
@@ -3333,25 +3339,136 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         let footer_h = 30;
         let content_bottom = y + SEARCH_H + 1 + AI_PANEL_H - footer_h;
 
-        if s.ai_pending {
+        let has_answer = s.ai_answer.is_some();
+        if s.ai_pending && !has_answer {
             SelectObject(mdc, s.font_q);
             SetTextColor(mdc, CLR_GRAY);
             let mut th: Vec<u16> = "Thinking…".encode_utf16().collect();
             let mut th_rc = RECT { left: x + pad, top: content_top, right: x + w - pad, bottom: content_bottom };
             let _ = DrawTextW(mdc, &mut th, &mut th_rc, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
         } else if let Some(ans) = &s.ai_answer {
-            SelectObject(mdc, s.font_c);
-            SetTextColor(mdc, CLR_WHITE);
-            let mut body: Vec<u16> = ans.encode_utf16().collect();
-            // Measure wrapped height, then draw shifted by the (clamped) scroll offset.
-            let mut calc = RECT { left: x + pad, top: 0, right: x + w - pad, bottom: 0 };
-            let _ = DrawTextW(mdc, &mut body.clone(), &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
-            let total_h = calc.bottom - calc.top;
+            let parts: Vec<&str> = ans.split("\n\n---\n\n").collect();
+
+            // 1. Measure Pass
+            let mut total_h = 0;
+            let card_inner_w = w - pad * 2 - 24;
+            let resp_w = w - pad * 2;
+
+            for part in &parts {
+                let mut prompt = "";
+                let mut response = "";
+                if part.starts_with("User: ") {
+                    let after_user = &part["User: ".len()..];
+                    if let Some((p, r)) = after_user.split_once("\n\n") {
+                        prompt = p.trim();
+                        response = r.trim();
+                    } else {
+                        prompt = after_user.trim();
+                    }
+                } else {
+                    response = part.trim();
+                }
+
+                if !prompt.is_empty() {
+                    let mut p_wide: Vec<u16> = prompt.encode_utf16().collect();
+                    let mut calc = RECT { left: 0, top: 0, right: card_inner_w, bottom: 0 };
+                    SelectObject(mdc, s.font_c);
+                    let _ = DrawTextW(mdc, &mut p_wide, &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                    let prompt_h = calc.bottom - calc.top;
+                    total_h += prompt_h + 16 + 16;
+                }
+
+                if !response.is_empty() {
+                    let mut r_wide: Vec<u16> = response.encode_utf16().collect();
+                    let mut calc = RECT { left: 0, top: 0, right: resp_w, bottom: 0 };
+                    SelectObject(mdc, s.font_c);
+                    let _ = DrawTextW(mdc, &mut r_wide, &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                    let resp_h = calc.bottom - calc.top;
+                    total_h += resp_h + 24;
+                }
+            }
+
             let view_h = content_bottom - content_top;
             let max_scroll = (total_h - view_h).max(0);
-            let scroll = s.ai_scroll.clamp(0, max_scroll);
-            let mut body_rc = RECT { left: x + pad, top: content_top - scroll, right: x + w - pad, bottom: content_top - scroll + total_h };
-            let _ = DrawTextW(mdc, &mut body, &mut body_rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+            let scroll = if s.ai_pending {
+                max_scroll
+            } else {
+                s.ai_scroll.clamp(0, max_scroll)
+            };
+            if s.ai_pending {
+                s.ai_scroll = scroll;
+            }
+
+            // 2. Paint Pass
+            let dc_state = SaveDC(mdc);
+            let _ = IntersectClipRect(mdc, x + pad, content_top, x + w - pad, content_bottom);
+
+            let mut current_y = content_top - scroll;
+            let bg_user = COLORREF(0x00_2C_2B_2A);
+
+            for part in &parts {
+                let mut prompt = "";
+                let mut response = "";
+                if part.starts_with("User: ") {
+                    let after_user = &part["User: ".len()..];
+                    if let Some((p, r)) = after_user.split_once("\n\n") {
+                        prompt = p.trim();
+                        response = r.trim();
+                    } else {
+                        prompt = after_user.trim();
+                    }
+                } else {
+                    response = part.trim();
+                }
+
+                if !prompt.is_empty() {
+                    let mut p_wide: Vec<u16> = prompt.encode_utf16().collect();
+                    let mut calc = RECT { left: 0, top: 0, right: card_inner_w, bottom: 0 };
+                    SelectObject(mdc, s.font_c);
+                    let _ = DrawTextW(mdc, &mut p_wide.clone(), &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                    let prompt_h = calc.bottom - calc.top;
+                    let bubble_h = prompt_h + 16;
+
+                    fill_rounded(mdc, x + pad, current_y, w - pad * 2, bubble_h, 8, bg_user);
+
+                    let mut body_rc = RECT {
+                        left: x + pad + 12,
+                        top: current_y + 8,
+                        right: x + w - pad - 12,
+                        bottom: current_y + 8 + prompt_h,
+                    };
+                    SetTextColor(mdc, COLORREF(0x00_D0_D0_D0));
+                    let _ = DrawTextW(mdc, &mut p_wide, &mut body_rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+
+                    current_y += bubble_h + 16;
+                }
+
+                if !response.is_empty() {
+                    let is_thinking = response == "Thinking...";
+                    let mut r_wide: Vec<u16> = response.encode_utf16().collect();
+                    let mut calc = RECT { left: 0, top: 0, right: resp_w, bottom: 0 };
+                    SelectObject(mdc, s.font_c);
+                    let _ = DrawTextW(mdc, &mut r_wide.clone(), &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+                    let resp_h = calc.bottom - calc.top;
+
+                    let mut body_rc = RECT {
+                        left: x + pad,
+                        top: current_y,
+                        right: x + w - pad,
+                        bottom: current_y + resp_h,
+                    };
+                    if is_thinking {
+                        SetTextColor(mdc, CLR_GRAY);
+                    } else {
+                        SetTextColor(mdc, CLR_WHITE);
+                    }
+                    let _ = DrawTextW(mdc, &mut r_wide, &mut body_rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+
+                    current_y += resp_h + 24;
+                }
+            }
+
+            RestoreDC(mdc, dc_state);
         }
 
         // Footer hint (painted over any text overflow)
