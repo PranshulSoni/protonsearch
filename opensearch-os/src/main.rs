@@ -70,6 +70,17 @@ const CLR_BDGBG: COLORREF = COLORREF(0x00_50_48_48);
 const CLR_BDGTX: COLORREF = COLORREF(0x00_C0_BB_BB);
 const COLOR_KEY: COLORREF = COLORREF(0x00_12_34_56);
 
+#[derive(Debug, Clone, PartialEq)]
+enum FormState {
+    None,
+    CreateSnippetName,
+    CreateSnippetContent { name: String },
+    CreateSnippetKeyword { name: String, content: String },
+    CreateQuicklinkName,
+    CreateQuicklinkUrl { name: String },
+    CreateQuicklinkKeyword { name: String, url: String },
+}
+
 // ── App state ─────────────────────────────────────────────────────────────────
 struct State {
     search_tx: Option<std::sync::mpsc::Sender<SearchRequest>>,
@@ -116,6 +127,7 @@ struct State {
     voice_pending_exec: bool, // true = waiting for search results to auto-execute
     voice_dot_tick: u32,     // animation frame counter for pulsing mic dot
     voice_exec_deadline: Option<std::time::Instant>, // when the auto-exec countdown fires
+    form_state: FormState,   // Phase 2 Quicklinks & Snippets creation form state
 }
 
 #[derive(PartialEq)]
@@ -339,6 +351,7 @@ unsafe fn run() {
         voice_pending_exec: false,
         voice_dot_tick: 0,
         voice_exec_deadline: None,
+        form_state: FormState::None,
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
