@@ -130,6 +130,9 @@ struct State {
     voice_dot_tick: u32,     // animation frame counter for pulsing mic dot
     voice_exec_deadline: Option<std::time::Instant>, // when the auto-exec countdown fires
     form_state: FormState,   // Phase 2 Quicklinks & Snippets creation form state
+    color_picker_active: bool,
+    color_picker_mx: i32,
+    color_picker_my: i32,
 }
 
 #[derive(PartialEq)]
@@ -361,6 +364,9 @@ unsafe fn run() {
         voice_dot_tick: 0,
         voice_exec_deadline: None,
         form_state: FormState::None,
+        color_picker_active: false,
+        color_picker_mx: 0,
+        color_picker_my: 0,
     });
 
     let class: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
@@ -568,9 +574,14 @@ unsafe extern "system" fn wnd_proc(
 
         WM_SETCURSOR => {
             unsafe {
-                use windows::Win32::UI::WindowsAndMessaging::{LoadCursorW, SetCursor, IDC_ARROW};
+                use windows::Win32::UI::WindowsAndMessaging::{LoadCursorW, SetCursor, IDC_ARROW, IDC_CROSS};
                 use windows::Win32::Foundation::HINSTANCE;
-                if let Ok(cursor) = LoadCursorW(HINSTANCE(std::ptr::null_mut()), IDC_ARROW) {
+                let idc = if !sp.is_null() && (*sp).color_picker_active {
+                    IDC_CROSS
+                } else {
+                    IDC_ARROW
+                };
+                if let Ok(cursor) = LoadCursorW(HINSTANCE(std::ptr::null_mut()), idc) {
                     SetCursor(cursor);
                     return LRESULT(1);
                 }
@@ -917,6 +928,13 @@ unsafe extern "system" fn wnd_proc(
             let s = &mut *sp;
             let vk = VIRTUAL_KEY(wp.0 as u16);
             let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
+
+            if s.color_picker_active {
+                if vk == VK_ESCAPE {
+                    stop_color_picker(hwnd, s);
+                }
+                return LRESULT(0);
+            }
 
             if s.form_state != FormState::None {
                 match vk {
@@ -1551,6 +1569,24 @@ unsafe extern "system" fn wnd_proc(
         WM_LBUTTONDOWN => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
+
+            if s.color_picker_active {
+                let mut pt = POINT::default();
+                let _ = GetCursorPos(&mut pt);
+                let screen_dc = GetDC(HWND(null_mut()));
+                let pixel = GetPixel(screen_dc, pt.x, pt.y);
+                let _ = ReleaseDC(HWND(null_mut()), screen_dc);
+
+                let r = (pixel.0 & 0xFF) as u8;
+                let g = ((pixel.0 >> 8) & 0xFF) as u8;
+                let b = ((pixel.0 >> 16) & 0xFF) as u8;
+                let hex = format!("#{:02X}{:02X}{:02X}", r, g, b);
+
+                copy_to_clipboard(hwnd, &hex);
+                stop_color_picker(hwnd, s);
+                do_hide(hwnd, s);
+                return LRESULT(0);
+            }
             // Mic button (search bar's right corner) toggles voice dictation.
             {
                 let cmy = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
@@ -1651,6 +1687,17 @@ unsafe extern "system" fn wnd_proc(
         WM_MOUSEMOVE => {
             if sp.is_null() { return LRESULT(0); }
             let s = &mut *sp;
+
+            if s.color_picker_active {
+                let mut pt = POINT::default();
+                let _ = GetCursorPos(&mut pt);
+                let mut client_pt = pt;
+                let _ = ScreenToClient(hwnd, &mut client_pt);
+                s.color_picker_mx = client_pt.x;
+                s.color_picker_my = client_pt.y;
+                let _ = InvalidateRect(hwnd, None, FALSE);
+                return LRESULT(0);
+            }
             let _mx = (lp.0 & 0xFFFF) as i16 as i32;
             let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
             
@@ -1675,6 +1722,16 @@ unsafe extern "system" fn wnd_proc(
                 }
             }
             LRESULT(0)
+        }
+
+        WM_RBUTTONDOWN => {
+            if sp.is_null() { return LRESULT(0); }
+            let s = &mut *sp;
+            if s.color_picker_active {
+                stop_color_picker(hwnd, s);
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wp, lp)
         }
 
         WM_ERASEBKGND => LRESULT(1),
@@ -1917,6 +1974,99 @@ unsafe fn start_hide(hwnd: HWND, s: &mut State) {
     animate_window(hwnd, false);
 }
 
+unsafe fn start_color_picker(hwnd: HWND, s: &mut State) {
+    s.color_picker_active = true;
+
+    // Get active monitor full bounds
+    let mut pt = POINT::default();
+    let _ = GetCursorPos(&mut pt);
+    let hmonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    let (monitor_w, monitor_h, monitor_left, monitor_top) = if GetMonitorInfoW(hmonitor, &mut mi).as_bool() {
+        (
+            mi.rcMonitor.right - mi.rcMonitor.left,
+            mi.rcMonitor.bottom - mi.rcMonitor.top,
+            mi.rcMonitor.left,
+            mi.rcMonitor.top,
+        )
+    } else {
+        (
+            GetSystemMetrics(SM_CXSCREEN),
+            GetSystemMetrics(SM_CYSCREEN),
+            0,
+            0,
+        )
+    };
+
+    // Resize and position the window to cover the entire active monitor
+    let _ = SetWindowPos(
+        hwnd,
+        HWND(null_mut()),
+        monitor_left,
+        monitor_top,
+        monitor_w,
+        monitor_h,
+        SWP_NOACTIVATE | SWP_NOZORDER,
+    );
+
+    // Set mouse capture
+    let _ = SetCapture(hwnd);
+    s.color_picker_mx = pt.x - monitor_left;
+    s.color_picker_my = pt.y - monitor_top;
+
+    let _ = InvalidateRect(hwnd, None, FALSE);
+}
+
+unsafe fn stop_color_picker(hwnd: HWND, s: &mut State) {
+    let _ = ReleaseCapture();
+    s.color_picker_active = false;
+
+    // Center the window on the active monitor's work area and reset size
+    let mut pt = POINT::default();
+    let _ = GetCursorPos(&mut pt);
+    let hmonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    let (work_w, work_h, work_left, work_top) = if GetMonitorInfoW(hmonitor, &mut mi).as_bool() {
+        (
+            mi.rcWork.right - mi.rcWork.left,
+            mi.rcWork.bottom - mi.rcWork.top,
+            mi.rcWork.left,
+            mi.rcWork.top,
+        )
+    } else {
+        (
+            GetSystemMetrics(SM_CXSCREEN),
+            GetSystemMetrics(SM_CYSCREEN),
+            0,
+            0,
+        )
+    };
+
+    let win_x = work_left + (work_w - WIN_W) / 2;
+    let win_y = work_top;
+
+    let _ = SetWindowPos(
+        hwnd,
+        HWND(null_mut()),
+        win_x,
+        win_y,
+        WIN_W,
+        work_h,
+        SWP_NOACTIVATE | SWP_NOZORDER,
+    );
+
+    s.cx = WIN_W / 2;
+    s.cy = work_h / 2;
+
+    let _ = InvalidateRect(hwnd, None, FALSE);
+}
+
 unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
     let _ = KillTimer(hwnd, TIMER_CURSOR_BLINK);
@@ -2002,6 +2152,9 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             } else if cmd == "action:import_quicklinks" {
                 import_quicklinks(hwnd, s);
                 do_hide(hwnd, s);
+                return;
+            } else if cmd == "action:color_picker" {
+                start_color_picker(hwnd, s);
                 return;
             } else {
                 launcher::launch(&cmd);
@@ -2389,6 +2542,95 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
     // Clear background with COLOR_KEY (completely transparent)
     fill(mdc, 0, 0, win_w, win_h, COLOR_KEY);
+
+    if s.color_picker_active {
+        // Draw the magnifier and picked color overlay under the cursor
+        let screen_dc = GetDC(HWND(null_mut()));
+        let mut pt_screen = POINT { x: s.color_picker_mx, y: s.color_picker_my };
+        let _ = ClientToScreen(hwnd, &mut pt_screen);
+        let pixel = GetPixel(screen_dc, pt_screen.x, pt_screen.y);
+
+        let zoom_w = 117;
+        let zoom_h = 117;
+        let mut draw_x = s.color_picker_mx + 25;
+        let mut draw_y = s.color_picker_my + 25;
+        
+        if draw_x + zoom_w + 20 > win_w {
+            draw_x = s.color_picker_mx - zoom_w - 25;
+        }
+        if draw_y + zoom_h + 80 > win_h {
+            draw_y = s.color_picker_my - zoom_h - 25;
+        }
+
+        let src_x = pt_screen.x - 6;
+        let src_y = pt_screen.y - 6;
+
+        let _ = StretchBlt(
+            mdc,
+            draw_x, draw_y, zoom_w, zoom_h,
+            screen_dc,
+            src_x, src_y, 13, 13,
+            SRCCOPY,
+        );
+
+        // Draw magnifier border using fill lines
+        fill(mdc, draw_x - 2, draw_y - 2, zoom_w + 4, 2, CLR_WHITE);
+        fill(mdc, draw_x - 2, draw_y + zoom_h, zoom_w + 4, 2, CLR_WHITE);
+        fill(mdc, draw_x - 2, draw_y - 2, 2, zoom_h + 4, CLR_WHITE);
+        fill(mdc, draw_x + zoom_w, draw_y - 2, 2, zoom_h + 4, CLR_WHITE);
+
+        // Draw central pixel highlight box (9x9)
+        let cx_box = draw_x + 54;
+        let cy_box = draw_y + 54;
+        fill(mdc, cx_box - 1, cy_box - 1, 9 + 2, 1, CLR_WHITE);
+        fill(mdc, cx_box - 1, cy_box + 9, 9 + 2, 1, CLR_WHITE);
+        fill(mdc, cx_box - 1, cy_box, 1, 9, CLR_WHITE);
+        fill(mdc, cx_box + 9, cy_box, 1, 9, CLR_WHITE);
+
+        // Draw color info box below magnifier
+        let info_y = draw_y + zoom_h + 6;
+        fill_rounded(mdc, draw_x - 1, info_y - 1, zoom_w + 2, 44 + 2, 6, CLR_DIV);
+        fill_rounded(mdc, draw_x, info_y, zoom_w, 44, 6, BG);
+
+        let r_comp = (pixel.0 & 0xFF) as u8;
+        let g_comp = ((pixel.0 >> 8) & 0xFF) as u8;
+        let b_comp = ((pixel.0 >> 16) & 0xFF) as u8;
+        fill_rounded(mdc, draw_x + 8, info_y + 8, 28, 28, 14, pixel);
+
+        SelectObject(mdc, s.font_b);
+        SetTextColor(mdc, CLR_WHITE);
+        SetBkMode(mdc, TRANSPARENT);
+        let hex_str = format!("#{:02X}{:02X}{:02X}", r_comp, g_comp, b_comp);
+        let mut hex_wide: Vec<u16> = hex_str.encode_utf16().collect();
+        let mut text_rect = RECT {
+            left: draw_x + 42,
+            top: info_y + 6,
+            right: draw_x + zoom_w - 4,
+            bottom: info_y + 22,
+        };
+        let _ = DrawTextW(mdc, &mut hex_wide, &mut text_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+        SelectObject(mdc, s.font_c);
+        SetTextColor(mdc, CLR_GRAY);
+        let rgb_str = format!("{},{},{}", r_comp, g_comp, b_comp);
+        let mut rgb_wide: Vec<u16> = rgb_str.encode_utf16().collect();
+        let mut rgb_rect = RECT {
+            left: draw_x + 42,
+            top: info_y + 22,
+            right: draw_x + zoom_w - 4,
+            bottom: info_y + 38,
+        };
+        let _ = DrawTextW(mdc, &mut rgb_wide, &mut rgb_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+        let _ = ReleaseDC(HWND(null_mut()), screen_dc);
+
+        let _ = BitBlt(hdc, 0, 0, win_w, win_h, mdc, 0, 0, SRCCOPY);
+        let _ = SelectObject(mdc, old);
+        let _ = DeleteObject(bmp);
+        let _ = DeleteDC(mdc);
+        let _ = EndPaint(hwnd, &ps);
+        return;
+    }
 
     // Calculate dynamic shape coordinates
     let p = s.current_p();
