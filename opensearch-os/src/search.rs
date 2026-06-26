@@ -7035,7 +7035,7 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         triggers: &["ask clipboard", "ai clipboard", "chat clipboard"],
         name: "Ask Clipboard using AI",
         breadcrumb: "AI > Ask Clipboard",
-        launch_command: "ai:chat:",
+        launch_command: "action:ask_clipboard",
         description: "Start an AI chat using your current clipboard text.",
     },
     QuickAction {

@@ -3814,6 +3814,24 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 );
                 do_hide(hwnd, s);
                 return;
+            } else if cmd == "action:ask_clipboard" {
+                if let Some(text) = paste_from_clipboard(hwnd) {
+                    let t = text.trim();
+                    if !t.is_empty() {
+                        s.chat_input = t.to_string();
+                        s.query = "".to_string();
+                        s.cursor_pos = 0;
+                        s.chat_input_active = true;
+                        s.ai_answer = Some("Ready. Hit Enter to send or edit your clipboard text above.".to_string());
+                        s.ai_title = "Ask Clipboard".to_string();
+                        s.results.clear();
+                        s.selected = 0;
+                        s.ai_scroll = 0;
+                        s.ai_follow_bottom = true;
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    }
+                }
+                return;
             } else if cmd == "action:export_snippets" {
                 export_snippets(hwnd, s);
                 do_hide(hwnd, s);
