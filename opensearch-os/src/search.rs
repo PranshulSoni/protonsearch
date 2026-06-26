@@ -3,7 +3,7 @@ use ort::{
     session::{builder::GraphOptimizationLevel, Session},
     value::TensorRef,
 };
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokenizers::Tokenizer;
@@ -12,6 +12,83 @@ pub static DISABLE_LIVE_RESULTS: AtomicBool = AtomicBool::new(false);
 
 const CATALOG: &[u8] = include_bytes!("../../assets/catalog.bin");
 const TOKENIZER: &[u8] = include_bytes!("../../assets/model/tokenizer.json");
+
+pub fn ensure_memory_events_schema(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS memory_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            detail TEXT,
+            app_name TEXT,
+            path TEXT,
+            url TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_memory_events_timestamp
+            ON memory_events(timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_memory_events_source_type
+            ON memory_events(source, event_type);
+        CREATE VIRTUAL TABLE IF NOT EXISTS memory_events_fts USING fts5(
+            title,
+            detail,
+            source,
+            event_type,
+            app_name,
+            path,
+            url,
+            content='memory_events',
+            content_rowid='id'
+        );
+        CREATE TRIGGER IF NOT EXISTS memory_events_ai AFTER INSERT ON memory_events BEGIN
+            INSERT INTO memory_events_fts(rowid, title, detail, source, event_type, app_name, path, url)
+            VALUES (new.id, new.title, coalesce(new.detail, ''), new.source, new.event_type, coalesce(new.app_name, ''), coalesce(new.path, ''), coalesce(new.url, ''));
+        END;
+        CREATE TRIGGER IF NOT EXISTS memory_events_ad AFTER DELETE ON memory_events BEGIN
+            INSERT INTO memory_events_fts(memory_events_fts, rowid, title, detail, source, event_type, app_name, path, url)
+            VALUES ('delete', old.id, old.title, coalesce(old.detail, ''), old.source, old.event_type, coalesce(old.app_name, ''), coalesce(old.path, ''), coalesce(old.url, ''));
+        END;
+        CREATE TRIGGER IF NOT EXISTS memory_events_au AFTER UPDATE ON memory_events BEGIN
+            INSERT INTO memory_events_fts(memory_events_fts, rowid, title, detail, source, event_type, app_name, path, url)
+            VALUES ('delete', old.id, old.title, coalesce(old.detail, ''), old.source, old.event_type, coalesce(old.app_name, ''), coalesce(old.path, ''), coalesce(old.url, ''));
+            INSERT INTO memory_events_fts(rowid, title, detail, source, event_type, app_name, path, url)
+            VALUES (new.id, new.title, coalesce(new.detail, ''), new.source, new.event_type, coalesce(new.app_name, ''), coalesce(new.path, ''), coalesce(new.url, ''));
+        END;
+        ",
+    )
+}
+
+pub fn insert_memory_event(
+    conn: &Connection,
+    timestamp: i64,
+    source: &str,
+    event_type: &str,
+    title: &str,
+    detail: &str,
+    app_name: &str,
+    path: Option<&str>,
+    url: Option<&str>,
+) {
+    if title.trim().is_empty() {
+        return;
+    }
+    if ensure_memory_events_schema(conn).is_err() {
+        return;
+    }
+    let _ = conn.execute(
+        "INSERT INTO memory_events
+         (timestamp, source, event_type, title, detail, app_name, path, url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+        params![timestamp, source, event_type, title, detail, app_name, path, url],
+    );
+    let _ = conn.execute(
+        "DELETE FROM memory_events
+         WHERE id NOT IN (SELECT id FROM memory_events ORDER BY timestamp DESC LIMIT 50000);",
+        [],
+    );
+}
 
 #[derive(Clone)]
 pub struct CatalogEntry {
@@ -222,6 +299,7 @@ impl SearchEngine {
             "CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp);",
             [],
         );
+        ensure_memory_events_schema(&conn)?;
 
         // Create quicklinks table
         conn.execute(
@@ -279,7 +357,11 @@ impl SearchEngine {
             [],
         )?;
 
-        let fc_count: i64 = conn.query_row("SELECT COUNT(*) FROM focus_categories", [], |row| row.get(0)).unwrap_or(0);
+        let fc_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM focus_categories", [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(0);
         if fc_count == 0 {
             let _ = conn.execute(
                 "INSERT INTO focus_categories (name, blocked_apps) VALUES (?, ?);",
@@ -1123,6 +1205,110 @@ impl SearchEngine {
                     ),
                 },
                 score: 4.5 - (i as f32 * 0.1),
+            });
+        }
+
+        results
+    }
+
+    pub fn search_memory_events(&self, query: &str) -> Vec<SearchResult> {
+        let q = query.trim();
+        let mut results = Vec::new();
+        let conn = &self.conn;
+        let rows: Vec<(
+            i64,
+            i64,
+            String,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+        )> = if q.is_empty() {
+            let mut stmt = match conn.prepare(
+                    "SELECT id, timestamp, source, event_type, title, coalesce(detail, ''), coalesce(app_name, ''), path, url
+                     FROM memory_events
+                     ORDER BY timestamp DESC LIMIT 50",
+                ) {
+                    Ok(s) => s,
+                    Err(_) => return results,
+                };
+            stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                ))
+            })
+            .map(|m| m.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+        } else {
+            let fts_query = make_fts_prefix_query(q);
+            if fts_query.is_empty() {
+                return results;
+            }
+            let mut stmt = match conn.prepare(
+                "SELECT e.id, e.timestamp, e.source, e.event_type, e.title,
+                            snippet(memory_events_fts, 1, '', '', '...', 14),
+                            coalesce(e.app_name, ''), e.path, e.url
+                     FROM memory_events_fts
+                     JOIN memory_events e ON e.id = memory_events_fts.rowid
+                     WHERE memory_events_fts MATCH ?
+                     ORDER BY e.timestamp DESC LIMIT 50",
+            ) {
+                Ok(s) => s,
+                Err(_) => return results,
+            };
+            stmt.query_map([fts_query], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                ))
+            })
+            .map(|m| m.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+        };
+
+        for (idx, (id, timestamp, source, event_type, title, detail, app_name, path, url)) in
+            rows.into_iter().enumerate()
+        {
+            let time_str = format_timestamp_local(timestamp);
+            let launch_command = url
+                .clone()
+                .or_else(|| path.clone())
+                .unwrap_or_else(|| app_name.clone());
+            let clean_detail = detail.replace("\r\n", " ").replace('\n', " ");
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: format!("memory.{}", id),
+                    control_name: title,
+                    breadcrumb_path: format!("Memory > {} > {} > {}", source, event_type, time_str),
+                    launch_command,
+                    source: "MEMORY".to_string(),
+                    description: ellipsize_chars(&clean_detail, 96),
+                    synonyms: format!(
+                        "{} {} {} {}",
+                        source.to_lowercase(),
+                        event_type.to_lowercase(),
+                        app_name.to_lowercase(),
+                        path.unwrap_or_default().to_lowercase()
+                    ),
+                },
+                score: 7.0 - (idx as f32 * 0.03),
             });
         }
 
@@ -2953,6 +3139,10 @@ impl SearchEngine {
         if q_lower_trimmed.starts_with("notes:") {
             let sub_query = q_lower_trimmed.strip_prefix("notes:").unwrap().trim();
             return self.search_notes(sub_query);
+        }
+        if q_lower_trimmed.starts_with("memory:") {
+            let sub_query = q_lower_trimmed.strip_prefix("memory:").unwrap().trim();
+            return self.search_memory_events(sub_query);
         }
         if q_lower_trimmed.starts_with("games:") {
             let sub_query = q_lower_trimmed.strip_prefix("games:").unwrap().trim();
@@ -7066,7 +7256,11 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         description: "Browse and search all your saved notes.",
     },
     QuickAction {
-        triggers: &["create focus category", "new focus category", "add focus category"],
+        triggers: &[
+            "create focus category",
+            "new focus category",
+            "add focus category",
+        ],
         name: "Create Focus Category",
         breadcrumb: "Focus > Add focus category",
         launch_command: "action:create_focus_category",
@@ -7621,7 +7815,11 @@ fn parse_time_range(query: &str) -> Option<(i64, i64, String)> {
         start_time = today_start + 12 * 3600;
         end_time = today_start + 17 * 3600;
     } else if q.contains("earlier today") || q.contains("earlier") {
-        time_phrase = if q.contains("earlier today") { "earlier today" } else { "earlier" };
+        time_phrase = if q.contains("earlier today") {
+            "earlier today"
+        } else {
+            "earlier"
+        };
         start_time = today_start;
         end_time = now;
     } else if q.contains("recently") {
@@ -7651,11 +7849,11 @@ fn parse_time_range(query: &str) -> Option<(i64, i64, String)> {
         // yesterday") leaves an EMPTY keyword → all events in the window, instead of
         // using the leftover words as a title filter that matches nothing.
         const FILLER: &[&str] = &[
-            "what", "whats", "what's", "was", "were", "am", "is", "i", "working", "work",
-            "worked", "on", "doing", "do", "did", "show", "me", "my", "the", "a", "an",
-            "opened", "open", "edited", "edit", "visited", "visit", "used", "use", "using",
-            "before", "after", "during", "at", "in", "with", "that", "this", "when", "which",
-            "files", "file", "code", "stuff", "things", "going", "up", "to", "of", "and",
+            "what", "whats", "what's", "was", "were", "am", "is", "i", "working", "work", "worked",
+            "on", "doing", "do", "did", "show", "me", "my", "the", "a", "an", "opened", "open",
+            "edited", "edit", "visited", "visit", "used", "use", "using", "before", "after",
+            "during", "at", "in", "with", "that", "this", "when", "which", "files", "file", "code",
+            "stuff", "things", "going", "up", "to", "of", "and",
         ];
         let clean_query = q
             .replace(time_phrase, " ")
@@ -7784,6 +7982,18 @@ fn ellipsize_chars(s: &str, max: usize) -> String {
     } else {
         format!("{}...", take_chars(s, max.saturating_sub(3)))
     }
+}
+
+fn make_fts_prefix_query(query: &str) -> String {
+    query
+        .split_whitespace()
+        .map(|w| {
+            let clean: String = w.chars().filter(|c| c.is_alphanumeric()).collect();
+            format!("{}*", clean)
+        })
+        .filter(|w| w.len() > 1)
+        .collect::<Vec<String>>()
+        .join(" ")
 }
 
 fn format_unix_date(timestamp: i64) -> String {
@@ -8432,9 +8642,17 @@ impl SearchEngine {
                             for line in content.lines() {
                                 let line = line.trim();
                                 if line.starts_with("\"appid\"") {
-                                    appid = line.replace("\"appid\"", "").replace("\"", "").trim().to_string();
+                                    appid = line
+                                        .replace("\"appid\"", "")
+                                        .replace("\"", "")
+                                        .trim()
+                                        .to_string();
                                 } else if line.starts_with("\"name\"") {
-                                    name = line.replace("\"name\"", "").replace("\"", "").trim().to_string();
+                                    name = line
+                                        .replace("\"name\"", "")
+                                        .replace("\"", "")
+                                        .trim()
+                                        .to_string();
                                 }
                             }
                             if !appid.is_empty() && !name.is_empty() {
@@ -8483,7 +8701,12 @@ impl SearchEngine {
                     let (name, blocked) = row;
                     let name_lower = name.to_lowercase();
                     let mut score = 0.0;
-                    if q.is_empty() || name_lower == q || q == "start focus session" || q == "focus session" || q == "focus" {
+                    if q.is_empty()
+                        || name_lower == q
+                        || q == "start focus session"
+                        || q == "focus session"
+                        || q == "focus"
+                    {
                         score = 4.0;
                     } else if name_lower.starts_with(&q) {
                         score = 3.5;
@@ -8573,12 +8796,17 @@ impl SearchEngine {
         let mut results = Vec::new();
         let q = query.trim().to_lowercase();
         if let Ok(appdata) = std::env::var("APPDATA") {
-            let notes_dir = std::path::PathBuf::from(appdata).join("opensearch-os").join("notes");
-            let _ = std::fs::create_dir_all(&notes_dir);  // fix #1: ensure dir exists before reading
+            let notes_dir = std::path::PathBuf::from(appdata)
+                .join("opensearch-os")
+                .join("notes");
+            let _ = std::fs::create_dir_all(&notes_dir); // fix #1: ensure dir exists before reading
             if let Ok(entries) = std::fs::read_dir(&notes_dir) {
                 for entry in entries.flatten() {
                     let filename = entry.file_name().to_string_lossy().to_string();
-                    let name = filename.strip_suffix(".txt").unwrap_or(&filename).to_string();
+                    let name = filename
+                        .strip_suffix(".txt")
+                        .unwrap_or(&filename)
+                        .to_string();
                     let name_lower = name.to_lowercase();
                     let full_path = entry.path().to_string_lossy().to_string();
                     let mut score = 0.0;
@@ -8599,8 +8827,13 @@ impl SearchEngine {
                                 breadcrumb_path: format!("Notes > {}", filename),
                                 launch_command: format!("open_note:{}", full_path),
                                 source: "ACTION".to_string(),
-                                description: "Open note in app (Ctrl+S to save, Esc to close)".to_string(),
-                                synonyms: format!("note {} {}", name_lower, filename.to_lowercase()),
+                                description: "Open note in app (Ctrl+S to save, Esc to close)"
+                                    .to_string(),
+                                synonyms: format!(
+                                    "note {} {}",
+                                    name_lower,
+                                    filename.to_lowercase()
+                                ),
                             },
                             score,
                         });

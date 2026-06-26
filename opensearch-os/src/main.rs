@@ -939,6 +939,17 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                                      is_image = excluded.is_image;",
                                 rusqlite::params![trimmed, now, app_name_clone],
                             );
+                            search::insert_memory_event(
+                                &conn,
+                                now,
+                                "Clipboard",
+                                "Copied Text",
+                                &format!("Copied text from {}", app_name_clone),
+                                &trimmed,
+                                &app_name_clone,
+                                None,
+                                None,
+                            );
                             let _ = conn.execute(
                                 "DELETE FROM clipboard_history WHERE pinned = 0 AND id NOT IN (SELECT id FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 500);",
                                 [],
@@ -2897,7 +2908,10 @@ fn compute_result_reasons(results: &[SearchResult]) -> std::collections::HashMap
         }
         let tag = if r.entry.source == "CLIPBOARD" {
             // id is clip.<ts> or clip.pinned.<ts>
-            r.entry.id.rsplit('.').next()
+            r.entry
+                .id
+                .rsplit('.')
+                .next()
                 .and_then(|t| t.parse::<i64>().ok())
                 .map(|ts| relative_age(now - ts))
                 .unwrap_or_default()
@@ -3972,7 +3986,10 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                         s.query = "".to_string();
                         s.cursor_pos = 0;
                         s.chat_input_active = true;
-                        s.ai_answer = Some("Ready. Hit Enter to send or edit your clipboard text above.".to_string());
+                        s.ai_answer = Some(
+                            "Ready. Hit Enter to send or edit your clipboard text above."
+                                .to_string(),
+                        );
                         s.ai_title = "Ask Clipboard".to_string();
                         s.results.clear();
                         s.selected = 0;
@@ -4685,7 +4702,11 @@ fn search_input_caret_active(s: &State) -> bool {
     search_input_caret_active_flags(s.search_input_active, s.note_editing, s.chat_input_active)
 }
 
-fn search_input_caret_active_flags(search_input_active: bool, note_editing: bool, chat_input_active: bool) -> bool {
+fn search_input_caret_active_flags(
+    search_input_active: bool,
+    note_editing: bool,
+    chat_input_active: bool,
+) -> bool {
     search_input_active && !note_editing && !chat_input_active
 }
 
@@ -5294,14 +5315,28 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         let body_top = y + SEARCH_H + 1;
         fill(mdc, x, y + SEARCH_H, w, 1, CLR_DIV);
 
-        let title_str = s.note_path.as_deref()
+        let title_str = s
+            .note_path
+            .as_deref()
             .and_then(|p| std::path::Path::new(p).file_stem())
-            .and_then(|n| n.to_str()).unwrap_or("Note").to_string();
+            .and_then(|n| n.to_str())
+            .unwrap_or("Note")
+            .to_string();
         SelectObject(mdc, s.font_n);
         SetTextColor(mdc, CLR_WHITE);
         let mut title: Vec<u16> = title_str.encode_utf16().collect();
-        let mut title_rc = RECT { left: x + pad, top: body_top + 12, right: x + w - pad, bottom: body_top + 42 };
-        let _ = DrawTextW(mdc, &mut title, &mut title_rc, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+        let mut title_rc = RECT {
+            left: x + pad,
+            top: body_top + 12,
+            right: x + w - pad,
+            bottom: body_top + 42,
+        };
+        let _ = DrawTextW(
+            mdc,
+            &mut title,
+            &mut title_rc,
+            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
+        );
 
         let content_top = body_top + 48;
         let footer_h = 30;
@@ -5310,24 +5345,60 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         // Body — append a caret block so the user sees the insertion point.
         SelectObject(mdc, s.font_c);
         SetTextColor(mdc, CLR_WHITE);
-        let shown = if s.cursor_visible && s.note_editing { format!("{}\u{2588}", s.note_text) } else { s.note_text.clone() };
+        let shown = if s.cursor_visible && s.note_editing {
+            format!("{}\u{2588}", s.note_text)
+        } else {
+            s.note_text.clone()
+        };
         let mut body: Vec<u16> = shown.encode_utf16().collect();
-        let mut calc = RECT { left: x + pad, top: 0, right: x + w - pad, bottom: 0 };
-        let _ = DrawTextW(mdc, &mut body.clone(), &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+        let mut calc = RECT {
+            left: x + pad,
+            top: 0,
+            right: x + w - pad,
+            bottom: 0,
+        };
+        let _ = DrawTextW(
+            mdc,
+            &mut body.clone(),
+            &mut calc,
+            DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX,
+        );
         let total_h = calc.bottom - calc.top;
         let view_h = content_bottom - content_top;
         let max_scroll = (total_h - view_h).max(0);
         let scroll = s.note_scroll.clamp(0, max_scroll);
-        let mut body_rc = RECT { left: x + pad, top: content_top - scroll, right: x + w - pad, bottom: content_top - scroll + total_h.max(view_h) };
-        let _ = DrawTextW(mdc, &mut body, &mut body_rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+        let mut body_rc = RECT {
+            left: x + pad,
+            top: content_top - scroll,
+            right: x + w - pad,
+            bottom: content_top - scroll + total_h.max(view_h),
+        };
+        let _ = DrawTextW(
+            mdc,
+            &mut body,
+            &mut body_rc,
+            DT_LEFT | DT_WORDBREAK | DT_NOPREFIX,
+        );
 
         fill(mdc, x, content_bottom, w, footer_h + 4, BG);
         fill(mdc, x, content_bottom, w, 1, CLR_DIV);
         SelectObject(mdc, s.font_b);
         SetTextColor(mdc, CLR_GRAY);
-        let mut hint: Vec<u16> = "Esc: save & close     ·     Ctrl+S: save     ·     ↑ ↓ scroll".encode_utf16().collect();
-        let mut hint_rc = RECT { left: x + pad, top: content_bottom + 2, right: x + w - pad, bottom: content_bottom + footer_h };
-        let _ = DrawTextW(mdc, &mut hint, &mut hint_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        let mut hint: Vec<u16> = "Esc: save & close     ·     Ctrl+S: save     ·     ↑ ↓ scroll"
+            .encode_utf16()
+            .collect();
+        let mut hint_rc = RECT {
+            left: x + pad,
+            top: content_bottom + 2,
+            right: x + w - pad,
+            bottom: content_bottom + footer_h,
+        };
+        let _ = DrawTextW(
+            mdc,
+            &mut hint,
+            &mut hint_rc,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+        );
         SelectObject(mdc, s.font_q);
     }
 
@@ -5943,7 +6014,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         .unwrap_or(s.icon_control_panel)
                 } else if res.entry.launch_command.starts_with("ms-settings:") {
                     s.icon_settings
-                } else if res.entry.source == "web" || res.entry.source == "HISTORY" || res.entry.source == "QUICKLINK" || res.entry.launch_command.starts_with("https://") {
+                } else if res.entry.source == "web"
+                    || res.entry.source == "HISTORY"
+                    || res.entry.source == "QUICKLINK"
+                    || res.entry.launch_command.starts_with("https://")
+                {
                     s.icon_web
                 } else if res.entry.source == "BOOKMARK" {
                     s.icon_bookmark
@@ -5951,15 +6026,42 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     s.icon_folder
                 } else if res.entry.source == "COMMIT" {
                     s.icon_commit
-                } else if res.entry.source == "TODO" || res.entry.source == "SNIPPET" || res.entry.launch_command.starts_with("action:create_snippet") {
+                } else if res.entry.source == "TODO"
+                    || res.entry.source == "SNIPPET"
+                    || res
+                        .entry
+                        .launch_command
+                        .starts_with("action:create_snippet")
+                {
                     s.icon_todo
-                } else if res.entry.source == "CLIPBOARD" || res.entry.launch_command.starts_with("action:ask_clipboard") {
+                } else if res.entry.source == "CLIPBOARD"
+                    || res.entry.launch_command.starts_with("action:ask_clipboard")
+                {
                     s.icon_clipboard
-                } else if res.entry.source == "AI" || res.entry.source == "MEMORY" || res.entry.launch_command.starts_with("action:reload_script_commands") {
+                } else if res.entry.source == "AI"
+                    || res.entry.source == "MEMORY"
+                    || res
+                        .entry
+                        .launch_command
+                        .starts_with("action:reload_script_commands")
+                {
                     s.icon_memory
-                } else if res.entry.launch_command.starts_with("start_focus_session:") || res.entry.launch_command.starts_with("action:toggle_focus_session") || res.entry.launch_command.starts_with("action:create_focus_category") {
+                } else if res.entry.launch_command.starts_with("start_focus_session:")
+                    || res
+                        .entry
+                        .launch_command
+                        .starts_with("action:toggle_focus_session")
+                    || res
+                        .entry
+                        .launch_command
+                        .starts_with("action:create_focus_category")
+                {
                     s.icon_bookmark // Star for focus
-                } else if res.entry.launch_command.starts_with("action:create_quicklink") {
+                } else if res
+                    .entry
+                    .launch_command
+                    .starts_with("action:create_quicklink")
+                {
                     s.icon_web
                 } else {
                     s.icon_control_panel
@@ -6011,7 +6113,10 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
             // "Why it surfaced" recency tag (Explain Results), right-aligned on the
             // breadcrumb line; the breadcrumb shortens to make room.
-            let reason = s.result_reasons.get(&res.entry.launch_command).filter(|r| !r.is_empty());
+            let reason = s
+                .result_reasons
+                .get(&res.entry.launch_command)
+                .filter(|r| !r.is_empty());
             let reason_slot = if reason.is_some() { 96 } else { 0 };
 
             // Breadcrumb
@@ -6687,6 +6792,17 @@ unsafe fn save_clipboard_image(
         rusqlite::params![img_path_str, timestamp, source_app],
     )
     .ok()?;
+    search::insert_memory_event(
+        &conn,
+        timestamp,
+        "Clipboard",
+        "Copied Image",
+        &format!("Copied image from {}", source_app),
+        &img_path_str,
+        source_app,
+        Some(&img_path_str),
+        None,
+    );
     let _ = conn.execute(
         "DELETE FROM clipboard_history WHERE pinned = 0 AND id NOT IN (SELECT id FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 500);",
         [],
@@ -7172,6 +7288,17 @@ fn log_timeline_event(
             "INSERT INTO timeline_events (timestamp, duration, app_name, window_title) VALUES (?, ?, ?, ?);",
             rusqlite::params![timestamp, duration, app_name, window_title],
         );
+        search::insert_memory_event(
+            &conn,
+            timestamp,
+            "Timeline",
+            "Active Window",
+            window_title,
+            &format!("Used {} for {} seconds", app_name, duration),
+            app_name,
+            None,
+            None,
+        );
         let _ = conn.execute(
             "DELETE FROM timeline_events WHERE id NOT IN (SELECT id FROM timeline_events ORDER BY timestamp DESC LIMIT 10000);",
             [],
@@ -7648,7 +7775,9 @@ unsafe fn handle_form_enter(hwnd: HWND, s: &mut State) {
         FormState::CreateNoteName => {
             if !input.is_empty() {
                 if let Ok(appdata) = std::env::var("APPDATA") {
-                    let notes_dir = std::path::PathBuf::from(appdata).join("opensearch-os").join("notes");
+                    let notes_dir = std::path::PathBuf::from(appdata)
+                        .join("opensearch-os")
+                        .join("notes");
                     let _ = std::fs::create_dir_all(&notes_dir);
                     let safe_name = input.replace(|c: char| !c.is_alphanumeric() && c != ' ', "_");
                     let note_path = notes_dir.join(format!("{}.txt", safe_name));
@@ -7710,7 +7839,6 @@ unsafe fn close_note_editor(hwnd: HWND, s: &mut State) {
         let _ = InvalidateRect(hwnd, None, FALSE);
     }
 }
-
 
 unsafe fn export_snippets(hwnd: HWND, s: &State) {
     if let Ok(conn) = rusqlite::Connection::open(&s.db_path) {
