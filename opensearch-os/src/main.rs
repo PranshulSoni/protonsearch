@@ -3461,6 +3461,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             || cmd == "ql:"
             || cmd == "snip:"
             || cmd == "img:"
+            || cmd == "memory:"
             || cmd == "chats:"
             || cmd == "agents:"
             || cmd == "agentchats:"

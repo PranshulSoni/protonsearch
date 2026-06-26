@@ -1315,6 +1315,75 @@ impl SearchEngine {
         results
     }
 
+    pub fn search_memory_home(&self) -> Vec<SearchResult> {
+        let (today_start, tomorrow_start) = local_day_bounds(0);
+        let (yesterday_start, today_again) = local_day_bounds(1);
+        let today_count = count_memory_events(&self.conn, today_start, tomorrow_start);
+        let yesterday_count = count_memory_events(&self.conn, yesterday_start, today_again);
+        let total_count = count_memory_events(&self.conn, 0, i64::MAX);
+        let today_sources = memory_source_summary(&self.conn, today_start, tomorrow_start);
+        let yesterday_sources = memory_source_summary(&self.conn, yesterday_start, today_again);
+
+        vec![
+            SearchResult {
+                entry: CatalogEntry {
+                    id: "memory.home".to_string(),
+                    control_name: "Your Windows PC doesn't forget".to_string(),
+                    breadcrumb_path: "Memory > Local on this PC".to_string(),
+                    launch_command: "memory:".to_string(),
+                    source: "MEMORY".to_string(),
+                    description: memory_home_description(today_count, yesterday_count, total_count),
+                    synonyms: "memory remembers local private pc windows timeline".to_string(),
+                },
+                score: 12.0,
+            },
+            SearchResult {
+                entry: CatalogEntry {
+                    id: "memory.today".to_string(),
+                    control_name: "Today".to_string(),
+                    breadcrumb_path: "Memory > Today".to_string(),
+                    launch_command: "memory:".to_string(),
+                    source: "MEMORY".to_string(),
+                    description: format!(
+                        "{} remembered events today. {}",
+                        today_count, today_sources
+                    ),
+                    synonyms: "memory today activity timeline events".to_string(),
+                },
+                score: 11.0,
+            },
+            SearchResult {
+                entry: CatalogEntry {
+                    id: "memory.yesterday".to_string(),
+                    control_name: "Yesterday".to_string(),
+                    breadcrumb_path: "Memory > Yesterday".to_string(),
+                    launch_command: "memory:".to_string(),
+                    source: "MEMORY".to_string(),
+                    description: format!(
+                        "{} remembered events yesterday. {}",
+                        yesterday_count, yesterday_sources
+                    ),
+                    synonyms: "memory yesterday activity rewind timeline events".to_string(),
+                },
+                score: 10.5,
+            },
+            SearchResult {
+                entry: CatalogEntry {
+                    id: "memory.privacy".to_string(),
+                    control_name: "Stored locally on this PC".to_string(),
+                    breadcrumb_path: "Memory > Privacy".to_string(),
+                    launch_command: "memory:".to_string(),
+                    source: "MEMORY".to_string(),
+                    description:
+                        "MemoryOS uses local SQLite storage. Pause/exclude/delete controls come next."
+                            .to_string(),
+                    synonyms: "memory privacy local storage sqlite pause exclude delete".to_string(),
+                },
+                score: 10.0,
+            },
+        ]
+    }
+
     pub fn search_project(&self, project_keyword: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
         let conn = &self.conn;
@@ -2766,6 +2835,17 @@ impl SearchEngine {
             }];
         }
 
+        if matches!(
+            q_lower_trimmed.as_str(),
+            "memory"
+                | "memories"
+                | "what do you remember"
+                | "what does my pc remember"
+                | "what does windows remember"
+        ) {
+            return self.search_memory_home();
+        }
+
         // Intercept temporal context queries (e.g. yesterday before lunch)
         if let Some((start_time, end_time, clean_q)) = parse_time_range(q) {
             return self.search_timeline(start_time, end_time, &clean_q);
@@ -2798,6 +2878,18 @@ impl SearchEngine {
 
         if q.is_empty() {
             let mut results = Vec::new();
+            results.push(SearchResult {
+                entry: CatalogEntry {
+                    id: "folder.memory".to_string(),
+                    control_name: "Your Windows PC doesn't forget".to_string(),
+                    breadcrumb_path: "Memory > Local on this PC".to_string(),
+                    launch_command: "memory:".to_string(),
+                    source: "MEMORY".to_string(),
+                    description: "Open everything MemoryOS has captured locally.".to_string(),
+                    synonyms: "memory remembers timeline today yesterday computer pc".to_string(),
+                },
+                score: 6.0,
+            });
             results.push(SearchResult {
                 entry: CatalogEntry {
                     id: "folder.bookmarks".to_string(),
@@ -4694,6 +4786,14 @@ mod tests {
         assert_eq!(ellipsize_chars("😀😀😀😀", 5), "😀😀😀😀");
         assert_eq!(take_chars("😀abcdef", 2), "😀a");
         assert_eq!(take_last_chars("abcdef😀", 2), "f😀");
+    }
+
+    #[test]
+    fn memory_home_description_keeps_local_trust_line() {
+        assert_eq!(
+            memory_home_description(3, 2, 9),
+            "3 events today, 2 yesterday, 9 total. Stored locally on this PC."
+        );
     }
 
     #[test]
@@ -7982,6 +8082,62 @@ fn ellipsize_chars(s: &str, max: usize) -> String {
     } else {
         format!("{}...", take_chars(s, max.saturating_sub(3)))
     }
+}
+
+fn memory_home_description(today: i64, yesterday: i64, total: i64) -> String {
+    format!(
+        "{} events today, {} yesterday, {} total. Stored locally on this PC.",
+        today, yesterday, total
+    )
+}
+
+fn count_memory_events(conn: &Connection, start: i64, end: i64) -> i64 {
+    conn.query_row(
+        "SELECT COUNT(*) FROM memory_events WHERE timestamp >= ? AND timestamp < ?",
+        params![start, end],
+        |row| row.get(0),
+    )
+    .unwrap_or(0)
+}
+
+fn memory_source_summary(conn: &Connection, start: i64, end: i64) -> String {
+    let mut stmt = match conn.prepare(
+        "SELECT source, COUNT(*) FROM memory_events
+         WHERE timestamp >= ? AND timestamp < ?
+         GROUP BY source ORDER BY COUNT(*) DESC LIMIT 4",
+    ) {
+        Ok(s) => s,
+        Err(_) => return "No captured events yet.".to_string(),
+    };
+    let parts: Vec<String> = stmt
+        .query_map(params![start, end], |row| {
+            Ok(format!(
+                "{} {}",
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?
+            ))
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default();
+    if parts.is_empty() {
+        "No captured events yet.".to_string()
+    } else {
+        parts.join(", ")
+    }
+}
+
+fn local_day_bounds(days_ago: i64) -> (i64, i64) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let local_time = unsafe { windows::Win32::System::SystemInformation::GetLocalTime() };
+    let seconds_since_midnight = (local_time.wHour as i64 * 3600)
+        + (local_time.wMinute as i64 * 60)
+        + local_time.wSecond as i64;
+    let today_start = now - seconds_since_midnight;
+    let start = today_start - days_ago * 86400;
+    (start, start + 86400)
 }
 
 fn make_fts_prefix_query(query: &str) -> String {
