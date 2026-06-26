@@ -918,6 +918,19 @@ unsafe extern "system" fn wnd_proc(
             LRESULT(0)
         }
 
+        WM_AI_PROGRESS => {
+            if lp.0 != 0 {
+                let text = unsafe { *Box::from_raw(lp.0 as *mut String) };
+                if !sp.is_null() {
+                    let s = &mut *sp;
+                    s.ai_answer = Some(text);
+                    s.ai_follow_bottom = true;
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+            }
+            LRESULT(0)
+        }
+
         WM_HERMES_APPROVAL => {
             // A Hermes tool needs approval. Stash it so the Approve/Deny buttons
             // render, and keep the panel from auto-dismissing.
