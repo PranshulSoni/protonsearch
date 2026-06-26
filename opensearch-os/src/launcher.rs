@@ -722,6 +722,59 @@ fn handle_window_action(action: &str) {
                     return;
                 }
             }
+            "move_top" => {
+                let mut r = RECT::default();
+                if GetWindowRect(target_hwnd, &mut r).is_ok() {
+                    w = r.right - r.left;
+                    h = r.bottom - r.top;
+                    x = r.left;
+                    y = work.top;
+                } else { return; }
+            }
+            "move_bottom" => {
+                let mut r = RECT::default();
+                if GetWindowRect(target_hwnd, &mut r).is_ok() {
+                    w = r.right - r.left;
+                    h = r.bottom - r.top;
+                    x = r.left;
+                    y = work.bottom - h;
+                } else { return; }
+            }
+            "bottom_center_sixth" => { w = sw / 3; h = sh / 2; x = work.left + sw / 3; y = work.top + sh / 2; }
+            "top_center_sixth" => { w = sw / 3; h = sh / 2; x = work.left + sw / 3; y = work.top; }
+            "bottom_left_sixth" => { w = sw / 3; h = sh / 2; x = work.left; y = work.top + sh / 2; }
+            "bottom_right_sixth" => { w = sw / 3; h = sh / 2; x = work.left + 2 * sw / 3; y = work.top + sh / 2; }
+            "top_left_sixth" => { w = sw / 3; h = sh / 2; x = work.left; y = work.top; }
+            "top_right_sixth" => { w = sw / 3; h = sh / 2; x = work.left + 2 * sw / 3; y = work.top; }
+            "bottom_center_two_thirds" => { w = 2 * sw / 3; h = sh / 2; x = work.left + sw / 6; y = work.top + sh / 2; }
+            "top_center_two_thirds" => { w = 2 * sw / 3; h = sh / 2; x = work.left + sw / 6; y = work.top; }
+            "bottom_third" => { w = sw; h = sh / 3; x = work.left; y = work.top + 2 * sh / 3; }
+            "top_third" => { w = sw; h = sh / 3; x = work.left; y = work.top; }
+            "bottom_three_fourths" => { w = sw; h = 3 * sh / 4; x = work.left; y = work.top + sh / 4; }
+            "top_three_fourths" => { w = sw; h = 3 * sh / 4; x = work.left; y = work.top; }
+            "bottom_two_thirds" => { w = sw; h = 2 * sh / 3; x = work.left; y = work.top + sh / 3; }
+            "top_two_thirds" => { w = sw; h = 2 * sh / 3; x = work.left; y = work.top; }
+            "first_fourth" => { w = sw / 4; h = sh; x = work.left; y = work.top; }
+            "second_fourth" => { w = sw / 4; h = sh; x = work.left + sw / 4; y = work.top; }
+            "third_fourth" => { w = sw / 4; h = sh; x = work.left + sw / 2; y = work.top; }
+            "last_fourth" => { w = sw / 4; h = sh; x = work.left + 3 * sw / 4; y = work.top; }
+            "top_first_fourth" => { w = sw / 4; h = sh / 2; x = work.left; y = work.top; }
+            "top_second_fourth" => { w = sw / 4; h = sh / 2; x = work.left + sw / 4; y = work.top; }
+            "top_third_fourth" => { w = sw / 4; h = sh / 2; x = work.left + sw / 2; y = work.top; }
+            "top_last_fourth" => { w = sw / 4; h = sh / 2; x = work.left + 3 * sw / 4; y = work.top; }
+            "bottom_first_fourth" => { w = sw / 4; h = sh / 2; x = work.left; y = work.top + sh / 2; }
+            "bottom_second_fourth" => { w = sw / 4; h = sh / 2; x = work.left + sw / 4; y = work.top + sh / 2; }
+            "bottom_third_fourth" => { w = sw / 4; h = sh / 2; x = work.left + sw / 2; y = work.top + sh / 2; }
+            "bottom_last_fourth" => { w = sw / 4; h = sh / 2; x = work.left + 3 * sw / 4; y = work.top + sh / 2; }
+            "last_third" => { w = sw / 3; h = sh; x = work.left + 2 * sw / 3; y = work.top; }
+            "last_three_fourths" => { w = 3 * sw / 4; h = sh; x = work.left + sw / 4; y = work.top; }
+            "last_two_thirds" => { w = 2 * sw / 3; h = sh; x = work.left + sw / 3; y = work.top; }
+            "first_third" => { w = sw / 3; h = sh; x = work.left; y = work.top; }
+            "first_three_fourths" => { w = 3 * sw / 4; h = sh; x = work.left; y = work.top; }
+            "first_two_thirds" => { w = 2 * sw / 3; h = sh; x = work.left; y = work.top; }
+            "center_half" => { w = sw / 2; h = sh; x = work.left + sw / 4; y = work.top; }
+            "center_three_fourths" => { w = 3 * sw / 4; h = sh; x = work.left + sw / 8; y = work.top; }
+            "center_two_thirds" => { w = 2 * sw / 3; h = sh; x = work.left + sw / 6; y = work.top; }
             _ => return,
         }
 
