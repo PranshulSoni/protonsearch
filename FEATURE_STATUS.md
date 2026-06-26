@@ -24,7 +24,7 @@
   - [Script Commands — Missing](#script-commands--missing)
   - [Typing Practice — Missing](#typing-practice--missing)
   - [Summarize Webpage — Missing](#summarize-webpage--missing)
-- [GitHub Issues — All Resolved](#github-issues--all-resolved)
+- [GitHub Issues — 1 Open](#github-issues--1-open)
   - [🔴 Security (Fixed)](#-security)
   - [🟠 Performance (Fixed)](#-performance)
   - [🟡 Quality (Fixed)](#-quality)
@@ -334,11 +334,17 @@
 
 ---
 
-## GitHub Issues — All Resolved
+## GitHub Issues — 1 Open
 
-All 14 issues are currently **resolved** or skipped via Ponytail logic.
+1 issue remains open. 14 previously fixed/skipped.
 
-### 🔴 Security (Fixed)
+### 🔴 Focus & Stability (Open)
+
+| # | Title | Description |
+|---|-------|-------------|
+| 20 | Focus category site blocking is unreliable | `taskkill /FI WINDOWTITLE` fails to block websites if the browser obfuscates the title. Documented as "not working" per user request. |
+
+### 🟢 Security (Fixed)
 
 | # | Title | Description |
 |---|-------|-------------|
@@ -387,7 +393,7 @@ All 14 issues are currently **resolved** or skipped via Ponytail logic.
 | Typing Practice | 0 | 1 | 0% |
 | Script Commands | 0 | 1 | 0% |
 | Voice & Input | 3 | 0 | 100% |
-| GitHub Issues Resolved | 14 | 0 | 100% |
+| GitHub Issues Resolved | 14 | 1 | 93% |
 
 ### Priority Recommendations
 
