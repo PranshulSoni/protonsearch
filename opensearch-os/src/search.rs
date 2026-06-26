@@ -3626,6 +3626,19 @@ mod tests {
     }
 
     #[test]
+    fn quick_actions_expose_native_windows_shortcuts() {
+        for command in [
+            "action:sleep_displays",
+            "action:show_desktop",
+            "action:open_run",
+            "action:quit_active_app",
+            "action:open_recycle_bin",
+        ] {
+            assert!(QUICK_ACTIONS.iter().any(|action| action.launch_command == command));
+        }
+    }
+
+    #[test]
     fn test_hybrid_search_accuracy() {
         DISABLE_LIVE_RESULTS.store(true, Ordering::Relaxed);
         let exe = std::env::current_exe().expect("failed to get current exe");
@@ -4246,11 +4259,46 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         description: "Put the computer to sleep.",
     },
     QuickAction {
+        triggers: &["sleep displays", "turn off displays", "turn off monitor", "screen off"],
+        name: "Sleep Displays",
+        breadcrumb: "System > Power > Turn displays off",
+        launch_command: "action:sleep_displays",
+        description: "Turn off the connected displays without sleeping the PC.",
+    },
+    QuickAction {
+        triggers: &["show desktop", "peek desktop", "minimize all", "desktop"],
+        name: "Show Desktop",
+        breadcrumb: "Windows > Desktop > Show desktop",
+        launch_command: "action:show_desktop",
+        description: "Toggle the desktop view.",
+    },
+    QuickAction {
+        triggers: &["run", "open run", "run dialog", "windows run"],
+        name: "Open Run",
+        breadcrumb: "Windows > Run dialog",
+        launch_command: "action:open_run",
+        description: "Open the Windows Run dialog.",
+    },
+    QuickAction {
+        triggers: &["quit active app", "close active app", "close current window", "close foreground window"],
+        name: "Quit Active App",
+        breadcrumb: "Windows > Active app > Close",
+        launch_command: "action:quit_active_app",
+        description: "Ask the previously active app window to close.",
+    },
+    QuickAction {
         triggers: &["empty recycle bin", "clear recycle bin", "empty trash", "recycle bin"],
         name: "Empty Recycle Bin",
         breadcrumb: "System > Storage > Empty the Recycle Bin",
         launch_command: "action:recycle",
         description: "Permanently delete all items in the Recycle Bin.",
+    },
+    QuickAction {
+        triggers: &["open recycle bin", "recycle bin folder", "open trash", "trash folder"],
+        name: "Open Recycle Bin",
+        breadcrumb: "File System > Recycle Bin",
+        launch_command: "action:open_recycle_bin",
+        description: "Open the Recycle Bin folder.",
     },
     QuickAction {
         triggers: &["open downloads", "downloads folder", "my downloads"],

@@ -228,6 +228,22 @@ fn handle_action(action: &str) {
                 let _ = windows::Win32::System::Power::SetSuspendState(false, false, false);
             }
         }
+        "sleep_displays" => {
+            sleep_displays();
+        }
+        "show_desktop" => {
+            send_win_d();
+        }
+        "open_run" => {
+            let _ = Command::new("explorer.exe")
+                .arg("shell:::{2559a1f3-21d7-11d4-bdaf-00c04f60b9f0}")
+                .spawn();
+        }
+        "open_recycle_bin" => {
+            let _ = Command::new("explorer.exe")
+                .arg("shell:RecycleBinFolder")
+                .spawn();
+        }
         "recycle" => {
             unsafe {
                 use windows::Win32::UI::Shell::{SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI};
@@ -775,6 +791,60 @@ pub fn toggle_hidden_files() -> Result<bool, windows::core::Error> {
         } else {
             Err(status.into())
         }
+    }
+}
+
+fn sleep_displays() {
+    unsafe {
+        use windows::Win32::{
+            Foundation::{HWND, LPARAM, WPARAM},
+            UI::WindowsAndMessaging::{SendMessageW, WM_SYSCOMMAND},
+        };
+
+        const SC_MONITORPOWER: usize = 0xF170;
+        let _ = SendMessageW(
+            HWND(-1isize as *mut std::ffi::c_void),
+            WM_SYSCOMMAND,
+            WPARAM(SC_MONITORPOWER),
+            LPARAM(2),
+        );
+    }
+}
+
+fn send_win_d() {
+    unsafe {
+        use windows::Win32::UI::Input::KeyboardAndMouse::*;
+
+        let win = VK_LWIN;
+        let d = VIRTUAL_KEY(0x44);
+        let inputs = [
+            key_input(win, KEYBD_EVENT_FLAGS(0)),
+            key_input(d, KEYBD_EVENT_FLAGS(0)),
+            key_input(d, KEYEVENTF_KEYUP),
+            key_input(win, KEYEVENTF_KEYUP),
+        ];
+
+        SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+fn key_input(
+    vk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY,
+    flags: windows::Win32::UI::Input::KeyboardAndMouse::KEYBD_EVENT_FLAGS,
+) -> windows::Win32::UI::Input::KeyboardAndMouse::INPUT {
+    use windows::Win32::UI::Input::KeyboardAndMouse::*;
+
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
     }
 }
 

@@ -3537,6 +3537,18 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             } else if cmd == "action:color_picker" {
                 start_color_picker(hwnd, s);
                 return;
+            } else if cmd == "action:quit_active_app" {
+                let prev_hwnd = s.prev_foreground;
+                do_hide(hwnd, s);
+                if !prev_hwnd.0.is_null() {
+                    let _ = windows::Win32::UI::WindowsAndMessaging::PostMessageW(
+                        prev_hwnd,
+                        windows::Win32::UI::WindowsAndMessaging::WM_CLOSE,
+                        WPARAM(0),
+                        LPARAM(0),
+                    );
+                }
+                return;
             } else {
                 launcher::launch(&cmd);
             }
