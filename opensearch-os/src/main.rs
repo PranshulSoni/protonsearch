@@ -808,43 +808,7 @@ unsafe extern "system" fn wnd_proc(
                     });
                 }
             } else {
-                // Try image format (CF_BITMAP)
-                unsafe {
-                    if let Some((buf, bih)) = capture_clipboard_image_data(hwnd) {
-                        let now = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs() as i64;
-                        let filename = format!("image_{}.bmp", now);
-                        let img_dir = db_path.parent().unwrap().join("clipboard_images");
-                        let _ = std::fs::create_dir_all(&img_dir);
-                        let img_path = img_dir.join(&filename);
-                        let img_path_str = img_path.to_string_lossy().to_string();
-                        
-                        let db_path_clone = db_path.clone();
-                        std::thread::spawn(move || {
-                            if write_bmp_file(&img_path, &buf, bih).is_ok() {
-                                if let Ok(conn) = rusqlite::Connection::open(&db_path_clone) {
-                                    let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-                                    let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
-                                    let _ = conn.execute(
-                                        "INSERT INTO clipboard_history (content, timestamp, source_app, is_image, pinned) \
-                                         VALUES (?, ?, ?, 1, 0) \
-                                         ON CONFLICT(content) DO UPDATE SET \
-                                             timestamp = excluded.timestamp, \
-                                             source_app = excluded.source_app, \
-                                             is_image = excluded.is_image;",
-                                        rusqlite::params![img_path_str, now, app_name],
-                                    );
-                                    let _ = conn.execute(
-                                        "DELETE FROM clipboard_history WHERE pinned = 0 AND id NOT IN (SELECT id FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 500);",
-                                        [],
-                                    );
-                                }
-                            }
-                        });
-                    }
-                }
+                let _ = unsafe { save_clipboard_image(hwnd, &db_path, &app_name) };
             }
             LRESULT(0)
         }
@@ -3545,6 +3509,25 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             } else if cmd == "action:reset_window_position" {
                 reset_launcher_window_position(hwnd, s);
                 return;
+            } else if cmd == "action:paste_latest_screenshot" {
+                let prev_hwnd = s.prev_foreground;
+                if let Some(path) = latest_clipboard_image_path(&s.db_path) {
+                    if copy_image_to_clipboard(hwnd, &path) {
+                        do_hide(hwnd, s);
+                        paste_into_window(prev_hwnd);
+                    } else {
+                        s.query = "Could not copy latest screenshot".to_string();
+                        s.cursor_pos = s.query.len();
+                        s.results.clear();
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    }
+                } else {
+                    s.query = "No screenshot found in Clipboard History".to_string();
+                    s.cursor_pos = s.query.len();
+                    s.results.clear();
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+                return;
             } else if cmd == "action:quit_active_app" {
                 let prev_hwnd = s.prev_foreground;
                 do_hide(hwnd, s);
@@ -5586,14 +5569,14 @@ fn clipboard_image_path(db_path: &std::path::Path, now_ms: u128) -> Option<(std:
 }
 
 unsafe fn save_clipboard_image(hwnd: HWND, db_path: &std::path::Path, source_app: &str) -> Option<String> {
-    let (buf, bih) = capture_clipboard_image_data(hwnd)?;
+    let bmp_bytes = capture_clipboard_bmp_bytes(hwnd)?;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
     let timestamp = now.as_secs() as i64;
     let (img_path, img_path_str) = clipboard_image_path(db_path, now.as_millis())?;
     std::fs::create_dir_all(img_path.parent()?).ok()?;
-    write_bmp_file(&img_path, &buf, bih).ok()?;
+    std::fs::write(&img_path, bmp_bytes).ok()?;
 
     let conn = rusqlite::Connection::open(db_path).ok()?;
     let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
@@ -5612,6 +5595,65 @@ unsafe fn save_clipboard_image(hwnd: HWND, db_path: &std::path::Path, source_app
         [],
     );
     Some(img_path.to_string_lossy().to_string())
+}
+
+fn latest_clipboard_image_path(db_path: &std::path::Path) -> Option<String> {
+    let conn = rusqlite::Connection::open(db_path).ok()?;
+    conn.query_row(
+        "SELECT content FROM clipboard_history WHERE is_image = 1 ORDER BY pinned DESC, timestamp DESC LIMIT 1",
+        [],
+        |row| row.get::<_, String>(0),
+    ).ok()
+}
+
+unsafe fn capture_clipboard_bmp_bytes(hwnd: HWND) -> Option<Vec<u8>> {
+    capture_clipboard_dib_bmp_bytes(hwnd).or_else(|| {
+        let (buf, bih) = capture_clipboard_image_data(hwnd)?;
+        bmp_file_bytes(&buf, bih)
+    })
+}
+
+unsafe fn capture_clipboard_dib_bmp_bytes(hwnd: HWND) -> Option<Vec<u8>> {
+    use windows::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard};
+    use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
+    use windows::Win32::Foundation::HGLOBAL;
+
+    const CF_DIB: u32 = 8;
+    const CF_DIBV5: u32 = 17;
+    let format = if IsClipboardFormatAvailable(CF_DIBV5).is_ok() {
+        CF_DIBV5
+    } else if IsClipboardFormatAvailable(CF_DIB).is_ok() {
+        CF_DIB
+    } else {
+        return None;
+    };
+
+    if OpenClipboard(hwnd).is_err() {
+        return None;
+    }
+
+    let result = (|| {
+        let handle = GetClipboardData(format).ok()?;
+        if handle.0.is_null() {
+            return None;
+        }
+        let hglobal = HGLOBAL(handle.0);
+        let size = GlobalSize(hglobal);
+        if size == 0 {
+            return None;
+        }
+        let ptr = GlobalLock(hglobal);
+        if ptr.is_null() {
+            return None;
+        }
+        let dib = std::slice::from_raw_parts(ptr as *const u8, size);
+        let bytes = dib_to_bmp_file_bytes(dib);
+        let _ = GlobalUnlock(hglobal);
+        bytes
+    })();
+
+    let _ = CloseClipboard();
+    result
 }
 
 unsafe fn capture_clipboard_image_data(hwnd: HWND) -> Option<(Vec<u8>, windows::Win32::Graphics::Gdi::BITMAPINFOHEADER)> {
@@ -5682,12 +5724,9 @@ unsafe fn capture_clipboard_image_data(hwnd: HWND) -> Option<(Vec<u8>, windows::
     result
 }
 
-fn write_bmp_file(path: &std::path::Path, buf: &[u8], bih: windows::Win32::Graphics::Gdi::BITMAPINFOHEADER) -> Result<(), String> {
-    use std::fs::File;
-    use std::io::Write;
-
-    let file_size = 54 + buf.len();
+fn bmp_file_bytes(buf: &[u8], bih: windows::Win32::Graphics::Gdi::BITMAPINFOHEADER) -> Option<Vec<u8>> {
     let mut file_header = [0u8; 14];
+    let file_size = 54usize.checked_add(buf.len())?;
     file_header[0] = b'B';
     file_header[1] = b'M';
     file_header[2..6].copy_from_slice(&(file_size as u32).to_le_bytes());
@@ -5702,12 +5741,48 @@ fn write_bmp_file(path: &std::path::Path, buf: &[u8], bih: windows::Win32::Graph
     info_header[16..20].copy_from_slice(&bih.biCompression.to_le_bytes());
     info_header[20..24].copy_from_slice(&bih.biSizeImage.to_le_bytes());
 
-    let mut file = File::create(path).map_err(|e| e.to_string())?;
-    file.write_all(&file_header).map_err(|e| e.to_string())?;
-    file.write_all(&info_header).map_err(|e| e.to_string())?;
-    file.write_all(buf).map_err(|e| e.to_string())?;
+    let mut bytes = Vec::with_capacity(file_size);
+    bytes.extend_from_slice(&file_header);
+    bytes.extend_from_slice(&info_header);
+    bytes.extend_from_slice(buf);
+    Some(bytes)
+}
 
-    Ok(())
+fn dib_to_bmp_file_bytes(dib: &[u8]) -> Option<Vec<u8>> {
+    if dib.len() < 40 {
+        return None;
+    }
+    let header_size = u32::from_le_bytes(dib[0..4].try_into().ok()?) as usize;
+    if header_size < 40 || header_size > dib.len() {
+        return None;
+    }
+    let bit_count = u16::from_le_bytes(dib[14..16].try_into().ok()?);
+    let compression = u32::from_le_bytes(dib[16..20].try_into().ok()?);
+    let clr_used = u32::from_le_bytes(dib[32..36].try_into().ok()?) as usize;
+    let color_count = if clr_used > 0 {
+        clr_used
+    } else if bit_count <= 8 {
+        1usize.checked_shl(bit_count as u32).unwrap_or(0)
+    } else {
+        0
+    };
+    let masks_size = if header_size == 40 && (compression == 3 || compression == 6) { 12 } else { 0 };
+    let pixel_offset = 14usize
+        .checked_add(header_size)?
+        .checked_add(masks_size)?
+        .checked_add(color_count.checked_mul(4)?)?;
+    let file_size = 14usize.checked_add(dib.len())?;
+
+    let mut file_header = [0u8; 14];
+    file_header[0] = b'B';
+    file_header[1] = b'M';
+    file_header[2..6].copy_from_slice(&(file_size as u32).to_le_bytes());
+    file_header[10..14].copy_from_slice(&(pixel_offset as u32).to_le_bytes());
+
+    let mut bytes = Vec::with_capacity(file_size);
+    bytes.extend_from_slice(&file_header);
+    bytes.extend_from_slice(dib);
+    Some(bytes)
 }
 
 unsafe fn import_windows_clipboard_history(db_path: &std::path::Path) {
@@ -6103,6 +6178,21 @@ mod tests {
         let db_path = std::path::PathBuf::from(r"C:\Users\Test\AppData\Roaming\opensearch-os\app.db");
         let (_, path_str) = clipboard_image_path(&db_path, 123).unwrap();
         assert!(path_str.ends_with(r"opensearch-os\clipboard_images\image_123.bmp"));
+    }
+
+    #[test]
+    fn dib_clipboard_bytes_are_wrapped_as_bmp() {
+        let mut dib = vec![0u8; 44];
+        dib[0..4].copy_from_slice(&40u32.to_le_bytes());
+        dib[4..8].copy_from_slice(&1i32.to_le_bytes());
+        dib[8..12].copy_from_slice(&1i32.to_le_bytes());
+        dib[12..14].copy_from_slice(&1u16.to_le_bytes());
+        dib[14..16].copy_from_slice(&32u16.to_le_bytes());
+        dib[20..24].copy_from_slice(&4u32.to_le_bytes());
+        let bmp = dib_to_bmp_file_bytes(&dib).unwrap();
+        assert_eq!(&bmp[0..2], b"BM");
+        assert_eq!(u32::from_le_bytes(bmp[10..14].try_into().unwrap()), 54);
+        assert_eq!(bmp.len(), 58);
     }
 }
 

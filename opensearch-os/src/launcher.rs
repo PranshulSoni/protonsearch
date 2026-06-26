@@ -255,6 +255,13 @@ fn handle_action(action: &str) {
                 .arg("shell:RecycleBinFolder")
                 .spawn();
         }
+        "reveal_logs" => {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let _ = Command::new("explorer.exe")
+                    .arg(std::path::PathBuf::from(appdata).join("opensearch-os"))
+                    .spawn();
+            }
+        }
         "recycle" => {
             unsafe {
                 use windows::Win32::UI::Shell::{SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI};
