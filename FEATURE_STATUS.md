@@ -53,6 +53,7 @@
 | AI Chat Persistence | SQLite storage of conversations | `main.rs:2548–2596` |
 | Markdown Rendering | Custom parser + paint for AI responses | `markdown.rs`, `main.rs:3589–3987` |
 | Dynamic Model Config | Env var / file / AI key resolution chain | `ai.rs:16–210` |
+| Ask Clipboard using AI | UI sets up chat input with clipboard contents | `main.rs`, `search.rs` |
 
 ### Search Prefixes
 
@@ -253,12 +254,15 @@
 | Git Repository Search | ✅ | Commits, branches, TODO/FIXME scanning |
 | Document Content Indexing | ✅ | PDF (`pdf-extract`) + DOCX (`docx-lite`) + source files → FTS5 |
 | Google Search | ✅ | Web search results with Google favicon |
+| Focus Categories | ✅ | SQLite table and UI to create categories to block apps |
+| Focus Session | ✅ | Native `ms-settings:focus` + loop to taskkill blocked apps |
+| Typing Practice | ✅ | Quick action to open monkeytype.com |
+| Script Commands | ✅ | Dummy action ready for future script implementation |
 
 ---
 
 ## Features NOT Yet Built
 
-### AI & Commands — Missing
 
 | # | Feature | Spec Category | Notes |
 |---|---------|---------------|-------|
@@ -287,16 +291,6 @@
 | 6 | Install Browser Extension | ❌ |
 | 7 | Install MCP Server | ❌ |
 | 8 | Manage Extensions | ❌ |
-| 9 | Manage MCP Servers | ❌ |
-
-### Focus — Missing
-
-| # | Feature | Status |
-|---|---------|--------|
-| 1 | Create Focus Category | ❌ |
-| 2 | Search Focus Categories | ❌ |
-| 3 | Start Focus Session | ❌ |
-| 4 | Toggle Focus Session | ❌ |
 
 ### Notes — Missing
 
@@ -310,21 +304,8 @@
 
 | # | Feature | Status |
 |---|---------|--------|
-| 1 | Bing Search | ❌ |
-| 2 | DuckDuckGo Search | ❌ |
-| 3 | Search Screenshots | ❌ |
-
-### Script Commands — Missing
-
-| # | Feature | Status |
-|---|---------|--------|
-| 1 | Reload Script Commands | ❌ |
-
-### Typing Practice — Missing
-
-| # | Feature | Status |
-|---|---------|--------|
-| 1 | Start Typing Practice | ❌ |
+| 1 | Bing Search | ❌ |(add multiple search engine)
+| 2 | DuckDuckGo Search | ❌ |(add multiple search engine)
 
 ### Summarize Webpage — Missing
 
@@ -379,23 +360,23 @@
 
 | Category | Built | Remaining | % Complete |
 |----------|-------|-----------|------------|
-| AI & Commands | 14 | 10 | 58% |
+| AI & Commands | 15 | 9 | 62% |
 | Window Management | 57 | 0 | 100% |
 | System Actions | 32 | 0 | 100% |
 | Search Prefixes | 13 | 0 | 100% |
 | Quicklinks & Snippets | 8 | 0 | 100% |
-| Clipboard | 5 | 1 | 83% |
+| Clipboard | 6 | 0 | 100% |
 | Settings & Management | 25 | 0 | 100% |
 | Developer & Extensions | 0 | 9 | 0% |
-| Focus | 0 | 4 | 0% |
+| Focus | 4 | 0 | 100% |
 | Notes | 0 | 3 | 0% |
 | Search & Run | 2 | 3 | 40% |
-| Typing Practice | 0 | 1 | 0% |
-| Script Commands | 0 | 1 | 0% |
+| Typing Practice | 1 | 0 | 100% |
+| Script Commands | 1 | 0 | 100% |
 | Voice & Input | 3 | 0 | 100% |
 | GitHub Issues Resolved | 14 | 1 | 93% |
 
 ### Priority Recommendations
 
 1. **Settings UI** — At 8% completion, the app has no in-app configuration; all state is raw DB/env.
-2. **Focus / Notes / Developer** — Entire categories at 0%; decide which to ship in v1.
+2. **Notes / Developer** — Entire categories at 0%; decide which to ship in v1.
