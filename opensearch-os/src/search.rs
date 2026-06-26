@@ -8555,11 +8555,13 @@ impl SearchEngine {
         let q = query.trim().to_lowercase();
         if let Ok(appdata) = std::env::var("APPDATA") {
             let notes_dir = std::path::PathBuf::from(appdata).join("opensearch-os").join("notes");
+            let _ = std::fs::create_dir_all(&notes_dir);  // fix #1: ensure dir exists before reading
             if let Ok(entries) = std::fs::read_dir(&notes_dir) {
                 for entry in entries.flatten() {
                     let filename = entry.file_name().to_string_lossy().to_string();
                     let name = filename.strip_suffix(".txt").unwrap_or(&filename).to_string();
                     let name_lower = name.to_lowercase();
+                    let full_path = entry.path().to_string_lossy().to_string();
                     let mut score = 0.0;
                     if q.is_empty() {
                         score = 1.0;
@@ -8574,11 +8576,11 @@ impl SearchEngine {
                         results.push(SearchResult {
                             entry: CatalogEntry {
                                 id: format!("note.{}", name),
-                                control_name: name.clone(),
-                                breadcrumb_path: format!("Notes > {}.txt", name),
-                                launch_command: format!("cmd /c start notepad.exe \"{}\"", entry.path().display()),
+                                control_name: format!("📝 {}", name),
+                                breadcrumb_path: format!("Notes > {}", filename),
+                                launch_command: format!("open_note:{}", full_path),
                                 source: "ACTION".to_string(),
-                                description: format!("Open {} in Notepad", filename),
+                                description: "Open note in app (Ctrl+S to save, Esc to close)".to_string(),
                                 synonyms: format!("note {} {}", name_lower, filename.to_lowercase()),
                             },
                             score,

@@ -140,6 +140,8 @@ struct State {
     editing_item: Option<String>,
     submenu_active: bool,
     submenu_selected: usize,
+    note_editor_hwnd: HWND,
+    editing_note_path: Option<String>,
     // Voice activation
     voice_listening: bool,    // true = currently recording query
     voice_triggered: bool,    // launcher opened via voice (auto-execute on result)
@@ -468,6 +470,8 @@ unsafe fn run() {
         editing_item: None,
         submenu_active: false,
         submenu_selected: 0,
+        note_editor_hwnd: HWND(std::ptr::null_mut()),
+        editing_note_path: None,
         voice_listening: false,
         voice_triggered: false,
         voice_pending_exec: false,
@@ -1187,6 +1191,19 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let s = &mut *sp;
             let vk = VIRTUAL_KEY(wp.0 as u16);
             let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
+            // Note editor: intercept Ctrl+S to save, Escape to close
+            if !s.note_editor_hwnd.0.is_null() {
+                if ctrl_down && vk.0 == 0x53 { // Ctrl+S
+                    save_note(s);
+                    return LRESULT(0);
+                }
+                if vk == VK_ESCAPE {
+                    close_note_editor(hwnd, s);
+                    return LRESULT(0);
+                }
+                // Let the edit control handle all other keys
+                return windows::Win32::UI::WindowsAndMessaging::DefWindowProcW(hwnd, msg, wp, lp);
+            }
 
             // A Hermes tool-approval is awaiting a decision. Intercept the
             // keys that resolve it before any other handling.
@@ -3752,6 +3769,13 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 s.cursor_pos = s.query.len();
                 s.results.clear();
                 s.selected = 0;
+                let _ = InvalidateRect(hwnd, None, FALSE);
+                return;
+            } else if let Some(path) = cmd.strip_prefix("open_note:") {
+                open_note_editor(hwnd, s, path.to_string());
+                s.query.clear();
+                s.cursor_pos = 0;
+                s.results.clear();
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
             } else if let Some(text) = cmd.strip_prefix("copy:") {
@@ -7416,7 +7440,7 @@ unsafe fn handle_form_enter(hwnd: HWND, s: &mut State) {
                     if !note_path.exists() {
                         let _ = std::fs::write(&note_path, "");
                     }
-                    let _ = std::process::Command::new("notepad.exe").arg(&note_path).spawn();
+                    open_note_editor(hwnd, s, note_path.to_string_lossy().to_string());
                 }
                 s.query.clear();
                 s.form_state = FormState::None;
@@ -7428,6 +7452,83 @@ unsafe fn handle_form_enter(hwnd: HWND, s: &mut State) {
     }
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
+unsafe fn open_note_editor(hwnd: HWND, s: &mut State, path: String) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CreateWindowExW, SetWindowTextW, SendMessageW, WM_SETFONT,
+        WS_CHILD, WS_VISIBLE, WS_VSCROLL, HMENU, WINDOW_STYLE, WINDOW_EX_STYLE,
+    };
+    use windows::core::PCWSTR;
+
+    // ES_MULTILINE=0x4, ES_AUTOVSCROLL=0x40, ES_WANTRETURN=0x1000, WS_HSCROLL=0x100000
+    const ES_MULTILINE: u32 = 0x0004;
+    const ES_AUTOVSCROLL: u32 = 0x0040;
+    const ES_WANTRETURN: u32 = 0x1000;
+
+    if !s.note_editor_hwnd.0.is_null() {
+        let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(s.note_editor_hwnd);
+        s.note_editor_hwnd = HWND(std::ptr::null_mut());
+    }
+
+    let editor_h = SEARCH_H + 1 + RESULT_H * VISIBLE_RESULTS as i32 + 12;
+    let class_w: Vec<u16> = "EDIT\0".encode_utf16().collect();
+    let title_w: Vec<u16> = "\0".encode_utf16().collect();
+
+    let hwnd_edit = CreateWindowExW(
+        WINDOW_EX_STYLE(0),
+        PCWSTR(class_w.as_ptr()),
+        PCWSTR(title_w.as_ptr()),
+        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_VSCROLL.0 | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN),
+        0, SEARCH_H + 1, WIN_W, editor_h,
+        hwnd,
+        HMENU(std::ptr::null_mut()),
+        windows::Win32::System::LibraryLoader::GetModuleHandleW(PCWSTR(std::ptr::null())).unwrap_or_default(),
+        None,
+    ).unwrap_or_default();
+
+    if !hwnd_edit.0.is_null() {
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            let content_w: Vec<u16> = content.encode_utf16().chain(std::iter::once(0)).collect();
+            let _ = SetWindowTextW(hwnd_edit, PCWSTR(content_w.as_ptr()));
+        }
+
+        let font_w: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
+        let hfont = windows::Win32::Graphics::Gdi::CreateFontW(
+            18, 0, 0, 0,
+            windows::Win32::Graphics::Gdi::FW_NORMAL.0 as i32,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            PCWSTR(font_w.as_ptr()),
+        );
+        let _ = SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+        let _ = SetFocus(hwnd_edit);
+    }
+
+    s.note_editor_hwnd = hwnd_edit;
+    s.editing_note_path = Some(path);
+    let _ = InvalidateRect(hwnd, None, FALSE);
+}
+
+unsafe fn save_note(s: &State) {
+    if let Some(path) = &s.editing_note_path {
+        if !s.note_editor_hwnd.0.is_null() {
+            let len = windows::Win32::UI::WindowsAndMessaging::GetWindowTextLengthW(s.note_editor_hwnd) as usize + 1;
+            let mut buf = vec![0u16; len];
+            windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(s.note_editor_hwnd, &mut buf);
+            let text = String::from_utf16_lossy(&buf[..buf.len().saturating_sub(1)]);
+            let _ = std::fs::write(path, text.as_bytes());
+        }
+    }
+}
+
+unsafe fn close_note_editor(hwnd: HWND, s: &mut State) {
+    if !s.note_editor_hwnd.0.is_null() {
+        save_note(s);
+        let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(s.note_editor_hwnd);
+        s.note_editor_hwnd = HWND(std::ptr::null_mut());
+        s.editing_note_path = None;
+        let _ = InvalidateRect(hwnd, None, FALSE);
+    }
+}
+
 
 unsafe fn export_snippets(hwnd: HWND, s: &State) {
     if let Ok(conn) = rusqlite::Connection::open(&s.db_path) {
