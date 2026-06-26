@@ -95,6 +95,7 @@ pub struct SearchEngine {
     recent_files: Vec<RecentFileInfo>,
     _db_path: std::path::PathBuf,
     conn: Connection,
+    query_cache: std::collections::HashMap<String, Vec<f32>>,
 }
 
 impl SearchEngine {
@@ -287,7 +288,7 @@ impl SearchEngine {
         }
 
         let meta_index = meta.iter().map(CatalogEntryIndex::from_entry).collect();
-        let mut engine = Self { vecs, meta, meta_index, n, dim, session, tokenizer, anchor_categories: vec![], apps: vec![], recent_files: vec![], _db_path: db_path, conn };
+        let mut engine = Self { vecs, meta, meta_index, n, dim, session, tokenizer, anchor_categories: vec![], apps: vec![], recent_files: vec![], _db_path: db_path, conn, query_cache: std::collections::HashMap::new() };
         for cat in &mut anchor_categories {
             for phrase in cat.phrases {
                 let phrase_with_prefix = format!("query: {}", phrase);
@@ -3332,6 +3333,9 @@ fn format_relative_time(ts: i64) -> String {
     }
 
     fn embed(&mut self, text: &str) -> Result<Vec<f32>> {
+        if let Some(cached) = self.query_cache.get(text) {
+            return Ok(cached.clone());
+        }
         let enc = self.tokenizer.encode(text, true)
             .map_err(|e| anyhow::anyhow!("encode: {e}"))?;
 
@@ -3355,7 +3359,10 @@ fn format_relative_time(ts: i64) -> String {
 
         let (_, hidden) = outputs["last_hidden_state"].try_extract_tensor::<f32>()?;
 
-        Ok(mean_pool_norm(hidden, &mask, seq, self.dim))
+        let result = mean_pool_norm(hidden, &mask, seq, self.dim);
+        if self.query_cache.len() > 100 { self.query_cache.clear(); }
+        self.query_cache.insert(text.to_string(), result.clone());
+        Ok(result)
     }
 
     fn get_conversational_results(&self, qvec: &[f32]) -> Vec<SearchResult> {

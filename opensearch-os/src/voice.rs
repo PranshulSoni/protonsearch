@@ -40,7 +40,10 @@ fn log_voice(msg: String) {
         .ok()
         .and_then(|p| p.parent().map(|d| d.join("voice_log.txt")))
         .unwrap_or_else(|| std::path::PathBuf::from("voice_log.txt"));
-    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > 1024 * 1024 { let _ = std::fs::remove_file(&path); }
+    }
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
         use std::io::Write;
         let _ = writeln!(file, "[{}] {}", now_ms(), msg);
     }

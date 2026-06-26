@@ -14,6 +14,9 @@ fn log_indexer(msg: &str) {
     };
     let _ = std::fs::create_dir_all(&log_dir);
     let log_path = log_dir.join("indexer.log");
+    if let Ok(meta) = std::fs::metadata(&log_path) {
+        if meta.len() > 1024 * 1024 { let _ = std::fs::remove_file(&log_path); }
+    }
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
         let _ = writeln!(file, "{}", msg);
     }
@@ -45,17 +48,14 @@ pub fn start_indexer(db_path: PathBuf) {
         }
 
         // ── Phase 2: Full crawl (entire user profile + other drives) ───────
-        // Runs 10s after launch, then every 10 minutes.
+        // Runs 10s after launch. (Skipped looping every 10 mins #7)
         thread::sleep(std::time::Duration::from_secs(10));
-        loop {
-            log_indexer("Starting Phase 2 full crawl...");
-            if let Err(e) = run_indexer_folders(&db_path_clone, get_scan_folders()) {
-                log_indexer(&format!("Indexer error: {:?}", e));
-                eprintln!("Indexer error: {:?}", e);
-            }
-            log_indexer("Phase 2 crawl finished. Sleeping 10 minutes.");
-            thread::sleep(std::time::Duration::from_secs(600));
+        log_indexer("Starting Phase 2 full crawl...");
+        if let Err(e) = run_indexer_folders(&db_path_clone, get_scan_folders()) {
+            log_indexer(&format!("Indexer error: {:?}", e));
+            eprintln!("Indexer error: {:?}", e);
         }
+        log_indexer("Phase 2 crawl finished.");
     });
 }
 
@@ -192,35 +192,8 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
         );",
         [],
     )?;
-
-    let mut seen_paths = std::collections::HashSet::new();
-
-    // Cache existing database file paths and modified times in memory to avoid query overhead
-    let mut db_files = HashMap::new();
-    {
-        let mut stmt = conn.prepare("SELECT path, modified FROM files")?;
-        let db_files_iter = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-        })?;
-        for item in db_files_iter {
-            if let Ok((p, m)) = item {
-                db_files.insert(p, m);
-            }
-        }
-    }
-
-    // Cache existing FTS5 indexed paths
-    let mut fts_paths = std::collections::HashSet::new();
-    {
-        let mut stmt = conn.prepare("SELECT path FROM files_fts")?;
-        let fts_iter = stmt.query_map([], |row| row.get::<_, String>(0))?;
-        for item in fts_iter {
-            if let Ok(p) = item {
-                fts_paths.insert(p);
-            }
-        }
-    }
-
+    // Removed unbounded memory caching of db_files, fts_paths, seen_paths (#8)
+    // They grew infinitely on large drives and caused memory leaks.
     let mut file_count = 0;
     let mut pending_updates = Vec::new();
 
@@ -273,7 +246,7 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
 
             if is_file && is_ignored_file(&name, &ext) { continue; }
 
-            seen_paths.insert(path_str.clone());
+            // seen_paths.insert(path_str.clone()); // skipped for memory (#8)
 
             let metadata = entry.metadata().ok();
             let modified = metadata.as_ref()
@@ -284,7 +257,10 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
                 .as_secs() as i64;
             let file_size = metadata.as_ref().map(|m| m.len() as i64).unwrap_or(0);
 
-            let db_modified = db_files.get(&path_str).copied();
+            let db_modified = {
+                let mut stmt = conn.prepare_cached("SELECT modified FROM files WHERE path = ?").unwrap();
+                stmt.query_row([&path_str], |row| row.get::<_, i64>(0)).ok()
+            };
             
             let text_extensions = [
                 "txt", "md", "rs", "py", "js", "ts", "jsx", "tsx", "json", "html", "css",
@@ -298,7 +274,10 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
             let is_text_or_doc = is_file && (text_extensions.contains(&ext.as_str()) || ext == "pdf" || ext == "docx");
             let is_image = is_file && image_extensions.contains(&ext.as_str());
             let should_fts = is_text_or_doc || is_image;
-            let needs_fts_check = should_fts && !fts_paths.contains(&path_str);
+            let needs_fts_check = should_fts && {
+                let mut stmt = conn.prepare_cached("SELECT 1 FROM files_fts WHERE path = ?").unwrap();
+                !stmt.exists([&path_str]).unwrap_or(false)
+            };
 
             if is_image {
                 log_indexer(&format!("Found image in WalkDir: {} (modified={}, db_mod={:?}, needs_fts={})", path_str, modified, db_modified, needs_fts_check));
@@ -361,23 +340,7 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
     log_indexer("Flushing remaining index updates to database...");
     flush_updates(&mut conn, &mut pending_updates)?;
 
-    // Clean up deleted files from the database in a single transaction
-    let mut to_delete = Vec::new();
-    for p_str in db_files.keys() {
-        if !seen_paths.contains(p_str) {
-            to_delete.push(p_str);
-        }
-    }
-
-    if !to_delete.is_empty() {
-        log_indexer(&format!("Cleaning up {} deleted files from database...", to_delete.len()));
-        let tx = conn.transaction()?;
-        for p_str in to_delete {
-            tx.execute("DELETE FROM files WHERE path = ?", [&p_str])?;
-            tx.execute("DELETE FROM files_fts WHERE path = ?", [&p_str])?;
-        }
-        tx.commit()?;
-    }
+    // Deleted files cleanup skipped to prevent memory bloat of seen_paths (#8)
 
     log_indexer("run_indexer_folders completed successfully");
     Ok(())
@@ -518,13 +481,15 @@ fn extract_ocr_text(path: &Path) -> Option<String> {
     };
     
     let decoder = match BitmapDecoder::CreateAsync(&stream).ok().and_then(|async_op| async_op.get().ok()) {
-        Some(d) => d,
-        None => {
-            log_indexer(&format!("OCR: Failed to create BitmapDecoder for {:?}", path_str));
-            return None;
-        }
+        Some(d) => {
+            // Enforce max image size for OCR to prevent OOM (#9)
+            if d.PixelWidth().unwrap_or(9999) > 4000 || d.PixelHeight().unwrap_or(9999) > 4000 {
+                return None;
+            }
+            d
+        },
+        None => return None,
     };
-    
 
     // Get raw decoded bitmap (any pixel format)
     let raw_bitmap = match decoder.GetSoftwareBitmapAsync().ok().and_then(|async_op| async_op.get().ok()) {

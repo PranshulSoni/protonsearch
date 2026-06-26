@@ -367,6 +367,9 @@ pub fn start_hermes_gateway_daemon() {
         let log_dir = std::path::Path::new(&appdata).join("opensearch-os");
         let _ = std::fs::create_dir_all(&log_dir);
         let log_file = log_dir.join("hermes_gateway.log");
+        if let Ok(meta) = std::fs::metadata(&log_file) {
+            if meta.len() > 1024 * 1024 { let _ = std::fs::remove_file(&log_file); }
+        }
         if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(log_file) {
             let _ = std::process::Command::new(&hermes_cmd)
                 .args(["gateway", "run", "--replace", "--accept-hooks"])

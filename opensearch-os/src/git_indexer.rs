@@ -49,6 +49,9 @@ fn log_git(msg: &str) {
         let log_path = std::path::PathBuf::from(appdata)
             .join("opensearch-os")
             .join("git_indexer.log");
+        if let Ok(meta) = std::fs::metadata(&log_path) {
+            if meta.len() > 1024 * 1024 { let _ = std::fs::remove_file(&log_path); }
+        }
         if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&log_path) {
             let _ = writeln!(f, "{msg}");
         }
