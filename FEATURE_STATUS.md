@@ -146,6 +146,43 @@
 | Move Left | `window:move_left` | ✅ |
 | Move Right | `window:move_right` | ✅ |
 | Toggle Always on Top | `window:toggle_always_on_top` | ✅ |
+| Move Top | `window:move_top` | ✅ |
+| Move Bottom | `window:move_bottom` | ✅ |
+| Top Center Sixth | `window:top_center_sixth` | ✅ |
+| Bottom Center Sixth | `window:bottom_center_sixth` | ✅ |
+| Top Left Sixth | `window:top_left_sixth` | ✅ |
+| Top Right Sixth | `window:top_right_sixth` | ✅ |
+| Bottom Left Sixth | `window:bottom_left_sixth` | ✅ |
+| Bottom Right Sixth | `window:bottom_right_sixth` | ✅ |
+| Top First Fourth | `window:top_first_fourth` | ✅ |
+| Top Second Fourth | `window:top_second_fourth` | ✅ |
+| Top Third Fourth | `window:top_third_fourth` | ✅ |
+| Top Last Fourth | `window:top_last_fourth` | ✅ |
+| Bottom First Fourth | `window:bottom_first_fourth` | ✅ |
+| Bottom Second Fourth | `window:bottom_second_fourth` | ✅ |
+| Bottom Third Fourth | `window:bottom_third_fourth` | ✅ |
+| Bottom Last Fourth | `window:bottom_last_fourth` | ✅ |
+| First Fourth | `window:first_fourth` | ✅ |
+| Second Fourth | `window:second_fourth` | ✅ |
+| Third Fourth | `window:third_fourth` | ✅ |
+| Last Fourth | `window:last_fourth` | ✅ |
+| First Third | `window:first_third` | ✅ |
+| Last Third | `window:last_third` | ✅ |
+| Top Third | `window:top_third` | ✅ |
+| Bottom Third | `window:bottom_third` | ✅ |
+| Center Half | `window:center_half` | ✅ |
+| Center Two Thirds | `window:center_two_thirds` | ✅ |
+| First Two Thirds | `window:first_two_thirds` | ✅ |
+| Last Two Thirds | `window:last_two_thirds` | ✅ |
+| Top Two Thirds | `window:top_two_thirds` | ✅ |
+| Bottom Two Thirds | `window:bottom_two_thirds` | ✅ |
+| Center Three Fourths | `window:center_three_fourths` | ✅ |
+| First Three Fourths | `window:first_three_fourths` | ✅ |
+| Last Three Fourths | `window:last_three_fourths` | ✅ |
+| Top Three Fourths | `window:top_three_fourths` | ✅ |
+| Bottom Three Fourths | `window:bottom_three_fourths` | ✅ |
+| Top Center Two Thirds | `window:top_center_two_thirds` | ✅ |
+| Bottom Center Two Thirds | `window:bottom_center_two_thirds` | ✅ |
 
 ### Quicklinks & Snippets
 
@@ -222,8 +259,6 @@
 
 | # | Feature | Status | Notes |
 |---|---------|--------|-------|
-| 1 | Move Top | ❌ | `move_left`/`move_right` exist; no vertical variants |
-| 2 | Move Bottom | ❌ | Same as above |
 | 3 | Move to Desktop 1–10 | ❌ | No virtual desktop COM integration (`IVirtualDesktop`) |
 | 4 | Move to Next/Previous Desktop | ❌ | Requires virtual desktop API |
 | 5 | Move to Next/Previous Display | ❌ | No multi-monitor move logic |
@@ -231,28 +266,6 @@
 | 7 | Close Desktop | ❌ | Requires virtual desktop API |
 | 8 | Close Desktop Active | ❌ | Requires virtual desktop API |
 | 9 | Rename Desktop / Rename Desktop Active | ❌ | Requires virtual desktop API |
-| 10 | Bottom Center Sixth | ❌ | No sixth-based layouts implemented |
-| 11 | Top Center Sixth | ❌ | — |
-| 12 | Bottom Left/Right Sixth | ❌ | — |
-| 13 | Top Left/Right Sixth | ❌ | — |
-| 14 | Bottom Center Two Thirds | ❌ | Vertical two-thirds positioning |
-| 15 | Top Center Two Thirds | ❌ | — |
-| 16 | Bottom Third | ❌ | Horizontal third at bottom |
-| 17 | Top Third | ❌ | Horizontal third at top |
-| 18 | Bottom Three Fourths | ❌ | — |
-| 19 | Top Three Fourths | ❌ | — |
-| 20 | Bottom Two Thirds | ❌ | — |
-| 21 | Top Two Thirds | ❌ | — |
-| 22 | First Fourth | ❌ | Horizontal fourth-based layouts |
-| 23 | Second Fourth | ❌ | — |
-| 24 | Third Fourth | ❌ | — |
-| 25 | Top First/Second/Third/Last Fourth | ❌ | Compound (vertical × horizontal) fourths |
-| 26 | Last Third / Last Three Fourths / Last Two Thirds | ❌ | First/Last nomenclature variants |
-| 27 | First Third / First Three Fourths / First Two Thirds | ❌ | — |
-| 28 | Center Half | ❌ | Centered, half-width position |
-| 29 | Center Third | ❌ | Centered, third-width position |
-| 30 | Center Three Fourths | ❌ | Centered, ¾-width position |
-| 31 | Center Two Thirds | ❌ | Centered, ⅔-width position |
 
 ### System Actions — Missing
 
@@ -399,7 +412,7 @@ All 14 issues are currently **open** with zero closed/resolved.
 | Category | Built | Remaining | % Complete |
 |----------|-------|-----------|------------|
 | AI & Commands | 14 | 10 | 58% |
-| Window Management | 26 | 31 | 46% |
+| Window Management | 50 | 7 | 88% |
 | System Actions | 22 | 13 | 63% |
 | Search Prefixes | 13 | 0 | 100% |
 | Quicklinks & Snippets | 8 | 0 | 100% |
@@ -419,6 +432,6 @@ All 14 issues are currently **open** with zero closed/resolved.
 1. **🔴 Security #5** — Must fix before any public release; remote script execution without integrity checks is a critical vulnerability.
 2. **🟠 Performance** — Issues #7, #8, #10 directly impact UX; the 10-minute full-drive walk and per-keystroke vector scan will degrade on real machines.
 3. **🟡 Quality #17** — 1350-line `search()` method makes feature additions risky; decompose before adding more search logic.
-4. **Window Management** — Virtual desktop support is the biggest gap (11 missing items depend on it). Requires COM `IVirtualDesktop` integration.
+4. **Window Management** — Virtual desktop support is the last major gap (7 missing items remain, mostly virtual desktop APIs). Requires COM `IVirtualDesktop` integration.
 5. **Settings UI** — At 8% completion, the app has no in-app configuration; all state is raw DB/env.
 6. **Focus / Notes / Developer** — Entire categories at 0%; decide which to ship in v1.
