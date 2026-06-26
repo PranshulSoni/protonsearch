@@ -2698,6 +2698,18 @@ impl SearchEngine {
             });
             results.push(SearchResult {
                 entry: CatalogEntry {
+                    id: "folder.notes".to_string(),
+                    control_name: "Notes".to_string(),
+                    breadcrumb_path: "Notes > Browse".to_string(),
+                    launch_command: "notes:".to_string(),
+                    source: "FOLDER".to_string(),
+                    description: "Folder containing your saved text notes".to_string(),
+                    synonyms: "notes text files read edit browse".to_string(),
+                },
+                score: 3.43,
+            });
+            results.push(SearchResult {
+                entry: CatalogEntry {
                     id: "folder.files".to_string(),
                     control_name: "Local Files".to_string(),
                     breadcrumb_path: "Local > Files".to_string(),
@@ -2937,6 +2949,10 @@ impl SearchEngine {
         if q_lower_trimmed.starts_with("focus:") {
             let sub_query = q_lower_trimmed.strip_prefix("focus:").unwrap().trim();
             return self.search_focus_categories(sub_query);
+        }
+        if q_lower_trimmed.starts_with("notes:") {
+            let sub_query = q_lower_trimmed.strip_prefix("notes:").unwrap().trim();
+            return self.search_notes(sub_query);
         }
         if q_lower_trimmed.starts_with("games:") {
             let sub_query = q_lower_trimmed.strip_prefix("games:").unwrap().trim();
@@ -3923,6 +3939,7 @@ impl SearchEngine {
         merged.append(&mut self.search_snippets_name_matches(q));
         merged.append(&mut self.search_focus_categories(q));
         merged.append(&mut self.search_games(q));
+        merged.append(&mut self.search_notes(q));
         merged.push(web_search.clone());
         merged.sort_unstable_by(|a, b| {
             b.score
@@ -7035,6 +7052,20 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         description: "Browse and search all text snippets.",
     },
     QuickAction {
+        triggers: &["create note", "new note", "add note"],
+        name: "Create Note",
+        breadcrumb: "Notes > Create Note",
+        launch_command: "action:create_note",
+        description: "Create a new text note and open it in Notepad.",
+    },
+    QuickAction {
+        triggers: &["search notes", "browse notes", "open notes"],
+        name: "Search Notes",
+        breadcrumb: "Notes > Search Notes",
+        launch_command: "notes:",
+        description: "Browse and search all your saved notes.",
+    },
+    QuickAction {
         triggers: &["create focus category", "new focus category", "add focus category"],
         name: "Create Focus Category",
         breadcrumb: "Focus > Add focus category",
@@ -8515,6 +8546,45 @@ impl SearchEngine {
                     },
                     score: 8.0,
                 });
+            }
+        }
+        results
+    }
+    pub fn search_notes(&self, query: &str) -> Vec<SearchResult> {
+        let mut results = Vec::new();
+        let q = query.trim().to_lowercase();
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let notes_dir = std::path::PathBuf::from(appdata).join("opensearch-os").join("notes");
+            if let Ok(entries) = std::fs::read_dir(&notes_dir) {
+                for entry in entries.flatten() {
+                    let filename = entry.file_name().to_string_lossy().to_string();
+                    let name = filename.strip_suffix(".txt").unwrap_or(&filename).to_string();
+                    let name_lower = name.to_lowercase();
+                    let mut score = 0.0;
+                    if q.is_empty() {
+                        score = 1.0;
+                    } else if name_lower == q {
+                        score = 4.0;
+                    } else if name_lower.starts_with(&q) {
+                        score = 3.5;
+                    } else if name_lower.contains(&q) {
+                        score = 3.0;
+                    }
+                    if score > 0.0 {
+                        results.push(SearchResult {
+                            entry: CatalogEntry {
+                                id: format!("note.{}", name),
+                                control_name: name.clone(),
+                                breadcrumb_path: format!("Notes > {}.txt", name),
+                                launch_command: format!("cmd /c start notepad.exe \"{}\"", entry.path().display()),
+                                source: "ACTION".to_string(),
+                                description: format!("Open {} in Notepad", filename),
+                                synonyms: format!("note {} {}", name_lower, filename.to_lowercase()),
+                            },
+                            score,
+                        });
+                    }
+                }
             }
         }
         results

@@ -92,6 +92,7 @@ enum FormState {
     CreateQuicklinkKeyword { name: String, url: String },
     CreateFocusCategoryName,
     CreateFocusCategoryBlocked { name: String },
+    CreateNoteName,
 }
 
 // ── App state ─────────────────────────────────────────────────────────────────
@@ -3783,6 +3784,13 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 s.results.clear();
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
+            } else if cmd == "action:create_note" {
+                s.form_state = FormState::CreateNoteName;
+                s.query.clear();
+                s.cursor_pos = 0;
+                s.results.clear();
+                let _ = InvalidateRect(hwnd, None, FALSE);
+                return;
             } else if cmd == "action:create_quicklink" {
                 s.form_state = FormState::CreateQuicklinkName;
                 s.query.clear();
@@ -5007,6 +5015,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             FormState::CreateQuicklinkKeyword { .. } => "Create Quicklink: Enter Keyword...",
             FormState::CreateFocusCategoryName => "Create Focus Category: Enter Name...",
             FormState::CreateFocusCategoryBlocked { .. } => "Focus Category: Enter blocked apps (comma separated, e.g. discord.exe, slack.exe)...",
+            FormState::CreateNoteName => "Create Note: Enter Title...",
             FormState::None => "Search Windows settings...",
         };
         let mut ph: Vec<u16> = ph_str.encode_utf16().collect();
@@ -7391,6 +7400,24 @@ unsafe fn handle_form_enter(hwnd: HWND, s: &mut State) {
                         );
                     }
                 });
+                s.query.clear();
+                s.form_state = FormState::None;
+                s.cursor_pos = 0;
+                trigger_search(hwnd, s);
+            }
+        }
+        FormState::CreateNoteName => {
+            if !input.is_empty() {
+                if let Ok(appdata) = std::env::var("APPDATA") {
+                    let notes_dir = std::path::PathBuf::from(appdata).join("opensearch-os").join("notes");
+                    let _ = std::fs::create_dir_all(&notes_dir);
+                    let safe_name = input.replace(|c: char| !c.is_alphanumeric() && c != ' ', "_");
+                    let note_path = notes_dir.join(format!("{}.txt", safe_name));
+                    if !note_path.exists() {
+                        let _ = std::fs::write(&note_path, "");
+                    }
+                    let _ = std::process::Command::new("notepad.exe").arg(&note_path).spawn();
+                }
                 s.query.clear();
                 s.form_state = FormState::None;
                 s.cursor_pos = 0;
