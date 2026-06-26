@@ -7620,9 +7620,21 @@ fn parse_time_range(query: &str) -> Option<(i64, i64, String)> {
         time_phrase = "this afternoon";
         start_time = today_start + 12 * 3600;
         end_time = today_start + 17 * 3600;
+    } else if q.contains("earlier today") || q.contains("earlier") {
+        time_phrase = if q.contains("earlier today") { "earlier today" } else { "earlier" };
+        start_time = today_start;
+        end_time = now;
+    } else if q.contains("recently") {
+        time_phrase = "recently";
+        start_time = now - 6 * 3600;
+        end_time = now;
     } else if q.contains("today") {
         time_phrase = "today";
         start_time = today_start;
+        end_time = now;
+    } else if q.contains("this week") {
+        time_phrase = "this week";
+        start_time = today_start - 6 * 86400;
         end_time = now;
     } else if q.contains("last week") {
         time_phrase = "last week";
@@ -7635,20 +7647,27 @@ fn parse_time_range(query: &str) -> Option<(i64, i64, String)> {
     }
 
     if !time_phrase.is_empty() {
-        let clean_phrase = q.replace(time_phrase, "");
-        let mut clean_query = clean_phrase.trim().to_string();
-
-        for word in &[
-            "opened", "edited", "visited", "used", "the", "file", "code", "before", "after",
-            "during", "i", "at",
-        ] {
-            if clean_query.starts_with(word) {
-                clean_query = clean_query.strip_prefix(word).unwrap().trim().to_string();
-            }
-            if clean_query.ends_with(word) {
-                clean_query = clean_query.strip_suffix(word).unwrap().trim().to_string();
-            }
-        }
+        // Strip question/filler words anywhere so natural recall ("what was I working on
+        // yesterday") leaves an EMPTY keyword → all events in the window, instead of
+        // using the leftover words as a title filter that matches nothing.
+        const FILLER: &[&str] = &[
+            "what", "whats", "what's", "was", "were", "am", "is", "i", "working", "work",
+            "worked", "on", "doing", "do", "did", "show", "me", "my", "the", "a", "an",
+            "opened", "open", "edited", "edit", "visited", "visit", "used", "use", "using",
+            "before", "after", "during", "at", "in", "with", "that", "this", "when", "which",
+            "files", "file", "code", "stuff", "things", "going", "up", "to", "of", "and",
+        ];
+        let clean_query = q
+            .replace(time_phrase, " ")
+            .split_whitespace()
+            .filter(|w| {
+                let bare = w.trim_matches(|c: char| !c.is_alphanumeric());
+                !bare.is_empty() && !FILLER.contains(&bare)
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+            .trim()
+            .to_string();
 
         return Some((start_time, end_time, clean_query));
     }
