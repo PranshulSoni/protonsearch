@@ -321,6 +321,33 @@ fn handle_action(action: &str) {
             keybd_event(VK_LMENU.0 as u8, 0, KEYEVENTF_KEYUP, 0);
             keybd_event(VK_LWIN.0 as u8, 0, KEYEVENTF_KEYUP, 0);
         },
+        "toggle_focus_session" => {
+            let _ = Command::new("cmd").args(["/C", "start", "ms-settings:focus"]).spawn();
+        }
+        cmd_str if cmd_str.starts_with("start_focus_session:") => {
+            let cat = cmd_str.strip_prefix("start_focus_session:").unwrap().to_string();
+            std::thread::spawn(move || {
+                let _ = Command::new("cmd").args(["/C", "start", "ms-settings:focus"]).spawn();
+                if let Ok(appdata) = std::env::var("APPDATA") {
+                    let db_path = std::path::PathBuf::from(appdata).join("opensearch-os").join("file_index.db");
+                    if let Ok(conn) = rusqlite::Connection::open(db_path) {
+                        if let Ok(blocked) = conn.query_row(
+                            "SELECT blocked_apps FROM focus_categories WHERE name = ?",
+                            [cat],
+                            |row| row.get::<_, String>(0)
+                        ) {
+                            let exes: Vec<String> = blocked.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                            for _ in 0..120 {
+                                for exe in &exes {
+                                    let _ = Command::new("taskkill").args(["/F", "/IM", exe]).creation_flags(0x08000000).output();
+                                }
+                                std::thread::sleep(std::time::Duration::from_secs(5));
+                            }
+                        }
+                    }
+                }
+            });
+        }
         "open_settings" | "reveal_logs" => {
             if let Ok(appdata) = std::env::var("APPDATA") {
                 let _ = Command::new("explorer.exe")

@@ -270,6 +270,23 @@ impl SearchEngine {
             [],
         )?;
 
+        // Create focus categories table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS focus_categories (
+                name TEXT PRIMARY KEY,
+                blocked_apps TEXT NOT NULL
+            );",
+            [],
+        )?;
+
+        let fc_count: i64 = conn.query_row("SELECT COUNT(*) FROM focus_categories", [], |row| row.get(0)).unwrap_or(0);
+        if fc_count == 0 {
+            let _ = conn.execute(
+                "INSERT INTO focus_categories (name, blocked_apps) VALUES (?, ?);",
+                rusqlite::params!["Deep Work", "Discord.exe, slack.exe"],
+            );
+        }
+
         // Create AI settings table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS ai_settings (
@@ -3872,6 +3889,7 @@ impl SearchEngine {
         merged.append(&mut project_results);
         merged.append(&mut self.search_quicklinks_name_matches(q));
         merged.append(&mut self.search_snippets_name_matches(q));
+        merged.append(&mut self.search_focus_categories(q));
         merged.push(web_search.clone());
         merged.sort_unstable_by(|a, b| {
             b.score
@@ -6984,6 +7002,20 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         description: "Browse and search all text snippets.",
     },
     QuickAction {
+        triggers: &["create focus category", "new focus category", "add focus category"],
+        name: "Create Focus Category",
+        breadcrumb: "Focus > Add focus category",
+        launch_command: "action:create_focus_category",
+        description: "Create a new focus category with blocked apps.",
+    },
+    QuickAction {
+        triggers: &["toggle focus session", "stop focus session"],
+        name: "Toggle Focus Session",
+        breadcrumb: "Focus > Toggle Session",
+        launch_command: "action:toggle_focus_session",
+        description: "Launch Windows Focus Session to toggle state.",
+    },
+    QuickAction {
         triggers: &["export snippets"],
         name: "Export Snippets",
         breadcrumb: "Snippets > Export to Desktop",
@@ -8259,6 +8291,45 @@ impl SearchEngine {
                     },
                     score: 8.0,
                 });
+            }
+        }
+        results
+    }
+    pub fn search_focus_categories(&self, query: &str) -> Vec<SearchResult> {
+        let mut results = Vec::new();
+        let conn = &self.conn;
+        let q = query.trim().to_lowercase();
+        if q.is_empty() { return results; }
+        if let Ok(mut stmt) = conn.prepare("SELECT name, blocked_apps FROM focus_categories") {
+            if let Ok(rows) = stmt.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            }) {
+                for row in rows.flatten() {
+                    let (name, blocked) = row;
+                    let name_lower = name.to_lowercase();
+                    let mut score = 0.0;
+                    if name_lower == q || q == "start focus session" || q == "focus session" || q == "focus" {
+                        score = 4.0;
+                    } else if name_lower.starts_with(&q) {
+                        score = 3.5;
+                    } else if name_lower.contains(&q) {
+                        score = 3.0;
+                    }
+                    if score > 0.0 {
+                        results.push(SearchResult {
+                            entry: CatalogEntry {
+                                id: format!("focus_category.{}", name),
+                                control_name: format!("Start Focus Session: {}", name),
+                                breadcrumb_path: "Focus > Start Session".to_string(),
+                                launch_command: format!("start_focus_session:{}", name),
+                                source: "ACTION".to_string(),
+                                description: format!("Blocks: {}", blocked),
+                                synonyms: format!("start focus session category {}", name),
+                            },
+                            score,
+                        });
+                    }
+                }
             }
         }
         results

@@ -90,6 +90,8 @@ enum FormState {
     CreateQuicklinkName,
     CreateQuicklinkUrl { name: String },
     CreateQuicklinkKeyword { name: String, url: String },
+    CreateFocusCategoryName,
+    CreateFocusCategoryBlocked { name: String },
 }
 
 // ── App state ─────────────────────────────────────────────────────────────────
@@ -3774,6 +3776,13 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 reset_cursor_blink(hwnd, s);
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
+            } else if cmd == "action:create_focus_category" {
+                s.form_state = FormState::CreateFocusCategoryName;
+                s.query.clear();
+                s.cursor_pos = 0;
+                s.results.clear();
+                let _ = InvalidateRect(hwnd, None, FALSE);
+                return;
             } else if cmd == "action:create_quicklink" {
                 s.form_state = FormState::CreateQuicklinkName;
                 s.query.clear();
@@ -4973,6 +4982,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 "Create Quicklink: Enter URL (use {query} placeholder)..."
             }
             FormState::CreateQuicklinkKeyword { .. } => "Create Quicklink: Enter Keyword...",
+            FormState::CreateFocusCategoryName => "Create Focus Category: Enter Name...",
+            FormState::CreateFocusCategoryBlocked { .. } => "Focus Category: Enter blocked apps (comma separated, e.g. discord.exe, slack.exe)...",
             FormState::None => "Search Windows settings...",
         };
         let mut ph: Vec<u16> = ph_str.encode_utf16().collect();
@@ -7329,6 +7340,34 @@ unsafe fn handle_form_enter(hwnd: HWND, s: &mut State) {
                 });
                 s.form_state = FormState::None;
                 s.query.clear();
+                s.cursor_pos = 0;
+                trigger_search(hwnd, s);
+            }
+        }
+        FormState::CreateFocusCategoryName => {
+            if !input.is_empty() {
+                s.form_state = FormState::CreateFocusCategoryBlocked { name: input };
+                s.query.clear();
+                s.cursor_pos = 0;
+                trigger_search(hwnd, s);
+            }
+        }
+        FormState::CreateFocusCategoryBlocked { name } => {
+            if !input.is_empty() {
+                let db_path = s.db_path.clone();
+                let name = name.clone();
+                let blocked = input;
+                std::thread::spawn(move || {
+                    if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                        let _ = conn.execute(
+                            "INSERT OR REPLACE INTO focus_categories (name, blocked_apps) VALUES (?, ?);",
+                            rusqlite::params![name, blocked],
+                        );
+                    }
+                });
+                s.query.clear();
+                s.form_state = FormState::None;
                 s.cursor_pos = 0;
                 trigger_search(hwnd, s);
             }
