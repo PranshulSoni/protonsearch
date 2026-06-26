@@ -2686,6 +2686,18 @@ impl SearchEngine {
             });
             results.push(SearchResult {
                 entry: CatalogEntry {
+                    id: "folder.games".to_string(),
+                    control_name: "Steam Games".to_string(),
+                    breadcrumb_path: "Games > Steam".to_string(),
+                    launch_command: "games:".to_string(),
+                    source: "FOLDER".to_string(),
+                    description: "Folder containing installed Steam games".to_string(),
+                    synonyms: "games steam play".to_string(),
+                },
+                score: 3.42,
+            });
+            results.push(SearchResult {
+                entry: CatalogEntry {
                     id: "folder.files".to_string(),
                     control_name: "Local Files".to_string(),
                     breadcrumb_path: "Local > Files".to_string(),
@@ -2925,6 +2937,10 @@ impl SearchEngine {
         if q_lower_trimmed.starts_with("focus:") {
             let sub_query = q_lower_trimmed.strip_prefix("focus:").unwrap().trim();
             return self.search_focus_categories(sub_query);
+        }
+        if q_lower_trimmed.starts_with("games:") {
+            let sub_query = q_lower_trimmed.strip_prefix("games:").unwrap().trim();
+            return self.search_games(sub_query);
         }
         if q_lower_trimmed.starts_with("todos:") {
             let sub_query = q_lower_trimmed.strip_prefix("todos:").unwrap().trim();
@@ -3906,6 +3922,7 @@ impl SearchEngine {
         merged.append(&mut self.search_quicklinks_name_matches(q));
         merged.append(&mut self.search_snippets_name_matches(q));
         merged.append(&mut self.search_focus_categories(q));
+        merged.append(&mut self.search_games(q));
         merged.push(web_search.clone());
         merged.sort_unstable_by(|a, b| {
             b.score
@@ -7032,6 +7049,20 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         description: "Launch Windows Focus Session to toggle state.",
     },
     QuickAction {
+        triggers: &["vs code new window", "vscode new window", "code new window"],
+        name: "VS Code: New Window",
+        breadcrumb: "Apps > VS Code",
+        launch_command: "cmd /c code -n",
+        description: "Open a new VS Code window.",
+    },
+    QuickAction {
+        triggers: &["chrome incognito", "chrome private window"],
+        name: "Chrome: Incognito Window",
+        breadcrumb: "Apps > Chrome",
+        launch_command: "cmd /c start chrome --incognito",
+        description: "Open a new Chrome incognito window.",
+    },
+    QuickAction {
         triggers: &["ask clipboard", "ai clipboard", "chat clipboard"],
         name: "Ask Clipboard using AI",
         breadcrumb: "AI > Ask Clipboard",
@@ -8328,6 +8359,64 @@ impl SearchEngine {
                     },
                     score: 8.0,
                 });
+            }
+        }
+        results
+    }
+    pub fn search_games(&self, query: &str) -> Vec<SearchResult> {
+        let mut results = Vec::new();
+        let q = query.trim().to_lowercase();
+        let paths = [
+            "C:\\Program Files (x86)\\Steam\\steamapps",
+            "D:\\SteamLibrary\\steamapps",
+            "E:\\SteamLibrary\\steamapps",
+        ];
+        for p in paths.iter() {
+            if let Ok(entries) = std::fs::read_dir(p) {
+                for entry in entries.flatten() {
+                    let filename = entry.file_name().to_string_lossy().to_string();
+                    if filename.starts_with("appmanifest_") && filename.ends_with(".acf") {
+                        if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                            let mut appid = String::new();
+                            let mut name = String::new();
+                            for line in content.lines() {
+                                let line = line.trim();
+                                if line.starts_with("\"appid\"") {
+                                    appid = line.replace("\"appid\"", "").replace("\"", "").trim().to_string();
+                                } else if line.starts_with("\"name\"") {
+                                    name = line.replace("\"name\"", "").replace("\"", "").trim().to_string();
+                                }
+                            }
+                            if !appid.is_empty() && !name.is_empty() {
+                                let name_lower = name.to_lowercase();
+                                let mut score = 0.0;
+                                if q.is_empty() {
+                                    score = 1.0;
+                                } else if name_lower == q {
+                                    score = 4.0;
+                                } else if name_lower.starts_with(&q) {
+                                    score = 3.5;
+                                } else if name_lower.contains(&q) {
+                                    score = 3.0;
+                                }
+                                if score > 0.0 {
+                                    results.push(SearchResult {
+                                        entry: CatalogEntry {
+                                            id: format!("steam.{}", appid),
+                                            control_name: format!("🎮 Steam: {}", name),
+                                            breadcrumb_path: "Games > Steam".to_string(),
+                                            launch_command: format!("steam://rungameid/{}", appid),
+                                            source: "ACTION".to_string(),
+                                            description: "Launch Steam game".to_string(),
+                                            synonyms: format!("steam games play {}", name_lower),
+                                        },
+                                        score,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         results
