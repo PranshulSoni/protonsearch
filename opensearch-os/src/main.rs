@@ -2841,14 +2841,11 @@ fn format_conversation(prompt: &str, response: &str) -> String {
     conversation
 }
 
-/// Relative-time tag for a file's mtime ("just now", "2h ago", "yesterday", "3w ago").
-/// ponytail: bucketed, no calendar lib — recency is the signal, exact dates aren't needed.
-fn relative_time(modified: std::time::SystemTime) -> String {
-    let secs = match std::time::SystemTime::now().duration_since(modified) {
-        Ok(d) => d.as_secs() as i64,
-        Err(_) => return String::new(), // mtime in the future — skip
-    };
-    match secs {
+/// Bucketed relative-age tag ("just now", "2h ago", "yesterday", "3w ago").
+/// ponytail: buckets, no calendar lib — recency is the signal, exact dates aren't needed.
+fn relative_age(age_secs: i64) -> String {
+    match age_secs {
+        s if s < 0 => String::new(),
         s if s < 60 => "just now".to_string(),
         s if s < 3600 => format!("{}m ago", s / 60),
         s if s < 86400 => format!("{}h ago", s / 3600),
@@ -2860,22 +2857,40 @@ fn relative_time(modified: std::time::SystemTime) -> String {
     }
 }
 
-/// "Explain results": map each result's launch_command to a recency tag when it's a real
-/// file path. ponytail: stat per result on arrival (≤30, debounced) — not in the paint loop.
+fn relative_time(modified: std::time::SystemTime) -> String {
+    match std::time::SystemTime::now().duration_since(modified) {
+        Ok(d) => relative_age(d.as_secs() as i64),
+        Err(_) => String::new(), // mtime in the future — skip
+    }
+}
+
+/// "Explain results": map each result's launch_command to a "why it surfaced" recency tag.
+/// Files use mtime; clipboard entries use the unix ts embedded in their id (e.g. clip.<ts>).
+/// ponytail: stat/parse per result on arrival (≤30, debounced) — not in the paint loop.
 fn compute_result_reasons(results: &[SearchResult]) -> std::collections::HashMap<String, String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
     let mut map = std::collections::HashMap::new();
     for r in results {
         let cmd = &r.entry.launch_command;
         if map.contains_key(cmd) {
             continue;
         }
-        if let Ok(md) = std::fs::metadata(cmd) {
-            if let Ok(modified) = md.modified() {
-                let tag = relative_time(modified);
-                if !tag.is_empty() {
-                    map.insert(cmd.clone(), tag);
-                }
-            }
+        let tag = if r.entry.source == "CLIPBOARD" {
+            // id is clip.<ts> or clip.pinned.<ts>
+            r.entry.id.rsplit('.').next()
+                .and_then(|t| t.parse::<i64>().ok())
+                .map(|ts| relative_age(now - ts))
+                .unwrap_or_default()
+        } else if let Ok(md) = std::fs::metadata(cmd) {
+            md.modified().map(relative_time).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        if !tag.is_empty() {
+            map.insert(cmd.clone(), tag);
         }
     }
     map
