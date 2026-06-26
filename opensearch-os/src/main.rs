@@ -3830,17 +3830,6 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 import_quicklinks(hwnd, s);
                 do_hide(hwnd, s);
                 return;
-            } else if cmd == "action:ask_clipboard" {
-                if let Some(text) = paste_from_clipboard(hwnd) {
-                    let t = text.trim();
-                    if !t.is_empty() {
-                        s.chat_input = t.to_string();
-                        s.query = "ai:".to_string();
-                        s.cursor_pos = s.query.len();
-                        trigger_search(hwnd, s);
-                    }
-                }
-                return;
             } else if cmd == "action:reload_script_commands" {
                 s.query = "Script commands reloaded!".to_string();
                 s.cursor_pos = s.query.len();
