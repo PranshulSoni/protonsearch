@@ -140,8 +140,11 @@ struct State {
     editing_item: Option<String>,
     submenu_active: bool,
     submenu_selected: usize,
-    note_editor_hwnd: HWND,
-    editing_note_path: Option<String>,
+    // In-app note editor (self-rendered — no child control, which broke on the layered window)
+    note_editing: bool,
+    note_text: String,
+    note_path: Option<String>,
+    note_scroll: i32,
     // Voice activation
     voice_listening: bool,    // true = currently recording query
     voice_triggered: bool,    // launcher opened via voice (auto-execute on result)
@@ -193,6 +196,9 @@ struct IconRequest {
 
 impl State {
     fn win_h(&self) -> i32 {
+        if self.note_editing {
+            return SEARCH_H + 1 + AI_PANEL_H;
+        }
         if self.ai_pending || self.ai_answer.is_some() {
             return SEARCH_H + 1 + AI_PANEL_H;
         }
@@ -470,8 +476,10 @@ unsafe fn run() {
         editing_item: None,
         submenu_active: false,
         submenu_selected: 0,
-        note_editor_hwnd: HWND(std::ptr::null_mut()),
-        editing_note_path: None,
+        note_editing: false,
+        note_text: String::new(),
+        note_path: None,
+        note_scroll: 0,
         voice_listening: false,
         voice_triggered: false,
         voice_pending_exec: false,
@@ -823,7 +831,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let s = &mut *sp;
                 // Don't dismiss while a voice flow is mid-setup — focus briefly bounces
                 // when the launcher is summoned from the background.
-                if s.voice_triggered || s.voice_pending_exec {
+                if s.voice_triggered || s.voice_pending_exec || s.note_editing {
                     return LRESULT(0);
                 }
                 if !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. }) {
@@ -841,28 +849,13 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 if (app_inactive || window_inactive)
                     && !s.voice_triggered
                     && !s.voice_pending_exec
+                    && !s.note_editing
                     && !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. })
                 {
                     start_hide(hwnd, s);
                 }
             }
             LRESULT(0)
-        }
-
-        // Dark-theme the note editor EDIT control
-        0x0133 /* WM_CTLCOLOREDIT */ => {
-            if !sp.is_null() {
-                let s = &*sp;
-                if !s.note_editor_hwnd.0.is_null() && HWND(lp.0 as *mut _) == s.note_editor_hwnd {
-                    let hdc = windows::Win32::Graphics::Gdi::HDC(wp.0 as *mut _);
-                    windows::Win32::Graphics::Gdi::SetTextColor(hdc, windows::Win32::Foundation::COLORREF(0x00_E8_E3_E0));
-                    windows::Win32::Graphics::Gdi::SetBkColor(hdc, windows::Win32::Foundation::COLORREF(0x00_2B_28_27));
-                    return LRESULT(windows::Win32::Graphics::Gdi::CreateSolidBrush(
-                        windows::Win32::Foundation::COLORREF(0x00_2B_28_27)
-                    ).0 as isize);
-                }
-            }
-            DefWindowProcW(hwnd, msg, wp, lp)
         }
 
         WM_ICON_LOADED => {
@@ -1160,6 +1153,17 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 }
                 return LRESULT(0);
             }
+            if s.note_editing {
+                if let Some(c) = char::from_u32(wp.0 as u32) {
+                    if !c.is_control() {
+                        s.note_text.push(c);
+                        s.note_scroll = i32::MAX; // follow the caret to the bottom
+                        reset_cursor_blink(hwnd, s);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    }
+                }
+                return LRESULT(0);
+            }
             if s.voice_listening {
                 s.voice_listening = false;
                 let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
@@ -1207,18 +1211,21 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let s = &mut *sp;
             let vk = VIRTUAL_KEY(wp.0 as u16);
             let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
-            // Note editor: intercept Ctrl+S to save, Escape to close
-            if !s.note_editor_hwnd.0.is_null() {
-                if ctrl_down && vk.0 == 0x53 { // Ctrl+S
+            // In-app note editor: text is appended in WM_CHAR; control keys here.
+            if s.note_editing {
+                if ctrl_down && vk.0 == 0x53 { // Ctrl+S — save, keep editing
                     save_note(s);
                     return LRESULT(0);
                 }
-                if vk == VK_ESCAPE {
-                    close_note_editor(hwnd, s);
-                    return LRESULT(0);
+                match vk {
+                    VK_ESCAPE => { close_note_editor(hwnd, s); }       // save & close
+                    VK_BACK => { s.note_text.pop(); s.note_scroll = i32::MAX; reset_cursor_blink(hwnd, s); let _ = InvalidateRect(hwnd, None, FALSE); }
+                    VK_RETURN => { s.note_text.push('\n'); s.note_scroll = i32::MAX; reset_cursor_blink(hwnd, s); let _ = InvalidateRect(hwnd, None, FALSE); }
+                    VK_UP => { s.note_scroll = (s.note_scroll - 24).max(0); let _ = InvalidateRect(hwnd, None, FALSE); }
+                    VK_DOWN => { s.note_scroll += 24; let _ = InvalidateRect(hwnd, None, FALSE); }
+                    _ => {}
                 }
-                // Let the edit control handle all other keys
-                return windows::Win32::UI::WindowsAndMessaging::DefWindowProcW(hwnd, msg, wp, lp);
+                return LRESULT(0);
             }
 
             // A Hermes tool-approval is awaiting a decision. Intercept the
@@ -5176,6 +5183,49 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         let cursor_top = tr.top + (tr.bottom - tr.top - text_h) / 2;
         fill(mdc, cursor_x, cursor_top, 2, text_h, CLR_WHITE);
     }
+    // ── Note editor panel (self-rendered) ──────────────────────────────────
+    if s.note_editing {
+        let pad = 24;
+        let body_top = y + SEARCH_H + 1;
+        fill(mdc, x, y + SEARCH_H, w, 1, CLR_DIV);
+
+        let title_str = s.note_path.as_deref()
+            .and_then(|p| std::path::Path::new(p).file_stem())
+            .and_then(|n| n.to_str()).unwrap_or("Note").to_string();
+        SelectObject(mdc, s.font_n);
+        SetTextColor(mdc, CLR_WHITE);
+        let mut title: Vec<u16> = title_str.encode_utf16().collect();
+        let mut title_rc = RECT { left: x + pad, top: body_top + 12, right: x + w - pad, bottom: body_top + 42 };
+        let _ = DrawTextW(mdc, &mut title, &mut title_rc, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+        let content_top = body_top + 48;
+        let footer_h = 30;
+        let content_bottom = y + SEARCH_H + 1 + AI_PANEL_H - footer_h;
+
+        // Body — append a caret block so the user sees the insertion point.
+        SelectObject(mdc, s.font_c);
+        SetTextColor(mdc, CLR_WHITE);
+        let shown = if s.cursor_visible { format!("{}\u{2588}", s.note_text) } else { s.note_text.clone() };
+        let mut body: Vec<u16> = shown.encode_utf16().collect();
+        let mut calc = RECT { left: x + pad, top: 0, right: x + w - pad, bottom: 0 };
+        let _ = DrawTextW(mdc, &mut body.clone(), &mut calc, DT_LEFT | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
+        let total_h = calc.bottom - calc.top;
+        let view_h = content_bottom - content_top;
+        let max_scroll = (total_h - view_h).max(0);
+        let scroll = s.note_scroll.clamp(0, max_scroll);
+        let mut body_rc = RECT { left: x + pad, top: content_top - scroll, right: x + w - pad, bottom: content_top - scroll + total_h.max(view_h) };
+        let _ = DrawTextW(mdc, &mut body, &mut body_rc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+
+        fill(mdc, x, content_bottom, w, footer_h + 4, BG);
+        fill(mdc, x, content_bottom, w, 1, CLR_DIV);
+        SelectObject(mdc, s.font_b);
+        SetTextColor(mdc, CLR_GRAY);
+        let mut hint: Vec<u16> = "Esc: save & close     ·     Ctrl+S: save     ·     ↑ ↓ scroll".encode_utf16().collect();
+        let mut hint_rc = RECT { left: x + pad, top: content_bottom + 2, right: x + w - pad, bottom: content_bottom + footer_h };
+        let _ = DrawTextW(mdc, &mut hint, &mut hint_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        SelectObject(mdc, s.font_q);
+    }
+
     // ── AI answer panel ────────────────────────────────────────────────────
     if s.ai_pending || s.ai_answer.is_some() {
         let pad = 24;
@@ -5705,7 +5755,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     }
 
     // ── Results ───────────────────────────────────────────────────────────
-    let n = if s.ai_pending || s.ai_answer.is_some() {
+    let n = if s.ai_pending || s.ai_answer.is_some() || s.note_editing {
         0
     } else {
         (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS)
@@ -7471,79 +7521,34 @@ unsafe fn handle_form_enter(hwnd: HWND, s: &mut State) {
     }
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
+// Self-rendered note editor: the text lives in State and is painted directly, so it
+// works on the layered window (a child EDIT control rendered as a black box and stole
+// focus, hiding the launcher). Type to append, Backspace/Enter edit, Esc saves & closes.
 unsafe fn open_note_editor(hwnd: HWND, s: &mut State, path: String) {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, SetWindowTextW, SendMessageW, WM_SETFONT,
-        WS_CHILD, WS_VISIBLE, WS_VSCROLL, HMENU, WINDOW_STYLE, WINDOW_EX_STYLE,
-    };
-    use windows::core::PCWSTR;
-
-    // ES_MULTILINE=0x4, ES_AUTOVSCROLL=0x40, ES_WANTRETURN=0x1000, WS_HSCROLL=0x100000
-    const ES_MULTILINE: u32 = 0x0004;
-    const ES_AUTOVSCROLL: u32 = 0x0040;
-    const ES_WANTRETURN: u32 = 0x1000;
-
-    if !s.note_editor_hwnd.0.is_null() {
-        let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(s.note_editor_hwnd);
-        s.note_editor_hwnd = HWND(std::ptr::null_mut());
-    }
-
-    let editor_h = SEARCH_H + 1 + RESULT_H * VISIBLE_RESULTS as i32 + 12;
-    let class_w: Vec<u16> = "EDIT\0".encode_utf16().collect();
-    let title_w: Vec<u16> = "\0".encode_utf16().collect();
-
-    let hwnd_edit = CreateWindowExW(
-        WINDOW_EX_STYLE(0),
-        PCWSTR(class_w.as_ptr()),
-        PCWSTR(title_w.as_ptr()),
-        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_VSCROLL.0 | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN),
-        0, SEARCH_H + 1, WIN_W, editor_h,
-        hwnd,
-        HMENU(std::ptr::null_mut()),
-        windows::Win32::System::LibraryLoader::GetModuleHandleW(PCWSTR(std::ptr::null())).unwrap_or_default(),
-        None,
-    ).unwrap_or_default();
-
-    if !hwnd_edit.0.is_null() {
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            let content_w: Vec<u16> = content.encode_utf16().chain(std::iter::once(0)).collect();
-            let _ = SetWindowTextW(hwnd_edit, PCWSTR(content_w.as_ptr()));
-        }
-
-        let font_w: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
-        let hfont = windows::Win32::Graphics::Gdi::CreateFontW(
-            18, 0, 0, 0,
-            windows::Win32::Graphics::Gdi::FW_NORMAL.0 as i32,
-            0, 0, 0, 0, 0, 0, 0, 0,
-            PCWSTR(font_w.as_ptr()),
-        );
-        let _ = SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-        let _ = SetFocus(hwnd_edit);
-    }
-
-    s.note_editor_hwnd = hwnd_edit;
-    s.editing_note_path = Some(path);
+    s.note_text = std::fs::read_to_string(&path).unwrap_or_default();
+    s.note_path = Some(path);
+    s.note_editing = true;
+    s.note_scroll = 0;
+    s.results.clear();
+    s.selected = 0;
+    reset_cursor_blink(hwnd, s);
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
 
 unsafe fn save_note(s: &State) {
-    if let Some(path) = &s.editing_note_path {
-        if !s.note_editor_hwnd.0.is_null() {
-            let len = windows::Win32::UI::WindowsAndMessaging::GetWindowTextLengthW(s.note_editor_hwnd) as usize + 1;
-            let mut buf = vec![0u16; len];
-            windows::Win32::UI::WindowsAndMessaging::GetWindowTextW(s.note_editor_hwnd, &mut buf);
-            let text = String::from_utf16_lossy(&buf[..buf.len().saturating_sub(1)]);
-            let _ = std::fs::write(path, text.as_bytes());
-        }
+    if let Some(path) = &s.note_path {
+        let _ = std::fs::write(path, s.note_text.as_bytes());
     }
 }
 
 unsafe fn close_note_editor(hwnd: HWND, s: &mut State) {
-    if !s.note_editor_hwnd.0.is_null() {
+    if s.note_editing {
         save_note(s);
-        let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(s.note_editor_hwnd);
-        s.note_editor_hwnd = HWND(std::ptr::null_mut());
-        s.editing_note_path = None;
+        s.note_editing = false;
+        s.note_text.clear();
+        s.note_path = None;
+        s.note_scroll = 0;
+        trigger_search(hwnd, s);
         let _ = InvalidateRect(hwnd, None, FALSE);
     }
 }
