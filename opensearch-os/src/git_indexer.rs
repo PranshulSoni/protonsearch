@@ -1,4 +1,5 @@
 use crate::indexer::get_scan_folders;
+use crate::search::{ensure_memory_events_schema, insert_memory_event};
 use rusqlite::{params, Connection};
 use std::io::Write;
 use std::os::windows::process::CommandExt;
@@ -98,6 +99,7 @@ fn run_git_indexer(db_path: &Path) -> anyhow::Result<()> {
     let mut conn = Connection::open(db_path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
     conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode=WAL;")?;
+    let _ = ensure_memory_events_schema(&conn);
 
     // Create tables
     conn.execute(
@@ -364,7 +366,7 @@ fn index_single_repo(conn: &mut Connection, repo_id: i64, repo_path: &Path) -> a
     }
 
     tx.execute("DELETE FROM git_commits WHERE repo_id = ?", [repo_id])?;
-    for (hash, author, date, message) in commits {
+    for (hash, author, date, message) in &commits {
         tx.execute(
             "INSERT OR REPLACE INTO git_commits (hash, repo_id, author, date, message) VALUES (?, ?, ?, ?, ?)",
             params![hash, repo_id, author, date, message],
@@ -380,5 +382,27 @@ fn index_single_repo(conn: &mut Connection, repo_id: i64, repo_path: &Path) -> a
     }
 
     tx.commit()?;
+
+    let repo_name = repo_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("Unknown Repo");
+    let repo_path_str = repo_path.to_string_lossy();
+    for (hash, author, date, message) in commits {
+        if date <= 0 {
+            continue;
+        }
+        insert_memory_event(
+            conn,
+            date,
+            "Git",
+            "Commit",
+            &format!("Commit: {}", message),
+            &format!("{} by {} in {}", hash, author, repo_name),
+            repo_name,
+            Some(&repo_path_str),
+            None,
+        );
+    }
     Ok(())
 }

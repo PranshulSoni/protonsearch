@@ -1,3 +1,4 @@
+use crate::search::{ensure_memory_events_schema, insert_memory_event};
 use rusqlite::{params, Connection};
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -30,6 +31,7 @@ fn run_browser_indexer(db_path: &Path) -> anyhow::Result<()> {
     let conn = Connection::open(db_path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
     conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+    let _ = ensure_memory_events_schema(&conn);
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS browser_items (
@@ -294,6 +296,19 @@ fn parse_history(path: &Path, source_type: &str, conn: &Connection) -> anyhow::R
                 let unix_micros = chromium_time_to_unix_micros(last_visit_time);
                 let _ =
                     insert_stmt.execute(params![url, title, source_type, visit_count, unix_micros]);
+                if unix_micros > 0 {
+                    insert_memory_event(
+                        conn,
+                        unix_micros_to_secs(unix_micros),
+                        "Browser",
+                        "Visited Page",
+                        &title,
+                        &url,
+                        source_type,
+                        None,
+                        Some(&url),
+                    );
+                }
             }
         }
     }
@@ -394,6 +409,19 @@ fn parse_firefox(path: &Path, conn: &Connection) -> anyhow::Result<()> {
                     visit_count,
                     last_visit_date
                 ]);
+                if last_visit_date > 0 {
+                    insert_memory_event(
+                        conn,
+                        unix_micros_to_secs(last_visit_date),
+                        "Browser",
+                        "Visited Page",
+                        &title,
+                        &url,
+                        "firefox_history",
+                        None,
+                        Some(&url),
+                    );
+                }
             }
         }
     }
@@ -403,6 +431,10 @@ fn parse_firefox(path: &Path, conn: &Connection) -> anyhow::Result<()> {
 
 fn chromium_time_to_unix_micros(chromium_time: i64) -> i64 {
     chromium_time.saturating_sub(11_644_473_600_000_000)
+}
+
+fn unix_micros_to_secs(unix_micros: i64) -> i64 {
+    unix_micros / 1_000_000
 }
 
 #[cfg(test)]
@@ -416,5 +448,10 @@ mod tests {
             chromium_time_to_unix_micros(11_644_473_601_000_000),
             1_000_000
         );
+    }
+
+    #[test]
+    fn browser_memory_events_use_unix_seconds() {
+        assert_eq!(unix_micros_to_secs(1_700_000_000_123_456), 1_700_000_000);
     }
 }

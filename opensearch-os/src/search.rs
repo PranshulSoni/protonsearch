@@ -77,6 +77,22 @@ pub fn insert_memory_event(
     if ensure_memory_events_schema(conn).is_err() {
         return;
     }
+    let exists = conn
+        .query_row(
+            "SELECT COUNT(*) FROM memory_events
+             WHERE timestamp = ?
+               AND source = ?
+               AND event_type = ?
+               AND title = ?
+               AND coalesce(path, '') = coalesce(?, '')
+               AND coalesce(url, '') = coalesce(?, '')",
+            params![timestamp, source, event_type, title, path, url],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0);
+    if exists > 0 {
+        return;
+    }
     let _ = conn.execute(
         "INSERT INTO memory_events
          (timestamp, source, event_type, title, detail, app_name, path, url)
