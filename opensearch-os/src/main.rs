@@ -712,11 +712,6 @@ unsafe extern "system" fn wnd_proc(
                 if s.voice_triggered || s.voice_pending_exec {
                     return LRESULT(0);
                 }
-                // Keep the launcher open while an AI request is running / its answer is shown,
-                // or while a Hermes tool-approval is awaiting a decision.
-                if s.ai_pending || s.ai_answer.is_some() || s.hermes_approval.is_some() {
-                    return LRESULT(0);
-                }
                 if !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. }) {
                     start_hide(hwnd, s);
                 }
@@ -1132,7 +1127,6 @@ unsafe extern "system" fn wnd_proc(
                     VK_UP => { ai_scroll_up(s, 40); let _ = InvalidateRect(hwnd, None, FALSE); }
                     _ => {}
                 }
-                return LRESULT(0);
             }
 
             if s.ai_answer.is_some() {
@@ -1145,6 +1139,7 @@ unsafe extern "system" fn wnd_proc(
                 match vk {
                     VK_ESCAPE => {
                         close_ai_panel(hwnd, s);
+                        start_hide(hwnd, s);
                         return LRESULT(0);
                     }
                     VK_BACK => {
@@ -2300,6 +2295,26 @@ unsafe fn start_hide(hwnd: HWND, s: &mut State) {
     let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
     let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
     animate_window(hwnd, false);
+    reset_visible_chat_view(hwnd, s);
+}
+
+unsafe fn reset_visible_chat_view(hwnd: HWND, s: &mut State) {
+    // ponytail: hide only resets what is visible; workers keep updating ai_chats in the background.
+    let _ = KillTimer(hwnd, TIMER_AI_ANIM);
+    s.ai_pending = false;
+    s.ai_answer = None;
+    s.ai_title.clear();
+    s.ai_scroll = 0;
+    s.ai_follow_bottom = true;
+    s.hermes_approval = None;
+    s.ai_tick = 0;
+    s.active_chat_id = None;
+    s.query.clear();
+    s.cursor_pos = 0;
+    s.results.clear();
+    s.selected = 0;
+    s.scroll_offset = 0;
+    s.text_selected = false;
 }
 
 unsafe fn start_color_picker(hwnd: HWND, s: &mut State) {
@@ -4368,7 +4383,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         SetTextColor(mdc, CLR_PH);
         let _ = DrawTextW(mdc, &mut ph, &mut tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         SetTextColor(mdc, CLR_WHITE);
-    } else if s.query.is_empty() || s.ai_pending || s.ai_answer.is_some() {
+    } else if s.query.is_empty() {
         let ph_str = match &s.form_state {
             FormState::CreateSnippetName => "Create Snippet: Enter Name...",
             FormState::CreateSnippetContent { .. } => "Create Snippet: Enter Content...",
@@ -4385,7 +4400,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     } else {
         let cur = floor_char_boundary(&s.query, s.cursor_pos);
         let before = &s.query[..cur];
-        let mut dw_before: Vec<u16> = before.encode_utf16().collect();
+        let dw_before: Vec<u16> = before.encode_utf16().collect();
         let mut size = SIZE::default();
         if !dw_before.is_empty() {
             let _ = GetTextExtentPoint32W(mdc, &dw_before, &mut size);
@@ -4448,10 +4463,10 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     }
 
     // Draw cursor
-    if s.cursor_visible && !(s.ai_pending || s.ai_answer.is_some()) {
+    if s.cursor_visible {
         let cur = floor_char_boundary(&s.query, s.cursor_pos);
         let before = &s.query[..cur];
-        let mut dw_before: Vec<u16> = before.encode_utf16().collect();
+        let dw_before: Vec<u16> = before.encode_utf16().collect();
         let mut size = SIZE::default();
         if !dw_before.is_empty() {
             let _ = GetTextExtentPoint32W(mdc, &dw_before, &mut size);
