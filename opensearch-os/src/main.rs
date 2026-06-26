@@ -1949,9 +1949,18 @@ unsafe extern "system" fn wnd_proc(
             reset_cursor_blink(hwnd, s);
             let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
             let mx = (lp.0 & 0xFFFF) as i16 as i32;
-            
             let mut rc_client = RECT::default();
             let _ = GetClientRect(hwnd, &mut rc_client);
+            let win_w = rc_client.right - rc_client.left;
+            let _bx = (win_w - WIN_W) / 2;
+            let by = s.cy - s.win_h() / 2;
+            
+            if my >= by && my < by + SEARCH_H {
+                if s.ai_answer.is_some() || s.ai_pending {
+                    close_ai_panel(hwnd, s);
+                    return LRESULT(0);
+                }
+            }
             let win_w = rc_client.right - rc_client.left;
             let x_start = (win_w - WIN_W) / 2;
             
