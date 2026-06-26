@@ -561,6 +561,8 @@ pub struct HermesApproval {
 /// Callbacks the streaming run uses to talk back to the UI thread. Each is a
 /// best-effort fire-and-forget (the UI owns its own message box / state).
 pub trait RunCallbacks: Send {
+    /// Callback when run_id is known, allowing database updates.
+    fn on_run_id(&self, _run_id: &str) {}
     /// A tool needs approval. The UI shows an Approve/Deny button.
     fn on_approval(&self, approval: HermesApproval);
     /// Incremental progress text (assistant thinking/deltas). Replaces the
@@ -613,12 +615,22 @@ pub fn supports_runs_api() -> bool {
 pub fn resolve_run_approval(approval: &HermesApproval, approved: bool) -> Result<()> {
     let cfg = get_hermes_config();
     let url = format!("{HERMES_BASE}/v1/runs/{}/approval", approval.run_id);
+    let choice = if approved {
+        if ALWAYS_APPROVE.load(std::sync::atomic::Ordering::Relaxed) {
+            "always"
+        } else {
+            "once"
+        }
+    } else {
+        "deny"
+    };
     // Cover the likely decision shapes the gateway might expect.
     let body = serde_json::json!({
         "decision": if approved { "approved" } else { "denied" },
         "approved": approved,
         "approval_id": approval.approval_id,
         "status": if approved { "approved" } else { "denied" },
+        "choice": choice,
     });
     let resp = ureq::post(&url)
         .set("Authorization", &format!("Bearer {}", cfg.api_key))
@@ -670,6 +682,8 @@ pub fn run_agent_streaming(system: &str, user: &str, cb: &dyn RunCallbacks) -> R
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("run start response had no run_id"))?
         .to_string();
+
+    cb.on_run_id(&run_id);
 
     // 2. Open the SSE event stream.
     let events_url = format!("{HERMES_BASE}/v1/runs/{}/events", run_id);
@@ -777,9 +791,12 @@ pub fn run_agent_streaming(system: &str, user: &str, cb: &dyn RunCallbacks) -> R
 /// look like an approval request.
 fn extract_approval(v: &serde_json::Value, run_id: &str) -> Option<HermesApproval> {
     // Type-based detection first.
-    let kind = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    let kind = v.get("type")
+        .or_else(|| v.get("event"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("");
     let approval_types = [
-        "approval_required", "approval.requested", "tool_call_pending",
+        "approval_required", "approval.requested", "approval.request", "tool_call_pending",
         "approval_pending", "requires_approval", "permission_request",
     ];
     let mut looks_like_approval = approval_types.contains(&kind);
@@ -950,3 +967,66 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
+
+#[derive(serde::Deserialize, Debug)]
+pub struct RunStatusResponse {
+    pub status: String,
+    pub output: Option<String>,
+    pub error: Option<String>,
+    pub last_event: Option<String>,
+}
+
+pub fn get_run_status(run_id: &str) -> Result<RunStatusResponse> {
+    let cfg = get_hermes_config();
+    let url = format!("{HERMES_BASE}/v1/runs/{run_id}");
+    let resp = ureq::get(&url)
+        .set("Authorization", &format!("Bearer {}", cfg.api_key))
+        .timeout(std::time::Duration::from_secs(5))
+        .call()?;
+    let status_resp: RunStatusResponse = resp.into_json()?;
+    Ok(status_resp)
+}
+
+pub fn poll_and_stream_existing_run(run_id: &str, cb: &dyn RunCallbacks) -> Result<()> {
+    let mut seen_waiting = false;
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let status_resp = match get_run_status(run_id) {
+            Ok(r) => r,
+            Err(_) => continue, // ignore transient network errors
+        };
+
+        match status_resp.status.as_str() {
+            "queued" | "running" => {
+                // Still running
+            }
+            "waiting_for_approval" => {
+                if !seen_waiting {
+                    seen_waiting = true;
+                    cb.on_approval(HermesApproval {
+                        run_id: run_id.to_string(),
+                        approval_id: "".to_string(),
+                        tool: "System command".to_string(),
+                        summary: "Hermes is waiting for your approval to run a command.".to_string(),
+                    });
+                }
+            }
+            "completed" => {
+                let out = status_resp.output.unwrap_or_default();
+                cb.on_done(true, &out);
+                break;
+            }
+            "failed" => {
+                let err = status_resp.error.unwrap_or_else(|| "Run failed".to_string());
+                cb.on_done(false, &err);
+                break;
+            }
+            _ => {
+                cb.on_done(false, "Run terminated");
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
