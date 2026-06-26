@@ -228,8 +228,19 @@ fn handle_action(action: &str) {
                 let _ = windows::Win32::System::Power::SetSuspendState(false, false, false);
             }
         }
+        "hibernate" => {
+            unsafe {
+                let _ = windows::Win32::System::Power::SetSuspendState(true, false, false);
+            }
+        }
+        "logout" => {
+            let _ = Command::new("shutdown").arg("/l").spawn();
+        }
         "sleep_displays" => {
             sleep_displays();
+        }
+        "show_screensaver" => {
+            show_screensaver();
         }
         "show_desktop" => {
             send_win_d();
@@ -857,6 +868,18 @@ fn sleep_displays() {
             WPARAM(SC_MONITORPOWER),
             LPARAM(2),
         );
+    }
+}
+
+fn show_screensaver() {
+    let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());
+    let screensaver = std::path::PathBuf::from(system_root)
+        .join("System32")
+        .join("scrnsave.scr");
+    if screensaver.exists() {
+        let _ = Command::new(screensaver).arg("/s").spawn();
+    } else {
+        let _ = Command::new("explorer.exe").arg("ms-settings:lockscreen").spawn();
     }
 }
 

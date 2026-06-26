@@ -2373,6 +2373,44 @@ unsafe fn do_show(hwnd: HWND, s: &mut State) {
     animate_window(hwnd, true);
 }
 
+unsafe fn reset_launcher_window_position(hwnd: HWND, s: &mut State) {
+    let mut pt = POINT::default();
+    let _ = GetCursorPos(&mut pt);
+    let hmonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    let (work_w, work_h, work_left, work_top) = if GetMonitorInfoW(hmonitor, &mut mi).as_bool() {
+        (
+            mi.rcWork.right - mi.rcWork.left,
+            mi.rcWork.bottom - mi.rcWork.top,
+            mi.rcWork.left,
+            mi.rcWork.top,
+        )
+    } else {
+        (
+            GetSystemMetrics(SM_CXSCREEN),
+            GetSystemMetrics(SM_CYSCREEN),
+            0,
+            0,
+        )
+    };
+
+    let _ = SetWindowPos(
+        hwnd,
+        HWND(null_mut()),
+        work_left + (work_w - WIN_W) / 2,
+        work_top,
+        WIN_W,
+        work_h,
+        SWP_NOACTIVATE | SWP_NOZORDER,
+    );
+    s.cx = WIN_W / 2;
+    s.cy = work_h / 2;
+    let _ = InvalidateRect(hwnd, None, FALSE);
+}
+
 // Hotkey / mic-button entry point: open the launcher, show "Listening…", and run one
 // one-shot dictation. Mirrors the old wake-word flow (auto-exec the top result).
 unsafe fn start_voice_capture(hwnd: HWND, s: &mut State) {
@@ -3536,6 +3574,9 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 return;
             } else if cmd == "action:color_picker" {
                 start_color_picker(hwnd, s);
+                return;
+            } else if cmd == "action:reset_window_position" {
+                reset_launcher_window_position(hwnd, s);
                 return;
             } else if cmd == "action:quit_active_app" {
                 let prev_hwnd = s.prev_foreground;
