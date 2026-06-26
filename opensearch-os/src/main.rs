@@ -3415,23 +3415,25 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
     if let Some(r) = s.results.get(s.selected) {
         let cmd = r.entry.launch_command.clone();
         let ctrl_name = r.entry.control_name.clone();
-        let is_action_folder = r.entry.source == "FOLDER"
-            && (cmd == "bookmarks:"
-                || cmd == "history:"
-                || cmd == "commits:"
-                || cmd == "todos:"
-                || cmd == "clip:"
-                || cmd == "file:"
-                || cmd == "code:"
-                || cmd == "switch:"
-                || cmd == "window:"
-                || cmd == "ql:"
-                || cmd == "snip:"
-                || cmd == "img:"
-                || cmd == "chats:"
-                || cmd == "agents:"
-                || cmd == "agentchats:"
-                || cmd == "notes:");
+        // A scope command navigates the launcher into that scope. These exact strings are
+        // never real launch targets, so trigger on the command alone — not the result's
+        // source (the "Search Notes" quick-action isn't a FOLDER but still uses "notes:").
+        let is_action_folder = cmd == "bookmarks:"
+            || cmd == "history:"
+            || cmd == "commits:"
+            || cmd == "todos:"
+            || cmd == "clip:"
+            || cmd == "file:"
+            || cmd == "code:"
+            || cmd == "switch:"
+            || cmd == "window:"
+            || cmd == "ql:"
+            || cmd == "snip:"
+            || cmd == "img:"
+            || cmd == "chats:"
+            || cmd == "agents:"
+            || cmd == "agentchats:"
+            || cmd == "notes:";
         if is_action_folder {
             s.query = cmd;
             s.cursor_pos = s.query.len();
