@@ -849,6 +849,22 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
 
+        // Dark-theme the note editor EDIT control
+        0x0133 /* WM_CTLCOLOREDIT */ => {
+            if !sp.is_null() {
+                let s = &*sp;
+                if !s.note_editor_hwnd.0.is_null() && HWND(lp.0 as *mut _) == s.note_editor_hwnd {
+                    let hdc = windows::Win32::Graphics::Gdi::HDC(wp.0 as *mut _);
+                    windows::Win32::Graphics::Gdi::SetTextColor(hdc, windows::Win32::Foundation::COLORREF(0x00_E8_E3_E0));
+                    windows::Win32::Graphics::Gdi::SetBkColor(hdc, windows::Win32::Foundation::COLORREF(0x00_2B_28_27));
+                    return LRESULT(windows::Win32::Graphics::Gdi::CreateSolidBrush(
+                        windows::Win32::Foundation::COLORREF(0x00_2B_28_27)
+                    ).0 as isize);
+                }
+            }
+            DefWindowProcW(hwnd, msg, wp, lp)
+        }
+
         WM_ICON_LOADED => {
             if sp.is_null() {
                 unsafe {
@@ -2623,6 +2639,8 @@ unsafe fn start_voice_capture(hwnd: HWND, s: &mut State) {
 }
 
 unsafe fn start_hide(hwnd: HWND, s: &mut State) {
+    // Destroy the in-app note editor so it doesn't ghost over the launcher
+    close_note_editor(hwnd, s);
     // Voice is one-shot (hotkey / mic button), so there's nothing to restart here.
     // Just clear voice flags so the window can dismiss normally.
     s.voice_listening = false;
@@ -7445,7 +7463,8 @@ unsafe fn handle_form_enter(hwnd: HWND, s: &mut State) {
                 s.query.clear();
                 s.form_state = FormState::None;
                 s.cursor_pos = 0;
-                trigger_search(hwnd, s);
+                s.results.clear();
+                // Don't trigger_search — note editor is now covering the results area
             }
         }
         FormState::None => {}
