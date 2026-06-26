@@ -1,3 +1,7 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static FOCUS_ACTIVE: AtomicBool = AtomicBool::new(false);
+
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::process::Command;
@@ -322,9 +326,11 @@ fn handle_action(action: &str) {
             keybd_event(VK_LWIN.0 as u8, 0, KEYEVENTF_KEYUP, 0);
         },
         "toggle_focus_session" => {
+            FOCUS_ACTIVE.store(false, Ordering::Relaxed);
             let _ = Command::new("cmd").args(["/C", "start", "ms-settings:focus"]).spawn();
         }
         cmd_str if cmd_str.starts_with("start_focus_session:") => {
+            FOCUS_ACTIVE.store(true, Ordering::Relaxed);
             let cat = cmd_str.strip_prefix("start_focus_session:").unwrap().to_string();
             std::thread::spawn(move || {
                 let _ = Command::new("cmd").args(["/C", "start", "ms-settings:focus"]).spawn();
@@ -336,12 +342,18 @@ fn handle_action(action: &str) {
                             [cat],
                             |row| row.get::<_, String>(0)
                         ) {
-                            let exes: Vec<String> = blocked.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
-                            for _ in 0..120 {
-                                for exe in &exes {
-                                    let _ = Command::new("taskkill").args(["/F", "/IM", exe]).creation_flags(0x08000000).output();
+                            let items: Vec<String> = blocked.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                            while FOCUS_ACTIVE.load(Ordering::Relaxed) {
+                                for item in &items {
+                                    if item.to_lowercase().ends_with(".exe") {
+                                        let _ = Command::new("taskkill").args(["/F", "/IM", item]).creation_flags(0x08000000).output();
+                                    } else {
+                                        // It's a website or window title (e.g. "YouTube" or "youtube.com")
+                                        let filter = format!("WINDOWTITLE eq *{}*", item);
+                                        let _ = Command::new("taskkill").args(["/F", "/FI", &filter, "/IM", "*"]).creation_flags(0x08000000).output();
+                                    }
                                 }
-                                std::thread::sleep(std::time::Duration::from_secs(5));
+                                std::thread::sleep(std::time::Duration::from_secs(3));
                             }
                         }
                     }
