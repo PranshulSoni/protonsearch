@@ -907,7 +907,7 @@ unsafe extern "system" fn wnd_proc(
                 let s = &mut *sp;
                 let target_chat = wp.0 as i64;
                 let active_chat = s.active_chat_id.unwrap_or(0);
-                if target_chat == 0 || target_chat == active_chat {
+                if target_chat == active_chat && (active_chat != 0 || s.ai_pending) {
                     let (ok, text) = payload;
                     let _ = KillTimer(hwnd, TIMER_AI_ANIM);
                     s.ai_pending = false;
@@ -928,7 +928,7 @@ unsafe extern "system" fn wnd_proc(
                     let s = &mut *sp;
                     let target_chat = wp.0 as i64;
                     let active_chat = s.active_chat_id.unwrap_or(0);
-                    if target_chat == 0 || target_chat == active_chat {
+                    if target_chat == active_chat && (active_chat != 0 || s.ai_pending) {
                         s.ai_answer = Some(text);
                         s.ai_follow_bottom = true;
                         let _ = InvalidateRect(hwnd, None, FALSE);
@@ -945,7 +945,7 @@ unsafe extern "system" fn wnd_proc(
                     let s = &mut *sp;
                     let target_chat = wp.0 as i64;
                     let active_chat = s.active_chat_id.unwrap_or(0);
-                    if target_chat == 0 || target_chat == active_chat {
+                    if target_chat == active_chat && (active_chat != 0 || s.ai_pending) {
                         s.hermes_approval = Some(approval);
                         s.ai_follow_bottom = true;
                         let _ = InvalidateRect(hwnd, None, FALSE);
@@ -2098,6 +2098,7 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         if !(s.ai_pending || s.ai_answer.is_some()) {
             s.query.clear();
             s.cursor_pos = 0;
+            s.results.clear();
             s.selected = 0;
             s.scroll_offset = 0;
             s.ai_pending = false;
@@ -2842,6 +2843,7 @@ unsafe fn close_ai_panel(hwnd: HWND, s: &mut State) {
     s.hermes_approval = None;
     s.ai_tick = 0;
     s.active_chat_id = None;
+    s.results.clear();
     trigger_search(hwnd, s); // restore normal results for the current query
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
