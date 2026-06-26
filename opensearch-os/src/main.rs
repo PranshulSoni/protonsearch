@@ -1145,7 +1145,6 @@ unsafe extern "system" fn wnd_proc(
                 match vk {
                     VK_ESCAPE => {
                         close_ai_panel(hwnd, s);
-                        start_hide(hwnd, s);
                         return LRESULT(0);
                     }
                     VK_BACK => {
@@ -1445,6 +1444,14 @@ unsafe extern "system" fn wnd_proc(
                     } else if s.text_selected {
                         s.text_selected = false;
                         reset_cursor_blink(hwnd, s);
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    } else if !s.query.is_empty() {
+                        s.query.clear();
+                        s.cursor_pos = 0;
+                        s.results.clear();
+                        s.selected = 0;
+                        s.scroll_offset = 0;
+                        trigger_search(hwnd, s);
                         let _ = InvalidateRect(hwnd, None, FALSE);
                     } else {
                         start_hide(hwnd, s);
