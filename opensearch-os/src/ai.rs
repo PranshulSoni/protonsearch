@@ -973,7 +973,6 @@ pub struct RunStatusResponse {
     pub status: String,
     pub output: Option<String>,
     pub error: Option<String>,
-    pub last_event: Option<String>,
 }
 
 pub fn get_run_status(run_id: &str) -> Result<RunStatusResponse> {

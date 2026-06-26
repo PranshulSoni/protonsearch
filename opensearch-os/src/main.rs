@@ -2616,7 +2616,6 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
                 prev_history,
                 db_path: db_path.clone(),
                 chat_id,
-                original_prompt: original_prompt.clone(),
                 original_response: original_response.clone(),
             };
             let result = ai::run_agent_streaming(&system_prompt, &new_prompt, &cb);
@@ -2688,7 +2687,6 @@ struct UiRunCallbacks {
     prev_history: String,
     db_path: std::path::PathBuf,
     chat_id: Option<i64>,
-    original_prompt: String,
     original_response: String,
 }
 
@@ -2805,7 +2803,6 @@ fn run_agent_via_runs_api(
             prev_history: String::new(),
             db_path: db_path_clone,
             chat_id,
-            original_prompt: String::new(),
             original_response: String::new(),
         };
         let result = ai::run_agent_streaming(&system, &user, &cb);
@@ -3047,7 +3044,6 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                                     prev_history: "".to_string(),
                                     db_path: db_path_clone,
                                     chat_id: chat_id_opt,
-                                    original_prompt: prompt_clone,
                                     original_response: response_clone,
                                 };
                                 let _ = ai::poll_and_stream_existing_run(&rid_clone, &cb);
