@@ -83,7 +83,7 @@ pub fn start_git_indexer(db_path: PathBuf) {
 fn run_git_indexer(db_path: &Path) -> anyhow::Result<()> {
     let mut conn = Connection::open(db_path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
-    conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+    conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode=WAL;")?;
 
     // Create tables
     conn.execute(

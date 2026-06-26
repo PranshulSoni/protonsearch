@@ -1011,12 +1011,13 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
             let repo_name = std::path::Path::new(&repo_path).file_name()
                 .map(|f| f.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "repo".to_string());
+            let short_hash = take_chars(&hash, 7);
 
             results.push(SearchResult {
                 entry: CatalogEntry {
                     id: format!("project.commit.{}", hash),
                     control_name: format!("💻 Commit: {} (in {})", message, repo_name),
-                    breadcrumb_path: format!("Project > Commit > {} [hash: {}]", repo_name, &hash[..7.min(hash.len())]),
+                    breadcrumb_path: format!("Project > Commit > {} [hash: {}]", repo_name, short_hash),
                     launch_command: repo_path.clone(),
                     source: "PROJECT".to_string(),
                     description: format!("Git commit at {}", format_timestamp_local(ts)),
@@ -1058,11 +1059,7 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                     score: 8.0,
                 });
             } else {
-                let mut preview = content.replace("\r\n", " ").replace('\n', " ");
-                if preview.len() > 100 {
-                    preview.truncate(97);
-                    preview.push_str("...");
-                }
+                let preview = ellipsize_chars(&content.replace("\r\n", " ").replace('\n', " "), 100);
                 results.push(SearchResult {
                     entry: CatalogEntry {
                         id: format!("project.clip.{}", content),
@@ -1220,18 +1217,10 @@ fn get_path_score_modifier(full_path: &str) -> f32 {
                     score: 3.0,
                 });
             } else {
-                let mut desc = content.replace("\r\n", " ").replace('\n', " ");
-                if desc.len() > 100 {
-                    desc.truncate(97);
-                    desc.push_str("...");
-                }
+                let desc = ellipsize_chars(&content.replace("\r\n", " ").replace('\n', " "), 100);
                 
                 let display_name = content.replace("\r\n", " ").replace('\n', " ").replace('\t', " ");
-                let display_name = if display_name.len() > 200 {
-                    format!("{}...", &display_name[..197])
-                } else {
-                    display_name
-                };
+                let display_name = ellipsize_chars(&display_name, 200);
 
                 results.push(SearchResult {
                     entry: CatalogEntry {
@@ -1836,14 +1825,6 @@ fn format_relative_time(ts: i64) -> String {
             }
         };
 
-        let format_unix_time = |timestamp: i64| -> String {
-            let days = timestamp / 86400;
-            let years = 1970 + days / 365;
-            let month = 1 + (days % 365) / 30;
-            let day = 1 + (days % 365) % 30;
-            format!("{:04}-{:02}-{:02}", years, month, day)
-        };
-
         for row in rows.into_iter().filter_map(|r| r.ok()) {
             let (hash, author, date, message, repo_name) = row;
             let msg_lower = message.to_lowercase();
@@ -1868,12 +1849,13 @@ fn format_relative_time(ts: i64) -> String {
             }
 
             if score > 0.0 {
-                let date_str = format_unix_time(date);
+                let date_str = format_unix_date(date);
+                let short_hash = take_chars(&hash, 7);
                 results.push(SearchResult {
                     entry: CatalogEntry {
                         id: format!("git.commit.{}", hash),
                         control_name: format!("[{}] {}", repo_name, message),
-                        breadcrumb_path: format!("Git > Commit > {} by {}", hash[..7.min(hash.len())].to_string(), author),
+                        breadcrumb_path: format!("Git > Commit > {} by {}", short_hash, author),
                         launch_command: format!("copy:{}", hash),
                         source: "COMMIT".to_string(),
                         description: format!("Commit on {} - {}", date_str, hash),
@@ -2592,8 +2574,8 @@ fn format_relative_time(ts: i64) -> String {
                 let mut model_val = "Default (DeepSeek/OpenCodeZen auto)".to_string();
                 let conn = &self.conn;
                 if let Ok(val) = conn.query_row("SELECT value FROM ai_settings WHERE key = 'api_key'", [], |row| row.get::<_, String>(0)) {
-                    if val.len() > 8 {
-                        key_masked = format!("{}...{}", &val[..4], &val[val.len()-4..]);
+                    if val.chars().count() > 8 {
+                        key_masked = format!("{}...{}", take_chars(&val, 4), take_last_chars(&val, 4));
                     } else if !val.is_empty() {
                         key_masked = "****".to_string();
                     }
@@ -3641,6 +3623,20 @@ mod tests {
         ] {
             assert!(QUICK_ACTIONS.iter().any(|action| action.launch_command == command));
         }
+    }
+
+    #[test]
+    fn string_shortening_is_utf8_safe() {
+        assert_eq!(ellipsize_chars("abcdefg", 6), "abc...");
+        assert_eq!(ellipsize_chars("😀😀😀😀", 5), "😀😀😀😀");
+        assert_eq!(take_chars("😀abcdef", 2), "😀a");
+        assert_eq!(take_last_chars("abcdef😀", 2), "f😀");
+    }
+
+    #[test]
+    fn unix_date_uses_real_calendar() {
+        assert_eq!(format_unix_date(0), "1970-01-01");
+        assert_eq!(format_unix_date(1_704_067_200), "2024-01-01");
     }
 
     #[test]
@@ -5494,6 +5490,40 @@ fn parse_sequential_anchor_and_time(s: &str, today_start: i64, yesterday_start: 
     }
 }
 
+fn take_chars(s: &str, max: usize) -> String {
+    s.chars().take(max).collect()
+}
+
+fn take_last_chars(s: &str, max: usize) -> String {
+    let mut chars = s.chars().rev().take(max).collect::<Vec<_>>();
+    chars.reverse();
+    chars.into_iter().collect()
+}
+
+fn ellipsize_chars(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        format!("{}...", take_chars(s, max.saturating_sub(3)))
+    }
+}
+
+fn format_unix_date(timestamp: i64) -> String {
+    let filetime_val = ((timestamp as i128) + 11_644_473_600) * 10_000_000;
+    if filetime_val < 0 {
+        return "1970-01-01".to_string();
+    }
+    let ft = windows::Win32::Foundation::FILETIME {
+        dwLowDateTime: (filetime_val & 0xFFFFFFFF) as u32,
+        dwHighDateTime: ((filetime_val >> 32) & 0xFFFFFFFF) as u32,
+    };
+    let mut st = windows::Win32::Foundation::SYSTEMTIME::default();
+    unsafe {
+        let _ = windows::Win32::System::Time::FileTimeToSystemTime(&ft, &mut st);
+    }
+    format!("{:04}-{:02}-{:02}", st.wYear, st.wMonth, st.wDay)
+}
+
 fn format_timestamp_local(timestamp: i64) -> String {
     let filetime_val = (timestamp + 11644473600) * 10000000;
     let ft = windows::Win32::Foundation::FILETIME {
@@ -5899,7 +5929,7 @@ impl SearchEngine {
                         breadcrumb_path: format!("Snippet{} > Copy to Clipboard", display_keyword),
                         launch_command: format!("copy_snippet:{}", content),
                         source: "SNIPPET".to_string(),
-                        description: if content.len() > 60 { format!("{}...", &content[..60]) } else { content.clone() },
+                        description: ellipsize_chars(&content, 63),
                         synonyms: format!("{} {}", name.to_lowercase(), kw_str),
                     },
                     score: 3.9,
@@ -6002,7 +6032,7 @@ impl SearchEngine {
                         breadcrumb_path: format!("Snippet{} > Copy to Clipboard", display_keyword),
                         launch_command: format!("copy_snippet:{}", content),
                         source: "SNIPPET".to_string(),
-                        description: if content.len() > 60 { format!("{}...", &content[..60]) } else { content.clone() },
+                        description: ellipsize_chars(&content, 63),
                         synonyms: format!("{} {}", name.to_lowercase(), kw_str),
                     },
                     score: 8.0,

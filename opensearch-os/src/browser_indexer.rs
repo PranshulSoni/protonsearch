@@ -2,6 +2,16 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use rusqlite::{Connection, params};
 
+struct TempFile {
+    path: PathBuf,
+}
+
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
 pub fn start_browser_indexer(db_path: PathBuf) {
     thread::spawn(move || {
         // Initial delay to let the app start up completely lag-free
@@ -211,6 +221,7 @@ fn parse_history(path: &Path, source_type: &str, conn: &Connection) -> anyhow::R
     let temp_path = temp_dir.join(format!("browser_history_temp_{}.db", timestamp));
 
     std::fs::copy(path, &temp_path)?;
+    let _temp_file = TempFile { path: temp_path.clone() };
 
     // Scope for temp connection so it is closed before we remove the file
     {
@@ -253,12 +264,12 @@ fn parse_history(path: &Path, source_type: &str, conn: &Connection) -> anyhow::R
         for row in rows.flatten() {
             let (url, title, visit_count, last_visit_time) = row;
             if url.starts_with("http://") || url.starts_with("https://") {
-                let _ = insert_stmt.execute(params![url, title, source_type, visit_count, last_visit_time]);
+                let unix_micros = chromium_time_to_unix_micros(last_visit_time);
+                let _ = insert_stmt.execute(params![url, title, source_type, visit_count, unix_micros]);
             }
         }
     }
 
-    let _ = std::fs::remove_file(&temp_path);
     Ok(())
 }
 
@@ -271,6 +282,7 @@ fn parse_firefox(path: &Path, conn: &Connection) -> anyhow::Result<()> {
     let temp_path = temp_dir.join(format!("firefox_places_temp_{}.db", timestamp));
 
     std::fs::copy(path, &temp_path)?;
+    let _temp_file = TempFile { path: temp_path.clone() };
 
     // Scope for connection closure
     {
@@ -344,6 +356,20 @@ fn parse_firefox(path: &Path, conn: &Connection) -> anyhow::Result<()> {
         }
     }
 
-    let _ = std::fs::remove_file(&temp_path);
     Ok(())
+}
+
+fn chromium_time_to_unix_micros(chromium_time: i64) -> i64 {
+    chromium_time.saturating_sub(11_644_473_600_000_000)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chromium_history_time_is_normalized_to_unix_micros() {
+        assert_eq!(chromium_time_to_unix_micros(11_644_473_600_000_000), 0);
+        assert_eq!(chromium_time_to_unix_micros(11_644_473_601_000_000), 1_000_000);
+    }
 }
