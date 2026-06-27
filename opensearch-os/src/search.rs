@@ -151,9 +151,18 @@ fn lean_allowed(r: &SearchResult) -> bool {
         // Otherwise it's a bare "scope:" entry-point; keep only the allowed categories.
         return matches!(
             cmd,
-            "file:" | "code:" | "img:" | "image:" | "screenshots:"
-                | "commits:" | "history:" | "bookmarks:" | "agents:" | "agentchats:"
-                | "clip:" | "clipboard:"
+            "file:"
+                | "code:"
+                | "img:"
+                | "image:"
+                | "screenshots:"
+                | "commits:"
+                | "history:"
+                | "bookmarks:"
+                | "agents:"
+                | "agentchats:"
+                | "clip:"
+                | "clipboard:"
         );
     }
 
@@ -4534,7 +4543,6 @@ impl SearchEngine {
         final_results
     }
 
-
     fn get_conversational_results(&self, qvec: &[f32]) -> Vec<SearchResult> {
         if DISABLE_LIVE_RESULTS.load(Ordering::Relaxed) {
             return vec![];
@@ -4900,22 +4908,39 @@ mod tests {
         };
         // kept
         for (s, c) in [
-            ("FILE", "C:/x.pdf"), ("RECENT", "C:/x"), ("CODE", "C:/x.rs"),
-            ("app", "shell:AppsFolder\\X"), ("COMMIT", "x"),
-            ("HISTORY", "https://x"), ("BOOKMARK", "https://x"),
-            ("X", "ms-settings:display"), ("X", "control.exe /name X"), ("X", "appwiz.cpl"),
-            ("AI", "agent:1\u{1f}hi"), ("AI", "openagent:1\u{1f}n"), ("AI", "aichat:5"),
-            ("FOLDER", "commits:"), ("FOLDER", "bookmarks:"), ("FOLDER", "agents:"),
-            ("FOLDER", "C:\\Users\\me\\Documents"), ("FOLDER", "/home/x/docs"),
-            ("CLIPBOARD", "copy:hi"), ("FOLDER", "clip:"),
+            ("FILE", "C:/x.pdf"),
+            ("RECENT", "C:/x"),
+            ("CODE", "C:/x.rs"),
+            ("app", "shell:AppsFolder\\X"),
+            ("COMMIT", "x"),
+            ("HISTORY", "https://x"),
+            ("BOOKMARK", "https://x"),
+            ("X", "ms-settings:display"),
+            ("X", "control.exe /name X"),
+            ("X", "appwiz.cpl"),
+            ("AI", "agent:1\u{1f}hi"),
+            ("AI", "openagent:1\u{1f}n"),
+            ("AI", "aichat:5"),
+            ("FOLDER", "commits:"),
+            ("FOLDER", "bookmarks:"),
+            ("FOLDER", "agents:"),
+            ("FOLDER", "C:\\Users\\me\\Documents"),
+            ("FOLDER", "/home/x/docs"),
+            ("CLIPBOARD", "copy:hi"),
+            ("FOLDER", "clip:"),
         ] {
             assert!(lean_allowed(&mk(s, c)), "should keep {s} {c}");
         }
         // dropped
         for (s, c) in [
-            ("CALC", "copy:4"), ("AI", "ai:ask:hi"),
-            ("AI", "aichats:"), ("FOLDER", "notes:"),
-            ("TODO", "x"), ("SNIPPET", "x"), ("QUICKLINK", "https://x"), ("web", "https://google.com"),
+            ("CALC", "copy:4"),
+            ("AI", "ai:ask:hi"),
+            ("AI", "aichats:"),
+            ("FOLDER", "notes:"),
+            ("TODO", "x"),
+            ("SNIPPET", "x"),
+            ("QUICKLINK", "https://x"),
+            ("web", "https://google.com"),
         ] {
             assert!(!lean_allowed(&mk(s, c)), "should drop {s} {c}");
         }

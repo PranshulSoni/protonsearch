@@ -327,30 +327,49 @@ fn handle_action(action: &str) {
         },
         "toggle_focus_session" => {
             FOCUS_ACTIVE.store(false, Ordering::Relaxed);
-            let _ = Command::new("cmd").args(["/C", "start", "ms-settings:focus"]).spawn();
+            let _ = Command::new("cmd")
+                .args(["/C", "start", "ms-settings:focus"])
+                .spawn();
         }
         cmd_str if cmd_str.starts_with("start_focus_session:") => {
             FOCUS_ACTIVE.store(true, Ordering::Relaxed);
-            let cat = cmd_str.strip_prefix("start_focus_session:").unwrap().to_string();
+            let cat = cmd_str
+                .strip_prefix("start_focus_session:")
+                .unwrap()
+                .to_string();
             std::thread::spawn(move || {
-                let _ = Command::new("cmd").args(["/C", "start", "ms-settings:focus"]).spawn();
+                let _ = Command::new("cmd")
+                    .args(["/C", "start", "ms-settings:focus"])
+                    .spawn();
                 if let Ok(appdata) = std::env::var("APPDATA") {
-                    let db_path = std::path::PathBuf::from(appdata).join("opensearch-os").join("file_index.db");
+                    let db_path = std::path::PathBuf::from(appdata)
+                        .join("opensearch-os")
+                        .join("file_index.db");
                     if let Ok(conn) = rusqlite::Connection::open(db_path) {
                         if let Ok(blocked) = conn.query_row(
                             "SELECT blocked_apps FROM focus_categories WHERE name = ?",
                             [cat],
-                            |row| row.get::<_, String>(0)
+                            |row| row.get::<_, String>(0),
                         ) {
-                            let items: Vec<String> = blocked.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+                            let items: Vec<String> = blocked
+                                .split(',')
+                                .map(|s| s.trim().to_string())
+                                .filter(|s| !s.is_empty())
+                                .collect();
                             while FOCUS_ACTIVE.load(Ordering::Relaxed) {
                                 for item in &items {
                                     if item.to_lowercase().ends_with(".exe") {
-                                        let _ = Command::new("taskkill").args(["/F", "/IM", item]).creation_flags(0x08000000).output();
+                                        let _ = Command::new("taskkill")
+                                            .args(["/F", "/IM", item])
+                                            .creation_flags(0x08000000)
+                                            .output();
                                     } else {
                                         // It's a website or window title (e.g. "YouTube" or "youtube.com")
                                         let filter = format!("WINDOWTITLE eq *{}*", item);
-                                        let _ = Command::new("taskkill").args(["/F", "/FI", &filter, "/IM", "*"]).creation_flags(0x08000000).output();
+                                        let _ = Command::new("taskkill")
+                                            .args(["/F", "/FI", &filter, "/IM", "*"])
+                                            .creation_flags(0x08000000)
+                                            .output();
                                     }
                                 }
                                 std::thread::sleep(std::time::Duration::from_secs(3));

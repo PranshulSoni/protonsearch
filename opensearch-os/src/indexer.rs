@@ -14,7 +14,10 @@ const TEXT_EXTENSIONS: &[&str] = &[
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "bmp", "gif"];
 
 fn is_indexable_content(ext: &str) -> bool {
-    TEXT_EXTENSIONS.contains(&ext) || ext == "pdf" || ext == "docx" || IMAGE_EXTENSIONS.contains(&ext)
+    TEXT_EXTENSIONS.contains(&ext)
+        || ext == "pdf"
+        || ext == "docx"
+        || IMAGE_EXTENSIONS.contains(&ext)
 }
 
 /// Extract searchable text for a file (document text or image OCR), or None.
@@ -34,12 +37,8 @@ fn extract_content(path: &Path, ext: &str) -> Option<String> {
 
 /// True if any path component is an ignored directory (node_modules, .git, appdata, temp…).
 fn path_in_ignored_dir(path: &Path) -> bool {
-    path.components().any(|c| {
-        c.as_os_str()
-            .to_str()
-            .map(is_ignored_dir)
-            .unwrap_or(false)
-    })
+    path.components()
+        .any(|c| c.as_os_str().to_str().map(is_ignored_dir).unwrap_or(false))
 }
 
 /// Index a single file immediately: upsert name/meta, plus content/OCR for indexable types.
@@ -53,8 +52,16 @@ fn index_one_file(conn: &Connection, path: &Path) {
         Some(s) => s.to_string(),
         None => return,
     };
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
     if name.is_empty() || is_ignored_file(&name, &ext) {
         return;
     }
@@ -115,7 +122,8 @@ pub fn start_watcher(db_path: PathBuf) {
 
         // Debounce: batch events in an ~800ms window and dedupe paths so a file being
         // written repeatedly (e.g. a download in progress) is only indexed once.
-        let mut collect = |set: &mut std::collections::HashSet<PathBuf>, res: notify::Result<notify::Event>| {
+        let mut collect = |set: &mut std::collections::HashSet<PathBuf>,
+                           res: notify::Result<notify::Event>| {
             if let Ok(ev) = res {
                 if matches!(ev.kind, EventKind::Create(_) | EventKind::Modify(_)) {
                     for p in ev.paths {
@@ -132,7 +140,9 @@ pub fn start_watcher(db_path: PathBuf) {
             let mut paths = std::collections::HashSet::new();
             collect(&mut paths, first);
             let deadline = std::time::Instant::now() + std::time::Duration::from_millis(800);
-            while let Ok(r) = rx.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now())) {
+            while let Ok(r) =
+                rx.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
+            {
                 collect(&mut paths, r);
                 if paths.len() > 2000 {
                     break;

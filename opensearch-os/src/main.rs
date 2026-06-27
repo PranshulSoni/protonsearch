@@ -26,7 +26,7 @@ use windows::{
 // ── Layout ────────────────────────────────────────────────────────────────────
 const WIN_W: i32 = 720;
 const SEARCH_H: i32 = 64;
-const RESULT_H: i32 = 64;
+const RESULT_H: i32 = 76;
 const MAX_RESULTS: usize = 30;
 const VISIBLE_RESULTS: usize = 8;
 const PAD_L: i32 = 24;
@@ -98,6 +98,17 @@ enum FormState {
     CreateNoteName,
 }
 
+#[derive(PartialEq, Clone, Copy, Debug)]
+enum FilterType {
+    All,
+    Files,
+    Content,
+    Images,
+    Code,
+    Settings,
+    Commands,
+}
+
 // ── App state ─────────────────────────────────────────────────────────────────
 struct State {
     search_tx: Option<std::sync::mpsc::Sender<SearchRequest>>,
@@ -132,6 +143,32 @@ struct State {
     icon_todo: HICON,
     icon_clipboard: HICON,
     icon_memory: HICON,
+    
+    // New icons from launcher_source_icons
+    icon_new_agent_history: HICON,
+    icon_new_all: HICON,
+    icon_new_browser_bookmarks: HICON,
+    icon_new_browser_history: HICON,
+    icon_new_clipboard_history: HICON,
+    icon_new_code: HICON,
+    icon_new_commands: HICON,
+    icon_new_content: HICON,
+    icon_new_enter: HICON,
+    icon_new_esc: HICON,
+    icon_new_files: HICON,
+    icon_new_git_commits: HICON,
+    icon_new_images: HICON,
+    icon_new_local_files: HICON,
+    icon_new_mic: HICON,
+    icon_new_navigate: HICON,
+    icon_new_search_screenshots: HICON,
+    icon_new_search: HICON,
+    icon_new_settings: HICON,
+    icon_new_source_code: HICON,
+    icon_new_tab: HICON,
+    
+    active_filter: FilterType,
+    hovered_filter: Option<FilterType>,
     text_selected: bool,
     cursor_visible: bool,
     scroll_offset: usize,
@@ -202,6 +239,14 @@ struct IconRequest {
 }
 
 impl State {
+    fn reset_results(&mut self) {
+        if self.query.is_empty() {
+            self.results = default_homepage_results();
+        } else {
+            self.results.clear();
+        }
+    }
+    
     fn win_h(&self) -> i32 {
         if self.note_editing {
             return SEARCH_H + 1 + AI_PANEL_H;
@@ -212,22 +257,21 @@ impl State {
         if self.form_state != FormState::None {
             return SEARCH_H + 24;
         }
+        if self.query.is_empty() {
+            return SEARCH_H + 36 + 8 * RESULT_H + 40;
+        }
         let n = self.results.len().min(VISIBLE_RESULTS) as i32;
         if n == 0 {
             SEARCH_H
         } else {
-            let base_h = SEARCH_H + 1 + n * RESULT_H;
-            if self.query.starts_with("clip:") || self.query.starts_with("clipboard:") {
-                base_h + 24
-            } else {
-                base_h + 28
-            }
+            SEARCH_H + 48 + n * RESULT_H + 40
         }
     }
     fn result_rect(&self, i: usize) -> RECT {
         let end_h = self.win_h();
         let end_y = self.cy - end_h / 2;
-        let y = end_y + SEARCH_H + 1 + i as i32 * RESULT_H;
+        let offset = if self.query.is_empty() { 36 } else { 48 };
+        let y = end_y + SEARCH_H + offset + i as i32 * RESULT_H;
         RECT {
             left: 0,
             top: y,
@@ -437,6 +481,28 @@ unsafe fn run() {
     let icon_clipboard = load_icon_from_dll("shell32.dll", 260, 32);
     let icon_memory = load_icon_from_dll("shell32.dll", 238, 32);
 
+    let icon_new_agent_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/agent-history.png"));
+    let icon_new_all = load_png_to_hicon(include_bytes!("../../launcher_source_icons/all.png"));
+    let icon_new_browser_bookmarks = load_png_to_hicon(include_bytes!("../../launcher_source_icons/browser-bookmarks.png"));
+    let icon_new_browser_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/browser-history.png"));
+    let icon_new_clipboard_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/clipboard-history.png"));
+    let icon_new_code = load_png_to_hicon(include_bytes!("../../launcher_source_icons/code.png"));
+    let icon_new_commands = load_png_to_hicon(include_bytes!("../../launcher_source_icons/commands.png"));
+    let icon_new_content = load_png_to_hicon(include_bytes!("../../launcher_source_icons/content.png"));
+    let icon_new_enter = load_png_to_hicon(include_bytes!("../../launcher_source_icons/enter.png"));
+    let icon_new_esc = load_png_to_hicon(include_bytes!("../../launcher_source_icons/esc.png"));
+    let icon_new_files = load_png_to_hicon(include_bytes!("../../launcher_source_icons/files.png"));
+    let icon_new_git_commits = load_png_to_hicon(include_bytes!("../../launcher_source_icons/git-commits.png"));
+    let icon_new_images = load_png_to_hicon(include_bytes!("../../launcher_source_icons/images.png"));
+    let icon_new_local_files = load_png_to_hicon(include_bytes!("../../launcher_source_icons/local-files.png"));
+    let icon_new_mic = load_png_to_hicon(include_bytes!("../../launcher_source_icons/mic.png"));
+    let icon_new_navigate = load_png_to_hicon(include_bytes!("../../launcher_source_icons/navigate.png"));
+    let icon_new_search_screenshots = load_png_to_hicon(include_bytes!("../../launcher_source_icons/search-screenshots.png"));
+    let icon_new_search = load_png_to_hicon(include_bytes!("../../launcher_source_icons/search.png"));
+    let icon_new_settings = load_png_to_hicon(include_bytes!("../../launcher_source_icons/settings.png"));
+    let icon_new_source_code = load_png_to_hicon(include_bytes!("../../launcher_source_icons/source-code.png"));
+    let icon_new_tab = load_png_to_hicon(include_bytes!("../../launcher_source_icons/tab.png"));
+
     let (icon_tx, icon_rx) = std::sync::mpsc::channel::<IconRequest>();
 
     let state = Box::new(State {
@@ -450,7 +516,7 @@ unsafe fn run() {
         chat_input: String::new(),
         chat_cursor_pos: 0,
         chat_input_active: false,
-        results: vec![],
+        results: default_homepage_results(),
         selected: 0,
         anim: Anim::Hidden,
         cx: sw / 2,
@@ -472,6 +538,29 @@ unsafe fn run() {
         icon_todo,
         icon_clipboard,
         icon_memory,
+        icon_new_agent_history,
+        icon_new_all,
+        icon_new_browser_bookmarks,
+        icon_new_browser_history,
+        icon_new_clipboard_history,
+        icon_new_code,
+        icon_new_commands,
+        icon_new_content,
+        icon_new_enter,
+        icon_new_esc,
+        icon_new_files,
+        icon_new_git_commits,
+        icon_new_images,
+        icon_new_local_files,
+        icon_new_mic,
+        icon_new_navigate,
+        icon_new_search_screenshots,
+        icon_new_search,
+        icon_new_settings,
+        icon_new_source_code,
+        icon_new_tab,
+        active_filter: FilterType::All,
+        hovered_filter: None,
         text_selected: false,
         cursor_visible: true,
         scroll_offset: 0,
@@ -992,7 +1081,23 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             if !sp.is_null() {
                 let s = &mut *sp;
                 if query_id == s.current_query_id {
-                    s.results = results;
+                    let mut filtered = results;
+                    if !matches!(s.active_filter, FilterType::All) {
+                        filtered.retain(|r| {
+                            let src = r.entry.source.as_str();
+                            let cmd = r.entry.launch_command.as_str();
+                            match s.active_filter {
+                                FilterType::Files => src == "FILE" || src == "FOLDER" || src == "PDF" || src == "DOCX",
+                                FilterType::Content => src == "CONTENT" || src == "FILE_CONTENT" || src == "OCR",
+                                FilterType::Images => src == "IMAGE" || src == "OCR",
+                                FilterType::Code => src == "CODE" || src == "COMMIT" || src == "TODO",
+                                FilterType::Settings => cmd.starts_with("ms-settings:") || cmd.starts_with("control") || cmd.contains(".cpl") || cmd.ends_with(".msc"),
+                                FilterType::Commands => src == "SYSTEM" || src == "WINDOW" || src == "app" || src.eq_ignore_ascii_case("app"),
+                                _ => true,
+                            }
+                        });
+                    }
+                    s.results = filtered;
                     s.result_reasons = compute_result_reasons(&s.results);
                     if s.results.is_empty() {
                         s.selected = 0;
@@ -1464,7 +1569,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         s.form_state = FormState::None;
                         s.query.clear();
                         s.cursor_pos = 0;
-                        s.results.clear();
+                        s.reset_results();
                         s.selected = 0;
                         s.scroll_offset = 0;
                         reset_cursor_blink(hwnd, s);
@@ -1720,7 +1825,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     } else if !s.query.is_empty() {
                         s.query.clear();
                         s.cursor_pos = 0;
-                        s.results.clear();
+                        s.reset_results();
                         s.selected = 0;
                         s.scroll_offset = 0;
                         trigger_search(hwnd, s);
@@ -2281,6 +2386,29 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let win_w = rc_client.right - rc_client.left;
             let x_start = (win_w - WIN_W) / 2;
 
+            if !s.query.is_empty() {
+                let list_y = by + SEARCH_H + 1;
+                let filter_top = list_y + 8;
+                let filter_bottom = filter_top + 32;
+                if my >= filter_top && my < filter_bottom {
+                    let mut fx = x_start + PAD_L + 60;
+                    let filters = [FilterType::All, FilterType::Files, FilterType::Content, FilterType::Images, FilterType::Code, FilterType::Settings, FilterType::Commands];
+                    for ftype in filters {
+                        let fw = 80;
+                        if mx >= fx && mx < fx + fw {
+                            if s.active_filter != ftype {
+                                s.active_filter = ftype;
+                                trigger_search(hwnd, s);
+                                let _ = InvalidateRect(hwnd, None, FALSE);
+                            }
+                            return LRESULT(0);
+                        }
+                        fx += fw + 8;
+                    }
+                }
+            }
+
+
             if s.submenu_active && mx >= x_start + (WIN_W - 240) {
                 let end_h = s.win_h();
                 let end_y = s.cy - end_h / 2;
@@ -2338,6 +2466,36 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             if pt.x != s.last_mouse_x || pt.y != s.last_mouse_y {
                 s.last_mouse_x = pt.x;
                 s.last_mouse_y = pt.y;
+                
+                let mut rc_client = RECT::default();
+                let _ = GetClientRect(hwnd, &mut rc_client);
+                let win_w = rc_client.right - rc_client.left;
+                let x_start = (win_w - WIN_W) / 2;
+                let by = s.cy - s.win_h() / 2;
+
+                if !s.query.is_empty() {
+                    let list_y = by + SEARCH_H + 1;
+                    let filter_top = list_y + 8;
+                    let filter_bottom = filter_top + 32;
+                    let mut new_hover = None;
+                    if my >= filter_top && my < filter_bottom {
+                        let mut fx = x_start + PAD_L + 60;
+                        let filters = [FilterType::All, FilterType::Files, FilterType::Content, FilterType::Images, FilterType::Code, FilterType::Settings, FilterType::Commands];
+                        for ftype in filters {
+                            let fw = 80;
+                            if _mx >= fx && _mx < fx + fw {
+                                new_hover = Some(ftype);
+                                break;
+                            }
+                            fx += fw + 8;
+                        }
+                    }
+                    if s.hovered_filter != new_hover {
+                        s.hovered_filter = new_hover;
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    }
+                }
+
 
                 let n = (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS);
                 for i in 0..n {
@@ -2463,7 +2621,7 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         if !(s.ai_pending || s.ai_answer.is_some()) {
             s.query.clear();
             s.cursor_pos = 0;
-            s.results.clear();
+            s.reset_results();
             s.selected = 0;
             s.scroll_offset = 0;
             s.ai_pending = false;
@@ -2717,7 +2875,7 @@ unsafe fn reset_visible_chat_view(hwnd: HWND, s: &mut State) {
     s.chat_input.clear();
     s.chat_cursor_pos = 0;
     s.chat_input_active = false;
-    s.results.clear();
+    s.reset_results();
     s.selected = 0;
     s.scroll_offset = 0;
     s.text_selected = false;
@@ -3042,7 +3200,7 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
     }
     s.ai_scroll = 0;
     s.ai_follow_bottom = true;
-    s.results.clear();
+    s.reset_results();
     s.selected = 0;
     s.chat_input.clear();
     s.chat_cursor_pos = 0;
@@ -3393,7 +3551,7 @@ unsafe fn close_ai_panel(hwnd: HWND, s: &mut State) {
     s.chat_input.clear();
     s.chat_cursor_pos = 0;
     s.chat_input_active = false;
-    s.results.clear();
+    s.reset_results();
     trigger_search(hwnd, s); // restore normal results for the current query
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
@@ -3490,7 +3648,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             s.ai_scroll = 0;
             s.ai_follow_bottom = true;
             s.ai_title = ctrl_name;
-            s.results.clear();
+            s.reset_results();
             s.selected = 0;
             let _ = InvalidateRect(hwnd, None, FALSE);
 
@@ -3558,7 +3716,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                         s.chat_input.clear();
                         s.chat_cursor_pos = 0;
                         s.chat_input_active = true;
-                        s.results.clear();
+                        s.reset_results();
                         s.selected = 0;
 
                         let mut is_active = false;
@@ -3691,7 +3849,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             if !name.is_empty() {
                 s.query = format!("agentchats:@{}", name);
                 s.cursor_pos = s.query.len();
-                s.results.clear();
+                s.reset_results();
                 s.selected = 0;
                 s.scroll_offset = 0;
                 s.text_selected = false;
@@ -3714,7 +3872,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             s.chat_input.clear();
             s.chat_cursor_pos = 0;
             s.chat_input_active = true;
-            s.results.clear();
+            s.reset_results();
             s.selected = 0;
             s.scroll_offset = 0;
             s.text_selected = false;
@@ -3745,7 +3903,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             s.ai_scroll = 0;
             s.ai_follow_bottom = true;
             s.ai_title = format!("@{}: {}", aname, msg);
-            s.results.clear();
+            s.reset_results();
             s.selected = 0;
             let _ = InvalidateRect(hwnd, None, FALSE);
 
@@ -3867,7 +4025,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     configure_hermes_llm(&cfg.endpoint, &cfg.model, &cfg.api_key);
                 }
                 s.cursor_pos = s.query.len();
-                s.results.clear();
+                s.reset_results();
                 s.selected = 0;
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
@@ -3898,7 +4056,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     s.query = "Installing Hermes Agent...".to_string();
                 }
                 s.cursor_pos = s.query.len();
-                s.results.clear();
+                s.reset_results();
                 s.selected = 0;
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
@@ -3906,7 +4064,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 open_note_editor(hwnd, s, path.to_string());
                 s.query.clear();
                 s.cursor_pos = 0;
-                s.results.clear();
+                s.reset_results();
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
             } else if let Some(text) = cmd.strip_prefix("copy:") {
@@ -3919,7 +4077,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 } else {
                     s.query = "Could not copy image to clipboard".to_string();
                     s.cursor_pos = s.query.len();
-                    s.results.clear();
+                    s.reset_results();
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
                 return;
@@ -3927,7 +4085,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 s.form_state = FormState::CreateSnippetName;
                 s.query.clear();
                 s.cursor_pos = 0;
-                s.results.clear();
+                s.reset_results();
                 s.selected = 0;
                 reset_cursor_blink(hwnd, s);
                 let _ = InvalidateRect(hwnd, None, FALSE);
@@ -3936,21 +4094,21 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 s.form_state = FormState::CreateFocusCategoryName;
                 s.query.clear();
                 s.cursor_pos = 0;
-                s.results.clear();
+                s.reset_results();
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
             } else if cmd == "action:create_note" {
                 s.form_state = FormState::CreateNoteName;
                 s.query.clear();
                 s.cursor_pos = 0;
-                s.results.clear();
+                s.reset_results();
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
             } else if cmd == "action:create_quicklink" {
                 s.form_state = FormState::CreateQuicklinkName;
                 s.query.clear();
                 s.cursor_pos = 0;
-                s.results.clear();
+                s.reset_results();
                 s.selected = 0;
                 reset_cursor_blink(hwnd, s);
                 let _ = InvalidateRect(hwnd, None, FALSE);
@@ -3990,7 +4148,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                                 .to_string(),
                         );
                         s.ai_title = "Ask Clipboard".to_string();
-                        s.results.clear();
+                        s.reset_results();
                         s.selected = 0;
                         s.ai_scroll = 0;
                         s.ai_follow_bottom = true;
@@ -4034,13 +4192,13 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     } else {
                         s.query = "Could not copy latest screenshot".to_string();
                         s.cursor_pos = s.query.len();
-                        s.results.clear();
+                        s.reset_results();
                         let _ = InvalidateRect(hwnd, None, FALSE);
                     }
                 } else {
                     s.query = "No screenshot found in Clipboard History".to_string();
                     s.cursor_pos = s.query.len();
-                    s.results.clear();
+                    s.reset_results();
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
                 return;
@@ -5139,13 +5297,13 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     SetBkMode(mdc, TRANSPARENT);
 
     // Draw Search Icon
-    if !s.icon_search.0.is_null() {
+    if !s.icon_new_search.0.is_null() {
         let icon_y = y + (SEARCH_H - 24) / 2;
         let _ = DrawIconEx(
             mdc,
             x + PAD_L,
             icon_y,
-            s.icon_search,
+            s.icon_new_search,
             24,
             24,
             0,
@@ -5229,33 +5387,20 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     // Mic button at the search bar's right corner. Pulses red while listening, sits
     // muted otherwise. Click toggles dictation (hit-test in WM_LBUTTONDOWN).
     if w >= WIN_W - 8 {
-        let mic_color = if s.voice_listening {
-            let phase = (s.voice_dot_tick as f32 * 0.25).sin().abs();
-            let lerp = |a: f32, b: f32| (a + (b - a) * phase) as u8;
-            let r_val = lerp(0x60 as f32, 255.0);
-            let g_val = lerp(0x24 as f32, 50.0);
-            let b_val = lerp(0x24 as f32, 50.0);
-            COLORREF(r_val as u32 | ((g_val as u32) << 8) | ((b_val as u32) << 16))
-        } else {
-            CLR_PH
-        };
-        SelectObject(mdc, s.font_mic);
-        SetTextColor(mdc, mic_color);
-        let mut glyph: Vec<u16> = "\u{E720}".encode_utf16().collect();
-        let mut mr = RECT {
-            left: x + w - 48,
-            top: y,
-            right: x + w - 12,
-            bottom: y + SEARCH_H,
-        };
-        let _ = DrawTextW(
-            mdc,
-            &mut glyph,
-            &mut mr,
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-        );
-        SelectObject(mdc, s.font_q);
-        SetTextColor(mdc, CLR_WHITE);
+        if !s.icon_new_mic.0.is_null() {
+            let icon_y = y + (SEARCH_H - 24) / 2;
+            let _ = DrawIconEx(
+                mdc,
+                x + w - 48,
+                icon_y,
+                s.icon_new_mic,
+                24,
+                24,
+                0,
+                HBRUSH(null_mut()),
+                DI_NORMAL,
+            );
+        }
     }
 
     // Draw countdown hint while waiting to auto-execute a voice query.
@@ -5937,21 +6082,78 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     };
     if n > 0 {
         let list_w = if s.submenu_active { w - 240 } else { w };
+        
+        // Draw top separator
         fill(mdc, x, y + SEARCH_H, list_w, 1, CLR_DIV);
+        
+        let mut list_y = y + SEARCH_H + 1;
+        
+        if s.query.is_empty() {
+            // Homepage empty state layout
+            // Draw "Quick Search" and "8 sources" header
+            SelectObject(mdc, s.font_c);
+            SetTextColor(mdc, CLR_GRAY);
+            let mut qs_w: Vec<u16> = "Quick Search".encode_utf16().collect();
+            let mut qs_rc = RECT { left: x + PAD_L, top: list_y + 10, right: x + w / 2, bottom: list_y + 26 };
+            let _ = DrawTextW(mdc, &mut qs_w, &mut qs_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            
+            let mut src_w: Vec<u16> = "8 sources".encode_utf16().collect();
+            let mut src_rc = RECT { left: x + w / 2, top: list_y + 10, right: x + w - PAD_L, bottom: list_y + 26 };
+            let _ = DrawTextW(mdc, &mut src_w, &mut src_rc, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            
+            list_y += 36;
+        } else {
+            // Search state layout: Filter Row
+            // Draw "Filter" text, and the pills
+            SelectObject(mdc, s.font_c);
+            SetTextColor(mdc, CLR_GRAY);
+            let mut filter_lbl: Vec<u16> = "Filter".encode_utf16().collect();
+            let mut f_rc = RECT { left: x + PAD_L, top: list_y + 16, right: x + PAD_L + 50, bottom: list_y + 32 };
+            let _ = DrawTextW(mdc, &mut filter_lbl, &mut f_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            
+            let filters = [
+                ("All", FilterType::All, s.icon_new_all),
+                ("Files", FilterType::Files, s.icon_new_files),
+                ("Content", FilterType::Content, s.icon_new_content),
+                ("Images", FilterType::Images, s.icon_new_images),
+                ("Code", FilterType::Code, s.icon_new_code),
+                ("Settings", FilterType::Settings, s.icon_new_settings),
+                ("Commands", FilterType::Commands, s.icon_new_commands),
+            ];
+            
+            let mut fx = x + PAD_L + 60;
+            for (label, ftype, icon) in filters.iter() {
+                let fw = 80; // approximate width
+                if *ftype == s.active_filter {
+                    fill_rounded(mdc, fx, list_y + 8, fw, 32, 16, CLR_ACCENT);
+                } else if Some(*ftype) == s.hovered_filter {
+                    fill_rounded(mdc, fx, list_y + 8, fw, 32, 16, COLORREF(0x00_30_28_21));
+                }
+                
+                // icon
+                if !icon.0.is_null() {
+                    let _ = unsafe { DrawIconEx(mdc, fx + 8, list_y + 12, *icon, 24, 24, 0, HBRUSH(null_mut()), DI_NORMAL) };
+                }
+                
+                SelectObject(mdc, s.font_c);
+                SetTextColor(mdc, if *ftype == s.active_filter { CLR_WHITE } else { CLR_GRAY });
+                let mut lw: Vec<u16> = label.encode_utf16().collect();
+                let mut l_rc = RECT { left: fx + 36, top: list_y + 16, right: fx + fw, bottom: list_y + 32 };
+                let _ = DrawTextW(mdc, &mut lw, &mut l_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                
+                fx += fw + 8;
+            }
+            
+            list_y += 48;
+        }
 
         for i in 0..n {
             let res_idx = s.scroll_offset + i;
             let res = &s.results[res_idx];
-            let ry = y + SEARCH_H + 1 + i as i32 * RESULT_H;
-            let starts_section = res_idx == 0
-                || source_section_label(&s.results[res_idx - 1].entry.source)
-                    != source_section_label(&res.entry.source);
-            let row_card_y = if starts_section { ry + 20 } else { ry + 5 };
-            let row_card_h = if starts_section {
-                RESULT_H - 24
-            } else {
-                RESULT_H - 10
-            };
+            let ry = list_y + i as i32 * RESULT_H;
+            
+            let row_card_y = ry + 6;
+            let row_card_h = RESULT_H - 12;
 
             let is_checked = s.selected_clip_ids.contains(&res.entry.id);
             let row_border = if res_idx == s.selected {
@@ -5974,7 +6176,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 row_card_y,
                 list_w - 24,
                 row_card_h,
-                7,
+                10,
                 row_border,
             );
             fill_rounded(
@@ -5983,300 +6185,110 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 row_card_y + 1,
                 list_w - 26,
                 row_card_h - 2,
-                6,
+                9,
                 row_bg,
             );
-            if starts_section {
-                SelectObject(mdc, s.font_b);
-                SetTextColor(mdc, CLR_GRAY);
-                let section = source_section_label(&res.entry.source);
-                let section_total = s
-                    .results
-                    .iter()
-                    .filter(|candidate| source_section_label(&candidate.entry.source) == section)
-                    .count();
-                let mut label: Vec<u16> = section.encode_utf16().collect();
-                let mut label_rect = RECT {
-                    left: x + PAD_L,
-                    top: ry + 3,
-                    right: x + list_w / 2,
-                    bottom: ry + 18,
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut label,
-                    &mut label_rect,
-                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                );
-                let count_text = if section_total == 1 {
-                    "1 result".to_string()
-                } else {
-                    format!("{} results", section_total)
-                };
-                let mut count: Vec<u16> = count_text.encode_utf16().collect();
-                let mut count_rect = RECT {
-                    left: x + list_w / 2,
-                    top: ry + 3,
-                    right: x + list_w - PAD_L,
-                    bottom: ry + 18,
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut count,
-                    &mut count_rect,
-                    DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                );
-            }
 
-            let cy = row_card_y + (row_card_h - 38) / 2;
+            let cy = row_card_y + (row_card_h - 40) / 2;
 
-            // Draw Icon
-            let mut drawn_custom_thumbnail = false;
-            if res.entry.source == "CLIPBOARD" {
-                if let Some(path) = res.entry.launch_command.strip_prefix("copy_image:") {
-                    let icon_y = row_card_y + (row_card_h - 28) / 2;
-                    let mut cache = s.clipboard_thumbnails.borrow_mut();
-                    if let Some(&hbitmap) = cache.get(path) {
-                        unsafe {
-                            draw_cached_bmp(mdc, x + PAD_L + 2, icon_y, 28, 28, hbitmap);
-                        }
-                        drawn_custom_thumbnail = true;
-                    } else {
-                        unsafe {
-                            if let Some(hbitmap) = load_bmp_file(path) {
-                                draw_cached_bmp(mdc, x + PAD_L + 2, icon_y, 28, 28, hbitmap);
-                                cache.insert(path.to_string(), hbitmap);
-                                drawn_custom_thumbnail = true;
-                            }
-                        }
-                    }
+            // Determine Icon
+            let icon_to_draw = if s.query.is_empty() {
+                // Map source to icon for homepage
+                match res.entry.source.as_str() {
+                    "HOMEPAGE_BROWSER" => if res.entry.id == "home_0" { s.icon_new_browser_bookmarks } else { s.icon_new_browser_history },
+                    "HOMEPAGE_GIT" => s.icon_new_git_commits,
+                    "HOMEPAGE_CLIPBOARD" => s.icon_new_clipboard_history,
+                    "HOMEPAGE_LOCAL" => s.icon_new_local_files,
+                    "HOMEPAGE_CODE" => s.icon_new_source_code,
+                    "HOMEPAGE_OCR" => s.icon_new_search_screenshots,
+                    "HOMEPAGE_AI" => s.icon_new_agent_history,
+                    _ => s.icon_control_panel,
                 }
-            }
-
-            if !drawn_custom_thumbnail {
-                // For WINDOW source: icon was pre-fetched into app_icons on result arrival.
-                // For all other async-loaded sources, also use app_icons.
-                let cached_icon = s
-                    .app_icons
-                    .get(&res.entry.launch_command)
-                    .copied()
-                    .filter(|h| !h.0.is_null());
-                let icon_to_draw = if let Some(hicon) = cached_icon {
+            } else {
+                // Standard app icon resolving
+                let cached_icon = s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null());
+                if let Some(hicon) = cached_icon {
                     hicon
-                } else if res.entry.source == "WINDOW" {
-                    s.app_icons
-                        .get(&res.entry.launch_command)
-                        .copied()
-                        .filter(|h| !h.0.is_null())
-                        .unwrap_or(s.icon_control_panel)
-                } else if res.entry.source == "app"
-                    || res.entry.source == "RECENT"
-                    || res.entry.source == "FILE"
-                    || res.entry.source == "CODE"
-                    || (res.entry.source == "ACTION"
-                        && res.entry.launch_command.starts_with("kill:"))
-                {
-                    s.app_icons
-                        .get(&res.entry.launch_command)
-                        .copied()
-                        .filter(|h| !h.0.is_null())
-                        .unwrap_or(s.icon_control_panel)
+                } else if res.entry.source == "WINDOW" || res.entry.source == "app" || res.entry.source == "RECENT" || res.entry.source == "FILE" || res.entry.source == "CODE" {
+                    s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null()).unwrap_or(s.icon_control_panel)
                 } else if res.entry.launch_command.starts_with("ms-settings:") {
-                    s.icon_settings
-                } else if res.entry.source == "web"
-                    || res.entry.source == "HISTORY"
-                    || res.entry.source == "QUICKLINK"
-                    || res.entry.launch_command.starts_with("https://")
-                {
-                    s.icon_web
-                } else if res.entry.source == "BOOKMARK" {
-                    s.icon_bookmark
-                } else if res.entry.source == "FOLDER" {
-                    s.icon_folder
-                } else if res.entry.source == "COMMIT" {
-                    s.icon_commit
-                } else if res.entry.source == "TODO"
-                    || res.entry.source == "SNIPPET"
-                    || res
-                        .entry
-                        .launch_command
-                        .starts_with("action:create_snippet")
-                {
-                    s.icon_todo
-                } else if res.entry.source == "CLIPBOARD"
-                    || res.entry.launch_command.starts_with("action:ask_clipboard")
-                {
-                    s.icon_clipboard
-                } else if res.entry.source == "AI"
-                    || res.entry.source == "MEMORY"
-                    || res
-                        .entry
-                        .launch_command
-                        .starts_with("action:reload_script_commands")
-                {
-                    s.icon_memory
-                } else if res.entry.launch_command.starts_with("start_focus_session:")
-                    || res
-                        .entry
-                        .launch_command
-                        .starts_with("action:toggle_focus_session")
-                    || res
-                        .entry
-                        .launch_command
-                        .starts_with("action:create_focus_category")
-                {
-                    s.icon_bookmark // Star for focus
-                } else if res
-                    .entry
-                    .launch_command
-                    .starts_with("action:create_quicklink")
-                {
+                    s.icon_new_settings
+                } else if res.entry.source == "web" || res.entry.source == "HISTORY" || res.entry.source == "QUICKLINK" || res.entry.launch_command.starts_with("https://") {
                     s.icon_web
                 } else {
-                    s.icon_control_panel
-                };
-
-                if !icon_to_draw.0.is_null() {
-                    let icon_y = row_card_y + (row_card_h - 28) / 2;
-                    let _ = unsafe {
-                        DrawIconEx(
-                            mdc,
-                            x + PAD_L + 2,
-                            icon_y,
-                            icon_to_draw,
-                            28,
-                            28,
-                            0,
-                            HBRUSH(null_mut()),
-                            DI_NORMAL,
-                        )
-                    };
+                    s.icon_control_panel // fallback
                 }
+            };
+
+            if !icon_to_draw.0.is_null() {
+                let icon_y = row_card_y + (row_card_h - 32) / 2;
+                let _ = unsafe { DrawIconEx(mdc, x + PAD_L + 2, icon_y, icon_to_draw, 32, 32, 0, HBRUSH(null_mut()), DI_NORMAL) };
             }
 
             // Name
             SelectObject(mdc, s.font_n);
             SetTextColor(mdc, CLR_WHITE);
-            let has_selections = !s.selected_clip_ids.is_empty();
-            let display_name = if s.selected_clip_ids.contains(&res.entry.id) {
-                format!(" [✓] {}", res.entry.control_name)
-            } else if has_selections && res.entry.source == "CLIPBOARD" {
-                format!(" [ ] {}", res.entry.control_name)
-            } else {
-                res.entry.control_name.clone()
-            };
+            let display_name = res.entry.control_name.clone();
             let mut name: Vec<u16> = display_name.encode_utf16().collect();
-            let badge_left = x + list_w - PAD_L - BADGE_W;
+            let tx = x + PAD_L + 48; // after icon
+            let badge_left = x + list_w - PAD_L - 80; // approximate space for right category
             let mut r = RECT {
                 left: tx,
-                top: cy,
+                top: row_card_y + (row_card_h - 22) / 2,
                 right: badge_left - 14,
-                bottom: cy + 22,
+                bottom: row_card_y + (row_card_h - 22) / 2 + 22,
             };
-            let _ = DrawTextW(
-                mdc,
-                &mut name,
-                &mut r,
-                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
-            );
-
-            // "Why it surfaced" recency tag (Explain Results), right-aligned on the
-            // breadcrumb line; the breadcrumb shortens to make room.
-            let reason = s
-                .result_reasons
-                .get(&res.entry.launch_command)
-                .filter(|r| !r.is_empty());
-            let reason_slot = if reason.is_some() { 96 } else { 0 };
-
-            // Breadcrumb
-            SelectObject(mdc, s.font_c);
-            SetTextColor(mdc, CLR_GRAY);
-            let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
-            let mut r2 = RECT {
-                left: tx,
-                top: cy + 24,
-                right: badge_left - 14 - reason_slot,
-                bottom: cy + 40,
-            };
-            let _ = DrawTextW(
-                mdc,
-                &mut crumb,
-                &mut r2,
-                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
-            );
-
-            if let Some(reason) = reason {
-                SetTextColor(mdc, CLR_PH);
-                let mut rtxt: Vec<u16> = reason.encode_utf16().collect();
-                let mut rr = RECT {
-                    left: badge_left - 14 - reason_slot,
-                    top: cy + 24,
-                    right: badge_left - 14,
-                    bottom: cy + 40,
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut rtxt,
-                    &mut rr,
-                    DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                );
+            if !s.query.is_empty() {
+                // If search results, we have subtitle below it
+                r.top = cy;
+                r.bottom = cy + 22;
             }
+            let _ = DrawTextW(mdc, &mut name, &mut r, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-            // Badge
-            let badge_source = if res.entry.id.starts_with("clip.pinned.") {
-                "pinned_clip"
+            if s.query.is_empty() {
+                // Right aligned category tag
+                SelectObject(mdc, s.font_c);
+                SetTextColor(mdc, CLR_PH);
+                let mut cat: Vec<u16> = res.entry.source.replace("HOMEPAGE_", "").encode_utf16().collect();
+                let mut rc_cat = RECT { left: x + w / 2, top: row_card_y, right: x + list_w - PAD_L - 10, bottom: row_card_y + row_card_h };
+                let _ = DrawTextW(mdc, &mut cat, &mut rc_cat, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
             } else {
-                &res.entry.source
-            };
-            badge(
-                mdc,
-                s,
-                badge_source,
-                badge_left,
-                row_card_y + (row_card_h - BADGE_H) / 2,
-            );
+                // Breadcrumb below name
+                SelectObject(mdc, s.font_c);
+                SetTextColor(mdc, CLR_GRAY);
+                let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
+                let mut r2 = RECT { left: tx, top: cy + 24, right: badge_left - 14, bottom: cy + 40 };
+                let _ = DrawTextW(mdc, &mut crumb, &mut r2, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+                
+                // Badge
+                let badge_source = if res.entry.id.starts_with("clip.pinned.") { "pinned_clip" } else { &res.entry.source };
+                badge(mdc, s, badge_source, badge_left, row_card_y + (row_card_h - BADGE_H) / 2);
+            }
         }
 
         // Draw scrollbar if there are more results than visible
         let total_results = s.results.len();
         if total_results > VISIBLE_RESULTS {
-            let track_top = y + SEARCH_H + 8;
-            let track_bottom = y + SEARCH_H + 1 + n as i32 * RESULT_H - 8;
+            let track_top = list_y + 8;
+            let track_bottom = list_y + n as i32 * RESULT_H - 8;
             let track_h = track_bottom - track_top;
 
-            // Thumb height proportional to ratio of visible results, capped at min 24px
             let thumb_h = ((VISIBLE_RESULTS as f32 / total_results as f32) * track_h as f32) as i32;
             let thumb_h = thumb_h.max(24);
 
-            // Thumb position proportional to scroll_offset
             let max_offset = total_results - VISIBLE_RESULTS;
-            let thumb_y = track_top
-                + (s.scroll_offset as f32 / max_offset as f32 * (track_h - thumb_h) as f32) as i32;
+            let thumb_y = track_top + (s.scroll_offset as f32 / max_offset as f32 * (track_h - thumb_h) as f32) as i32;
 
-            // Draw subtle track
             let sb_x = x + list_w - 10;
             let sb_w = 4;
             fill(mdc, sb_x, track_top, sb_w, track_h, COLORREF(0x00_2D_26_22));
-            // Draw thumb
             fill(mdc, sb_x, thumb_y, sb_w, thumb_h, COLORREF(0x00_70_62_58));
         }
 
         if s.submenu_active {
-            // Draw dividing line
             fill(mdc, x + list_w, y + SEARCH_H, 1, h - SEARCH_H, CLR_DIV);
-
-            // Draw submenu background
-            fill(
-                mdc,
-                x + list_w + 1,
-                y + SEARCH_H + 1,
-                238,
-                h - SEARCH_H - 1,
-                COLORREF(0x00_23_1D_19),
-            );
-
+            fill(mdc, x + list_w + 1, y + SEARCH_H + 1, 238, h - SEARCH_H - 1, COLORREF(0x00_23_1D_19));
             let actions = ["Run as Administrator", "Open File Location", "Copy Path"];
-
             let action_h = 44;
             let start_y = y + SEARCH_H + 16;
             for idx in 0..3 {
@@ -6286,42 +6298,17 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 }
 
                 SelectObject(mdc, s.font_n);
-                if s.submenu_selected == idx {
-                    SetTextColor(mdc, CLR_WHITE);
-                } else {
-                    SetTextColor(mdc, CLR_GRAY);
-                }
-
+                SetTextColor(mdc, if s.submenu_selected == idx { CLR_WHITE } else { CLR_GRAY });
                 let mut text_wide: Vec<u16> = actions[idx].encode_utf16().collect();
-                let mut r_action = RECT {
-                    left: x + list_w + 16,
-                    top: ay,
-                    right: x + w - 16,
-                    bottom: ay + action_h,
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut text_wide,
-                    &mut r_action,
-                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                );
+                let mut r_action = RECT { left: x + list_w + 16, top: ay, right: x + w - 16, bottom: ay + action_h };
+                let _ = DrawTextW(mdc, &mut text_wide, &mut r_action, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
                 if s.submenu_selected == idx {
                     SelectObject(mdc, s.font_c);
                     SetTextColor(mdc, CLR_GRAY);
                     let mut hint_wide: Vec<u16> = "Enter".encode_utf16().collect();
-                    let mut r_hint = RECT {
-                        left: x + w - 60,
-                        top: ay,
-                        right: x + w - 16,
-                        bottom: ay + action_h,
-                    };
-                    let _ = DrawTextW(
-                        mdc,
-                        &mut hint_wide,
-                        &mut r_hint,
-                        DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                    );
+                    let mut r_hint = RECT { left: x + w - 60, top: ay, right: x + w - 16, bottom: ay + action_h };
+                    let _ = DrawTextW(mdc, &mut hint_wide, &mut r_hint, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
                 }
             }
         }
@@ -6432,6 +6419,32 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let _ = DeleteObject(bmp);
     let _ = DeleteDC(mdc);
     let _ = EndPaint(hwnd, &ps);
+}
+
+fn default_homepage_results() -> Vec<crate::search::SearchResult> {
+    let items = [
+        ("Browser Bookmarks", "Browser > Bookmarks", "home_bookmark:", "HOMEPAGE_BROWSER"),
+        ("Browser History", "Browser > History", "home_history:", "HOMEPAGE_BROWSER"),
+        ("Git Commits", "Git > Commits", "home_commits:", "HOMEPAGE_GIT"),
+        ("Clipboard History", "Clipboard > History", "home_clipboard:", "HOMEPAGE_CLIPBOARD"),
+        ("Local Files", "Local > Files", "home_files:", "HOMEPAGE_LOCAL"),
+        ("Source Code", "Local > Source Code", "home_code:", "HOMEPAGE_CODE"),
+        ("Search Screenshots", "Local > Image Text (OCR)", "home_ocr:", "HOMEPAGE_OCR"),
+        ("Agent History", "AI > Agent runs", "home_agent:", "HOMEPAGE_AI"),
+    ];
+    
+    items.into_iter().enumerate().map(|(i, (name, path, cmd, src))| crate::search::SearchResult {
+        score: 1.0 - (i as f32 * 0.01),
+        entry: crate::search::CatalogEntry {
+            id: format!("home_{}", i),
+            control_name: name.to_string(),
+            breadcrumb_path: path.to_string(),
+            launch_command: cmd.to_string(),
+            source: src.to_string(),
+            description: "".to_string(),
+            synonyms: "".to_string(),
+        }
+    }).collect()
 }
 
 unsafe fn fill(hdc: HDC, x: i32, y: i32, w: i32, h: i32, c: COLORREF) {
@@ -6699,6 +6712,85 @@ unsafe fn load_icon_from_memory(bytes: &[u8], size: i32) -> HICON {
             }
         }
     }
+    HICON(null_mut())
+}
+
+unsafe fn load_png_to_hicon(bytes: &[u8]) -> HICON {
+    use windows::Win32::Graphics::Gdi::{
+        CreateDIBSection, DeleteObject, GetDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, CreateBitmap,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CreateIconIndirect, ICONINFO, DestroyIcon,
+    };
+    
+    let img = match image::load_from_memory_with_format(bytes, image::ImageFormat::Png) {
+        Ok(img) => img.into_rgba8(),
+        Err(_) => return HICON(null_mut()),
+    };
+    
+    let (width, height) = img.dimensions();
+    
+    let mut bmi = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: width as i32,
+            biHeight: -(height as i32), // top-down
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    
+    let hdc = GetDC(HWND(null_mut()));
+    let mut bits: *mut u8 = null_mut();
+    let h_color = CreateDIBSection(
+        hdc,
+        &bmi as *const _,
+        DIB_RGB_COLORS,
+        &mut bits as *mut _ as *mut *mut core::ffi::c_void,
+        HANDLE(null_mut()),
+        0,
+    );
+    
+    if let Ok(h) = h_color {
+        if !bits.is_null() {
+            let slice = std::slice::from_raw_parts_mut(bits, (width * height * 4) as usize);
+            let src = img.as_raw();
+            for i in 0..(width * height) as usize {
+                // premultiply alpha
+                let a = src[i * 4 + 3] as u32;
+                let r = (src[i * 4] as u32 * a) / 255;
+                let g = (src[i * 4 + 1] as u32 * a) / 255;
+                let b = (src[i * 4 + 2] as u32 * a) / 255;
+                slice[i * 4] = b as u8;
+                slice[i * 4 + 1] = g as u8;
+                slice[i * 4 + 2] = r as u8;
+                slice[i * 4 + 3] = a as u8;
+            }
+        }
+        
+        let h_mask = CreateBitmap(width as i32, height as i32, 1, 1, Some(std::ptr::null()));
+        
+        let mut ii = ICONINFO {
+            fIcon: TRUE,
+            xHotspot: 0,
+            yHotspot: 0,
+            hbmMask: h_mask,
+            hbmColor: h,
+        };
+        
+        let hicon = CreateIconIndirect(&mut ii).unwrap_or(HICON(null_mut()));
+        
+        let _ = DeleteObject(h);
+        let _ = DeleteObject(h_mask);
+        let _ = ReleaseDC(HWND(null_mut()), hdc);
+        
+        return hicon;
+    }
+    
+    let _ = ReleaseDC(HWND(null_mut()), hdc);
     HICON(null_mut())
 }
 
@@ -7921,7 +8013,7 @@ unsafe fn handle_form_enter(hwnd: HWND, s: &mut State) {
                 s.query.clear();
                 s.form_state = FormState::None;
                 s.cursor_pos = 0;
-                s.results.clear();
+                s.reset_results();
                 // Don't trigger_search — note editor is now covering the results area
             }
         }
@@ -7947,7 +8039,7 @@ unsafe fn open_note_editor(hwnd: HWND, s: &mut State, path: String) {
     s.search_input_active = false;
     s.form_state = FormState::None;
     s.text_selected = false;
-    s.results.clear();
+    s.reset_results();
     s.selected = 0;
     reset_cursor_blink(hwnd, s);
     let _ = InvalidateRect(hwnd, None, FALSE);
