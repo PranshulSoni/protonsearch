@@ -1,104 +1,175 @@
 # Omnisearch (`opensearch-os`)
 
-**Omnisearch** is a premium, high-performance, native Windows launcher, command palette, and system-wide search tool written in Rust. By utilizing raw Win32 APIs and direct GDI graphics rendering (avoiding heavy web frameworks or Electron wrapper overhead), it offers a lightweight, sub-millisecond responsive search experience.
+Omnisearch is a native Windows deep-search launcher built in Rust. It is designed for fast keyboard-first retrieval across files, folders, document content, OCR text, browser data, clipboard history, Git activity, Windows settings, apps, and AI/agent chat history.
 
----
+This branch (`lean-build`) focuses on the core search product: find the right thing quickly, rank it predictably, and keep the UI lightweight enough for daily use.
 
-## What the Project Is
+## What It Does
 
-Omnisearch is a centralized control center for Windows. It acts as both an application launcher and a deep indexing search engine that lets you find, execute, and inspect anything across your system: files, bookmarks, clipboard items, browser history, Git commit logs, code TODOs, quick system power commands, and OpenAI-powered conversational chat/agent tasks.
+Omnisearch opens with `Alt+Space` and gives one command/search surface for local Windows data:
 
----
+- Launch apps and Windows settings.
+- Search files and folders by name.
+- Search PDF, DOCX, text, source-code, and OCR-indexed image content.
+- Search browser bookmarks and history across Chrome, Edge, Brave, and Firefox profiles.
+- Search clipboard history, including saved clipboard images and pinned entries.
+- Search Git commits, branches, repositories, and TODO/FIXME comments.
+- Search AI chats, agent runs, and persistent agents.
+- Run selected Windows actions such as volume control, DNS flush, lock, sleep, restart Explorer, and settings shortcuts.
 
-## Core Capabilities & Features
+## Resume-Friendly Highlights
 
-### 1. Modern UI & Premium Aesthetics (Win32 & GDI)
-* **Tailored Interface**: Features a modern, compact window layout (720px width, 76px row height) designed around the `Segoe UI Variable` typography.
-* **Charcoal Styling**: Features a clean, solid, opaque charcoal-colored window (100% opacity, no heavy Acrylic blur rendering lag).
-* **Flat List Design**: A flat-list results interface matching modern design aesthetics, with top-level filter pills, statistics sub-headers ("Results" and "Best matches first"), selection borders, and left-aligned vertical blue accent indicators.
-* **Lag-Free Icon Resolving**: Resolves `.lnk` targets via `IShellLinkW` (stripping shortcut arrow watermarks) and fetches high-res icons asynchronously in background worker threads, passing them to the paint loop via Win32 message passing (`WM_ICON_LOADED`) to maintain a constant 60 FPS.
+- Built a native Windows launcher in Rust using Win32 APIs and custom GDI rendering instead of Electron or a browser shell.
+- Implemented a SQLite + FTS5 indexing pipeline for local files, document text, source code, image OCR, browser data, clipboard history, and Git metadata.
+- Added hybrid search behavior that combines Everything IPC metadata search, SQLite fallback queries, FTS5 content search, curated source filters, and custom ranking.
+- Designed a 720px compact launcher UI with a 64px search bar, 76px result rows, dynamic result filters, horizontal filter scrolling, high-resolution icon rendering, keyboard navigation, mouse hover states, and dark-mode visual polish.
+- Built asynchronous search and icon-loading flows with Win32 message passing (`WM_SEARCH_RESULTS`, `WM_ICON_LOADED`) so expensive work stays out of the paint loop.
+- Added OCR indexing for images/screenshots using Windows OCR APIs with image-size protection to avoid hangs or out-of-memory failures.
+- Integrated browser indexing for Chromium and Firefox profiles, including a capped import of the latest 5,000 browser-history URLs.
+- Added clipboard history with image capture, pinning, multi-select support, and retention capped to the latest 500 non-pinned entries.
+- Added Git indexing with a 15-minute background refresh for repositories, commits, branches, and TODO/FIXME task discovery.
+- Added AI chat and Hermes agent integrations with SQLite chat persistence, streaming run progress, and approval prompts for tool execution.
+- Maintained local-first storage under `%APPDATA%\opensearch-os` with SQLite as the primary persistence layer.
 
-### 2. Deep Local File & Content Search
-* **Throttled Crawler Indexer**: Runs a background crawler (`indexer.rs`) that indexes files in `Desktop`, `Documents`, and `Downloads`.
-* **Document Text Extraction**: Extracts text content from PDF (using `pdf-extract`) and Microsoft Word DOCX (using `docx-lite`) files, caching text up to 50KB to preserve a lightweight database footprint.
-* **Source Code Indexing**: Indexes source files with extensions (`.rs`, `.py`, `.js`, `.ts`, `.c`, `.cpp`, `.h`, `.hpp`, `.cs`, `.go`, `.java`, `.kt`, `.sh`, `.bat`, `.ps1`, `.yaml`, `.yml`, `.toml`, `.ini`, `.sql`, `.xml`).
-* **SQLite FTS5**: Leverages SQLite's FTS5 extension (`files_fts` table) to perform sub-millisecond lexical full-text queries.
+## Core Search Sources
 
-### 3. Developer & Git Repository Scanner
-* **Fast Git Discovery**: Crawls system folders metadata-first (ignoring `node_modules`, `target`, etc.) to locate Git repositories in under **186ms** without recursive loops.
-* **Commits & Branches**: Queries the `HEAD` branch and the last 100 commits via Git CLI tools.
-* **TODO / FIXME Tasks**: Scans codebase comments for task tags. Pressing `Enter` deep-links directly into VS Code at the exact file and line using `code -g <file>:<line>`.
+| Source | What is indexed/searched | Notes |
+|---|---|---|
+| Apps | Installed Win32/UWP apps and settings entries | Uses shell/app enumeration and async icon lookup |
+| Files | Desktop, Downloads, Pictures, Documents, Program Files, and fixed drives | Metadata-first scan with ignored heavy folders |
+| Content | PDF, DOCX, text, Markdown, and source files | Extracted content is capped at 50KB per file for DB size and speed |
+| Images/OCR | Screenshots and image files | OCR text is stored in FTS for text search |
+| Browser | Chrome, Edge, Brave, and Firefox bookmarks/history | Browser indexer refreshes every 10 minutes |
+| Clipboard | Text and image clipboard history | Pinned items are preserved; non-pinned retention is capped |
+| Git | Repositories, branches, commits, TODO/FIXME comments | Git scanner refreshes every 15 minutes |
+| AI | AI chats, agent chats, persistent agents | Stored locally in SQLite |
+| Windows | Settings, control-panel actions, windows/processes, quick actions | Keyboard-first execution |
 
-### 4. Multi-Browser Profiles Scanner
-* **Cross-Browser Bookmarks & History**: Scans Chromium profiles (Chrome, Edge, Brave) and Gecko profiles (Firefox). Pre-copies profile database locks before parsing to prevent browse conflict locks.
-* **Firefox Places Support**: Direct SQLite querying of Firefox's `places.sqlite` structure.
+## Search Prefixes
 
-### 5. In-Process Tools & Quick System Actions
-* **Math Parser / Calculator**: High-speed, recursive descent math parser (evaluates formulas like `2+2`, `15% of 340`, `sqrt(9)*4`, etc.) and copies results to the clipboard.
-* **Quick System Actions**: Lock screen, sleep, shutdown, restart, volume control (percentage and toggle mute), hosts file editing, and recycling bin controls.
-* **Recent Files Tracker**: Parses `%APPDATA%\Microsoft\Windows\Recent` to display recently used files with appropriate file-type icons.
+General search shows the curated deep-search result set. Prefixes let you jump directly into a specific source.
 
-### 6. OpenAI Chat & Agent Runs
-* **Conversational AI**: Native OpenAI-compatible API connector with markdown output rendering and chat history persistence.
-* **Agent Gateway**: Integrates with Hermes gateway daemon streaming runs with approve/deny dialogs.
+| Prefix | Purpose |
+|---|---|
+| `file:` | Search indexed local files and document content |
+| `code:` | Search indexed source-code files and code content |
+| `img:` / `screenshots:` | Search image files and OCR text |
+| `bookmarks:` | Search browser bookmarks |
+| `history:` | Search browser history |
+| `clip:` / `clipboard:` | Search clipboard history |
+| `commits:` | Search Git commits |
+| `todos:` | Search TODO/FIXME code tasks |
+| `agents:` | Browse persistent AI agents |
+| `agentchats:` | Browse agent chat history |
+| `chats:` | Browse AI chat history |
+| `switch:` / `window:` | Search running windows/processes |
+| `ql:` / `quicklink:` | Search custom web shortcuts |
+| `snip:` / `snippet:` | Search reusable snippets |
 
----
+## UI And Interaction
 
-## Search Prefixes & Scopes
+- Global hotkey: `Alt+Space`.
+- Centered launcher window with fast expand/collapse behavior.
+- Dark-mode UI optimized for repeated daily use.
+- Dynamic filter row with real result counts for `All`, `Files`, `Content`, `Images`, `Code`, `Settings`, and `Commands`.
+- Horizontal filter scrolling for narrow result sets.
+- Search result badges are de-emphasized so they do not dominate the result title.
+- Agent chat uses a separate chat input rather than hijacking the main search field.
+- Escape behavior routes agent chat back to agent history first, then back to the main launcher flow.
+- Clipboard image results can render thumbnails and support pinning/multi-select flows.
 
-To avoid database congestion, Omnisearch utilizes specific search prefixes:
+## Architecture
 
-> [!NOTE]
-> Prefix-based queries bypass the mocked search results layout, querying the active indexing databases directly and displaying results in the original card/category layout.
+The Rust app lives in `opensearch-os/`.
 
-| Category | Prefix | Empty State Placeholder | Badge | Description |
-|---|---|---|---|---|
-| **Bookmarks** | `bookmarks: <query>` | `📁 Browser Bookmarks` | `BOOKMARK` | Search browser favorites |
-| **History** | `history: <query>` | `📁 Browser History` | `HISTORY` | Search browser history URLs |
-| **Commits** | `commits: <query>` | `📁 Git Commits` | `COMMIT` | Search recent repository commits |
-| **TODOs** | `todos: <query>` | `📁 Git TODOs` | `TODO` | Search code tasks / comments |
-| **Local Files** | `file: <query>` | `📁 Local Files` | `FILE` | Search documents (PDF, DOCX, TXT) |
-| **Source Code** | `code: <query>` | `📁 Source Code` | `CODE` | Search code files |
-| **Clipboard** | `clip:` / `clipboard:` | `📁 Clipboard History` | `CLIP` | Search clipboard history |
-| **Quicklinks** | `ql:` / `quicklink:` | `📁 Quicklinks` | `QL` | Browse/search web shortcuts |
-| **Snippets** | `snip:` / `snippet:` | `📁 Snippets` | `SNIP` | Browse/search text snippets |
-| **Windows** | `switch:` / `window:` | `📁 Active Windows` | `WIN` | Search running windows/processes |
+| File | Responsibility |
+|---|---|
+| `src/main.rs` | Win32 window lifecycle, hotkeys, input handling, GDI rendering, result UI, clipboard UI, AI panel, and launcher event loop |
+| `src/search.rs` | Query routing, ranking, prefix search, SQLite schema, FTS search, browser/clipboard/Git/AI result assembly |
+| `src/indexer.rs` | File crawling, document extraction, OCR extraction, SQLite/FTS population, folder watching |
+| `src/browser_indexer.rs` | Chromium/Firefox bookmark and history indexing |
+| `src/git_indexer.rs` | Repository discovery, commit indexing, branch indexing, TODO/FIXME scanning |
+| `src/ai.rs` | OpenAI-compatible chat, Hermes agent config, streaming runs, approval handling |
+| `src/launcher.rs` | Windows action execution and system integrations |
+| `src/voice.rs` | Windows speech recognition input |
+| `src/markdown.rs` | Lightweight markdown parsing/render support for AI output |
+| `src/uninstall.rs` | Native uninstaller |
 
----
+## Storage
 
-## Codebase Architecture
+Runtime data is stored under:
 
-The project is structured under the `opensearch-os/` subdirectory:
+```text
+%APPDATA%\opensearch-os
+```
 
-* **`src/main.rs`**: Core window management, GDI-based double-buffered rendering, input handling, and event loop.
-* **`src/indexer.rs`**: Handles background threads for crawling, Chromium/Firefox profile database extraction, and document content parsing (PDF/Word).
-* **`src/search.rs`**: Core ranking, prefix matching logic, and SQLite database connector configuring WAL (Write-Ahead Logging) and thread concurrency settings.
-* **`build.rs`**: Embeds icons, manifests, and compilation properties for the executable.
+Main storage uses SQLite with tables for indexed files, FTS content, browser items, clipboard history, chats, agents, and settings. The app keeps expensive work disk-backed and capped where needed instead of keeping everything in RAM.
 
----
-
-## Build & Run Instructions
+## Build And Run
 
 ### Prerequisites
-* Rust compiler toolchain (Stable channel target `x86_64-pc-windows-msvc`).
-* SQLite runtime dependencies.
 
-### Development Build
-To compile the launcher in debug mode:
+- Windows
+- Rust stable toolchain for `x86_64-pc-windows-msvc`
+- MSVC build tools
+
+### Build
+
 ```powershell
+cd opensearch-os
 cargo build
 ```
 
-### Production Build
-To compile a fully optimized release target:
+### Release Build
+
 ```powershell
+cd opensearch-os
 cargo build --release
 ```
 
-### Build Constraints & Clean Compilation
-> [!IMPORTANT]
-> If the launcher is running in the background, file locks will cause compile errors (`Access is denied / os error 5`). Always terminate any running instance of the application before building:
+### Run
+
+```powershell
+.\target\release\opensearch-os.exe
+```
+
+If the app is already running, kill it before rebuilding because Windows can lock the executable:
 
 ```powershell
 taskkill /F /IM opensearch-os.exe
 ```
+
+### Test
+
+Use a single test thread because some tests share temporary SQLite/appdata state:
+
+```powershell
+cd opensearch-os
+cargo test -- --test-threads=1
+```
+
+## Current Product Focus
+
+The current branch is about making deep search feel trustworthy:
+
+- Faster real search results instead of hardcoded demo rows.
+- Better source-specific ranking.
+- Cleaner Raycast-style result presentation.
+- Correct icons for apps, settings, folders, files, images, commands, and AI results.
+- Search filters driven by actual result counts.
+- Clipboard image paste, pinning, and multi-select reliability.
+- Agent chat/history flows that do not trap the launcher in chat mode.
+
+## Tech Stack
+
+- Rust 2021
+- Win32 API via the `windows` crate
+- GDI custom rendering
+- SQLite via `rusqlite` with bundled SQLite
+- SQLite FTS5
+- Everything IPC integration
+- Windows OCR and speech APIs
+- `pdf-extract` for PDF text
+- `docx-lite` for DOCX text
+- `notify` and `walkdir` for indexing
+- `ureq` for AI/Hermes HTTP calls
