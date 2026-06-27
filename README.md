@@ -23,13 +23,34 @@ Omnisearch opens with `Alt+Space` and gives one command/search surface for local
 - Implemented a SQLite + FTS5 indexing pipeline for local files, document text, source code, image OCR, browser data, clipboard history, and Git metadata.
 - Added hybrid search behavior that combines Everything IPC metadata search, SQLite fallback queries, FTS5 content search, curated source filters, and custom ranking.
 - Designed a 720px compact launcher UI with a 64px search bar, 76px result rows, dynamic result filters, horizontal filter scrolling, high-resolution icon rendering, keyboard navigation, mouse hover states, and dark-mode visual polish.
-- Built asynchronous search and icon-loading flows with Win32 message passing (`WM_SEARCH_RESULTS`, `WM_ICON_LOADED`) so expensive work stays out of the paint loop.
+- Built asynchronous search and icon-loading flows with Win32 message passing (`WM_SEARCH_RESULTS`, `WM_ICON_LOADED`) and a 150ms keystroke debounce so expensive work stays out of the paint loop.
 - Added OCR indexing for images/screenshots using Windows OCR APIs with image-size protection to avoid hangs or out-of-memory failures.
 - Integrated browser indexing for Chromium and Firefox profiles, including a capped import of the latest 5,000 browser-history URLs.
 - Added clipboard history with image capture, pinning, multi-select support, and retention capped to the latest 500 non-pinned entries.
 - Added Git indexing with a 15-minute background refresh for repositories, commits, branches, and TODO/FIXME task discovery.
 - Added AI chat and Hermes agent integrations with SQLite chat persistence, streaming run progress, and approval prompts for tool execution.
 - Maintained local-first storage under `%APPDATA%\opensearch-os` with SQLite as the primary persistence layer.
+
+## Performance And Optimization
+
+The app is built as a native Win32 process instead of Electron, so the baseline cost stays close to a small desktop utility rather than a browser runtime.
+
+| Area | Current implementation |
+|---|---|
+| UI runtime | Native Rust + Win32 + GDI, no Electron/webview runtime |
+| Search input | 150ms debounce per query to avoid searching on every keystroke |
+| Paint loop | Search, indexing, AI, and icon loading run outside the paint path |
+| Result bounds | Dedicated source searches usually return 50-100 rows before final ranking/truncation |
+| Browser indexing | Imports recent browser history with capped profile reads, including a 5,000 URL cap in the browser indexer |
+| Clipboard retention | Keeps pinned items and caps non-pinned clipboard history at 500 entries |
+| Document extraction | Caps extracted text at 50KB per file to keep SQLite/FTS compact |
+| Background refresh | Browser index refreshes every 10 minutes; Git index refreshes every 15 minutes |
+| Observed memory | Current local long-running dev session: ~27MB private memory, ~74MB working set |
+| Optimization target | 15MB idle private memory and ~30MB private memory during normal active search |
+
+For resume wording, the defensible version is:
+
+> Built a native Rust/Win32 deep-search launcher with SQLite FTS5, 150ms debounced query execution, capped background indexing, 500-entry clipboard retention, 5,000-entry browser-history import caps, and a measured ~27MB private-memory footprint in local testing.
 
 ## Core Search Sources
 
