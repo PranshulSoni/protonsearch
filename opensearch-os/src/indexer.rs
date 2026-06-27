@@ -5,6 +5,148 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::WalkDir;
 
+const TEXT_EXTENSIONS: &[&str] = &[
+    "txt", "md", "rs", "py", "js", "ts", "jsx", "tsx", "json", "html", "css", "c", "cpp", "h",
+    "hpp", "cs", "go", "java", "kt", "sh", "bat", "ps1", "yaml", "yml", "toml", "ini", "sql",
+    "xml", "rb", "php", "lua", "swift", "dart", "vue", "svelte", "csv", "tex", "rst", "adoc",
+    "conf", "env",
+];
+const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "bmp", "gif"];
+
+fn is_indexable_content(ext: &str) -> bool {
+    TEXT_EXTENSIONS.contains(&ext) || ext == "pdf" || ext == "docx" || IMAGE_EXTENSIONS.contains(&ext)
+}
+
+/// Extract searchable text for a file (document text or image OCR), or None.
+fn extract_content(path: &Path, ext: &str) -> Option<String> {
+    if TEXT_EXTENSIONS.contains(&ext) {
+        read_text_file(path).ok()
+    } else if ext == "pdf" {
+        safe_extract_pdf_text(path)
+    } else if ext == "docx" {
+        safe_extract_docx_text(path)
+    } else if IMAGE_EXTENSIONS.contains(&ext) {
+        extract_ocr_text(path)
+    } else {
+        None
+    }
+}
+
+/// True if any path component is an ignored directory (node_modules, .git, appdata, temp…).
+fn path_in_ignored_dir(path: &Path) -> bool {
+    path.components().any(|c| {
+        c.as_os_str()
+            .to_str()
+            .map(is_ignored_dir)
+            .unwrap_or(false)
+    })
+}
+
+/// Index a single file immediately: upsert name/meta, plus content/OCR for indexable types.
+/// Used by the filesystem watcher so new files are searchable in milliseconds.
+fn index_one_file(conn: &Connection, path: &Path) {
+    let meta = match std::fs::metadata(path) {
+        Ok(m) if m.is_file() => m,
+        _ => return,
+    };
+    let path_str = match path.to_str() {
+        Some(s) => s.to_string(),
+        None => return,
+    };
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if name.is_empty() || is_ignored_file(&name, &ext) {
+        return;
+    }
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let size = meta.len() as i64;
+
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO files (path, name, extension, modified, size, is_dir) VALUES (?,?,?,?,?,0)",
+        params![path_str, name, ext, modified, size],
+    );
+    if is_indexable_content(&ext) {
+        let content = extract_content(path, &ext).unwrap_or_default();
+        let _ = conn.execute("DELETE FROM files_fts WHERE path = ?", [&path_str]);
+        let _ = conn.execute(
+            "INSERT INTO files_fts (path, content) VALUES (?, ?)",
+            params![path_str, content],
+        );
+    }
+}
+
+/// Watch the user profile + fixed drives and index created/modified files instantly.
+/// Falls back to the periodic crawl (safety net) for any events the OS drops.
+pub fn start_watcher(db_path: PathBuf) {
+    use notify::{EventKind, RecursiveMode, Watcher};
+    thread::spawn(move || {
+        // OCR (WinRT) needs COM initialized on this thread.
+        let _ = unsafe {
+            windows::Win32::System::Com::CoInitializeEx(
+                None,
+                windows::Win32::System::Com::COINIT_MULTITHREADED,
+            )
+        };
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut watcher = match notify::recommended_watcher(move |res| {
+            let _ = tx.send(res);
+        }) {
+            Ok(w) => w,
+            Err(e) => {
+                log_indexer(&format!("Watcher init failed: {e}"));
+                return;
+            }
+        };
+        for folder in get_scan_folders() {
+            let _ = watcher.watch(&folder, RecursiveMode::Recursive);
+        }
+        let conn = match Connection::open(&db_path) {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+        let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+        log_indexer("Watcher started");
+
+        // Debounce: batch events in an ~800ms window and dedupe paths so a file being
+        // written repeatedly (e.g. a download in progress) is only indexed once.
+        let mut collect = |set: &mut std::collections::HashSet<PathBuf>, res: notify::Result<notify::Event>| {
+            if let Ok(ev) = res {
+                if matches!(ev.kind, EventKind::Create(_) | EventKind::Modify(_)) {
+                    for p in ev.paths {
+                        set.insert(p);
+                    }
+                }
+            }
+        };
+        loop {
+            let first = match rx.recv() {
+                Ok(r) => r,
+                Err(_) => break,
+            };
+            let mut paths = std::collections::HashSet::new();
+            collect(&mut paths, first);
+            let deadline = std::time::Instant::now() + std::time::Duration::from_millis(800);
+            while let Ok(r) = rx.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now())) {
+                collect(&mut paths, r);
+                if paths.len() > 2000 {
+                    break;
+                }
+            }
+            for p in paths {
+                if !path_in_ignored_dir(&p) {
+                    index_one_file(&conn, &p);
+                }
+            }
+        }
+    });
+}
+
 fn log_indexer(msg: &str) {
     use std::fs::OpenOptions;
     use std::io::Write;
@@ -313,17 +455,9 @@ fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<
                 stmt.query_row([&path_str], |row| row.get::<_, i64>(0)).ok()
             };
 
-            let text_extensions = [
-                "txt", "md", "rs", "py", "js", "ts", "jsx", "tsx", "json", "html", "css", "c",
-                "cpp", "h", "hpp", "cs", "go", "java", "kt", "sh", "bat", "ps1", "yaml", "yml",
-                "toml", "ini", "sql", "xml", "rb", "php", "lua", "swift", "dart", "vue", "svelte",
-                "csv", "tex", "rst", "adoc", "conf", "env",
-            ];
-            let image_extensions = ["png", "jpg", "jpeg", "bmp", "gif"];
-
             let is_text_or_doc = is_file
-                && (text_extensions.contains(&ext.as_str()) || ext == "pdf" || ext == "docx");
-            let is_image = is_file && image_extensions.contains(&ext.as_str());
+                && (TEXT_EXTENSIONS.contains(&ext.as_str()) || ext == "pdf" || ext == "docx");
+            let is_image = is_file && IMAGE_EXTENSIONS.contains(&ext.as_str());
             let should_fts = is_text_or_doc || is_image;
             let needs_fts_check = should_fts && {
                 let mut stmt = conn

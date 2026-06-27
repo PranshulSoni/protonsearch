@@ -59,6 +59,7 @@ anyhow = "1"
 ureq = { version = "2", features = ["json"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 walkdir = "2.5"
+notify = "6"
 pdf-extract = "0.10"
 docx-lite = "0.1"
 everything-ipc = "0.1.3"

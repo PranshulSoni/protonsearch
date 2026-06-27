@@ -641,6 +641,7 @@ unsafe fn run() {
     std::thread::spawn(move || {
         let db_path = db_path_for_thread;
         indexer::start_indexer(db_path.clone());
+        indexer::start_watcher(db_path.clone()); // instant indexing of new/changed files
         browser_indexer::start_browser_indexer(db_path.clone());
         git_indexer::start_git_indexer(db_path.clone());
 
