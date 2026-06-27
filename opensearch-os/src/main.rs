@@ -1039,7 +1039,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                             let now = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .unwrap_or_default()
-                                .as_secs() as i64;
+                                .as_millis() as i64;
                             let _ = conn.execute(
                                 "INSERT INTO clipboard_history (content, timestamp, source_app, is_image, pinned) \
                                  VALUES (?, ?, ?, 0, 0) \
@@ -1741,49 +1741,58 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         // Ctrl + P (Pin/Unpin toggle)
                         if let Some(r) = s.results.get(s.selected) {
                             if r.entry.source == "CLIPBOARD" {
-                                let id = r.entry.id.clone();
-                                let parts: Vec<&str> = id.split('.').collect();
-                                if let Some(ts_str) = parts.last() {
-                                    if let Ok(ts) = ts_str.parse::<i64>() {
-                                        let db_path = s.db_path.clone();
-                                        let is_pinned = id.starts_with("clip.pinned.");
-                                        let new_id = if is_pinned {
-                                            format!("clip.{}", ts)
-                                        } else {
-                                            format!("clip.pinned.{}", ts)
-                                        };
-                                        if s.selected_clip_ids.contains(&id) {
-                                            s.selected_clip_ids.remove(&id);
-                                            s.selected_clip_ids.insert(new_id.clone());
+                                let current_id = r.entry.id.clone();
+                                let timestamps = selected_clip_timestamps(&s.selected_clip_ids, Some(&current_id));
+                                if !timestamps.is_empty() {
+                                    let pin_target = !current_id.starts_with("clip.pinned.");
+                                    let timestamp_set: std::collections::HashSet<i64> =
+                                        timestamps.iter().copied().collect();
+                                    if !s.selected_clip_ids.is_empty() {
+                                        s.selected_clip_ids = timestamp_set
+                                            .iter()
+                                            .map(|ts| clip_id_for_pin_state(*ts, pin_target))
+                                            .collect();
+                                    }
+                                    for result in &mut s.results {
+                                        if result.entry.source == "CLIPBOARD" {
+                                            if let Some(ts) = clip_timestamp_from_id(&result.entry.id) {
+                                                if timestamp_set.contains(&ts) {
+                                                    result.entry.id = clip_id_for_pin_state(ts, pin_target);
+                                                }
+                                            }
                                         }
-                                        if let Some(r_mut) = s.results.get_mut(s.selected) {
-                                            r_mut.entry.id = new_id;
-                                        }
-                                        let _ = InvalidateRect(hwnd, None, FALSE);
+                                    }
+                                    let _ = InvalidateRect(hwnd, None, FALSE);
 
-                                        let hwnd_notify = SendHwnd(hwnd);
-                                        std::thread::spawn(move || {
-                                            let hwnd_notify = hwnd_notify;
-                                            if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                                                let _ = conn.busy_timeout(
-                                                    std::time::Duration::from_secs(5),
-                                                );
-                                                let _ =
-                                                    conn.execute_batch("PRAGMA journal_mode=WAL;");
+                                    let db_path = s.db_path.clone();
+                                    let hwnd_notify = SendHwnd(hwnd);
+                                    std::thread::spawn(move || {
+                                        let hwnd_notify = hwnd_notify;
+                                        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+                                            let _ = conn.busy_timeout(
+                                                std::time::Duration::from_secs(5),
+                                            );
+                                            let _ =
+                                                conn.execute_batch("PRAGMA journal_mode=WAL;");
+                                            let mut changed_any = false;
+                                            for ts in timestamps {
                                                 if conn.execute(
-                                                    "UPDATE clipboard_history SET pinned = (CASE WHEN pinned = 1 THEN 0 ELSE 1 END) WHERE timestamp = ?;",
-                                                    [ts],
+                                                    "UPDATE clipboard_history SET pinned = ? WHERE timestamp = ?;",
+                                                    rusqlite::params![if pin_target { 1 } else { 0 }, ts],
                                                 ).is_ok() {
+                                                    changed_any = true;
+                                                }
+                                            }
+                                            if changed_any {
                                                     let _ = PostMessageW(
                                                         hwnd_notify.0,
                                                         WM_REFRESH_SEARCH,
                                                         WPARAM(0),
                                                         LPARAM(0),
                                                     );
-                                                }
                                             }
-                                        });
-                                    }
+                                        }
+                                    });
                                 }
                             }
                         }
@@ -1801,9 +1810,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                                 && !r.entry.launch_command.starts_with("copy_image:")
                             {
                                 let id = r.entry.id.clone();
-                                let parts: Vec<&str> = id.split('.').collect();
-                                if let Some(ts_str) = parts.last() {
-                                    if let Ok(ts) = ts_str.parse::<i64>() {
+                                if let Some(ts) = clip_timestamp_from_id(&id) {
                                         let db_path = s.db_path.clone();
                                         let hwnd_notify = SendHwnd(hwnd);
                                         std::thread::spawn(move || {
@@ -1824,7 +1831,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                                                  }
                                             }
                                         });
-                                    }
                                 }
                             }
                         }
@@ -1947,8 +1953,14 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         if let Some(r) = s.results.get(s.selected) {
                             if r.entry.source == "CLIPBOARD" {
                                 let id = r.entry.id.clone();
-                                if s.selected_clip_ids.contains(&id) {
-                                    s.selected_clip_ids.remove(&id);
+                                if selected_clip_ids_contain(&s.selected_clip_ids, &id) {
+                                    if let Some(ts) = clip_timestamp_from_id(&id) {
+                                        s.selected_clip_ids.retain(|selected_id| {
+                                            clip_timestamp_from_id(selected_id) != Some(ts)
+                                        });
+                                    } else {
+                                        s.selected_clip_ids.remove(&id);
+                                    }
                                 } else {
                                     s.selected_clip_ids.insert(id);
                                 }
@@ -1976,8 +1988,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                             let db_path = s.db_path.clone();
                             let selected_ids: Vec<String> =
                                 s.selected_clip_ids.iter().cloned().collect();
-                            let selected_set: std::collections::HashSet<String> =
-                                selected_ids.iter().cloned().collect();
+                            let selected_timestamps: std::collections::HashSet<i64> =
+                                selected_ids.iter().filter_map(|id| clip_timestamp_from_id(id)).collect();
                             s.selected_clip_ids.clear();
                             let hwnd_notify = SendHwnd(hwnd);
                             std::thread::spawn(move || {
@@ -1987,12 +1999,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                                     let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
                                     let mut deleted_any = false;
                                     for id in &selected_ids {
-                                        let parts: Vec<&str> = id.split('.').collect();
-                                        if let Some(ts_str) = parts.last() {
-                                            if let Ok(ts) = ts_str.parse::<i64>() {
-                                                if conn.execute("DELETE FROM clipboard_history WHERE timestamp = ?;", [ts]).is_ok() {
-                                                    deleted_any = true;
-                                                }
+                                        if let Some(ts) = clip_timestamp_from_id(id) {
+                                            if conn.execute("DELETE FROM clipboard_history WHERE timestamp = ?;", [ts]).is_ok() {
+                                                deleted_any = true;
                                             }
                                         }
                                     }
@@ -2006,7 +2015,10 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                                     }
                                 }
                             });
-                            s.results.retain(|r| !selected_set.contains(&r.entry.id));
+                            s.results.retain(|r| {
+                                clip_timestamp_from_id(&r.entry.id)
+                                    .map_or(true, |ts| !selected_timestamps.contains(&ts))
+                            });
                             let _ = InvalidateRect(hwnd, None, FALSE);
                         } else {
                             if s.selected_clip_ids.is_empty() {
@@ -2041,8 +2053,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         let db_path = s.db_path.clone();
                         let selected_ids: Vec<String> =
                             s.selected_clip_ids.iter().cloned().collect();
-                        let selected_set: std::collections::HashSet<String> =
-                            selected_ids.iter().cloned().collect();
+                        let selected_timestamps: std::collections::HashSet<i64> =
+                            selected_ids.iter().filter_map(|id| clip_timestamp_from_id(id)).collect();
                         s.selected_clip_ids.clear();
                         let hwnd_notify = SendHwnd(hwnd);
                         std::thread::spawn(move || {
@@ -2052,12 +2064,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                                 let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
                                 let mut deleted_any = false;
                                 for id in &selected_ids {
-                                    let parts: Vec<&str> = id.split('.').collect();
-                                    if let Some(ts_str) = parts.last() {
-                                        if let Ok(ts) = ts_str.parse::<i64>() {
-                                            if conn.execute("DELETE FROM clipboard_history WHERE timestamp = ?;", [ts]).is_ok() {
-                                                deleted_any = true;
-                                            }
+                                    if let Some(ts) = clip_timestamp_from_id(id) {
+                                        if conn.execute("DELETE FROM clipboard_history WHERE timestamp = ?;", [ts]).is_ok() {
+                                            deleted_any = true;
                                         }
                                     }
                                 }
@@ -2071,14 +2080,15 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                                 }
                             }
                         });
-                        s.results.retain(|r| !selected_set.contains(&r.entry.id));
+                        s.results.retain(|r| {
+                            clip_timestamp_from_id(&r.entry.id)
+                                .map_or(true, |ts| !selected_timestamps.contains(&ts))
+                        });
                         let _ = InvalidateRect(hwnd, None, FALSE);
                         return LRESULT(0);
                     }
                     if let Some(ref id) = s.editing_item {
-                        let parts: Vec<&str> = id.split('.').collect();
-                        if let Some(ts_str) = parts.last() {
-                            if let Ok(ts) = ts_str.parse::<i64>() {
+                        if let Some(ts) = clip_timestamp_from_id(id) {
                                 let db_path = s.db_path.clone();
                                 let new_content = s.query.clone();
                                 let new_content_for_thread = new_content.clone();
@@ -2103,7 +2113,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                                     }
                                 });
                                 copy_to_clipboard(hwnd, &new_content);
-                            }
                         }
                         s.editing_item = None;
                         s.query = "clip:".to_string();
@@ -2120,29 +2129,37 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         std::thread::spawn(move || {
                             let hwnd_copy = hwnd_copy;
                             if let Ok(conn) = rusqlite::Connection::open(&db_path) {
-                                let mut contents = Vec::new();
                                 let mut timestamps = Vec::new();
                                 for id in &selected_ids {
-                                    let parts: Vec<&str> = id.split('.').collect();
-                                    if let Some(ts_str) = parts.last() {
-                                        if let Ok(ts) = ts_str.parse::<i64>() {
-                                            timestamps.push(ts);
-                                        }
+                                    if let Some(ts) = clip_timestamp_from_id(id) {
+                                        timestamps.push(ts);
                                     }
                                 }
                                 timestamps.sort();
+                                timestamps.dedup();
+                                let mut rows = Vec::new();
                                 for ts in timestamps {
-                                    if let Ok(content) = conn.query_row(
-                                        "SELECT content FROM clipboard_history WHERE timestamp = ?;",
+                                    if let Ok((content, is_image)) = conn.query_row(
+                                        "SELECT content, is_image FROM clipboard_history WHERE timestamp = ?;",
                                         [ts],
-                                        |row| row.get::<_, String>(0),
+                                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)),
                                     ) {
-                                        contents.push(content);
+                                        rows.push((content, is_image == 1));
                                     }
                                 }
-                                if !contents.is_empty() {
-                                    let combined = contents.join("\r\n");
-                                    copy_to_clipboard(hwnd_copy.0, &combined);
+                                if rows.len() == 1 && rows[0].1 {
+                                    let _ = copy_image_to_clipboard(hwnd_copy.0, &rows[0].0);
+                                } else {
+                                    let contents: Vec<String> = rows
+                                        .into_iter()
+                                        .map(|(content, is_image)| {
+                                            if is_image { format!("[Image] {}", content) } else { content }
+                                        })
+                                        .collect();
+                                    if !contents.is_empty() {
+                                        let combined = contents.join("\r\n");
+                                        copy_to_clipboard(hwnd_copy.0, &combined);
+                                    }
                                 }
                             }
                         });
@@ -3072,6 +3089,39 @@ fn relative_time(modified: std::time::SystemTime) -> String {
     }
 }
 
+fn clip_timestamp_from_id(id: &str) -> Option<i64> {
+    id.rsplit('.').next()?.parse::<i64>().ok()
+}
+
+fn clip_timestamp_to_unix_seconds(ts: i64) -> i64 {
+    if ts > 10_000_000_000 { ts / 1000 } else { ts }
+}
+
+fn clip_id_for_pin_state(ts: i64, pinned: bool) -> String {
+    if pinned { format!("clip.pinned.{}", ts) } else { format!("clip.{}", ts) }
+}
+
+fn selected_clip_ids_contain(selected: &std::collections::HashSet<String>, candidate_id: &str) -> bool {
+    selected.contains(candidate_id)
+        || clip_timestamp_from_id(candidate_id).is_some_and(|candidate_ts| {
+            selected.iter().any(|id| clip_timestamp_from_id(id) == Some(candidate_ts))
+        })
+}
+
+fn selected_clip_timestamps(
+    selected: &std::collections::HashSet<String>,
+    fallback_id: Option<&str>,
+) -> Vec<i64> {
+    let mut timestamps: Vec<i64> = if selected.is_empty() {
+        fallback_id.into_iter().filter_map(clip_timestamp_from_id).collect()
+    } else {
+        selected.iter().filter_map(|id| clip_timestamp_from_id(id)).collect()
+    };
+    timestamps.sort_unstable();
+    timestamps.dedup();
+    timestamps
+}
+
 /// "Explain results": map each result's launch_command to a "why it surfaced" recency tag.
 /// Files use mtime; clipboard entries use the unix ts embedded in their id (e.g. clip.<ts>).
 /// ponytail: stat/parse per result on arrival (≤30, debounced) — not in the paint loop.
@@ -3088,11 +3138,8 @@ fn compute_result_reasons(results: &[SearchResult]) -> std::collections::HashMap
         }
         let tag = if r.entry.source == "CLIPBOARD" {
             // id is clip.<ts> or clip.pinned.<ts>
-            r.entry
-                .id
-                .rsplit('.')
-                .next()
-                .and_then(|t| t.parse::<i64>().ok())
+            clip_timestamp_from_id(&r.entry.id)
+                .map(clip_timestamp_to_unix_seconds)
                 .map(|ts| relative_age(now - ts))
                 .unwrap_or_default()
         } else {
@@ -6299,7 +6346,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     RESULT_H - 10
                 };
 
-                let is_checked = s.selected_clip_ids.contains(&res.entry.id);
+                let is_checked = selected_clip_ids_contain(&s.selected_clip_ids, &res.entry.id);
                 let row_border = if res_idx == s.selected {
                     CLR_ACCENT
                 } else if is_checked {
@@ -6352,66 +6399,84 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
                 let cy = row_card_y + (row_card_h - 38) / 2;
 
-                let cached_icon = s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null());
-                let icon_to_draw = if let Some(hicon) = cached_icon {
-                    hicon
-                } else if res.entry.source == "WINDOW" {
-                    s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null()).unwrap_or(s.icon_control_panel)
-                } else if res.entry.source == "app"
-                    || res.entry.source == "RECENT"
-                    || res.entry.source == "FILE"
-                    || res.entry.source == "CODE"
-                    || (res.entry.source == "ACTION" && res.entry.launch_command.starts_with("kill:"))
-                {
-                    s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null()).unwrap_or(s.icon_control_panel)
-                } else if res.entry.launch_command.starts_with("ms-settings:") {
-                    s.icon_settings
-                } else if res.entry.source == "web"
-                    || res.entry.source == "HISTORY"
-                    || res.entry.source == "QUICKLINK"
-                    || res.entry.launch_command.starts_with("https://")
-                {
-                    s.icon_web
-                } else if res.entry.source == "BOOKMARK" {
-                    s.icon_bookmark
-                } else if res.entry.source == "FOLDER" {
-                    s.icon_folder
-                } else if res.entry.source == "COMMIT" {
-                    s.icon_commit
-                } else if res.entry.source == "TODO"
-                    || res.entry.source == "SNIPPET"
-                    || res.entry.launch_command.starts_with("action:create_snippet")
-                {
-                    s.icon_todo
-                } else if res.entry.source == "CLIPBOARD"
-                    || res.entry.launch_command.starts_with("action:ask_clipboard")
-                {
-                    s.icon_clipboard
-                } else if res.entry.source == "AI"
-                    || res.entry.source == "MEMORY"
-                    || res.entry.launch_command.starts_with("action:reload_script_commands")
-                {
-                    s.icon_memory
-                } else if res.entry.launch_command.starts_with("start_focus_session:")
-                    || res.entry.launch_command.starts_with("action:toggle_focus_session")
-                    || res.entry.launch_command.starts_with("action:create_focus_category")
-                {
-                    s.icon_bookmark
-                } else if res.entry.launch_command.starts_with("action:create_quicklink") {
-                    s.icon_web
-                } else {
-                    s.icon_control_panel
-                };
+                let icon_y = row_card_y + (row_card_h - 28) / 2;
+                let mut drew_thumbnail = false;
+                if let Some(path) = res.entry.launch_command.strip_prefix("copy_image:") {
+                    let mut cache = s.clipboard_thumbnails.borrow_mut();
+                    if let Some(&hbitmap) = cache.get(path) {
+                        draw_cached_bmp(mdc, x + PAD_L + 2, icon_y, 28, 28, hbitmap);
+                        drew_thumbnail = true;
+                    } else if let Some(hbitmap) = load_bmp_file(path) {
+                        draw_cached_bmp(mdc, x + PAD_L + 2, icon_y, 28, 28, hbitmap);
+                        cache.insert(path.to_string(), hbitmap);
+                        drew_thumbnail = true;
+                    }
+                }
+                if !drew_thumbnail {
+                    let cached_icon = s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null());
+                    let icon_to_draw = if let Some(hicon) = cached_icon {
+                        hicon
+                    } else if res.entry.source == "WINDOW" {
+                        s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null()).unwrap_or(s.icon_control_panel)
+                    } else if res.entry.source == "app"
+                        || res.entry.source == "RECENT"
+                        || res.entry.source == "FILE"
+                        || res.entry.source == "CODE"
+                        || (res.entry.source == "ACTION" && res.entry.launch_command.starts_with("kill:"))
+                    {
+                        s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null()).unwrap_or(s.icon_control_panel)
+                    } else if res.entry.launch_command.starts_with("ms-settings:") {
+                        s.icon_settings
+                    } else if res.entry.source == "web"
+                        || res.entry.source == "HISTORY"
+                        || res.entry.source == "QUICKLINK"
+                        || res.entry.launch_command.starts_with("https://")
+                    {
+                        s.icon_web
+                    } else if res.entry.source == "BOOKMARK" {
+                        s.icon_bookmark
+                    } else if res.entry.source == "FOLDER" {
+                        s.icon_folder
+                    } else if res.entry.source == "COMMIT" {
+                        s.icon_commit
+                    } else if res.entry.source == "TODO"
+                        || res.entry.source == "SNIPPET"
+                        || res.entry.launch_command.starts_with("action:create_snippet")
+                    {
+                        s.icon_todo
+                    } else if res.entry.source == "CLIPBOARD"
+                        || res.entry.launch_command.starts_with("action:ask_clipboard")
+                    {
+                        s.icon_clipboard
+                    } else if res.entry.source == "AI"
+                        || res.entry.source == "MEMORY"
+                        || res.entry.launch_command.starts_with("action:reload_script_commands")
+                    {
+                        s.icon_memory
+                    } else if res.entry.launch_command.starts_with("start_focus_session:")
+                        || res.entry.launch_command.starts_with("action:toggle_focus_session")
+                        || res.entry.launch_command.starts_with("action:create_focus_category")
+                    {
+                        s.icon_bookmark
+                    } else if res.entry.launch_command.starts_with("action:create_quicklink") {
+                        s.icon_web
+                    } else {
+                        s.icon_control_panel
+                    };
 
-                if !icon_to_draw.0.is_null() {
-                    let icon_y = row_card_y + (row_card_h - 28) / 2;
-                    let _ = unsafe { DrawIconEx(mdc, x + PAD_L + 2, icon_y, icon_to_draw, 28, 28, 0, HBRUSH(null_mut()), DI_NORMAL) };
+                    if !icon_to_draw.0.is_null() {
+                        let _ = unsafe { DrawIconEx(mdc, x + PAD_L + 2, icon_y, icon_to_draw, 28, 28, 0, HBRUSH(null_mut()), DI_NORMAL) };
+                    }
                 }
 
                 let tx = x + PAD_L + 48;
                 SelectObject(mdc, s.font_n);
                 SetTextColor(mdc, CLR_WHITE);
-                let display_name = res.entry.control_name.clone();
+                let display_name = if selected_clip_ids_contain(&s.selected_clip_ids, &res.entry.id) {
+                    format!("[✓] {}", res.entry.control_name)
+                } else {
+                    res.entry.control_name.clone()
+                };
                 let mut name: Vec<u16> = display_name.encode_utf16().collect();
                 let badge_left = x + list_w - PAD_L - BADGE_W;
                 let mut r = RECT { left: tx, top: cy, right: badge_left - 14, bottom: cy + 22 };
@@ -7217,10 +7282,10 @@ unsafe fn load_icon_from_memory(bytes: &[u8], size: i32) -> HICON {
 
 unsafe fn load_png_to_hicon(bytes: &[u8]) -> HICON {
     use windows::Win32::Graphics::Gdi::{
-        CreateDIBSection, DeleteObject, GetDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, CreateBitmap,
+        CreateDIBSection, DeleteObject, GetDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, CreateBitmap,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateIconIndirect, ICONINFO, DestroyIcon,
+        CreateIconIndirect, ICONINFO,
     };
     
     let img = match image::load_from_memory_with_format(bytes, image::ImageFormat::Png) {
@@ -7230,7 +7295,7 @@ unsafe fn load_png_to_hicon(bytes: &[u8]) -> HICON {
     
     let (width, height) = img.dimensions();
     
-    let mut bmi = BITMAPINFO {
+    let bmi = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
             biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
             biWidth: width as i32,
@@ -7488,7 +7553,8 @@ unsafe fn save_clipboard_image(
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
-    let timestamp = now.as_secs() as i64;
+    let timestamp = now.as_millis() as i64;
+    let memory_timestamp = now.as_secs() as i64;
     let (img_path, img_path_str) = clipboard_image_path(db_path, now.as_millis())?;
     std::fs::create_dir_all(img_path.parent()?).ok()?;
     std::fs::write(&img_path, bmp_bytes).ok()?;
@@ -7508,7 +7574,7 @@ unsafe fn save_clipboard_image(
     .ok()?;
     search::insert_memory_event(
         &conn,
-        timestamp,
+        memory_timestamp,
         "Clipboard",
         "Copied Image",
         &format!("Copied image from {}", source_app),
@@ -8096,6 +8162,31 @@ mod tests {
         assert_eq!(source_section_label("ACTION"), "COMMANDS");
         assert_eq!(source_section_label("MEMORY"), "MEMORY");
         assert_eq!(source_section_label("unknown"), "RESULTS");
+    }
+
+    #[test]
+    fn clipboard_selection_matches_pinned_and_unpinned_ids() {
+        let mut selected = std::collections::HashSet::new();
+        selected.insert("clip.1710000000123".to_string());
+
+        assert!(selected_clip_ids_contain(&selected, "clip.1710000000123"));
+        assert!(selected_clip_ids_contain(&selected, "clip.pinned.1710000000123"));
+        assert!(!selected_clip_ids_contain(&selected, "clip.1710000000456"));
+        assert_eq!(selected_clip_timestamps(&selected, Some("clip.1")), vec![1710000000123]);
+        assert_eq!(
+            selected_clip_timestamps(&std::collections::HashSet::new(), Some("clip.pinned.42")),
+            vec![42]
+        );
+    }
+
+    #[test]
+    fn clipboard_timestamp_normalizes_millis_for_age() {
+        assert_eq!(clip_timestamp_to_unix_seconds(1_710_000_000), 1_710_000_000);
+        assert_eq!(clip_timestamp_to_unix_seconds(1_710_000_000_123), 1_710_000_000);
+        assert_eq!(
+            clip_id_for_pin_state(1_710_000_000_123, true),
+            "clip.pinned.1710000000123"
+        );
     }
 
     #[test]
