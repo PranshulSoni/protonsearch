@@ -239,6 +239,20 @@ struct IconRequest {
 }
 
 impl State {
+    fn has_prefix(&self) -> bool {
+        let q = self.query.to_lowercase();
+        q.starts_with("bookmarks:")
+            || q.starts_with("history:")
+            || q.starts_with("commits:")
+            || q.starts_with("todos:")
+            || q.starts_with("clip:")
+            || q.starts_with("clipboard:")
+            || q.starts_with("file:")
+            || q.starts_with("code:")
+            || q.starts_with("img:")
+            || q.starts_with("agentchats:")
+    }
+
     fn reset_results(&mut self) {
         if self.query.is_empty() {
             self.results = default_homepage_results();
@@ -266,13 +280,20 @@ impl State {
         if n == 0 {
             SEARCH_H
         } else {
-            SEARCH_H + 80 + n * RESULT_H + 40
+            let offset = if self.has_prefix() { 48 } else { 80 };
+            SEARCH_H + offset + n * RESULT_H + 40
         }
     }
     fn result_rect(&self, i: usize) -> RECT {
         let end_h = self.win_h();
         let end_y = self.cy - end_h / 2;
-        let offset = if self.query.is_empty() { 36 } else { 80 };
+        let offset = if self.query.is_empty() {
+            36
+        } else if self.has_prefix() {
+            48
+        } else {
+            80
+        };
         let y = end_y + SEARCH_H + offset + i as i32 * RESULT_H;
         RECT {
             left: 0,
@@ -1084,6 +1105,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let s = &mut *sp;
                 if query_id == s.current_query_id {
                     let mut filtered = if s.query.is_empty() {
+                        results
+                    } else if s.has_prefix() {
                         results
                     } else {
                         mock_search_results()
@@ -6110,6 +6133,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             let _ = DrawTextW(mdc, &mut src_w, &mut src_rc, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
             
             list_y += 36;
+        } else if s.has_prefix() {
+            // Prefix search layout - no filter pills, just list_y stays as-is (offset 0)
         } else {
             // Search state layout: Filter Row
             let filters = [
@@ -6189,24 +6214,20 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         for i in 0..n {
             let res_idx = s.scroll_offset + i;
             let res = &s.results[res_idx];
-            let ry = list_y + i as i32 * RESULT_H;
             
-            let is_selected = res_idx == s.selected;
-            if is_selected {
-                let border_y = ry + 4;
-                let border_h = RESULT_H - 8;
-                
-                // Draw rounded background highlight card
-                fill_rounded(mdc, x + 12, border_y, list_w - 24, border_h, 6, CLR_ACCENT);
-                fill_rounded(mdc, x + 13, border_y + 1, list_w - 26, border_h - 2, 5, BG_SEL);
-                
-                // Draw vertical blue accent bar on the left edge inside the card
-                fill(mdc, x + 13, border_y + 4, 3, border_h - 8, CLR_ACCENT);
-            }
+            if s.query.is_empty() {
+                // Homepage (Image 3) flat list items
+                let ry = list_y + i as i32 * RESULT_H;
+                let is_selected = res_idx == s.selected;
+                if is_selected {
+                    let border_y = ry + 4;
+                    let border_h = RESULT_H - 8;
+                    fill_rounded(mdc, x + 12, border_y, list_w - 24, border_h, 6, CLR_ACCENT);
+                    fill_rounded(mdc, x + 13, border_y + 1, list_w - 26, border_h - 2, 5, BG_SEL);
+                    fill(mdc, x + 13, border_y + 4, 3, border_h - 8, CLR_ACCENT);
+                }
 
-            // Determine Icon
-            let icon_to_draw = if s.query.is_empty() {
-                match res.entry.source.as_str() {
+                let icon_to_draw = match res.entry.source.as_str() {
                     "HOMEPAGE_BROWSER" => if res.entry.id == "home_0" { s.icon_new_browser_bookmarks } else { s.icon_new_browser_history },
                     "HOMEPAGE_GIT" => s.icon_new_git_commits,
                     "HOMEPAGE_CLIPBOARD" => s.icon_new_clipboard_history,
@@ -6215,28 +6236,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     "HOMEPAGE_OCR" => s.icon_new_search_screenshots,
                     "HOMEPAGE_AI" => s.icon_new_agent_history,
                     _ => s.icon_control_panel,
-                }
-            } else {
-                match res.entry.source.as_str() {
-                    "CODE" => s.icon_new_code,
-                    "PDF" => s.icon_new_content,
-                    "OCR" => s.icon_new_search_screenshots,
-                    "FILE" => s.icon_new_files,
-                    "Settings" => s.icon_new_settings,
-                    "SYSTEM" => s.icon_new_commands,
-                    _ => s.icon_control_panel,
-                }
-            };
+                };
 
-            if !icon_to_draw.0.is_null() {
-                let icon_y = ry + (RESULT_H - 32) / 2;
-                let _ = unsafe { DrawIconEx(mdc, x + PAD_L, icon_y, icon_to_draw, 32, 32, 0, HBRUSH(null_mut()), DI_NORMAL) };
-            }
+                if !icon_to_draw.0.is_null() {
+                    let icon_y = ry + (RESULT_H - 32) / 2;
+                    let _ = unsafe { DrawIconEx(mdc, x + PAD_L, icon_y, icon_to_draw, 32, 32, 0, HBRUSH(null_mut()), DI_NORMAL) };
+                }
 
-            let tx = x + PAD_L + 48; // after icon
-            
-            if s.query.is_empty() {
-                // Name
+                let tx = x + PAD_L + 48;
                 SelectObject(mdc, s.font_n);
                 SetTextColor(mdc, CLR_WHITE);
                 let display_name = res.entry.control_name.clone();
@@ -6249,7 +6256,6 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 };
                 let _ = DrawTextW(mdc, &mut name, &mut r, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-                // Breadcrumb
                 SelectObject(mdc, s.font_c);
                 SetTextColor(mdc, CLR_GRAY);
                 let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
@@ -6261,7 +6267,6 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 };
                 let _ = DrawTextW(mdc, &mut crumb, &mut r2, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-                // Category
                 let cat_str = match res.entry.source.as_str() {
                     "HOMEPAGE_BROWSER" => "Browser",
                     "HOMEPAGE_GIT" => "Git",
@@ -6280,8 +6285,185 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     bottom: ry + RESULT_H,
                 };
                 let _ = DrawTextW(mdc, &mut cat, &mut rc_cat, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+            } else if s.has_prefix() {
+                // ── Old UI results layout with cards and headers ───────────────────
+                let ry = list_y + i as i32 * RESULT_H;
+                let starts_section = res_idx == 0
+                    || source_section_label(&s.results[res_idx - 1].entry.source)
+                        != source_section_label(&res.entry.source);
+                let row_card_y = if starts_section { ry + 20 } else { ry + 5 };
+                let row_card_h = if starts_section {
+                    RESULT_H - 24
+                } else {
+                    RESULT_H - 10
+                };
+
+                let is_checked = s.selected_clip_ids.contains(&res.entry.id);
+                let row_border = if res_idx == s.selected {
+                    CLR_ACCENT
+                } else if is_checked {
+                    COLORREF(0x00_57_46_38)
+                } else {
+                    CLR_ROW_BORDER
+                };
+                let row_bg = if res_idx == s.selected {
+                    BG_SEL
+                } else if is_checked {
+                    COLORREF(0x00_30_28_21)
+                } else {
+                    CLR_ROW
+                };
+                fill_rounded(mdc, x + 12, row_card_y, list_w - 24, row_card_h, 7, row_border);
+                fill_rounded(mdc, x + 13, row_card_y + 1, list_w - 26, row_card_h - 2, 6, row_bg);
+                
+                if starts_section {
+                    SelectObject(mdc, s.font_b);
+                    SetTextColor(mdc, CLR_GRAY);
+                    let section = source_section_label(&res.entry.source);
+                    let section_total = s
+                        .results
+                        .iter()
+                        .filter(|candidate| source_section_label(&candidate.entry.source) == section)
+                        .count();
+                    let mut label: Vec<u16> = section.encode_utf16().collect();
+                    let mut label_rect = RECT {
+                        left: x + PAD_L,
+                        top: ry + 3,
+                        right: x + list_w / 2,
+                        bottom: ry + 18,
+                    };
+                    let _ = DrawTextW(mdc, &mut label, &mut label_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                    
+                    let count_text = if section_total == 1 {
+                        "1 result".to_string()
+                    } else {
+                        format!("{} results", section_total)
+                    };
+                    let mut count: Vec<u16> = count_text.encode_utf16().collect();
+                    let mut count_rect = RECT {
+                        left: x + list_w / 2,
+                        top: ry + 3,
+                        right: x + list_w - PAD_L,
+                        bottom: ry + 18,
+                    };
+                    let _ = DrawTextW(mdc, &mut count, &mut count_rect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                }
+
+                let cy = row_card_y + (row_card_h - 38) / 2;
+
+                let cached_icon = s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null());
+                let icon_to_draw = if let Some(hicon) = cached_icon {
+                    hicon
+                } else if res.entry.source == "WINDOW" {
+                    s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null()).unwrap_or(s.icon_control_panel)
+                } else if res.entry.source == "app"
+                    || res.entry.source == "RECENT"
+                    || res.entry.source == "FILE"
+                    || res.entry.source == "CODE"
+                    || (res.entry.source == "ACTION" && res.entry.launch_command.starts_with("kill:"))
+                {
+                    s.app_icons.get(&res.entry.launch_command).copied().filter(|h| !h.0.is_null()).unwrap_or(s.icon_control_panel)
+                } else if res.entry.launch_command.starts_with("ms-settings:") {
+                    s.icon_settings
+                } else if res.entry.source == "web"
+                    || res.entry.source == "HISTORY"
+                    || res.entry.source == "QUICKLINK"
+                    || res.entry.launch_command.starts_with("https://")
+                {
+                    s.icon_web
+                } else if res.entry.source == "BOOKMARK" {
+                    s.icon_bookmark
+                } else if res.entry.source == "FOLDER" {
+                    s.icon_folder
+                } else if res.entry.source == "COMMIT" {
+                    s.icon_commit
+                } else if res.entry.source == "TODO"
+                    || res.entry.source == "SNIPPET"
+                    || res.entry.launch_command.starts_with("action:create_snippet")
+                {
+                    s.icon_todo
+                } else if res.entry.source == "CLIPBOARD"
+                    || res.entry.launch_command.starts_with("action:ask_clipboard")
+                {
+                    s.icon_clipboard
+                } else if res.entry.source == "AI"
+                    || res.entry.source == "MEMORY"
+                    || res.entry.launch_command.starts_with("action:reload_script_commands")
+                {
+                    s.icon_memory
+                } else if res.entry.launch_command.starts_with("start_focus_session:")
+                    || res.entry.launch_command.starts_with("action:toggle_focus_session")
+                    || res.entry.launch_command.starts_with("action:create_focus_category")
+                {
+                    s.icon_bookmark
+                } else if res.entry.launch_command.starts_with("action:create_quicklink") {
+                    s.icon_web
+                } else {
+                    s.icon_control_panel
+                };
+
+                if !icon_to_draw.0.is_null() {
+                    let icon_y = row_card_y + (row_card_h - 28) / 2;
+                    let _ = unsafe { DrawIconEx(mdc, x + PAD_L + 2, icon_y, icon_to_draw, 28, 28, 0, HBRUSH(null_mut()), DI_NORMAL) };
+                }
+
+                let tx = x + PAD_L + 48;
+                SelectObject(mdc, s.font_n);
+                SetTextColor(mdc, CLR_WHITE);
+                let display_name = res.entry.control_name.clone();
+                let mut name: Vec<u16> = display_name.encode_utf16().collect();
+                let badge_left = x + list_w - PAD_L - BADGE_W;
+                let mut r = RECT { left: tx, top: cy, right: badge_left - 14, bottom: cy + 22 };
+                let _ = DrawTextW(mdc, &mut name, &mut r, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+
+                let reason = s.result_reasons.get(&res.entry.launch_command).filter(|r| !r.is_empty());
+                let reason_slot = if reason.is_some() { 96 } else { 0 };
+
+                SelectObject(mdc, s.font_c);
+                SetTextColor(mdc, CLR_GRAY);
+                let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
+                let mut r2 = RECT { left: tx, top: cy + 24, right: badge_left - 14 - reason_slot, bottom: cy + 40 };
+                let _ = DrawTextW(mdc, &mut crumb, &mut r2, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+
+                if let Some(reason) = reason {
+                    SetTextColor(mdc, CLR_PH);
+                    let mut rtxt: Vec<u16> = reason.encode_utf16().collect();
+                    let mut rr = RECT { left: badge_left - 14 - reason_slot, top: cy + 24, right: badge_left - 14, bottom: cy + 40 };
+                    let _ = DrawTextW(mdc, &mut rtxt, &mut rr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                }
+
+                let badge_source = if res.entry.id.starts_with("clip.pinned.") { "pinned_clip" } else { &res.entry.source };
+                badge(mdc, s, badge_source, badge_left, row_card_y + (row_card_h - BADGE_H) / 2);
+
             } else {
-                // Name
+                // ── Search Page (Image 4) flat list items ──────────────────────────
+                let ry = list_y + i as i32 * RESULT_H;
+                let is_selected = res_idx == s.selected;
+                if is_selected {
+                    let border_y = ry + 4;
+                    let border_h = RESULT_H - 8;
+                    fill_rounded(mdc, x + 12, border_y, list_w - 24, border_h, 6, CLR_ACCENT);
+                    fill_rounded(mdc, x + 13, border_y + 1, list_w - 26, border_h - 2, 5, BG_SEL);
+                    fill(mdc, x + 13, border_y + 4, 3, border_h - 8, CLR_ACCENT);
+                }
+
+                let icon_to_draw = match res.entry.source.as_str() {
+                    "CODE" => s.icon_new_code,
+                    "PDF" => s.icon_new_content,
+                    "OCR" => s.icon_new_search_screenshots,
+                    "FILE" => s.icon_new_files,
+                    "Settings" => s.icon_new_settings,
+                    "SYSTEM" => s.icon_new_commands,
+                    _ => s.icon_control_panel,
+                };
+
+                if !icon_to_draw.0.is_null() {
+                    let icon_y = ry + (RESULT_H - 32) / 2;
+                    let _ = unsafe { DrawIconEx(mdc, x + PAD_L, icon_y, icon_to_draw, 32, 32, 0, HBRUSH(null_mut()), DI_NORMAL) };
+                }
+
+                let tx = x + PAD_L + 48;
                 SelectObject(mdc, s.font_n);
                 SetTextColor(mdc, CLR_WHITE);
                 let display_name = res.entry.control_name.clone();
@@ -6294,7 +6476,6 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 };
                 let _ = DrawTextW(mdc, &mut name, &mut r, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-                // Description with Highlight
                 draw_highlighted_text(
                     mdc,
                     &res.entry.description,
@@ -6306,7 +6487,6 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     ry + 30,
                 );
 
-                // Breadcrumb
                 SelectObject(mdc, s.font_c);
                 SetTextColor(mdc, CLR_PH);
                 let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
@@ -6318,7 +6498,6 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 };
                 let _ = DrawTextW(mdc, &mut crumb, &mut r2, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
-                // Badge
                 let badge_source = &res.entry.source;
                 let label = match badge_source.as_str() {
                     "CODE" => "Code",
@@ -6330,7 +6509,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     _ => badge_source,
                 };
                 
-                let t: Vec<u16> = label.encode_utf16().collect();
+                let mut t: Vec<u16> = label.encode_utf16().collect();
                 let mut sz = SIZE::default();
                 SelectObject(mdc, s.font_b);
                 let _ = GetTextExtentPoint32W(mdc, &t, &mut sz);
