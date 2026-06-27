@@ -6452,40 +6452,40 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                             }
                         })
                     } else if res.entry.launch_command.starts_with("ms-settings:") {
-                        s.icon_settings
+                        s.icon_new_settings
                     } else if res.entry.source == "web"
                         || res.entry.source == "HISTORY"
                         || res.entry.source == "QUICKLINK"
                         || res.entry.launch_command.starts_with("https://")
                     {
-                        s.icon_web
+                        s.icon_new_browser_history
                     } else if res.entry.source == "BOOKMARK" {
-                        s.icon_bookmark
+                        s.icon_new_browser_bookmarks
                     } else if res.entry.source == "FOLDER" {
-                        s.icon_folder
+                        s.icon_new_files
                     } else if res.entry.source == "COMMIT" {
-                        s.icon_commit
+                        s.icon_new_git_commits
                     } else if res.entry.source == "TODO"
                         || res.entry.source == "SNIPPET"
                         || res.entry.launch_command.starts_with("action:create_snippet")
                     {
-                        s.icon_todo
+                        s.icon_new_content
                     } else if res.entry.source == "CLIPBOARD"
                         || res.entry.launch_command.starts_with("action:ask_clipboard")
                     {
-                        s.icon_clipboard
+                        s.icon_new_clipboard_history
                     } else if res.entry.source == "AI"
                         || res.entry.source == "MEMORY"
                         || res.entry.launch_command.starts_with("action:reload_script_commands")
                     {
-                        s.icon_memory
+                        s.icon_new_agent_history
                     } else if res.entry.launch_command.starts_with("start_focus_session:")
                         || res.entry.launch_command.starts_with("action:toggle_focus_session")
                         || res.entry.launch_command.starts_with("action:create_focus_category")
                     {
-                        s.icon_bookmark
+                        s.icon_new_agent_history
                     } else if res.entry.launch_command.starts_with("action:create_quicklink") {
-                        s.icon_web
+                        s.icon_new_browser_bookmarks
                     } else {
                         s.icon_new_all
                     };
@@ -6540,12 +6540,18 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 }
 
                 let icon_to_draw = match res.entry.source.as_str() {
+                    "ACTION" | "SYSTEM" | "WINDOW" => s.icon_new_commands,
+                    "BOOKMARK" | "QUICKLINK" => s.icon_new_browser_bookmarks,
                     "CODE" => s.icon_new_code,
+                    "CLIPBOARD" => s.icon_new_clipboard_history,
+                    "COMMIT" => s.icon_new_git_commits,
+                    "FOLDER" | "FILE" | "RECENT" => s.icon_new_files,
+                    "HISTORY" | "web" => s.icon_new_browser_history,
+                    "MEMORY" | "AI" => s.icon_new_agent_history,
                     "PDF" => s.icon_new_content,
                     "OCR" => s.icon_new_search_screenshots,
-                    "FILE" => s.icon_new_files,
-                    "Settings" => s.icon_new_settings,
-                    "SYSTEM" => s.icon_new_commands,
+                    "Settings" | "SETTINGS" => s.icon_new_settings,
+                    "SNIPPET" | "TODO" => s.icon_new_content,
                     _ => s.icon_new_all,
                 };
 
