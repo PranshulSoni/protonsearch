@@ -169,6 +169,8 @@ struct State {
     
     active_filter: FilterType,
     hovered_filter: Option<FilterType>,
+    filter_counts: [usize; 7],
+    filter_scroll_x: i32,
     text_selected: bool,
     cursor_visible: bool,
     scroll_offset: usize,
@@ -584,6 +586,8 @@ unsafe fn run() {
         icon_new_tab,
         active_filter: FilterType::All,
         hovered_filter: None,
+        filter_counts: [0; 7],
+        filter_scroll_x: 0,
         text_selected: false,
         cursor_visible: true,
         scroll_offset: 0,
@@ -1104,27 +1108,10 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             if !sp.is_null() {
                 let s = &mut *sp;
                 if query_id == s.current_query_id {
-                    let mut filtered = if s.query.is_empty() {
-                        results
-                    } else if s.has_prefix() {
-                        results
-                    } else {
-                        mock_search_results()
-                    };
+                    s.filter_counts = filter_counts_for_results(&results);
+                    let mut filtered = results;
                     if !matches!(s.active_filter, FilterType::All) {
-                        filtered.retain(|r| {
-                            let src = r.entry.source.as_str();
-                            let cmd = r.entry.launch_command.as_str();
-                            match s.active_filter {
-                                FilterType::Files => src == "FILE" || src == "FOLDER" || src == "PDF" || src == "DOCX",
-                                FilterType::Content => src == "CONTENT" || src == "FILE_CONTENT" || src == "OCR",
-                                FilterType::Images => src == "IMAGE" || src == "OCR",
-                                FilterType::Code => src == "CODE" || src == "COMMIT" || src == "TODO",
-                                FilterType::Settings => src == "Settings" || cmd.starts_with("ms-settings:") || cmd.starts_with("control") || cmd.contains(".cpl") || cmd.ends_with(".msc"),
-                                FilterType::Commands => src == "SYSTEM" || src == "WINDOW" || src == "app" || src.eq_ignore_ascii_case("app"),
-                                _ => true,
-                            }
-                        });
+                        filtered.retain(|r| result_matches_filter(r, s.active_filter));
                     }
                     s.results = filtered;
                     s.result_reasons = compute_result_reasons(&s.results);
@@ -2239,6 +2226,24 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
                 let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
                 let _ = InvalidateRect(hwnd, None, FALSE);
+            }
+            if !s.query.is_empty() && !s.has_prefix() {
+                let mut pt = POINT::default();
+                let _ = GetCursorPos(&mut pt);
+                let _ = ScreenToClient(hwnd, &mut pt);
+                let win_h = s.win_h();
+                let y_start = s.cy - win_h / 2;
+                let list_y = y_start + SEARCH_H + 1;
+                if pt.y >= list_y + 8 && pt.y < list_y + 40 {
+                    let delta = (wp.0 >> 16) as i16;
+                    if delta < 0 {
+                        s.filter_scroll_x = (s.filter_scroll_x + 88).min(480);
+                    } else {
+                        s.filter_scroll_x = (s.filter_scroll_x - 88).max(0);
+                    }
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                    return LRESULT(0);
+                }
             }
             if !s.results.is_empty() {
                 let delta = (wp.0 >> 16) as i16;
@@ -6185,17 +6190,18 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         } else {
             // Search state layout: Filter Row
             let filters = [
-                ("All", 24, FilterType::All, s.icon_new_all),
-                ("Files", 8, FilterType::Files, s.icon_new_files),
-                ("Content", 9, FilterType::Content, s.icon_new_content),
-                ("Images", 3, FilterType::Images, s.icon_new_images),
-                ("Code", 4, FilterType::Code, s.icon_new_code),
-                ("Settings", 1, FilterType::Settings, s.icon_new_settings),
-                ("Commands", 2, FilterType::Commands, s.icon_new_commands),
+                ("All", FilterType::All, s.icon_new_all),
+                ("Files", FilterType::Files, s.icon_new_files),
+                ("Content", FilterType::Content, s.icon_new_content),
+                ("Images", FilterType::Images, s.icon_new_images),
+                ("Code", FilterType::Code, s.icon_new_code),
+                ("Settings", FilterType::Settings, s.icon_new_settings),
+                ("Commands", FilterType::Commands, s.icon_new_commands),
             ];
             
-            let mut fx = x + PAD_L;
-            for &(label, count, ftype, icon) in filters.iter() {
+            let mut fx = x + PAD_L - s.filter_scroll_x;
+            for &(label, ftype, icon) in filters.iter() {
+                let count = s.filter_counts[filter_index(ftype)];
                 let full_label = format!("{} {}", label, count);
                 let mut lw: Vec<u16> = full_label.encode_utf16().collect();
                 
@@ -6794,83 +6800,70 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
     }).collect()
 }
 
-fn mock_search_results() -> Vec<crate::search::SearchResult> {
-    let items = [
-        (
-            "search_pipeline.py",
-            "src/search/pipeline/search_pipeline.py · Ln 42",
-            "def build_index_pipeline(config):",
-            "CODE",
-            "search_pipeline.py"
-        ),
-        (
-            "System Design Notes.pdf",
-            "Docs/Architecture · Page 24",
-            "The indexing pipeline extracts text from PDFs and images...",
-            "PDF",
-            "System Design Notes.pdf"
-        ),
-        (
-            "whiteboard-architecture.png",
-            "Notes/Whiteboards · PNG",
-            "OCR: Search Service -> Ingestion -> Index -> Query API",
-            "OCR",
-            "whiteboard-architecture.png"
-        ),
-        (
-            "README.md",
-            "Projects/search-engine · Markdown",
-            "Run the indexing pipeline before starting local search...",
-            "FILE",
-            "README.md"
-        ),
-        (
-            "Indexing Settings",
-            "Settings",
-            "Configure watched folders, OCR, and content extraction",
-            "Settings",
-            "ms-settings:"
-        ),
-        (
-            "Rebuild Index",
-            "Command",
-            "Refresh searchable file content and OCR cache",
-            "SYSTEM",
-            "rebuild-index"
-        ),
-    ];
+fn filter_index(ftype: FilterType) -> usize {
+    match ftype {
+        FilterType::All => 0,
+        FilterType::Files => 1,
+        FilterType::Content => 2,
+        FilterType::Images => 3,
+        FilterType::Code => 4,
+        FilterType::Settings => 5,
+        FilterType::Commands => 6,
+    }
+}
 
-    items.into_iter().enumerate().map(|(i, (name, path, desc, src, cmd))| crate::search::SearchResult {
-        score: 1.0 - (i as f32 * 0.01),
-        entry: crate::search::CatalogEntry {
-            id: format!("search_{}", i),
-            control_name: name.to_string(),
-            breadcrumb_path: path.to_string(),
-            launch_command: cmd.to_string(),
-            source: src.to_string(),
-            description: desc.to_string(),
-            synonyms: "".to_string(),
+fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
+    let src = r.entry.source.as_str();
+    let cmd = r.entry.launch_command.as_str();
+    match ftype {
+        FilterType::All => true,
+        FilterType::Files => src == "FILE" || src == "FOLDER" || src == "RECENT" || src == "PDF" || src == "DOCX",
+        FilterType::Content => src == "CONTENT" || src == "FILE_CONTENT" || src == "PDF" || src == "OCR",
+        FilterType::Images => src == "IMAGE" || src == "OCR" || cmd.starts_with("copy_image:"),
+        FilterType::Code => src == "CODE" || src == "COMMIT" || src == "TODO" || src == "SNIPPET",
+        FilterType::Settings => src == "Settings" || cmd.starts_with("ms-settings:") || cmd.starts_with("control") || cmd.contains(".cpl") || cmd.ends_with(".msc"),
+        FilterType::Commands => src == "SYSTEM" || src == "WINDOW" || src == "ACTION" || src == "AI" || src.eq_ignore_ascii_case("app"),
+    }
+}
+
+fn filter_counts_for_results(results: &[SearchResult]) -> [usize; 7] {
+    let mut counts = [0; 7];
+    counts[0] = results.len();
+    for r in results {
+        for ftype in [
+            FilterType::Files,
+            FilterType::Content,
+            FilterType::Images,
+            FilterType::Code,
+            FilterType::Settings,
+            FilterType::Commands,
+        ] {
+            if result_matches_filter(r, ftype) {
+                counts[filter_index(ftype)] += 1;
+            }
         }
-    }).collect()
+    }
+    counts
 }
 
 fn filter_pill_rects(s: &State, x_start: i32, list_y: i32) -> Vec<(FilterType, RECT)> {
     let filters = [
-        ("All", 24, FilterType::All, !s.icon_new_all.0.is_null()),
-        ("Files", 8, FilterType::Files, !s.icon_new_files.0.is_null()),
-        ("Content", 9, FilterType::Content, !s.icon_new_content.0.is_null()),
-        ("Images", 3, FilterType::Images, !s.icon_new_images.0.is_null()),
-        ("Code", 4, FilterType::Code, !s.icon_new_code.0.is_null()),
-        ("Settings", 1, FilterType::Settings, !s.icon_new_settings.0.is_null()),
-        ("Commands", 2, FilterType::Commands, !s.icon_new_commands.0.is_null()),
+        ("All", FilterType::All, !s.icon_new_all.0.is_null()),
+        ("Files", FilterType::Files, !s.icon_new_files.0.is_null()),
+        ("Content", FilterType::Content, !s.icon_new_content.0.is_null()),
+        ("Images", FilterType::Images, !s.icon_new_images.0.is_null()),
+        ("Code", FilterType::Code, !s.icon_new_code.0.is_null()),
+        ("Settings", FilterType::Settings, !s.icon_new_settings.0.is_null()),
+        ("Commands", FilterType::Commands, !s.icon_new_commands.0.is_null()),
     ];
     
     let mut res = Vec::new();
     unsafe {
         let hdc = GetDC(HWND(std::ptr::null_mut()));
         let old_font = SelectObject(hdc, s.font_c);
-        let mut fx = x_start + PAD_L;
-        for &(label, count, ftype, has_icon) in &filters {
+        let mut fx = x_start + PAD_L - s.filter_scroll_x;
+        for &(label, ftype, has_icon) in &filters {
+            let count = s.filter_counts[filter_index(ftype)];
             let full_label = format!("{} {}", label, count);
             let mut lw: Vec<u16> = full_label.encode_utf16().collect();
             let mut sz_lbl = SIZE::default();
@@ -8162,6 +8155,35 @@ mod tests {
         assert_eq!(source_section_label("ACTION"), "COMMANDS");
         assert_eq!(source_section_label("MEMORY"), "MEMORY");
         assert_eq!(source_section_label("unknown"), "RESULTS");
+    }
+
+    #[test]
+    fn filter_counts_use_actual_search_results() {
+        let mk = |source: &str, cmd: &str| SearchResult {
+            score: 1.0,
+            entry: search::CatalogEntry {
+                id: format!("{}.{}", source, cmd),
+                control_name: source.to_string(),
+                breadcrumb_path: String::new(),
+                launch_command: cmd.to_string(),
+                source: source.to_string(),
+                description: String::new(),
+                synonyms: String::new(),
+            },
+        };
+        let results = vec![
+            mk("FILE", "C:\\readme.md"),
+            mk("CODE", "C:\\main.rs"),
+            mk("Settings", "ms-settings:display"),
+            mk("OCR", "C:\\screen.png"),
+        ];
+        let counts = filter_counts_for_results(&results);
+        assert_eq!(counts[filter_index(FilterType::All)], 4);
+        assert_eq!(counts[filter_index(FilterType::Files)], 1);
+        assert_eq!(counts[filter_index(FilterType::Code)], 1);
+        assert_eq!(counts[filter_index(FilterType::Settings)], 1);
+        assert_eq!(counts[filter_index(FilterType::Images)], 1);
+        assert_eq!(counts[filter_index(FilterType::Content)], 1);
     }
 
     #[test]
