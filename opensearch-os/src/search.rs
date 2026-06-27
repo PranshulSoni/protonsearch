@@ -147,8 +147,12 @@ fn lean_allowed(r: &SearchResult) -> bool {
         return true;
     }
 
-    // Allowed scope-folders so the user can still navigate into these categories.
     if s == "FOLDER" {
+        // Real directory results carry a filesystem path — keep them (folder search).
+        if cmd.contains('\\') || cmd.contains('/') {
+            return true;
+        }
+        // Otherwise it's a bare "scope:" entry-point; keep only the allowed categories.
         return matches!(
             cmd,
             "file:" | "code:" | "img:" | "image:" | "screenshots:"
@@ -4966,6 +4970,7 @@ mod tests {
             ("X", "ms-settings:display"), ("X", "control.exe /name X"), ("X", "appwiz.cpl"),
             ("AI", "agent:1\u{1f}hi"), ("AI", "openagent:1\u{1f}n"), ("AI", "aichat:5"),
             ("FOLDER", "commits:"), ("FOLDER", "bookmarks:"), ("FOLDER", "agents:"),
+            ("FOLDER", "C:\\Users\\me\\Documents"), ("FOLDER", "/home/x/docs"),
         ] {
             assert!(lean_allowed(&mk(s, c)), "should keep {s} {c}");
         }
