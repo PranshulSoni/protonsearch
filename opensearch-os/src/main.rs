@@ -506,27 +506,27 @@ unsafe fn run() {
     let icon_clipboard = load_icon_from_dll("shell32.dll", 260, 32);
     let icon_memory = load_icon_from_dll("shell32.dll", 238, 32);
 
-    let icon_new_agent_history = load_icon_from_memory(include_bytes!("../../icons/agent-history.ico"), 32);
-    let icon_new_all = load_icon_from_memory(include_bytes!("../../icons/all.ico"), 32);
-    let icon_new_browser_bookmarks = load_icon_from_memory(include_bytes!("../../icons/browser-bookmarks.ico"), 32);
-    let icon_new_browser_history = load_icon_from_memory(include_bytes!("../../icons/browser-history.ico"), 32);
-    let icon_new_clipboard_history = load_icon_from_memory(include_bytes!("../../icons/clipboard-history.ico"), 32);
-    let icon_new_code = load_icon_from_memory(include_bytes!("../../icons/code.ico"), 32);
-    let icon_new_commands = load_icon_from_memory(include_bytes!("../../icons/commands.ico"), 32);
-    let icon_new_content = load_icon_from_memory(include_bytes!("../../icons/content.ico"), 32);
-    let icon_new_enter = load_icon_from_memory(include_bytes!("../../icons/enter.ico"), 32);
-    let icon_new_esc = load_icon_from_memory(include_bytes!("../../icons/esc.ico"), 32);
+    let icon_new_agent_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/agent-history.png"));
+    let icon_new_all = load_png_to_hicon(include_bytes!("../../launcher_source_icons/all.png"));
+    let icon_new_browser_bookmarks = load_png_to_hicon(include_bytes!("../../launcher_source_icons/browser-bookmarks.png"));
+    let icon_new_browser_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/browser-history.png"));
+    let icon_new_clipboard_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/clipboard-history.png"));
+    let icon_new_code = load_png_to_hicon(include_bytes!("../../launcher_source_icons/code.png"));
+    let icon_new_commands = load_png_to_hicon(include_bytes!("../../launcher_source_icons/commands.png"));
+    let icon_new_content = load_png_to_hicon(include_bytes!("../../launcher_source_icons/content.png"));
+    let icon_new_enter = load_png_to_hicon(include_bytes!("../../launcher_source_icons/enter.png"));
+    let icon_new_esc = load_png_to_hicon(include_bytes!("../../launcher_source_icons/esc.png"));
     let icon_new_files = load_png_to_hicon(include_bytes!("../../launcher_source_icons/files.png"));
     let icon_new_git_commits = load_png_to_hicon(include_bytes!("../../launcher_source_icons/git-commits.png"));
     let icon_new_images = load_png_to_hicon(include_bytes!("../../launcher_source_icons/images.png"));
     let icon_new_local_files = load_png_to_hicon(include_bytes!("../../launcher_source_icons/local-files.png"));
     let icon_new_mic = load_png_to_hicon(include_bytes!("../../launcher_source_icons/mic.png"));
-    let icon_new_navigate = load_icon_from_memory(include_bytes!("../../icons/navigate.ico"), 32);
-    let icon_new_search_screenshots = load_icon_from_memory(include_bytes!("../../icons/search-screenshots.ico"), 32);
-    let icon_new_search = load_icon_from_memory(include_bytes!("../../icons/search.ico"), 24);
-    let icon_new_settings = load_icon_from_memory(include_bytes!("../../icons/settings.ico"), 32);
-    let icon_new_source_code = load_icon_from_memory(include_bytes!("../../icons/source-code.ico"), 32);
-    let icon_new_tab = load_icon_from_memory(include_bytes!("../../icons/tab.ico"), 32);
+    let icon_new_navigate = load_png_to_hicon(include_bytes!("../../launcher_source_icons/navigate.png"));
+    let icon_new_search_screenshots = load_png_to_hicon(include_bytes!("../../launcher_source_icons/search-screenshots.png"));
+    let icon_new_search = load_png_to_hicon(include_bytes!("../../launcher_source_icons/search.png"));
+    let icon_new_settings = load_png_to_hicon(include_bytes!("../../launcher_source_icons/settings.png"));
+    let icon_new_source_code = load_png_to_hicon(include_bytes!("../../launcher_source_icons/source-code.png"));
+    let icon_new_tab = load_png_to_hicon(include_bytes!("../../launcher_source_icons/tab.png"));
 
     let (icon_tx, icon_rx) = std::sync::mpsc::channel::<IconRequest>();
 
