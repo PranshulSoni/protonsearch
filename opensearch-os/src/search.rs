@@ -1,8 +1,4 @@
 use anyhow::{bail, Result};
-use ort::{
-    session::{builder::GraphOptimizationLevel, Session},
-    value::TensorRef,
-};
 use rusqlite::{params, Connection};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -225,18 +221,16 @@ pub struct SearchEngine {
     meta_index: Vec<CatalogEntryIndex>,
     n: usize,
     dim: usize,
-    session: Session,
     tokenizer: Tokenizer,
     anchor_categories: Vec<AnchorCategory>,
     apps: Vec<AppInfo>,
     recent_files: Vec<RecentFileInfo>,
     _db_path: std::path::PathBuf,
     conn: Connection,
-    query_cache: std::collections::HashMap<String, Vec<f32>>,
 }
 
 impl SearchEngine {
-    pub fn new(model_path: &std::path::Path, db_path: std::path::PathBuf) -> Result<Self> {
+    pub fn new(db_path: std::path::PathBuf) -> Result<Self> {
         if CATALOG.len() < 8 {
             bail!("catalog.bin too small");
         }
@@ -267,15 +261,6 @@ impl SearchEngine {
                 synonyms: m.synonyms,
             });
         }
-
-        let session = Session::builder()
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .with_optimization_level(GraphOptimizationLevel::Level3)
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .with_intra_threads(1)
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .commit_from_file(model_path)
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         let tokenizer =
             Tokenizer::from_bytes(TOKENIZER).map_err(|e| anyhow::anyhow!("tokenizer: {e}"))?;
@@ -476,24 +461,13 @@ impl SearchEngine {
             meta_index,
             n,
             dim,
-            session,
             tokenizer,
-            anchor_categories: vec![],
+            anchor_categories,
             apps: vec![],
             recent_files: vec![],
             _db_path: db_path,
             conn,
-            query_cache: std::collections::HashMap::new(),
         };
-        for cat in &mut anchor_categories {
-            for phrase in cat.phrases {
-                let phrase_with_prefix = format!("query: {}", phrase);
-                if let Ok(v) = engine.embed(&phrase_with_prefix) {
-                    cat.vecs.push(v);
-                }
-            }
-        }
-        engine.anchor_categories = anchor_categories;
         engine.apps = scan_apps();
         engine.recent_files = scan_recent_files();
 
@@ -4052,25 +4026,13 @@ impl SearchEngine {
             .collect();
         let q_char_count = q_lower.chars().count();
 
-        // BAAI models require queries to be prefixed with "query: "
-        let query_with_prefix = format!("query: {}", q_lower);
-        let qvec = match self.embed(&query_with_prefix) {
-            Ok(v) => v,
-            Err(_) => return vec![],
-        };
-
+        // ponytail: embeddings removed — settings/catalog ranked by lexical signals only
+        // (name/synonym/breadcrumb/description/fuzzy). Faster, no model, no per-query ONNX.
         let mut scores: Vec<(usize, f32)> = (0..self.n)
             .map(|i| {
                 let entry_idx = &self.meta_index[i];
 
-                // 1. Semantic score
-                let sem_score: f32 = self.vecs[i * self.dim..][..self.dim]
-                    .iter()
-                    .zip(&qvec)
-                    .map(|(a, b)| a * b)
-                    .sum();
-
-                // 2. Lexical score
+                // Lexical score
                 let mut lex_score = 0.0f32;
                 let name_lower = entry_idx.name.as_str();
 
@@ -4175,18 +4137,19 @@ impl SearchEngine {
                     lex_score += 0.25;
                 }
 
-                (i, sem_score + lex_score * 0.25)
+                (i, lex_score)
             })
             .collect();
 
         scores.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let mut conv_results = self.get_conversational_results(&qvec);
+        // ponytail: conversational/anchor matching was embedding-based — gone now.
+        let mut conv_results: Vec<SearchResult> = Vec::new();
 
         let mut final_results = get_live_results(q);
         let mut vec_results: Vec<SearchResult> = scores
             .into_iter()
-            .filter(|(_, s)| *s > 0.62)
+            .filter(|(_, s)| *s > 0.35)
             .map(|(i, score)| SearchResult {
                 entry: self.meta[i].clone(),
                 score,
@@ -4566,42 +4529,6 @@ impl SearchEngine {
         final_results
     }
 
-    fn embed(&mut self, text: &str) -> Result<Vec<f32>> {
-        if let Some(cached) = self.query_cache.get(text) {
-            return Ok(cached.clone());
-        }
-        let enc = self
-            .tokenizer
-            .encode(text, true)
-            .map_err(|e| anyhow::anyhow!("encode: {e}"))?;
-
-        let ids: Vec<i64> = enc.get_ids().iter().map(|&x| x as i64).collect();
-        let mask: Vec<i64> = enc.get_attention_mask().iter().map(|&x| x as i64).collect();
-        let types: Vec<i64> = enc.get_type_ids().iter().map(|&x| x as i64).collect();
-        let seq = ids.len();
-
-        let input_ids_t = TensorRef::<i64>::from_array_view(([1usize, seq], ids.as_slice()))
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
-        let attn_mask_t = TensorRef::<i64>::from_array_view(([1usize, seq], mask.as_slice()))
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
-        let type_ids_t = TensorRef::<i64>::from_array_view(([1usize, seq], types.as_slice()))
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
-
-        let outputs = self.session.run(ort::inputs![
-            "input_ids"      => input_ids_t,
-            "attention_mask" => attn_mask_t,
-            "token_type_ids" => type_ids_t,
-        ])?;
-
-        let (_, hidden) = outputs["last_hidden_state"].try_extract_tensor::<f32>()?;
-
-        let result = mean_pool_norm(hidden, &mask, seq, self.dim);
-        if self.query_cache.len() > 100 {
-            self.query_cache.clear();
-        }
-        self.query_cache.insert(text.to_string(), result.clone());
-        Ok(result)
-    }
 
     fn get_conversational_results(&self, qvec: &[f32]) -> Vec<SearchResult> {
         if DISABLE_LIVE_RESULTS.load(Ordering::Relaxed) {
@@ -5153,7 +5080,8 @@ mod tests {
                 .expect("failed to get grandparent")
                 .join("model_int8.onnx");
         }
-        let mut engine = SearchEngine::new(&model_path, std::path::PathBuf::from("test_db.db"))
+        let _ = &model_path;
+        let mut engine = SearchEngine::new(std::path::PathBuf::from("test_db.db"))
             .expect("Failed to initialize engine");
 
         let queries = vec![
@@ -5415,8 +5343,8 @@ mod tests {
                 .expect("failed to get grandparent")
                 .join("model_int8.onnx");
         }
-        let mut engine =
-            SearchEngine::new(&model_path, db_path).expect("Failed to initialize engine");
+        let _ = &model_path;
+        let mut engine = SearchEngine::new(db_path).expect("Failed to initialize engine");
 
         println!("--- DIAGNOSTIC SEARCH TEST ---");
         let results = engine.search("resume", 10);

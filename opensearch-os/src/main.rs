@@ -661,14 +661,8 @@ unsafe fn run() {
             }
         });
 
-        let model_path = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.join("model_int8.onnx")));
         let db_path_for_engine = db_path.clone();
-        let result = match model_path {
-            Some(p) => SearchEngine::new(&p, db_path_for_engine),
-            None => Err(anyhow::anyhow!("cannot locate exe directory")),
-        };
+        let result = SearchEngine::new(db_path_for_engine);
         let hwnd_bg = HWND(hwnd_usize as *mut std::ffi::c_void);
         unsafe {
             match result {
