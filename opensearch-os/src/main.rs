@@ -374,7 +374,7 @@ impl State {
     }
 
     fn shows_guidance_footer(&self) -> bool {
-        self.query.to_lowercase().starts_with("bookmarks:")
+        false
     }
     
     fn win_h(&self) -> i32 {
@@ -393,23 +393,60 @@ impl State {
         let n = self.results.len().min(VISIBLE_RESULTS) as i32;
         if n == 0 {
             SEARCH_H
+        } else if self.has_prefix() {
+            let mut headers_count = 0;
+            for idx in 0..(n as usize) {
+                let res_idx = self.scroll_offset + idx;
+                if res_idx >= self.results.len() {
+                    break;
+                }
+                let starts_section = res_idx == 0
+                    || source_section_label(&self.results[res_idx - 1].entry.source)
+                        != source_section_label(&self.results[res_idx].entry.source);
+                if starts_section {
+                    headers_count += 1;
+                }
+            }
+            SEARCH_H + 1 + n * RESULT_H + headers_count * 24 + 8
         } else {
-            let offset = if self.has_prefix() { 1 } else { 80 };
-            let footer = if self.shows_guidance_footer() { 40 } else { 8 };
+            let offset = 80;
+            let footer = 8;
             SEARCH_H + offset + n * RESULT_H + footer
         }
     }
-    fn result_rect(&self, i: usize) -> RECT {
+    fn result_row_y(&self, i: usize) -> i32 {
         let end_h = self.win_h();
         let end_y = self.cy - end_h / 2;
-        let offset = if self.query.is_empty() {
-            37
-        } else if self.has_prefix() {
-            1
-        } else {
-            81
-        };
-        let y = end_y + SEARCH_H + offset + i as i32 * RESULT_H;
+        let mut cur_y = end_y + SEARCH_H + 1;
+        
+        if self.query.is_empty() {
+            cur_y += 48; // filter bar
+            cur_y += 32; // "Results" label
+            return cur_y + i as i32 * RESULT_H;
+        }
+        
+        if self.has_prefix() {
+            let mut headers_count = 0;
+            for idx in 0..=i {
+                let res_idx = self.scroll_offset + idx;
+                if res_idx >= self.results.len() {
+                    break;
+                }
+                let starts_section = res_idx == 0
+                    || source_section_label(&self.results[res_idx - 1].entry.source)
+                        != source_section_label(&self.results[res_idx].entry.source);
+                if starts_section {
+                    headers_count += 1;
+                }
+            }
+            return cur_y + headers_count * 24 + i as i32 * RESULT_H;
+        }
+        
+        cur_y += 80; // "Best matches first" label
+        cur_y + i as i32 * RESULT_H
+    }
+    fn result_rect(&self, i: usize) -> RECT {
+        let y = self.result_row_y(i);
         RECT {
             left: 0,
             top: y,
@@ -6797,30 +6834,10 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 let _ = DrawTextW(mdc, &mut cat, &mut rc_cat, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
             } else if s.has_prefix() {
-                // ── Old UI results layout with cards and headers ───────────────────
-                let ry = list_y + i as i32 * RESULT_H;
+                // ── Flat results layout with headers ───────────────────
                 let starts_section = res_idx == 0
                     || source_section_label(&s.results[res_idx - 1].entry.source)
                         != source_section_label(&res.entry.source);
-                let row_card_y = if starts_section { ry + 20 } else { ry + 5 };
-                let row_card_h = if starts_section {
-                    RESULT_H - 24
-                } else {
-                    RESULT_H - 10
-                };
-
-                let is_selected = res_idx == s.selected;
-                let is_hovered = Some(res_idx) == s.hovered_item;
-                let is_checked = selected_clip_ids_contain(&s.selected_clip_ids, &res.entry.id);
-
-                if is_selected {
-                    fill_rounded(mdc, x + 8, row_card_y, list_w - 16, row_card_h, 4, palette.bg_sel);
-                } else if is_hovered {
-                    fill_rounded(mdc, x + 8, row_card_y, list_w - 16, row_card_h, 4, palette.bg_hover);
-                } else if is_checked {
-                    fill_rounded(mdc, x + 8, row_card_y, list_w - 16, row_card_h, 4, palette.bg_hover);
-                }
-                
                 if starts_section {
                     SelectObject(mdc, s.font_b);
                     SetTextColor(mdc, palette.clr_gray);
@@ -6833,9 +6850,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     let mut label: Vec<u16> = section.encode_utf16().collect();
                     let mut label_rect = RECT {
                         left: x + PAD_L,
-                        top: ry + 3,
+                        top: list_y + 4,
                         right: x + list_w / 2,
-                        bottom: ry + 18,
+                        bottom: list_y + 20,
                     };
                     let _ = DrawTextW(mdc, &mut label, &mut label_rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
                     
@@ -6847,24 +6864,41 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     let mut count: Vec<u16> = count_text.encode_utf16().collect();
                     let mut count_rect = RECT {
                         left: x + list_w / 2,
-                        top: ry + 3,
+                        top: list_y + 4,
                         right: x + list_w - PAD_L,
-                        bottom: ry + 18,
+                        bottom: list_y + 20,
                     };
                     let _ = DrawTextW(mdc, &mut count, &mut count_rect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+                    // Separator line
+                    let sep_y = list_y + 23;
+                    fill(mdc, x + PAD_L, sep_y, list_w - 2 * PAD_L, 1, palette.clr_div);
+
+                    list_y += 24;
                 }
 
-                let cy = row_card_y + (row_card_h - 38) / 2;
+                let ry = list_y;
+                let is_selected = res_idx == s.selected;
+                let is_hovered = Some(res_idx) == s.hovered_item;
+                let is_checked = selected_clip_ids_contain(&s.selected_clip_ids, &res.entry.id);
 
-                let icon_y = row_card_y + (row_card_h - 28) / 2;
+                if is_selected {
+                    fill_rounded(mdc, x + 8, ry + 2, list_w - 16, RESULT_H - 4, 4, palette.bg_sel);
+                } else if is_hovered {
+                    fill_rounded(mdc, x + 8, ry + 2, list_w - 16, RESULT_H - 4, 4, palette.bg_hover);
+                } else if is_checked {
+                    fill_rounded(mdc, x + 8, ry + 2, list_w - 16, RESULT_H - 4, 4, palette.bg_hover);
+                }
+
+                let icon_y = ry + (RESULT_H - 28) / 2;
                 let mut drew_thumbnail = false;
                 if let Some(path) = image_path_for_result(res) {
                     let mut cache = s.clipboard_thumbnails.borrow_mut();
                     if let Some(&hbitmap) = cache.get(path) {
-                        draw_cached_bmp(mdc, x + PAD_L, icon_y - 2, 28, 28, hbitmap);
+                        draw_cached_bmp(mdc, x + PAD_L, icon_y, 28, 28, hbitmap);
                         drew_thumbnail = true;
                     } else if let Some(hbitmap) = load_shell_thumbnail(path, 256) {
-                        draw_cached_bmp(mdc, x + PAD_L, icon_y - 2, 28, 28, hbitmap);
+                        draw_cached_bmp(mdc, x + PAD_L, icon_y, 28, 28, hbitmap);
                         cache.insert(path.to_string(), hbitmap);
                         drew_thumbnail = true;
                     }
@@ -6942,7 +6976,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 };
                 let mut name: Vec<u16> = display_name.encode_utf16().collect();
                 let badge_left = x + list_w - PAD_L - BADGE_W;
-                let mut r = RECT { left: tx, top: cy, right: badge_left - 14, bottom: cy + 22 };
+                let mut r = RECT { left: tx, top: ry + 8, right: badge_left - 14, bottom: ry + 26 };
                 let _ = DrawTextW(mdc, &mut name, &mut r, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
                 let reason = s.result_reasons.get(&res.entry.launch_command).filter(|r| !r.is_empty());
@@ -6951,18 +6985,19 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 SelectObject(mdc, s.font_c);
                 SetTextColor(mdc, if is_selected { palette.clr_gray_sel } else { palette.clr_gray });
                 let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
-                let mut r2 = RECT { left: tx, top: cy + 24, right: badge_left - 14 - reason_slot, bottom: cy + 40 };
+                let mut r2 = RECT { left: tx, top: ry + 28, right: badge_left - 14 - reason_slot, bottom: ry + 44 };
                 let _ = DrawTextW(mdc, &mut crumb, &mut r2, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
                 if let Some(reason) = reason {
                     SetTextColor(mdc, palette.clr_ph);
                     let mut rtxt: Vec<u16> = reason.encode_utf16().collect();
-                    let mut rr = RECT { left: badge_left - 14 - reason_slot, top: cy + 24, right: badge_left - 14, bottom: cy + 40 };
+                    let mut rr = RECT { left: badge_left - 14 - reason_slot, top: ry + 28, right: badge_left - 14, bottom: ry + 44 };
                     let _ = DrawTextW(mdc, &mut rtxt, &mut rr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
                 }
 
                 let badge_source = if res.entry.id.starts_with("clip.pinned.") { "pinned_clip" } else { &res.entry.source };
-                badge(mdc, s, badge_source, badge_left, row_card_y + (row_card_h - BADGE_H) / 2);
+                badge(mdc, s, badge_source, badge_left, ry + (RESULT_H - BADGE_H) / 2);
+                list_y += RESULT_H;
 
             } else {
                 // ── Search Page (Image 4) flat list items ──────────────────────────
