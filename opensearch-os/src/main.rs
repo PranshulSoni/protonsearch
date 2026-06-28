@@ -23,6 +23,11 @@ use windows::{
     },
 };
 
+#[link(name = "kernel32")]
+extern "system" {
+    fn GlobalFree(memory: HGLOBAL) -> HGLOBAL;
+}
+
 // ── Layout ────────────────────────────────────────────────────────────────────
 const WIN_W: i32 = 720;
 const SEARCH_H: i32 = 64;
@@ -7619,34 +7624,65 @@ unsafe fn paste_into_window(target: HWND) {
 }
 
 unsafe fn copy_image_to_clipboard(hwnd: HWND, file_path: &str) -> bool {
-    use windows::core::PCWSTR;
-    use windows::Win32::Foundation::HANDLE;
     use windows::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
     };
-    use windows::Win32::UI::WindowsAndMessaging::{
-        LoadImageW, IMAGE_BITMAP, LR_CREATEDIBSECTION, LR_LOADFROMFILE,
+    use windows::Win32::System::Memory::{
+        GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE,
     };
 
-    let wide_path: Vec<u16> = file_path.encode_utf16().chain(std::iter::once(0)).collect();
-    let h_img = LoadImageW(
-        None,
-        PCWSTR(wide_path.as_ptr()),
-        IMAGE_BITMAP,
-        0,
-        0,
-        LR_LOADFROMFILE | LR_CREATEDIBSECTION,
-    );
+    let dib = match image::open(file_path).ok().and_then(image_to_dib_bytes) {
+        Some(dib) => dib,
+        None => return false,
+    };
+    let h_mem = match GlobalAlloc(GMEM_MOVEABLE, dib.len()) {
+        Ok(handle) => handle,
+        Err(_) => return false,
+    };
+    let ptr = GlobalLock(h_mem);
+    if ptr.is_null() {
+        let _ = GlobalFree(h_mem);
+        return false;
+    }
+    std::ptr::copy_nonoverlapping(dib.as_ptr(), ptr as *mut u8, dib.len());
+    let _ = GlobalUnlock(h_mem);
 
-    if let Ok(hbitmap) = h_img {
-        if OpenClipboard(hwnd).is_ok() {
-            let _ = EmptyClipboard();
-            let ok = SetClipboardData(2, HANDLE(hbitmap.0)).is_ok();
-            let _ = CloseClipboard();
-            return ok;
+    if OpenClipboard(hwnd).is_err() {
+        let _ = GlobalFree(h_mem);
+        return false;
+    }
+    let _ = EmptyClipboard();
+    let copied = SetClipboardData(8, HANDLE(h_mem.0)).is_ok();
+    let _ = CloseClipboard();
+    if !copied {
+        let _ = GlobalFree(h_mem);
+    }
+    copied
+}
+
+fn image_to_dib_bytes(image: image::DynamicImage) -> Option<Vec<u8>> {
+    let rgba = image.into_rgba8();
+    let width = rgba.width();
+    let height = rgba.height();
+    let pixel_bytes = width.checked_mul(height)?.checked_mul(4)? as usize;
+    let mut dib = Vec::with_capacity(40 + pixel_bytes);
+    dib.extend_from_slice(&40u32.to_le_bytes());
+    dib.extend_from_slice(&(width as i32).to_le_bytes());
+    dib.extend_from_slice(&(height as i32).to_le_bytes());
+    dib.extend_from_slice(&1u16.to_le_bytes());
+    dib.extend_from_slice(&32u16.to_le_bytes());
+    dib.extend_from_slice(&0u32.to_le_bytes());
+    dib.extend_from_slice(&(pixel_bytes as u32).to_le_bytes());
+    dib.extend_from_slice(&0i32.to_le_bytes());
+    dib.extend_from_slice(&0i32.to_le_bytes());
+    dib.extend_from_slice(&0u32.to_le_bytes());
+    dib.extend_from_slice(&0u32.to_le_bytes());
+    for row in rgba.rows().rev() {
+        for pixel in row {
+            dib.extend_from_slice(&[pixel[2], pixel[1], pixel[0], 255]);
         }
     }
-    false
+    Some(dib)
 }
 
 unsafe fn paste_clipboard_into_chat(hwnd: HWND, s: &mut State) {
@@ -8384,6 +8420,19 @@ mod tests {
             Some("C:\\Pictures\\shot.jpg")
         );
         assert_eq!(image_path_for_result(&result("C:\\notes.txt")), None);
+    }
+
+    #[test]
+    fn image_clipboard_dib_is_bottom_up_bgra() {
+        let mut image = image::RgbaImage::new(1, 2);
+        image.put_pixel(0, 0, image::Rgba([255, 0, 0, 128]));
+        image.put_pixel(0, 1, image::Rgba([0, 0, 255, 128]));
+        let dib = image_to_dib_bytes(image::DynamicImage::ImageRgba8(image)).unwrap();
+        assert_eq!(u32::from_le_bytes(dib[0..4].try_into().unwrap()), 40);
+        assert_eq!(i32::from_le_bytes(dib[4..8].try_into().unwrap()), 1);
+        assert_eq!(i32::from_le_bytes(dib[8..12].try_into().unwrap()), 2);
+        assert_eq!(&dib[40..44], &[255, 0, 0, 255]);
+        assert_eq!(&dib[44..48], &[0, 0, 255, 255]);
     }
 
     #[test]
