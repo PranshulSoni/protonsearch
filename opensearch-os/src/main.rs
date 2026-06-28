@@ -6763,11 +6763,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 
                 if ftype == s.active_filter {
                     fill_rounded(mdc, fx, list_y + 8, fw, 32, 16, s.theme.palette().clr_accent);
-                    fill_rounded(mdc, fx + 1, list_y + 9, fw - 2, 30, 15, COLORREF(0x00_2D_1F_18)); // dark blue bg
+                    fill_rounded(mdc, fx + 1, list_y + 9, fw - 2, 30, 15, s.theme.palette().bg);
                 } else if Some(ftype) == s.hovered_filter {
-                    fill_rounded(mdc, fx, list_y + 8, fw, 32, 16, COLORREF(0x00_30_28_21));
+                    fill_rounded(mdc, fx, list_y + 8, fw, 32, 16, s.theme.palette().bg_hover);
                 } else {
-                    fill_rounded(mdc, fx, list_y + 8, fw, 32, 16, COLORREF(0x00_24_20_1d));
+                    fill_rounded(mdc, fx, list_y + 8, fw, 32, 16, s.theme.palette().bg);
                 }
                 
                 SetTextColor(mdc, if ftype == s.active_filter { s.theme.palette().clr_white } else { s.theme.palette().clr_gray });
