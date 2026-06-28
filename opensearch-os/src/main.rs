@@ -603,12 +603,7 @@ unsafe fn run() {
         Err(_) => std::path::PathBuf::from("file_index.db"),
     };
 
-    let system_settings = std::path::PathBuf::from(
-        std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string()),
-    )
-    .join("ImmersiveControlPanel")
-    .join("SystemSettings.exe");
-    let icon_settings = get_file_icon(&system_settings.to_string_lossy());
+    let icon_settings = load_icon_from_dll("shell32.dll", 274, 64);
     let icon_web = load_icon_from_dll("shell32.dll", 14, 64);
     let icon_bookmark = load_icon_from_dll("shell32.dll", 43, 64);
     let icon_folder = load_icon_from_dll("shell32.dll", 3, 64);
@@ -982,7 +977,7 @@ unsafe extern "system" fn preview_wnd_proc(
     use windows::Win32::Graphics::Gdi::{
         BeginPaint, EndPaint, PAINTSTRUCT, CreateCompatibleDC, CreateCompatibleBitmap,
         SelectObject, BitBlt, DeleteObject, DeleteDC, SRCCOPY,
-        DT_CENTER, DT_WORDBREAK, DT_END_ELLIPSIS, DT_NOPREFIX
+        DT_CENTER, DT_WORDBREAK, DT_END_ELLIPSIS, DT_NOPREFIX, GetObjectW, BITMAP
     };
 
     if msg == WM_NCCREATE {
@@ -999,6 +994,7 @@ unsafe extern "system" fn preview_wnd_proc(
                 return DefWindowProcW(hwnd, msg, wp, lp);
             }
             let s = &*sp;
+            let palette = s.theme.palette();
 
             let mut ps = PAINTSTRUCT::default();
             let hdc = BeginPaint(hwnd, &mut ps);
@@ -1013,15 +1009,14 @@ unsafe extern "system" fn preview_wnd_proc(
             let bmp = CreateCompatibleBitmap(hdc, win_w, win_h);
             let old = SelectObject(mdc, bmp);
 
-            // Draw background (matching launcher dark theme)
-            fill(mdc, 0, 0, win_w, win_h, COLORREF(0x00_1D_19_16));
+            // Draw background
+            fill(mdc, 0, 0, win_w, win_h, palette.bg);
 
-            // Draw a thin border using fill lines
-            let border_color = COLORREF(0x00_2D_26_22);
-            fill(mdc, 0, 0, win_w, 1, border_color); // top
-            fill(mdc, 0, win_h - 1, win_w, 1, border_color); // bottom
-            fill(mdc, 0, 0, 1, win_h, border_color); // left
-            fill(mdc, win_w - 1, 0, 1, win_h, border_color); // right
+            // Draw a thin border
+            fill(mdc, 0, 0, win_w, 1, palette.clr_div); // top
+            fill(mdc, 0, win_h - 1, win_w, 1, palette.clr_div); // bottom
+            fill(mdc, 0, 0, 1, win_h, palette.clr_div); // left
+            fill(mdc, win_w - 1, 0, 1, win_h, palette.clr_div); // right
 
             if let Some((result, path)) = s
                 .results
@@ -1029,37 +1024,43 @@ unsafe extern "system" fn preview_wnd_proc(
                 .and_then(|result| image_path_for_result(result).map(|path| (result, path)))
             {
                 let mut cache = s.clipboard_thumbnails.borrow_mut();
-                let hbitmap = cache
-                    .get(path)
-                    .copied()
-                    .or_else(|| load_shell_thumbnail(path, 256).inspect(|h| {
-                        cache.insert(path.to_string(), *h);
-                    }));
+                let hbitmap = cache.get(path).copied();
 
                 if let Some(hbitmap) = hbitmap {
-                    // Draw thumbnail centered horizontally, say top 20
-                    let img_w = 216;
-                    let img_h = 216;
-                    let img_x = (win_w - img_w) / 2;
-                    let img_y = 20;
-                    draw_cached_bmp(mdc, img_x, img_y, img_w, img_h, hbitmap);
-                }
+                    let mut bmp_info: BITMAP = std::mem::zeroed();
+                    let size = std::mem::size_of::<BITMAP>() as i32;
+                    if GetObjectW(hbitmap, size, Some(&mut bmp_info as *mut BITMAP as *mut _)) != 0 {
+                        let img_w = bmp_info.bmWidth;
+                        let img_h = bmp_info.bmHeight;
+                        
+                        let max_w = win_w - 32;
+                        let max_h = win_h - 48;
+                        let scale = (max_w as f32 / img_w as f32).min(max_h as f32 / img_h as f32).min(1.0);
+                        let draw_w = (img_w as f32 * scale).round() as i32;
+                        let draw_h = (img_h as f32 * scale).round() as i32;
 
-                SelectObject(mdc, s.font_c);
-                SetTextColor(mdc, CLR_GRAY);
-                let mut name: Vec<u16> = result.entry.control_name.encode_utf16().collect();
-                let mut name_rect = RECT {
-                    left: 12,
-                    top: 248,
-                    right: win_w - 12,
-                    bottom: win_h - 12,
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut name,
-                    &mut name_rect,
-                    DT_CENTER | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
-                );
+                        let img_x = (win_w - draw_w) / 2;
+                        let img_y = 12;
+
+                        draw_cached_bmp(mdc, img_x, img_y, draw_w, draw_h, hbitmap);
+
+                        SelectObject(mdc, s.font_c);
+                        SetTextColor(mdc, palette.clr_gray);
+                        let mut name: Vec<u16> = result.entry.control_name.encode_utf16().collect();
+                        let mut name_rect = RECT {
+                            left: 12,
+                            top: img_y + draw_h + 8,
+                            right: win_w - 12,
+                            bottom: win_h - 4,
+                        };
+                        let _ = DrawTextW(
+                            mdc,
+                            &mut name,
+                            &mut name_rect,
+                            DT_CENTER | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
+                        );
+                    }
+                }
             }
 
             let _ = BitBlt(hdc, 0, 0, win_w, win_h, mdc, 0, 0, SRCCOPY);
@@ -1079,13 +1080,44 @@ unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
         CreateWindowExW, ShowWindow, SetWindowPos, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, 
         HWND_TOPMOST, WS_EX_TOPMOST, WS_EX_TOOLWINDOW, WS_POPUP, GetWindowRect
     };
-    use windows::Win32::Graphics::Gdi::InvalidateRect;
+    use windows::Win32::Graphics::Gdi::{InvalidateRect, GetObjectW, BITMAP};
     
     let mut parent_rect = RECT::default();
     let _ = GetWindowRect(hwnd_parent, &mut parent_rect);
     
-    let p_w = 260;
-    let p_h = parent_rect.bottom - parent_rect.top;
+    let mut p_w = 260;
+    let mut p_h = parent_rect.bottom - parent_rect.top;
+    
+    if let Some((_result, path)) = s
+        .results
+        .get(s.selected)
+        .and_then(|result| image_path_for_result(result).map(|path| (result, path)))
+    {
+        let mut cache = s.clipboard_thumbnails.borrow_mut();
+        let hbitmap = cache
+            .get(path)
+            .copied()
+            .or_else(|| load_shell_thumbnail(path, 256).inspect(|h| {
+                cache.insert(path.to_string(), *h);
+            }));
+            
+        if let Some(hbitmap) = hbitmap {
+            let mut bmp: BITMAP = std::mem::zeroed();
+            let size = std::mem::size_of::<BITMAP>() as i32;
+            if GetObjectW(hbitmap, size, Some(&mut bmp as *mut BITMAP as *mut _)) != 0 {
+                let img_w = bmp.bmWidth;
+                let img_h = bmp.bmHeight;
+                let max_size = 320;
+                let scale = (max_size as f32 / img_w as f32).min(max_size as f32 / img_h as f32).min(1.0);
+                let draw_w = (img_w as f32 * scale).round() as i32;
+                let draw_h = (img_h as f32 * scale).round() as i32;
+                
+                p_w = (draw_w + 32).max(180);
+                p_h = draw_h + 64;
+            }
+        }
+    }
+    
     let p_x = parent_rect.right + 8;
     let p_y = parent_rect.top;
     
@@ -1357,7 +1389,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let results = unsafe { *Box::from_raw(results_ptr) };
             if !sp.is_null() {
                 let s = &mut *sp;
-                if query_id == s.current_query_id {
+                if s.query.is_empty() {
+                    // Discard search results if user cleared the query
+                } else if query_id == s.current_query_id {
                     s.results_stale = false;
                     s.filter_counts = filter_counts_for_results(&results);
                     let mut filtered = results;
@@ -4697,6 +4731,7 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
         return;
     }
     if s.query.is_empty() {
+        s.current_query_id += 1;
         s.results_stale = false;
         s.results = default_homepage_results();
         s.selected = 2; // select Git Commits on homepage
