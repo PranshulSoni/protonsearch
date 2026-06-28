@@ -7321,7 +7321,20 @@ unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
     };
     
     let img = match image::load_from_memory_with_format(bytes, image::ImageFormat::Png) {
-        Ok(img) => img.resize(size, size, image::imageops::FilterType::Lanczos3).into_rgba8(),
+        Ok(img) => {
+            let rgba = img.into_rgba8();
+            let cropped = if let Some((x, y, width, height)) = alpha_bounds(&rgba) {
+                image::imageops::crop_imm(&rgba, x, y, width, height).to_image()
+            } else {
+                rgba
+            };
+            image::imageops::resize(
+                &cropped,
+                size,
+                size,
+                image::imageops::FilterType::Lanczos3,
+            )
+        }
         Err(_) => return HICON(null_mut()),
     };
     
@@ -7389,6 +7402,22 @@ unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
     
     let _ = ReleaseDC(HWND(null_mut()), hdc);
     HICON(null_mut())
+}
+
+fn alpha_bounds(img: &image::RgbaImage) -> Option<(u32, u32, u32, u32)> {
+    let (mut left, mut top) = (img.width(), img.height());
+    let (mut right, mut bottom) = (0, 0);
+    let mut found = false;
+    for (x, y, pixel) in img.enumerate_pixels() {
+        if pixel[3] != 0 {
+            left = left.min(x);
+            top = top.min(y);
+            right = right.max(x);
+            bottom = bottom.max(y);
+            found = true;
+        }
+    }
+    found.then_some((left, top, right - left + 1, bottom - top + 1))
 }
 
 unsafe fn get_active_app_name() -> String {
@@ -8224,6 +8253,14 @@ mod tests {
         assert_eq!(counts[filter_index(FilterType::Settings)], 1);
         assert_eq!(counts[filter_index(FilterType::Images)], 1);
         assert_eq!(counts[filter_index(FilterType::Content)], 1);
+    }
+
+    #[test]
+    fn source_icon_padding_is_trimmed() {
+        let mut image = image::RgbaImage::new(8, 8);
+        image.put_pixel(2, 1, image::Rgba([255, 255, 255, 255]));
+        image.put_pixel(5, 6, image::Rgba([255, 255, 255, 255]));
+        assert_eq!(alpha_bounds(&image), Some((2, 1, 4, 6)));
     }
 
     #[test]
