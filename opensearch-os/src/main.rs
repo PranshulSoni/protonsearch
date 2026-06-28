@@ -64,7 +64,7 @@ const WM_TRAYICON: u32 = WM_USER + 9;
 
 unsafe fn setup_tray_icon(hwnd: windows::Win32::Foundation::HWND, hinst: windows::Win32::Foundation::HMODULE) {
     use windows::Win32::UI::Shell::{Shell_NotifyIconW, NOTIFYICONDATAW, NIM_ADD, NIF_MESSAGE, NIF_ICON, NIF_TIP};
-    use windows::Win32::UI::WindowsAndMessaging::{LoadIconW, LoadCursorW, IDC_APPSTARTING, HICON};
+    use windows::Win32::UI::WindowsAndMessaging::{LoadIconW, IDI_APPLICATION, HICON};
     use windows::Win32::Foundation::HINSTANCE;
     use windows::core::PCWSTR;
     
@@ -74,13 +74,11 @@ unsafe fn setup_tray_icon(hwnd: windows::Win32::Foundation::HWND, hinst: windows
     nid.uID = 1;
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    let hicon = LoadIconW(hinst, PCWSTR(1 as _)).unwrap_or_default();
+    let mut hicon = LoadIconW(hinst, PCWSTR(1 as _)).unwrap_or_default();
     if hicon.0.is_null() {
-        let hcursor = LoadCursorW(HINSTANCE(std::ptr::null_mut()), IDC_APPSTARTING).unwrap();
-        nid.hIcon = HICON(hcursor.0);
-    } else {
-        nid.hIcon = hicon;
+        hicon = LoadIconW(HINSTANCE(std::ptr::null_mut()), IDI_APPLICATION).unwrap_or_default();
     }
+    nid.hIcon = hicon;
     let tip = "OpenSearch OS".encode_utf16().collect::<Vec<u16>>();
     for (i, &c) in tip.iter().enumerate().take(127) {
         nid.szTip[i] = c;
