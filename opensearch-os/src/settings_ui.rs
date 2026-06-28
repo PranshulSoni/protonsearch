@@ -1,7 +1,7 @@
 slint::include_modules!();
 
 use crate::settings::AppSettings;
-use slint::{SharedString, ComponentHandle, CloseRequestResponse};
+use slint::{CloseRequestResponse, ComponentHandle, SharedString};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 use std::sync::Mutex;
@@ -36,13 +36,12 @@ pub fn init_settings_window(hwnd: HWND) {
             Ok(u) => u,
             Err(_) => continue,
         };
-        let ui_weak = ui.as_weak();
 
         // Load and apply current settings
         let settings = AppSettings::load();
         ui.set_run_on_startup(settings.run_on_startup);
         ui.set_hide_on_lose_focus(settings.hide_on_lose_focus);
-        ui.set_theme_mode(SharedString::from(settings.theme_mode.clone()));
+        ui.set_theme_mode(SharedString::from(settings.normalized_theme_mode()));
         ui.set_global_hotkey(SharedString::from(settings.global_hotkey.clone()));
         ui.set_window_width(settings.window_width as i32);
         ui.set_item_height(settings.item_height as i32);
@@ -51,6 +50,7 @@ pub fn init_settings_window(hwnd: HWND) {
         let ui_weak_close = ui.as_weak();
         ui.window().on_close_requested(move || {
             if let Some(ui) = ui_weak_close.upgrade() {
+                ui.invoke_set_hotkey_recording(false);
                 // Quit the inner event loop to unblock us
                 slint::quit_event_loop().ok();
                 ui.window().hide().ok();
@@ -82,27 +82,32 @@ pub fn init_settings_window(hwnd: HWND) {
             }
         });
 
-        // Hotkey recording
-        let ui_weak_hotkey = ui.as_weak();
-        ui.on_record_hotkey(move || {
-            let weak_clone = ui_weak_hotkey.clone();
-            std::thread::spawn(move || {
-                if let Some(recorded) = crate::hotkey::record_hotkey_blocking() {
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(ui) = weak_clone.upgrade() {
-                            ui.set_global_hotkey(SharedString::from(recorded));
-                            ui.invoke_save_settings();
-                        }
-                    });
-                } else {
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(ui) = weak_clone.upgrade() {
-                            let s = AppSettings::load();
-                            ui.set_global_hotkey(SharedString::from(s.global_hotkey));
-                        }
-                    });
-                }
-            });
+        ui.on_format_hotkey(move |key, ctrl, alt, shift, win| {
+            let Some(hotkey) = crate::hotkey::format_recorded_hotkey(
+                key.as_str(),
+                ctrl,
+                alt,
+                shift,
+                win,
+            ) else {
+                return SharedString::from("");
+            };
+            if crate::hotkey::hotkey_available(&hotkey) {
+                SharedString::from(hotkey)
+            } else {
+                SharedString::from("")
+            }
+        });
+
+        ui.on_set_hotkey_recording(move |recording| {
+            unsafe {
+                let _ = PostMessageW(
+                    hwnd,
+                    windows::Win32::UI::WindowsAndMessaging::WM_USER + 11,
+                    windows::Win32::Foundation::WPARAM(recording as usize),
+                    windows::Win32::Foundation::LPARAM(0),
+                );
+            }
         });
 
         // Show the window and run the event loop until it's closed

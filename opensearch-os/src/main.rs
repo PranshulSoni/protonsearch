@@ -44,7 +44,15 @@ const VISIBLE_RESULTS: usize = 8;
 const PAD_L: i32 = 24;
 const BADGE_W: i32 = 54;
 const BADGE_H: i32 = 18;
+const SEARCH_ICON_SIZE: i32 = 32;
+const RESULT_ICON_SIZE: i32 = 32;
+const RESULT_TEXT_BLOCK_H: i32 = 40;
+const RESULT_TEXT_GAP: i32 = 12;
 const WM_MOUSELEAVE: u32 = 0x02A3;
+
+fn centered_in_result_row(row_y: i32, height: i32) -> i32 {
+    row_y + (RESULT_H - height) / 2
+}
 
 
 // ── Win32 IDs ─────────────────────────────────────────────────────────────────
@@ -70,6 +78,7 @@ const WM_HERMES_APPROVAL: u32 = WM_USER + 7;
 const WM_AI_PROGRESS: u32 = WM_USER + 8;
 const WM_TRAYICON: u32 = WM_USER + 9;
 const WM_RELOAD_SETTINGS: u32 = WM_USER + 10;
+const WM_SET_HOTKEY_RECORDING: u32 = WM_USER + 11;
 
 unsafe fn setup_tray_icon(hwnd: windows::Win32::Foundation::HWND, hinst: windows::Win32::Foundation::HMODULE) {
     use windows::Win32::UI::Shell::{Shell_NotifyIconW, NOTIFYICONDATAW, NIM_ADD, NIF_MESSAGE, NIF_ICON, NIF_TIP};
@@ -235,6 +244,15 @@ impl Theme {
                 clr_accent: COLORREF(0x00_D7_78_00),
             },
         }
+    }
+}
+
+fn theme_from_setting(value: &str) -> Theme {
+    match value {
+        "Light" => Theme::Light,
+        "NordDarker" => Theme::NordDarker,
+        "Dark" | "Darker" => Theme::Darker,
+        _ => Theme::Darker,
     }
 }
 
@@ -427,8 +445,7 @@ impl State {
         let mut cur_y = end_y + SEARCH_H + 1;
         
         if self.query.is_empty() {
-            cur_y += 48; // filter bar
-            cur_y += 32; // "Results" label
+            cur_y += 36; // "Quick Search" header
             return cur_y + i as i32 * RESULT_H;
         }
         
@@ -665,11 +682,7 @@ unsafe fn run() {
     let (icon_tx, icon_rx) = std::sync::mpsc::channel::<IconRequest>();
 
     let app_settings = crate::settings::AppSettings::load();
-    let theme = match app_settings.theme_mode.as_str() {
-        "Light" => Theme::Light,
-        "NordDarker" => Theme::NordDarker,
-        _ => Theme::Darker,
-    };
+    let theme = theme_from_setting(&app_settings.theme_mode);
     let state = Box::new(State {
         app_settings,
         theme,
@@ -691,7 +704,7 @@ unsafe fn run() {
         anim: Anim::Hidden,
         cx: sw / 2,
         cy: sh / 3,
-        font_q: mk_font(-28, 400),
+        font_q: mk_font(-24, 400),
         font_n: mk_font(-18, 700),
         font_c: mk_font(-14, 400),
         font_b: mk_font(-13, 600),
@@ -994,8 +1007,6 @@ unsafe fn run() {
     } else {
         voice::log(&format!("launcher hotkey {} registered", settings.global_hotkey));
     }
-    crate::hotkey::start_hook();
-
     // Ctrl+Shift+Space starts voice dictation. (Ctrl+Alt is AltGr on many layouts and
     // gets eaten, so it's deliberately avoided.) Non-fatal: the launcher works without it.
     if RegisterHotKey(
@@ -3084,11 +3095,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             if !sp.is_null() {
                 let s = &mut *sp;
                 s.app_settings = crate::settings::AppSettings::load();
-                s.theme = match s.app_settings.theme_mode.as_str() {
-                    "Light" => Theme::Light,
-                    "NordDarker" => Theme::NordDarker,
-                    _ => Theme::Darker,
-                };
+                s.theme = theme_from_setting(&s.app_settings.theme_mode);
                 
                 if !crate::hotkey::register_hotkey(hwnd, HOTKEY_ID, &s.app_settings.global_hotkey) {
                     voice::log(&format!(
@@ -3105,6 +3112,21 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 // Parse theme manually if needed, or trigger redraw
                 unsafe {
                     let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                }
+            }
+            LRESULT(0)
+        }
+
+        WM_SET_HOTKEY_RECORDING => {
+            if !sp.is_null() {
+                let s = &mut *sp;
+                if wp.0 != 0 {
+                    let _ = UnregisterHotKey(hwnd, HOTKEY_ID);
+                } else if !crate::hotkey::register_hotkey(hwnd, HOTKEY_ID, &s.app_settings.global_hotkey) {
+                    voice::log(&format!(
+                        "launcher hotkey {} registration FAILED (already in use?)",
+                        s.app_settings.global_hotkey
+                    ));
                 }
             }
             LRESULT(0)
@@ -5937,14 +5959,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
     // Draw Search Icon
     if !s.icon_new_search.0.is_null() {
-        let icon_y = y + (SEARCH_H - 24) / 2;
+        let icon_y = y + (SEARCH_H - SEARCH_ICON_SIZE) / 2;
         let _ = DrawIconEx(
             mdc,
             x + PAD_L,
             icon_y,
             s.icon_new_search,
-            24,
-            24,
+            SEARCH_ICON_SIZE,
+            SEARCH_ICON_SIZE,
             0,
             HBRUSH(null_mut()),
             DI_NORMAL,
@@ -5952,8 +5974,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     }
 
     // Text / placeholder
-    let tx = x + PAD_L + 24 + 8;
-    let tw = w - (PAD_L + 24 + 8) - PAD_L - 24;
+    let tx = x + PAD_L + SEARCH_ICON_SIZE + 12;
+    let tw = w - (PAD_L + SEARCH_ICON_SIZE + 12) - PAD_L - SEARCH_ICON_SIZE;
     let mut tr = RECT {
         left: tx,
         top: y,
@@ -6027,14 +6049,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     // muted otherwise. Click toggles dictation (hit-test in WM_LBUTTONDOWN).
     if w >= WIN_W - 8 {
         if !s.icon_new_mic.0.is_null() {
-            let icon_y = y + (SEARCH_H - 24) / 2;
+            let icon_y = y + (SEARCH_H - SEARCH_ICON_SIZE) / 2;
             let _ = DrawIconEx(
                 mdc,
-                x + w - PAD_L - 24, // Align correctly for 24x24
+                x + w - PAD_L - SEARCH_ICON_SIZE,
                 icon_y,
                 s.icon_new_mic,
-                24,
-                24,
+                SEARCH_ICON_SIZE,
+                SEARCH_ICON_SIZE,
                 0,
                 HBRUSH(null_mut()),
                 DI_NORMAL,

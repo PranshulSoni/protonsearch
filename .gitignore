@@ -50,3 +50,6 @@ task.md
 # Voice debug log
 voice_log.txt
 HICON
+
+# External projects
+Flow.Launcher-dev/

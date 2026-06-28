@@ -16,9 +16,12 @@ export component SettingsWindow inherits Window {
     
     // Callbacks to Rust
     callback save-settings();
-    callback record-hotkey();
+    callback format-hotkey(string, bool, bool, bool, bool) -> string;
+    callback set-hotkey-recording(bool);
     
     property <int> current-page: 0;
+    property <bool> recording-hotkey: false;
+    property <string> previous-hotkey: "";
     
     // Theme Tokens
     property <bool> is-light: false; // Locked to dark mode for settings app
@@ -190,8 +193,9 @@ export component SettingsWindow inherits Window {
                     // Appearance Page
                     if root.current-page == 1: VerticalBox {
                         alignment: start;
-                        spacing: 12px;
+                        spacing: 14px;
                         Text { text: "Appearance"; font-size: 26px; font-weight: 600; color: root.text-primary; }
+                        Text { text: "Launcher theme"; font-size: 13px; color: root.text-muted; }
                         
                         Rectangle {
                             background: root.card-bg;
@@ -200,15 +204,66 @@ export component SettingsWindow inherits Window {
                             border-width: 1px;
                             padding: 20px;
                             HorizontalBox {
-                                Text { text: "Theme"; vertical-alignment: center; color: root.text-primary; font-size: 14px; }
-                                Rectangle { horizontal-stretch: 1; }
-                                HorizontalBox {
-                                    width: 160px;
-                                    ComboBox {
-                                        model: ["Light", "Darker", "NordDarker"];
-                                        current-value: root.theme-mode;
-                                        selected(val) => {
-                                            root.theme-mode = val;
+                                spacing: 12px;
+                                Rectangle {
+                                    height: 106px;
+                                    width: 150px;
+                                    border-radius: 8px;
+                                    border-width: root.theme-mode == "Light" ? 2px : 1px;
+                                    border-color: root.theme-mode == "Light" ? #3b82f6 : root.border-color;
+                                    background: #ffffff;
+                                    VerticalBox {
+                                        padding: 10px;
+                                        spacing: 8px;
+                                        Text { text: "Light"; color: #111111; font-weight: 600; }
+                                        Rectangle { height: 24px; border-radius: 5px; background: #f2f2f2; }
+                                        Rectangle { height: 24px; border-radius: 5px; background: #e5e5e5; }
+                                    }
+                                    TouchArea {
+                                        clicked => {
+                                            root.theme-mode = "Light";
+                                            root.save-settings();
+                                        }
+                                    }
+                                }
+                                Rectangle {
+                                    height: 106px;
+                                    width: 150px;
+                                    border-radius: 8px;
+                                    border-width: root.theme-mode == "Dark" ? 2px : 1px;
+                                    border-color: root.theme-mode == "Dark" ? #3b82f6 : root.border-color;
+                                    background: #1e1e1e;
+                                    VerticalBox {
+                                        padding: 10px;
+                                        spacing: 8px;
+                                        Text { text: "Dark"; color: #ffffff; font-weight: 600; }
+                                        Rectangle { height: 24px; border-radius: 5px; background: #2f2f2f; }
+                                        Rectangle { height: 24px; border-radius: 5px; background: #3a3a3a; }
+                                    }
+                                    TouchArea {
+                                        clicked => {
+                                            root.theme-mode = "Dark";
+                                            root.save-settings();
+                                        }
+                                    }
+                                }
+                                Rectangle {
+                                    height: 106px;
+                                    width: 150px;
+                                    border-radius: 8px;
+                                    border-width: root.theme-mode == "NordDarker" ? 2px : 1px;
+                                    border-color: root.theme-mode == "NordDarker" ? #3b82f6 : root.border-color;
+                                    background: #2e3440;
+                                    VerticalBox {
+                                        padding: 10px;
+                                        spacing: 8px;
+                                        Text { text: "Nord Dark"; color: #e5e9f0; font-weight: 600; }
+                                        Rectangle { height: 24px; border-radius: 5px; background: #3b4252; }
+                                        Rectangle { height: 24px; border-radius: 5px; background: #4c566a; }
+                                    }
+                                    TouchArea {
+                                        clicked => {
+                                            root.theme-mode = "NordDarker";
                                             root.save-settings();
                                         }
                                     }
@@ -237,10 +292,12 @@ export component SettingsWindow inherits Window {
                                 HorizontalBox {
                                     width: 200px;
                                     Button {
-                                        text: root.global-hotkey;
+                                        text: root.recording-hotkey ? "Listening..." : root.global-hotkey;
                                         clicked => {
-                                            root.global-hotkey = "Listening...";
-                                            root.record-hotkey();
+                                            root.previous-hotkey = root.global-hotkey;
+                                            root.recording-hotkey = true;
+                                            root.set-hotkey-recording(true);
+                                            hotkey-capture.focus();
                                         }
                                     }
                                 }
@@ -269,6 +326,34 @@ export component SettingsWindow inherits Window {
                     }
                 }
             }
+        }
+    }
+
+    hotkey-capture := FocusScope {
+        x: -1px;
+        y: -1px;
+        width: 1px;
+        height: 1px;
+
+        key-pressed(event) => {
+            if (!root.recording-hotkey) {
+                return reject;
+            }
+            if (event.text == "\u{1b}" || event.text == "Escape" || event.text == "Esc") {
+                root.recording-hotkey = false;
+                root.global-hotkey = root.previous-hotkey;
+                root.set-hotkey-recording(false);
+                return accept;
+            }
+            let hotkey = root.format-hotkey(event.text, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta);
+            if (hotkey != "") {
+                root.global-hotkey = hotkey;
+                root.recording-hotkey = false;
+                root.set-hotkey-recording(false);
+                root.save-settings();
+                return accept;
+            }
+            return accept;
         }
     }
 }
