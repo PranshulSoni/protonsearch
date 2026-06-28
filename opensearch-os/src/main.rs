@@ -219,6 +219,7 @@ struct State {
     submenu_active: bool,
     submenu_selected: usize,
     image_preview_active: bool,
+    hwnd_preview: Option<HWND>,
     // In-app note editor (self-rendered — no child control, which broke on the layered window)
     note_editing: bool,
     note_text: String,
@@ -607,6 +608,7 @@ unsafe fn run() {
         submenu_active: false,
         submenu_selected: 0,
         image_preview_active: false,
+        hwnd_preview: None,
         note_editing: false,
         note_text: String::new(),
         note_path: None,
@@ -673,6 +675,19 @@ unsafe fn run() {
         ..Default::default()
     };
     RegisterClassExW(&wc);
+
+    let preview_class: Vec<u16> = "opensearch-os-preview\0".encode_utf16().collect();
+    let wc_preview = WNDCLASSEXW {
+        cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+        style: CS_HREDRAW | CS_VREDRAW,
+        lpfnWndProc: Some(preview_wnd_proc),
+        hInstance: hinst.into(),
+        hCursor: LoadCursorW(HINSTANCE(null_mut()), IDC_ARROW).unwrap(),
+        hbrBackground: HBRUSH(null_mut()),
+        lpszClassName: PCWSTR(preview_class.as_ptr()),
+        ..Default::default()
+    };
+    RegisterClassExW(&wc_preview);
 
     let sw = GetSystemMetrics(SM_CXSCREEN);
     let win_x = (sw - WIN_W) / 2;
@@ -882,6 +897,160 @@ unsafe fn run() {
 
     let _ = UnregisterHotKey(hwnd, HOTKEY_ID);
     let _ = UnregisterHotKey(hwnd, HOTKEY_VOICE_ID);
+}
+
+unsafe extern "system" fn preview_wnd_proc(
+    hwnd: HWND,
+    msg: u32,
+    wp: WPARAM,
+    lp: LPARAM,
+) -> LRESULT {
+    use windows::Win32::UI::WindowsAndMessaging::{GWLP_USERDATA, WM_NCCREATE, WM_PAINT, DefWindowProcW, GetWindowLongPtrW, SetWindowLongPtrW};
+    use windows::Win32::Graphics::Gdi::{
+        BeginPaint, EndPaint, PAINTSTRUCT, CreateCompatibleDC, CreateCompatibleBitmap,
+        SelectObject, BitBlt, DeleteObject, DeleteDC, SRCCOPY,
+        DT_CENTER, DT_WORDBREAK, DT_END_ELLIPSIS, DT_NOPREFIX
+    };
+
+    if msg == WM_NCCREATE {
+        let cs = &*(lp.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, cs.lpCreateParams as isize);
+        return LRESULT(1);
+    }
+
+    let sp = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut State;
+
+    match msg {
+        WM_PAINT => {
+            if sp.is_null() {
+                return DefWindowProcW(hwnd, msg, wp, lp);
+            }
+            let s = &*sp;
+
+            let mut ps = PAINTSTRUCT::default();
+            let hdc = BeginPaint(hwnd, &mut ps);
+
+            let mut rc = RECT::default();
+            let _ = GetClientRect(hwnd, &mut rc);
+            let win_w = rc.right - rc.left;
+            let win_h = rc.bottom - rc.top;
+
+            // Double-buffer
+            let mdc = CreateCompatibleDC(hdc);
+            let bmp = CreateCompatibleBitmap(hdc, win_w, win_h);
+            let old = SelectObject(mdc, bmp);
+
+            // Draw background (matching launcher dark theme)
+            fill(mdc, 0, 0, win_w, win_h, COLORREF(0x00_1D_19_16));
+
+            // Draw a thin border using fill lines
+            let border_color = COLORREF(0x00_2D_26_22);
+            fill(mdc, 0, 0, win_w, 1, border_color); // top
+            fill(mdc, 0, win_h - 1, win_w, 1, border_color); // bottom
+            fill(mdc, 0, 0, 1, win_h, border_color); // left
+            fill(mdc, win_w - 1, 0, 1, win_h, border_color); // right
+
+            if let Some((result, path)) = s
+                .results
+                .get(s.selected)
+                .and_then(|result| image_path_for_result(result).map(|path| (result, path)))
+            {
+                let mut cache = s.clipboard_thumbnails.borrow_mut();
+                let hbitmap = cache
+                    .get(path)
+                    .copied()
+                    .or_else(|| load_shell_thumbnail(path, 256).inspect(|h| {
+                        cache.insert(path.to_string(), *h);
+                    }));
+
+                if let Some(hbitmap) = hbitmap {
+                    // Draw thumbnail centered horizontally, say top 20
+                    let img_w = 216;
+                    let img_h = 216;
+                    let img_x = (win_w - img_w) / 2;
+                    let img_y = 20;
+                    draw_cached_bmp(mdc, img_x, img_y, img_w, img_h, hbitmap);
+                }
+
+                SelectObject(mdc, s.font_c);
+                SetTextColor(mdc, CLR_GRAY);
+                let mut name: Vec<u16> = result.entry.control_name.encode_utf16().collect();
+                let mut name_rect = RECT {
+                    left: 12,
+                    top: 248,
+                    right: win_w - 12,
+                    bottom: win_h - 12,
+                };
+                let _ = DrawTextW(
+                    mdc,
+                    &mut name,
+                    &mut name_rect,
+                    DT_CENTER | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
+                );
+            }
+
+            let _ = BitBlt(hdc, 0, 0, win_w, win_h, mdc, 0, 0, SRCCOPY);
+            let _ = SelectObject(mdc, old);
+            let _ = DeleteObject(bmp);
+            let _ = DeleteDC(mdc);
+
+            let _ = EndPaint(hwnd, &ps);
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wp, lp),
+    }
+}
+
+unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CreateWindowExW, ShowWindow, SetWindowPos, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, 
+        HWND_TOPMOST, WS_EX_TOPMOST, WS_EX_TOOLWINDOW, WS_POPUP, GetWindowRect
+    };
+    use windows::Win32::Graphics::Gdi::InvalidateRect;
+    
+    let mut parent_rect = RECT::default();
+    let _ = GetWindowRect(hwnd_parent, &mut parent_rect);
+    
+    let p_w = 260;
+    let p_h = parent_rect.bottom - parent_rect.top;
+    let p_x = parent_rect.right + 8;
+    let p_y = parent_rect.top;
+    
+    if s.hwnd_preview.is_none() {
+        let preview_class: Vec<u16> = "opensearch-os-preview\0".encode_utf16().collect();
+        let hinst = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap();
+        
+        let hwnd_preview = CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+            PCWSTR(preview_class.as_ptr()),
+            PCWSTR::null(),
+            WS_POPUP,
+            p_x,
+            p_y,
+            p_w,
+            p_h,
+            hwnd_parent,
+            HMENU(null_mut()),
+            hinst,
+            Some(s as *mut State as _),
+        );
+        if let Ok(h) = hwnd_preview {
+            let _ = ShowWindow(h, SW_SHOWNOACTIVATE);
+            s.hwnd_preview = Some(h);
+        }
+    } else {
+        let hwnd_preview = s.hwnd_preview.unwrap();
+        let _ = SetWindowPos(hwnd_preview, HWND_TOPMOST, p_x, p_y, p_w, p_h, SWP_NOACTIVATE);
+        let _ = ShowWindow(hwnd_preview, SW_SHOWNOACTIVATE);
+        let _ = InvalidateRect(hwnd_preview, None, FALSE);
+    }
+}
+
+unsafe fn hide_preview_window(s: &State) {
+    use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+    if let Some(h) = s.hwnd_preview {
+        let _ = ShowWindow(h, SW_HIDE);
+    }
 }
 
 // ── WndProc ───────────────────────────────────────────────────────────────────
@@ -1381,6 +1550,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let s = &mut *sp;
                 if s.image_preview_active {
                     s.image_preview_active = false;
+                    hide_preview_window(s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
             }
@@ -1988,6 +2158,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         if let Some(r) = s.results.get(s.selected) {
                             if image_path_for_result(r).is_some() {
                                 s.image_preview_active = true;
+                                show_preview_window(hwnd, s);
                                 let _ = InvalidateRect(hwnd, None, FALSE);
                             } else if r.entry.source == "app" {
                                 s.submenu_active = !s.submenu_active;
@@ -3119,6 +3290,7 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     s.voice_exec_deadline = None;
     s.form_state = FormState::None;
     s.image_preview_active = false;
+    hide_preview_window(s);
     let _ = ShowWindow(hwnd, SW_HIDE);
     s.anim = Anim::Hidden;
 }
@@ -4411,6 +4583,7 @@ unsafe fn kick_debounce(hwnd: HWND, s: &mut State) {
 unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
     s.submenu_active = false;
     s.image_preview_active = false;
+    hide_preview_window(s);
     if s.editing_item.is_some() {
         return;
     }
@@ -6305,7 +6478,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         (s.results.len().saturating_sub(s.scroll_offset)).min(VISIBLE_RESULTS)
     };
     if n > 0 {
-        let list_w = if s.submenu_active || s.image_preview_active {
+        let list_w = if s.submenu_active {
             w - 240
         } else {
             w
@@ -6786,53 +6959,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         }
 
         if s.image_preview_active {
-            fill(mdc, x + list_w, y + SEARCH_H, 1, h - SEARCH_H, CLR_DIV);
-            fill(
-                mdc,
-                x + list_w + 1,
-                y + SEARCH_H + 1,
-                238,
-                h - SEARCH_H - 1,
-                COLORREF(0x00_23_1D_19),
-            );
-            if let Some((result, path)) = s
-                .results
-                .get(s.selected)
-                .and_then(|result| image_path_for_result(result).map(|path| (result, path)))
-            {
-                let mut cache = s.clipboard_thumbnails.borrow_mut();
-                let hbitmap = cache
-                    .get(path)
-                    .copied()
-                    .or_else(|| load_shell_thumbnail(path, 256).inspect(|h| {
-                        cache.insert(path.to_string(), *h);
-                    }));
-                if let Some(hbitmap) = hbitmap {
-                    draw_cached_bmp(
-                        mdc,
-                        x + list_w + 12,
-                        y + SEARCH_H + 20,
-                        216,
-                        216,
-                        hbitmap,
-                    );
-                }
-                SelectObject(mdc, s.font_c);
-                SetTextColor(mdc, CLR_GRAY);
-                let mut name: Vec<u16> = result.entry.control_name.encode_utf16().collect();
-                let mut name_rect = RECT {
-                    left: x + list_w + 12,
-                    top: y + SEARCH_H + 248,
-                    right: x + w - 12,
-                    bottom: y + SEARCH_H + 286,
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut name,
-                    &mut name_rect,
-                    DT_CENTER | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
-                );
-            }
+            // Draw nothing in main window, handled by popup preview
         } else if s.submenu_active {
             fill(mdc, x + list_w, y + SEARCH_H, 1, h - SEARCH_H, CLR_DIV);
             fill(mdc, x + list_w + 1, y + SEARCH_H + 1, 238, h - SEARCH_H - 1, COLORREF(0x00_23_1D_19));
@@ -6996,6 +7123,13 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let _ = SelectObject(mdc, old);
     let _ = DeleteObject(bmp);
     let _ = DeleteDC(mdc);
+
+    if s.image_preview_active {
+        if let Some(h) = s.hwnd_preview {
+            let _ = unsafe { windows::Win32::Graphics::Gdi::InvalidateRect(h, None, FALSE) };
+        }
+    }
+
     let _ = EndPaint(hwnd, &ps);
 }
 

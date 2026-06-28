@@ -24,5 +24,6 @@
   2. ~~Optimize Full-screen behavior.~~ (Done: Set end_w to win_w to allow app to stretch horizontally)
   3. ~~Remove icons from the search filter (keep text only).~~ (Done: Center-aligned filter text)
   4. ~~Fix PDF icon (use system default icon).~~ (Done in prior steps)
-  5. Add functional theme (Light/Dark mode) switching.
-  6. Refactor the UI drawing inspired by Flow.Launcher (C# to Rust).
+  5. ~~Move image preview to a separate popup window.~~ (Done: Added preview_wnd_proc and show_preview_window helpers)
+  6. Add functional theme (Light/Dark mode) switching.
+  7. Refactor the UI drawing inspired by Flow.Launcher (C# to Rust).
