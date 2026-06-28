@@ -4,7 +4,6 @@ export component SettingsWindow inherits Window {
     title: "Settings";
     width: 800px;
     height: 600px;
-    background: #1e1e1e;
     
     // Properties to bind to Rust
     in-out property <bool> run-on-startup;
@@ -17,8 +16,25 @@ export component SettingsWindow inherits Window {
     
     // Callbacks to Rust
     callback save-settings();
+    callback record-hotkey();
     
     property <int> current-page: 0;
+    
+    // Theme Tokens
+    property <bool> is-light: false; // Locked to dark mode for settings app
+    property <color> bg-color: is-light ? #FAFAFA : #1e1e1e;
+    property <color> sidebar-bg: is-light ? #F0F0F0 : #252525;
+    property <color> card-bg: is-light ? #FFFFFF : #2b2b2b;
+    
+    property <color> text-primary: is-light ? #111111 : #ffffff;
+    property <color> text-secondary: is-light ? #555555 : #cccccc;
+    property <color> text-muted: is-light ? #777777 : #aaaaaa;
+    
+    property <color> hover-bg: is-light ? #E5E5E5 : #2f2f2f;
+    property <color> active-bg: is-light ? #D5D5D5 : #3a3a3a;
+    property <color> border-color: is-light ? #EAEAEA : #333333;
+
+    background: root.bg-color;
 
     HorizontalBox {
         padding: 0;
@@ -27,7 +43,7 @@ export component SettingsWindow inherits Window {
         // Sidebar Navigation
         Rectangle {
             width: 220px;
-            background: #252525;
+            background: root.sidebar-bg;
             
             VerticalBox {
                 padding-top: 32px;
@@ -39,7 +55,7 @@ export component SettingsWindow inherits Window {
                     text: "opensearch-os";
                     font-size: 18px;
                     font-weight: 700;
-                    color: #ffffff;
+                    color: root.text-primary;
                     horizontal-alignment: center;
                 }
                 
@@ -49,12 +65,12 @@ export component SettingsWindow inherits Window {
                 Rectangle {
                     height: 36px;
                     border-radius: 6px;
-                    background: root.current-page == 0 ? #3a3a3a : ta-general.has-hover ? #2f2f2f : transparent;
+                    background: root.current-page == 0 ? root.active-bg : ta-general.has-hover ? root.hover-bg : transparent;
                     animate background { duration: 150ms; }
                     
                     HorizontalBox {
                         padding-left: 12px;
-                        Text { text: "General"; vertical-alignment: center; color: root.current-page == 0 ? #ffffff : #cccccc; font-weight: root.current-page == 0 ? 600 : 400; }
+                        Text { text: "General"; vertical-alignment: center; color: root.current-page == 0 ? root.text-primary : root.text-secondary; font-weight: root.current-page == 0 ? 600 : 400; }
                     }
                     ta-general := TouchArea {
                         clicked => { root.current-page = 0; }
@@ -65,12 +81,12 @@ export component SettingsWindow inherits Window {
                 Rectangle {
                     height: 36px;
                     border-radius: 6px;
-                    background: root.current-page == 1 ? #3a3a3a : ta-appearance.has-hover ? #2f2f2f : transparent;
+                    background: root.current-page == 1 ? root.active-bg : ta-appearance.has-hover ? root.hover-bg : transparent;
                     animate background { duration: 150ms; }
                     
                     HorizontalBox {
                         padding-left: 12px;
-                        Text { text: "Appearance"; vertical-alignment: center; color: root.current-page == 1 ? #ffffff : #cccccc; font-weight: root.current-page == 1 ? 600 : 400; }
+                        Text { text: "Appearance"; vertical-alignment: center; color: root.current-page == 1 ? root.text-primary : root.text-secondary; font-weight: root.current-page == 1 ? 600 : 400; }
                     }
                     ta-appearance := TouchArea {
                         clicked => { root.current-page = 1; }
@@ -81,12 +97,12 @@ export component SettingsWindow inherits Window {
                 Rectangle {
                     height: 36px;
                     border-radius: 6px;
-                    background: root.current-page == 2 ? #3a3a3a : ta-hotkeys.has-hover ? #2f2f2f : transparent;
+                    background: root.current-page == 2 ? root.active-bg : ta-hotkeys.has-hover ? root.hover-bg : transparent;
                     animate background { duration: 150ms; }
                     
                     HorizontalBox {
                         padding-left: 12px;
-                        Text { text: "Hotkeys"; vertical-alignment: center; color: root.current-page == 2 ? #ffffff : #cccccc; font-weight: root.current-page == 2 ? 600 : 400; }
+                        Text { text: "Hotkeys"; vertical-alignment: center; color: root.current-page == 2 ? root.text-primary : root.text-secondary; font-weight: root.current-page == 2 ? 600 : 400; }
                     }
                     ta-hotkeys := TouchArea {
                         clicked => { root.current-page = 2; }
@@ -99,12 +115,12 @@ export component SettingsWindow inherits Window {
                 Rectangle {
                     height: 36px;
                     border-radius: 6px;
-                    background: root.current-page == 3 ? #3a3a3a : ta-about.has-hover ? #2f2f2f : transparent;
+                    background: root.current-page == 3 ? root.active-bg : ta-about.has-hover ? root.hover-bg : transparent;
                     animate background { duration: 150ms; }
                     
                     HorizontalBox {
                         padding-left: 12px;
-                        Text { text: "About"; vertical-alignment: center; color: root.current-page == 3 ? #ffffff : #cccccc; font-weight: root.current-page == 3 ? 600 : 400; }
+                        Text { text: "About"; vertical-alignment: center; color: root.current-page == 3 ? root.text-primary : root.text-secondary; font-weight: root.current-page == 3 ? 600 : 400; }
                     }
                     ta-about := TouchArea {
                         clicked => { root.current-page = 3; }
@@ -115,27 +131,29 @@ export component SettingsWindow inherits Window {
         
         // Main Content Area
         Rectangle {
-            background: #1e1e1e;
+            background: root.bg-color;
             
             ScrollView {
                 width: 100%;
                 height: 100%;
                 
                 VerticalBox {
-                    padding: 40px;
-                    spacing: 24px;
+                    padding: 24px;
+                    spacing: 12px;
                     
                     // General Page
                     if root.current-page == 0: VerticalBox {
-                        spacing: 24px;
-                        Text { text: "General Settings"; font-size: 26px; font-weight: 600; color: #ffffff; }
+                        spacing: 12px;
+                        Text { text: "General Settings"; font-size: 26px; font-weight: 600; color: root.text-primary; }
                         
                         Rectangle {
-                            background: #2b2b2b;
+                            background: root.card-bg;
                             border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
                             padding: 20px;
                             HorizontalBox {
-                                Text { text: "Run on startup"; vertical-alignment: center; color: #eeeeee; font-size: 14px; }
+                                Text { text: "Run on startup"; vertical-alignment: center; color: root.text-primary; font-size: 14px; }
                                 Rectangle { horizontal-stretch: 1; }
                                 CheckBox {
                                     checked: root.run-on-startup;
@@ -148,11 +166,13 @@ export component SettingsWindow inherits Window {
                         }
                         
                         Rectangle {
-                            background: #2b2b2b;
+                            background: root.card-bg;
                             border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
                             padding: 20px;
                             HorizontalBox {
-                                Text { text: "Hide on lose focus"; vertical-alignment: center; color: #eeeeee; font-size: 14px; }
+                                Text { text: "Hide on lose focus"; vertical-alignment: center; color: root.text-primary; font-size: 14px; }
                                 Rectangle { horizontal-stretch: 1; }
                                 CheckBox {
                                     checked: root.hide-on-lose-focus;
@@ -167,87 +187,57 @@ export component SettingsWindow inherits Window {
                     
                     // Appearance Page
                     if root.current-page == 1: VerticalBox {
-                        spacing: 24px;
-                        Text { text: "Appearance"; font-size: 26px; font-weight: 600; color: #ffffff; }
+                        spacing: 12px;
+                        Text { text: "Appearance"; font-size: 26px; font-weight: 600; color: root.text-primary; }
                         
                         Rectangle {
-                            background: #2b2b2b;
+                            background: root.card-bg;
                             border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
                             padding: 20px;
                             HorizontalBox {
-                                Text { text: "Theme"; vertical-alignment: center; color: #eeeeee; font-size: 14px; }
+                                Text { text: "Theme"; vertical-alignment: center; color: root.text-primary; font-size: 14px; }
                                 Rectangle { horizontal-stretch: 1; }
-                                ComboBox {
-                                    model: ["Light", "Dark"];
-                                    current-value: root.theme-mode;
-                                    selected(val) => {
-                                        root.theme-mode = val;
-                                        root.save-settings();
+                                HorizontalBox {
+                                    width: 160px;
+                                    ComboBox {
+                                        model: ["Light", "Dark"];
+                                        current-value: root.theme-mode;
+                                        selected(val) => {
+                                            root.theme-mode = val;
+                                            root.save-settings();
+                                        }
                                     }
                                 }
                             }
                         }
                         
-                        Rectangle {
-                            background: #2b2b2b;
-                            border-radius: 8px;
-                            padding: 20px;
-                            VerticalBox {
-                                spacing: 16px;
-                                HorizontalBox {
-                                    Text { text: "Window Width: " + root.window-width + "px"; vertical-alignment: center; color: #eeeeee; font-size: 14px; }
-                                }
-                                Slider {
-                                    minimum: 400;
-                                    maximum: 1200;
-                                    value: root.window-width;
-                                    changed(val) => {
-                                        root.window-width = Math.round(val);
-                                        root.save-settings();
-                                    }
-                                }
-                            }
-                        }
-                        
-                        Rectangle {
-                            background: #2b2b2b;
-                            border-radius: 8px;
-                            padding: 20px;
-                            VerticalBox {
-                                spacing: 16px;
-                                HorizontalBox {
-                                    Text { text: "Item Height: " + root.item-height + "px"; vertical-alignment: center; color: #eeeeee; font-size: 14px; }
-                                }
-                                Slider {
-                                    minimum: 40;
-                                    maximum: 120;
-                                    value: root.item-height;
-                                    changed(val) => {
-                                        root.item-height = Math.round(val);
-                                        root.save-settings();
-                                    }
-                                }
-                            }
-                        }
+
                     }
                     
                     // Hotkeys Page
                     if root.current-page == 2: VerticalBox {
-                        spacing: 24px;
-                        Text { text: "Hotkeys"; font-size: 26px; font-weight: 600; color: #ffffff; }
+                        spacing: 12px;
+                        Text { text: "Hotkeys"; font-size: 26px; font-weight: 600; color: root.text-primary; }
                         
                         Rectangle {
-                            background: #2b2b2b;
+                            background: root.card-bg;
                             border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
                             padding: 20px;
                             HorizontalBox {
-                                Text { text: "Global Hotkey"; vertical-alignment: center; color: #eeeeee; font-size: 14px; }
+                                Text { text: "Global Hotkey"; vertical-alignment: center; color: root.text-primary; font-size: 14px; }
                                 Rectangle { horizontal-stretch: 1; }
-                                LineEdit {
-                                    text: root.global-hotkey;
-                                    accepted(val) => {
-                                        root.global-hotkey = val;
-                                        root.save-settings();
+                                HorizontalBox {
+                                    width: 200px;
+                                    Button {
+                                        text: root.global-hotkey;
+                                        clicked => {
+                                            root.global-hotkey = "Listening...";
+                                            root.record-hotkey();
+                                        }
                                     }
                                 }
                             }
@@ -257,16 +247,18 @@ export component SettingsWindow inherits Window {
                     // About Page
                     if root.current-page == 3: VerticalBox {
                         spacing: 24px;
-                        Text { text: "About"; font-size: 26px; font-weight: 600; color: #ffffff; }
+                        Text { text: "About"; font-size: 26px; font-weight: 600; color: root.text-primary; }
                         Rectangle {
-                            background: #2b2b2b;
+                            background: root.card-bg;
                             border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
                             padding: 32px;
                             VerticalBox {
                                 spacing: 12px;
-                                Text { text: "opensearch-os"; font-size: 22px; font-weight: 700; color: #ffffff; }
-                                Text { text: "Version 0.1.0"; font-size: 14px; color: #aaaaaa; }
-                                Text { text: "A blazing fast Win32 search launcher in Rust."; color: #cccccc; font-size: 14px; }
+                                Text { text: "opensearch-os"; font-size: 22px; font-weight: 700; color: root.text-primary; }
+                                Text { text: "Version 0.1.0"; font-size: 14px; color: root.text-muted; }
+                                Text { text: "A blazing fast Win32 search launcher in Rust."; color: root.text-secondary; font-size: 14px; }
                             }
                         }
                     }

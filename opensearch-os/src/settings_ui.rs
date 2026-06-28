@@ -60,6 +60,20 @@ pub fn init_settings_window(hwnd: HWND) {
         }
     });
 
+    let ui_weak_hotkey = ui.as_weak();
+    ui.on_record_hotkey(move || {
+        let weak_clone = ui_weak_hotkey.clone();
+        std::thread::spawn(move || {
+            let recorded = crate::hotkey::record_hotkey_blocking();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak_clone.upgrade() {
+                    ui.set_global_hotkey(SharedString::from(recorded));
+                    ui.invoke_save_settings(); // Automatically save the newly recorded hotkey
+                }
+            });
+        });
+    });
+
     // Do not run here! If we run here, we block the thread. Wait, we are spawned in a background thread in main.rs, so blocking here is correct!
     // But we need to make sure the window is initially HIDDEN. 
     // In Slint, the window is shown automatically when `run` is called unless we hide it before.

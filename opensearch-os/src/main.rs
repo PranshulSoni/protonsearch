@@ -17,6 +17,8 @@ mod voice;
 
 use search::{SearchEngine, SearchResult};
 use std::os::windows::process::CommandExt;
+pub mod hotkey;
+
 use std::ptr::null_mut;
 use windows::{
     core::{Interface, PCWSTR},
@@ -981,21 +983,9 @@ unsafe fn run() {
         }
     });
 
-    // Win+Space is reserved by Windows IME; Alt+Space is the conventional launcher hotkey.
-    if RegisterHotKey(hwnd, HOTKEY_ID, MOD_ALT | MOD_NOREPEAT, VK_SPACE.0 as u32).is_err() {
-        use windows::Win32::UI::WindowsAndMessaging::MessageBoxW;
-        let msg: Vec<u16> = "Failed to register Alt+Space hotkey.\nAnother app may be using it.\0"
-            .encode_utf16()
-            .collect();
-        let title: Vec<u16> = "OpenSearch OS\0".encode_utf16().collect();
-        MessageBoxW(
-            HWND(null_mut()),
-            PCWSTR(msg.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONERROR,
-        );
-        return;
-    }
+    // Use the low-level keyboard hook for the global hotkey
+    crate::hotkey::set_hotkey_target(hwnd, &crate::settings::AppSettings::load().global_hotkey);
+    crate::hotkey::start_hook();
 
     // Ctrl+Shift+Space starts voice dictation. (Ctrl+Alt is AltGr on many layouts and
     // gets eaten, so it's deliberately avoided.) Non-fatal: the launcher works without it.
@@ -1018,7 +1008,6 @@ unsafe fn run() {
         DispatchMessageW(&msg);
     }
 
-    let _ = UnregisterHotKey(hwnd, HOTKEY_ID);
     let _ = UnregisterHotKey(hwnd, HOTKEY_VOICE_ID);
 }
 
@@ -1242,7 +1231,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             DefWindowProcW(hwnd, msg, wp, lp)
         }
 
-        WM_HOTKEY if wp.0 as i32 == HOTKEY_ID => {
+        // Handled via WH_KEYBOARD_LL hook now
+        msg if msg == WM_USER + 4 => {
             let s = &mut *sp;
             match s.anim {
                 Anim::Hidden | Anim::Hiding { .. } => do_show(hwnd, s),
@@ -1251,6 +1241,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
 
+        // Voice dictation hotkey still uses RegisterHotKey
         WM_HOTKEY if wp.0 as i32 == HOTKEY_VOICE_ID => {
             if !sp.is_null() {
                 start_voice_capture(hwnd, &mut *sp);
@@ -1301,7 +1292,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 if next == hwnd || next.0.is_null() {
                     return LRESULT(0);
                 }
-                if !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. }) {
+                if s.app_settings.hide_on_lose_focus && !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. }) {
                     start_hide(hwnd, s);
                 }
             }
