@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::sync::mpsc;
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM, HWND};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
@@ -58,9 +59,9 @@ static TARGET_HWND: Lazy<Mutex<Option<isize>>> = Lazy::new(|| Mutex::new(None));
 static IS_HOOKED: AtomicBool = AtomicBool::new(false);
 static HOOK_HANDLE: Lazy<Mutex<Option<isize>>> = Lazy::new(|| Mutex::new(None));
 
-// For the Settings UI to record a hotkey
+// For the Settings UI to record a hotkey - use channel for instant notification
 static RECORDING_MODE: AtomicBool = AtomicBool::new(false);
-static RECORDED_HOTKEY: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
+static RECORDING_SENDER: Lazy<Mutex<Option<mpsc::SyncSender<String>>>> = Lazy::new(|| Mutex::new(None));
 
 pub fn set_hotkey_target(hwnd: HWND, config_str: &str) {
     if let Ok(mut g) = TARGET_HWND.lock() {
@@ -140,10 +141,13 @@ unsafe extern "system" fn keyboard_hook_proc(ncode: i32, wparam: WPARAM, lparam:
                     parts.push(&key_str);
                     
                     let hotkey_str = parts.join("+");
-                    if let Ok(mut g) = RECORDED_HOTKEY.lock() {
-                        *g = Some(hotkey_str);
-                    }
                     RECORDING_MODE.store(false, Ordering::SeqCst);
+                    // Send instantly via channel - no spinloop needed
+                    if let Ok(guard) = RECORDING_SENDER.lock() {
+                        if let Some(sender) = guard.as_ref() {
+                            let _ = sender.try_send(hotkey_str);
+                        }
+                    }
                     
                     // Consume the keystroke so it doesn't trigger anything else!
                     return LRESULT(1);
@@ -173,52 +177,61 @@ unsafe extern "system" fn keyboard_hook_proc(ncode: i32, wparam: WPARAM, lparam:
 }
 
 pub fn record_hotkey_blocking() -> Option<String> {
-    // Spinlock waiting for recording to finish
+    // Create a sync channel - receives instantly when hook fires
+    let (tx, rx) = mpsc::sync_channel::<String>(1);
+    {
+        if let Ok(mut guard) = RECORDING_SENDER.lock() {
+            *guard = Some(tx);
+        }
+    }
     RECORDING_MODE.store(true, Ordering::SeqCst);
-    if let Ok(mut g) = RECORDED_HOTKEY.lock() {
-        *g = None;
-    }
     
-    let mut recorded_str = None;
-    loop {
-        if !RECORDING_MODE.load(Ordering::SeqCst) {
-            if let Ok(g) = RECORDED_HOTKEY.lock() {
-                if let Some(s) = &*g {
-                    recorded_str = Some(s.clone());
-                }
-            }
-            break;
+    // Block until the key is pressed (channel recv is instant, no spinloop)
+    let key_str = match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+        Ok(s) => s,
+        Err(_) => {
+            // Timed out or cancelled
+            RECORDING_MODE.store(false, Ordering::SeqCst);
+            return None;
         }
-        thread::sleep(std::time::Duration::from_millis(50));
+    };
+    
+    // Clean up the sender
+    if let Ok(mut guard) = RECORDING_SENDER.lock() {
+        *guard = None;
     }
     
-    if let Some(key_str) = recorded_str {
-        // Parse the recorded string to see if it conflicts
-        if let Some(cfg) = HotkeyConfig::parse(&key_str) {
-            let mut modifiers = MOD_NOREPEAT;
-            if cfg.alt { modifiers |= MOD_ALT; }
-            if cfg.ctrl { modifiers |= MOD_CONTROL; }
-            if cfg.shift { modifiers |= MOD_SHIFT; }
-            if cfg.win { modifiers |= MOD_WIN; }
-            
-            unsafe {
-                let test_id = 9999;
-                if RegisterHotKey(HWND(std::ptr::null_mut()), test_id, modifiers, cfg.vkey).is_err() {
-                    // Conflict!
-                    let msg: Vec<u16> = "This hotkey is already in use by Windows or another app.\n\nDo you want OmniSearch to forcefully override it?\n(Choosing Yes will hijack the hotkey globally)".encode_utf16().chain(std::iter::once(0)).collect();
-                    let title: Vec<u16> = "Hotkey Conflict\0".encode_utf16().collect();
-                    let res = MessageBoxW(HWND(std::ptr::null_mut()), windows::core::PCWSTR(msg.as_ptr()), windows::core::PCWSTR(title.as_ptr()), MB_YESNO | MB_ICONWARNING);
-                    if res.0 == 6 /* IDYES */ {
-                        return Some(key_str);
-                    } else {
-                        return None;
-                    }
+    // Check for hotkey conflicts via RegisterHotKey
+    if let Some(cfg) = HotkeyConfig::parse(&key_str) {
+        let mut modifiers = HOT_KEY_MODIFIERS(0);
+        if cfg.alt { modifiers |= MOD_ALT; }
+        if cfg.ctrl { modifiers |= MOD_CONTROL; }
+        if cfg.shift { modifiers |= MOD_SHIFT; }
+        if cfg.win { modifiers |= MOD_WIN; }
+        modifiers |= MOD_NOREPEAT;
+        
+        unsafe {
+            let test_id = 9999i32;
+            if RegisterHotKey(HWND(std::ptr::null_mut()), test_id, modifiers, cfg.vkey).is_err() {
+                // Conflict - show dialog
+                let msg: Vec<u16> = "This hotkey is already in use by Windows or another app.\n\nDo you want OmniSearch to forcefully override it?\n(Choosing Yes will hijack the hotkey globally)"
+                    .encode_utf16().chain(std::iter::once(0)).collect();
+                let title: Vec<u16> = "Hotkey Conflict\0".encode_utf16().collect();
+                let res = MessageBoxW(
+                    HWND(std::ptr::null_mut()),
+                    windows::core::PCWSTR(msg.as_ptr()),
+                    windows::core::PCWSTR(title.as_ptr()),
+                    MB_YESNO | MB_ICONWARNING
+                );
+                if res.0 == 6 /* IDYES */ {
+                    return Some(key_str);
                 } else {
-                    let _ = UnregisterHotKey(HWND(std::ptr::null_mut()), test_id);
+                    return None;
                 }
+            } else {
+                let _ = UnregisterHotKey(HWND(std::ptr::null_mut()), test_id);
             }
         }
-        return Some(key_str);
     }
-    None
+    Some(key_str)
 }

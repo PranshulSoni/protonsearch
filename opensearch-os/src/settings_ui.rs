@@ -94,27 +94,25 @@ pub fn init_settings_window(hwnd: HWND) {
 }
 
 pub fn show_settings_window() {
-    // If the UI is already running, show it via the event loop
+    // Always dispatch into the Slint event loop - don't check weak outside
     if let Ok(guard) = SETTINGS_UI.lock() {
         if let Some(weak) = guard.as_ref() {
-            if let Some(ui) = weak.upgrade() {
-                let weak_clone = weak.clone();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = weak_clone.upgrade() {
-                        
-                        // Refresh data just in case
-                        let settings = AppSettings::load();
-                        ui.set_run_on_startup(settings.run_on_startup);
-                        ui.set_hide_on_lose_focus(settings.hide_on_lose_focus);
-                        ui.set_theme_mode(SharedString::from(settings.theme_mode.clone()));
-                        ui.set_global_hotkey(SharedString::from(settings.global_hotkey.clone()));
-                        ui.set_window_width(settings.window_width as i32);
-                        ui.set_item_height(settings.item_height as i32);
-
-                        ui.window().show().unwrap();
-                    }
-                });
-            }
+            let weak_clone = weak.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak_clone.upgrade() {
+                    // Refresh data
+                    let settings = AppSettings::load();
+                    ui.set_run_on_startup(settings.run_on_startup);
+                    ui.set_hide_on_lose_focus(settings.hide_on_lose_focus);
+                    ui.set_theme_mode(SharedString::from(settings.theme_mode.clone()));
+                    ui.set_global_hotkey(SharedString::from(settings.global_hotkey.clone()));
+                    ui.set_window_width(settings.window_width as i32);
+                    ui.set_item_height(settings.item_height as i32);
+                    ui.window().show().unwrap();
+                    // Bring to front
+                    ui.window().set_minimized(false);
+                }
+            });
         }
     }
 }
