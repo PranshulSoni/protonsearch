@@ -120,6 +120,22 @@ pub struct SearchResult {
     pub score: f32,
 }
 
+fn content_match_source(extension: &str, only_code: bool) -> &'static str {
+    if matches!(extension, "png" | "jpg" | "jpeg" | "bmp" | "gif" | "webp") {
+        "OCR"
+    } else if only_code
+        || matches!(
+            extension,
+            "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "c" | "cpp" | "h" | "hpp" | "cs"
+                | "go" | "java" | "kt" | "swift" | "dart" | "rb" | "php"
+        )
+    {
+        "CODE_CONTENT"
+    } else {
+        "FILE_CONTENT"
+    }
+}
+
 /// lean-build allowlist: keep only the curated feature set. See SearchEngine::search.
 fn lean_allowed(r: &SearchResult) -> bool {
     let s = r.entry.source.as_str();
@@ -170,7 +186,17 @@ fn lean_allowed(r: &SearchResult) -> bool {
     // (8) bookmarks, plus clipboard history.
     matches!(
         s,
-        "FILE" | "RECENT" | "CODE" | "app" | "COMMIT" | "HISTORY" | "BOOKMARK" | "CLIPBOARD"
+        "FILE"
+            | "FILE_CONTENT"
+            | "RECENT"
+            | "CODE"
+            | "CODE_CONTENT"
+            | "OCR"
+            | "app"
+            | "COMMIT"
+            | "HISTORY"
+            | "BOOKMARK"
+            | "CLIPBOARD"
     )
 }
 
@@ -932,7 +958,8 @@ impl SearchEngine {
             }
             // Order by bm25 relevance and keep a generous cap so content/OCR matches
             // aren't cut off by arbitrary rowid order (was LIMIT 50, unordered → misses).
-            fts_params_vec.push(rusqlite::types::Value::Integer(300));
+            let fts_limit = if max_results <= 30 { 30 } else { 300 };
+            fts_params_vec.push(rusqlite::types::Value::Integer(fts_limit));
             let fts_params_ref = rusqlite::params_from_iter(fts_params_vec.iter());
             if let Ok(rows) = stmt_fts.query_map(fts_params_ref, |row| {
                 Ok((
@@ -951,6 +978,7 @@ impl SearchEngine {
                             results.iter_mut().find(|r| r.entry.launch_command == path)
                         {
                             existing.score += 0.5; // content match bonus
+                            existing.entry.source = content_match_source(&ext, only_code).to_string();
                         }
                         continue;
                     }
@@ -965,11 +993,7 @@ impl SearchEngine {
                         .split_whitespace()
                         .collect::<Vec<&str>>()
                         .join(" ");
-                    let source = if only_code || code_exts.contains(&ext.as_str()) {
-                        "CODE"
-                    } else {
-                        "FILE"
-                    };
+                    let source = content_match_source(&ext, only_code);
                     // Score: content-only matches intentionally score lower than filename matches.
                     // Base 0.8 + up to 1.5 name bonus keeps content matches below pure filename hits (score 1.8+).
                     let name_bonus = score_name(&name).min(1.5);
@@ -1020,8 +1044,7 @@ impl SearchEngine {
     }
 
     fn search_local_files(&self, query: &str) -> Vec<SearchResult> {
-        // General search: filename matches only (no FTS content-only results)
-        self.search_files_generic(query, false, 15, false)
+        self.search_files_generic(query, false, 30, true)
     }
 
     /*
@@ -4350,8 +4373,14 @@ impl SearchEngine {
         });
         file_matches.truncate(15); // Cap at 15 file results
         for m in &mut file_matches {
-            // General file search only returns title/name hits; content-only search stays behind web in file:/code:/img: scopes.
-            m.score += 70.0;
+            m.score += if matches!(
+                m.entry.source.as_str(),
+                "FILE_CONTENT" | "CODE_CONTENT" | "OCR"
+            ) {
+                40.0
+            } else {
+                70.0
+            };
         }
 
         if intent == Intent::FindFile {
@@ -4897,8 +4926,11 @@ mod tests {
         // kept
         for (s, c) in [
             ("FILE", "C:/x.pdf"),
+            ("FILE_CONTENT", "C:/x.pdf"),
             ("RECENT", "C:/x"),
             ("CODE", "C:/x.rs"),
+            ("CODE_CONTENT", "C:/x.rs"),
+            ("OCR", "C:/x.png"),
             ("app", "shell:AppsFolder\\X"),
             ("COMMIT", "x"),
             ("HISTORY", "https://x"),
@@ -4954,6 +4986,13 @@ mod tests {
         assert_eq!(index.description, "adjust screen");
         assert_eq!(index.source, "modern");
         assert_eq!(index.synonyms, "monitor|brightness");
+    }
+
+    #[test]
+    fn content_matches_are_classified_for_filters() {
+        assert_eq!(content_match_source("pdf", false), "FILE_CONTENT");
+        assert_eq!(content_match_source("rs", false), "CODE_CONTENT");
+        assert_eq!(content_match_source("png", false), "OCR");
     }
 
     #[test]

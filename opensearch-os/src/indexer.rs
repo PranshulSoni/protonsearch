@@ -11,7 +11,7 @@ const TEXT_EXTENSIONS: &[&str] = &[
     "xml", "rb", "php", "lua", "swift", "dart", "vue", "svelte", "csv", "tex", "rst", "adoc",
     "conf", "env",
 ];
-const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "bmp", "gif"];
+const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "bmp", "gif", "webp"];
 
 fn is_indexable_content(ext: &str) -> bool {
     TEXT_EXTENSIONS.contains(&ext)

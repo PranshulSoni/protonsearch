@@ -6602,10 +6602,10 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 let icon_to_draw = match res.entry.source.as_str() {
                     "ACTION" | "SYSTEM" | "WINDOW" => s.icon_new_commands,
                     "BOOKMARK" | "QUICKLINK" => s.icon_new_browser_bookmarks,
-                    "CODE" => s.icon_new_code,
+                    "CODE" | "CODE_CONTENT" => s.icon_new_code,
                     "CLIPBOARD" => s.icon_new_clipboard_history,
                     "COMMIT" => s.icon_new_git_commits,
-                    "FOLDER" | "FILE" | "RECENT" => s.icon_new_files,
+                    "FOLDER" | "FILE" | "FILE_CONTENT" | "RECENT" => s.icon_new_files,
                     "HISTORY" | "web" => s.icon_new_browser_history,
                     "MEMORY" | "AI" => s.icon_new_agent_history,
                     "PDF" => s.icon_new_content,
@@ -6658,9 +6658,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 let badge_source = &res.entry.source;
                 let label = match badge_source.as_str() {
                     "CODE" => "Code",
+                    "CODE_CONTENT" => "Code Content",
                     "PDF" => "PDF Content",
                     "OCR" => "Image OCR",
                     "FILE" => "File",
+                    "FILE_CONTENT" => "Content",
                     "Settings" => "Settings",
                     "SYSTEM" => "Command",
                     _ => badge_source,
@@ -6952,10 +6954,10 @@ fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
     let cmd = r.entry.launch_command.as_str();
     match ftype {
         FilterType::All => true,
-        FilterType::Files => src == "FILE" || src == "FOLDER" || src == "RECENT" || src == "PDF" || src == "DOCX",
-        FilterType::Content => src == "CONTENT" || src == "FILE_CONTENT" || src == "PDF" || src == "OCR",
+        FilterType::Files => src == "FILE" || src == "FILE_CONTENT" || src == "FOLDER" || src == "RECENT" || src == "PDF" || src == "DOCX",
+        FilterType::Content => src == "CONTENT" || src == "FILE_CONTENT" || src == "CODE_CONTENT" || src == "PDF" || src == "OCR",
         FilterType::Images => src == "IMAGE" || src == "OCR" || cmd.starts_with("copy_image:"),
-        FilterType::Code => src == "CODE" || src == "COMMIT" || src == "TODO" || src == "SNIPPET",
+        FilterType::Code => src == "CODE" || src == "CODE_CONTENT" || src == "COMMIT" || src == "TODO" || src == "SNIPPET",
         FilterType::Settings => src == "Settings" || cmd.starts_with("ms-settings:") || cmd.starts_with("control") || cmd.contains(".cpl") || cmd.ends_with(".msc"),
         FilterType::Commands => src == "SYSTEM" || src == "WINDOW" || src == "ACTION" || src == "AI" || src.eq_ignore_ascii_case("app"),
     }
