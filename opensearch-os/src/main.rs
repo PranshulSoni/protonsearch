@@ -500,38 +500,38 @@ unsafe fn run() {
     const SEARCH_ICO: &[u8] = include_bytes!("../../assets/logo/search.ico");
     const WEB_ICO: &[u8] = include_bytes!("../../assets/logo/web.ico");
 
-    let icon_settings = load_icon_from_memory(SETTINGS_ICO, 32);
-    let icon_control_panel = load_icon_from_memory(CONTROL_PANEL_ICO, 32);
-    let icon_search = load_icon_from_memory(SEARCH_ICO, 24);
-    let icon_web = load_icon_from_memory(WEB_ICO, 32);
-    let icon_bookmark = load_icon_from_dll("shell32.dll", 43, 32);
-    let icon_folder = load_icon_from_dll("shell32.dll", 3, 32);
-    let icon_commit = load_icon_from_dll("shell32.dll", 22, 32);
-    let icon_todo = load_icon_from_dll("shell32.dll", 270, 32);
-    let icon_clipboard = load_icon_from_dll("shell32.dll", 260, 32);
-    let icon_memory = load_icon_from_dll("shell32.dll", 238, 32);
+    let icon_settings = load_icon_from_memory(SETTINGS_ICO, 64);
+    let icon_control_panel = load_icon_from_memory(CONTROL_PANEL_ICO, 64);
+    let icon_search = load_icon_from_memory(SEARCH_ICO, 64);
+    let icon_web = load_icon_from_memory(WEB_ICO, 64);
+    let icon_bookmark = load_icon_from_dll("shell32.dll", 43, 64);
+    let icon_folder = load_icon_from_dll("shell32.dll", 3, 64);
+    let icon_commit = load_icon_from_dll("shell32.dll", 22, 64);
+    let icon_todo = load_icon_from_dll("shell32.dll", 270, 64);
+    let icon_clipboard = load_icon_from_dll("shell32.dll", 260, 64);
+    let icon_memory = load_icon_from_dll("shell32.dll", 238, 64);
 
-    let icon_new_agent_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/agent-history.png"));
-    let icon_new_all = load_png_to_hicon(include_bytes!("../../launcher_source_icons/all.png"));
-    let icon_new_browser_bookmarks = load_png_to_hicon(include_bytes!("../../launcher_source_icons/browser-bookmarks.png"));
-    let icon_new_browser_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/browser-history.png"));
-    let icon_new_clipboard_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/clipboard-history.png"));
-    let icon_new_code = load_png_to_hicon(include_bytes!("../../launcher_source_icons/code.png"));
-    let icon_new_commands = load_png_to_hicon(include_bytes!("../../launcher_source_icons/commands.png"));
-    let icon_new_content = load_png_to_hicon(include_bytes!("../../launcher_source_icons/content.png"));
-    let icon_new_enter = load_png_to_hicon(include_bytes!("../../launcher_source_icons/enter.png"));
-    let icon_new_esc = load_png_to_hicon(include_bytes!("../../launcher_source_icons/esc.png"));
-    let icon_new_files = load_png_to_hicon(include_bytes!("../../launcher_source_icons/files.png"));
-    let icon_new_git_commits = load_png_to_hicon(include_bytes!("../../launcher_source_icons/git-commits.png"));
-    let icon_new_images = load_png_to_hicon(include_bytes!("../../launcher_source_icons/images.png"));
-    let icon_new_local_files = load_png_to_hicon(include_bytes!("../../launcher_source_icons/local-files.png"));
-    let icon_new_mic = load_png_to_hicon(include_bytes!("../../launcher_source_icons/mic.png"));
-    let icon_new_navigate = load_png_to_hicon(include_bytes!("../../launcher_source_icons/navigate.png"));
-    let icon_new_search_screenshots = load_png_to_hicon(include_bytes!("../../launcher_source_icons/search-screenshots.png"));
-    let icon_new_search = load_png_to_hicon(include_bytes!("../../launcher_source_icons/search.png"));
-    let icon_new_settings = load_png_to_hicon(include_bytes!("../../launcher_source_icons/settings.png"));
-    let icon_new_source_code = load_png_to_hicon(include_bytes!("../../launcher_source_icons/source-code.png"));
-    let icon_new_tab = load_png_to_hicon(include_bytes!("../../launcher_source_icons/tab.png"));
+    let icon_new_agent_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/agent-history.png"), 64);
+    let icon_new_all = load_png_to_hicon(include_bytes!("../../launcher_source_icons/all.png"), 64);
+    let icon_new_browser_bookmarks = load_png_to_hicon(include_bytes!("../../launcher_source_icons/browser-bookmarks.png"), 64);
+    let icon_new_browser_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/browser-history.png"), 64);
+    let icon_new_clipboard_history = load_png_to_hicon(include_bytes!("../../launcher_source_icons/clipboard-history.png"), 64);
+    let icon_new_code = load_png_to_hicon(include_bytes!("../../launcher_source_icons/code.png"), 64);
+    let icon_new_commands = load_png_to_hicon(include_bytes!("../../launcher_source_icons/commands.png"), 64);
+    let icon_new_content = load_png_to_hicon(include_bytes!("../../launcher_source_icons/content.png"), 64);
+    let icon_new_enter = load_png_to_hicon(include_bytes!("../../launcher_source_icons/enter.png"), 64);
+    let icon_new_esc = load_png_to_hicon(include_bytes!("../../launcher_source_icons/esc.png"), 64);
+    let icon_new_files = load_png_to_hicon(include_bytes!("../../launcher_source_icons/files.png"), 64);
+    let icon_new_git_commits = load_png_to_hicon(include_bytes!("../../launcher_source_icons/git-commits.png"), 64);
+    let icon_new_images = load_png_to_hicon(include_bytes!("../../launcher_source_icons/images.png"), 64);
+    let icon_new_local_files = load_png_to_hicon(include_bytes!("../../launcher_source_icons/local-files.png"), 64);
+    let icon_new_mic = load_png_to_hicon(include_bytes!("../../launcher_source_icons/mic.png"), 64);
+    let icon_new_navigate = load_png_to_hicon(include_bytes!("../../launcher_source_icons/navigate.png"), 64);
+    let icon_new_search_screenshots = load_png_to_hicon(include_bytes!("../../launcher_source_icons/search-screenshots.png"), 64);
+    let icon_new_search = load_png_to_hicon(include_bytes!("../../launcher_source_icons/search.png"), 64);
+    let icon_new_settings = load_png_to_hicon(include_bytes!("../../launcher_source_icons/settings.png"), 64);
+    let icon_new_source_code = load_png_to_hicon(include_bytes!("../../launcher_source_icons/source-code.png"), 64);
+    let icon_new_tab = load_png_to_hicon(include_bytes!("../../launcher_source_icons/tab.png"), 64);
 
     let (icon_tx, icon_rx) = std::sync::mpsc::channel::<IconRequest>();
 
@@ -4327,6 +4327,8 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
         let _ = InvalidateRect(_hwnd, None, FALSE);
         return;
     }
+    s.results.clear(); // Clear results immediately to prevent old homepage items from rendering during typing lag
+    let _ = InvalidateRect(_hwnd, None, FALSE);
     s.current_query_id += 1;
     let req = SearchRequest {
         query: s.query.clone(),
@@ -5393,14 +5395,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
     // Draw Search Icon
     if !s.icon_new_search.0.is_null() {
-        let icon_y = y + (SEARCH_H - 24) / 2;
+        let icon_y = y + (SEARCH_H - 30) / 2;
         let _ = DrawIconEx(
             mdc,
-            x + PAD_L,
+            x + PAD_L + 3, // x + 27 (symmetrical 27px margin)
             icon_y,
             s.icon_new_search,
-            24,
-            24,
+            30,
+            30,
             0,
             HBRUSH(null_mut()),
             DI_NORMAL,
@@ -5483,14 +5485,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     // muted otherwise. Click toggles dictation (hit-test in WM_LBUTTONDOWN).
     if w >= WIN_W - 8 {
         if !s.icon_new_mic.0.is_null() {
-            let icon_y = y + (SEARCH_H - 24) / 2;
+            let icon_y = y + (SEARCH_H - 30) / 2;
             let _ = DrawIconEx(
                 mdc,
-                x + w - 48,
+                x + w - PAD_L - 30 - 3, // x + w - 57 (symmetrical 27px margin)
                 icon_y,
                 s.icon_new_mic,
-                24,
-                24,
+                30,
+                30,
                 0,
                 HBRUSH(null_mut()),
                 DI_NORMAL,
@@ -7300,7 +7302,7 @@ unsafe fn load_icon_from_memory(bytes: &[u8], size: i32) -> HICON {
     HICON(null_mut())
 }
 
-unsafe fn load_png_to_hicon(bytes: &[u8]) -> HICON {
+unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
     use windows::Win32::Graphics::Gdi::{
         CreateDIBSection, DeleteObject, GetDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, CreateBitmap,
     };
@@ -7309,7 +7311,7 @@ unsafe fn load_png_to_hicon(bytes: &[u8]) -> HICON {
     };
     
     let img = match image::load_from_memory_with_format(bytes, image::ImageFormat::Png) {
-        Ok(img) => img.into_rgba8(),
+        Ok(img) => img.resize(size, size, image::imageops::FilterType::Lanczos3).into_rgba8(),
         Err(_) => return HICON(null_mut()),
     };
     
