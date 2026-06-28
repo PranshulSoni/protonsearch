@@ -2669,11 +2669,47 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         WM_TRAYICON => {
             let l_event = lp.0 as u32;
             use windows::Win32::UI::WindowsAndMessaging::{WM_LBUTTONUP, WM_RBUTTONUP};
-            if l_event == WM_LBUTTONUP || l_event == WM_RBUTTONUP {
+            if l_event == WM_LBUTTONUP {
                 if !sp.is_null() {
                     let s = &mut *sp;
                     do_show(hwnd, s);
                 }
+            } else if l_event == WM_RBUTTONUP {
+                use windows::Win32::UI::WindowsAndMessaging::{
+                    CreatePopupMenu, AppendMenuW, TrackPopupMenu, DestroyMenu, MF_STRING, 
+                    TPM_RIGHTBUTTON, TPM_BOTTOMALIGN, SetForegroundWindow, WM_NULL
+                };
+                let hmenu = unsafe { CreatePopupMenu().unwrap() };
+                let mut open_text: Vec<u16> = "Open".encode_utf16().chain(std::iter::once(0)).collect();
+                let _ = unsafe { AppendMenuW(hmenu, MF_STRING, 1, PCWSTR(open_text.as_ptr())) };
+                
+                let mut exit_text: Vec<u16> = "Exit".encode_utf16().chain(std::iter::once(0)).collect();
+                let _ = unsafe { AppendMenuW(hmenu, MF_STRING, 2, PCWSTR(exit_text.as_ptr())) };
+                
+                let mut pt = POINT::default();
+                let _ = unsafe { GetCursorPos(&mut pt) };
+                
+                let _ = unsafe { SetForegroundWindow(hwnd) };
+                
+                let _ = unsafe { TrackPopupMenu(hmenu, TPM_RIGHTBUTTON | TPM_BOTTOMALIGN, pt.x, pt.y, 0, hwnd, None) };
+                let _ = unsafe { PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)) };
+                
+                let _ = unsafe { DestroyMenu(hmenu) };
+            }
+            LRESULT(0)
+        }
+
+        windows::Win32::UI::WindowsAndMessaging::WM_COMMAND => {
+            let cmd = wp.0 & 0xFFFF;
+            if cmd == 1 {
+                // Open App
+                if !sp.is_null() {
+                    let s = &mut *sp;
+                    do_show(hwnd, s);
+                }
+            } else if cmd == 2 {
+                // Exit App
+                let _ = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) };
             }
             LRESULT(0)
         }
