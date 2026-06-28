@@ -3081,6 +3081,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     _ => Theme::Darker,
                 };
                 
+                // Update the low-level keyboard hook with the new hotkey
+                crate::hotkey::set_hotkey_target(hwnd, &s.app_settings.global_hotkey);
+                
                 // Parse theme manually if needed, or trigger redraw
                 unsafe {
                     windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
