@@ -47,6 +47,7 @@ const TIMER_CURSOR_BLINK: usize = 2;
 const TIMER_VOICE_AUTOEXEC: usize = 3;
 const TIMER_VOICE_ANIM: usize = 4;
 const TIMER_AI_ANIM: usize = 5;
+const TIMER_ICON_BATCH: usize = 6;
 const CURSOR_BLINK_MS: u32 = 530;
 const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
@@ -127,6 +128,7 @@ struct State {
     chat_cursor_pos: usize,
     chat_input_active: bool,
     results: Vec<SearchResult>,
+    results_stale: bool,
     selected: usize,
     anim: Anim,
     cx: i32,
@@ -266,6 +268,7 @@ impl State {
     fn reset_results(&mut self) {
         if self.query.is_empty() {
             self.results = default_homepage_results();
+            self.results_stale = false;
             self.selected = 2; // "Git Commits"
             self.scroll_offset = 0;
         } else {
@@ -558,6 +561,7 @@ unsafe fn run() {
         chat_cursor_pos: 0,
         chat_input_active: false,
         results: default_homepage_results(),
+        results_stale: false,
         selected: 2,
         anim: Anim::Hidden,
         cx: sw / 2,
@@ -1028,9 +1032,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 }
             }
 
-            unsafe {
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
+            let _ = KillTimer(hwnd, TIMER_ICON_BATCH);
+            let _ = SetTimer(hwnd, TIMER_ICON_BATCH, 40, None);
             LRESULT(0)
         }
 
@@ -1127,6 +1130,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             if !sp.is_null() {
                 let s = &mut *sp;
                 if query_id == s.current_query_id {
+                    s.results_stale = false;
                     s.filter_counts = filter_counts_for_results(&results);
                     let mut filtered = results;
                     if !matches!(s.active_filter, FilterType::All) {
@@ -1290,6 +1294,10 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     s.ai_tick = (s.ai_tick + 1) % 60;
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
+                TIMER_ICON_BATCH => {
+                    let _ = KillTimer(hwnd, TIMER_ICON_BATCH);
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
                 TIMER_VOICE_AUTOEXEC => {
                     let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
                     let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
@@ -1372,9 +1380,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     s.query.insert(s.cursor_pos, c);
                     s.cursor_pos += c.len_utf8();
                     s.selected = 0;
-                    s.results.clear(); // Clear results immediately to hide homepage
                     s.scroll_offset = 0;
-                    kick_debounce(hwnd);
+                    kick_debounce(hwnd, s);
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
@@ -1654,7 +1661,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                             s.reset_results();
                         } else {
                             s.selected = 0;
-                            s.results.clear(); // Clear results immediately to hide homepage
                         }
                         reset_cursor_blink(hwnd, s);
                         let _ = InvalidateRect(hwnd, None, FALSE);
@@ -1961,10 +1967,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         s.reset_results();
                     } else {
                         s.selected = 0;
-                        s.results.clear(); // Clear results immediately to hide homepage
                     }
                     s.scroll_offset = 0;
-                    kick_debounce(hwnd);
+                            kick_debounce(hwnd, s);
                     reset_cursor_blink(hwnd, s);
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
@@ -2063,7 +2068,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         s.query.remove(s.cursor_pos);
                         s.selected = 0;
                         s.scroll_offset = 0;
-                        kick_debounce(hwnd);
+                        kick_debounce(hwnd, s);
                         reset_cursor_blink(hwnd, s);
                         let _ = InvalidateRect(hwnd, None, FALSE);
                     }
@@ -3731,6 +3736,11 @@ fn ai_scroll_down(s: &mut State, step: i32) {
 }
 
 unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
+    if s.results_stale {
+        let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
+        trigger_search(hwnd, s);
+        return;
+    }
     if let Some(r) = s.results.get(s.selected) {
         let cmd = r.entry.launch_command.clone();
         let ctrl_name = r.entry.control_name.clone();
@@ -4354,7 +4364,8 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
     }
 }
 
-unsafe fn kick_debounce(hwnd: HWND) {
+unsafe fn kick_debounce(hwnd: HWND, s: &mut State) {
+    s.results_stale = true;
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
     let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 150, None);
 }
@@ -4366,14 +4377,14 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
         return;
     }
     if s.query.is_empty() {
+        s.results_stale = false;
         s.results = default_homepage_results();
         s.selected = 2; // select Git Commits on homepage
         s.scroll_offset = 0;
         let _ = InvalidateRect(_hwnd, None, FALSE);
         return;
     }
-    s.results.clear(); // Clear results immediately to prevent old homepage items from rendering during typing lag
-    let _ = InvalidateRect(_hwnd, None, FALSE);
+    s.results_stale = true;
     s.current_query_id += 1;
     let req = SearchRequest {
         query: s.query.clone(),
@@ -7745,9 +7756,8 @@ unsafe fn paste_clipboard_into_query(hwnd: HWND, s: &mut State, search_now: bool
         }
         if search_now {
             s.selected = 0;
-            s.results.clear(); // Clear results immediately to hide homepage
             s.scroll_offset = 0;
-            kick_debounce(hwnd);
+            kick_debounce(hwnd, s);
         }
     } else if save_clipboard_image(hwnd, &s.db_path, "Pasted Image").is_some() {
         s.query = "clip:".to_string();
