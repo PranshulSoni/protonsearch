@@ -4387,26 +4387,14 @@ impl SearchEngine {
                     }
                 }
 
-                // If not found in git repos, check folder names in indexed files
+                // If not found in git repos, check folder names in indexed files using SQLite query to avoid loading all paths
                 if matched_project_name.is_none() {
-                    if let Ok(mut s) = conn.prepare("SELECT path FROM files WHERE is_dir = 1") {
-                        let paths: Vec<String> = s
-                            .query_map([], |row| row.get::<_, String>(0))
-                            .map(|m| m.filter_map(|r| r.ok()).collect())
-                            .unwrap_or_default();
-                        for path in paths {
-                            if let Some(folder_name) = std::path::Path::new(&path).file_name() {
-                                let folder_name_lc = folder_name.to_string_lossy().to_lowercase();
-                                if !folder_name_lc.is_empty()
-                                    && (q_lower_trimmed == folder_name_lc
-                                        || q_lower_trimmed.contains(&folder_name_lc)
-                                        || folder_name_lc.contains(&q_lower_trimmed))
-                                {
-                                    matched_project_name =
-                                        Some(folder_name.to_string_lossy().into_owned());
-                                    break;
-                                }
-                            }
+                    let folder_like = format!("%{}%", q_lower_trimmed);
+                    if let Ok(mut s) = conn.prepare(
+                        "SELECT name FROM files WHERE is_dir = 1 AND (name LIKE ?1 OR ?2 LIKE '%' || name || '%') LIMIT 1"
+                    ) {
+                        if let Ok(name) = s.query_row([&folder_like, &q_lower_trimmed], |row| row.get::<_, String>(0)) {
+                            matched_project_name = Some(name);
                         }
                     }
                 }
