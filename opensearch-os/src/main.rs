@@ -983,8 +983,17 @@ unsafe fn run() {
         }
     });
 
-    // Use the low-level keyboard hook for the global hotkey
-    crate::hotkey::set_hotkey_target(hwnd, &crate::settings::AppSettings::load().global_hotkey);
+    // Flow Launcher uses a native registered hotkey for the launcher toggle; keep
+    // the low-level hook only for recording a new shortcut in Settings.
+    let settings = crate::settings::AppSettings::load();
+    if !crate::hotkey::register_hotkey(hwnd, HOTKEY_ID, &settings.global_hotkey) {
+        voice::log(&format!(
+            "launcher hotkey {} registration FAILED (already in use?)",
+            settings.global_hotkey
+        ));
+    } else {
+        voice::log(&format!("launcher hotkey {} registered", settings.global_hotkey));
+    }
     crate::hotkey::start_hook();
 
     // Ctrl+Shift+Space starts voice dictation. (Ctrl+Alt is AltGr on many layouts and
@@ -1008,6 +1017,7 @@ unsafe fn run() {
         DispatchMessageW(&msg);
     }
 
+    let _ = UnregisterHotKey(hwnd, HOTKEY_ID);
     let _ = UnregisterHotKey(hwnd, HOTKEY_VOICE_ID);
 }
 
@@ -1231,8 +1241,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             DefWindowProcW(hwnd, msg, wp, lp)
         }
 
-        // Handled via WH_KEYBOARD_LL hook now
-        msg if msg == WM_USER + 4 => {
+        WM_HOTKEY if wp.0 as i32 == HOTKEY_ID => {
             let s = &mut *sp;
             match s.anim {
                 Anim::Hidden | Anim::Hiding { .. } => do_show(hwnd, s),
@@ -3081,12 +3090,21 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     _ => Theme::Darker,
                 };
                 
-                // Update the low-level keyboard hook with the new hotkey
-                crate::hotkey::set_hotkey_target(hwnd, &s.app_settings.global_hotkey);
+                if !crate::hotkey::register_hotkey(hwnd, HOTKEY_ID, &s.app_settings.global_hotkey) {
+                    voice::log(&format!(
+                        "launcher hotkey {} registration FAILED (already in use?)",
+                        s.app_settings.global_hotkey
+                    ));
+                } else {
+                    voice::log(&format!(
+                        "launcher hotkey {} registered",
+                        s.app_settings.global_hotkey
+                    ));
+                }
                 
                 // Parse theme manually if needed, or trigger redraw
                 unsafe {
-                    windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
                 }
             }
             LRESULT(0)

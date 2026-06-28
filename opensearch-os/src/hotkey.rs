@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
 use std::sync::mpsc;
-use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM, HWND};
+use std::sync::Mutex;
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use once_cell::sync::Lazy;
@@ -36,8 +36,19 @@ impl HotkeyConfig {
                 "win" => win = true,
                 "space" => if is_last { vkey = VK_SPACE.0 as u32; },
                 "enter" => if is_last { vkey = VK_RETURN.0 as u32; },
-                "esc" => if is_last { vkey = VK_ESCAPE.0 as u32; },
+                "esc" | "escape" => if is_last { vkey = VK_ESCAPE.0 as u32; },
                 "tab" => if is_last { vkey = VK_TAB.0 as u32; },
+                "up" => if is_last { vkey = VK_UP.0 as u32; },
+                "down" => if is_last { vkey = VK_DOWN.0 as u32; },
+                "left" => if is_last { vkey = VK_LEFT.0 as u32; },
+                "right" => if is_last { vkey = VK_RIGHT.0 as u32; },
+                k if is_last && k.starts_with('f') => {
+                    if let Ok(n) = k[1..].parse::<u32>() {
+                        if (1..=24).contains(&n) {
+                            vkey = VK_F1.0 as u32 + n - 1;
+                        }
+                    }
+                }
                 k if k.len() == 1 => {
                     let c = k.chars().next().unwrap();
                     if c.is_ascii_alphabetic() {
@@ -52,10 +63,17 @@ impl HotkeyConfig {
         if vkey == 0 { return None; }
         Some(Self { ctrl, alt, shift, win, vkey })
     }
+
+    pub fn modifiers(&self) -> HOT_KEY_MODIFIERS {
+        let mut modifiers = HOT_KEY_MODIFIERS(0);
+        if self.alt { modifiers |= MOD_ALT; }
+        if self.ctrl { modifiers |= MOD_CONTROL; }
+        if self.shift { modifiers |= MOD_SHIFT; }
+        if self.win { modifiers |= MOD_WIN; }
+        modifiers | MOD_NOREPEAT
+    }
 }
 
-static CURRENT_HOTKEY: Lazy<Mutex<Option<HotkeyConfig>>> = Lazy::new(|| Mutex::new(None));
-static TARGET_HWND: Lazy<Mutex<Option<isize>>> = Lazy::new(|| Mutex::new(None));
 static IS_HOOKED: AtomicBool = AtomicBool::new(false);
 static HOOK_HANDLE: Lazy<Mutex<Option<isize>>> = Lazy::new(|| Mutex::new(None));
 
@@ -63,14 +81,13 @@ static HOOK_HANDLE: Lazy<Mutex<Option<isize>>> = Lazy::new(|| Mutex::new(None));
 static RECORDING_MODE: AtomicBool = AtomicBool::new(false);
 static RECORDING_SENDER: Lazy<Mutex<Option<mpsc::SyncSender<String>>>> = Lazy::new(|| Mutex::new(None));
 
-pub fn set_hotkey_target(hwnd: HWND, config_str: &str) {
-    if let Ok(mut g) = TARGET_HWND.lock() {
-        *g = Some(hwnd.0 as isize);
-    }
-    if let Some(parsed) = HotkeyConfig::parse(config_str) {
-        if let Ok(mut g) = CURRENT_HOTKEY.lock() {
-            *g = Some(parsed);
-        }
+pub fn register_hotkey(hwnd: HWND, id: i32, config_str: &str) -> bool {
+    unsafe {
+        let _ = UnregisterHotKey(hwnd, id);
+        let Some(cfg) = HotkeyConfig::parse(config_str) else {
+            return false;
+        };
+        RegisterHotKey(hwnd, id, cfg.modifiers(), cfg.vkey).is_ok()
     }
 }
 
@@ -153,22 +170,6 @@ unsafe extern "system" fn keyboard_hook_proc(ncode: i32, wparam: WPARAM, lparam:
                     return LRESULT(1);
                 }
                 
-                // 2. Are we checking for the global launcher hotkey?
-                if let Ok(g) = CURRENT_HOTKEY.lock() {
-                    if let Some(cfg) = &*g {
-                        if cfg.ctrl == ctrl && cfg.alt == alt && cfg.shift == shift && cfg.win == win && cfg.vkey == vkey {
-                            // Match! Send message to main window
-                            if let Ok(hwnd_g) = TARGET_HWND.lock() {
-                                if let Some(hwnd_isize) = *hwnd_g {
-                                    let hwnd = HWND(hwnd_isize as *mut std::ffi::c_void);
-                                    PostMessageW(hwnd, WM_USER + 4, WPARAM(0), LPARAM(0));
-                                    // Block keystroke so windows doesn't process it!
-                                    return LRESULT(1); 
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -234,4 +235,32 @@ pub fn record_hotkey_blocking() -> Option<String> {
         }
     }
     Some(key_str)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_common_launcher_hotkeys() {
+        let alt_space = HotkeyConfig::parse("Alt+Space").unwrap();
+        assert!(alt_space.alt);
+        assert!(!alt_space.ctrl);
+        assert_eq!(alt_space.vkey, VK_SPACE.0 as u32);
+
+        let ctrl_shift_f12 = HotkeyConfig::parse("Ctrl + Shift + F12").unwrap();
+        assert!(ctrl_shift_f12.ctrl);
+        assert!(ctrl_shift_f12.shift);
+        assert_eq!(ctrl_shift_f12.vkey, VK_F12.0 as u32);
+    }
+
+    #[test]
+    fn builds_register_hotkey_modifiers() {
+        let cfg = HotkeyConfig::parse("Ctrl+Alt+K").unwrap();
+        let modifiers = cfg.modifiers();
+        assert_ne!(modifiers & MOD_CONTROL, HOT_KEY_MODIFIERS(0));
+        assert_ne!(modifiers & MOD_ALT, HOT_KEY_MODIFIERS(0));
+        assert_ne!(modifiers & MOD_NOREPEAT, HOT_KEY_MODIFIERS(0));
+        assert_eq!(cfg.vkey, b'K' as u32);
+    }
 }
