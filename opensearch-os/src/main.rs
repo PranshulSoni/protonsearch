@@ -370,6 +370,7 @@ struct State {
     active_chat_id: Option<i64>,          // persistent chat thread ID in ai_chats table
     // Hermes Runs API: a pending tool approval (None = nothing to approve).
     hermes_approval: Option<ai::HermesApproval>,
+    unfiltered_results: Vec<SearchResult>,
     search_loading: bool,
     search_anim_tick: usize,
 }
@@ -982,6 +983,7 @@ unsafe fn run() {
         ai_tick: 0,
         active_chat_id: None,
         hermes_approval: None,
+        unfiltered_results: default_homepage_results(),
         search_loading: false,
         search_anim_tick: 0,
     });
@@ -1704,8 +1706,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         s.search_loading = false;
                         let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
                     }
-                    s.filter_counts = filter_counts_for_results(&results);
-                    let mut filtered = results;
+                    s.unfiltered_results = results;
+                    s.filter_counts = filter_counts_for_results(&s.unfiltered_results);
+                    let mut filtered = s.unfiltered_results.clone();
                     if !matches!(s.active_filter, FilterType::All) {
                         filtered.retain(|r| result_matches_filter(r, s.active_filter));
                     }
@@ -2966,23 +2969,20 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let rects = filter_pill_rects(s, x_start, list_y);
                 for (ftype, r) in rects {
                     if mx >= r.left && mx < r.right && my >= r.top && my < r.bottom {
-                        let current_active = if s.has_prefix() {
-                            filter_type_from_prefix(&s.query)
-                        } else {
-                            s.active_filter
-                        };
-                        if current_active != ftype {
-                            if s.has_prefix() {
-                                let new_query = update_query_for_filter(&s.query, ftype);
-                                s.query = new_query;
-                                s.cursor_pos = s.query.len();
+                        if s.active_filter != ftype {
+                            s.active_filter = ftype;
+                            let mut filtered = s.unfiltered_results.clone();
+                            if !matches!(s.active_filter, FilterType::All) {
+                                filtered.retain(|r| result_matches_filter(r, s.active_filter));
+                            }
+                            s.results = filtered;
+                            s.result_reasons = compute_result_reasons(&s.results);
+                            if s.results.is_empty() {
                                 s.selected = 0;
                                 s.scroll_offset = 0;
-                                s.results.clear();
-                                trigger_search(hwnd, s);
                             } else {
-                                s.active_filter = ftype;
-                                trigger_search(hwnd, s);
+                                s.selected = s.selected.min(s.results.len() - 1);
+                                s.scroll_offset = s.scroll_offset.min(s.results.len().saturating_sub(VISIBLE_RESULTS));
                             }
                             let _ = InvalidateRect(hwnd, None, FALSE);
                         }
@@ -5208,7 +5208,14 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
     if s.query.is_empty() {
         s.current_query_id += 1;
         s.results_stale = false;
-        s.results = default_homepage_results();
+        s.search_loading = false;
+        let _ = KillTimer(_hwnd, TIMER_SEARCH_ANIM);
+        s.unfiltered_results = default_homepage_results();
+        let mut filtered = s.unfiltered_results.clone();
+        if !matches!(s.active_filter, FilterType::All) {
+            filtered.retain(|r| result_matches_filter(r, s.active_filter));
+        }
+        s.results = filtered;
         // Land on the homepage item the user last visited, not a fixed default.
         s.selected = s.homepage_sel.min(s.results.len().saturating_sub(1));
         s.scroll_offset = 0;
