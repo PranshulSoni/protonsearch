@@ -22,7 +22,7 @@ fn get_desktop_wallpaper_path() -> Option<String> {
     let mut buffer = [0u16; 512];
     let success = unsafe {
         windows::Win32::UI::WindowsAndMessaging::SystemParametersInfoW(
-            windows::Win32::UI::WindowsAndMessaging::SPI_GETDESKTOPWALLPAPER,
+            windows::Win32::UI::WindowsAndMessaging::SPI_GETDESKWALLPAPER,
             buffer.len() as u32,
             Some(buffer.as_mut_ptr() as *mut std::ffi::c_void),
             Default::default(),
