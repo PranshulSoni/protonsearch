@@ -557,28 +557,6 @@ fn save_ai_settings(api_key: &str, endpoint: &str, model: &str, always_approve: 
     }
 }
 
-fn get_indexed_files_count() -> u32 {
-    if let Some(conn) = get_db_conn() {
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS files (
-                path TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                extension TEXT NOT NULL,
-                modified INTEGER NOT NULL,
-                size INTEGER NOT NULL DEFAULT 0,
-                is_dir INTEGER NOT NULL DEFAULT 0
-            );",
-            [],
-        );
-        if let Ok(count) =
-            conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, i64>(0))
-        {
-            return count as u32;
-        }
-    }
-    0
-}
-
 fn pick_folder() -> Option<std::path::PathBuf> {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
