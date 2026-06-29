@@ -7808,11 +7808,18 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     res.entry.control_name.clone()
                 };
                 let mut name: Vec<u16> = display_name.encode_utf16().collect();
+
+                let mut sz_name = SIZE::default();
+                unsafe {
+                    SelectObject(mdc, s.font_n);
+                    let _ = GetTextExtentPoint32W(mdc, &name, &mut sz_name);
+                }
+
                 let badge_left = x + list_w - PAD_L - BADGE_W;
                 let mut r = RECT {
                     left: tx,
                     top: text_top,
-                    right: badge_left - 14,
+                    right: (tx + sz_name.cx + 2).min(badge_left - 14),
                     bottom: text_top + 22,
                 };
                 let _ = DrawTextW(
@@ -7822,34 +7829,67 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
                 );
 
+                let default_gray = if is_selected {
+                    palette.clr_gray_sel
+                } else {
+                    palette.clr_gray
+                };
+
                 let reason = s
                     .result_reasons
                     .get(&res.entry.launch_command)
                     .filter(|r| !r.is_empty());
                 let reason_slot = if reason.is_some() { 96 } else { 0 };
 
-                SelectObject(mdc, s.font_c);
-                SetTextColor(
-                    mdc,
-                    if is_selected {
-                        palette.clr_gray_sel
-                    } else {
-                        palette.clr_gray
-                    },
-                );
-                let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
-                let mut r2 = RECT {
-                    left: tx,
-                    top: text_top + 22,
-                    right: badge_left - 14 - reason_slot,
-                    bottom: text_top + RESULT_TEXT_BLOCK_H,
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut crumb,
-                    &mut r2,
-                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
-                );
+                if !res.entry.description.is_empty() {
+                    // Draw breadcrumb path on Line 1 next to control_name
+                    let separator = "  —  ".to_string();
+                    let full_path = separator + &res.entry.breadcrumb_path;
+                    let mut path_w: Vec<u16> = full_path.encode_utf16().collect();
+                    SelectObject(mdc, s.font_c);
+                    SetTextColor(mdc, default_gray);
+
+                    let mut r_path = RECT {
+                        left: tx + sz_name.cx + 4,
+                        top: text_top + 2,
+                        right: badge_left - 14,
+                        bottom: text_top + 22,
+                    };
+                    let _ = DrawTextW(
+                        mdc,
+                        &mut path_w,
+                        &mut r_path,
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+                    );
+
+                    // Draw description on Line 2
+                    draw_highlighted_text(
+                        mdc,
+                        &res.entry.description,
+                        clean_query_prefix(&s.query),
+                        s.font_c,
+                        default_gray,
+                        palette.clr_accent,
+                        tx,
+                        text_top + 22,
+                    );
+                } else {
+                    SelectObject(mdc, s.font_c);
+                    SetTextColor(mdc, default_gray);
+                    let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
+                    let mut r2 = RECT {
+                        left: tx,
+                        top: text_top + 22,
+                        right: badge_left - 14 - reason_slot,
+                        bottom: text_top + RESULT_TEXT_BLOCK_H,
+                    };
+                    let _ = DrawTextW(
+                        mdc,
+                        &mut crumb,
+                        &mut r2,
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+                    );
+                }
 
                 if let Some(reason) = reason {
                     SetTextColor(mdc, palette.clr_ph);
@@ -7991,10 +8031,18 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 SetTextColor(mdc, palette.clr_white);
                 let display_name = res.entry.control_name.clone();
                 let mut name: Vec<u16> = display_name.encode_utf16().collect();
+
+                let mut sz_name = SIZE::default();
+                unsafe {
+                    SelectObject(mdc, s.font_n);
+                    let _ = GetTextExtentPoint32W(mdc, &name, &mut sz_name);
+                }
+
+                let badge_limit = x + list_w - PAD_L - 100;
                 let mut r = RECT {
                     left: tx,
                     top: text_top,
-                    right: x + list_w - PAD_L - 100,
+                    right: (tx + sz_name.cx + 2).min(badge_limit),
                     bottom: text_top + 22,
                 };
                 let _ = DrawTextW(
@@ -8010,10 +8058,31 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     palette.clr_gray
                 };
                 if !res.entry.description.is_empty() {
+                    // Draw breadcrumb path on Line 1 next to control_name
+                    let separator = "  —  ".to_string();
+                    let full_path = separator + &res.entry.breadcrumb_path;
+                    let mut path_w: Vec<u16> = full_path.encode_utf16().collect();
+                    SelectObject(mdc, s.font_c);
+                    SetTextColor(mdc, default_gray);
+
+                    let mut r_path = RECT {
+                        left: tx + sz_name.cx + 4,
+                        top: text_top + 2,
+                        right: badge_limit,
+                        bottom: text_top + 22,
+                    };
+                    let _ = DrawTextW(
+                        mdc,
+                        &mut path_w,
+                        &mut r_path,
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+                    );
+
+                    // Draw description on Line 2
                     draw_highlighted_text(
                         mdc,
                         &res.entry.description,
-                        &s.query,
+                        clean_query_prefix(&s.query),
                         s.font_c,
                         default_gray,
                         palette.clr_accent,
@@ -8027,7 +8096,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     let mut r2 = RECT {
                         left: tx,
                         top: text_top + 22,
-                        right: x + list_w - PAD_L - 100,
+                        right: badge_limit,
                         bottom: text_top + RESULT_TEXT_BLOCK_H,
                     };
                     let _ = DrawTextW(
@@ -8381,6 +8450,20 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
             },
         })
         .collect()
+}
+
+fn clean_query_prefix(query: &str) -> &str {
+    let prefixes = [
+        "bookmarks:", "history:", "commits:", "todos:", "clip:", "clipboard:",
+        "file:", "code:", "img:", "image:", "screenshots:", "agentchats:"
+    ];
+    let q_lower = query.to_lowercase();
+    for p in &prefixes {
+        if q_lower.starts_with(p) {
+            return query[p.len()..].trim();
+        }
+    }
+    query
 }
 
 fn filter_type_from_prefix(query: &str) -> FilterType {
