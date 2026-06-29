@@ -8379,17 +8379,15 @@ fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
         FilterType::All => true,
         FilterType::Files => {
             src == "FILE"
-                || src == "FILE_CONTENT"
                 || src == "FOLDER"
                 || src == "RECENT"
-                || src == "PDF"
-                || src == "DOCX"
         }
         FilterType::Content => {
             src == "CONTENT"
                 || src == "FILE_CONTENT"
                 || src == "CODE_CONTENT"
                 || src == "PDF"
+                || src == "DOCX"
                 || src == "OCR"
         }
         FilterType::Images => src == "IMAGE" || src == "OCR" || cmd.starts_with("copy_image:"),
