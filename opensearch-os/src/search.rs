@@ -1060,7 +1060,7 @@ impl SearchEngine {
     }
 
     fn search_local_files(&self, query: &str) -> Vec<SearchResult> {
-        self.search_files_generic(query, false, 30, true)
+        self.search_files_generic(query, false, 300, true)
     }
 
     /*
@@ -4353,7 +4353,6 @@ impl SearchEngine {
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        recent_matches.truncate(5); // Cap at 5 recent file results
 
         let web_query = if intent == Intent::WebSearch && !q_clean.is_empty() {
             q_clean.as_str()
@@ -4387,7 +4386,7 @@ impl SearchEngine {
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        file_matches.truncate(15); // Cap at 15 file results
+        
         for m in &mut file_matches {
             m.score += if matches!(
                 m.entry.source.as_str(),

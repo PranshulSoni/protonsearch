@@ -38,7 +38,7 @@ extern "system" {
 // ── Layout ────────────────────────────────────────────────────────────────────
 const WIN_W: i32 = 840;
 const RESULT_H: i32 = 68;
-const MAX_RESULTS: usize = 30;
+const MAX_RESULTS: usize = 300;
 const VISIBLE_RESULTS: usize = 8;
 const PAD_L: i32 = 24;
 const BADGE_W: i32 = 54;
