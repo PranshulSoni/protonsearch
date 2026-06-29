@@ -1414,8 +1414,8 @@ unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
     let p_x = parent_rect.right + 8;
 
     // Align vertically with the selected item
-    let visual_idx = s.selected as i32 - s.scroll_offset as i32;
-    let item_y = SEARCH_H + 1 + visual_idx * s.app_settings.item_height as i32;
+    let visual_idx = s.selected - s.scroll_offset;
+    let item_y = s.result_row_y(visual_idx);
     let item_center = item_y + (s.app_settings.item_height as i32) / 2;
     let mut p_y = parent_rect.top + item_center - (p_h / 2);
 
@@ -3687,6 +3687,7 @@ unsafe fn do_show(hwnd: HWND, s: &mut State) {
         }
     }
     animate_window(hwnd, true);
+    trigger_search(hwnd, s);
 }
 
 unsafe fn reset_launcher_window_position(hwnd: HWND, s: &mut State) {
@@ -5223,85 +5224,6 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
         return;
     }
 
-    // ── Bare-word scope aliases ─────────────────────────────────────────────
-    // If the user types an exact command word (no colon needed), jump straight
-    // into that scope.  The table maps lowercase alias → scope prefix string.
-    const SCOPE_ALIASES: &[(&str, &str)] = &[
-        // Clipboard
-        ("clipboard", "clip:"),
-        ("clip", "clip:"),
-        // Files / code
-        ("files", "file:"),
-        ("file", "file:"),
-        ("code", "code:"),
-        // Browser
-        ("bookmarks", "bookmarks:"),
-        ("bookmark", "bookmarks:"),
-        ("history", "history:"),
-        ("browser history", "history:"),
-        // Git
-        ("commits", "commits:"),
-        ("commit", "commits:"),
-        ("git", "commits:"),
-        ("todos", "todos:"),
-        ("todo", "todos:"),
-        // AI chats
-        ("chats", "chats:"),
-        ("chat", "chats:"),
-        ("ai chats", "chats:"),
-        // Images / screenshots
-        ("images", "img:"),
-        ("image", "img:"),
-        ("screenshots", "img:"),
-        ("screenshot", "img:"),
-        // Agents
-        ("agents", "agents:"),
-        ("agent", "agents:"),
-        ("agent chats", "agentchats:"),
-        ("agentchats", "agentchats:"),
-        // Notes
-        ("notes", "notes:"),
-        ("note", "notes:"),
-        // Memory / timeline
-        ("memory", "memory:"),
-        ("timeline", "memory:"),
-        // Window switcher
-        ("windows", "switch:"),
-        ("switch", "switch:"),
-        ("window", "window:"),
-        // Quick links / snippets
-        ("quicklinks", "ql:"),
-        ("snippets", "snip:"),
-    ];
-    let q_lower = s.query.trim().to_lowercase();
-    // Skip alias resolution if the query already contains ':' — that means
-    // the user is either already in a scope or is backspacing out of one.
-    // Without this guard, 'clip:' → backspace → 'clip' would loop back.
-    let query_has_colon = s.query.contains(':');
-    for (alias, prefix) in SCOPE_ALIASES {
-        if !query_has_colon && q_lower == *alias {
-            s.query = prefix.to_string();
-            s.cursor_pos = s.query.len();
-            s.selected = 0;
-            s.scroll_offset = 0;
-            s.text_selected = false;
-            reset_cursor_blink(_hwnd, s);
-            // Re-enter trigger_search with the rewritten query.
-            s.results_stale = true;
-            s.current_query_id += 1;
-            s.search_loading = true;
-            let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 80, None);
-            let req = SearchRequest {
-                query: s.query.clone(),
-                query_id: s.current_query_id,
-            };
-            if let Some(ref tx) = s.search_tx {
-                let _ = tx.send(req);
-            }
-            let _ = InvalidateRect(_hwnd, None, FALSE);
-            return;
-        }
-    }
     // ── End bare-word aliases ───────────────────────────────────────────────
 
     s.results_stale = true;
