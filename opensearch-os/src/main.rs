@@ -504,8 +504,55 @@ impl State {
     }
 }
 
+fn enforce_single_instance() -> Option<windows::Win32::Foundation::HANDLE> {
+    use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, PostMessageW, WM_COMMAND};
+    use windows::Win32::Foundation::WPARAM;
+    use windows::Win32::System::Threading::CreateMutexW;
+    use windows::Win32::Foundation::GetLastError;
+    use windows::Win32::Foundation::ERROR_ALREADY_EXISTS;
+    use windows::core::PCWSTR;
+
+    unsafe {
+        let name: Vec<u16> = "Local\\OpenSearchOSInstanceMutex\0".encode_utf16().collect();
+        let handle = CreateMutexW(None, true, PCWSTR(name.as_ptr()));
+        if let Ok(h) = handle {
+            if GetLastError() == ERROR_ALREADY_EXISTS {
+                let class_name: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
+                if let Ok(hwnd) = FindWindowW(PCWSTR(class_name.as_ptr()), None) {
+                    if !hwnd.0.is_null() {
+                        let _ = PostMessageW(hwnd, WM_COMMAND, WPARAM(1), LPARAM(0));
+                    }
+                }
+                let _ = windows::Win32::Foundation::CloseHandle(h);
+                return None;
+            }
+            return Some(h);
+        }
+    }
+    None
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--settings") {
+        unsafe {
+            let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
+            let _ = windows::Win32::System::Com::CoInitializeEx(
+                None,
+                windows::Win32::System::Com::COINIT_APARTMENTTHREADED
+                    | windows::Win32::System::Com::COINIT_DISABLE_OLE1DDE,
+            );
+        }
+        settings_ui::run_settings_window();
+        return;
+    }
+
+    let _mutex = match enforce_single_instance() {
+        Some(m) => m,
+        None => return,
+    };
+
     accept_speech_privacy();
     register_startup();
     unsafe {
@@ -924,12 +971,7 @@ unsafe fn run() {
         browser_indexer::start_browser_indexer(db_path.clone());
         git_indexer::start_git_indexer(db_path.clone());
 
-        let hwnd_settings_usize = hwnd_usize;
-        std::thread::spawn(move || {
-            let hwnd_for_settings =
-                windows::Win32::Foundation::HWND(hwnd_settings_usize as *mut std::ffi::c_void);
-            settings_ui::init_settings_window(hwnd_for_settings);
-        });
+
 
         let db_path_for_timeline = db_path.clone();
         let hwnd_for_timeline = SendHwnd(HWND(hwnd_usize as *mut std::ffi::c_void));
@@ -3107,7 +3149,11 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 } else if selection.0 == 2 {
                     let _ = unsafe { PostMessageW(hwnd, windows::Win32::UI::WindowsAndMessaging::WM_CLOSE, WPARAM(0), LPARAM(0)) };
                 } else if selection.0 == 3 {
-                    settings_ui::show_settings_window();
+                    if let Ok(exe) = std::env::current_exe() {
+                        let _ = std::process::Command::new(exe)
+                            .arg("--settings")
+                            .spawn();
+                    }
                 }
             }
             LRESULT(0)

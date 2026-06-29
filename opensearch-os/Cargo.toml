@@ -12,6 +12,10 @@ name = "inspect-db"
 path = "src/inspect_db.rs"
 
 [[bin]]
+name = "test_slint"
+path = "src/bin/test_slint.rs"
+
+[[bin]]
 name = "uninstall"
 path = "src/uninstall.rs"
 
@@ -36,6 +40,8 @@ windows = { version = "0.58", features = [
     "Win32_System_Threading",
     "Win32_System_Time",
     "Win32_System_SystemInformation",
+    "Win32_Security",
+    "Win32_System_Diagnostics_Debug",
     "ApplicationModel_DataTransfer",
     "Foundation",
     "Foundation_Collections",

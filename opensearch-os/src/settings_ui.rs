@@ -1,51 +1,46 @@
 slint::include_modules!();
 
 use crate::settings::AppSettings;
-use once_cell::sync::Lazy;
 use slint::{CloseRequestResponse, ComponentHandle, SharedString};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
-use windows::Win32::Foundation::HWND;
+use std::sync::atomic::Ordering;
+use windows::Win32::Foundation::{HWND, GetLastError};
 use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
-// Signal channel: main thread sends () to ask settings window to show
-static SHOW_REQUEST: Lazy<Mutex<Option<std::sync::mpsc::SyncSender<()>>>> =
-    Lazy::new(|| Mutex::new(None));
-// Track whether the settings thread is alive at all
-static SETTINGS_READY: AtomicBool = AtomicBool::new(false);
+fn find_launcher_hwnd() -> Option<HWND> {
+    use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
+    use windows::core::PCWSTR;
+    let class_name: Vec<u16> = "opensearch-os\0".encode_utf16().collect();
+    if let Ok(hwnd) = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), None) } {
+        if !hwnd.0.is_null() {
+            return Some(hwnd);
+        }
+    }
+    None
+}
 
-pub fn init_settings_window(hwnd: HWND) {
+pub fn run_settings_window() {
+    // single instance check for settings
+    use windows::Win32::System::Threading::CreateMutexW;
+    use windows::Win32::Foundation::ERROR_ALREADY_EXISTS;
+    use windows::core::PCWSTR;
+
+    unsafe {
+        let name: Vec<u16> = "Local\\OpenSearchOSSettingsMutex\0".encode_utf16().collect();
+        let handle = CreateMutexW(None, true, PCWSTR(name.as_ptr()));
+        if let Ok(h) = handle {
+            if GetLastError() == ERROR_ALREADY_EXISTS {
+                let _ = windows::Win32::Foundation::CloseHandle(h);
+                return; // Settings already open
+            }
+        }
+    }
+
     std::env::set_var("SLINT_STYLE", "fluent-dark");
 
     let ui = match SettingsWindow::new() {
         Ok(u) => u,
         Err(_) => return,
     };
-
-    let (tx, rx) = std::sync::mpsc::sync_channel::<()>(1);
-    if let Ok(mut guard) = SHOW_REQUEST.lock() {
-        *guard = Some(tx);
-    }
-    SETTINGS_READY.store(true, Ordering::SeqCst);
-
-    let ui_weak_show = ui.as_weak();
-    std::thread::spawn(move || {
-        loop {
-            match rx.recv() {
-                Ok(_) => {
-                    let weak = ui_weak_show.clone();
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(ui) = weak.upgrade() {
-                            ui.window().show().ok();
-                            ui.window().set_minimized(false);
-                            ui.window().request_redraw();
-                        }
-                    });
-                }
-                Err(_) => break,
-            }
-        }
-    });
 
     // Load current settings
     let settings = AppSettings::load();
@@ -75,14 +70,24 @@ pub fn init_settings_window(hwnd: HWND) {
     let folders_model = slint::ModelRc::new(slint::VecModel::from(folders_vec));
     ui.set_db_folders(folders_model);
 
-    // Close = hide window, keep event loop alive
+    // Close = hide window, terminate event loop
     let ui_weak_close = ui.as_weak();
     ui.window().on_close_requested(move || {
         if let Some(ui) = ui_weak_close.upgrade() {
-            ui.invoke_set_hotkey_recording(false);
+            if let Some(hwnd) = find_launcher_hwnd() {
+                unsafe {
+                    let _ = PostMessageW(
+                        hwnd,
+                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 11,
+                        windows::Win32::Foundation::WPARAM(0),
+                        windows::Win32::Foundation::LPARAM(0),
+                    );
+                }
+            }
             ui.window().hide().ok();
+            slint::quit_event_loop().ok();
         }
-        CloseRequestResponse::KeepWindowShown
+        CloseRequestResponse::HideWindow
     });
 
         // Save settings callback
@@ -115,13 +120,15 @@ pub fn init_settings_window(hwnd: HWND) {
                     ui.get_agent_always_approve(),
                 );
 
-                unsafe {
-                    let _ = PostMessageW(
-                        hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 10,
-                        windows::Win32::Foundation::WPARAM(0),
-                        windows::Win32::Foundation::LPARAM(0),
-                    );
+                if let Some(hwnd) = find_launcher_hwnd() {
+                    unsafe {
+                        let _ = PostMessageW(
+                            hwnd,
+                            windows::Win32::UI::WindowsAndMessaging::WM_USER + 10,
+                            windows::Win32::Foundation::WPARAM(0),
+                            windows::Win32::Foundation::LPARAM(0),
+                        );
+                    }
                 }
             }
         });
@@ -143,13 +150,17 @@ pub fn init_settings_window(hwnd: HWND) {
             }
         });
 
-        ui.on_set_hotkey_recording(move |recording| unsafe {
-            let _ = PostMessageW(
-                hwnd,
-                windows::Win32::UI::WindowsAndMessaging::WM_USER + 11,
-                windows::Win32::Foundation::WPARAM(recording as usize),
-                windows::Win32::Foundation::LPARAM(0),
-            );
+        ui.on_set_hotkey_recording(move |recording| {
+            if let Some(hwnd) = find_launcher_hwnd() {
+                unsafe {
+                    let _ = PostMessageW(
+                        hwnd,
+                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 11,
+                        windows::Win32::Foundation::WPARAM(recording as usize),
+                        windows::Win32::Foundation::LPARAM(0),
+                    );
+                }
+            }
         });
 
         let ui_weak_add = ui.as_weak();
@@ -389,15 +400,3 @@ fn pick_folder() -> Option<std::path::PathBuf> {
     rx.recv().unwrap_or(None)
 }
 
-pub fn show_settings_window() {
-    if !SETTINGS_READY.load(Ordering::SeqCst) {
-        // Settings thread not yet ready — spawn it now lazily
-        // (This path shouldn't normally be hit since init is called at startup)
-        return;
-    }
-    if let Ok(guard) = SHOW_REQUEST.lock() {
-        if let Some(tx) = guard.as_ref() {
-            let _ = tx.try_send(());
-        }
-    }
-}
