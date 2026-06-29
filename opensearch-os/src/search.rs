@@ -1060,7 +1060,7 @@ impl SearchEngine {
     }
 
     fn search_local_files(&self, query: &str) -> Vec<SearchResult> {
-        self.search_files_generic(query, false, 300, true)
+        self.search_files_generic(query, false, 300, false)
     }
 
     /*
