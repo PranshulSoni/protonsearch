@@ -415,54 +415,79 @@ pub fn run_settings_window() {
     let ui_weak_status = ui.as_weak();
     std::thread::spawn(move || {
         log_settings_ui("Settings status thread started");
+
+        // Open one persistent connection with WAL + a short busy timeout so we
+        // never block the Slint event loop even while the indexer is writing.
+        let appdata = std::env::var("APPDATA").unwrap_or_default();
+        let db_path = std::path::PathBuf::from(&appdata)
+            .join("opensearch-os")
+            .join("file_index.db");
+
+        let conn = match rusqlite::Connection::open(&db_path) {
+            Ok(c) => c,
+            Err(e) => {
+                log_settings_ui(&format!("Status thread: failed to open DB: {:?}", e));
+                return;
+            }
+        };
+        // WAL lets readers and writers proceed concurrently; 300ms timeout
+        // means we give up quickly rather than stalling the UI thread.
+        let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+        let _ = conn.busy_timeout(std::time::Duration::from_millis(300));
+
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(250));
+            // Poll at 1-second intervals — we don't need sub-second UI accuracy here.
+            std::thread::sleep(std::time::Duration::from_secs(1));
+
             let ui_weak = ui_weak_status.clone();
             if ui_weak.upgrade().is_none() {
                 log_settings_ui("Settings status thread UI upgrade is None, exiting");
                 break;
             }
 
-            let mut is_indexing = false;
-            let mut progress = "Idle".to_string();
-            let mut last_time = "Never".to_string();
-            let mut count = 0;
+            // Ensure required tables exist (no-op if already there).
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS indexer_state (key TEXT PRIMARY KEY, value TEXT);
+                 CREATE TABLE IF NOT EXISTS files (
+                    path TEXT PRIMARY KEY, name TEXT NOT NULL,
+                    extension TEXT NOT NULL, modified INTEGER NOT NULL,
+                    size INTEGER NOT NULL DEFAULT 0, is_dir INTEGER NOT NULL DEFAULT 0);",
+            );
 
-            match get_db_conn() {
-                Some(conn) => {
-                    is_indexing = get_indexer_state_from_db(&conn, "is_indexing", "0") == "1";
-                    progress = get_indexer_state_from_db(&conn, "progress", "Idle");
-                    last_time = get_indexer_state_from_db(&conn, "last_index_time", "Never");
-                    
-                    // Re-create check to prevent errors
-                    let _ = conn.execute(
-                        "CREATE TABLE IF NOT EXISTS files (
-                            path TEXT PRIMARY KEY,
-                            name TEXT NOT NULL,
-                            extension TEXT NOT NULL,
-                            modified INTEGER NOT NULL,
-                            size INTEGER NOT NULL DEFAULT 0,
-                            is_dir INTEGER NOT NULL DEFAULT 0
-                        );",
-                        [],
-                    );
-                    match conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, i64>(0)) {
-                        Ok(c) => count = c as i32,
-                        Err(e) => log_settings_ui(&format!("Failed to query count: {:?}", e)),
-                    }
-                }
-                None => {
-                    log_settings_ui("get_db_conn() returned None");
-                }
-            }
+            let is_indexing = conn
+                .query_row(
+                    "SELECT value FROM indexer_state WHERE key = 'is_indexing'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .unwrap_or_else(|_| "0".to_string())
+                == "1";
 
-            let progress_clone = progress.clone();
-            let last_time_clone = last_time.clone();
+            let progress = conn
+                .query_row(
+                    "SELECT value FROM indexer_state WHERE key = 'progress'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .unwrap_or_else(|_| "Idle".to_string());
+
+            let last_time = conn
+                .query_row(
+                    "SELECT value FROM indexer_state WHERE key = 'last_index_time'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .unwrap_or_else(|_| "Never".to_string());
+
+            let count: i32 = conn
+                .query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, i64>(0))
+                .unwrap_or(0) as i32;
+
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {
                     ui.set_db_is_indexing(is_indexing);
-                    ui.set_db_status(slint::SharedString::from(progress_clone));
-                    ui.set_db_last_indexed(slint::SharedString::from(last_time_clone));
+                    ui.set_db_status(slint::SharedString::from(progress));
+                    ui.set_db_last_indexed(slint::SharedString::from(last_time));
                     ui.set_db_file_count(count);
                 }
             });

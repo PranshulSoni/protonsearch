@@ -229,8 +229,9 @@ pub fn start_indexer(db_path: PathBuf) {
         }
 
         // ── Phase 1: Priority folders (Desktop, Downloads, Pictures, Documents) ──────
-        // Indexed within ~1 second of launch so common files are instantly searchable.
-        thread::sleep(std::time::Duration::from_millis(500));
+        // Delay 3s so the launcher window is fully up and the settings app can open
+        // without being immediately hit by heavy first-launch DB writes.
+        thread::sleep(std::time::Duration::from_secs(3));
         log_indexer("Starting Phase 1 priority scan...");
         if let Err(e) = run_indexer_folders(&db_path_clone, get_priority_folders()) {
             log_indexer(&format!("Priority indexer error: {:?}", e));
@@ -238,8 +239,8 @@ pub fn start_indexer(db_path: PathBuf) {
         }
 
         // ── Phase 2: Full crawl (entire user profile + other drives) ───────
-        // Runs 10s after launch. (Skipped looping every 10 mins #7)
-        thread::sleep(std::time::Duration::from_secs(10));
+        // Runs 15s after launch to further reduce first-open contention.
+        thread::sleep(std::time::Duration::from_secs(15));
         log_indexer("Starting Phase 2 full crawl...");
         if let Err(e) = run_indexer_folders(&db_path_clone, get_scan_folders()) {
             log_indexer(&format!("Indexer error: {:?}", e));
