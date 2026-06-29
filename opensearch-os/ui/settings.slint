@@ -753,7 +753,7 @@ export component SettingsWindow inherits Window {
                                     x: (parent.width - self.width) / 2;
                                     y: (parent.height - self.height) / 2;
 
-                                    VerticalBox {
+                                    VerticalLayout {
                                         padding: 0;
                                         spacing: 0;
                                         
@@ -767,17 +767,15 @@ export component SettingsWindow inherits Window {
                                                 background: root.theme-mode == "Light" ? #f2f2f2 : (root.theme-mode == "NordDarker" ? #3b4252 : #2a2a2a);
                                             }
 
-                                            HorizontalBox {
+                                            HorizontalLayout {
                                                 padding-left: 16px;
                                                 padding-right: 16px;
                                                 spacing: 12px;
-                                                alignment: center;
                                                 
-                                                // Search Icon
+                                                // Search Icon (using highly compatible magnifying glass)
                                                 Text {
-                                                    text: "⌕";
-                                                    font-size: root.query-font-size * 0.75px;
-                                                    color: root.theme-mode == "Light" ? #a0a0a0 : (root.theme-mode == "NordDarker" ? #81a1c1 : #888888);
+                                                    text: "🔍";
+                                                    font-size: 14px;
                                                     vertical-alignment: center;
                                                 }
 
@@ -798,20 +796,19 @@ export component SettingsWindow inherits Window {
                                                     opacity: 0.95;
                                                 }
 
-                                                Rectangle { horizontal-stretch: 1; }
+                                                Rectangle { } // Spacer
                                                 
-                                                // Microphone Icon
+                                                // Microphone Icon (using highly compatible emoji)
                                                 Text {
-                                                    text: "🎙";
+                                                    text: "🎤";
                                                     font-size: 14px;
-                                                    color: root.theme-mode == "Light" ? #a0a0a0 : (root.theme-mode == "NordDarker" ? #81a1c1 : #888888);
                                                     vertical-alignment: center;
                                                 }
                                             }
                                         }
 
                                         // Mockup Results Area
-                                        VerticalBox {
+                                        VerticalLayout {
                                             padding-left: 8px;
                                             padding-right: 8px;
                                             padding-top: 6px;
@@ -823,19 +820,18 @@ export component SettingsWindow inherits Window {
                                                 height: 34px;
                                                 background: transparent;
                                                 border-radius: 4px;
-                                                HorizontalBox {
+                                                HorizontalLayout {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    spacing: 8px;
-                                                    alignment: center;
+                                                    spacing: 12px;
                                                     Text { text: "⭐"; font-size: 14px; vertical-alignment: center; }
-                                                    VerticalBox {
+                                                    VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
                                                         Text { text: "Browser Bookmarks"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
                                                         Text { text: "Browser > Bookmarks"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
-                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Rectangle { } // Spacer
                                                     Text { text: "Browser"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
@@ -845,19 +841,18 @@ export component SettingsWindow inherits Window {
                                                 height: 34px;
                                                 background: transparent;
                                                 border-radius: 4px;
-                                                HorizontalBox {
+                                                HorizontalLayout {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    spacing: 8px;
-                                                    alignment: center;
-                                                    Text { text: "🖥️"; font-size: 14px; vertical-alignment: center; }
-                                                    VerticalBox {
+                                                    spacing: 12px;
+                                                    Text { text: "🌐"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
                                                         Text { text: "Browser History"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
                                                         Text { text: "Browser > History"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
-                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Rectangle { } // Spacer
                                                     Text { text: "Browser"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
@@ -867,19 +862,18 @@ export component SettingsWindow inherits Window {
                                                 height: 34px;
                                                 background: root.theme-mode == "Light" ? #e5e5e5 : (root.theme-mode == "NordDarker" ? #3b4252 : #2f2f2f);
                                                 border-radius: 4px;
-                                                HorizontalBox {
+                                                HorizontalLayout {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    spacing: 8px;
-                                                    alignment: center;
+                                                    spacing: 12px;
                                                     Text { text: "🔍"; font-size: 14px; vertical-alignment: center; }
-                                                    VerticalBox {
+                                                    VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
                                                         Text { text: "Git Commits"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #111111 : #ffffff; }
                                                         Text { text: "Git > Commits"; font-size: 9px; color: root.theme-mode == "Light" ? #666666 : #bbbbbb; }
                                                     }
-                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Rectangle { } // Spacer
                                                     Text { text: "Git"; font-size: 9px; color: root.theme-mode == "Light" ? #555555 : #999999; vertical-alignment: center; }
                                                 }
                                             }
@@ -889,19 +883,18 @@ export component SettingsWindow inherits Window {
                                                 height: 34px;
                                                 background: transparent;
                                                 border-radius: 4px;
-                                                HorizontalBox {
+                                                HorizontalLayout {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    spacing: 8px;
-                                                    alignment: center;
-                                                    Text { text: "📋"; font-size: 14px; vertical-alignment: center; }
-                                                    VerticalBox {
+                                                    spacing: 12px;
+                                                    Text { text: "📄"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
                                                         Text { text: "Clipboard History"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
                                                         Text { text: "Clipboard > History"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
-                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Rectangle { } // Spacer
                                                     Text { text: "Clipboard"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
@@ -911,19 +904,18 @@ export component SettingsWindow inherits Window {
                                                 height: 34px;
                                                 background: transparent;
                                                 border-radius: 4px;
-                                                HorizontalBox {
+                                                HorizontalLayout {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    spacing: 8px;
-                                                    alignment: center;
+                                                    spacing: 12px;
                                                     Text { text: "📁"; font-size: 14px; vertical-alignment: center; }
-                                                    VerticalBox {
+                                                    VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
                                                         Text { text: "Local Files"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
                                                         Text { text: "Local > Files"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
-                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Rectangle { } // Spacer
                                                     Text { text: "Local"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
@@ -933,19 +925,18 @@ export component SettingsWindow inherits Window {
                                                 height: 34px;
                                                 background: transparent;
                                                 border-radius: 4px;
-                                                HorizontalBox {
+                                                HorizontalLayout {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    spacing: 8px;
-                                                    alignment: center;
-                                                    Text { text: "📄"; font-size: 14px; vertical-alignment: center; }
-                                                    VerticalBox {
+                                                    spacing: 12px;
+                                                    Text { text: "💻"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
                                                         Text { text: "Source Code"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
                                                         Text { text: "Local > Source Code"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
-                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Rectangle { } // Spacer
                                                     Text { text: "Code"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
@@ -955,19 +946,18 @@ export component SettingsWindow inherits Window {
                                                 height: 34px;
                                                 background: transparent;
                                                 border-radius: 4px;
-                                                HorizontalBox {
+                                                HorizontalLayout {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    spacing: 8px;
-                                                    alignment: center;
-                                                    Text { text: "📄"; font-size: 14px; vertical-alignment: center; }
-                                                    VerticalBox {
+                                                    spacing: 12px;
+                                                    Text { text: "📷"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
                                                         Text { text: "Search Screenshots"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
                                                         Text { text: "Local > Image Text (OCR)"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
-                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Rectangle { } // Spacer
                                                     Text { text: "OCR"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
@@ -977,19 +967,18 @@ export component SettingsWindow inherits Window {
                                                 height: 34px;
                                                 background: transparent;
                                                 border-radius: 4px;
-                                                HorizontalBox {
+                                                HorizontalLayout {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    spacing: 8px;
-                                                    alignment: center;
-                                                    Text { text: "💾"; font-size: 14px; vertical-alignment: center; }
-                                                    VerticalBox {
+                                                    spacing: 12px;
+                                                    Text { text: "🤖"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
                                                         Text { text: "Agent History"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
                                                         Text { text: "AI > Agent runs"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
-                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Rectangle { } // Spacer
                                                     Text { text: "AI"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
