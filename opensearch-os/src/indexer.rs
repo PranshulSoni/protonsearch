@@ -435,15 +435,40 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
     res_rx
 }
 
+fn save_indexer_state_to_db(db_path: &Path, key: &str, value: &str) {
+    if let Ok(conn) = Connection::open(db_path) {
+        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS indexer_state (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );",
+            [],
+        );
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO indexer_state (key, value) VALUES (?, ?);",
+            [key, value],
+        );
+    }
+}
+
 pub fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<()> {
-    IS_INDEXING.store(true, Ordering::SeqCst);
+    if IS_INDEXING.swap(true, Ordering::SeqCst) {
+        log_indexer("Indexer already running, skipping overlapping run.");
+        return Ok(());
+    }
+    save_indexer_state_to_db(db_path, "is_indexing", "1");
+
     if let Ok(mut g) = INDEXING_PROGRESS.lock() {
         *g = "Starting scan...".to_string();
+        save_indexer_state_to_db(db_path, "progress", &g);
     }
     let res = run_indexer_folders_inner(db_path, folders);
     IS_INDEXING.store(false, Ordering::SeqCst);
+    save_indexer_state_to_db(db_path, "is_indexing", "0");
     if let Ok(mut g) = INDEXING_PROGRESS.lock() {
         *g = "Idle".to_string();
+        save_indexer_state_to_db(db_path, "progress", &g);
     }
     if res.is_ok() {
         if let Ok(mut g) = LAST_INDEX_TIME.lock() {
@@ -454,6 +479,7 @@ pub fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Res
                     st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond
                 );
             }
+            save_indexer_state_to_db(db_path, "last_index_time", &g);
         }
     }
     res
@@ -511,6 +537,7 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
         }
         if let Ok(mut g) = INDEXING_PROGRESS.lock() {
             *g = format!("Scanning: {}", folder.to_string_lossy());
+            save_indexer_state_to_db(db_path, "progress", &g);
         }
         log_indexer(&format!("Folder exists, starting WalkDir: {:?}", folder));
         let walker = WalkDir::new(&folder).into_iter().filter_entry(|e| {
@@ -606,6 +633,7 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
             if file_count % 1000 == 0 {
                 if let Ok(mut g) = INDEXING_PROGRESS.lock() {
                     *g = format!("Scanning: {} files processed...", file_count);
+                    save_indexer_state_to_db(db_path, "progress", &g);
                 }
             }
         }
@@ -635,6 +663,7 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
                         "Extracting: {}/{} files (OCR/Text)...",
                         processed_jobs, total_jobs
                     );
+                    save_indexer_state_to_db(db_path, "progress", &g);
                 }
             }
             pending_updates.push(update);
