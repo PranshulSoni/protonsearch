@@ -510,9 +510,9 @@ fn get_indexed_files_count() -> u32 {
             [],
         );
         if let Ok(count) =
-            conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, u32>(0))
+            conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, i64>(0))
         {
-            return count;
+            return count as u32;
         }
     }
     0
