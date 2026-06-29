@@ -2440,27 +2440,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
                 VK_BACK => {
-                    // If the query is exactly a bare scope prefix (e.g. "clip:",
-                    // "agents:") with nothing after it, backspace exits the scope
-                    // by clearing to empty — like pressing Escape from a folder.
-                    let is_bare_scope_prefix = {
-                        let q = &s.query;
-                        q.ends_with(':') && !q.is_empty()
-                            && s.cursor_pos == q.len()
-                            && !s.text_selected
-                            && !ctrl_down
-                    };
-                    if is_bare_scope_prefix {
-                        s.query.clear();
-                        s.cursor_pos = 0;
-                        s.text_selected = false;
-                        s.selected = s.homepage_sel;
-                        s.scroll_offset = 0;
-                        s.reset_results();
-                        reset_cursor_blink(hwnd, s);
-                        let _ = InvalidateRect(hwnd, None, FALSE);
-                        return LRESULT(0);
-                    }
                     if ctrl_down {
                         if s.text_selected {
                             s.query.clear();
@@ -3877,6 +3856,17 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
         }
         s.taskbar_shown_by_app = false;
     }
+
+    // Pre-reset query and results to homepage so the next show has data immediately.
+    s.query.clear();
+    s.cursor_pos = 0;
+    s.text_selected = false;
+    s.active_filter = FilterType::All;
+    s.unfiltered_results = default_homepage_results();
+    s.results = s.unfiltered_results.clone();
+    s.results_stale = false;
+    s.selected = s.homepage_sel.min(s.results.len().saturating_sub(1));
+    s.scroll_offset = 0;
 
     let _ = ShowWindow(hwnd, SW_HIDE);
     s.anim = Anim::Hidden;
