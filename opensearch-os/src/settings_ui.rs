@@ -18,6 +18,26 @@ fn find_launcher_hwnd() -> Option<HWND> {
     None
 }
 
+fn get_desktop_wallpaper_path() -> Option<String> {
+    let mut buffer = [0u16; 512];
+    let success = unsafe {
+        windows::Win32::UI::WindowsAndMessaging::SystemParametersInfoW(
+            windows::Win32::UI::WindowsAndMessaging::SPI_GETDESKTOPWALLPAPER,
+            buffer.len() as u32,
+            Some(buffer.as_mut_ptr() as *mut std::ffi::c_void),
+            windows::Win32::UI::WindowsAndMessaging::SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+    };
+    if success.as_bool() {
+        let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+        let path_str = String::from_utf16_lossy(&buffer[..len]);
+        if !path_str.trim().is_empty() && std::path::Path::new(&path_str).exists() {
+            return Some(path_str);
+        }
+    }
+    None
+}
+
 pub fn run_settings_window() {
     // single instance check for settings
     use windows::Win32::System::Threading::CreateMutexW;
@@ -67,6 +87,13 @@ pub fn run_settings_window() {
     ui.set_result_subtitle_font_weight(SharedString::from(settings.result_subtitle_font_weight.clone()));
     ui.set_result_subtitle_font_size(settings.result_subtitle_font_size as i32);
     ui.set_show_placeholder(settings.show_placeholder);
+
+    if let Some(w_path) = get_desktop_wallpaper_path() {
+        if let Ok(img) = slint::Image::load_from_path(std::path::Path::new(&w_path)) {
+            ui.set_desktop_wallpaper(img);
+            ui.set_has_desktop_wallpaper(true);
+        }
+    }
 
     // Load Agent properties
     ui.set_agent_api_key(SharedString::from(api_key));

@@ -151,6 +151,8 @@ export component SettingsWindow inherits Window {
     in-out property <string> result-subtitle-font-weight;
     in-out property <int> result-subtitle-font-size;
     in-out property <bool> show-placeholder;
+    in-out property <image> desktop-wallpaper;
+    in-out property <bool> has-desktop-wallpaper: false;
 
     property <bool> edit-panel-expanded: false;
     
@@ -712,127 +714,47 @@ export component SettingsWindow inherits Window {
                         
                         Text { text: "Appearance"; font-size: 26px; font-weight: 600; color: root.text-primary; }
                         
-                        // Launcher theme row
-                        Text { text: "Launcher Theme"; font-size: 13px; color: root.text-muted; }
-                        Rectangle {
-                            background: root.card-bg;
-                            border-radius: 8px;
-                            border-color: root.border-color;
-                            border-width: 1px;
-                            padding: 16px;
-                            HorizontalBox {
-                                spacing: 12px;
-                                alignment: start;
-                                // Light card
-                                Rectangle {
-                                    height: 90px;
-                                    width: 130px;
-                                    border-radius: 8px;
-                                    border-width: root.theme-mode == "Light" ? 2px : 1px;
-                                    border-color: root.theme-mode == "Light" ? #1d90f3 : root.border-color;
-                                    background: #ffffff;
-                                    VerticalBox {
-                                        padding: 10px;
-                                        spacing: 6px;
-                                        Text { text: "Light"; color: #111111; font-weight: 600; font-size: 12px; }
-                                        Rectangle { height: 16px; border-radius: 4px; background: #f2f2f2; }
-                                        Rectangle { height: 16px; border-radius: 4px; background: #e5e5e5; }
-                                    }
-                                    TouchArea { clicked => { root.theme-mode = "Light"; root.save-settings(); } }
-                                }
-                                // Dark card
-                                Rectangle {
-                                    height: 90px;
-                                    width: 130px;
-                                    border-radius: 8px;
-                                    border-width: root.theme-mode == "Dark" ? 2px : 1px;
-                                    border-color: root.theme-mode == "Dark" ? #1d90f3 : root.border-color;
-                                    background: #1e1e1e;
-                                    VerticalBox {
-                                        padding: 10px;
-                                        spacing: 6px;
-                                        Text { text: "Dark"; color: #ffffff; font-weight: 600; font-size: 12px; }
-                                        Rectangle { height: 16px; border-radius: 4px; background: #2f2f2f; }
-                                        Rectangle { height: 16px; border-radius: 4px; background: #3a3a3a; }
-                                    }
-                                    TouchArea { clicked => { root.theme-mode = "Dark"; root.save-settings(); } }
-                                }
-                                // Nord card
-                                Rectangle {
-                                    height: 90px;
-                                    width: 130px;
-                                    border-radius: 8px;
-                                    border-width: root.theme-mode == "NordDarker" ? 2px : 1px;
-                                    border-color: root.theme-mode == "NordDarker" ? #1d90f3 : root.border-color;
-                                    background: #2e3440;
-                                    VerticalBox {
-                                        padding: 10px;
-                                        spacing: 6px;
-                                        Text { text: "Nord Dark"; color: #e5e9f0; font-weight: 600; font-size: 12px; }
-                                        Rectangle { height: 16px; border-radius: 4px; background: #3b4252; }
-                                        Rectangle { height: 16px; border-radius: 4px; background: #4c566a; }
-                                    }
-                                    TouchArea { clicked => { root.theme-mode = "NordDarker"; root.save-settings(); } }
-                                }
-                            }
-                        }
-
-                        // Show placeholder setting
-                        Rectangle {
-                            background: root.card-bg;
-                            border-radius: 8px;
-                            border-color: root.border-color;
-                            border-width: 1px;
-                            height: 64px;
-                            HorizontalBox {
-                                padding-left: 20px;
-                                padding-right: 20px;
-                                spacing: 16px;
-                                VerticalBox {
-                                    alignment: center;
-                                    spacing: 2px;
-                                    Text { text: "Show placeholder"; color: root.text-primary; font-size: 14px; font-weight: 600; }
-                                    Text { text: "Display placeholder when query is empty"; color: root.text-muted; font-size: 12px; }
-                                }
-                                Rectangle { horizontal-stretch: 1; }
-                                VerticalBox {
-                                    alignment: center;
-                                    ToggleSwitch {
-                                        checked <=> root.show-placeholder;
-                                        toggled => {
-                                            root.save-settings();
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Preview & Edits Container
+                        // Preview & Edits Container (At the Top!)
                         HorizontalBox {
                             spacing: 16px;
                             
                             // Left Preview Area
                             Rectangle {
-                                background: @linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
                                 border-radius: 8px;
                                 border-width: 1px;
                                 border-color: root.border-color;
-                                height: 380px;
+                                height: 440px;
                                 horizontal-stretch: 1;
+                                clip: true;
 
-                                // The Mockup Launcher Popup
+                                // Background image (User's wallpaper)
+                                if root.has-desktop-wallpaper : Image {
+                                    source: root.desktop-wallpaper;
+                                    image-fit: fill;
+                                    width: 100%;
+                                    height: 100%;
+                                }
+
+                                // Fallback gradient if no wallpaper is loaded
+                                if !root.has-desktop-wallpaper : Rectangle {
+                                    background: @linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                                    width: 100%;
+                                    height: 100%;
+                                }
+
+                                // The Mockup Launcher Popup (exactly matching the user's photos)
                                 Rectangle {
-                                    width: 380px;
-                                    height: 250px;
-                                    background: root.theme-mode == "Light" ? #ffffff : (root.theme-mode == "NordDarker" ? #2e3440 : #181818);
+                                    width: 440px;
+                                    height: 352px;
+                                    background: root.theme-mode == "Light" ? #ffffff : (root.theme-mode == "NordDarker" ? #232731 : #1c1c1c);
                                     border-radius: 12px;
                                     border-width: 1px;
-                                    border-color: root.theme-mode == "Light" ? #e5e7eb : #333333;
+                                    border-color: root.theme-mode == "Light" ? #e0e0e0 : (root.theme-mode == "NordDarker" ? #3b4252 : #2d2d2d);
                                     x: (parent.width - self.width) / 2;
                                     y: (parent.height - self.height) / 2;
 
                                     VerticalBox {
-                                        padding: 10px;
+                                        padding: 0;
                                         spacing: 0;
                                         
                                         // Mockup Search Input Box
@@ -842,180 +764,236 @@ export component SettingsWindow inherits Window {
                                             Rectangle {
                                                 y: parent.height - 1px;
                                                 height: 1px;
-                                                background: root.theme-mode == "Light" ? #eaeaea : #2b2b2b;
+                                                background: root.theme-mode == "Light" ? #f2f2f2 : (root.theme-mode == "NordDarker" ? #3b4252 : #2a2a2a);
                                             }
 
                                             HorizontalBox {
-                                                padding-left: 8px;
-                                                padding-right: 8px;
+                                                padding-left: 16px;
+                                                padding-right: 16px;
+                                                spacing: 12px;
                                                 alignment: center;
                                                 
+                                                // Search Icon
                                                 Text {
-                                                    text: "Hi There";
+                                                    text: "⌕";
+                                                    font-size: root.query-font-size * 0.75px;
+                                                    color: root.theme-mode == "Light" ? #a0a0a0 : (root.theme-mode == "NordDarker" ? #81a1c1 : #888888);
+                                                    vertical-alignment: center;
+                                                }
+
+                                                // Search Text Placeholder or Caret cursor
+                                                if root.show-placeholder : Text {
+                                                    text: "Search files, code, PDFs, OCR...";
                                                     font-family: root.query-font-family;
-                                                    font-size: root.query-font-size * 0.7px;
+                                                    font-size: root.query-font-size * 0.65px;
                                                     font-weight: root.query-font-weight == "Bold" ? 700 : (root.query-font-weight == "Semi-Bold" ? 600 : 400);
-                                                    color: root.theme-mode == "Light" ? #111111 : #ffffff;
+                                                    color: root.theme-mode == "Light" ? #8e8e93 : (root.theme-mode == "NordDarker" ? #4c566a : #6b6b6b);
                                                     vertical-alignment: center;
                                                 }
+
+                                                if !root.show-placeholder : Rectangle {
+                                                    width: 2px;
+                                                    height: root.query-font-size * 0.75px;
+                                                    background: root.theme-mode == "Light" ? #000000 : (root.theme-mode == "NordDarker" ? #88c0d0 : #ffffff);
+                                                    opacity: 0.95;
+                                                }
+
                                                 Rectangle { horizontal-stretch: 1; }
+                                                
+                                                // Microphone Icon
                                                 Text {
-                                                    text: "04:00 PM  ⌕";
-                                                    font-size: 11px;
-                                                    color: root.theme-mode == "Light" ? #666666 : #aaaaaa;
+                                                    text: "🎙";
+                                                    font-size: 14px;
+                                                    color: root.theme-mode == "Light" ? #a0a0a0 : (root.theme-mode == "NordDarker" ? #81a1c1 : #888888);
                                                     vertical-alignment: center;
                                                 }
                                             }
                                         }
 
-                                        // Mockup Results List
+                                        // Mockup Results Area
                                         VerticalBox {
+                                            padding-left: 8px;
+                                            padding-right: 8px;
                                             padding-top: 6px;
+                                            padding-bottom: 6px;
                                             spacing: 4px;
-                                            
-                                            // Mockup Item 1 (Selected/Active)
+
+                                            // Mockup Item 1: Browser Bookmarks
                                             Rectangle {
-                                                height: root.item-height * 0.6px;
-                                                background: #1d90f3;
-                                                border-radius: 6px;
-                                                
+                                                height: 34px;
+                                                background: transparent;
+                                                border-radius: 4px;
                                                 HorizontalBox {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
                                                     spacing: 8px;
                                                     alignment: center;
-                                                    
-                                                    // Yellow Folder Icon
-                                                    Text { text: "📁"; font-size: 16px; vertical-alignment: center; }
-                                                    
+                                                    Text { text: "⭐"; font-size: 14px; vertical-alignment: center; }
                                                     VerticalBox {
                                                         alignment: center;
-                                                        spacing: 1px;
-                                                        Text {
-                                                            text: "Explorer";
-                                                            font-family: root.result-title-font-family;
-                                                            font-size: root.result-title-font-size * 0.7px;
-                                                            font-weight: root.result-title-font-weight == "Bold" ? 700 : (root.result-title-font-weight == "Semi-Bold" ? 600 : 400);
-                                                            color: #ffffff;
-                                                        }
-                                                        Text {
-                                                            text: "Search for files, folders and file conte...";
-                                                            font-family: root.result-subtitle-font-family;
-                                                            font-size: root.result-subtitle-font-size * 0.7px;
-                                                            font-weight: root.result-subtitle-font-weight == "Bold" ? 700 : (root.result-subtitle-font-weight == "Semi-Bold" ? 600 : 400);
-                                                            color: #e5e7eb;
-                                                        }
+                                                        spacing: 0;
+                                                        Text { text: "Browser Bookmarks"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
+                                                        Text { text: "Browser > Bookmarks"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
                                                     Rectangle { horizontal-stretch: 1; }
-                                                    Text {
-                                                        text: "Alt+1";
-                                                        font-size: 10px;
-                                                        color: #e5e7eb;
-                                                        vertical-alignment: center;
-                                                    }
+                                                    Text { text: "Browser"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
 
-                                            // Mockup Item 2
+                                            // Mockup Item 2: Browser History
                                             Rectangle {
-                                                height: root.item-height * 0.6px;
+                                                height: 34px;
                                                 background: transparent;
-                                                
+                                                border-radius: 4px;
                                                 HorizontalBox {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
                                                     spacing: 8px;
                                                     alignment: center;
-                                                    
-                                                    Text { text: "🔍"; font-size: 16px; vertical-alignment: center; }
-                                                    
+                                                    Text { text: "🖥️"; font-size: 14px; vertical-alignment: center; }
                                                     VerticalBox {
                                                         alignment: center;
-                                                        spacing: 1px;
-                                                        Text {
-                                                            text: "WebSearch";
-                                                            font-family: root.result-title-font-family;
-                                                            font-size: root.result-title-font-size * 0.7px;
-                                                            font-weight: root.result-title-font-weight == "Bold" ? 700 : (root.result-title-font-weight == "Semi-Bold" ? 600 : 400);
-                                                            color: root.theme-mode == "Light" ? #111111 : #ffffff;
-                                                        }
-                                                        Text {
-                                                            text: "Search the web with different search...";
-                                                            font-family: root.result-subtitle-font-family;
-                                                            font-size: root.result-subtitle-font-size * 0.7px;
-                                                            font-weight: root.result-subtitle-font-weight == "Bold" ? 700 : (root.result-subtitle-font-weight == "Semi-Bold" ? 600 : 400);
-                                                            color: root.theme-mode == "Light" ? #666666 : #aaaaaa;
-                                                        }
+                                                        spacing: 0;
+                                                        Text { text: "Browser History"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
+                                                        Text { text: "Browser > History"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
                                                     Rectangle { horizontal-stretch: 1; }
-                                                    Text {
-                                                        text: "Alt+2";
-                                                        font-size: 10px;
-                                                        color: root.theme-mode == "Light" ? #666666 : #888888;
-                                                        vertical-alignment: center;
-                                                    }
+                                                    Text { text: "Browser"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
 
-                                            // Mockup Item 3
+                                            // Mockup Item 3: Git Commits (Selected / Active)
                                             Rectangle {
-                                                height: root.item-height * 0.6px;
-                                                background: transparent;
-                                                
+                                                height: 34px;
+                                                background: root.theme-mode == "Light" ? #e5e5e5 : (root.theme-mode == "NordDarker" ? #3b4252 : #2f2f2f);
+                                                border-radius: 4px;
                                                 HorizontalBox {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
                                                     spacing: 8px;
                                                     alignment: center;
-                                                    
-                                                    Text { text: "💻"; font-size: 16px; vertical-alignment: center; }
-                                                    
+                                                    Text { text: "🔍"; font-size: 14px; vertical-alignment: center; }
                                                     VerticalBox {
                                                         alignment: center;
-                                                        spacing: 1px;
-                                                        Text {
-                                                            text: "Program";
-                                                            font-family: root.result-title-font-family;
-                                                            font-size: root.result-title-font-size * 0.7px;
-                                                            font-weight: root.result-title-font-weight == "Bold" ? 700 : (root.result-title-font-weight == "Semi-Bold" ? 600 : 400);
-                                                            color: root.theme-mode == "Light" ? #111111 : #ffffff;
-                                                        }
-                                                        Text {
-                                                            text: "Launch programs as admin or a differ...";
-                                                            font-family: root.result-subtitle-font-family;
-                                                            font-size: root.result-subtitle-font-size * 0.7px;
-                                                            font-weight: root.result-subtitle-font-weight == "Bold" ? 700 : (root.result-subtitle-font-weight == "Semi-Bold" ? 600 : 400);
-                                                            color: root.theme-mode == "Light" ? #666666 : #aaaaaa;
-                                                        }
+                                                        spacing: 0;
+                                                        Text { text: "Git Commits"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #111111 : #ffffff; }
+                                                        Text { text: "Git > Commits"; font-size: 9px; color: root.theme-mode == "Light" ? #666666 : #bbbbbb; }
                                                     }
                                                     Rectangle { horizontal-stretch: 1; }
-                                                    Text {
-                                                        text: "Alt+3";
-                                                        font-size: 10px;
-                                                        color: root.theme-mode == "Light" ? #666666 : #888888;
-                                                        vertical-alignment: center;
+                                                    Text { text: "Git"; font-size: 9px; color: root.theme-mode == "Light" ? #555555 : #999999; vertical-alignment: center; }
+                                                }
+                                            }
+
+                                            // Mockup Item 4: Clipboard History
+                                            Rectangle {
+                                                height: 34px;
+                                                background: transparent;
+                                                border-radius: 4px;
+                                                HorizontalBox {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    spacing: 8px;
+                                                    alignment: center;
+                                                    Text { text: "📋"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalBox {
+                                                        alignment: center;
+                                                        spacing: 0;
+                                                        Text { text: "Clipboard History"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
+                                                        Text { text: "Clipboard > History"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
                                                     }
+                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Text { text: "Clipboard"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
+                                                }
+                                            }
+
+                                            // Mockup Item 5: Local Files
+                                            Rectangle {
+                                                height: 34px;
+                                                background: transparent;
+                                                border-radius: 4px;
+                                                HorizontalBox {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    spacing: 8px;
+                                                    alignment: center;
+                                                    Text { text: "📁"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalBox {
+                                                        alignment: center;
+                                                        spacing: 0;
+                                                        Text { text: "Local Files"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
+                                                        Text { text: "Local > Files"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
+                                                    }
+                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Text { text: "Local"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
+                                                }
+                                            }
+
+                                            // Mockup Item 6: Source Code
+                                            Rectangle {
+                                                height: 34px;
+                                                background: transparent;
+                                                border-radius: 4px;
+                                                HorizontalBox {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    spacing: 8px;
+                                                    alignment: center;
+                                                    Text { text: "📄"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalBox {
+                                                        alignment: center;
+                                                        spacing: 0;
+                                                        Text { text: "Source Code"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
+                                                        Text { text: "Local > Source Code"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
+                                                    }
+                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Text { text: "Code"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
+                                                }
+                                            }
+
+                                            // Mockup Item 7: Search Screenshots
+                                            Rectangle {
+                                                height: 34px;
+                                                background: transparent;
+                                                border-radius: 4px;
+                                                HorizontalBox {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    spacing: 8px;
+                                                    alignment: center;
+                                                    Text { text: "📄"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalBox {
+                                                        alignment: center;
+                                                        spacing: 0;
+                                                        Text { text: "Search Screenshots"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
+                                                        Text { text: "Local > Image Text (OCR)"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
+                                                    }
+                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Text { text: "OCR"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
+                                                }
+                                            }
+
+                                            // Mockup Item 8: Agent History
+                                            Rectangle {
+                                                height: 34px;
+                                                background: transparent;
+                                                border-radius: 4px;
+                                                HorizontalBox {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    spacing: 8px;
+                                                    alignment: center;
+                                                    Text { text: "💾"; font-size: 14px; vertical-alignment: center; }
+                                                    VerticalBox {
+                                                        alignment: center;
+                                                        spacing: 0;
+                                                        Text { text: "Agent History"; font-size: 11px; font-weight: 600; color: root.theme-mode == "Light" ? #222222 : #d8dee9; }
+                                                        Text { text: "AI > Agent runs"; font-size: 9px; color: root.theme-mode == "Light" ? #888888 : #4c566a; }
+                                                    }
+                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Text { text: "AI"; font-size: 9px; color: root.theme-mode == "Light" ? #777777 : #4c566a; vertical-alignment: center; }
                                                 }
                                             }
                                         }
-                                    }
-                                }
-
-                                // Backdrop message at bottom center
-                                Rectangle {
-                                    background: #00000080;
-                                    border-radius: 4px;
-                                    height: 22px;
-                                    width: 250px;
-                                    x: (parent.width - self.width) / 2;
-                                    y: parent.height - self.height - 10px;
-                                    
-                                    Text {
-                                        text: "The backdrop effect is not applied in the preview.";
-                                        color: #cccccc;
-                                        font-size: 10px;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
                                     }
                                 }
 
@@ -1051,7 +1029,7 @@ export component SettingsWindow inherits Window {
                                 border-radius: 8px;
                                 border-width: 1px;
                                 border-color: root.border-color;
-                                height: 380px;
+                                height: 440px;
 
                                 ScrollView {
                                     VerticalBox {
@@ -1238,9 +1216,104 @@ export component SettingsWindow inherits Window {
                                 }
                             }
                         }
+                        
+                        // Launcher theme row
+                        Text { text: "Launcher Theme"; font-size: 13px; color: root.text-muted; }
+                        Rectangle {
+                            background: root.card-bg;
+                            border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
+                            padding: 16px;
+                            HorizontalBox {
+                                spacing: 12px;
+                                alignment: start;
+                                // Light card
+                                Rectangle {
+                                    height: 90px;
+                                    width: 130px;
+                                    border-radius: 8px;
+                                    border-width: root.theme-mode == "Light" ? 2px : 1px;
+                                    border-color: root.theme-mode == "Light" ? #1d90f3 : root.border-color;
+                                    background: #ffffff;
+                                    VerticalBox {
+                                        padding: 10px;
+                                        spacing: 6px;
+                                        Text { text: "Light"; color: #111111; font-weight: 600; font-size: 12px; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #f2f2f2; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #e5e5e5; }
+                                    }
+                                    TouchArea { clicked => { root.theme-mode = "Light"; root.save-settings(); } }
+                                }
+                                // Dark card
+                                Rectangle {
+                                    height: 90px;
+                                    width: 130px;
+                                    border-radius: 8px;
+                                    border-width: root.theme-mode == "Dark" ? 2px : 1px;
+                                    border-color: root.theme-mode == "Dark" ? #1d90f3 : root.border-color;
+                                    background: #1e1e1e;
+                                    VerticalBox {
+                                        padding: 10px;
+                                        spacing: 6px;
+                                        Text { text: "Dark"; color: #ffffff; font-weight: 600; font-size: 12px; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #2f2f2f; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #3a3a3a; }
+                                    }
+                                    TouchArea { clicked => { root.theme-mode = "Dark"; root.save-settings(); } }
+                                }
+                                // Nord card
+                                Rectangle {
+                                    height: 90px;
+                                    width: 130px;
+                                    border-radius: 8px;
+                                    border-width: root.theme-mode == "NordDarker" ? 2px : 1px;
+                                    border-color: root.theme-mode == "NordDarker" ? #1d90f3 : root.border-color;
+                                    background: #2e3440;
+                                    VerticalBox {
+                                        padding: 10px;
+                                        spacing: 6px;
+                                        Text { text: "Nord Dark"; color: #e5e9f0; font-weight: 600; font-size: 12px; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #3b4252; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #4c566a; }
+                                    }
+                                    TouchArea { clicked => { root.theme-mode = "NordDarker"; root.save-settings(); } }
+                                }
+                            }
+                        }
+
+                        // Show placeholder setting
+                        Rectangle {
+                            background: root.card-bg;
+                            border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
+                            height: 64px;
+                            HorizontalBox {
+                                padding-left: 20px;
+                                padding-right: 20px;
+                                spacing: 16px;
+                                VerticalBox {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text { text: "Show placeholder"; color: root.text-primary; font-size: 14px; font-weight: 600; }
+                                    Text { text: "Display placeholder when query is empty"; color: root.text-muted; font-size: 12px; }
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                                VerticalBox {
+                                    alignment: center;
+                                    ToggleSwitch {
+                                        checked <=> root.show-placeholder;
+                                        toggled => {
+                                            root.save-settings();
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
                         // Bottom Spacer
-                        Rectangle { height: 100px; }
+                        Rectangle { height: 60px; }
                     }
                     
                     // Hotkeys Page
