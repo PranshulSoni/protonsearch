@@ -1063,6 +1063,10 @@ impl SearchEngine {
         self.search_files_generic(query, false, 300, false)
     }
 
+    fn search_local_files_with_fts(&self, query: &str, with_fts: bool) -> Vec<SearchResult> {
+        self.search_files_generic(query, false, 300, with_fts)
+    }
+
     /*
     pub fn db_path(&self) -> std::path::PathBuf {
         self._db_path.clone()
@@ -2930,15 +2934,16 @@ impl SearchEngine {
     /// actions, calculator, web search, AI text commands) is produced by search_raw but
     /// filtered out here. ponytail: one gate beats deleting thousands of lines.
     pub fn search(&mut self, query: &str, top_k: usize) -> Vec<SearchResult> {
-        // Filter only — do NOT re-truncate. search_raw already applies the right limits
-        // per query type (file:/code: return up to 50, with content/OCR matches at the
-        // tail); truncating here cut those off when filename matches filled the top.
-        let mut results = self.search_raw(query, top_k);
+        self.search_with_fts(query, top_k, true)
+    }
+
+    pub fn search_with_fts(&mut self, query: &str, top_k: usize, with_fts: bool) -> Vec<SearchResult> {
+        let mut results = self.search_raw_with_fts(query, top_k, with_fts);
         results.retain(lean_allowed);
         results
     }
 
-    fn search_raw(&mut self, query: &str, top_k: usize) -> Vec<SearchResult> {
+    fn search_raw_with_fts(&mut self, query: &str, top_k: usize, with_fts: bool) -> Vec<SearchResult> {
         let q = query.trim();
         let q_lower_trimmed = q.to_lowercase();
 
@@ -4380,7 +4385,7 @@ impl SearchEngine {
             },
         };
 
-        let mut file_matches = self.search_local_files(&q_lower);
+        let mut file_matches = self.search_local_files_with_fts(&q_lower, with_fts);
         file_matches.sort_unstable_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)

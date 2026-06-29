@@ -62,6 +62,7 @@ const TIMER_VOICE_AUTOEXEC: usize = 3;
 const TIMER_VOICE_ANIM: usize = 4;
 const TIMER_AI_ANIM: usize = 5;
 const TIMER_ICON_BATCH: usize = 6;
+const TIMER_SEARCH_ANIM: usize = 7;
 const CURSOR_BLINK_MS: u32 = 530;
 const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
@@ -369,6 +370,8 @@ struct State {
     active_chat_id: Option<i64>,          // persistent chat thread ID in ai_chats table
     // Hermes Runs API: a pending tool approval (None = nothing to approve).
     hermes_approval: Option<ai::HermesApproval>,
+    search_loading: bool,
+    search_anim_tick: usize,
 }
 
 #[derive(PartialEq)]
@@ -979,6 +982,8 @@ unsafe fn run() {
         ai_tick: 0,
         active_chat_id: None,
         hermes_approval: None,
+        search_loading: false,
+        search_anim_tick: 0,
     });
 
     // Spawn background Hermes gateway status checker and auto-starter
@@ -1174,20 +1179,51 @@ unsafe fn run() {
                     // Spawn search worker thread
                     std::thread::spawn(move || {
                         let hwnd_target = hwnd_worker;
-                        while let Ok(req) = rx.recv() {
-                            // Drain queued requests to keep only the latest one
-                            let mut latest_req = req;
+                        let mut latest_req: Option<SearchRequest> = None;
+                        loop {
+                            let req = if latest_req.is_none() {
+                                match rx.recv() {
+                                    Ok(r) => r,
+                                    Err(_) => break,
+                                }
+                            } else {
+                                latest_req.take().unwrap()
+                            };
+
+                            let mut current_req = req;
                             while let Ok(next_req) = rx.try_recv() {
-                                latest_req = next_req;
+                                current_req = next_req;
                             }
 
-                            let results = engine.search(&latest_req.query, MAX_RESULTS);
-                            let results_ptr = Box::into_raw(Box::new(results)) as isize;
+                            // 1. Run Fast Search (with_fts = false)
+                            let fast_results = engine.search_with_fts(&current_req.query, MAX_RESULTS, false);
+                            let fast_results_ptr = Box::into_raw(Box::new(fast_results)) as isize;
+                            let wparam_fast = (current_req.query_id & 0xFFFF_FFFF) as usize; // is_final = false
                             let _ = PostMessageW(
                                 hwnd_target.0,
                                 WM_SEARCH_RESULTS,
-                                WPARAM(latest_req.query_id),
-                                LPARAM(results_ptr),
+                                WPARAM(wparam_fast),
+                                LPARAM(fast_results_ptr),
+                            );
+
+                            // 2. Check if a new query has arrived before starting the slow search
+                            match rx.try_recv() {
+                                Ok(next_req) => {
+                                    latest_req = Some(next_req);
+                                    continue;
+                                }
+                                Err(_) => {}
+                            }
+
+                            // 3. Run Slow Search (with_fts = true)
+                            let slow_results = engine.search_with_fts(&current_req.query, MAX_RESULTS, true);
+                            let slow_results_ptr = Box::into_raw(Box::new(slow_results)) as isize;
+                            let wparam_slow = ((current_req.query_id & 0xFFFF_FFFF) as usize) | (1 << 32); // is_final = true
+                            let _ = PostMessageW(
+                                hwnd_target.0,
+                                WM_SEARCH_RESULTS,
+                                WPARAM(wparam_slow),
+                                LPARAM(slow_results_ptr),
                             );
                         }
                     });
@@ -1653,7 +1689,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         }
 
         WM_SEARCH_RESULTS => {
-            let query_id = wp.0;
+            let packed = wp.0;
+            let query_id = packed & 0xFFFF_FFFF;
+            let is_final = (packed >> 32) != 0;
             let results_ptr = lp.0 as *mut Vec<SearchResult>;
             let results = unsafe { *Box::from_raw(results_ptr) };
             if !sp.is_null() {
@@ -1662,6 +1700,10 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     // Discard search results if user cleared the query
                 } else if query_id == s.current_query_id {
                     s.results_stale = false;
+                    if is_final {
+                        s.search_loading = false;
+                        let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
+                    }
                     s.filter_counts = filter_counts_for_results(&results);
                     let mut filtered = results;
                     if !matches!(s.active_filter, FilterType::All) {
@@ -1780,6 +1822,10 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
 
+                TIMER_SEARCH_ANIM => {
+                    s.search_anim_tick = (s.search_anim_tick + 1) % 8;
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
                 _ => {}
             }
             LRESULT(0)
@@ -3090,6 +3136,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
 
         WM_DESTROY => {
             let _ = unsafe {
+                let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
                 windows::Win32::System::DataExchange::RemoveClipboardFormatListener(hwnd)
             };
             if !sp.is_null() {
@@ -3808,6 +3855,8 @@ unsafe fn stop_color_picker(hwnd: HWND, s: &mut State) {
 unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
     let _ = KillTimer(hwnd, TIMER_CURSOR_BLINK);
+    let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
+    s.search_loading = false;
     s.form_state = FormState::None;
     s.image_preview_active = false;
     s.cursor_visible = false;
@@ -5233,6 +5282,8 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
             // Re-enter trigger_search with the rewritten query.
             s.results_stale = true;
             s.current_query_id += 1;
+            s.search_loading = true;
+            let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 80, None);
             let req = SearchRequest {
                 query: s.query.clone(),
                 query_id: s.current_query_id,
@@ -5248,6 +5299,8 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
 
     s.results_stale = true;
     s.current_query_id += 1;
+    s.search_loading = true;
+    let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 80, None);
     let req = SearchRequest {
         query: s.query.clone(),
         query_id: s.current_query_id,
@@ -6260,6 +6313,38 @@ fn image_path_for_result(result: &SearchResult) -> Option<&str> {
     .then_some(path)
 }
 
+unsafe fn draw_spinner(hdc: HDC, x: i32, y: i32, size: i32, tick: usize, color: COLORREF) {
+    let center_x = x + size / 2;
+    let center_y = y + size / 2;
+    let r = size / 2 - 2;
+
+    for i in 0..8 {
+        let angle = (i as f32) * 2.0 * std::f32::consts::PI / 8.0;
+        let dx = (angle.cos() * r as f32) as i32;
+        let dy = (angle.sin() * r as f32) as i32;
+        
+        let diff = (i + 8 - tick) % 8;
+        let dot_color = if diff == 0 {
+            color
+        } else {
+            let r_val = ((color.0 & 0xFF) * (8 - diff) as u32 / 8) as u8;
+            let g_val = (((color.0 >> 8) & 0xFF) * (8 - diff) as u32 / 8) as u8;
+            let b_val = (((color.0 >> 16) & 0xFF) * (8 - diff) as u32 / 8) as u8;
+            COLORREF(r_val as u32 | ((g_val as u32) << 8) | ((b_val as u32) << 16))
+        };
+        
+        let br = CreateSolidBrush(dot_color);
+        let rect = RECT {
+            left: center_x + dx - 2,
+            top: center_y + dy - 2,
+            right: center_x + dx + 2,
+            bottom: center_y + dy + 2,
+        };
+        let _ = FillRect(hdc, &rect, br);
+        let _ = DeleteObject(br);
+    }
+}
+
 unsafe fn paint(hwnd: HWND, s: &State) {
     #[allow(non_snake_case)]
     let SEARCH_H = s.search_h();
@@ -6473,13 +6558,37 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
     // Text / placeholder
     let tx = x + PAD_L + SEARCH_ICON_SIZE + 12;
-    let tw = w - (PAD_L + SEARCH_ICON_SIZE + 12) - PAD_L - SEARCH_ICON_SIZE;
+    let right_reserve = if s.search_loading { 180 } else { PAD_L + SEARCH_ICON_SIZE };
+    let tw = w - (PAD_L + SEARCH_ICON_SIZE + 12) - right_reserve;
     let mut tr = RECT {
         left: tx,
         top: y,
         right: tx + tw,
         bottom: y + SEARCH_H,
     };
+
+    if s.search_loading {
+        let spinner_size = 16;
+        let spinner_x = x + w - PAD_L - spinner_size - 4;
+        let spinner_y = y + (SEARCH_H - spinner_size) / 2;
+        draw_spinner(mdc, spinner_x, spinner_y, spinner_size, s.search_anim_tick, palette.clr_accent);
+
+        SelectObject(mdc, s.font_c);
+        SetTextColor(mdc, palette.clr_ph);
+        let mut load_text: Vec<u16> = "Searching content...".encode_utf16().collect();
+        let mut load_rect = RECT {
+            left: spinner_x - 140,
+            top: y,
+            right: spinner_x - 8,
+            bottom: y + SEARCH_H,
+        };
+        let _ = DrawTextW(
+            mdc,
+            &mut load_text,
+            &mut load_rect,
+            DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+        );
+    }
 
     SelectObject(mdc, s.font_q);
     SetTextColor(mdc, palette.clr_white);
