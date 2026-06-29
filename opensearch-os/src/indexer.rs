@@ -94,11 +94,42 @@ fn index_one_file(conn: &Connection, path: &Path) {
     }
 }
 
+static WATCHER: Lazy<Mutex<Option<notify::RecommendedWatcher>>> = Lazy::new(|| Mutex::new(None));
+
 /// Watch the user profile + fixed drives and index created/modified files instantly.
 /// Falls back to the periodic crawl (safety net) for any events the OS drops.
 pub fn start_watcher(db_path: PathBuf) {
-    use notify::{EventKind, RecursiveMode, Watcher};
+    let is_initial = WATCHER.lock().unwrap().is_none();
+
+    let mut g = WATCHER.lock().unwrap();
+    // Drop the old watcher first to release all OS watches and close mpsc channels
+    *g = None;
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut watcher = match notify::recommended_watcher(move |res| {
+        let _ = tx.send(res);
+    }) {
+        Ok(w) => w,
+        Err(e) => {
+            log_indexer(&format!("Watcher init failed: {e}"));
+            return;
+        }
+    };
+
+    let folders = get_scan_folders();
+    for folder in &folders {
+        log_indexer(&format!("Watcher watching folder: {:?}", folder));
+        let _ = watcher.watch(folder, notify::RecursiveMode::Recursive);
+    }
+
+    let db_path_clone = db_path.clone();
     thread::spawn(move || {
+        if is_initial {
+            // Wait 15s for the initial indexer I/O burst to settle before registering
+            // recursive filesystem watches.
+            thread::sleep(std::time::Duration::from_secs(15));
+        }
+
         // OCR (WinRT) needs COM initialized on this thread.
         let _ = unsafe {
             windows::Win32::System::Com::CoInitializeEx(
@@ -106,24 +137,8 @@ pub fn start_watcher(db_path: PathBuf) {
                 windows::Win32::System::Com::COINIT_MULTITHREADED,
             )
         };
-        // Wait 15s for the initial indexer I/O burst to settle before registering
-        // recursive filesystem watches — registering RecursiveMode::Recursive on
-        // drive roots at cold start competes with the file indexer's WalkDir.
-        thread::sleep(std::time::Duration::from_secs(15));
-        let (tx, rx) = std::sync::mpsc::channel();
-        let mut watcher = match notify::recommended_watcher(move |res| {
-            let _ = tx.send(res);
-        }) {
-            Ok(w) => w,
-            Err(e) => {
-                log_indexer(&format!("Watcher init failed: {e}"));
-                return;
-            }
-        };
-        for folder in get_scan_folders() {
-            let _ = watcher.watch(&folder, RecursiveMode::Recursive);
-        }
-        let conn = match Connection::open(&db_path) {
+
+        let conn = match Connection::open(&db_path_clone) {
             Ok(c) => c,
             Err(_) => return,
         };
@@ -131,18 +146,17 @@ pub fn start_watcher(db_path: PathBuf) {
         let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
         log_indexer("Watcher started");
 
-        // Debounce: batch events in an ~800ms window and dedupe paths so a file being
-        // written repeatedly (e.g. a download in progress) is only indexed once.
         let mut collect = |set: &mut std::collections::HashSet<PathBuf>,
                            res: notify::Result<notify::Event>| {
             if let Ok(ev) = res {
-                if matches!(ev.kind, EventKind::Create(_) | EventKind::Modify(_)) {
+                if matches!(ev.kind, notify::EventKind::Create(_) | notify::EventKind::Modify(_)) {
                     for p in ev.paths {
                         set.insert(p);
                     }
                 }
             }
         };
+
         loop {
             let first = match rx.recv() {
                 Ok(r) => r,
@@ -165,7 +179,13 @@ pub fn start_watcher(db_path: PathBuf) {
                 }
             }
         }
+        log_indexer("Watcher thread exited");
+        unsafe {
+            windows::Win32::System::Com::CoUninitialize();
+        }
     });
+
+    *g = Some(watcher);
 }
 
 fn log_indexer(msg: &str) {
