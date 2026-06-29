@@ -398,8 +398,17 @@ pub fn run_settings_window() {
             .join("opensearch-os")
             .join("file_index.db");
         std::thread::spawn(move || {
+            let _ = unsafe {
+                windows::Win32::System::Com::CoInitializeEx(
+                    None,
+                    windows::Win32::System::Com::COINIT_MULTITHREADED,
+                )
+            };
             let folders = crate::indexer::get_scan_folders();
             let _ = crate::indexer::run_indexer_folders(&db_path, folders);
+            unsafe {
+                windows::Win32::System::Com::CoUninitialize();
+            }
         });
     });
 
