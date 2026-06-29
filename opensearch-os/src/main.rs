@@ -62,6 +62,7 @@ const TIMER_VOICE_AUTOEXEC: usize = 3;
 const TIMER_VOICE_ANIM: usize = 4;
 const TIMER_AI_ANIM: usize = 5;
 const TIMER_ICON_BATCH: usize = 6;
+const TIMER_ANIM: usize = 7;  // show/hide fade animation (16ms ≈ 60fps)
 const CURSOR_BLINK_MS: u32 = 530;
 const WM_ICON_LOADED: u32 = WM_USER + 1;
 const WM_ENGINE_READY: u32 = WM_USER + 2;
@@ -1731,6 +1732,44 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     s.ai_tick = (s.ai_tick + 1) % 60;
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
+                TIMER_ANIM => {
+                    // Advance the show/hide fade animation one tick (~60fps).
+                    let elapsed = match s.anim {
+                        Anim::Appearing { start_time, .. } | Anim::Hiding { start_time, .. } => {
+                            start_time.elapsed().as_secs_f32()
+                        }
+                        _ => {
+                            let _ = KillTimer(hwnd, TIMER_ANIM);
+                            return LRESULT(0);
+                        }
+                    };
+                    let (appearing, start_p) = match s.anim {
+                        Anim::Appearing { start_p, .. } => (true, start_p),
+                        Anim::Hiding { start_p, .. } => (false, start_p),
+                        _ => unreachable!(),
+                    };
+                    let duration = ANIM_DURATION_SEC;
+                    let p = if appearing {
+                        (start_p + elapsed / duration).min(1.0)
+                    } else {
+                        (start_p - elapsed / duration).max(0.0)
+                    };
+                    let t = ease_out(p);
+                    let alpha = (t * 255.0) as u8;
+                    let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                    let is_finished = if appearing { p >= 1.0 } else { p <= 0.0 };
+                    if is_finished {
+                        let _ = KillTimer(hwnd, TIMER_ANIM);
+                        if appearing {
+                            s.anim = Anim::Visible;
+                            force_foreground(hwnd);
+                        } else {
+                            s.anim = Anim::Hidden;
+                            let _ = ShowWindow(hwnd, SW_HIDE);
+                        }
+                    }
+                }
                 TIMER_ICON_BATCH => {
                     let _ = KillTimer(hwnd, TIMER_ICON_BATCH);
                     let _ = InvalidateRect(hwnd, None, FALSE);
@@ -3316,15 +3355,8 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
     }
     let s = &mut *sp;
 
-    static mut IN_ANIMATION: bool = false;
-    if IN_ANIMATION {
-        return;
-    }
-    IN_ANIMATION = true;
-
     let start_time = std::time::Instant::now();
-    let duration = ANIM_DURATION_SEC;
-    let start_p = if appearing { 0.0 } else { 1.0 };
+    let start_p = if appearing { 0.0f32 } else { 1.0f32 };
 
     if appearing {
         // Save the current foreground window so snippet auto-paste can restore focus to it
@@ -3442,59 +3474,19 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         s.last_mouse_x = pt.x;
         s.last_mouse_y = pt.y;
 
-        s.anim = Anim::Appearing {
-            start_time,
-            start_p,
-        };
-
+        s.anim = Anim::Appearing { start_time, start_p };
         let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, 0, LWA_COLORKEY | LWA_ALPHA);
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         force_foreground(hwnd);
     } else {
         let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
-        s.anim = Anim::Hiding {
-            start_time,
-            start_p,
-        };
+        s.anim = Anim::Hiding { start_time, start_p };
     }
 
-    loop {
-        match s.anim {
-            Anim::Appearing { .. } if appearing => {}
-            Anim::Hiding { .. } if !appearing => {}
-            _ => break,
-        }
-
-        let elapsed = start_time.elapsed().as_secs_f32();
-        let p = if appearing {
-            (start_p + elapsed / duration).min(1.0)
-        } else {
-            (start_p - elapsed / duration).max(0.0)
-        };
-
-        let t = ease_out(p);
-        let alpha = (t * 255.0) as u8;
-        let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
-
-        let _ = InvalidateRect(hwnd, None, FALSE);
-        let _ = UpdateWindow(hwnd);
-
-        let is_finished = if appearing { p >= 1.0 } else { p <= 0.0 };
-        if is_finished {
-            if appearing {
-                s.anim = Anim::Visible;
-                force_foreground(hwnd);
-            } else {
-                s.anim = Anim::Hidden;
-                let _ = ShowWindow(hwnd, SW_HIDE);
-            }
-            break;
-        }
-
-        let _ = DwmFlush();
-    }
-
-    IN_ANIMATION = false;
+    // Kick the 60fps animation timer — each tick advances the alpha one step.
+    // This is non-blocking: the message loop continues to run normally.
+    let _ = KillTimer(hwnd, TIMER_ANIM);
+    let _ = SetTimer(hwnd, TIMER_ANIM, 16, None); // ~60fps
 }
 
 // AttachThreadInput trick: allows SetForegroundWindow to succeed even from background context.
