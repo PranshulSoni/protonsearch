@@ -50,8 +50,8 @@ const RESULT_TEXT_BLOCK_H: i32 = 40;
 const RESULT_TEXT_GAP: i32 = 12;
 const WM_MOUSELEAVE: u32 = 0x02A3;
 
-fn centered_in_result_row(row_y: i32, height: i32) -> i32 {
-    row_y + (RESULT_H - height) / 2
+fn centered_in_result_row(row_y: i32, height: i32, item_h: i32) -> i32 {
+    row_y + (item_h - height) / 2
 }
 
 // ── Win32 IDs ─────────────────────────────────────────────────────────────────
@@ -380,6 +380,12 @@ struct IconRequest {
 }
 
 impl State {
+    fn search_h(&self) -> i32 {
+        self.app_settings.search_bar_height as i32
+    }
+    fn item_h(&self) -> i32 {
+        self.app_settings.item_height as i32
+    }
     fn has_prefix(&self) -> bool {
         let q = self.query.to_lowercase();
         q.starts_with("bookmarks:")
@@ -411,16 +417,16 @@ impl State {
 
     fn win_h(&self) -> i32 {
         if self.note_editing {
-            return SEARCH_H + 1 + AI_PANEL_H;
+            return self.search_h() + 1 + AI_PANEL_H;
         }
         if self.ai_pending || self.ai_answer.is_some() {
-            return SEARCH_H + 1 + AI_PANEL_H;
+            return self.search_h() + 1 + AI_PANEL_H;
         }
         if self.form_state != FormState::None {
-            return SEARCH_H + 24;
+            return self.search_h() + 24;
         }
         if self.query.is_empty() {
-            return SEARCH_H + 36 + 8 * RESULT_H + 8;
+            return self.search_h() + 36 + 8 * self.item_h() + 8;
         }
         let n = self.results.len().min(VISIBLE_RESULTS) as i32;
         if self.has_prefix() {
@@ -437,21 +443,21 @@ impl State {
                     headers_count += 1;
                 }
             }
-            SEARCH_H + 1 + n * RESULT_H + headers_count * 24 + 8
+            self.search_h() + 1 + n * self.item_h() + headers_count * 24 + 8
         } else {
             let offset = 80;
             let footer = 8;
-            SEARCH_H + offset + n * RESULT_H + footer
+            self.search_h() + offset + n * self.item_h() + footer
         }
     }
     fn result_row_y(&self, i: usize) -> i32 {
         let end_h = self.win_h();
         let end_y = self.cy - end_h / 2;
-        let mut cur_y = end_y + SEARCH_H + 1;
+        let mut cur_y = end_y + self.search_h() + 1;
 
         if self.query.is_empty() {
             cur_y += 36; // "Quick Search" header
-            return cur_y + i as i32 * RESULT_H;
+            return cur_y + i as i32 * self.item_h();
         }
 
         if self.has_prefix() {
@@ -468,11 +474,11 @@ impl State {
                     headers_count += 1;
                 }
             }
-            return cur_y + headers_count * 24 + i as i32 * RESULT_H;
+            return cur_y + headers_count * 24 + i as i32 * self.item_h();
         }
 
         cur_y += 80; // "Best matches first" label
-        cur_y + i as i32 * RESULT_H
+        cur_y + i as i32 * self.item_h()
     }
     fn result_rect(&self, i: usize) -> RECT {
         let y = self.result_row_y(i);
@@ -480,7 +486,7 @@ impl State {
             left: 0,
             top: y,
             right: WIN_W,
-            bottom: y + RESULT_H,
+            bottom: y + self.item_h(),
         }
     }
     fn current_p(&self) -> f32 {
@@ -640,6 +646,32 @@ fn register_startup() {
     }
 }
 
+unsafe fn create_gdi_font(family: &str, size_px: i32, weight_str: &str) -> HFONT {
+    let face: Vec<u16> = family.encode_utf16().chain(std::iter::once(0)).collect();
+    let weight = match weight_str {
+        "Bold" => 700,
+        "Semi-Bold" => 600,
+        "Medium" => 500,
+        _ => 400,
+    };
+    CreateFontW(
+        -size_px,
+        0,
+        0,
+        0,
+        weight,
+        0,
+        0,
+        0,
+        DEFAULT_CHARSET.0 as u32,
+        OUT_DEFAULT_PRECIS.0 as u32,
+        CLIP_DEFAULT_PRECIS.0 as u32,
+        CLEARTYPE_QUALITY.0 as u32,
+        (DEFAULT_PITCH.0 | FF_SWISS.0) as u32,
+        PCWSTR(face.as_ptr()),
+    )
+}
+
 unsafe fn run() {
     let hinst = GetModuleHandleW(PCWSTR::null()).unwrap();
     let face: Vec<u16> = "Segoe UI Variable\0".encode_utf16().collect();
@@ -756,9 +788,9 @@ unsafe fn run() {
         anim: Anim::Hidden,
         cx: sw / 2,
         cy: sh / 3,
-        font_q: mk_font(-24, 400),
-        font_n: mk_font(-18, 700),
-        font_c: mk_font(-14, 400),
+        font_q: create_gdi_font(&settings.query_font_family, settings.query_font_size as i32, &settings.query_font_weight),
+        font_n: create_gdi_font(&settings.result_title_font_family, settings.result_title_font_size as i32, &settings.result_title_font_weight),
+        font_c: create_gdi_font(&settings.result_subtitle_font_family, settings.result_subtitle_font_size as i32, &settings.result_subtitle_font_weight),
         font_b: mk_font(-13, 600),
         font_mic,
         font_code,
@@ -3167,6 +3199,16 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let s = &mut *sp;
                 s.app_settings = crate::settings::AppSettings::load();
                 s.theme = theme_from_setting(&s.app_settings.theme_mode);
+
+                // Recreate fonts dynamically
+                unsafe {
+                    let _ = windows::Win32::Graphics::Gdi::DeleteObject(s.font_q);
+                    let _ = windows::Win32::Graphics::Gdi::DeleteObject(s.font_n);
+                    let _ = windows::Win32::Graphics::Gdi::DeleteObject(s.font_c);
+                    s.font_q = create_gdi_font(&s.app_settings.query_font_family, s.app_settings.query_font_size as i32, &s.app_settings.query_font_weight);
+                    s.font_n = create_gdi_font(&s.app_settings.result_title_font_family, s.app_settings.result_title_font_size as i32, &s.app_settings.result_title_font_weight);
+                    s.font_c = create_gdi_font(&s.app_settings.result_subtitle_font_family, s.app_settings.result_subtitle_font_size as i32, &s.app_settings.result_subtitle_font_weight);
+                }
 
                 if !crate::hotkey::register_hotkey(hwnd, HOTKEY_ID, &s.app_settings.global_hotkey) {
                     voice::log(&format!(
@@ -6234,7 +6276,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
         );
         SetTextColor(mdc, palette.clr_white);
-    } else if s.query.is_empty() {
+    } else if s.query.is_empty() && (s.app_settings.show_placeholder || !matches!(s.form_state, FormState::None)) {
         let ph_str = match &s.form_state {
             FormState::CreateSnippetName => "Create Snippet: Enter Name...",
             FormState::CreateSnippetContent { .. } => "Create Snippet: Enter Content...",
@@ -7181,12 +7223,12 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
             if s.query.is_empty() {
                 // Homepage (Image 3) flat list items
-                let ry = list_y + i as i32 * RESULT_H;
+                let ry = list_y + i as i32 * s.item_h();
                 let is_selected = res_idx == s.selected;
                 let is_hovered = Some(res_idx) == s.hovered_item;
                 if is_selected {
                     let border_y = ry + 2;
-                    let border_h = RESULT_H - 4;
+                    let border_h = s.item_h() - 4;
                     fill_rounded(
                         mdc,
                         x + 8,
@@ -7198,7 +7240,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     );
                 } else if is_hovered {
                     let border_y = ry + 2;
-                    let border_h = RESULT_H - 4;
+                    let border_h = s.item_h() - 4;
                     fill_rounded(
                         mdc,
                         x + 8,
@@ -7227,7 +7269,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 };
 
                 if !icon_to_draw.0.is_null() {
-                    let icon_y = centered_in_result_row(ry, RESULT_ICON_SIZE);
+                    let icon_y = centered_in_result_row(ry, RESULT_ICON_SIZE, s.app_settings.item_height as i32);
                     let _ = unsafe {
                         DrawIconEx(
                             mdc,
@@ -7244,7 +7286,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 }
 
                 let tx = x + PAD_L + RESULT_ICON_SIZE + RESULT_TEXT_GAP;
-                let text_top = centered_in_result_row(ry, RESULT_TEXT_BLOCK_H);
+                let text_top = centered_in_result_row(ry, RESULT_TEXT_BLOCK_H, s.app_settings.item_height as i32);
                 SelectObject(mdc, s.font_n);
                 SetTextColor(mdc, palette.clr_white);
                 let display_name = res.entry.control_name.clone();
@@ -7300,7 +7342,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     left: x + list_w / 2,
                     top: ry,
                     right: x + list_w - PAD_L,
-                    bottom: ry + RESULT_H,
+                    bottom: ry + s.item_h(),
                 };
                 let _ = DrawTextW(
                     mdc,
@@ -7382,7 +7424,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         x + 8,
                         ry + 2,
                         list_w - 16,
-                        RESULT_H - 4,
+                        s.item_h() - 4,
                         4,
                         palette.bg_sel,
                     );
@@ -7392,7 +7434,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         x + 8,
                         ry + 2,
                         list_w - 16,
-                        RESULT_H - 4,
+                        s.item_h() - 4,
                         4,
                         palette.bg_hover,
                     );
@@ -7402,13 +7444,13 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         x + 8,
                         ry + 2,
                         list_w - 16,
-                        RESULT_H - 4,
+                        s.item_h() - 4,
                         4,
                         palette.bg_hover,
                     );
                 }
 
-                let icon_y = centered_in_result_row(ry, RESULT_ICON_SIZE);
+                let icon_y = centered_in_result_row(ry, RESULT_ICON_SIZE, s.app_settings.item_height as i32);
                 let mut drew_thumbnail = false;
                 if let Some(path) = image_path_for_result(res) {
                     let mut cache = s.clipboard_thumbnails.borrow_mut();
@@ -7540,7 +7582,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 }
 
                 let tx = x + PAD_L + RESULT_ICON_SIZE + RESULT_TEXT_GAP;
-                let text_top = centered_in_result_row(ry, RESULT_TEXT_BLOCK_H);
+                let text_top = centered_in_result_row(ry, RESULT_TEXT_BLOCK_H, s.app_settings.item_height as i32);
                 SelectObject(mdc, s.font_n);
                 SetTextColor(mdc, palette.clr_white);
                 let display_name = if selected_clip_ids_contain(&s.selected_clip_ids, &res.entry.id)
@@ -7620,17 +7662,17 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     s,
                     badge_source,
                     badge_left,
-                    ry + (RESULT_H - BADGE_H) / 2,
+                    ry + (s.item_h() - BADGE_H) / 2,
                 );
-                list_y += RESULT_H;
+                list_y += s.item_h();
             } else {
                 // ── Search Page (Image 4) flat list items ──────────────────────────
-                let ry = list_y + i as i32 * RESULT_H;
+                let ry = list_y + i as i32 * s.item_h();
                 let is_selected = res_idx == s.selected;
                 let is_hovered = Some(res_idx) == s.hovered_item;
                 if is_selected {
                     let border_y = ry + 2;
-                    let border_h = RESULT_H - 4;
+                    let border_h = s.item_h() - 4;
                     fill_rounded(
                         mdc,
                         x + 8,
@@ -7642,7 +7684,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     );
                 } else if is_hovered {
                     let border_y = ry + 2;
-                    let border_h = RESULT_H - 4;
+                    let border_h = s.item_h() - 4;
                     fill_rounded(
                         mdc,
                         x + 8,
@@ -7663,7 +7705,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         })
                     });
                     if let Some(hbitmap) = hbitmap {
-                        let icon_y = centered_in_result_row(ry, RESULT_ICON_SIZE);
+                        let icon_y = centered_in_result_row(ry, RESULT_ICON_SIZE, s.app_settings.item_height as i32);
                         draw_cached_bmp(
                             mdc,
                             x + PAD_L,
@@ -7699,7 +7741,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         });
 
                 if !drew_thumbnail && !icon_to_draw.0.is_null() {
-                    let icon_y = centered_in_result_row(ry, RESULT_ICON_SIZE);
+                    let icon_y = centered_in_result_row(ry, RESULT_ICON_SIZE, s.app_settings.item_height as i32);
                     let _ = unsafe {
                         DrawIconEx(
                             mdc,
@@ -7716,7 +7758,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 }
 
                 let tx = x + PAD_L + RESULT_ICON_SIZE + RESULT_TEXT_GAP;
-                let text_top = centered_in_result_row(ry, RESULT_TEXT_BLOCK_H);
+                let text_top = centered_in_result_row(ry, RESULT_TEXT_BLOCK_H, s.app_settings.item_height as i32);
                 SelectObject(mdc, s.font_n);
                 SetTextColor(mdc, palette.clr_white);
                 let display_name = res.entry.control_name.clone();
@@ -7793,7 +7835,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         s,
                         label,
                         badge_x,
-                        ry + (RESULT_H - BADGE_H) / 2,
+                        ry + (s.item_h() - BADGE_H) / 2,
                         badge_w,
                     );
                 }
@@ -7804,7 +7846,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         let total_results = s.results.len();
         if total_results > VISIBLE_RESULTS {
             let track_top = list_y + 8;
-            let track_bottom = list_y + n as i32 * RESULT_H - 8;
+            let track_bottom = list_y + n as i32 * s.item_h() - 8;
             let track_h = track_bottom - track_top;
 
             let thumb_h = ((VISIBLE_RESULTS as f32 / total_results as f32) * track_h as f32) as i32;
@@ -9563,8 +9605,8 @@ mod tests {
 
     #[test]
     fn row_geometry_centers_icons_and_text() {
-        assert_eq!(centered_in_result_row(100, RESULT_ICON_SIZE), 118);
-        assert_eq!(centered_in_result_row(100, RESULT_TEXT_BLOCK_H), 114);
+        assert_eq!(centered_in_result_row(100, RESULT_ICON_SIZE, 68), 118);
+        assert_eq!(centered_in_result_row(100, RESULT_TEXT_BLOCK_H, 68), 114);
     }
 
     #[test]

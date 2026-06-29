@@ -7,9 +7,9 @@ export component ToggleSwitch inherits Rectangle {
     width: 44px;
     height: 20px;
     border-radius: 10px;
-    background: checked ? #60a5fa : #1a1a1a;
+    background: checked ? #1d90f3 : #1a1a1a;
     border-width: 1px;
-    border-color: checked ? #60a5fa : #8a8a8a;
+    border-color: checked ? #1d90f3 : #8a8a8a;
 
     animate background { duration: 150ms; easing: ease-in-out; }
     animate border-color { duration: 150ms; easing: ease-in-out; }
@@ -94,7 +94,7 @@ export component CustomDropdown inherits Rectangle {
             spacing: 2px;
             for item[idx] in model : Rectangle {
                 height: 26px;
-                background: current-index == idx ? #60a5fa : (item-ta.has-hover ? #353535 : transparent);
+                background: current-index == idx ? #1d90f3 : (item-ta.has-hover ? #353535 : transparent);
                 border-radius: 4px;
                 
                 HorizontalBox {
@@ -102,7 +102,7 @@ export component CustomDropdown inherits Rectangle {
                     alignment: center;
                     Text {
                         text: item;
-                        color: current-index == idx ? #1a1a1a : #ffffff;
+                        color: #ffffff;
                         font-size: 13px;
                         vertical-alignment: center;
                     }
@@ -140,6 +140,19 @@ export component SettingsWindow inherits Window {
     
     in-out property <int> window-width;
     in-out property <int> item-height;
+    in-out property <int> search-bar-height;
+    in-out property <string> query-font-family;
+    in-out property <string> query-font-weight;
+    in-out property <int> query-font-size;
+    in-out property <string> result-title-font-family;
+    in-out property <string> result-title-font-weight;
+    in-out property <int> result-title-font-size;
+    in-out property <string> result-subtitle-font-family;
+    in-out property <string> result-subtitle-font-weight;
+    in-out property <int> result-subtitle-font-size;
+    in-out property <bool> show-placeholder;
+
+    property <bool> edit-panel-expanded: false;
     
     // Callbacks to Rust
     callback save-settings();
@@ -695,85 +708,539 @@ export component SettingsWindow inherits Window {
                     // Appearance Page
                     if root.current-page == 1: VerticalBox {
                         alignment: start;
-                        spacing: 14px;
-                        Text { text: "Appearance"; font-size: 26px; font-weight: 600; color: root.text-primary; }
-                        Text { text: "Launcher theme"; font-size: 13px; color: root.text-muted; }
+                        spacing: 16px;
                         
+                        Text { text: "Appearance"; font-size: 26px; font-weight: 600; color: root.text-primary; }
+                        
+                        // Launcher theme row
+                        Text { text: "Launcher Theme"; font-size: 13px; color: root.text-muted; }
                         Rectangle {
                             background: root.card-bg;
                             border-radius: 8px;
                             border-color: root.border-color;
                             border-width: 1px;
-                            padding: 20px;
+                            padding: 16px;
                             HorizontalBox {
                                 spacing: 12px;
+                                alignment: start;
+                                // Light card
                                 Rectangle {
-                                    height: 106px;
-                                    width: 150px;
+                                    height: 90px;
+                                    width: 130px;
                                     border-radius: 8px;
                                     border-width: root.theme-mode == "Light" ? 2px : 1px;
-                                    border-color: root.theme-mode == "Light" ? #3b82f6 : root.border-color;
+                                    border-color: root.theme-mode == "Light" ? #1d90f3 : root.border-color;
                                     background: #ffffff;
                                     VerticalBox {
                                         padding: 10px;
-                                        spacing: 8px;
-                                        Text { text: "Light"; color: #111111; font-weight: 600; }
-                                        Rectangle { height: 24px; border-radius: 5px; background: #f2f2f2; }
-                                        Rectangle { height: 24px; border-radius: 5px; background: #e5e5e5; }
+                                        spacing: 6px;
+                                        Text { text: "Light"; color: #111111; font-weight: 600; font-size: 12px; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #f2f2f2; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #e5e5e5; }
                                     }
-                                    TouchArea {
-                                        clicked => {
-                                            root.theme-mode = "Light";
-                                            root.save-settings();
-                                        }
-                                    }
+                                    TouchArea { clicked => { root.theme-mode = "Light"; root.save-settings(); } }
                                 }
+                                // Dark card
                                 Rectangle {
-                                    height: 106px;
-                                    width: 150px;
+                                    height: 90px;
+                                    width: 130px;
                                     border-radius: 8px;
                                     border-width: root.theme-mode == "Dark" ? 2px : 1px;
-                                    border-color: root.theme-mode == "Dark" ? #3b82f6 : root.border-color;
+                                    border-color: root.theme-mode == "Dark" ? #1d90f3 : root.border-color;
                                     background: #1e1e1e;
                                     VerticalBox {
                                         padding: 10px;
-                                        spacing: 8px;
-                                        Text { text: "Dark"; color: #ffffff; font-weight: 600; }
-                                        Rectangle { height: 24px; border-radius: 5px; background: #2f2f2f; }
-                                        Rectangle { height: 24px; border-radius: 5px; background: #3a3a3a; }
+                                        spacing: 6px;
+                                        Text { text: "Dark"; color: #ffffff; font-weight: 600; font-size: 12px; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #2f2f2f; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #3a3a3a; }
                                     }
-                                    TouchArea {
-                                        clicked => {
-                                            root.theme-mode = "Dark";
-                                            root.save-settings();
-                                        }
-                                    }
+                                    TouchArea { clicked => { root.theme-mode = "Dark"; root.save-settings(); } }
                                 }
+                                // Nord card
                                 Rectangle {
-                                    height: 106px;
-                                    width: 150px;
+                                    height: 90px;
+                                    width: 130px;
                                     border-radius: 8px;
                                     border-width: root.theme-mode == "NordDarker" ? 2px : 1px;
-                                    border-color: root.theme-mode == "NordDarker" ? #3b82f6 : root.border-color;
+                                    border-color: root.theme-mode == "NordDarker" ? #1d90f3 : root.border-color;
                                     background: #2e3440;
                                     VerticalBox {
                                         padding: 10px;
-                                        spacing: 8px;
-                                        Text { text: "Nord Dark"; color: #e5e9f0; font-weight: 600; }
-                                        Rectangle { height: 24px; border-radius: 5px; background: #3b4252; }
-                                        Rectangle { height: 24px; border-radius: 5px; background: #4c566a; }
+                                        spacing: 6px;
+                                        Text { text: "Nord Dark"; color: #e5e9f0; font-weight: 600; font-size: 12px; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #3b4252; }
+                                        Rectangle { height: 16px; border-radius: 4px; background: #4c566a; }
                                     }
-                                    TouchArea {
-                                        clicked => {
-                                            root.theme-mode = "NordDarker";
+                                    TouchArea { clicked => { root.theme-mode = "NordDarker"; root.save-settings(); } }
+                                }
+                            }
+                        }
+
+                        // Show placeholder setting
+                        Rectangle {
+                            background: root.card-bg;
+                            border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
+                            height: 64px;
+                            HorizontalBox {
+                                padding-left: 20px;
+                                padding-right: 20px;
+                                spacing: 16px;
+                                VerticalBox {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text { text: "Show placeholder"; color: root.text-primary; font-size: 14px; font-weight: 600; }
+                                    Text { text: "Display placeholder when query is empty"; color: root.text-muted; font-size: 12px; }
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                                VerticalBox {
+                                    alignment: center;
+                                    ToggleSwitch {
+                                        checked <=> root.show-placeholder;
+                                        toggled => {
                                             root.save-settings();
                                         }
                                     }
                                 }
                             }
                         }
-                        
 
+                        // Preview & Edits Container
+                        HorizontalBox {
+                            spacing: 16px;
+                            
+                            // Left Preview Area
+                            Rectangle {
+                                background: @linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                                border-radius: 8px;
+                                border-width: 1px;
+                                border-color: root.border-color;
+                                height: 380px;
+                                horizontal-stretch: 1;
+
+                                // The Mockup Launcher Popup
+                                Rectangle {
+                                    width: 380px;
+                                    height: 250px;
+                                    background: root.theme-mode == "Light" ? #ffffff : (root.theme-mode == "NordDarker" ? #2e3440 : #181818);
+                                    border-radius: 12px;
+                                    border-width: 1px;
+                                    border-color: root.theme-mode == "Light" ? #e5e7eb : #333333;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+
+                                    VerticalBox {
+                                        padding: 10px;
+                                        spacing: 0;
+                                        
+                                        // Mockup Search Input Box
+                                        Rectangle {
+                                            height: root.search-bar-height * 0.7px;
+
+                                            Rectangle {
+                                                y: parent.height - 1px;
+                                                height: 1px;
+                                                background: root.theme-mode == "Light" ? #eaeaea : #2b2b2b;
+                                            }
+
+                                            HorizontalBox {
+                                                padding-left: 8px;
+                                                padding-right: 8px;
+                                                alignment: center;
+                                                
+                                                Text {
+                                                    text: "Hi There";
+                                                    font-family: root.query-font-family;
+                                                    font-size: root.query-font-size * 0.7px;
+                                                    font-weight: root.query-font-weight == "Bold" ? 700 : (root.query-font-weight == "Semi-Bold" ? 600 : 400);
+                                                    color: root.theme-mode == "Light" ? #111111 : #ffffff;
+                                                    vertical-alignment: center;
+                                                }
+                                                Rectangle { horizontal-stretch: 1; }
+                                                Text {
+                                                    text: "04:00 PM  ⌕";
+                                                    font-size: 11px;
+                                                    color: root.theme-mode == "Light" ? #666666 : #aaaaaa;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+
+                                        // Mockup Results List
+                                        VerticalBox {
+                                            padding-top: 6px;
+                                            spacing: 4px;
+                                            
+                                            // Mockup Item 1 (Selected/Active)
+                                            Rectangle {
+                                                height: root.item-height * 0.6px;
+                                                background: #1d90f3;
+                                                border-radius: 6px;
+                                                
+                                                HorizontalBox {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    spacing: 8px;
+                                                    alignment: center;
+                                                    
+                                                    // Yellow Folder Icon
+                                                    Text { text: "📁"; font-size: 16px; vertical-alignment: center; }
+                                                    
+                                                    VerticalBox {
+                                                        alignment: center;
+                                                        spacing: 1px;
+                                                        Text {
+                                                            text: "Explorer";
+                                                            font-family: root.result-title-font-family;
+                                                            font-size: root.result-title-font-size * 0.7px;
+                                                            font-weight: root.result-title-font-weight == "Bold" ? 700 : (root.result-title-font-weight == "Semi-Bold" ? 600 : 400);
+                                                            color: #ffffff;
+                                                        }
+                                                        Text {
+                                                            text: "Search for files, folders and file conte...";
+                                                            font-family: root.result-subtitle-font-family;
+                                                            font-size: root.result-subtitle-font-size * 0.7px;
+                                                            font-weight: root.result-subtitle-font-weight == "Bold" ? 700 : (root.result-subtitle-font-weight == "Semi-Bold" ? 600 : 400);
+                                                            color: #e5e7eb;
+                                                        }
+                                                    }
+                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Text {
+                                                        text: "Alt+1";
+                                                        font-size: 10px;
+                                                        color: #e5e7eb;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+
+                                            // Mockup Item 2
+                                            Rectangle {
+                                                height: root.item-height * 0.6px;
+                                                background: transparent;
+                                                
+                                                HorizontalBox {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    spacing: 8px;
+                                                    alignment: center;
+                                                    
+                                                    Text { text: "🔍"; font-size: 16px; vertical-alignment: center; }
+                                                    
+                                                    VerticalBox {
+                                                        alignment: center;
+                                                        spacing: 1px;
+                                                        Text {
+                                                            text: "WebSearch";
+                                                            font-family: root.result-title-font-family;
+                                                            font-size: root.result-title-font-size * 0.7px;
+                                                            font-weight: root.result-title-font-weight == "Bold" ? 700 : (root.result-title-font-weight == "Semi-Bold" ? 600 : 400);
+                                                            color: root.theme-mode == "Light" ? #111111 : #ffffff;
+                                                        }
+                                                        Text {
+                                                            text: "Search the web with different search...";
+                                                            font-family: root.result-subtitle-font-family;
+                                                            font-size: root.result-subtitle-font-size * 0.7px;
+                                                            font-weight: root.result-subtitle-font-weight == "Bold" ? 700 : (root.result-subtitle-font-weight == "Semi-Bold" ? 600 : 400);
+                                                            color: root.theme-mode == "Light" ? #666666 : #aaaaaa;
+                                                        }
+                                                    }
+                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Text {
+                                                        text: "Alt+2";
+                                                        font-size: 10px;
+                                                        color: root.theme-mode == "Light" ? #666666 : #888888;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+
+                                            // Mockup Item 3
+                                            Rectangle {
+                                                height: root.item-height * 0.6px;
+                                                background: transparent;
+                                                
+                                                HorizontalBox {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    spacing: 8px;
+                                                    alignment: center;
+                                                    
+                                                    Text { text: "💻"; font-size: 16px; vertical-alignment: center; }
+                                                    
+                                                    VerticalBox {
+                                                        alignment: center;
+                                                        spacing: 1px;
+                                                        Text {
+                                                            text: "Program";
+                                                            font-family: root.result-title-font-family;
+                                                            font-size: root.result-title-font-size * 0.7px;
+                                                            font-weight: root.result-title-font-weight == "Bold" ? 700 : (root.result-title-font-weight == "Semi-Bold" ? 600 : 400);
+                                                            color: root.theme-mode == "Light" ? #111111 : #ffffff;
+                                                        }
+                                                        Text {
+                                                            text: "Launch programs as admin or a differ...";
+                                                            font-family: root.result-subtitle-font-family;
+                                                            font-size: root.result-subtitle-font-size * 0.7px;
+                                                            font-weight: root.result-subtitle-font-weight == "Bold" ? 700 : (root.result-subtitle-font-weight == "Semi-Bold" ? 600 : 400);
+                                                            color: root.theme-mode == "Light" ? #666666 : #aaaaaa;
+                                                        }
+                                                    }
+                                                    Rectangle { horizontal-stretch: 1; }
+                                                    Text {
+                                                        text: "Alt+3";
+                                                        font-size: 10px;
+                                                        color: root.theme-mode == "Light" ? #666666 : #888888;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Backdrop message at bottom center
+                                Rectangle {
+                                    background: #00000080;
+                                    border-radius: 4px;
+                                    height: 22px;
+                                    width: 250px;
+                                    x: (parent.width - self.width) / 2;
+                                    y: parent.height - self.height - 10px;
+                                    
+                                    Text {
+                                        text: "The backdrop effect is not applied in the preview.";
+                                        color: #cccccc;
+                                        font-size: 10px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                // Pencil Edit Button top-right
+                                Rectangle {
+                                    width: 32px;
+                                    height: 32px;
+                                    background: edit-btn-ta.has-hover ? #ffffff30 : #ffffff1a;
+                                    border-radius: 6px;
+                                    x: parent.width - self.width - 12px;
+                                    y: 12px;
+                                    
+                                    Text {
+                                        text: "✎";
+                                        color: #ffffff;
+                                        font-size: 14px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                    
+                                    edit-btn-ta := TouchArea {
+                                        clicked => {
+                                            root.edit-panel-expanded = !root.edit-panel-expanded;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Right Edit Panel (Only if expanded)
+                            if root.edit-panel-expanded : Rectangle {
+                                width: 320px;
+                                background: root.card-bg;
+                                border-radius: 8px;
+                                border-width: 1px;
+                                border-color: root.border-color;
+                                height: 380px;
+
+                                ScrollView {
+                                    VerticalBox {
+                                        padding: 16px;
+                                        spacing: 12px;
+                                        
+                                        Text { text: "Edit Layout & Fonts"; font-size: 15px; font-weight: 600; color: root.text-primary; }
+                                        
+                                        // Search Bar Height Slider
+                                        VerticalBox {
+                                            spacing: 4px;
+                                            HorizontalBox {
+                                                padding: 0;
+                                                Text { text: "Search Bar Height"; color: root.text-secondary; font-size: 12px; }
+                                                Rectangle { horizontal-stretch: 1; }
+                                                Text { text: root.search-bar-height + "px"; color: root.accent; font-size: 12px; font-weight: 600; }
+                                            }
+                                            Slider {
+                                                minimum: 40;
+                                                maximum: 80;
+                                                value: root.search-bar-height;
+                                                changed(val) => {
+                                                    root.search-bar-height = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                        }
+
+                                        // Query Box Font Family & Weight & Size
+                                        VerticalBox {
+                                            spacing: 4px;
+                                            Text { text: "Query Font Family"; color: root.text-secondary; font-size: 12px; }
+                                            CustomDropdown {
+                                                width: 100%;
+                                                current-index: root.query-font-family == "Segoe UI Variable" ? 0 :
+                                                               root.query-font-family == "Arial" ? 1 :
+                                                               root.query-font-family == "Consolas" ? 2 :
+                                                               root.query-font-family == "Outfit" ? 3 : 0;
+                                                model: ["Segoe UI Variable", "Arial", "Consolas", "Outfit"];
+                                                selected(val) => {
+                                                    root.query-font-family = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                            Text { text: "Query Font Weight"; color: root.text-secondary; font-size: 12px; }
+                                            CustomDropdown {
+                                                width: 100%;
+                                                current-index: root.query-font-weight == "Regular" ? 0 :
+                                                               root.query-font-weight == "Semi-Bold" ? 1 :
+                                                               root.query-font-weight == "Bold" ? 2 : 0;
+                                                model: ["Regular", "Semi-Bold", "Bold"];
+                                                selected(val) => {
+                                                    root.query-font-weight = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                            HorizontalBox {
+                                                padding: 0;
+                                                Text { text: "Query Font Size"; color: root.text-secondary; font-size: 12px; }
+                                                Rectangle { horizontal-stretch: 1; }
+                                                Text { text: root.query-font-size + "px"; color: root.accent; font-size: 12px; font-weight: 600; }
+                                            }
+                                            Slider {
+                                                minimum: 14;
+                                                maximum: 32;
+                                                value: root.query-font-size;
+                                                changed(val) => {
+                                                    root.query-font-size = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                        }
+
+                                        // Item Height Slider
+                                        VerticalBox {
+                                            spacing: 4px;
+                                            HorizontalBox {
+                                                padding: 0;
+                                                Text { text: "Item Height"; color: root.text-secondary; font-size: 12px; }
+                                                Rectangle { horizontal-stretch: 1; }
+                                                Text { text: root.item-height + "px"; color: root.accent; font-size: 12px; font-weight: 600; }
+                                            }
+                                            Slider {
+                                                minimum: 40;
+                                                maximum: 100;
+                                                value: root.item-height;
+                                                changed(val) => {
+                                                    root.item-height = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                        }
+
+                                        // Result Title Font Size & Family & Weight
+                                        VerticalBox {
+                                            spacing: 4px;
+                                            Text { text: "Result Title Font Family"; color: root.text-secondary; font-size: 12px; }
+                                            CustomDropdown {
+                                                width: 100%;
+                                                current-index: root.result-title-font-family == "Segoe UI Variable" ? 0 :
+                                                               root.result-title-font-family == "Arial" ? 1 :
+                                                               root.result-title-font-family == "Consolas" ? 2 :
+                                                               root.result-title-font-family == "Outfit" ? 3 : 0;
+                                                model: ["Segoe UI Variable", "Arial", "Consolas", "Outfit"];
+                                                selected(val) => {
+                                                    root.result-title-font-family = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                            Text { text: "Result Title Font Weight"; color: root.text-secondary; font-size: 12px; }
+                                            CustomDropdown {
+                                                width: 100%;
+                                                current-index: root.result-title-font-weight == "Regular" ? 0 :
+                                                               root.result-title-font-weight == "Semi-Bold" ? 1 :
+                                                               root.result-title-font-weight == "Bold" ? 2 : 2; // Default to Bold
+                                                model: ["Regular", "Semi-Bold", "Bold"];
+                                                selected(val) => {
+                                                    root.result-title-font-weight = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                            HorizontalBox {
+                                                padding: 0;
+                                                Text { text: "Result Title Font Size"; color: root.text-secondary; font-size: 12px; }
+                                                Rectangle { horizontal-stretch: 1; }
+                                                Text { text: root.result-title-font-size + "px"; color: root.accent; font-size: 12px; font-weight: 600; }
+                                            }
+                                            Slider {
+                                                minimum: 12;
+                                                maximum: 24;
+                                                value: root.result-title-font-size;
+                                                changed(val) => {
+                                                    root.result-title-font-size = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                        }
+
+                                        // Result Subtitle Font Size & Family & Weight
+                                        VerticalBox {
+                                            spacing: 4px;
+                                            Text { text: "Result Subtitle Font Family"; color: root.text-secondary; font-size: 12px; }
+                                            CustomDropdown {
+                                                width: 100%;
+                                                current-index: root.result-subtitle-font-family == "Segoe UI Variable" ? 0 :
+                                                               root.result-subtitle-font-family == "Arial" ? 1 :
+                                                               root.result-subtitle-font-family == "Consolas" ? 2 :
+                                                               root.result-subtitle-font-family == "Outfit" ? 3 : 0;
+                                                model: ["Segoe UI Variable", "Arial", "Consolas", "Outfit"];
+                                                selected(val) => {
+                                                    root.result-subtitle-font-family = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                            Text { text: "Result Subtitle Font Weight"; color: root.text-secondary; font-size: 12px; }
+                                            CustomDropdown {
+                                                width: 100%;
+                                                current-index: root.result-subtitle-font-weight == "Regular" ? 0 :
+                                                               root.result-subtitle-font-weight == "Semi-Bold" ? 1 :
+                                                               root.result-subtitle-font-weight == "Bold" ? 2 : 0;
+                                                model: ["Regular", "Semi-Bold", "Bold"];
+                                                selected(val) => {
+                                                    root.result-subtitle-font-weight = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                            HorizontalBox {
+                                                padding: 0;
+                                                Text { text: "Result Subtitle Font Size"; color: root.text-secondary; font-size: 12px; }
+                                                Rectangle { horizontal-stretch: 1; }
+                                                Text { text: root.result-subtitle-font-size + "px"; color: root.accent; font-size: 12px; font-weight: 600; }
+                                            }
+                                            Slider {
+                                                minimum: 10;
+                                                maximum: 20;
+                                                value: root.result-subtitle-font-size;
+                                                changed(val) => {
+                                                    root.result-subtitle-font-size = val;
+                                                    root.save-settings();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Bottom Spacer
+                        Rectangle { height: 100px; }
                     }
                     
                     // Hotkeys Page

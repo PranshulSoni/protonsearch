@@ -56,6 +56,17 @@ pub fn run_settings_window() {
     ui.set_hotkey_error(SharedString::from(""));
     ui.set_window_width(settings.window_width as i32);
     ui.set_item_height(settings.item_height as i32);
+    ui.set_search_bar_height(settings.search_bar_height as i32);
+    ui.set_query_font_family(SharedString::from(settings.query_font_family.clone()));
+    ui.set_query_font_weight(SharedString::from(settings.query_font_weight.clone()));
+    ui.set_query_font_size(settings.query_font_size as i32);
+    ui.set_result_title_font_family(SharedString::from(settings.result_title_font_family.clone()));
+    ui.set_result_title_font_weight(SharedString::from(settings.result_title_font_weight.clone()));
+    ui.set_result_title_font_size(settings.result_title_font_size as i32);
+    ui.set_result_subtitle_font_family(SharedString::from(settings.result_subtitle_font_family.clone()));
+    ui.set_result_subtitle_font_weight(SharedString::from(settings.result_subtitle_font_weight.clone()));
+    ui.set_result_subtitle_font_size(settings.result_subtitle_font_size as i32);
+    ui.set_show_placeholder(settings.show_placeholder);
 
     // Load Agent properties
     ui.set_agent_api_key(SharedString::from(api_key));
@@ -112,6 +123,17 @@ pub fn run_settings_window() {
                 s.global_hotkey = next_hotkey;
                 s.window_width = ui.get_window_width() as u32;
                 s.item_height = ui.get_item_height() as u32;
+                s.search_bar_height = ui.get_search_bar_height() as u32;
+                s.query_font_family = ui.get_query_font_family().to_string();
+                s.query_font_weight = ui.get_query_font_weight().to_string();
+                s.query_font_size = ui.get_query_font_size() as u32;
+                s.result_title_font_family = ui.get_result_title_font_family().to_string();
+                s.result_title_font_weight = ui.get_result_title_font_weight().to_string();
+                s.result_title_font_size = ui.get_result_title_font_size() as u32;
+                s.result_subtitle_font_family = ui.get_result_subtitle_font_family().to_string();
+                s.result_subtitle_font_weight = ui.get_result_subtitle_font_weight().to_string();
+                s.result_subtitle_font_size = ui.get_result_subtitle_font_size() as u32;
+                s.show_placeholder = ui.get_show_placeholder();
                 s.save();
                 ui.set_hotkey_error(SharedString::from(""));
                 crate::settings_startup::set_run_on_startup(s.run_on_startup);

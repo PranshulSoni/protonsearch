@@ -36,6 +36,39 @@ pub struct AppSettings {
 
     #[serde(default = "default_scan_folders")]
     pub scan_folders: Vec<String>,
+
+    #[serde(default = "default_search_bar_height")]
+    pub search_bar_height: u32,
+
+    #[serde(default = "default_query_font_family")]
+    pub query_font_family: String,
+
+    #[serde(default = "default_query_font_weight")]
+    pub query_font_weight: String,
+
+    #[serde(default = "default_query_font_size")]
+    pub query_font_size: u32,
+
+    #[serde(default = "default_result_title_font_family")]
+    pub result_title_font_family: String,
+
+    #[serde(default = "default_result_title_font_weight")]
+    pub result_title_font_weight: String,
+
+    #[serde(default = "default_result_title_font_size")]
+    pub result_title_font_size: u32,
+
+    #[serde(default = "default_result_subtitle_font_family")]
+    pub result_subtitle_font_family: String,
+
+    #[serde(default = "default_result_subtitle_font_weight")]
+    pub result_subtitle_font_weight: String,
+
+    #[serde(default = "default_result_subtitle_font_size")]
+    pub result_subtitle_font_size: u32,
+
+    #[serde(default = "default_true")]
+    pub show_placeholder: bool,
 }
 
 impl Default for AppSettings {
@@ -52,6 +85,17 @@ impl Default for AppSettings {
             last_win_x: default_zero_i32(),
             last_win_y: default_zero_i32(),
             scan_folders: default_scan_folders(),
+            search_bar_height: default_search_bar_height(),
+            query_font_family: default_query_font_family(),
+            query_font_weight: default_query_font_weight(),
+            query_font_size: default_query_font_size(),
+            result_title_font_family: default_result_title_font_family(),
+            result_title_font_weight: default_result_title_font_weight(),
+            result_title_font_size: default_result_title_font_size(),
+            result_subtitle_font_family: default_result_subtitle_font_family(),
+            result_subtitle_font_weight: default_result_subtitle_font_weight(),
+            result_subtitle_font_size: default_result_subtitle_font_size(),
+            show_placeholder: default_true(),
         }
     }
 }
@@ -83,6 +127,36 @@ fn default_item_height() -> u32 {
 }
 fn default_scan_folders() -> Vec<String> {
     Vec::new()
+}
+fn default_search_bar_height() -> u32 {
+    60
+}
+fn default_query_font_family() -> String {
+    "Segoe UI Variable".to_string()
+}
+fn default_query_font_weight() -> String {
+    "Regular".to_string()
+}
+fn default_query_font_size() -> u32 {
+    24
+}
+fn default_result_title_font_family() -> String {
+    "Segoe UI Variable".to_string()
+}
+fn default_result_title_font_weight() -> String {
+    "Bold".to_string()
+}
+fn default_result_title_font_size() -> u32 {
+    18
+}
+fn default_result_subtitle_font_family() -> String {
+    "Segoe UI Variable".to_string()
+}
+fn default_result_subtitle_font_weight() -> String {
+    "Regular".to_string()
+}
+fn default_result_subtitle_font_size() -> u32 {
+    13
 }
 
 
