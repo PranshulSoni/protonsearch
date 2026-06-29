@@ -172,27 +172,16 @@ pub fn run_settings_window() {
             s.window_location = ui.get_window_location().to_string();
             s.theme_mode = ui.get_theme_mode().to_string();
             let next_hotkey = ui.get_global_hotkey().to_string();
-            let next_voice_hotkey = ui.get_voice_hotkey().to_string();
             if let Err(message) = crate::hotkey::validate_hotkey_unique(
                 &next_hotkey,
                 &s.global_hotkey,
-                Some(&next_voice_hotkey),
+                None,
             ) {
                 ui.set_hotkey_error(SharedString::from(message));
-                ui.set_global_hotkey(SharedString::from(s.global_hotkey));
-                return;
-            }
-            if let Err(message) = crate::hotkey::validate_hotkey_unique(
-                &next_voice_hotkey,
-                &s.voice_hotkey,
-                Some(&next_hotkey),
-            ) {
-                ui.set_voice_hotkey_error(SharedString::from(message));
-                ui.set_voice_hotkey(SharedString::from(s.voice_hotkey));
+                ui.set_global_hotkey(SharedString::from(s.global_hotkey.clone()));
                 return;
             }
             s.global_hotkey = next_hotkey;
-            s.voice_hotkey = next_voice_hotkey;
             s.window_width = ui.get_window_width() as u32;
             s.item_height = ui.get_item_height() as u32;
             s.search_bar_height = ui.get_search_bar_height() as u32;
@@ -277,45 +266,7 @@ pub fn run_settings_window() {
         }
     });
 
-    let ui_weak_apply_voice = ui.as_weak();
-    ui.on_apply_voice_hotkey(move || {
-        let Some(ui) = ui_weak_apply_voice.upgrade() else {
-            return;
-        };
-        let s1 = ui.get_vslot1_val().to_string();
-        let s2 = ui.get_vslot2_val().to_string();
-        let s3 = ui.get_vslot3_val().to_string();
-        let s4 = ui.get_vslot4_val().to_string();
-        let settings = AppSettings::load();
-        let current = settings.voice_hotkey;
-        let other = settings.global_hotkey;
-        match crate::hotkey::assemble_hotkey(&[&s1, &s2, &s3, &s4], &current, Some(&other)) {
-            Ok(combo) => {
-                if combo == current {
-                    ui.set_voice_hotkey_error(SharedString::from(""));
-                    return;
-                }
-                ui.set_voice_hotkey_error(SharedString::from(""));
-                ui.set_voice_hotkey(SharedString::from(combo.clone()));
-                let mut s = AppSettings::load();
-                s.voice_hotkey = combo;
-                s.save();
-                if let Some(hwnd) = find_launcher_hwnd() {
-                    unsafe {
-                        let _ = PostMessageW(
-                            hwnd,
-                            windows::Win32::UI::WindowsAndMessaging::WM_USER + 10,
-                            WPARAM(0),
-                            LPARAM(0),
-                        );
-                    }
-                }
-            }
-            Err(message) => {
-                ui.set_voice_hotkey_error(SharedString::from(message));
-            }
-        }
-    });
+    ui.on_apply_voice_hotkey(move || {});
 
     let ui_weak_add = ui.as_weak();
     ui.on_add_folder(move || {

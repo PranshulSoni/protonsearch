@@ -335,12 +335,6 @@ struct State {
     // Explain Results: launch_command -> "why it surfaced" tag (e.g. "2h ago"),
     // computed when results arrive so paint does no file I/O.
     result_reasons: std::collections::HashMap<String, String>,
-    // Voice activation
-    voice_listening: bool,    // true = currently recording query
-    voice_triggered: bool,    // launcher opened via voice (auto-execute on result)
-    voice_pending_exec: bool, // true = waiting for search results to auto-execute
-    voice_dot_tick: u32,      // animation frame counter for pulsing mic dot
-    voice_exec_deadline: Option<std::time::Instant>, // when the auto-exec countdown fires
     form_state: FormState,    // Phase 2 Quicklinks & Snippets creation form state
     color_picker_active: bool,
     color_picker_mx: i32,
@@ -890,11 +884,6 @@ unsafe fn run() {
         note_path: None,
         note_scroll: 0,
         result_reasons: std::collections::HashMap::new(),
-        voice_listening: false,
-        voice_triggered: false,
-        voice_pending_exec: false,
-        voice_dot_tick: 0,
-        voice_exec_deadline: None,
         form_state: FormState::None,
         color_picker_active: false,
         color_picker_mx: 0,
@@ -1149,19 +1138,7 @@ unsafe fn run() {
             settings.global_hotkey
         ));
     }
-    // Voice dictation hotkey (configurable in Settings; defaults to Ctrl+Shift+Space).
-    // Non-fatal: the launcher works without it.
-    if !crate::hotkey::register_hotkey(hwnd, HOTKEY_VOICE_ID, &settings.voice_hotkey) {
-        voice::log(&format!(
-            "voice hotkey {} registration FAILED (already in use?)",
-            settings.voice_hotkey
-        ));
-    } else {
-        voice::log(&format!(
-            "voice hotkey {} registered",
-            settings.voice_hotkey
-        ));
-    }
+
 
     let mut msg = MSG::default();
     while GetMessageW(&mut msg, HWND(null_mut()), 0, 0).as_bool() {
@@ -1170,7 +1147,6 @@ unsafe fn run() {
     }
 
     let _ = UnregisterHotKey(hwnd, HOTKEY_ID);
-    let _ = UnregisterHotKey(hwnd, HOTKEY_VOICE_ID);
 }
 
 unsafe extern "system" fn preview_wnd_proc(
@@ -1419,13 +1395,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
 
-        // Voice dictation hotkey still uses RegisterHotKey
-        WM_HOTKEY if wp.0 as i32 == HOTKEY_VOICE_ID => {
-            if !sp.is_null() {
-                start_voice_capture(hwnd, &mut *sp);
-            }
-            LRESULT(0)
-        }
+
 
         WM_START_EDITING => {
             let ptr = lp.0 as *mut (String, String);
@@ -1460,9 +1430,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         WM_KILLFOCUS => {
             if !sp.is_null() {
                 let s = &mut *sp;
-                // Don't dismiss while a voice flow is mid-setup — focus briefly bounces
-                // when the launcher is summoned from the background.
-                if s.voice_triggered || s.voice_pending_exec || s.note_editing {
+                if s.note_editing {
                     return LRESULT(0);
                 }
                 // The window receiving focus is wParam; if it's us (or none), don't hide.
@@ -1484,8 +1452,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let window_inactive = msg == WM_ACTIVATE && (wp.0 & 0xffff) == 0;
                 if s.app_settings.hide_on_lose_focus
                     && (app_inactive || window_inactive)
-                    && !s.voice_triggered
-                    && !s.voice_pending_exec
                     && !s.note_editing
                     && !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. })
                 {
@@ -1638,19 +1604,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                             .scroll_offset
                             .min(s.results.len().saturating_sub(VISIBLE_RESULTS));
                     }
-                    if s.voice_pending_exec
-                        && !s.results.is_empty()
-                        && s.voice_exec_deadline.is_none()
-                    {
-                        // Results are in. Show them and count down ~3.5s before executing,
-                        // so the user can press Esc to cancel or arrow/type to take over.
-                        let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-                        let _ = SetTimer(hwnd, TIMER_VOICE_AUTOEXEC, 3500, None);
-                        let _ = SetTimer(hwnd, TIMER_VOICE_ANIM, 100, None); // repaint countdown
-                        s.voice_exec_deadline = Some(
-                            std::time::Instant::now() + std::time::Duration::from_millis(3500),
-                        );
-                    }
+
                     // Clear stale WINDOW icon cache when new window results arrive
                     if s.results.iter().any(|r| r.entry.source == "WINDOW") {
                         s.app_icons.retain(|k, _| !k.starts_with("window:"));
@@ -1716,43 +1670,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
 
-        WM_VOICE_QUERY_READY => {
-            if sp.is_null() {
-                if wp.0 == 1 && lp.0 != 0 {
-                    let _ = unsafe { Box::from_raw(lp.0 as *mut String) };
-                }
-                return LRESULT(0);
-            }
-            let s = &mut *sp;
-            let text = if wp.0 == 1 && lp.0 != 0 {
-                let text_box = unsafe { Box::from_raw(lp.0 as *mut String) };
-                *text_box
-            } else {
-                String::new()
-            };
-            if s.voice_listening {
-                s.voice_listening = false;
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let text = text.trim().to_string();
-                if !text.is_empty() {
-                    // Query already normalized in voice.rs. Type it out, search, and let
-                    // WM_SEARCH_RESULTS arm the ~3.5s "Esc to cancel" auto-exec countdown.
-                    s.query = text;
-                    s.cursor_pos = s.query.len();
-                    s.selected = 0;
-                    s.scroll_offset = 0;
-                    s.voice_pending_exec = s.voice_triggered;
-                    s.voice_exec_deadline = None;
-                    reset_cursor_blink(hwnd, s);
-                    trigger_search(hwnd, s);
-                } else {
-                    s.voice_triggered = false;
-                    s.voice_pending_exec = false;
-                }
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
-            LRESULT(0)
-        }
+
 
         WM_TIMER => {
             if sp.is_null() {
@@ -1773,10 +1691,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         let _ = KillTimer(hwnd, TIMER_CURSOR_BLINK);
                     }
                 }
-                TIMER_VOICE_ANIM => {
-                    s.voice_dot_tick = (s.voice_dot_tick + 1) % 100;
-                    let _ = InvalidateRect(hwnd, None, FALSE);
-                }
+
                 TIMER_AI_ANIM => {
                     s.ai_tick = (s.ai_tick + 1) % 60;
                     let _ = InvalidateRect(hwnd, None, FALSE);
@@ -1785,18 +1700,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     let _ = KillTimer(hwnd, TIMER_ICON_BATCH);
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
-                TIMER_VOICE_AUTOEXEC => {
-                    let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-                    let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                    s.voice_exec_deadline = None;
-                    if s.voice_triggered || s.voice_pending_exec {
-                        s.voice_triggered = false;
-                        s.voice_pending_exec = false;
-                        if !s.results.is_empty() {
-                            execute_selected(hwnd, s);
-                        }
-                    }
-                }
+
                 _ => {}
             }
             LRESULT(0)
@@ -1835,19 +1739,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 }
                 return LRESULT(0);
             }
-            if s.voice_listening {
-                s.voice_listening = false;
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
-            if s.voice_triggered {
-                s.voice_triggered = false;
-                s.voice_pending_exec = false;
-                s.voice_exec_deadline = None;
-                let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
+
             s.submenu_active = false;
             if let Some(c) = char::from_u32(wp.0 as u32) {
                 if !c.is_control() {
@@ -2215,19 +2107,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 }
                 return LRESULT(0);
             }
-            if s.voice_listening {
-                s.voice_listening = false;
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
-            if s.voice_triggered {
-                s.voice_triggered = false;
-                s.voice_pending_exec = false;
-                s.voice_exec_deadline = None;
-                let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
+
             let vk = VIRTUAL_KEY(wp.0 as u16);
 
             // Check if Ctrl is pressed
@@ -2775,19 +2655,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return LRESULT(0);
             }
-            if s.voice_listening {
-                s.voice_listening = false;
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
-            if s.voice_triggered {
-                s.voice_triggered = false;
-                s.voice_pending_exec = false;
-                s.voice_exec_deadline = None;
-                let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
+
             if !s.query.is_empty() {
                 let mut pt = POINT::default();
                 let _ = GetCursorPos(&mut pt);
@@ -2947,46 +2815,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 do_hide(hwnd, s);
                 return LRESULT(0);
             }
-            // Mic button (search bar's right corner) toggles voice dictation.
-            {
-                let cmy = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
-                let cmx = (lp.0 & 0xFFFF) as i16 as i32;
-                let mut rcc = RECT::default();
-                let _ = GetClientRect(hwnd, &mut rcc);
-                let bx = (rcc.right - rcc.left - WIN_W) / 2;
-                let by = s.cy - s.win_h() / 2;
-                if cmx >= bx + WIN_W - 52
-                    && cmx < bx + WIN_W - 4
-                    && cmy >= by
-                    && cmy < by + SEARCH_H
-                {
-                    if s.voice_listening {
-                        s.voice_listening = false;
-                        s.voice_triggered = false;
-                        s.voice_pending_exec = false;
-                        s.voice_exec_deadline = None;
-                        let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                        let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-                        let _ = InvalidateRect(hwnd, None, FALSE);
-                    } else {
-                        start_voice_capture(hwnd, s);
-                    }
-                    return LRESULT(0);
-                }
-            }
-            if s.voice_listening {
-                s.voice_listening = false;
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
-            if s.voice_triggered {
-                s.voice_triggered = false;
-                s.voice_pending_exec = false;
-                s.voice_exec_deadline = None;
-                let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-                let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-                let _ = InvalidateRect(hwnd, None, FALSE);
-            }
+
             reset_cursor_blink(hwnd, s);
             let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
             let mx = (lp.0 & 0xFFFF) as i16 as i32;
@@ -3760,44 +3589,11 @@ unsafe fn reset_launcher_window_position(hwnd: HWND, s: &mut State) {
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
 
-// Hotkey / mic-button entry point: open the launcher, show "Listening…", and run one
-// one-shot dictation. Mirrors the old wake-word flow (auto-exec the top result).
-unsafe fn start_voice_capture(hwnd: HWND, s: &mut State) {
-    if s.voice_listening {
-        return;
-    }
-    match s.anim {
-        Anim::Hidden | Anim::Hiding { .. } => do_show(hwnd, s),
-        _ => {}
-    }
-    force_foreground(hwnd);
-    s.query.clear();
-    s.cursor_pos = 0;
-    s.search_input_active = false;
-    s.selected = 0;
-    s.scroll_offset = 0;
-    s.text_selected = false;
-    s.voice_triggered = true;
-    s.voice_listening = true;
-    s.voice_pending_exec = false;
-    s.voice_exec_deadline = None;
-    s.voice_dot_tick = 0;
-    let _ = SetTimer(hwnd, TIMER_VOICE_ANIM, 80, None);
-    voice::start_query_listener(hwnd);
-    let _ = InvalidateRect(hwnd, None, FALSE);
-}
+
 
 unsafe fn start_hide(hwnd: HWND, s: &mut State) {
     // Destroy the in-app note editor so it doesn't ghost over the launcher
     close_note_editor(hwnd, s);
-    // Voice is one-shot (hotkey / mic button), so there's nothing to restart here.
-    // Just clear voice flags so the window can dismiss normally.
-    s.voice_listening = false;
-    s.voice_triggered = false;
-    s.voice_pending_exec = false;
-    s.voice_exec_deadline = None;
-    let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-    let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
     animate_window(hwnd, false);
     reset_visible_chat_view(hwnd, s);
 }
@@ -3921,12 +3717,6 @@ unsafe fn stop_color_picker(hwnd: HWND, s: &mut State) {
 unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
     let _ = KillTimer(hwnd, TIMER_CURSOR_BLINK);
-    let _ = KillTimer(hwnd, TIMER_VOICE_ANIM);
-    let _ = KillTimer(hwnd, TIMER_VOICE_AUTOEXEC);
-    s.voice_triggered = false;
-    s.voice_listening = false;
-    s.voice_pending_exec = false;
-    s.voice_exec_deadline = None;
     s.form_state = FormState::None;
     s.image_preview_active = false;
     s.cursor_visible = false;
@@ -6557,17 +6347,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     SelectObject(mdc, s.font_q);
     SetTextColor(mdc, palette.clr_white);
 
-    if s.voice_listening {
-        let mut ph: Vec<u16> = "Listening...".encode_utf16().collect();
-        SetTextColor(mdc, palette.clr_ph);
-        let _ = DrawTextW(
-            mdc,
-            &mut ph,
-            &mut tr,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-        );
-        SetTextColor(mdc, palette.clr_white);
-    } else if s.query.is_empty()
+    if s.query.is_empty()
         && (s.app_settings.show_placeholder || !matches!(s.form_state, FormState::None))
     {
         let ph_str = match &s.form_state {
@@ -6620,52 +6400,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         }
     }
 
-    // Mic button at the search bar's right corner. Pulses red while listening, sits
     // muted otherwise. Click toggles dictation (hit-test in WM_LBUTTONDOWN).
     if w >= WIN_W - 8 {
-        if !s.icon_new_mic.0.is_null() {
-            let icon_y = y + (SEARCH_H - SEARCH_ICON_SIZE) / 2;
-            let _ = DrawIconEx(
-                mdc,
-                x + w - PAD_L - SEARCH_ICON_SIZE,
-                icon_y,
-                s.icon_new_mic,
-                SEARCH_ICON_SIZE,
-                SEARCH_ICON_SIZE,
-                0,
-                HBRUSH(null_mut()),
-                DI_NORMAL,
-            );
-        }
-    }
 
-    // Draw countdown hint while waiting to auto-execute a voice query.
-    if (s.voice_triggered || s.voice_pending_exec) && !s.voice_listening {
-        let hint_text = if let Some(deadline) = s.voice_exec_deadline {
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            let secs = (remaining.as_millis() as f32 / 1000.0).ceil() as u32;
-            format!("Esc to cancel · {}s", secs.max(1))
-        } else {
-            "Listening…".to_string()
-        };
-        SelectObject(mdc, s.font_c);
-        SetTextColor(mdc, COLORREF(0x00_3C_B4_00)); // green
-        let mut hint: Vec<u16> = hint_text.encode_utf16().collect();
-        let mut hint_tr = RECT {
-            left: x + w - 200,
-            top: y,
-            right: x + w - 52,
-            bottom: y + SEARCH_H,
-        };
-        let _ = DrawTextW(
-            mdc,
-            &mut hint,
-            &mut hint_tr,
-            DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-        );
-        SetTextColor(mdc, s.theme.palette().clr_white);
-        SelectObject(mdc, s.font_q);
-    }
 
     // Draw cursor
     if s.cursor_visible && search_input_caret_active(s) {

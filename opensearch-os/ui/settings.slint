@@ -1299,6 +1299,7 @@ export component SettingsWindow inherits Window {
                                         current-value <=> root.slot1-val;
                                         selected => { root.apply-hotkey(); }
                                     }
+
                                     ComboBox {
                                         horizontal-stretch: 1;
                                         height: 40px;
@@ -1325,102 +1326,6 @@ export component SettingsWindow inherits Window {
                         }
 
                         Rectangle { height: 6px; }
-
-                        // Voice dictation hotkey card — same editor as Open launcher
-                        Rectangle {
-                            background: root.card-bg;
-                            border-radius: 8px;
-                            border-color: root.border-color;
-                            border-width: 1px;
-
-                            VerticalLayout {
-                                padding: 20px;
-                                spacing: 14px;
-
-                                HorizontalBox {
-                                    spacing: 16px;
-                                    padding: 0;
-
-                                    VerticalBox {
-                                        alignment: center;
-                                        spacing: 2px;
-                                        Text { text: "Voice dictation"; color: root.text-primary; font-size: 14px; font-weight: 600; }
-                                        Text { text: "Starts microphone dictation"; color: root.text-muted; font-size: 12px; }
-                                    }
-
-                                    Rectangle { horizontal-stretch: 1; }
-
-                                    Rectangle {
-                                        min-width: 150px;
-                                        height: 34px;
-                                        border-radius: 6px;
-                                        border-width: 1px;
-                                        border-color: root.border-color;
-                                        background: root.bg-color;
-                                        Text {
-                                            text: root.voice-hotkey;
-                                            color: root.text-primary;
-                                            font-size: 14px;
-                                            font-weight: 600;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-                                }
-
-                                HorizontalBox {
-                                    spacing: 10px;
-                                    padding: 0;
-
-                                    ComboBox {
-                                        horizontal-stretch: 1;
-                                        height: 40px;
-                                        model: root.slot1-model;
-                                        current-value <=> root.vslot1-val;
-                                        selected => { root.apply-voice-hotkey(); }
-                                    }
-                                    ComboBox {
-                                        horizontal-stretch: 1;
-                                        height: 40px;
-                                        model: root.slot2-model;
-                                        current-value <=> root.vslot2-val;
-                                        selected => { root.apply-voice-hotkey(); }
-                                    }
-                                    ComboBox {
-                                        horizontal-stretch: 1;
-                                        height: 40px;
-                                        model: root.slot34-model;
-                                        current-value <=> root.vslot3-val;
-                                        selected => { root.apply-voice-hotkey(); }
-                                    }
-                                    ComboBox {
-                                        horizontal-stretch: 1;
-                                        height: 40px;
-                                        model: root.slot34-model;
-                                        current-value <=> root.vslot4-val;
-                                        selected => { root.apply-voice-hotkey(); }
-                                    }
-                                }
-                            }
-                        }
-
-                        if root.voice-hotkey-error != "": Rectangle {
-                            height: 42px;
-                            border-radius: 8px;
-                            background: #3a1d1d;
-                            border-color: #7f1d1d;
-                            border-width: 1px;
-                            HorizontalLayout {
-                                padding-left: 16px;
-                                padding-right: 16px;
-                                Text {
-                                    text: root.voice-hotkey-error;
-                                    color: #fecaca;
-                                    font-size: 13px;
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
 
                         // Error banner — only shown when there's an error
                         if root.hotkey-error != "": Rectangle {
