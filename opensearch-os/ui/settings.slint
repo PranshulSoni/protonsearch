@@ -595,13 +595,8 @@ export component SettingsWindow inherits Window {
                                     Rectangle { horizontal-stretch: 1; }
                                     VerticalBox {
                                         alignment: center;
-                                        CustomDropdown {
+                                        ComboBox {
                                             width: 220px;
-                                            current-index: root.window-location == "Remember Last Position" ? 0 :
-                                                           root.window-location == "Monitor with Mouse Cursor" ? 1 :
-                                                           root.window-location == "Monitor with Focused Window" ? 2 :
-                                                           root.window-location == "Primary Monitor" ? 3 :
-                                                           root.window-location == "Custom Monitor" ? 4 : 1;
                                             model: [
                                                 "Remember Last Position",
                                                 "Monitor with Mouse Cursor",
@@ -609,6 +604,7 @@ export component SettingsWindow inherits Window {
                                                 "Primary Monitor",
                                                 "Custom Monitor"
                                             ];
+                                            current-value: root.window-location;
                                             selected(val) => {
                                                 root.window-location = val;
                                                 root.save-settings();
