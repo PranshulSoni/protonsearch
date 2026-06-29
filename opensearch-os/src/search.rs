@@ -4233,7 +4233,7 @@ impl SearchEngine {
             } else if app_lower.starts_with(&q_lower) && q_lower.chars().count() >= 2 {
                 score = 118.0;
             } else if app_lower.starts_with(&q_lower) {
-                score = 20.5; // 1-char prefix stays modest, avoids single-letter domination.
+                score = 116.0; // 1-char prefix should still beat 'contains' matches
             } else if q_lower.starts_with(&app_lower) {
                 score = 114.0;
             } else if app_lower.contains(&q_lower) {

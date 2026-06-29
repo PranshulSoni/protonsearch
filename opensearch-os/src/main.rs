@@ -5067,7 +5067,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
 unsafe fn kick_debounce(hwnd: HWND, s: &mut State) {
     s.results_stale = true;
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
-    let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 150, None);
+    let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 20, None);
 }
 
 unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
