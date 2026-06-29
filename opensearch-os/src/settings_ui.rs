@@ -48,6 +48,8 @@ pub fn run_settings_window() {
 
     ui.set_run_on_startup(settings.run_on_startup);
     ui.set_hide_on_lose_focus(settings.hide_on_lose_focus);
+    ui.set_show_taskbar(settings.show_taskbar);
+    ui.set_window_location(SharedString::from(settings.window_location.clone()));
     ui.set_theme_mode(SharedString::from(settings.normalized_theme_mode()));
     ui.set_global_hotkey(SharedString::from(settings.global_hotkey.clone()));
     ui.set_voice_hotkey(SharedString::from(crate::hotkey::VOICE_DICTATION_HOTKEY));
@@ -97,6 +99,8 @@ pub fn run_settings_window() {
                 let mut s = AppSettings::load();
                 s.run_on_startup = ui.get_run_on_startup();
                 s.hide_on_lose_focus = ui.get_hide_on_lose_focus();
+                s.show_taskbar = ui.get_show_taskbar();
+                s.window_location = ui.get_window_location().to_string();
                 s.theme_mode = ui.get_theme_mode().to_string();
                 let next_hotkey = ui.get_global_hotkey().to_string();
                 if let Err(message) = crate::hotkey::validate_hotkey(&next_hotkey, &s.global_hotkey)

@@ -340,6 +340,7 @@ struct State {
     color_picker_mx: i32,
     color_picker_my: i32,
     prev_foreground: HWND, // Window that had focus before launcher appeared (for snippet auto-paste)
+    taskbar_shown_by_app: bool,
     // AI answer panel
     ai_pending: bool,                        // true while waiting on the AI response
     ai_answer: Option<String>,               // the response text to render
@@ -807,6 +808,7 @@ unsafe fn run() {
         color_picker_mx: 0,
         color_picker_my: 0,
         prev_foreground: HWND(null_mut()),
+        taskbar_shown_by_app: false,
         ai_pending: false,
         ai_answer: None,
         ai_title: String::new(),
@@ -3223,6 +3225,35 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
     }
 }
 
+unsafe extern "system" fn monitor_enum_proc(
+    hmonitor: HMONITOR,
+    _: HDC,
+    _: *mut RECT,
+    lparam: LPARAM,
+) -> BOOL {
+    let monitors = &mut *(lparam.0 as *mut Vec<HMONITOR>);
+    monitors.push(hmonitor);
+    TRUE
+}
+
+unsafe fn get_custom_monitor() -> HMONITOR {
+    use windows::Win32::Graphics::Gdi::EnumDisplayMonitors;
+    let mut monitors = Vec::<HMONITOR>::new();
+    let _ = EnumDisplayMonitors(
+        HDC(null_mut()),
+        None,
+        Some(monitor_enum_proc),
+        LPARAM(&mut monitors as *mut _ as isize),
+    );
+    if monitors.len() > 1 {
+        monitors[1] // Use the second monitor
+    } else if !monitors.is_empty() {
+        monitors[0]
+    } else {
+        HMONITOR(null_mut())
+    }
+}
+
 // ── Window lifecycle ──────────────────────────────────────────────────────────
 unsafe fn animate_window(hwnd: HWND, appearing: bool) {
     let sp = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut State;
@@ -3267,14 +3298,51 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         let mut pt = POINT::default();
         let _ = GetCursorPos(&mut pt);
 
-        // Get active monitor work area (excludes taskbar)
-        let hmonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        // Determine which monitor to place the window on based on Settings
+        let hmonitor = match s.app_settings.window_location.as_str() {
+            "Remember Last Position" => {
+                if s.app_settings.last_win_x != 0 || s.app_settings.last_win_y != 0 {
+                    let last_pt = POINT { x: s.app_settings.last_win_x, y: s.app_settings.last_win_y };
+                    MonitorFromPoint(last_pt, MONITOR_DEFAULTTONEAREST)
+                } else {
+                    MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST)
+                }
+            }
+            "Monitor with Focused Window" => {
+                let fore = GetForegroundWindow();
+                if !fore.0.is_null() {
+                    use windows::Win32::Graphics::Gdi::MonitorFromWindow;
+                    MonitorFromWindow(fore, windows::Win32::Graphics::Gdi::MONITOR_DEFAULTTONEAREST)
+                } else {
+                    MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST)
+                }
+            }
+            "Primary Monitor" => {
+                MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY)
+            }
+            "Custom Monitor" => {
+                get_custom_monitor()
+            }
+            _ => { // "Monitor with Mouse Cursor" (default)
+                MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST)
+            }
+        };
+
         let mut mi = MONITORINFO {
             cbSize: std::mem::size_of::<MONITORINFO>() as u32,
             ..Default::default()
         };
         let (work_w, work_h, work_left, work_top) = if GetMonitorInfoW(hmonitor, &mut mi).as_bool()
         {
+            // Save the last opened monitor center coordinates for "Remember Last Position"
+            let center_x = mi.rcWork.left + (mi.rcWork.right - mi.rcWork.left) / 2;
+            let center_y = mi.rcWork.top + (mi.rcWork.bottom - mi.rcWork.top) / 2;
+            if s.app_settings.last_win_x != center_x || s.app_settings.last_win_y != center_y {
+                s.app_settings.last_win_x = center_x;
+                s.app_settings.last_win_y = center_y;
+                s.app_settings.save();
+            }
+
             (
                 mi.rcWork.right - mi.rcWork.left,
                 mi.rcWork.bottom - mi.rcWork.top,
@@ -3390,6 +3458,20 @@ unsafe fn reset_cursor_blink(hwnd: HWND, s: &mut State) {
 
 unsafe fn do_show(hwnd: HWND, s: &mut State) {
     reset_cursor_blink(hwnd, s);
+    if s.app_settings.show_taskbar && !s.taskbar_shown_by_app {
+        use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, PostMessageW};
+        use windows::Win32::Graphics::Gdi::{MonitorFromWindow, MONITOR_DEFAULTTONEAREST};
+        use windows::Win32::Foundation::{WPARAM, LPARAM};
+        use windows::core::PCWSTR;
+        let class_name: Vec<u16> = "Shell_TrayWnd\0".encode_utf16().collect();
+        if let Ok(h) = FindWindowW(PCWSTR(class_name.as_ptr()), None) {
+            if !h.0.is_null() {
+                let mon = MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST);
+                let _ = PostMessageW(h, 0x05D1, WPARAM(1), LPARAM(mon.0 as isize));
+                s.taskbar_shown_by_app = true;
+            }
+        }
+    }
     animate_window(hwnd, true);
 }
 
@@ -3602,6 +3684,20 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     s.form_state = FormState::None;
     s.image_preview_active = false;
     hide_preview_window(s);
+
+    if s.taskbar_shown_by_app {
+        use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, PostMessageW};
+        use windows::Win32::Foundation::{WPARAM, LPARAM};
+        use windows::core::PCWSTR;
+        let class_name: Vec<u16> = "Shell_TrayWnd\0".encode_utf16().collect();
+        if let Ok(h) = FindWindowW(PCWSTR(class_name.as_ptr()), None) {
+            if !h.0.is_null() {
+                let _ = PostMessageW(h, 0x05D1, WPARAM(0), LPARAM(0));
+            }
+        }
+        s.taskbar_shown_by_app = false;
+    }
+
     let _ = ShowWindow(hwnd, SW_HIDE);
     s.anim = Anim::Hidden;
 }

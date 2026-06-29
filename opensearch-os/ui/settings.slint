@@ -1,5 +1,39 @@
 import { Button, VerticalBox, HorizontalBox, CheckBox, ComboBox, LineEdit, StandardListView, TabWidget, Slider, ScrollView, Palette } from "std-widgets.slint";
 
+export component ToggleSwitch inherits Rectangle {
+    in-out property <bool> checked;
+    callback toggled;
+
+    width: 44px;
+    height: 20px;
+    border-radius: 10px;
+    background: checked ? #60a5fa : #1a1a1a;
+    border-width: 1px;
+    border-color: checked ? #60a5fa : #8a8a8a;
+
+    animate background { duration: 150ms; easing: ease-in-out; }
+    animate border-color { duration: 150ms; easing: ease-in-out; }
+
+    Rectangle {
+        x: checked ? parent.width - self.width - 4px : 4px;
+        y: (parent.height - self.height) / 2;
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        background: checked ? #1a1a1a : #8a8a8a;
+
+        animate x { duration: 150ms; easing: ease-in-out; }
+        animate background { duration: 150ms; easing: ease-in-out; }
+    }
+
+    TouchArea {
+        clicked => {
+            checked = !checked;
+            toggled();
+        }
+    }
+}
+
 export component SettingsWindow inherits Window {
     title: "Settings";
     width: 800px;
@@ -8,6 +42,8 @@ export component SettingsWindow inherits Window {
     // Properties to bind to Rust
     in-out property <bool> run-on-startup;
     in-out property <bool> hide-on-lose-focus;
+    in-out property <bool> show-taskbar;
+    in-out property <string> window-location;
     in-out property <string> theme-mode;
     in-out property <string> global-hotkey;
     in-out property <string> voice-hotkey;
@@ -438,7 +474,7 @@ export component SettingsWindow inherits Window {
                                         Text { text: "Launch OmniSearch when Windows starts"; color: root.text-muted; font-size: 12px; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
-                                    CheckBox {
+                                    ToggleSwitch {
                                         checked: root.run-on-startup;
                                         toggled => {
                                             root.run-on-startup = self.checked;
@@ -469,10 +505,85 @@ export component SettingsWindow inherits Window {
                                         Text { text: "Dismiss launcher when it loses keyboard focus"; color: root.text-muted; font-size: 12px; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
-                                    CheckBox {
+                                    ToggleSwitch {
                                         checked: root.hide-on-lose-focus;
                                         toggled => {
                                             root.hide-on-lose-focus = self.checked;
+                                            root.save-settings();
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle { height: 6px; }
+
+                            // Show taskbar when Omnisearch is opened row
+                            Rectangle {
+                                background: root.card-bg;
+                                border-radius: 8px;
+                                border-color: root.border-color;
+                                border-width: 1px;
+                                height: 64px;
+                                HorizontalBox {
+                                    padding-left: 20px;
+                                    padding-right: 20px;
+                                    spacing: 16px;
+
+                                    VerticalBox {
+                                        alignment: center;
+                                        spacing: 2px;
+                                        Text { text: "Show taskbar when Omnisearch is opened"; color: root.text-primary; font-size: 14px; font-weight: 600; }
+                                        Text { text: "Temporarily show taskbar when omnisearch is opened, useful for auto-hidden taskbars"; color: root.text-muted; font-size: 12px; }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    ToggleSwitch {
+                                        checked: root.show-taskbar;
+                                        toggled => {
+                                            root.show-taskbar = self.checked;
+                                            root.save-settings();
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle { height: 6px; }
+
+                            // Search Window Location row
+                            Rectangle {
+                                background: root.card-bg;
+                                border-radius: 8px;
+                                border-color: root.border-color;
+                                border-width: 1px;
+                                height: 72px;
+                                HorizontalBox {
+                                    padding-left: 20px;
+                                    padding-right: 20px;
+                                    spacing: 16px;
+
+                                    VerticalBox {
+                                        alignment: center;
+                                        spacing: 2px;
+                                        Text { text: "Search window location"; color: root.text-primary; font-size: 14px; font-weight: 600; }
+                                        Text { text: "Monitor/position where the launcher window appears"; color: root.text-muted; font-size: 12px; }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    ComboBox {
+                                        width: 220px;
+                                        height: 32px;
+                                        current-index: root.window-location == "Remember Last Position" ? 0 :
+                                                       root.window-location == "Monitor with Mouse Cursor" ? 1 :
+                                                       root.window-location == "Monitor with Focused Window" ? 2 :
+                                                       root.window-location == "Primary Monitor" ? 3 :
+                                                       root.window-location == "Custom Monitor" ? 4 : 1;
+                                        model: [
+                                            "Remember Last Position",
+                                            "Monitor with Mouse Cursor",
+                                            "Monitor with Focused Window",
+                                            "Primary Monitor",
+                                            "Custom Monitor"
+                                        ];
+                                        selected(val) => {
+                                            root.window-location = val;
                                             root.save-settings();
                                         }
                                     }
@@ -876,7 +987,7 @@ export component SettingsWindow inherits Window {
                                         Text { text: "Execute command line actions automatically without confirmation prompts"; color: root.text-muted; font-size: 12px; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
-                                    CheckBox {
+                                    ToggleSwitch {
                                         checked: root.agent-always-approve;
                                         toggled => {
                                             root.agent-always-approve = self.checked;

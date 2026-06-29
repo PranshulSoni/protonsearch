@@ -22,6 +22,18 @@ pub struct AppSettings {
     #[serde(default = "default_item_height")]
     pub item_height: u32,
 
+    #[serde(default = "default_false")]
+    pub show_taskbar: bool,
+
+    #[serde(default = "default_window_location")]
+    pub window_location: String,
+
+    #[serde(default = "default_zero_i32")]
+    pub last_win_x: i32,
+
+    #[serde(default = "default_zero_i32")]
+    pub last_win_y: i32,
+
     #[serde(default = "default_scan_folders")]
     pub scan_folders: Vec<String>,
 }
@@ -35,9 +47,23 @@ impl Default for AppSettings {
             global_hotkey: default_global_hotkey(),
             window_width: default_window_width(),
             item_height: default_item_height(),
+            show_taskbar: default_false(),
+            window_location: default_window_location(),
+            last_win_x: default_zero_i32(),
+            last_win_y: default_zero_i32(),
             scan_folders: default_scan_folders(),
         }
     }
+}
+
+fn default_false() -> bool {
+    false
+}
+fn default_window_location() -> String {
+    "Monitor with Mouse Cursor".to_string()
+}
+fn default_zero_i32() -> i32 {
+    0
 }
 
 fn default_true() -> bool {
