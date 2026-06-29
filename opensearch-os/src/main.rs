@@ -324,6 +324,7 @@ struct State {
     hovered_filter: Option<FilterType>,
     filter_counts: [usize; 8],
     filter_scroll_x: i32,
+    sort_asc: bool,
     text_selected: bool,
     cursor_visible: bool,
     // Homepage highlight to restore when returning to the homepage (Escape / cleared query),
@@ -946,6 +947,7 @@ unsafe fn run() {
         hovered_filter: None,
         filter_counts: [0; 8],
         filter_scroll_x: 0,
+        sort_asc: false,
         text_selected: false,
         cursor_visible: true,
         homepage_sel: 2,
@@ -1712,6 +1714,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     if !matches!(s.active_filter, FilterType::All) {
                         filtered.retain(|r| result_matches_filter(r, s.active_filter));
                     }
+                    apply_sort(&mut filtered, s.sort_asc);
                     s.results = filtered;
                     s.result_reasons = compute_result_reasons(&s.results);
                     if s.results.is_empty() {
@@ -2954,6 +2957,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                             if !matches!(s.active_filter, FilterType::All) {
                                 filtered.retain(|r| result_matches_filter(r, s.active_filter));
                             }
+                            apply_sort(&mut filtered, s.sort_asc);
                             s.results = filtered;
                             s.result_reasons = compute_result_reasons(&s.results);
                             if s.results.is_empty() {
@@ -2967,6 +2971,22 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         }
                         return LRESULT(0);
                     }
+                }
+
+                // Click on "Best matches first" / "A–Z" chevron sort toggle
+                // The chevron sits at roughly (x_start + WIN_W - PAD_L - 120 .. x_start + WIN_W - PAD_L)
+                // on the row list_y + 48 .. list_y + 80.
+                let sort_row_top = list_y + 48;
+                let sort_row_bot = list_y + 80;
+                let sort_x_left = x_start + WIN_W / 2;
+                let sort_x_right = x_start + WIN_W - 12;
+                if my >= sort_row_top && my < sort_row_bot && mx >= sort_x_left && mx < sort_x_right {
+                    s.sort_asc = !s.sort_asc;
+                    apply_sort(&mut s.results, s.sort_asc);
+                    s.selected = 0;
+                    s.scroll_offset = 0;
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                    return LRESULT(0);
                 }
             }
 
@@ -7375,9 +7395,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
             list_y += 48;
 
-
             if !s.has_prefix() {
-                // Draw "Results" and "Best matches first" with chevron
+                // Draw "Results" label and clickable "Best matches first" / "A–Z" sort toggle
                 SelectObject(mdc, s.font_c);
                 SetTextColor(mdc, s.theme.palette().clr_gray);
                 let mut res_w: Vec<u16> = "Results".encode_utf16().collect();
@@ -7394,7 +7413,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                 );
 
-                let mut bm_text: Vec<u16> = "Best matches first".encode_utf16().collect();
+                let sort_label = if s.sort_asc { "A\u{2013}Z" } else { "Best matches first" };
+                let mut bm_text: Vec<u16> = sort_label.encode_utf16().collect();
                 let mut sz_bm = SIZE::default();
                 let _ = GetTextExtentPoint32W(mdc, &bm_text, &mut sz_bm);
                 let bm_x = x + list_w - PAD_L - sz_bm.cx - 16;
@@ -7411,14 +7431,20 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                 );
 
-                // Draw chevron next to Best matches first
+                // Draw directional chevron
                 let chev_x = bm_x + sz_bm.cx + 6;
                 let chev_y = list_y + 8 + sz_bm.cy / 2;
                 let pen = CreatePen(PS_SOLID, 1, s.theme.palette().clr_gray);
                 let old_pen = SelectObject(mdc, pen);
-                let _ = MoveToEx(mdc, chev_x, chev_y - 2, None);
-                let _ = LineTo(mdc, chev_x + 3, chev_y + 1);
-                let _ = LineTo(mdc, chev_x + 6, chev_y - 2);
+                if s.sort_asc {
+                    let _ = MoveToEx(mdc, chev_x, chev_y + 1, None);
+                    let _ = LineTo(mdc, chev_x + 3, chev_y - 2);
+                    let _ = LineTo(mdc, chev_x + 6, chev_y + 1);
+                } else {
+                    let _ = MoveToEx(mdc, chev_x, chev_y - 2, None);
+                    let _ = LineTo(mdc, chev_x + 3, chev_y + 1);
+                    let _ = LineTo(mdc, chev_x + 6, chev_y - 2);
+                }
                 SelectObject(mdc, old_pen);
                 let _ = DeleteObject(pen);
 
@@ -8463,18 +8489,6 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
         ),
         ("Local Files", "Local > Files", "file:", "HOMEPAGE_LOCAL"),
         (
-            "Source Code",
-            "Local > Source Code",
-            "code:",
-            "HOMEPAGE_CODE",
-        ),
-        (
-            "Search Screenshots",
-            "Local > Image Text (OCR)",
-            "img:",
-            "HOMEPAGE_OCR",
-        ),
-        (
             "Agent History",
             "AI > Agent runs",
             "agentchats:",
@@ -8564,7 +8578,20 @@ fn filter_index(ftype: FilterType) -> usize {
     }
 }
 
+fn apply_sort(results: &mut Vec<SearchResult>, sort_asc: bool) {
+    if sort_asc {
+        results.sort_by(|a, b| {
+            a.entry.control_name.to_lowercase().cmp(&b.entry.control_name.to_lowercase())
+        });
+    } else {
+        results.sort_by(|a, b| {
+            b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+}
+
 fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
+
     let src = r.entry.source.as_str();
     let cmd = r.entry.launch_command.as_str();
     match ftype {
@@ -8593,6 +8620,8 @@ fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
         FilterType::Settings => {
             src.eq_ignore_ascii_case("settings")
                 || src.eq_ignore_ascii_case("control")
+                || src == "ACTION"
+                || src == "SYSTEM"
                 || cmd.starts_with("ms-settings:")
                 || cmd.starts_with("control")
                 || cmd.contains(".cpl")
