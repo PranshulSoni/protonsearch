@@ -457,8 +457,8 @@ impl State {
                     break;
                 }
                 let starts_section = res_idx == 0
-                    || source_section_label(&self.results[res_idx - 1].entry.source)
-                        != source_section_label(&self.results[res_idx].entry.source);
+                    || source_section_label_res(&self.results[res_idx - 1])
+                        != source_section_label_res(&self.results[res_idx]);
                 if starts_section {
                     headers_count += 1;
                 }
@@ -488,8 +488,8 @@ impl State {
                     break;
                 }
                 let starts_section = res_idx == 0
-                    || source_section_label(&self.results[res_idx - 1].entry.source)
-                        != source_section_label(&self.results[res_idx].entry.source);
+                    || source_section_label_res(&self.results[res_idx - 1])
+                        != source_section_label_res(&self.results[res_idx]);
                 if starts_section {
                     headers_count += 1;
                 }
@@ -7658,17 +7658,17 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             } else if s.has_prefix() {
                 // ── Flat results layout with headers ───────────────────
                 let starts_section = res_idx == 0
-                    || source_section_label(&s.results[res_idx - 1].entry.source)
-                        != source_section_label(&res.entry.source);
+                    || source_section_label_res(&s.results[res_idx - 1])
+                        != source_section_label_res(res);
                 if starts_section {
                     SelectObject(mdc, s.font_b);
                     SetTextColor(mdc, palette.clr_gray);
-                    let section = source_section_label(&res.entry.source);
+                    let section = source_section_label_res(res);
                     let section_total = s
                         .results
                         .iter()
                         .filter(|candidate| {
-                            source_section_label(&candidate.entry.source) == section
+                            source_section_label_res(candidate) == section
                         })
                         .count();
                     let mut label: Vec<u16> = section.encode_utf16().collect();
@@ -8679,18 +8679,25 @@ fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
                 || src == "SNIPPET"
         }
         FilterType::Settings => {
-            src == "Settings"
+            src.eq_ignore_ascii_case("settings")
+                || src.eq_ignore_ascii_case("control")
                 || cmd.starts_with("ms-settings:")
                 || cmd.starts_with("control")
                 || cmd.contains(".cpl")
                 || cmd.ends_with(".msc")
         }
         FilterType::Commands => {
-            src == "SYSTEM"
+            (src == "SYSTEM"
                 || src == "WINDOW"
                 || src == "ACTION"
                 || src == "AI"
-                || src.eq_ignore_ascii_case("app")
+                || src.eq_ignore_ascii_case("app"))
+                && !(cmd.starts_with("ms-settings:")
+                    || cmd.starts_with("control")
+                    || cmd.contains(".cpl")
+                    || cmd.ends_with(".msc")
+                    || src.eq_ignore_ascii_case("settings")
+                    || src.eq_ignore_ascii_case("control"))
         }
     }
 }
@@ -8945,6 +8952,22 @@ unsafe fn draw_rounded_border_and_bg(
 ) {
     fill_rounded(hdc, x, y, w, h, r, border);
     fill_rounded(hdc, x + 1, y + 1, w - 2, h - 2, r - 1, bg);
+}
+
+fn source_section_label_res(res: &SearchResult) -> &'static str {
+    let source = res.entry.source.as_str();
+    let cmd = res.entry.launch_command.as_str();
+    if source.eq_ignore_ascii_case("settings")
+        || source.eq_ignore_ascii_case("control")
+        || cmd.starts_with("ms-settings:")
+        || cmd.starts_with("control")
+        || cmd.contains(".cpl")
+        || cmd.ends_with(".msc")
+    {
+        "SETTINGS"
+    } else {
+        source_section_label(source)
+    }
 }
 
 fn source_section_label(source: &str) -> &'static str {

@@ -161,6 +161,11 @@ fn lean_allowed(r: &SearchResult) -> bool {
         || cmd.starts_with("control")
         || cmd.contains(".cpl")
         || cmd.ends_with(".msc")
+        || cmd.starts_with("action:")
+        || s == "ACTION"
+        || s == "SYSTEM"
+        || s == "settings"
+        || s == "control"
     {
         return true;
     }
