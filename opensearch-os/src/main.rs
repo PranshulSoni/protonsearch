@@ -9405,6 +9405,14 @@ unsafe fn start_timeline_tracker(db_path: std::path::PathBuf, launcher_hwnd: Sen
 
     let launcher_hwnd = launcher_hwnd.0;
 
+    // Open a single persistent SQLite connection for the lifetime of this tracker thread.
+    let conn = match rusqlite::Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+    let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+
     let mut last_hwnd = HWND::default();
     let mut last_title = String::new();
     let mut last_app = String::new();
@@ -9467,7 +9475,7 @@ unsafe fn start_timeline_tracker(db_path: std::path::PathBuf, launcher_hwnd: Sen
         if fg != last_hwnd || title != last_title || app != last_app {
             let duration = focus_start.elapsed().as_secs() as i64;
             if (!last_title.is_empty() || !last_app.is_empty()) && duration >= 1 {
-                log_timeline_event(&db_path, focus_timestamp, duration, &last_app, &last_title);
+                log_timeline_event(&conn, focus_timestamp, duration, &last_app, &last_title);
             }
             last_hwnd = fg;
             last_title = title;
@@ -9482,35 +9490,34 @@ unsafe fn start_timeline_tracker(db_path: std::path::PathBuf, launcher_hwnd: Sen
 }
 
 fn log_timeline_event(
-    db_path: &std::path::Path,
+    conn: &rusqlite::Connection,
     timestamp: i64,
     duration: i64,
     app_name: &str,
     window_title: &str,
 ) {
-    if let Ok(conn) = rusqlite::Connection::open(db_path) {
-        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-        let _ = conn.execute(
-            "INSERT INTO timeline_events (timestamp, duration, app_name, window_title) VALUES (?, ?, ?, ?);",
-            rusqlite::params![timestamp, duration, app_name, window_title],
-        );
-        search::insert_memory_event(
-            &conn,
-            timestamp,
-            "Timeline",
-            "Active Window",
-            window_title,
-            &format!("Used {} for {} seconds", app_name, duration),
-            app_name,
-            None,
-            None,
-        );
-        let _ = conn.execute(
-            "DELETE FROM timeline_events WHERE id NOT IN (SELECT id FROM timeline_events ORDER BY timestamp DESC LIMIT 10000);",
-            [],
-        );
-    }
+    let _ = conn.execute(
+        "INSERT INTO timeline_events (timestamp, duration, app_name, window_title) VALUES (?, ?, ?, ?);",
+        rusqlite::params![timestamp, duration, app_name, window_title],
+    );
+    search::insert_memory_event(
+        conn,
+        timestamp,
+        "Timeline",
+        "Active Window",
+        window_title,
+        &format!("Used {} for {} seconds", app_name, duration),
+        app_name,
+        None,
+        None,
+    );
+    // Keep only the latest 10000 timeline events to bound DB size
+    let _ = conn.execute(
+        "DELETE FROM timeline_events WHERE id NOT IN (SELECT id FROM timeline_events ORDER BY timestamp DESC LIMIT 10000);",
+        [],
+    );
 }
+
 
 unsafe fn load_shell_thumbnail(path: &str, size: i32) -> Option<HBITMAP> {
     let wide_path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();

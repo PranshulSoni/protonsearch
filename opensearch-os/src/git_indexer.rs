@@ -78,8 +78,9 @@ pub fn start_git_indexer(db_path: PathBuf) {
             let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
         }
         log_git("[start_git_indexer] thread started");
-        // Initial delay to let the app start up completely lag-free
-        thread::sleep(std::time::Duration::from_secs(2));
+        // Initial delay: 30s so the heavy file indexer, watcher, and search engine
+        // all finish their initial I/O burst before git starts hitting the disk.
+        thread::sleep(std::time::Duration::from_secs(30));
         loop {
             log_git("[run_git_indexer] starting run");
             if let Err(e) = run_git_indexer(&db_path) {

@@ -106,6 +106,10 @@ pub fn start_watcher(db_path: PathBuf) {
                 windows::Win32::System::Com::COINIT_MULTITHREADED,
             )
         };
+        // Wait 15s for the initial indexer I/O burst to settle before registering
+        // recursive filesystem watches — registering RecursiveMode::Recursive on
+        // drive roots at cold start competes with the file indexer's WalkDir.
+        thread::sleep(std::time::Duration::from_secs(15));
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = match notify::recommended_watcher(move |res| {
             let _ = tx.send(res);
@@ -375,8 +379,8 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
     use std::sync::{Arc, Mutex};
 
     let n_workers = std::thread::available_parallelism()
-        .map(|n| n.get().min(8))
-        .unwrap_or(4);
+        .map(|n| (n.get() / 2).max(1).min(4))
+        .unwrap_or(2);
 
     let (job_tx, job_rx) = mpsc::channel::<ExtractJob>(); // unbounded; jobs are tiny (paths/meta)
     let job_rx = Arc::new(Mutex::new(job_rx));
@@ -654,11 +658,8 @@ pub fn get_scan_folders() -> Vec<PathBuf> {
 pub fn get_default_scan_folders() -> Vec<PathBuf> {
     let mut folders = Vec::new();
 
-    let system_drive = std::env::var("SystemDrive")
-        .unwrap_or_else(|_| "C:".to_string())
-        .to_uppercase();
-
-    // 1. Get the User Profile folder
+    // Only scan the user's home profile directory by default.
+    // ProgramFiles and other drive roots are excluded to prevent massive startup I/O.
     unsafe {
         use windows::Win32::Foundation::HANDLE;
         use windows::Win32::System::Com::CoTaskMemFree;
@@ -683,34 +684,6 @@ pub fn get_default_scan_folders() -> Vec<PathBuf> {
     if folders.is_empty() {
         if let Ok(profile) = std::env::var("USERPROFILE") {
             folders.push(PathBuf::from(profile));
-        }
-    }
-
-    // 1b. Program Files (user wants installed-app files indexed too).
-    for var in ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"] {
-        if let Ok(p) = std::env::var(var) {
-            let pb = PathBuf::from(p);
-            if pb.exists() && !folders.contains(&pb) {
-                folders.push(pb);
-            }
-        }
-    }
-
-    // 2. Discover all other fixed drives and scan them from their roots
-    for c in b'A'..=b'Z' {
-        let drive_letter = c as char;
-        let drive_path_str = format!("{}:\\", drive_letter);
-        if drive_path_str.to_uppercase().starts_with(&system_drive) {
-            continue;
-        }
-        let wide_path: Vec<u16> = drive_path_str.encode_utf16().chain(Some(0)).collect();
-        unsafe {
-            use windows::Win32::Storage::FileSystem::GetDriveTypeW;
-            let drive_type = GetDriveTypeW(windows::core::PCWSTR(wide_path.as_ptr()));
-            if drive_type == 3 {
-                // 3 corresponds to DRIVE_FIXED in Win32
-                folders.push(PathBuf::from(drive_path_str));
-            }
         }
     }
 
