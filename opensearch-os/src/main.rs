@@ -311,6 +311,10 @@ struct State {
     icon_todo: HICON,
     icon_clipboard: HICON,
     icon_memory: HICON,
+    icon_chrome: HICON,
+    icon_firefox: HICON,
+    icon_edge: HICON,
+    icon_brave: HICON,
 
     icon_new_mic: HICON,
     icon_new_search: HICON,
@@ -811,6 +815,25 @@ unsafe fn run() {
         SEARCH_ICON_SIZE as u32,
     );
 
+    let icon_chrome = {
+        let h = unsafe { get_app_icon("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe") };
+        if h.0.is_null() {
+            unsafe { get_app_icon("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe") }
+        } else {
+            h
+        }
+    };
+    let icon_firefox = unsafe { get_app_icon("C:\\Program Files\\Mozilla Firefox\\firefox.exe") };
+    let icon_edge = unsafe { get_app_icon("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe") };
+    let icon_brave = {
+        let h = unsafe { get_app_icon("C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe") };
+        if h.0.is_null() {
+            unsafe { get_app_icon("C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe") }
+        } else {
+            h
+        }
+    };
+
     let (icon_tx, icon_rx) = std::sync::mpsc::channel::<IconRequest>();
 
     let app_settings = crate::settings::AppSettings::load();
@@ -869,6 +892,10 @@ unsafe fn run() {
         icon_todo,
         icon_clipboard,
         icon_memory,
+        icon_chrome,
+        icon_firefox,
+        icon_edge,
+        icon_brave,
         icon_new_mic,
         icon_new_search,
         active_filter: FilterType::All,
@@ -3069,6 +3096,18 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 }
                 if !s.icon_todo.0.is_null() {
                     let _ = DestroyIcon(s.icon_todo);
+                }
+                if !s.icon_chrome.0.is_null() {
+                    let _ = DestroyIcon(s.icon_chrome);
+                }
+                if !s.icon_firefox.0.is_null() {
+                    let _ = DestroyIcon(s.icon_firefox);
+                }
+                if !s.icon_edge.0.is_null() {
+                    let _ = DestroyIcon(s.icon_edge);
+                }
+                if !s.icon_brave.0.is_null() {
+                    let _ = DestroyIcon(s.icon_brave);
                 }
                 for &hicon in s.app_icons.values() {
                     if !hicon.0.is_null() {
@@ -7856,10 +7895,36 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                                     "FILE" | "FILE_CONTENT" | "RECENT" | "CODE" | "CODE_CONTENT"
                                     | "OCR" => s.icon_file,
                                     "ACTION" | "SYSTEM" | "WINDOW" => s.icon_app,
-                                    "BOOKMARK" | "QUICKLINK" => s.icon_bookmark,
+                                    "BOOKMARK" | "QUICKLINK" => {
+                                        let desc = res.entry.description.to_lowercase();
+                                        if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
+                                            s.icon_chrome
+                                        } else if desc.contains("firefox") && !s.icon_firefox.0.is_null() {
+                                            s.icon_firefox
+                                        } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
+                                            s.icon_edge
+                                        } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
+                                            s.icon_brave
+                                        } else {
+                                            s.icon_bookmark
+                                        }
+                                    }
                                     "CLIPBOARD" => s.icon_clipboard,
                                     "COMMIT" => s.icon_commit,
-                                    "HISTORY" | "web" => s.icon_web,
+                                    "HISTORY" | "web" => {
+                                        let desc = res.entry.description.to_lowercase();
+                                        if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
+                                            s.icon_chrome
+                                        } else if desc.contains("firefox") && !s.icon_firefox.0.is_null() {
+                                            s.icon_firefox
+                                        } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
+                                            s.icon_edge
+                                        } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
+                                            s.icon_brave
+                                        } else {
+                                            s.icon_web
+                                        }
+                                    }
                                     "MEMORY" | "AI" => s.icon_app,
                                     "PDF" => s.icon_file,
                                     "Settings" | "SETTINGS" => s.icon_settings,
