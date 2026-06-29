@@ -37,7 +37,7 @@ export component ToggleSwitch inherits Rectangle {
 
 
 export component SettingsWindow inherits Window {
-    title: "Settings";
+    title: "OmniSearch Settings";
     min-width: 950px;
     min-height: 600px;
     preferred-width: 950px;
@@ -76,6 +76,7 @@ export component SettingsWindow inherits Window {
     callback format-hotkey(string, bool, bool, bool, bool) -> string;
     callback validate-hotkey(string) -> string;
     callback set-hotkey-recording(bool);
+    callback process-captured-hotkey(string);
     
     // Agent settings properties
     in-out property <string> agent-api-key;
@@ -98,8 +99,8 @@ export component SettingsWindow inherits Window {
 
     
     property <int> current-page: 0;
-    property <bool> recording-hotkey: false;
-    property <string> previous-hotkey: "";
+    in-out property <bool> recording-hotkey: false;
+    in-out property <string> previous-hotkey: "";
     property <bool> show-api-key: false;
 
     
@@ -1214,132 +1215,104 @@ export component SettingsWindow inherits Window {
                             Text { text: "Keyboard shortcuts used by the launcher"; font-size: 13px; color: root.text-muted; }
                         }
 
-                        // Hotkey rows card
+                        // Open launcher row card
                         Rectangle {
                             background: root.card-bg;
-                            border-radius: 10px;
+                            border-radius: 8px;
                             border-color: root.border-color;
                             border-width: 1px;
+                            height: 64px;
+                            
+                            ta-launcher-row := TouchArea {
+                                clicked => {
+                                    root.hotkey-error = "";
+                                    root.previous-hotkey = root.global-hotkey;
+                                    root.recording-hotkey = true;
+                                    root.set-hotkey-recording(true);
+                                }
+                            }
+                            
+                            HorizontalBox {
+                                padding-left: 20px;
+                                padding-right: 20px;
+                                spacing: 16px;
 
-                            VerticalLayout {
-                                // ── Open Launcher row ──────────────────────────────────
-                                Rectangle {
-                                    height: 68px;
-                                    background: ta-launcher-row.has-hover ? root.hover-bg : transparent;
-                                    animate background { duration: 100ms; }
+                                VerticalBox {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text { text: "Open launcher"; color: root.text-primary; font-size: 14px; font-weight: 600; }
+                                    Text { text: "Toggles the search window"; color: root.text-muted; font-size: 12px; }
+                                }
+                                
+                                Rectangle { horizontal-stretch: 1; }
+                                
+                                VerticalBox {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 180px;
+                                        height: 34px;
+                                        border-radius: 6px;
+                                        border-width: root.recording-hotkey ? 2px : 1px;
+                                        border-color: root.recording-hotkey ? #3b82f6 : root.border-color;
+                                        background: root.recording-hotkey ? #13243d : root.bg-color;
+                                        
+                                        animate border-color { duration: 120ms; }
+                                        animate background { duration: 120ms; }
 
-                                    HorizontalLayout {
-                                        padding-left: 24px;
-                                        padding-right: 24px;
-                                        padding-top: 0px;
-                                        padding-bottom: 0px;
-                                        spacing: 0px;
-
-                                        // Label block
-                                        VerticalLayout {
-                                            alignment: center;
-                                            spacing: 3px;
-                                            horizontal-stretch: 1;
-                                            Text {
-                                                text: "Open launcher";
-                                                color: root.text-primary;
-                                                font-size: 14px;
-                                                font-weight: 600;
-                                            }
-                                            Text {
-                                                text: "Toggles the search window";
-                                                color: root.text-muted;
-                                                font-size: 12px;
-                                            }
-                                        }
-
-                                        // Hotkey pill (clickable to record)
-                                        Rectangle {
-                                            width: 180px;
-                                            height: 36px;
-                                            border-radius: 7px;
-                                            border-width: root.recording-hotkey ? 2px : 1px;
-                                            border-color: root.recording-hotkey ? #3b82f6 : root.border-color;
-                                            background: root.recording-hotkey ? #13243d : root.bg-color;
-                                            y: (parent.height - self.height) / 2;
-
-                                            animate border-color { duration: 120ms; }
-                                            animate background { duration: 120ms; }
-
-                                            Text {
-                                                text: root.recording-hotkey ? "Press shortcut…" : root.global-hotkey;
-                                                color: root.recording-hotkey ? #93c5fd : root.text-primary;
-                                                font-size: 13px;
-                                                font-weight: 600;
-                                                horizontal-alignment: center;
-                                                vertical-alignment: center;
-                                                overflow: elide;
-                                            }
-                                        }
-                                    }
-
-                                    ta-launcher-row := TouchArea {
-                                        clicked => {
-                                            root.hotkey-error = "";
-                                            root.previous-hotkey = root.global-hotkey;
-                                            root.recording-hotkey = true;
-                                            root.set-hotkey-recording(true);
-                                            hotkey-capture.focus();
+                                        Text {
+                                            text: root.recording-hotkey ? "Press shortcut…" : root.global-hotkey;
+                                            color: root.recording-hotkey ? #93c5fd : root.text-primary;
+                                            font-size: 13px;
+                                            font-weight: 600;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
                                         }
                                     }
                                 }
+                            }
+                        }
 
-                                // Divider
-                                Rectangle { height: 1px; background: root.border-color; }
+                        Rectangle { height: 6px; }
 
-                                // ── Voice Dictation row ────────────────────────────────
-                                Rectangle {
-                                    height: 68px;
-                                    background: transparent;
+                        // Voice dictation row card
+                        Rectangle {
+                            background: root.card-bg;
+                            border-radius: 8px;
+                            border-color: root.border-color;
+                            border-width: 1px;
+                            height: 64px;
 
-                                    HorizontalLayout {
-                                        padding-left: 24px;
-                                        padding-right: 24px;
-                                        padding-top: 0px;
-                                        padding-bottom: 0px;
-                                        spacing: 0px;
+                            HorizontalBox {
+                                padding-left: 20px;
+                                padding-right: 20px;
+                                spacing: 16px;
 
-                                        // Label block
-                                        VerticalLayout {
-                                            alignment: center;
-                                            spacing: 3px;
-                                            horizontal-stretch: 1;
-                                            Text {
-                                                text: "Voice dictation";
-                                                color: root.text-primary;
-                                                font-size: 14px;
-                                                font-weight: 600;
-                                            }
-                                            Text {
-                                                text: "Fixed shortcut · managed by the launcher";
-                                                color: root.text-muted;
-                                                font-size: 12px;
-                                            }
-                                        }
+                                VerticalBox {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text { text: "Voice dictation"; color: root.text-primary; font-size: 14px; font-weight: 600; }
+                                    Text { text: "Fixed shortcut · managed by the launcher"; color: root.text-muted; font-size: 12px; }
+                                }
 
-                                        // Hotkey pill (read-only)
-                                        Rectangle {
-                                            width: 180px;
-                                            height: 36px;
-                                            border-radius: 7px;
-                                            border-width: 1px;
-                                            border-color: root.border-color;
-                                            background: root.bg-color;
-                                            y: (parent.height - self.height) / 2;
+                                Rectangle { horizontal-stretch: 1; }
 
-                                            Text {
-                                                text: root.voice-hotkey;
-                                                color: root.text-muted;
-                                                font-size: 13px;
-                                                font-weight: 600;
-                                                horizontal-alignment: center;
-                                                vertical-alignment: center;
-                                            }
+                                VerticalBox {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 180px;
+                                        height: 34px;
+                                        border-radius: 6px;
+                                        border-width: 1px;
+                                        border-color: root.border-color;
+                                        background: root.bg-color;
+
+                                        Text {
+                                            text: root.voice-hotkey;
+                                            color: root.text-muted;
+                                            font-size: 13px;
+                                            font-weight: 600;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
                                         }
                                     }
                                 }
@@ -1717,38 +1690,4 @@ export component SettingsWindow inherits Window {
     }
 }
 
-    hotkey-capture := FocusScope {
-        x: -1px;
-        y: -1px;
-        width: 1px;
-        height: 1px;
-
-        key-pressed(event) => {
-            if (!root.recording-hotkey) {
-                return reject;
-            }
-            if (event.text == "\u{1b}" || event.text == "Escape" || event.text == "Esc") {
-                root.recording-hotkey = false;
-                root.global-hotkey = root.previous-hotkey;
-                root.set-hotkey-recording(false);
-                return accept;
-            }
-            let hotkey = root.format-hotkey(event.text, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta);
-            if (hotkey != "") {
-                let status = root.validate-hotkey(hotkey);
-                if (status == "OK") {
-                    root.hotkey-error = "";
-                    root.global-hotkey = hotkey;
-                    root.recording-hotkey = false;
-                    root.set-hotkey-recording(false);
-                    root.save-settings();
-                } else {
-                    root.hotkey-error = status;
-                }
-                return accept;
-            }
-            root.hotkey-error = "Press a supported key with Ctrl, Alt, Shift, or Win.";
-            return accept;
-        }
-    }
 }

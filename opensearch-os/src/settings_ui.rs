@@ -2,9 +2,136 @@ slint::include_modules!();
 
 use crate::settings::AppSettings;
 use slint::{CloseRequestResponse, ComponentHandle, SharedString};
-use std::sync::atomic::Ordering;
-use windows::Win32::Foundation::{HWND, GetLastError};
-use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
+use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, Ordering};
+use windows::Win32::Foundation::{HWND, GetLastError, LRESULT, WPARAM, LPARAM};
+use windows::Win32::UI::WindowsAndMessaging::{
+    PostMessageW, CallWindowProcW, DefWindowProcW, WNDPROC, GWLP_WNDPROC, SetWindowLongPtrW,
+};
+
+pub static IS_RECORDING_HOTKEY: AtomicBool = AtomicBool::new(false);
+
+thread_local! {
+    static SETTINGS_UI_WEAK: RefCell<Option<slint::Weak<SettingsWindow>>> = RefCell::new(None);
+    static PREV_SETTINGS_WNDPROC: RefCell<Option<WNDPROC>> = RefCell::new(None);
+}
+
+fn vkey_to_string(vk: u32) -> Option<String> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::*;
+    let s = match VIRTUAL_KEY(vk as u16) {
+        VK_SPACE => "Space".to_string(),
+        VK_RETURN => "Enter".to_string(),
+        VK_ESCAPE => "Escape".to_string(),
+        VK_TAB => "Tab".to_string(),
+        VK_UP => "Up".to_string(),
+        VK_DOWN => "Down".to_string(),
+        VK_LEFT => "Left".to_string(),
+        VK_RIGHT => "Right".to_string(),
+        VK_BACK => "Backspace".to_string(),
+        VK_DELETE => "Delete".to_string(),
+        VK_INSERT => "Insert".to_string(),
+        VK_HOME => "Home".to_string(),
+        VK_END => "End".to_string(),
+        VK_PRIOR => "PageUp".to_string(),
+        VK_NEXT => "PageDown".to_string(),
+        k if k.0 >= VK_F1.0 && k.0 <= VK_F24.0 => {
+            format!("F{}", k.0 - VK_F1.0 + 1)
+        }
+        k if (k.0 >= b'A' as u16 && k.0 <= b'Z' as u16) || (k.0 >= b'0' as u16 && k.0 <= b'9' as u16) => {
+            let c = k.0 as u8 as char;
+            c.to_string()
+        }
+        _ => return None,
+    };
+    Some(s)
+}
+
+unsafe extern "system" fn settings_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wp: WPARAM,
+    lp: LPARAM,
+) -> LRESULT {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        WM_SYSCOMMAND, WM_KEYDOWN, WM_SYSKEYDOWN, WM_KEYUP, WM_SYSKEYUP, SC_KEYMENU,
+    };
+    use windows::Win32::UI::Input::KeyboardAndMouse::*;
+
+    if IS_RECORDING_HOTKEY.load(Ordering::Relaxed) {
+        match msg {
+            WM_SYSCOMMAND => {
+                let cmd = wp.0 & 0xFFF0;
+                if cmd == SC_KEYMENU as usize {
+                    return LRESULT(0); // Swallow Alt/system menu shortcut
+                }
+            }
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                let vk = wp.0 as u16;
+                let is_modifier = vk == VK_CONTROL.0
+                    || vk == VK_SHIFT.0
+                    || vk == VK_MENU.0
+                    || vk == VK_LWIN.0
+                    || vk == VK_RWIN.0;
+
+                if is_modifier {
+                    return LRESULT(0);
+                }
+
+                // Get modifier states: cast GetKeyState to u16 and check 0x8000 bit to avoid i16 overflow.
+                let ctrl = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
+                let alt = (GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0;
+                let shift = (GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
+                let win = (((GetKeyState(VK_LWIN.0 as i32) as u16) | (GetKeyState(VK_RWIN.0 as i32) as u16)) & 0x8000) != 0;
+
+                if let Some(key_name) = vkey_to_string(wp.0 as u32) {
+                    if key_name == "Escape" {
+                        SETTINGS_UI_WEAK.with(|cell| {
+                            if let Some(weak) = &*cell.borrow() {
+                                let weak_clone = weak.clone();
+                                let _ = slint::invoke_from_event_loop(move || {
+                                    if let Some(ui) = weak_clone.upgrade() {
+                                        ui.invoke_process_captured_hotkey(slint::SharedString::from("Escape"));
+                                    }
+                                });
+                            }
+                        });
+                    } else {
+                        let mut parts = Vec::new();
+                        if ctrl { parts.push("Ctrl"); }
+                        if alt { parts.push("Alt"); }
+                        if shift { parts.push("Shift"); }
+                        if win { parts.push("Win"); }
+                        parts.push(&key_name);
+                        let hotkey_str = parts.join("+");
+
+                        SETTINGS_UI_WEAK.with(|cell| {
+                            if let Some(weak) = &*cell.borrow() {
+                                let weak_clone = weak.clone();
+                                let _ = slint::invoke_from_event_loop(move || {
+                                    if let Some(ui) = weak_clone.upgrade() {
+                                        ui.invoke_process_captured_hotkey(slint::SharedString::from(hotkey_str));
+                                    }
+                                });
+                            }
+                        });
+                    }
+                }
+                return LRESULT(0);
+            }
+            WM_KEYUP | WM_SYSKEYUP => {
+                return LRESULT(0);
+            }
+            _ => {}
+        }
+    }
+
+    let prev = PREV_SETTINGS_WNDPROC.with(|cell| *cell.borrow());
+    if let Some(prev_fn) = prev {
+        CallWindowProcW(prev_fn, hwnd, msg, wp, lp)
+    } else {
+        DefWindowProcW(hwnd, msg, wp, lp)
+    }
+}
 
 fn find_launcher_hwnd() -> Option<HWND> {
     use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
@@ -204,6 +331,7 @@ pub fn run_settings_window() {
         });
 
         ui.on_set_hotkey_recording(move |recording| {
+            IS_RECORDING_HOTKEY.store(recording, Ordering::Relaxed);
             if let Some(hwnd) = find_launcher_hwnd() {
                 unsafe {
                     let _ = PostMessageW(
@@ -212,6 +340,84 @@ pub fn run_settings_window() {
                         windows::Win32::Foundation::WPARAM(recording as usize),
                         windows::Win32::Foundation::LPARAM(0),
                     );
+                }
+            }
+        });
+
+        let ui_weak_process = ui.as_weak();
+        ui.on_process_captured_hotkey(move |hotkey| {
+            if let Some(ui) = ui_weak_process.upgrade() {
+                if hotkey == "Escape" {
+                    ui.set_recording_hotkey(false);
+                    ui.set_global_hotkey(ui.get_previous_hotkey());
+                    ui.set_hotkey_error(SharedString::from(""));
+                    IS_RECORDING_HOTKEY.store(false, Ordering::Relaxed);
+                    if let Some(hwnd) = find_launcher_hwnd() {
+                        unsafe {
+                            let _ = PostMessageW(
+                                hwnd,
+                                windows::Win32::UI::WindowsAndMessaging::WM_USER + 11,
+                                windows::Win32::Foundation::WPARAM(0),
+                                windows::Win32::Foundation::LPARAM(0),
+                            );
+                        }
+                    }
+                } else {
+                    let settings = AppSettings::load();
+                    match crate::hotkey::validate_hotkey(hotkey.as_str(), &settings.global_hotkey) {
+                        Ok(()) => {
+                            ui.set_hotkey_error(SharedString::from(""));
+                            ui.set_global_hotkey(SharedString::from(hotkey.clone()));
+                            ui.set_recording_hotkey(false);
+                            IS_RECORDING_HOTKEY.store(false, Ordering::Relaxed);
+                            
+                            // Save settings
+                            let mut s = AppSettings::load();
+                            s.run_on_startup = ui.get_run_on_startup();
+                            s.hide_on_lose_focus = ui.get_hide_on_lose_focus();
+                            s.show_taskbar = ui.get_show_taskbar();
+                            s.window_location = ui.get_window_location().to_string();
+                            s.theme_mode = ui.get_theme_mode().to_string();
+                            s.global_hotkey = hotkey.to_string();
+                            s.window_width = ui.get_window_width() as u32;
+                            s.item_height = ui.get_item_height() as u32;
+                            s.search_bar_height = ui.get_search_bar_height() as u32;
+                            s.query_font_family = ui.get_query_font_family().to_string();
+                            s.query_font_weight = ui.get_query_font_weight().to_string();
+                            s.query_font_size = ui.get_query_font_size() as u32;
+                            s.result_title_font_family = ui.get_result_title_font_family().to_string();
+                            s.result_title_font_weight = ui.get_result_title_font_weight().to_string();
+                            s.result_title_font_size = ui.get_result_title_font_size() as u32;
+                            s.result_subtitle_font_family = ui.get_result_subtitle_font_family().to_string();
+                            s.result_subtitle_font_weight = ui.get_result_subtitle_font_weight().to_string();
+                            s.result_subtitle_font_size = ui.get_result_subtitle_font_size() as u32;
+                            s.show_placeholder = ui.get_show_placeholder();
+                            s.save();
+
+                            crate::settings_startup::set_run_on_startup(s.run_on_startup);
+
+                            // Reload launcher hotkeys
+                            if let Some(hwnd) = find_launcher_hwnd() {
+                                unsafe {
+                                    let _ = PostMessageW(
+                                        hwnd,
+                                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 11,
+                                        windows::Win32::Foundation::WPARAM(0),
+                                        windows::Win32::Foundation::LPARAM(0),
+                                    );
+                                    let _ = PostMessageW(
+                                        hwnd,
+                                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 10,
+                                        windows::Win32::Foundation::WPARAM(0),
+                                        windows::Win32::Foundation::LPARAM(0),
+                                    );
+                                }
+                            }
+                        }
+                        Err(message) => {
+                            ui.set_hotkey_error(SharedString::from(message));
+                        }
+                    }
                 }
             }
         });
@@ -315,11 +521,45 @@ pub fn run_settings_window() {
             }
         });
 
+        SETTINGS_UI_WEAK.with(|cell| {
+            *cell.borrow_mut() = Some(ui.as_weak());
+        });
+
         // Show the window and run the event loop until it's closed
         ui.window().show().ok();
 
+        // Subclass the Settings window to intercept key events during hotkey recording
+        let mut settings_hwnd = HWND(std::ptr::null_mut());
+        unsafe {
+            use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
+            use windows::core::PCWSTR;
+            let title_wide: Vec<u16> = "OmniSearch Settings\0".encode_utf16().collect();
+            if let Ok(hwnd) = FindWindowW(None, PCWSTR(title_wide.as_ptr())) {
+                if !hwnd.0.is_null() {
+                    settings_hwnd = hwnd;
+                    let prev_wndproc = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, settings_wndproc as *const () as isize);
+                    PREV_SETTINGS_WNDPROC.with(|cell| {
+                        *cell.borrow_mut() = Some(std::mem::transmute::<isize, WNDPROC>(prev_wndproc));
+                    });
+                }
+            }
+        }
+
         ui.window().set_minimized(false);
         slint::run_event_loop().ok();
+
+        // Clean up subclass on exit
+        if !settings_hwnd.0.is_null() {
+            let prev = PREV_SETTINGS_WNDPROC.with(|cell| cell.borrow_mut().take());
+            if let Some(prev_fn) = prev {
+                unsafe {
+                    SetWindowLongPtrW(settings_hwnd, GWLP_WNDPROC, std::mem::transmute::<WNDPROC, isize>(prev_fn));
+                }
+            }
+        }
+        SETTINGS_UI_WEAK.with(|cell| {
+            *cell.borrow_mut() = None;
+        });
 }
 
 fn get_db_conn() -> Option<rusqlite::Connection> {
