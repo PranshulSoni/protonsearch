@@ -34,92 +34,7 @@ export component ToggleSwitch inherits Rectangle {
     }
 }
 
-export component CustomDropdown inherits Rectangle {
-    in-out property <[string]> model;
-    in-out property <int> current-index: 0;
-    in-out property <string> selected-value: model[current-index];
-    callback selected(string);
 
-    property <bool> is-open: false;
-
-    width: 220px;
-    height: 32px;
-    background: #2b2b2b;
-    border-radius: 6px;
-    border-width: 1px;
-    border-color: #3f3f3f;
-
-    HorizontalBox {
-        padding-left: 12px;
-        padding-right: 12px;
-        spacing: 8px;
-        alignment: center;
-
-        Text {
-            text: model[current-index];
-            color: #ffffff;
-            font-size: 13px;
-            vertical-alignment: center;
-        }
-
-        Rectangle { horizontal-stretch: 1; }
-
-        Text {
-            text: is-open ? "▲" : "▼";
-            color: #aaaaaa;
-            font-size: 8px;
-            vertical-alignment: center;
-        }
-    }
-
-    TouchArea {
-        clicked => {
-            is-open = !is-open;
-        }
-    }
-
-    // Popup list container
-    if is-open : Rectangle {
-        y: 36px;
-        width: parent.width;
-        height: model.length * 30px + 10px;
-        background: #2b2b2b;
-        border-radius: 6px;
-        border-width: 1px;
-        border-color: #3f3f3f;
-        z: 100; // Draw on top of everything!
-
-        VerticalBox {
-            padding: 4px;
-            spacing: 2px;
-            for item[idx] in model : Rectangle {
-                height: 26px;
-                background: current-index == idx ? #1d90f3 : (item-ta.has-hover ? #353535 : transparent);
-                border-radius: 4px;
-                
-                HorizontalBox {
-                    padding-left: 8px;
-                    alignment: center;
-                    Text {
-                        text: item;
-                        color: #ffffff;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                    }
-                }
-
-                item-ta := TouchArea {
-                    clicked => {
-                        current-index = idx;
-                        selected-value = item;
-                        is-open = false;
-                        selected(item);
-                    }
-                }
-            }
-        }
-    }
-}
 
 export component SettingsWindow inherits Window {
     title: "Settings";
@@ -986,19 +901,20 @@ export component SettingsWindow inherits Window {
                                     }
                                 }
 
-                                // Pencil Edit Button top-right
+                                // Edit Button top-right (Text based to prevent missing glyph box)
                                 Rectangle {
-                                    width: 32px;
-                                    height: 32px;
+                                    width: 48px;
+                                    height: 24px;
                                     background: edit-btn-ta.has-hover ? #ffffff30 : #ffffff1a;
-                                    border-radius: 6px;
+                                    border-radius: 4px;
                                     x: parent.width - self.width - 12px;
                                     y: 12px;
                                     
                                     Text {
-                                        text: "✎";
+                                        text: "Edit";
                                         color: #ffffff;
-                                        font-size: 14px;
+                                        font-size: 11px;
+                                        font-weight: 600;
                                         horizontal-alignment: center;
                                         vertical-alignment: center;
                                     }
@@ -1051,25 +967,20 @@ export component SettingsWindow inherits Window {
                                         VerticalBox {
                                             spacing: 4px;
                                             Text { text: "Query Font Family"; color: root.text-secondary; font-size: 12px; }
-                                            CustomDropdown {
+                                            ComboBox {
                                                 width: 100%;
-                                                current-index: root.query-font-family == "Segoe UI Variable" ? 0 :
-                                                               root.query-font-family == "Arial" ? 1 :
-                                                               root.query-font-family == "Consolas" ? 2 :
-                                                               root.query-font-family == "Outfit" ? 3 : 0;
                                                 model: ["Segoe UI Variable", "Arial", "Consolas", "Outfit"];
+                                                current-value: root.query-font-family;
                                                 selected(val) => {
                                                     root.query-font-family = val;
                                                     root.save-settings();
                                                 }
                                             }
                                             Text { text: "Query Font Weight"; color: root.text-secondary; font-size: 12px; }
-                                            CustomDropdown {
+                                            ComboBox {
                                                 width: 100%;
-                                                current-index: root.query-font-weight == "Regular" ? 0 :
-                                                               root.query-font-weight == "Semi-Bold" ? 1 :
-                                                               root.query-font-weight == "Bold" ? 2 : 0;
                                                 model: ["Regular", "Semi-Bold", "Bold"];
+                                                current-value: root.query-font-weight;
                                                 selected(val) => {
                                                     root.query-font-weight = val;
                                                     root.save-settings();
@@ -1116,25 +1027,20 @@ export component SettingsWindow inherits Window {
                                         VerticalBox {
                                             spacing: 4px;
                                             Text { text: "Result Title Font Family"; color: root.text-secondary; font-size: 12px; }
-                                            CustomDropdown {
+                                            ComboBox {
                                                 width: 100%;
-                                                current-index: root.result-title-font-family == "Segoe UI Variable" ? 0 :
-                                                               root.result-title-font-family == "Arial" ? 1 :
-                                                               root.result-title-font-family == "Consolas" ? 2 :
-                                                               root.result-title-font-family == "Outfit" ? 3 : 0;
                                                 model: ["Segoe UI Variable", "Arial", "Consolas", "Outfit"];
+                                                current-value: root.result-title-font-family;
                                                 selected(val) => {
                                                     root.result-title-font-family = val;
                                                     root.save-settings();
                                                 }
                                             }
                                             Text { text: "Result Title Font Weight"; color: root.text-secondary; font-size: 12px; }
-                                            CustomDropdown {
+                                            ComboBox {
                                                 width: 100%;
-                                                current-index: root.result-title-font-weight == "Regular" ? 0 :
-                                                               root.result-title-font-weight == "Semi-Bold" ? 1 :
-                                                               root.result-title-font-weight == "Bold" ? 2 : 2; // Default to Bold
                                                 model: ["Regular", "Semi-Bold", "Bold"];
+                                                current-value: root.result-title-font-weight;
                                                 selected(val) => {
                                                     root.result-title-font-weight = val;
                                                     root.save-settings();
@@ -1161,25 +1067,20 @@ export component SettingsWindow inherits Window {
                                         VerticalBox {
                                             spacing: 4px;
                                             Text { text: "Result Subtitle Font Family"; color: root.text-secondary; font-size: 12px; }
-                                            CustomDropdown {
+                                            ComboBox {
                                                 width: 100%;
-                                                current-index: root.result-subtitle-font-family == "Segoe UI Variable" ? 0 :
-                                                               root.result-subtitle-font-family == "Arial" ? 1 :
-                                                               root.result-subtitle-font-family == "Consolas" ? 2 :
-                                                               root.result-subtitle-font-family == "Outfit" ? 3 : 0;
                                                 model: ["Segoe UI Variable", "Arial", "Consolas", "Outfit"];
+                                                current-value: root.result-subtitle-font-family;
                                                 selected(val) => {
                                                     root.result-subtitle-font-family = val;
                                                     root.save-settings();
                                                 }
                                             }
                                             Text { text: "Result Subtitle Font Weight"; color: root.text-secondary; font-size: 12px; }
-                                            CustomDropdown {
+                                            ComboBox {
                                                 width: 100%;
-                                                current-index: root.result-subtitle-font-weight == "Regular" ? 0 :
-                                                               root.result-subtitle-font-weight == "Semi-Bold" ? 1 :
-                                                               root.result-subtitle-font-weight == "Bold" ? 2 : 0;
                                                 model: ["Regular", "Semi-Bold", "Bold"];
+                                                current-value: root.result-subtitle-font-weight;
                                                 selected(val) => {
                                                     root.result-subtitle-font-weight = val;
                                                     root.save-settings();

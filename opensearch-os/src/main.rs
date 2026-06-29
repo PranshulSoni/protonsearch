@@ -37,7 +37,6 @@ extern "system" {
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 const WIN_W: i32 = 840;
-const SEARCH_H: i32 = 68;
 const RESULT_H: i32 = 68;
 const MAX_RESULTS: usize = 30;
 const VISIBLE_RESULTS: usize = 8;
@@ -1219,6 +1218,8 @@ unsafe extern "system" fn preview_wnd_proc(
 }
 
 unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
+    #[allow(non_snake_case)]
+    let SEARCH_H = s.search_h();
     use windows::Win32::Graphics::Gdi::{GetObjectW, InvalidateRect, BITMAP};
     use windows::Win32::UI::WindowsAndMessaging::{
         CreateWindowExW, GetWindowRect, SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE,
@@ -1327,6 +1328,12 @@ unsafe fn hide_preview_window(s: &State) {
 // ── WndProc ───────────────────────────────────────────────────────────────────
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     let sp = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut State;
+    #[allow(non_snake_case)]
+    let SEARCH_H = if !sp.is_null() {
+        unsafe { (*sp).search_h() }
+    } else {
+        68
+    };
 
     match msg {
         WM_CREATE => {
@@ -6049,6 +6056,8 @@ fn image_path_for_result(result: &SearchResult) -> Option<&str> {
 }
 
 unsafe fn paint(hwnd: HWND, s: &State) {
+    #[allow(non_snake_case)]
+    let SEARCH_H = s.search_h();
     let palette = s.theme.palette();
     let mut ps = PAINTSTRUCT::default();
     let hdc = BeginPaint(hwnd, &mut ps);
@@ -6305,28 +6314,30 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         );
         SetTextColor(mdc, palette.clr_white);
     } else {
-        let cur = floor_char_boundary(&s.query, s.cursor_pos);
-        let before = &s.query[..cur];
-        let dw_before: Vec<u16> = before.encode_utf16().collect();
-        let mut size = SIZE::default();
-        if !dw_before.is_empty() {
-            let _ = GetTextExtentPoint32W(mdc, &dw_before, &mut size);
+        if !s.query.is_empty() {
+            let cur = floor_char_boundary(&s.query, s.cursor_pos);
+            let before = &s.query[..cur];
+            let dw_before: Vec<u16> = before.encode_utf16().collect();
+            let mut size = SIZE::default();
+            if !dw_before.is_empty() {
+                let _ = GetTextExtentPoint32W(mdc, &dw_before, &mut size);
+            }
+            let max_w = w - 80;
+            let mut scroll_x = 0;
+            if size.cx > max_w {
+                scroll_x = size.cx - max_w;
+            }
+            let mut dw_query: Vec<u16> = s.query.encode_utf16().collect();
+            let mut text_rect = tr;
+            text_rect.left -= scroll_x;
+            text_rect.right += 2000; // prevent clipping the remaining text
+            let _ = DrawTextW(
+                mdc,
+                &mut dw_query,
+                &mut text_rect,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+            );
         }
-        let max_w = w - 80;
-        let mut scroll_x = 0;
-        if size.cx > max_w {
-            scroll_x = size.cx - max_w;
-        }
-        let mut dw_query: Vec<u16> = s.query.encode_utf16().collect();
-        let mut text_rect = tr;
-        text_rect.left -= scroll_x;
-        text_rect.right += 2000; // prevent clipping the remaining text
-        let _ = DrawTextW(
-            mdc,
-            &mut dw_query,
-            &mut text_rect,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-        );
     }
 
     // Mic button at the search bar's right corner. Pulses red while listening, sits
