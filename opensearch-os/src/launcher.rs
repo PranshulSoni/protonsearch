@@ -379,7 +379,14 @@ fn handle_action(action: &str) {
                 }
             });
         }
-        "open_settings" | "reveal_logs" => {
+        "open_settings" => {
+            if let Ok(exe) = std::env::current_exe() {
+                let _ = Command::new(exe)
+                    .arg("--settings")
+                    .spawn();
+            }
+        }
+        "reveal_logs" => {
             if let Ok(appdata) = std::env::var("APPDATA") {
                 let _ = Command::new("explorer.exe")
                     .arg(std::path::PathBuf::from(appdata).join("opensearch-os"))
