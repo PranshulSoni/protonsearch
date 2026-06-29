@@ -386,28 +386,40 @@ pub fn run_settings_window() {
         if ui_weak.upgrade().is_none() {
             break;
         }
-        let is_indexing = crate::indexer::IS_INDEXING.load(Ordering::Relaxed);
-        let progress = {
-            if let Ok(g) = crate::indexer::INDEXING_PROGRESS.lock() {
-                g.clone()
-            } else {
-                "Idle".to_string()
+
+        let mut is_indexing = false;
+        let mut progress = "Idle".to_string();
+        let mut last_time = "Never".to_string();
+        let mut count = 0;
+
+        if let Some(conn) = get_db_conn() {
+            is_indexing = get_indexer_state_from_db(&conn, "is_indexing", "0") == "1";
+            progress = get_indexer_state_from_db(&conn, "progress", "Idle");
+            last_time = get_indexer_state_from_db(&conn, "last_index_time", "Never");
+            
+            // Re-create check to prevent errors
+            let _ = conn.execute(
+                "CREATE TABLE IF NOT EXISTS files (
+                    path TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    extension TEXT NOT NULL,
+                    modified INTEGER NOT NULL,
+                    size INTEGER NOT NULL DEFAULT 0,
+                    is_dir INTEGER NOT NULL DEFAULT 0
+                );",
+                [],
+            );
+            if let Ok(c) = conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, i64>(0)) {
+                count = c as i32;
             }
-        };
-        let last_time = {
-            if let Ok(g) = crate::indexer::LAST_INDEX_TIME.lock() {
-                g.clone()
-            } else {
-                "Never".to_string()
-            }
-        };
-        let count = get_indexed_files_count();
+        }
+
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(ui) = ui_weak.upgrade() {
                 ui.set_db_is_indexing(is_indexing);
                 ui.set_db_status(slint::SharedString::from(progress));
                 ui.set_db_last_indexed(slint::SharedString::from(last_time));
-                ui.set_db_file_count(count as i32);
+                ui.set_db_file_count(count);
             }
         });
     });
@@ -416,6 +428,22 @@ pub fn run_settings_window() {
     ui.window().show().ok();
     ui.window().set_minimized(false);
     slint::run_event_loop().ok();
+}
+
+fn get_indexer_state_from_db(conn: &rusqlite::Connection, key: &str, default: &str) -> String {
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS indexer_state (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );",
+        [],
+    );
+    conn.query_row(
+        "SELECT value FROM indexer_state WHERE key = ?",
+        [key],
+        |row| row.get::<_, String>(0),
+    )
+    .unwrap_or_else(|_| default.to_string())
 }
 
 fn get_db_conn() -> Option<rusqlite::Connection> {
