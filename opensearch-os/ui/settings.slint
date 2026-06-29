@@ -34,11 +34,98 @@ export component ToggleSwitch inherits Rectangle {
     }
 }
 
+export component CustomDropdown inherits Rectangle {
+    in-out property <[string]> model;
+    in-out property <int> current-index: 0;
+    in-out property <string> selected-value: model[current-index];
+    callback selected(string);
+
+    property <bool> is-open: false;
+
+    width: 220px;
+    height: 32px;
+    background: #2b2b2b;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: #3f3f3f;
+
+    HorizontalBox {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 8px;
+        alignment: center;
+
+        Text {
+            text: model[current-index];
+            color: #ffffff;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+
+        Rectangle { horizontal-stretch: 1; }
+
+        Text {
+            text: is-open ? "▲" : "▼";
+            color: #aaaaaa;
+            font-size: 8px;
+            vertical-alignment: center;
+        }
+    }
+
+    TouchArea {
+        clicked => {
+            is-open = !is-open;
+        }
+    }
+
+    // Popup list container
+    if is-open : Rectangle {
+        y: 36px;
+        width: parent.width;
+        height: model.length * 30px + 10px;
+        background: #2b2b2b;
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: #3f3f3f;
+        z: 100; // Draw on top of everything!
+
+        VerticalBox {
+            padding: 4px;
+            spacing: 2px;
+            for item[idx] in model : Rectangle {
+                height: 26px;
+                background: current-index == idx ? #60a5fa : (item-ta.has-hover ? #353535 : transparent);
+                border-radius: 4px;
+                
+                HorizontalBox {
+                    padding-left: 8px;
+                    alignment: center;
+                    Text {
+                        text: item;
+                        color: current-index == idx ? #1a1a1a : #ffffff;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                    }
+                }
+
+                item-ta := TouchArea {
+                    clicked => {
+                        current-index = idx;
+                        selected-value = item;
+                        is-open = false;
+                        selected(item);
+                    }
+                }
+            }
+        }
+    }
+}
+
 export component SettingsWindow inherits Window {
     title: "Settings";
-    min-width: 800px;
+    min-width: 950px;
     min-height: 600px;
-    preferred-width: 800px;
+    preferred-width: 950px;
     preferred-height: 600px;
     
     // Properties to bind to Rust
@@ -101,7 +188,7 @@ export component SettingsWindow inherits Window {
     property <color> border-color: is-light ? #EAEAEA : #333333;
 
     // Accent color
-    property <color> accent: #5b8af0;
+    property <color> accent: #60a5fa;
 
     background: root.bg-color;
 
@@ -174,7 +261,7 @@ export component SettingsWindow inherits Window {
                     border-radius: 8px;
                     x: 8px;
                     width: parent.width - 16px;
-                    background: root.current-page == 0 ? #3a3a4a : (ta-general.has-hover ? root.hover-bg : transparent);
+                    background: root.current-page == 0 ? #353535 : (ta-general.has-hover ? root.hover-bg : transparent);
                     animate background { duration: 120ms; }
                     // Left accent bar
                     Rectangle {
@@ -214,7 +301,7 @@ export component SettingsWindow inherits Window {
                     border-radius: 8px;
                     x: 8px;
                     width: parent.width - 16px;
-                    background: root.current-page == 1 ? #3a3a4a : (ta-appearance.has-hover ? root.hover-bg : transparent);
+                    background: root.current-page == 1 ? #353535 : (ta-appearance.has-hover ? root.hover-bg : transparent);
                     animate background { duration: 120ms; }
                     Rectangle {
                         x: 0px;
@@ -253,7 +340,7 @@ export component SettingsWindow inherits Window {
                     border-radius: 8px;
                     x: 8px;
                     width: parent.width - 16px;
-                    background: root.current-page == 2 ? #3a3a4a : (ta-hotkeys.has-hover ? root.hover-bg : transparent);
+                    background: root.current-page == 2 ? #353535 : (ta-hotkeys.has-hover ? root.hover-bg : transparent);
                     animate background { duration: 120ms; }
                     Rectangle {
                         x: 0px;
@@ -292,7 +379,7 @@ export component SettingsWindow inherits Window {
                     border-radius: 8px;
                     x: 8px;
                     width: parent.width - 16px;
-                    background: root.current-page == 3 ? #3a3a4a : (ta-agent.has-hover ? root.hover-bg : transparent);
+                    background: root.current-page == 3 ? #353535 : (ta-agent.has-hover ? root.hover-bg : transparent);
                     animate background { duration: 120ms; }
                     Rectangle {
                         x: 0px;
@@ -331,7 +418,7 @@ export component SettingsWindow inherits Window {
                     border-radius: 8px;
                     x: 8px;
                     width: parent.width - 16px;
-                    background: root.current-page == 4 ? #3a3a4a : (ta-database.has-hover ? root.hover-bg : transparent);
+                    background: root.current-page == 4 ? #353535 : (ta-database.has-hover ? root.hover-bg : transparent);
                     animate background { duration: 120ms; }
                     Rectangle {
                         x: 0px;
@@ -374,7 +461,7 @@ export component SettingsWindow inherits Window {
                     border-radius: 8px;
                     x: 8px;
                     width: parent.width - 16px;
-                    background: root.current-page == 5 ? #3a3a4a : (ta-about.has-hover ? root.hover-bg : transparent);
+                    background: root.current-page == 5 ? #353535 : (ta-about.has-hover ? root.hover-bg : transparent);
                     animate background { duration: 120ms; }
                     Rectangle {
                         x: 0px;
@@ -477,10 +564,13 @@ export component SettingsWindow inherits Window {
                                         Text { text: "Launch OmniSearch when Windows starts"; color: root.text-muted; font-size: 12px; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
-                                    ToggleSwitch {
-                                        checked <=> root.run-on-startup;
-                                        toggled => {
-                                            root.save-settings();
+                                    VerticalBox {
+                                        alignment: center;
+                                        ToggleSwitch {
+                                            checked <=> root.run-on-startup;
+                                            toggled => {
+                                                root.save-settings();
+                                            }
                                         }
                                     }
                                 }
@@ -507,10 +597,13 @@ export component SettingsWindow inherits Window {
                                         Text { text: "Dismiss launcher when it loses keyboard focus"; color: root.text-muted; font-size: 12px; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
-                                    ToggleSwitch {
-                                        checked <=> root.hide-on-lose-focus;
-                                        toggled => {
-                                            root.save-settings();
+                                    VerticalBox {
+                                        alignment: center;
+                                        ToggleSwitch {
+                                            checked <=> root.hide-on-lose-focus;
+                                            toggled => {
+                                                root.save-settings();
+                                            }
                                         }
                                     }
                                 }
@@ -537,10 +630,13 @@ export component SettingsWindow inherits Window {
                                         Text { text: "Temporarily show taskbar when omnisearch is opened, useful for auto-hidden taskbars"; color: root.text-muted; font-size: 12px; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
-                                    ToggleSwitch {
-                                        checked <=> root.show-taskbar;
-                                        toggled => {
-                                            root.save-settings();
+                                    VerticalBox {
+                                        alignment: center;
+                                        ToggleSwitch {
+                                            checked <=> root.show-taskbar;
+                                            toggled => {
+                                                root.save-settings();
+                                            }
                                         }
                                     }
                                 }
@@ -567,28 +663,32 @@ export component SettingsWindow inherits Window {
                                         Text { text: "Monitor/position where the launcher window appears"; color: root.text-muted; font-size: 12px; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
-                                    ComboBox {
-                                        width: 220px;
-                                        height: 32px;
-                                        current-index: root.window-location == "Remember Last Position" ? 0 :
-                                                       root.window-location == "Monitor with Mouse Cursor" ? 1 :
-                                                       root.window-location == "Monitor with Focused Window" ? 2 :
-                                                       root.window-location == "Primary Monitor" ? 3 :
-                                                       root.window-location == "Custom Monitor" ? 4 : 1;
-                                        model: [
-                                            "Remember Last Position",
-                                            "Monitor with Mouse Cursor",
-                                            "Monitor with Focused Window",
-                                            "Primary Monitor",
-                                            "Custom Monitor"
-                                        ];
-                                        selected(val) => {
-                                            root.window-location = val;
-                                            root.save-settings();
+                                    VerticalBox {
+                                        alignment: center;
+                                        CustomDropdown {
+                                            width: 220px;
+                                            current-index: root.window-location == "Remember Last Position" ? 0 :
+                                                           root.window-location == "Monitor with Mouse Cursor" ? 1 :
+                                                           root.window-location == "Monitor with Focused Window" ? 2 :
+                                                           root.window-location == "Primary Monitor" ? 3 :
+                                                           root.window-location == "Custom Monitor" ? 4 : 1;
+                                            model: [
+                                                "Remember Last Position",
+                                                "Monitor with Mouse Cursor",
+                                                "Monitor with Focused Window",
+                                                "Primary Monitor",
+                                                "Custom Monitor"
+                                            ];
+                                            selected(val) => {
+                                                root.window-location = val;
+                                                root.save-settings();
+                                            }
                                         }
                                     }
                                 }
                             }
+
+                            Rectangle { height: 120px; }
                         }
                     }
                     
@@ -987,10 +1087,13 @@ export component SettingsWindow inherits Window {
                                         Text { text: "Execute command line actions automatically without confirmation prompts"; color: root.text-muted; font-size: 12px; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
-                                    ToggleSwitch {
-                                        checked <=> root.agent-always-approve;
-                                        toggled => {
-                                            root.save-settings();
+                                    VerticalBox {
+                                        alignment: center;
+                                        ToggleSwitch {
+                                            checked <=> root.agent-always-approve;
+                                            toggled => {
+                                                root.save-settings();
+                                            }
                                         }
                                     }
                                 }
