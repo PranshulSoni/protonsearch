@@ -3280,6 +3280,13 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 s.app_settings = crate::settings::AppSettings::load();
                 s.theme = theme_from_setting(&s.app_settings.theme_mode);
 
+                // Reload filesystem watcher with new folders list
+                let db_path_watcher = match std::env::var("APPDATA") {
+                    Ok(d) => std::path::PathBuf::from(d).join("opensearch-os").join("file_index.db"),
+                    Err(_) => std::path::PathBuf::from("file_index.db"),
+                };
+                indexer::start_watcher(db_path_watcher);
+
                 // Recreate fonts dynamically
                 unsafe {
                     let _ = windows::Win32::Graphics::Gdi::DeleteObject(s.font_q);
