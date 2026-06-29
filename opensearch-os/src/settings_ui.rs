@@ -25,10 +25,10 @@ fn get_desktop_wallpaper_path() -> Option<String> {
             windows::Win32::UI::WindowsAndMessaging::SPI_GETDESKTOPWALLPAPER,
             buffer.len() as u32,
             Some(buffer.as_mut_ptr() as *mut std::ffi::c_void),
-            windows::Win32::UI::WindowsAndMessaging::SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+            Default::default(),
         )
     };
-    if success.as_bool() {
+    if success.is_ok() {
         let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
         let path_str = String::from_utf16_lossy(&buffer[..len]);
         if !path_str.trim().is_empty() && std::path::Path::new(&path_str).exists() {
