@@ -6,6 +6,10 @@ use std::sync::atomic::Ordering;
 use windows::Win32::Foundation::{GetLastError, HWND, LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
+thread_local! {
+    static SETTINGS_WINDOW: std::cell::RefCell<Option<std::rc::Rc<SettingsWindow>>> = std::cell::RefCell::new(None);
+}
+
 fn find_launcher_hwnd() -> Option<HWND> {
     use windows::core::PCWSTR;
     use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
@@ -60,9 +64,14 @@ pub fn run_settings_window() {
     std::env::set_var("SLINT_STYLE", "fluent-dark");
 
     let ui = match SettingsWindow::new() {
-        Ok(u) => u,
+        Ok(u) => std::rc::Rc::new(u),
         Err(_) => return,
     };
+
+    // Store in thread-local so it is never dropped during the event loop
+    SETTINGS_WINDOW.with(|cell| {
+        *cell.borrow_mut() = Some(std::rc::Rc::clone(&ui));
+    });
 
     // Load current settings
     let settings = AppSettings::load();
@@ -421,8 +430,8 @@ pub fn run_settings_window() {
         let _ = conn.busy_timeout(std::time::Duration::from_millis(300));
 
         loop {
-            // Poll at 1-second intervals — we don't need sub-second UI accuracy here.
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            // Poll at 3-second intervals — we don't need sub-second UI accuracy here.
+            std::thread::sleep(std::time::Duration::from_secs(3));
 
             let ui_weak = ui_weak_status.clone();
             if ui_weak.upgrade().is_none() {
@@ -483,6 +492,11 @@ pub fn run_settings_window() {
     ui.window().show().ok();
     ui.window().set_minimized(false);
     slint::run_event_loop().ok();
+
+    // Clear thread-local reference to allow it to be dropped
+    SETTINGS_WINDOW.with(|cell| {
+        *cell.borrow_mut() = None;
+    });
     drop(ui);
 }
 

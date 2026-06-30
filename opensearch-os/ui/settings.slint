@@ -99,6 +99,7 @@ export component SettingsWindow inherits Window {
     in-out property <string> agent-endpoint;
     in-out property <string> agent-model;
     in-out property <bool> agent-always-approve;
+    in-out property <image> agent-logo: @image-url("../../icons/AgentLogo.png");
 
     // Database settings properties
     in-out property <string> db-last-indexed;
@@ -1393,7 +1394,6 @@ export component SettingsWindow inherits Window {
                                     padding-left: 16px;
                                     padding-right: 16px;
                                     spacing: 16px;
-                                    alignment: center;
                                     
                                     // Avatar/Icon for Agent
                                     Rectangle {
@@ -1406,7 +1406,7 @@ export component SettingsWindow inherits Window {
                                         clip: true;
                                         
                                         Image {
-                                            source: @image-url("../../icons/AgentLogo.png");
+                                            source: root.agent-logo;
                                             width: 24px;
                                             height: 24px;
                                             image-fit: contain;
@@ -1440,21 +1440,26 @@ export component SettingsWindow inherits Window {
                                         border-radius: 12px;
                                         border-width: 1px;
                                         border-color: root.accent;
-                                        height: 24px;
-                                        padding-left: 10px;
-                                        padding-right: 10px;
                                         
                                         animate background { duration: 150ms; easing: ease-in-out; }
                                         
-                                        Text {
-                                            text: "Message ➜";
-                                            font-size: 11px;
-                                            font-weight: 700;
-                                            color: agent-card-ta.has-hover ? #1e1e1e : root.accent;
-                                            vertical-alignment: center;
-                                            horizontal-alignment: center;
+                                        HorizontalLayout {
+                                            padding-left: 12px;
+                                            padding-right: 12px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+                                            alignment: center;
                                             
-                                            animate color { duration: 150ms; easing: ease-in-out; }
+                                            Text {
+                                                text: "Message ➜";
+                                                font-size: 11px;
+                                                font-weight: 700;
+                                                color: agent-card-ta.has-hover ? #1e1e1e : root.accent;
+                                                vertical-alignment: center;
+                                                horizontal-alignment: center;
+                                                
+                                                animate color { duration: 150ms; easing: ease-in-out; }
+                                            }
                                         }
                                     }
                                 }
