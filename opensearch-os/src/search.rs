@@ -2,12 +2,10 @@ use anyhow::{bail, Result};
 use rusqlite::{params, Connection};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokenizers::Tokenizer;
 
 pub static DISABLE_LIVE_RESULTS: AtomicBool = AtomicBool::new(false);
 
 const CATALOG: &[u8] = include_bytes!("../../assets/catalog.bin");
-const TOKENIZER: &[u8] = include_bytes!("../../assets/model/tokenizer.json");
 
 pub fn ensure_memory_events_schema(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
@@ -366,7 +364,6 @@ pub struct SearchEngine {
     meta_index: Vec<CatalogEntryIndex>,
     n: usize,
     dim: usize,
-    tokenizer: Tokenizer,
     anchor_categories: Vec<AnchorCategory>,
     apps: Vec<AppInfo>,
     recent_files: Vec<RecentFileInfo>,
@@ -410,9 +407,6 @@ impl SearchEngine {
                 synonyms: m.synonyms,
             });
         }
-
-        let tokenizer =
-            Tokenizer::from_bytes(TOKENIZER).map_err(|e| anyhow::anyhow!("tokenizer: {e}"))?;
 
         let mut anchor_categories = vec![
             AnchorCategory {
@@ -617,7 +611,6 @@ impl SearchEngine {
             meta_index,
             n,
             dim,
-            tokenizer,
             anchor_categories,
             apps: vec![],
             recent_files: vec![],
