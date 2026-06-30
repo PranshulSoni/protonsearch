@@ -146,7 +146,7 @@ struct SearchRequest {
 }
 // ── Animation ─────────────────────────────────────────────────────────────────
 // const ANIM_TICK_MS: u32 = 1;
-const ANIM_DURATION_SEC: f32 = 0.100; // 100ms
+const ANIM_DURATION_SEC: f32 = 0.150; // 150ms
                                       // const MAX_ALPHA: u8 = 255;
 
 // ── Genie Morph Dimensions ────────────────────────────────────────────────────
@@ -3590,7 +3590,7 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
     }
 
     let _ = InvalidateRect(hwnd, None, FALSE);
-    let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 16, None);
+    let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 8, None);
 }
 
 // AttachThreadInput trick: allows SetForegroundWindow to succeed even from background context.
@@ -5231,7 +5231,7 @@ unsafe fn sync_height_animation(hwnd: HWND, s: &mut State) {
         s.height_anim_from = s.shown_h.max(s.search_h());
         s.target_h = target;
         s.height_anim_started = std::time::Instant::now();
-        let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 16, None);
+        let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 8, None);
         let _ = InvalidateRect(hwnd, None, FALSE);
     } else if s.shown_h == 0 {
         s.shown_h = target;
@@ -5404,7 +5404,7 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
     // Drive the window grow at 60fps (16ms). This used to be 80ms, which capped the
     // grow at ~12fps and made navigation feel choppy. The WM_TIMER handler drops back
     // to a gentle 80ms once the grow finishes and only the loading spinner remains.
-    let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 16, None);
+    let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 8, None);
     let req = SearchRequest {
         query: s.query.clone(),
         query_id: s.current_query_id,
@@ -5424,7 +5424,7 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
 }
 
 fn ease_out(t: f32) -> f32 {
-    1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(4)
+    1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(2)
 }
 // fn ease_in(t: f32) -> f32 { t.clamp(0.0, 1.0).powi(4) }
 
