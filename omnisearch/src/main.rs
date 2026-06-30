@@ -106,7 +106,7 @@ unsafe fn setup_tray_icon(
     nid.uCallbackMessage = WM_TRAYICON;
     let hicon = unsafe {
         load_png_to_hicon(
-            include_bytes!("../../icons/OmniSearchTrans_small.png"),
+            include_bytes!("../../icons/OmniSearchTrans.png"),
             16,
         )
     };
@@ -987,13 +987,13 @@ unsafe fn run(first_settings_run: bool) {
 
     let icon_main = unsafe {
         load_png_to_hicon(
-            include_bytes!("../../icons/OmniSearchTrans_small.png"),
+            include_bytes!("../../icons/OmniSearchTrans.png"),
             32,
         )
     };
     let icon_main_sm = unsafe {
         load_png_to_hicon(
-            include_bytes!("../../icons/OmniSearchTrans_small.png"),
+            include_bytes!("../../icons/OmniSearchTrans.png"),
             16,
         )
     };

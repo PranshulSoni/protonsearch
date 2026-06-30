@@ -477,6 +477,19 @@ fn save_indexer_state_to_db(db_path: &Path, key: &str, value: &str) {
     }
 }
 
+pub fn run_indexer_folders_force(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<()> {
+    if let Ok(mut g) = INDEXING_PROGRESS.lock() {
+        *g = "Forced indexing of added folder...".to_string();
+        save_indexer_state_to_db(db_path, "progress", &g);
+    }
+    let res = run_indexer_folders_inner(db_path, folders);
+    if let Ok(mut g) = INDEXING_PROGRESS.lock() {
+        *g = "Idle".to_string();
+        save_indexer_state_to_db(db_path, "progress", &g);
+    }
+    res
+}
+
 pub fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<()> {
     if IS_INDEXING.swap(true, Ordering::SeqCst) {
         log_indexer("Indexer already running, skipping overlapping run.");

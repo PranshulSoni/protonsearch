@@ -23,9 +23,9 @@ fn find_launcher_hwnd() -> Option<HWND> {
 }
 
 fn get_desktop_wallpaper_path() -> Option<String> {
-    // 1. Try LocalAppData themes transcoded wallpaper (most reliable on Win10/11 for active slideshows/custom wallpapers)
-    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-        let transcoded = std::path::Path::new(&local_app_data)
+    // 1. Try Roaming AppData themes transcoded wallpaper (most reliable on Win10/11 for active slideshows/custom wallpapers)
+    if let Ok(app_data) = std::env::var("APPDATA") {
+        let transcoded = std::path::Path::new(&app_data)
             .join("Microsoft")
             .join("Windows")
             .join("Themes")
@@ -358,7 +358,7 @@ pub fn run_settings_window() {
                         let db_path = std::path::PathBuf::from(appdata)
                             .join("omnisearch")
                             .join("file_index.db");
-                        let _ = crate::indexer::run_indexer_folders(&db_path, vec![std::path::PathBuf::from(path_str_clone)]);
+                        let _ = crate::indexer::run_indexer_folders_force(&db_path, vec![std::path::PathBuf::from(path_str_clone)]);
                     });
                     let folders_vec: Vec<slint::SharedString> = s
                         .scan_folders
