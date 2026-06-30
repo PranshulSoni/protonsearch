@@ -74,7 +74,8 @@ pub fn run_settings_window() {
     ui.set_window_location(SharedString::from(settings.window_location.clone()));
     ui.set_theme_mode(SharedString::from(settings.normalized_theme_mode()));
     ui.set_global_hotkey(SharedString::from(settings.global_hotkey.clone()));
-    ui.set_hotkey_error(SharedString::from(""));
+    ui.set_hotkey_available(true);
+    ui.set_hotkey_error(SharedString::from("Current hotkey is active."));
 
     // Populate the four hotkey dropdowns and pre-select the saved combo.
     let (slot1_model, slot2_model, slot34_model) = crate::hotkey::slot_models();
@@ -207,6 +208,7 @@ pub fn run_settings_window() {
             if let Err(message) =
                 crate::hotkey::validate_hotkey_unique(&next_hotkey, &s.global_hotkey, None)
             {
+                ui.set_hotkey_available(false);
                 ui.set_hotkey_error(SharedString::from(message));
                 ui.set_global_hotkey(SharedString::from(s.global_hotkey.clone()));
                 return;
@@ -226,7 +228,8 @@ pub fn run_settings_window() {
             s.result_subtitle_font_size = ui.get_result_subtitle_font_size() as u32;
             s.show_placeholder = ui.get_show_placeholder();
             s.save();
-            ui.set_hotkey_error(SharedString::from(""));
+            ui.set_hotkey_available(true);
+            ui.set_hotkey_error(SharedString::from("Hotkey available and saved."));
 
             let run_on_startup = s.run_on_startup;
             let api_key = ui.get_agent_api_key().to_string();
@@ -269,10 +272,12 @@ pub fn run_settings_window() {
         match crate::hotkey::assemble_hotkey(&[&s1, &s2, &s3, &s4], &current, None) {
             Ok(combo) => {
                 if combo == current {
-                    ui.set_hotkey_error(SharedString::from(""));
+                    ui.set_hotkey_available(true);
+                    ui.set_hotkey_error(SharedString::from("Current hotkey is active."));
                     return;
                 }
-                ui.set_hotkey_error(SharedString::from(""));
+                ui.set_hotkey_available(true);
+                ui.set_hotkey_error(SharedString::from("Hotkey available and saved."));
                 ui.set_global_hotkey(SharedString::from(combo.clone()));
                 let mut s = AppSettings::load();
                 s.global_hotkey = combo;
@@ -289,6 +294,7 @@ pub fn run_settings_window() {
                 }
             }
             Err(message) => {
+                ui.set_hotkey_available(false);
                 ui.set_hotkey_error(SharedString::from(message));
             }
         }

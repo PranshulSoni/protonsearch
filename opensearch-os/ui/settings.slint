@@ -60,6 +60,7 @@ export component SettingsWindow inherits Window {
     in-out property <string> theme-mode;
     in-out property <string> global-hotkey;
     in-out property <string> hotkey-error;
+    in-out property <bool> hotkey-available: true;
     
     in-out property <int> window-width;
     in-out property <int> item-height;
@@ -1318,19 +1319,19 @@ export component SettingsWindow inherits Window {
 
                         Rectangle { height: 6px; }
 
-                        // Error banner — only shown when there's an error
+                        // Availability banner — validates against real Win32 global hotkey registration.
                         if root.hotkey-error != "": Rectangle {
                             height: 42px;
                             border-radius: 8px;
-                            background: #3a1d1d;
-                            border-color: #7f1d1d;
+                            background: root.hotkey-available ? #12351f : #3a1d1d;
+                            border-color: root.hotkey-available ? #1f7a3a : #7f1d1d;
                             border-width: 1px;
                             HorizontalLayout {
                                 padding-left: 16px;
                                 padding-right: 16px;
                                 Text {
                                     text: root.hotkey-error;
-                                    color: #fecaca;
+                                    color: root.hotkey-available ? #bbf7d0 : #fecaca;
                                     font-size: 13px;
                                     vertical-alignment: center;
                                 }
