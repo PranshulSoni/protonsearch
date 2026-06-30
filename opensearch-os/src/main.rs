@@ -1771,7 +1771,11 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 TIMER_CURSOR_BLINK => {
                     if text_caret_active(s) {
                         s.cursor_visible = !s.cursor_visible;
-                        let _ = InvalidateRect(hwnd, None, FALSE);
+                        if search_input_caret_active(s) {
+                            invalidate_search_row(hwnd, s);
+                        } else {
+                            let _ = InvalidateRect(hwnd, None, FALSE);
+                        }
                     } else {
                         s.cursor_visible = false;
                         let _ = KillTimer(hwnd, TIMER_CURSOR_BLINK);
@@ -1789,7 +1793,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
 
                 TIMER_SEARCH_ANIM => {
                     s.search_anim_tick = (s.search_anim_tick + 1) % 8;
-                    let _ = InvalidateRect(hwnd, None, FALSE);
+                    invalidate_search_row(hwnd, s);
                 }
                 _ => {}
             }
@@ -1850,10 +1854,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     s.cursor_pos += c.len_utf8();
                     s.selected = 0;
                     s.scroll_offset = 0;
-                    s.results.clear();
                     kick_debounce(hwnd, s);
                     reset_cursor_blink(hwnd, s);
-                    let _ = InvalidateRect(hwnd, None, FALSE);
+                    invalidate_search_row(hwnd, s);
                 }
             }
             LRESULT(0)
@@ -2431,7 +2434,11 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     s.scroll_offset = 0;
                     kick_debounce(hwnd, s);
                     reset_cursor_blink(hwnd, s);
-                    let _ = InvalidateRect(hwnd, None, FALSE);
+                    if s.query.is_empty() {
+                        let _ = InvalidateRect(hwnd, None, FALSE);
+                    } else {
+                        invalidate_search_row(hwnd, s);
+                    }
                 }
                 VK_TAB => {
                     let is_clip_view =
@@ -2531,7 +2538,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         s.scroll_offset = 0;
                         kick_debounce(hwnd, s);
                         reset_cursor_blink(hwnd, s);
-                        let _ = InvalidateRect(hwnd, None, FALSE);
+                        invalidate_search_row(hwnd, s);
                     }
                 }
                 VK_RETURN => {
@@ -5155,6 +5162,36 @@ unsafe fn kick_debounce(hwnd: HWND, s: &mut State) {
     s.results_stale = true;
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
     let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 20, None);
+}
+
+fn search_row_invalidation_rect(client_w: i32, cy: i32, win_h: i32, search_h: i32) -> RECT {
+    let x = (client_w - WIN_W) / 2;
+    let y = cy - win_h / 2;
+    RECT {
+        left: x,
+        top: y,
+        right: x + WIN_W,
+        bottom: y + search_h + 2,
+    }
+}
+
+unsafe fn invalidate_search_row(hwnd: HWND, s: &State) {
+    if s.anim != Anim::Visible {
+        let _ = InvalidateRect(hwnd, None, FALSE);
+        return;
+    }
+    let mut client = RECT::default();
+    if GetClientRect(hwnd, &mut client).is_ok() {
+        let rect = search_row_invalidation_rect(
+            client.right - client.left,
+            s.cy,
+            s.win_h(),
+            s.search_h(),
+        );
+        let _ = InvalidateRect(hwnd, Some(&rect), FALSE);
+    } else {
+        let _ = InvalidateRect(hwnd, None, FALSE);
+    }
 }
 
 unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
@@ -10064,6 +10101,12 @@ mod tests {
     fn row_geometry_centers_icons_and_text() {
         assert_eq!(centered_in_result_row(100, RESULT_ICON_SIZE, 68), 118);
         assert_eq!(centered_in_result_row(100, RESULT_TEXT_BLOCK_H, 68), 114);
+    }
+
+    #[test]
+    fn search_row_invalidation_only_covers_search_header() {
+        let rect = search_row_invalidation_rect(900, 300, 500, 60);
+        assert_eq!((rect.left, rect.top, rect.right, rect.bottom), (30, 50, 870, 112));
     }
 
     #[test]
