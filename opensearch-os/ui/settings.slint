@@ -36,12 +36,21 @@ export component ToggleSwitch inherits Rectangle {
 
 
 
+struct SlintAgent {
+    id: int,
+    name: string,
+    goal: string,
+}
+
 export component SettingsWindow inherits Window {
     title: "OmniSearch Settings";
     min-width: 950px;
     min-height: 600px;
     preferred-width: 950px;
     preferred-height: 600px;
+
+    in-out property <[SlintAgent]> available-agents;
+    callback launch-agent(int);
     
     // Properties to bind to Rust
     in-out property <bool> run-on-startup;
@@ -344,7 +353,7 @@ export component SettingsWindow inherits Window {
                             width: 18px;
                         }
                         Text {
-                            text: "Agent";
+                            text: "Agents";
                             font-size: 14px;
                             font-weight: root.current-page == 3 ? 600 : 400;
                             color: root.current-page == 3 ? root.text-primary : root.text-secondary;
@@ -1351,10 +1360,85 @@ export component SettingsWindow inherits Window {
                         VerticalBox {
                             spacing: 4px;
                             Text {
-                                text: "Agent";
+                                text: "Agents";
                                 font-size: 30px;
                                 font-weight: 700;
                                 color: root.text-primary;
+                            }
+                        }
+
+                        // Section: Available Agents
+                        VerticalBox {
+                            spacing: 12px;
+                            Text {
+                                text: "AVAILABLE AGENTS";
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: root.text-muted;
+                                letter-spacing: 1px;
+                            }
+                            
+                            for agent in root.available-agents : Rectangle {
+                                height: 60px;
+                                background: agent-card-ta.has-hover ? root.hover-bg : root.card-bg;
+                                border-radius: 8px;
+                                border-color: root.border-color;
+                                border-width: 1px;
+                                
+                                HorizontalBox {
+                                    padding-left: 16px;
+                                    padding-right: 16px;
+                                    spacing: 16px;
+                                    alignment: center;
+                                    
+                                    // Avatar/Icon for Agent
+                                    Rectangle {
+                                        width: 36px;
+                                        height: 36px;
+                                        border-radius: 18px;
+                                        background: #2b3a42;
+                                        Text {
+                                            text: "🤖";
+                                            font-size: 16px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    
+                                    // Name and Goal
+                                    VerticalBox {
+                                        alignment: center;
+                                        spacing: 2px;
+                                        Text {
+                                            text: "@" + agent.name;
+                                            color: root.text-primary;
+                                            font-size: 14px;
+                                            font-weight: 700;
+                                        }
+                                        Text {
+                                            text: agent.goal;
+                                            color: root.text-muted;
+                                            font-size: 12px;
+                                        }
+                                    }
+                                    
+                                    Rectangle { horizontal-stretch: 1; }
+                                    
+                                    // Enter / Action badge
+                                    Text {
+                                        text: "Message ➜";
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: root.accent;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                
+                                agent-card-ta := TouchArea {
+                                    clicked => {
+                                        root.launch-agent(agent.id);
+                                    }
+                                }
                             }
                         }
 
