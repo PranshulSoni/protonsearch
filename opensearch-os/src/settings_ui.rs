@@ -165,11 +165,9 @@ pub fn run_settings_window() {
             s.window_location = ui.get_window_location().to_string();
             s.theme_mode = ui.get_theme_mode().to_string();
             let next_hotkey = ui.get_global_hotkey().to_string();
-            if let Err(message) = crate::hotkey::validate_hotkey_unique(
-                &next_hotkey,
-                &s.global_hotkey,
-                None,
-            ) {
+            if let Err(message) =
+                crate::hotkey::validate_hotkey_unique(&next_hotkey, &s.global_hotkey, None)
+            {
                 ui.set_hotkey_error(SharedString::from(message));
                 ui.set_global_hotkey(SharedString::from(s.global_hotkey.clone()));
                 return;
@@ -456,7 +454,6 @@ fn log_settings_ui(msg: &str) {
         let _ = writeln!(file, "{}", msg);
     }
 }
-
 
 fn get_db_conn() -> Option<rusqlite::Connection> {
     let appdata = match std::env::var("APPDATA") {

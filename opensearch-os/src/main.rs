@@ -2,6 +2,7 @@
 #![windows_subsystem = "windows"]
 
 mod ai;
+mod applog;
 mod browser_indexer;
 mod git_indexer;
 mod indexer;
@@ -12,7 +13,6 @@ mod search;
 mod settings;
 mod settings_startup;
 mod settings_ui;
-mod applog;
 mod uninstall;
 
 use search::{SearchEngine, SearchResult};
@@ -238,7 +238,7 @@ impl Theme {
                 clr_bdgbg: COLORREF(0x00_52_42_3B),
                 clr_bdgtx: COLORREF(0x00_F0_E9_E5),
                 clr_accent: COLORREF(0x00_AB_91_83),
-                bg_footer: COLORREF(0x00_33_29_24),    // nord darker footer shade (#242933)
+                bg_footer: COLORREF(0x00_33_29_24), // nord darker footer shade (#242933)
                 scrollbar_track: COLORREF(0x00_2D_26_22), // original Nord scrollbar track (#22262d)
                 scrollbar_thumb: COLORREF(0x00_70_62_58), // original Nord scrollbar thumb (#586270)
             },
@@ -352,7 +352,7 @@ struct State {
     // Explain Results: launch_command -> "why it surfaced" tag (e.g. "2h ago"),
     // computed when results arrive so paint does no file I/O.
     result_reasons: std::collections::HashMap<String, String>,
-    form_state: FormState,    // Phase 2 Quicklinks & Snippets creation form state
+    form_state: FormState, // Phase 2 Quicklinks & Snippets creation form state
     color_picker_active: bool,
     color_picker_mx: i32,
     color_picker_my: i32,
@@ -448,10 +448,10 @@ impl State {
             return self.search_h() + 24;
         }
         if self.query.is_empty() {
-            return self.search_h() + 37 + 8 * self.item_h() + 8;
+            return homepage_win_h(self.search_h(), self.item_h());
         }
-        let n = self.results.len().min(VISIBLE_RESULTS) as i32;
         if self.has_prefix() {
+            let n = self.results.len().min(VISIBLE_RESULTS) as i32;
             let mut headers_count = 0;
             for idx in 0..(n as usize) {
                 let res_idx = self.scroll_offset + idx;
@@ -467,14 +467,14 @@ impl State {
             }
             self.search_h() + 1 + n * self.item_h() + headers_count * 24 + 8
         } else {
-            let offset = 81;
-            let footer = 8;
-            self.search_h() + offset + n * self.item_h() + footer
+            normal_search_win_h(self.search_h(), self.item_h())
         }
     }
+    fn launcher_top_y(&self) -> i32 {
+        launcher_top_y(self.cy, self.search_h(), self.item_h())
+    }
     fn result_row_y(&self, i: usize) -> i32 {
-        let end_h = self.win_h();
-        let end_y = self.cy - end_h / 2;
+        let end_y = self.launcher_top_y();
         let mut cur_y = end_y + self.search_h() + 1;
 
         if self.query.is_empty() {
@@ -777,10 +777,14 @@ unsafe fn run() {
             }
         }
         if h.0.is_null() {
-            h = unsafe { get_file_icon("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe") };
+            h = unsafe {
+                get_file_icon("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
+            };
         }
         if h.0.is_null() {
-            h = unsafe { get_file_icon("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe") };
+            h = unsafe {
+                get_file_icon("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe")
+            };
         }
         h
     };
@@ -806,7 +810,9 @@ unsafe fn run() {
             }
         }
         if h.0.is_null() {
-            h = unsafe { get_file_icon("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe") };
+            h = unsafe {
+                get_file_icon("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe")
+            };
         }
         h
     };
@@ -819,10 +825,18 @@ unsafe fn run() {
             }
         }
         if h.0.is_null() {
-            h = unsafe { get_file_icon("C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe") };
+            h = unsafe {
+                get_file_icon(
+                    "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+                )
+            };
         }
         if h.0.is_null() {
-            h = unsafe { get_file_icon("C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe") };
+            h = unsafe {
+                get_file_icon(
+                    "C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+                )
+            };
         }
         h
     };
@@ -1208,7 +1222,6 @@ unsafe fn run() {
             settings.global_hotkey
         ));
     }
-
 
     let mut msg = MSG::default();
     while GetMessageW(&mut msg, HWND(null_mut()), 0, 0).as_bool() {
@@ -1661,6 +1674,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 if s.query.is_empty() {
                     // Discard search results if user cleared the query
                 } else if query_id == s.current_query_id {
+                    if !is_final && results.is_empty() {
+                        return LRESULT(0);
+                    }
                     s.results_stale = false;
                     if is_final {
                         s.search_loading = false;
@@ -1695,8 +1711,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         s.app_icons.retain(|k, _| !k.starts_with("window:"));
                     }
                     trigger_icon_loading(hwnd, s);
-                    let _ = InvalidateRect(hwnd, None, FALSE);
-                    let _ = UpdateWindow(hwnd);
+                    invalidate_results_area(hwnd, s);
                 }
             }
             LRESULT(0)
@@ -2736,8 +2751,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let mut pt = POINT::default();
                 let _ = GetCursorPos(&mut pt);
                 let _ = ScreenToClient(hwnd, &mut pt);
-                let win_h = s.win_h();
-                let y_start = s.cy - win_h / 2;
+                let y_start = s.launcher_top_y();
                 let list_y = y_start + SEARCH_H + 1;
                 if pt.y >= list_y + 8 && pt.y < list_y + 40 {
                     let delta = (wp.0 >> 16) as i16;
@@ -2788,7 +2802,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 // Recover the content_bottom/footer geometry the same way the footer
                 // painter does, so the button rects line up exactly.
                 let win_h = s.win_h();
-                let y_start = s.cy - win_h / 2;
+                let y_start = s.launcher_top_y();
                 let footer_h = if s.hermes_approval.is_some() {
                     76
                 } else if s.ai_pending {
@@ -2839,8 +2853,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             if s.ai_answer.is_some() {
                 let my = ((lp.0 >> 16) & 0xFFFF) as i16 as i32;
                 let mx = (lp.0 & 0xFFFF) as i16 as i32;
-                let win_h = s.win_h();
-                let y_start = s.cy - win_h / 2;
+                let y_start = s.launcher_top_y();
                 let mut rc_client = RECT::default();
                 let _ = GetClientRect(hwnd, &mut rc_client);
                 let win_w = rc_client.right - rc_client.left;
@@ -2899,7 +2912,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let _ = GetClientRect(hwnd, &mut rc_client);
             let win_w = rc_client.right - rc_client.left;
             let _bx = (win_w - WIN_W) / 2;
-            let by = s.cy - s.win_h() / 2;
+            let by = s.launcher_top_y();
 
             if my >= by && my < by + SEARCH_H {
                 s.search_input_active = true;
@@ -2958,9 +2971,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
 
 
             if s.submenu_active && mx >= x_start + (WIN_W - 240) {
-                let end_h = s.win_h();
-                let end_y = s.cy - end_h / 2;
-                let start_y = end_y + SEARCH_H + 16;
+                let start_y = s.launcher_top_y() + SEARCH_H + 16;
                 let action_h = 44;
                 for idx in 0..3 {
                     let ay = start_y + idx as i32 * (action_h + 8);
@@ -3030,7 +3041,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 let _ = GetClientRect(hwnd, &mut rc_client);
                 let win_w = rc_client.right - rc_client.left;
                 let x_start = (win_w - WIN_W) / 2;
-                let by = s.cy - s.win_h() / 2;
+                let by = s.launcher_top_y();
 
                 if !s.query.is_empty() && !s.has_prefix() {
                     let list_y = by + SEARCH_H + 1;
@@ -3681,8 +3692,6 @@ unsafe fn reset_launcher_window_position(hwnd: HWND, s: &mut State) {
     s.cy = work_h / 2;
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
-
-
 
 unsafe fn start_hide(hwnd: HWND, s: &mut State) {
     // Destroy the in-app note editor so it doesn't ghost over the launcher
@@ -5164,15 +5173,44 @@ unsafe fn kick_debounce(hwnd: HWND, s: &mut State) {
     let _ = SetTimer(hwnd, TIMER_DEBOUNCE, 20, None);
 }
 
-fn search_row_invalidation_rect(client_w: i32, cy: i32, win_h: i32, search_h: i32) -> RECT {
+fn search_row_invalidation_rect(client_w: i32, cy: i32, search_h: i32, item_h: i32) -> RECT {
     let x = (client_w - WIN_W) / 2;
-    let y = cy - win_h / 2;
+    let y = launcher_top_y(cy, search_h, item_h);
     RECT {
         left: x,
         top: y,
         right: x + WIN_W,
         bottom: y + search_h + 2,
     }
+}
+
+fn results_invalidation_rect(
+    client_w: i32,
+    cy: i32,
+    win_h: i32,
+    search_h: i32,
+    item_h: i32,
+) -> RECT {
+    let x = (client_w - WIN_W) / 2;
+    let y = launcher_top_y(cy, search_h, item_h);
+    RECT {
+        left: x,
+        top: y + search_h + 1,
+        right: x + WIN_W,
+        bottom: y + win_h,
+    }
+}
+
+fn homepage_win_h(search_h: i32, item_h: i32) -> i32 {
+    search_h + 37 + 8 * item_h + 8
+}
+
+fn launcher_top_y(cy: i32, search_h: i32, item_h: i32) -> i32 {
+    cy - homepage_win_h(search_h, item_h) / 2
+}
+
+fn normal_search_win_h(search_h: i32, item_h: i32) -> i32 {
+    search_h + 81 + VISIBLE_RESULTS as i32 * item_h + 8
 }
 
 unsafe fn invalidate_search_row(hwnd: HWND, s: &State) {
@@ -5185,8 +5223,28 @@ unsafe fn invalidate_search_row(hwnd: HWND, s: &State) {
         let rect = search_row_invalidation_rect(
             client.right - client.left,
             s.cy,
+            s.search_h(),
+            s.item_h(),
+        );
+        let _ = InvalidateRect(hwnd, Some(&rect), FALSE);
+    } else {
+        let _ = InvalidateRect(hwnd, None, FALSE);
+    }
+}
+
+unsafe fn invalidate_results_area(hwnd: HWND, s: &State) {
+    if s.anim != Anim::Visible {
+        let _ = InvalidateRect(hwnd, None, FALSE);
+        return;
+    }
+    let mut client = RECT::default();
+    if GetClientRect(hwnd, &mut client).is_ok() {
+        let rect = results_invalidation_rect(
+            client.right - client.left,
+            s.cy,
             s.win_h(),
             s.search_h(),
+            s.item_h(),
         );
         let _ = InvalidateRect(hwnd, Some(&rect), FALSE);
     } else {
@@ -5912,10 +5970,14 @@ unsafe fn resolve_lnk(path: &str) -> Option<String> {
 fn get_registered_app_path(exe_name: &str) -> Option<String> {
     use windows::core::PCWSTR;
     use windows::Win32::System::Registry::{
-        RegOpenKeyExW, RegQueryValueExW, RegCloseKey, HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER, KEY_READ, REG_SZ
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE,
+        KEY_READ, REG_SZ,
     };
 
-    let subkey_str = format!("Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\{}\0", exe_name);
+    let subkey_str = format!(
+        "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\{}\0",
+        exe_name
+    );
     let subkey_wide: Vec<u16> = subkey_str.encode_utf16().collect();
 
     for root in &[HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
@@ -5932,7 +5994,9 @@ fn get_registered_app_path(exe_name: &str) -> Option<String> {
                     Some(&mut val_type),
                     Some(buf.as_mut_ptr() as *mut u8),
                     Some(&mut buf_size),
-                ).is_ok() {
+                )
+                .is_ok()
+                {
                     let _ = RegCloseKey(hkey);
                     if val_type == REG_SZ {
                         let len = (buf_size / 2) as usize;
@@ -6252,7 +6316,7 @@ unsafe fn draw_spinner(hdc: HDC, x: i32, y: i32, size: i32, tick: usize, color: 
         let angle = (i as f32) * 2.0 * std::f32::consts::PI / 8.0;
         let dx = (angle.cos() * r as f32) as i32;
         let dy = (angle.sin() * r as f32) as i32;
-        
+
         let diff = (i + 8 - tick) % 8;
         let dot_color = if diff == 0 {
             color
@@ -6262,7 +6326,7 @@ unsafe fn draw_spinner(hdc: HDC, x: i32, y: i32, size: i32, tick: usize, color: 
             let b_val = (((color.0 >> 16) & 0xFF) * (8 - diff) as u32 / 8) as u8;
             COLORREF(r_val as u32 | ((g_val as u32) << 8) | ((b_val as u32) << 16))
         };
-        
+
         let br = CreateSolidBrush(dot_color);
         let rect = RECT {
             left: center_x + dx - 2,
@@ -6457,7 +6521,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let w = (pill_w as f32 + (end_w - pill_w) as f32 * t) as i32;
     let h = (pill_h as f32 + (end_h - pill_h) as f32 * t) as i32;
     let x = (win_w - w) / 2;
-    let y = s.cy - h / 2;
+    let start_y = s.cy - pill_h / 2;
+    let end_y = s.launcher_top_y();
+    let y = (start_y as f32 + (end_y - start_y) as f32 * t) as i32;
     let r = (pill_r as f32 + (8 - pill_r) as f32 * t) as i32;
 
     // Fill background / Draw Glowing Border around the morphing rounded rect
@@ -6501,7 +6567,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         let spinner_size = 16;
         let spinner_x = x + w - PAD_L - spinner_size - 4;
         let spinner_y = y + (SEARCH_H - spinner_size) / 2;
-        draw_spinner(mdc, spinner_x, spinner_y, spinner_size, s.search_anim_tick, palette.clr_accent);
+        draw_spinner(
+            mdc,
+            spinner_x,
+            spinner_y,
+            spinner_size,
+            s.search_anim_tick,
+            palette.clr_accent,
+        );
 
         SelectObject(mdc, s.font_c);
         SetTextColor(mdc, palette.clr_ph);
@@ -6575,7 +6648,6 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             );
         }
     }
-
 
     // Draw cursor
     if s.cursor_visible && search_input_caret_active(s) {
@@ -7405,7 +7477,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                 );
 
-                let sort_label = if s.sort_asc { "A\u{2013}Z" } else { "Best matches first" };
+                let sort_label = if s.sort_asc {
+                    "A\u{2013}Z"
+                } else {
+                    "Best matches first"
+                };
                 let mut bm_text: Vec<u16> = sort_label.encode_utf16().collect();
                 let mut sz_bm = SIZE::default();
                 let _ = GetTextExtentPoint32W(mdc, &bm_text, &mut sz_bm);
@@ -7597,9 +7673,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     let section_total = s
                         .results
                         .iter()
-                        .filter(|candidate| {
-                            source_section_label_res(candidate) == section
-                        })
+                        .filter(|candidate| source_section_label_res(candidate) == section)
                         .count();
                     let mut label: Vec<u16> = section.encode_utf16().collect();
                     let mut label_rect = RECT {
@@ -8008,63 +8082,67 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     }
                 }
 
-                let icon_to_draw =
-                    s.app_icons
-                        .get(&res.entry.launch_command)
-                        .copied()
-                        .filter(|icon| !icon.0.is_null())
-                        .unwrap_or_else(|| {
-                            if res.entry.launch_command.starts_with("ms-settings:")
-                                || res.entry.launch_command.starts_with("control")
-                                || res.entry.launch_command.contains(".cpl")
-                                || res.entry.launch_command.ends_with(".msc")
-                            {
-                                s.icon_settings
-                            } else {
-                                match res.entry.source.as_str() {
-                                    "app" => s.icon_app,
-                                    "FOLDER" => s.icon_folder,
-                                    "FILE" | "FILE_CONTENT" | "RECENT" | "CODE" | "CODE_CONTENT"
-                                    | "OCR" => s.icon_file,
-                                    "ACTION" | "SYSTEM" | "WINDOW" => s.icon_app,
-                                    "BOOKMARK" | "QUICKLINK" => {
-                                        let desc = res.entry.description.to_lowercase();
-                                        if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
-                                            s.icon_chrome
-                                        } else if desc.contains("firefox") && !s.icon_firefox.0.is_null() {
-                                            s.icon_firefox
-                                        } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
-                                            s.icon_edge
-                                        } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
-                                            s.icon_brave
-                                        } else {
-                                            s.icon_bookmark
-                                        }
+                let icon_to_draw = s
+                    .app_icons
+                    .get(&res.entry.launch_command)
+                    .copied()
+                    .filter(|icon| !icon.0.is_null())
+                    .unwrap_or_else(|| {
+                        if res.entry.launch_command.starts_with("ms-settings:")
+                            || res.entry.launch_command.starts_with("control")
+                            || res.entry.launch_command.contains(".cpl")
+                            || res.entry.launch_command.ends_with(".msc")
+                        {
+                            s.icon_settings
+                        } else {
+                            match res.entry.source.as_str() {
+                                "app" => s.icon_app,
+                                "FOLDER" => s.icon_folder,
+                                "FILE" | "FILE_CONTENT" | "RECENT" | "CODE" | "CODE_CONTENT"
+                                | "OCR" => s.icon_file,
+                                "ACTION" | "SYSTEM" | "WINDOW" => s.icon_app,
+                                "BOOKMARK" | "QUICKLINK" => {
+                                    let desc = res.entry.description.to_lowercase();
+                                    if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
+                                        s.icon_chrome
+                                    } else if desc.contains("firefox")
+                                        && !s.icon_firefox.0.is_null()
+                                    {
+                                        s.icon_firefox
+                                    } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
+                                        s.icon_edge
+                                    } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
+                                        s.icon_brave
+                                    } else {
+                                        s.icon_bookmark
                                     }
-                                    "CLIPBOARD" => s.icon_clipboard,
-                                    "COMMIT" => s.icon_commit,
-                                    "HISTORY" | "web" => {
-                                        let desc = res.entry.description.to_lowercase();
-                                        if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
-                                            s.icon_chrome
-                                        } else if desc.contains("firefox") && !s.icon_firefox.0.is_null() {
-                                            s.icon_firefox
-                                        } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
-                                            s.icon_edge
-                                        } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
-                                            s.icon_brave
-                                        } else {
-                                            s.icon_web
-                                        }
-                                    }
-                                    "MEMORY" | "AI" => s.icon_app,
-                                    "PDF" => s.icon_file,
-                                    "Settings" | "SETTINGS" => s.icon_settings,
-                                    "SNIPPET" | "TODO" => s.icon_file,
-                                    _ => s.icon_app,
                                 }
+                                "CLIPBOARD" => s.icon_clipboard,
+                                "COMMIT" => s.icon_commit,
+                                "HISTORY" | "web" => {
+                                    let desc = res.entry.description.to_lowercase();
+                                    if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
+                                        s.icon_chrome
+                                    } else if desc.contains("firefox")
+                                        && !s.icon_firefox.0.is_null()
+                                    {
+                                        s.icon_firefox
+                                    } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
+                                        s.icon_edge
+                                    } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
+                                        s.icon_brave
+                                    } else {
+                                        s.icon_web
+                                    }
+                                }
+                                "MEMORY" | "AI" => s.icon_app,
+                                "PDF" => s.icon_file,
+                                "Settings" | "SETTINGS" => s.icon_settings,
+                                "SNIPPET" | "TODO" => s.icon_file,
+                                _ => s.icon_app,
                             }
-                        });
+                        }
+                    });
 
                 if !drew_thumbnail && !icon_to_draw.0.is_null() {
                     let icon_y = centered_in_result_row(
@@ -8508,8 +8586,19 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
 
 fn clean_query_prefix(query: &str) -> &str {
     let prefixes = [
-        "bookmarks:", "history:", "commits:", "todos:", "clip:", "clipboard:",
-        "file:", "folder:", "code:", "img:", "image:", "screenshots:", "agentchats:"
+        "bookmarks:",
+        "history:",
+        "commits:",
+        "todos:",
+        "clip:",
+        "clipboard:",
+        "file:",
+        "folder:",
+        "code:",
+        "img:",
+        "image:",
+        "screenshots:",
+        "agentchats:",
     ];
     let q_lower = query.to_lowercase();
     for p in &prefixes {
@@ -8537,8 +8626,19 @@ fn filter_type_from_prefix(query: &str) -> FilterType {
 
 fn update_query_for_filter(query: &str, ftype: FilterType) -> String {
     let prefixes = [
-        "bookmarks:", "history:", "commits:", "todos:", "clip:", "clipboard:",
-        "file:", "folder:", "code:", "img:", "image:", "screenshots:", "agentchats:"
+        "bookmarks:",
+        "history:",
+        "commits:",
+        "todos:",
+        "clip:",
+        "clipboard:",
+        "file:",
+        "folder:",
+        "code:",
+        "img:",
+        "image:",
+        "screenshots:",
+        "agentchats:",
     ];
     let mut clean_query = query.to_string();
     let q_lower = query.to_lowercase();
@@ -8577,28 +8677,27 @@ fn filter_index(ftype: FilterType) -> usize {
 fn apply_sort(results: &mut Vec<SearchResult>, sort_asc: bool) {
     if sort_asc {
         results.sort_by(|a, b| {
-            a.entry.control_name.to_lowercase().cmp(&b.entry.control_name.to_lowercase())
+            a.entry
+                .control_name
+                .to_lowercase()
+                .cmp(&b.entry.control_name.to_lowercase())
         });
     } else {
         results.sort_by(|a, b| {
-            b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
     }
 }
 
 fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
-
     let src = r.entry.source.as_str();
     let cmd = r.entry.launch_command.as_str();
     match ftype {
         FilterType::All => true,
-        FilterType::Files => {
-            src == "FILE"
-                || src == "RECENT"
-        }
-        FilterType::Folders => {
-            src == "FOLDER"
-        }
+        FilterType::Files => src == "FILE" || src == "RECENT",
+        FilterType::Folders => src == "FOLDER",
         FilterType::Content => {
             src == "CONTENT"
                 || src == "FILE_CONTENT"
@@ -10025,17 +10124,26 @@ mod tests {
             if let Some(p) = &chrome {
                 let h1 = get_app_icon(p);
                 let h2 = get_file_icon(p);
-                println!("Chrome HICON: get_app_icon={:?}, get_file_icon={:?}", h1.0, h2.0);
+                println!(
+                    "Chrome HICON: get_app_icon={:?}, get_file_icon={:?}",
+                    h1.0, h2.0
+                );
             }
             if let Some(p) = &firefox {
                 let h1 = get_app_icon(p);
                 let h2 = get_file_icon(p);
-                println!("Firefox HICON: get_app_icon={:?}, get_file_icon={:?}", h1.0, h2.0);
+                println!(
+                    "Firefox HICON: get_app_icon={:?}, get_file_icon={:?}",
+                    h1.0, h2.0
+                );
             }
             if let Some(p) = &brave {
                 let h1 = get_app_icon(p);
                 let h2 = get_file_icon(p);
-                println!("Brave HICON: get_app_icon={:?}, get_file_icon={:?}", h1.0, h2.0);
+                println!(
+                    "Brave HICON: get_app_icon={:?}, get_file_icon={:?}",
+                    h1.0, h2.0
+                );
             }
         }
     }
@@ -10105,8 +10213,27 @@ mod tests {
 
     #[test]
     fn search_row_invalidation_only_covers_search_header() {
-        let rect = search_row_invalidation_rect(900, 300, 500, 60);
-        assert_eq!((rect.left, rect.top, rect.right, rect.bottom), (30, 50, 870, 112));
+        let rect = search_row_invalidation_rect(900, 300, 60, 54);
+        assert_eq!((rect.left, rect.top, rect.right, rect.bottom), (30, 32, 870, 94));
+    }
+
+    #[test]
+    fn results_invalidation_starts_below_search_header() {
+        let rect = results_invalidation_rect(900, 300, 500, 60, 54);
+        assert_eq!((rect.left, rect.top, rect.right, rect.bottom), (30, 93, 870, 532));
+    }
+
+    #[test]
+    fn normal_search_height_does_not_depend_on_result_count() {
+        assert_eq!(normal_search_win_h(60, 54), 581);
+        assert_eq!(normal_search_win_h(60, 68), 693);
+    }
+
+    #[test]
+    fn launcher_top_is_anchored_to_homepage_height() {
+        assert_eq!(homepage_win_h(60, 54), 537);
+        assert_eq!(launcher_top_y(300, 60, 54), 32);
+        assert_eq!(launcher_top_y(300, 60, 54), launcher_top_y(300, 60, 54));
     }
 
     #[test]

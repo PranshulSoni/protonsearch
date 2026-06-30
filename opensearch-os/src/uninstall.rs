@@ -83,7 +83,13 @@ fn main() {
 
     // Clean up startup registry key if it exists
     let _ = Command::new("reg")
-        .args(["delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "opensearch-os", "/f"])
+        .args([
+            "delete",
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            "/v",
+            "opensearch-os",
+            "/f",
+        ])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output();
 

@@ -458,7 +458,10 @@ impl SearchEngine {
         let conn = Connection::open(&db_path)?;
         let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);", []);
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);",
+            [],
+        );
         // Add columns if they don't exist
         let _ = conn.execute(
             "ALTER TABLE clipboard_history ADD COLUMN is_image INTEGER DEFAULT 0;",
@@ -728,7 +731,8 @@ impl SearchEngine {
             };
             let mut score = if row.name_lower == q_lower || name_no_ext_lower == q_lower {
                 3.0
-            } else if row.name_lower.starts_with(&q_lower) || name_no_ext_lower.starts_with(&q_lower)
+            } else if row.name_lower.starts_with(&q_lower)
+                || name_no_ext_lower.starts_with(&q_lower)
             {
                 2.5
             } else if row.name_lower.contains(&q_lower) {
@@ -795,8 +799,6 @@ impl SearchEngine {
         results.truncate(max_results);
         results
     }
-
-
 
     // with_fts_content: if false (general search), skips content-only matches — only filename hits shown.
     //                   if true  (file:/code: prefix), full content search is included.
@@ -3115,7 +3117,11 @@ impl SearchEngine {
                     });
                 }
             }
-            app_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            app_matches.sort_unstable_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             // 2. Recent matches
             let mut recent_matches = Vec::new();
@@ -3167,11 +3173,19 @@ impl SearchEngine {
                     });
                 }
             }
-            recent_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            recent_matches.sort_unstable_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             // 3. File matches by title
             let mut file_matches = self.search_local_files_with_fts(&q_lower, false);
-            file_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            file_matches.sort_unstable_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             for m in &mut file_matches {
                 m.score += 70.0;
             }
@@ -3181,8 +3195,12 @@ impl SearchEngine {
             merged.append(&mut app_matches);
             merged.append(&mut recent_matches);
             merged.append(&mut file_matches);
-            merged.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-            
+            merged.sort_unstable_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
             // Deduplicate
             let mut unique_results = Vec::new();
             let mut seen_ids = std::collections::HashSet::new();
@@ -4652,7 +4670,7 @@ impl SearchEngine {
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        
+
         for m in &mut file_matches {
             m.score += if matches!(
                 m.entry.source.as_str(),

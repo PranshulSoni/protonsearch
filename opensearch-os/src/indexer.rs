@@ -1,6 +1,6 @@
+use notify::Watcher;
 use once_cell::sync::Lazy;
 use rusqlite::{params, Connection};
-use notify::Watcher;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -150,7 +150,10 @@ pub fn start_watcher(db_path: PathBuf) {
         let mut collect = |set: &mut std::collections::HashSet<PathBuf>,
                            res: notify::Result<notify::Event>| {
             if let Ok(ev) = res {
-                if matches!(ev.kind, notify::EventKind::Create(_) | notify::EventKind::Modify(_)) {
+                if matches!(
+                    ev.kind,
+                    notify::EventKind::Create(_) | notify::EventKind::Modify(_)
+                ) {
                     for p in ev.paths {
                         set.insert(p);
                     }
