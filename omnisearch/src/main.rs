@@ -3022,7 +3022,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
 
             if my >= by && my < by + SEARCH_H {
                 s.search_input_active = true;
-                if s.ai_answer.is_some() || s.ai_pending {
+                if s.ai_answer.is_some() || s.ai_pending || s.chat_input_active {
                     s.chat_input_active = false;
                     close_ai_panel(hwnd, s);
                     return LRESULT(0);
@@ -3432,19 +3432,19 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                         |row| row.get::<_, String>(0)
                     ) {
                         let new_title = format!("@{}: [New Conversation]", name);
-                        let chat_id = store_ai_chat(&s.db_path, "agent", &new_title, "", "");
                         s.ai_pending = false;
                         s.ai_answer = None;
                         s.ai_title = new_title;
                         s.ai_scroll = 0;
                         s.ai_follow_bottom = true;
-                        s.active_chat_id = chat_id;
+                        s.active_chat_id = None;
                         s.chat_input.clear();
                         s.chat_cursor_pos = 0;
                         s.chat_input_active = true;
                         s.reset_results();
                         s.selected = 0;
                         s.scroll_offset = 0;
+                        sync_height_animation(hwnd, s);
                         do_show(hwnd, s);
                     }
                 }
@@ -4225,6 +4225,15 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
 
     let hwnd_raw = hwnd.0 as isize;
     let db_path = s.db_path.clone();
+
+    if s.active_chat_id.is_none() {
+        let (cmd_type, title_str) = if s.ai_title.starts_with("@") {
+            ("agent", s.ai_title.clone())
+        } else {
+            ("ask", "Follow-up Chat".to_string())
+        };
+        s.active_chat_id = store_ai_chat(&db_path, cmd_type, &title_str, "", "");
+    }
     let chat_id = s.active_chat_id;
     let new_prompt = follow_up;
 
@@ -4906,34 +4915,31 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             let _agent_id: i64 = parts.next().and_then(|v| v.parse().ok()).unwrap_or(-1);
             let name = parts.next().unwrap_or("").to_string();
             if !name.is_empty() {
-                let db_path = s.db_path.clone();
                 let new_title = format!("@{}: [New Conversation]", name);
-                let chat_id = store_ai_chat(&db_path, "agent", &new_title, "", "");
                 s.ai_pending = false;
                 s.ai_answer = None;
                 s.ai_title = new_title;
                 s.ai_scroll = 0;
                 s.ai_follow_bottom = true;
-                s.active_chat_id = chat_id;
+                s.active_chat_id = None;
                 s.chat_input.clear();
                 s.chat_cursor_pos = 0;
                 s.chat_input_active = true;
                 s.reset_results();
                 s.selected = 0;
                 s.scroll_offset = 0;
+                sync_height_animation(hwnd, s);
                 let _ = InvalidateRect(hwnd, None, FALSE);
             }
             return;
         } else if let Some(name) = cmd.strip_prefix("startnewagent:") {
-            let db_path = s.db_path.clone();
             let new_title = format!("@{}: [New Conversation]", name);
-            let chat_id = store_ai_chat(&db_path, "agent", &new_title, "", "");
             s.ai_pending = false;
             s.ai_answer = None;
             s.ai_title = new_title;
             s.ai_scroll = 0;
             s.ai_follow_bottom = true;
-            s.active_chat_id = chat_id;
+            s.active_chat_id = None;
             s.chat_input.clear();
             s.chat_cursor_pos = 0;
             s.chat_input_active = true;
@@ -4942,6 +4948,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             s.scroll_offset = 0;
             s.text_selected = false;
             reset_cursor_blink(hwnd, s);
+            sync_height_animation(hwnd, s);
             let _ = InvalidateRect(hwnd, None, FALSE);
             return;
         } else if let Some(rest) = cmd.strip_prefix("agent:") {
