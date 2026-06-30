@@ -1,12 +1,12 @@
-# Omnisearch (`opensearch-os`)
+# OmniSearch
 
-Omnisearch is a native Windows deep-search launcher built in Rust. It is designed for fast keyboard-first retrieval across files, folders, document content, OCR text, browser data, clipboard history, Git activity, Windows settings, apps, and AI/agent chat history.
+OmniSearch is a native Windows deep-search launcher built in Rust. It is designed for fast keyboard-first retrieval across files, folders, document content, OCR text, browser data, clipboard history, Git activity, Windows settings, apps, and AI/agent chat history.
 
 This branch (`lean-build`) focuses on the core search product: find the right thing quickly, rank it predictably, and keep the UI lightweight enough for daily use.
 
 ## What It Does
 
-Omnisearch opens with `Alt+Space` and gives one command/search surface for local Windows data:
+OmniSearch opens with `Alt+Space` and gives one command/search surface for local Windows data:
 
 - **Apps & Windows/UWP Launching**: Direct COM enumeration of modern Windows Store apps (Calculator, Settings, Camera, etc.) via `IShellItem` and launching via `shell:AppsFolder\<AppID>`.
 - **In-Process Calculator**: High-speed math parser (evaluates formulas like `2+2`, `15% of 340`, `sqrt(9)*4`, etc.) and copies the result to the clipboard on Enter.
@@ -37,7 +37,7 @@ Omnisearch opens with `Alt+Space` and gives one command/search surface for local
 
 ## Performance And Optimization
 
-The app is built as a native Win32 process instead of Electron, so the baseline cost stays close to a small desktop utility rather than a browser runtime.
+OmniSearch is built as a native Win32 process instead of Electron, so the baseline cost stays close to a small desktop utility rather than a browser runtime.
 
 | Area | Current implementation |
 |---|---|

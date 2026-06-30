@@ -111,7 +111,7 @@ unsafe fn setup_tray_icon(
         )
     };
     nid.hIcon = hicon;
-    let tip = "OpenSearch OS".encode_utf16().collect::<Vec<u16>>();
+    let tip = "OmniSearch".encode_utf16().collect::<Vec<u16>>();
     for (i, &c) in tip.iter().enumerate().take(127) {
         nid.szTip[i] = c;
     }
