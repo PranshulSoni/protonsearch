@@ -6399,6 +6399,10 @@ fn is_file_result_source(source: &str) -> bool {
     )
 }
 
+fn is_content_match_source(source: &str) -> bool {
+    matches!(source, "FILE_CONTENT" | "CODE_CONTENT" | "OCR" | "PDF" | "DOCX")
+}
+
 fn is_windows_settings_command(command: &str) -> bool {
     command.starts_with("ms-settings:")
         || command.starts_with("control")
@@ -8352,84 +8356,140 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     RESULT_TEXT_BLOCK_H,
                     s.app_settings.item_height as i32,
                 );
-                SelectObject(mdc, s.font_n);
-                SetTextColor(mdc, palette.clr_white);
-                let display_name = res.entry.control_name.clone();
-                let mut name: Vec<u16> = display_name.encode_utf16().collect();
-
-                let mut sz_name = SIZE::default();
-                unsafe {
-                    SelectObject(mdc, s.font_n);
-                    let _ = GetTextExtentPoint32W(mdc, &name, &mut sz_name);
-                }
 
                 let badge_limit = x + list_w - PAD_L - 100;
-                let mut r = RECT {
-                    left: tx,
-                    top: text_top,
-                    right: (tx + sz_name.cx + 2).min(badge_limit),
-                    bottom: text_top + 22,
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut name,
-                    &mut r,
-                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
-                );
-
                 let default_gray = if is_selected {
                     palette.clr_gray_sel
                 } else {
                     palette.clr_gray
                 };
-                if !res.entry.description.is_empty() {
-                    // Draw breadcrumb path on Line 1 next to control_name
-                    let separator = "  —  ".to_string();
-                    let full_path = separator + &res.entry.breadcrumb_path;
-                    let mut path_w: Vec<u16> = full_path.encode_utf16().collect();
+
+                if is_content_match_source(&res.entry.source) && !res.entry.description.is_empty()
+                {
+                    let content_top = centered_in_result_row(ry, 54, s.item_h());
+
+                    SelectObject(mdc, s.font_n);
+                    SetTextColor(mdc, palette.clr_white);
+                    let mut title: Vec<u16> = res.entry.control_name.encode_utf16().collect();
+                    let mut title_rect = RECT {
+                        left: tx,
+                        top: content_top,
+                        right: badge_limit,
+                        bottom: content_top + 20,
+                    };
+                    let _ = DrawTextW(
+                        mdc,
+                        &mut title,
+                        &mut title_rect,
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+                    );
+
+                    SelectObject(mdc, s.font_c);
+                    SetTextColor(mdc, palette.clr_white);
+                    let mut snippet: Vec<u16> = res.entry.description.encode_utf16().collect();
+                    let mut snippet_rect = RECT {
+                        left: tx,
+                        top: content_top + 20,
+                        right: badge_limit,
+                        bottom: content_top + 38,
+                    };
+                    let _ = DrawTextW(
+                        mdc,
+                        &mut snippet,
+                        &mut snippet_rect,
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+                    );
+
                     SelectObject(mdc, s.font_c);
                     SetTextColor(mdc, default_gray);
-
-                    let mut r_path = RECT {
-                        left: tx + sz_name.cx + 4,
-                        top: text_top + 2,
+                    let meta = format!("{}  >  {}", res.entry.source, res.entry.breadcrumb_path);
+                    let mut meta_w: Vec<u16> = meta.encode_utf16().collect();
+                    let mut meta_rect = RECT {
+                        left: tx,
+                        top: content_top + 38,
                         right: badge_limit,
+                        bottom: content_top + 54,
+                    };
+                    let _ = DrawTextW(
+                        mdc,
+                        &mut meta_w,
+                        &mut meta_rect,
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+                    );
+                } else {
+                    SelectObject(mdc, s.font_n);
+                    SetTextColor(mdc, palette.clr_white);
+                    let display_name = res.entry.control_name.clone();
+                    let mut name: Vec<u16> = display_name.encode_utf16().collect();
+
+                    let mut sz_name = SIZE::default();
+                    unsafe {
+                        SelectObject(mdc, s.font_n);
+                        let _ = GetTextExtentPoint32W(mdc, &name, &mut sz_name);
+                    }
+
+                    let mut r = RECT {
+                        left: tx,
+                        top: text_top,
+                        right: (tx + sz_name.cx + 2).min(badge_limit),
                         bottom: text_top + 22,
                     };
                     let _ = DrawTextW(
                         mdc,
-                        &mut path_w,
-                        &mut r_path,
+                        &mut name,
+                        &mut r,
                         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
                     );
 
-                    // Draw description on Line 2
-                    draw_highlighted_text(
-                        mdc,
-                        &res.entry.description,
-                        clean_query_prefix(&s.query),
-                        s.font_c,
-                        default_gray,
-                        palette.clr_accent,
-                        tx,
-                        text_top + 22,
-                    );
-                } else {
-                    SelectObject(mdc, s.font_c);
-                    SetTextColor(mdc, default_gray);
-                    let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
-                    let mut r2 = RECT {
-                        left: tx,
-                        top: text_top + 22,
-                        right: badge_limit,
-                        bottom: text_top + RESULT_TEXT_BLOCK_H,
-                    };
-                    let _ = DrawTextW(
-                        mdc,
-                        &mut crumb,
-                        &mut r2,
-                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
-                    );
+                    if !res.entry.description.is_empty() {
+                        // Draw breadcrumb path on Line 1 next to control_name
+                        let separator = "  —  ".to_string();
+                        let full_path = separator + &res.entry.breadcrumb_path;
+                        let mut path_w: Vec<u16> = full_path.encode_utf16().collect();
+                        SelectObject(mdc, s.font_c);
+                        SetTextColor(mdc, default_gray);
+
+                        let mut r_path = RECT {
+                            left: tx + sz_name.cx + 4,
+                            top: text_top + 2,
+                            right: badge_limit,
+                            bottom: text_top + 22,
+                        };
+                        let _ = DrawTextW(
+                            mdc,
+                            &mut path_w,
+                            &mut r_path,
+                            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+                        );
+
+                        // Draw description on Line 2
+                        draw_highlighted_text(
+                            mdc,
+                            &res.entry.description,
+                            clean_query_prefix(&s.query),
+                            s.font_c,
+                            default_gray,
+                            palette.clr_accent,
+                            tx,
+                            text_top + 22,
+                        );
+                    } else {
+                        SelectObject(mdc, s.font_c);
+                        SetTextColor(mdc, default_gray);
+                        let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
+                        let mut r2 = RECT {
+                            left: tx,
+                            top: text_top + 22,
+                            right: badge_limit,
+                            bottom: text_top + RESULT_TEXT_BLOCK_H,
+                        };
+                        let _ = DrawTextW(
+                            mdc,
+                            &mut crumb,
+                            &mut r2,
+                            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+                        );
+                    }
                 }
 
                 let badge_source = &res.entry.source;
@@ -10647,6 +10707,16 @@ mod tests {
         assert!(is_windows_settings_command("control.exe inetcpl.cpl"));
         assert!(is_windows_settings_command("services.msc"));
         assert!(!is_windows_settings_command("C:\\Windows\\System32\\taskmgr.exe"));
+    }
+
+    #[test]
+    fn content_sources_use_content_match_layout() {
+        for source in ["FILE_CONTENT", "CODE_CONTENT", "OCR", "PDF", "DOCX"] {
+            assert!(is_content_match_source(source));
+        }
+        for source in ["FILE", "CODE", "Settings", "SYSTEM"] {
+            assert!(!is_content_match_source(source));
+        }
     }
 
     #[test]
