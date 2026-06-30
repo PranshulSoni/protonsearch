@@ -6437,6 +6437,13 @@ fn is_file_result_source(source: &str) -> bool {
     )
 }
 
+fn is_windows_settings_command(command: &str) -> bool {
+    command.starts_with("ms-settings:")
+        || command.starts_with("control")
+        || command.contains(".cpl")
+        || command.ends_with(".msc")
+}
+
 fn image_path_for_result(result: &SearchResult) -> Option<&str> {
     let path = result
         .entry
@@ -8299,19 +8306,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     }
                 }
 
-                let icon_to_draw = s
-                    .app_icons
-                    .get(&res.entry.launch_command)
-                    .copied()
-                    .filter(|icon| !icon.0.is_null())
-                    .unwrap_or_else(|| {
-                        if res.entry.launch_command.starts_with("ms-settings:")
-                            || res.entry.launch_command.starts_with("control")
-                            || res.entry.launch_command.contains(".cpl")
-                            || res.entry.launch_command.ends_with(".msc")
-                        {
-                            s.icon_settings
-                        } else {
+                let icon_to_draw = if is_windows_settings_command(&res.entry.launch_command) {
+                    s.icon_settings
+                } else {
+                    s.app_icons
+                        .get(&res.entry.launch_command)
+                        .copied()
+                        .filter(|icon| !icon.0.is_null())
+                        .unwrap_or_else(|| {
                             match res.entry.source.as_str() {
                                 "app" => s.icon_app,
                                 "FOLDER" => s.icon_folder,
@@ -8358,8 +8360,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                                 "SNIPPET" | "TODO" => s.icon_file,
                                 _ => s.icon_app,
                             }
-                        }
-                    });
+                        })
+                };
 
                 if !drew_thumbnail && !icon_to_draw.0.is_null() {
                     let icon_y = centered_in_result_row(
@@ -10664,6 +10666,14 @@ mod tests {
             assert!(is_file_result_source(source));
         }
         assert!(!is_file_result_source("app"));
+    }
+
+    #[test]
+    fn windows_settings_commands_use_settings_icon() {
+        assert!(is_windows_settings_command("ms-settings:display"));
+        assert!(is_windows_settings_command("control.exe inetcpl.cpl"));
+        assert!(is_windows_settings_command("services.msc"));
+        assert!(!is_windows_settings_command("C:\\Windows\\System32\\taskmgr.exe"));
     }
 
     #[test]
