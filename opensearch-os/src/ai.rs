@@ -489,29 +489,8 @@ fn ensure_hermes_gateway_running() -> Result<()> {
     Ok(())
 }
 
-fn fallback_config_from_key(key: &str) -> Option<AiConfig> {
-    if key.is_empty() || key == "hermes" {
-        return None;
-    }
-    Some(AiConfig {
-        endpoint: "https://opencode.ai/zen/v1/chat/completions".to_string(),
-        model: "deepseek-v4-flash-free".to_string(),
-        api_key: key.to_string(),
-    })
-}
-
 fn get_agent_config() -> AiConfig {
-    if HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
-        get_hermes_config()
-    } else if let Ok(cfg) = get_config() {
-        if cfg.model == "hermes-agent" {
-            fallback_config_from_key(&cfg.api_key).unwrap_or_else(get_hermes_config)
-        } else {
-            cfg
-        }
-    } else {
-        get_hermes_config()
-    }
+    get_hermes_config()
 }
 
 /// Human-readable label for errors, based on which backend the request hit.
