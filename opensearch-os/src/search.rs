@@ -575,168 +575,7 @@ impl SearchEngine {
         0.0
     }
 
-    fn query_everything(
-        &self,
-        query: &str,
-        only_code: bool,
-        max_results: usize,
-    ) -> Option<Vec<SearchResult>> {
-        use everything_ipc::wm::{EverythingClient, RequestFlags};
-        use windows::Win32::UI::WindowsAndMessaging::{
-            FindWindowW, SendMessageTimeoutW, SMTO_ABORTIFHUNG,
-        };
-        use windows::core::PCWSTR;
-        use windows::Win32::Foundation::{LPARAM, WPARAM};
 
-        // Find the Everything IPC window
-        let class_name: Vec<u16> = "Everything_WM_IPC".encode_utf16().chain(std::iter::once(0)).collect();
-        let hwnd = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), None).ok()? };
-
-        // Check if the Everything window is responsive with a 30ms timeout
-        let ok = unsafe {
-            SendMessageTimeoutW(
-                hwnd,
-                0, // WM_NULL
-                WPARAM(0),
-                LPARAM(0),
-                SMTO_ABORTIFHUNG,
-                30, // 30ms timeout
-                None,
-            )
-        };
-        if ok.0 == 0 {
-            return None; // Everything window is unresponsive
-        }
-
-        let client = EverythingClient::new().ok()?;
-
-        let code_exts = [
-            "rs", "py", "js", "ts", "json", "html", "css", "c", "cpp", "h", "hpp", "cs", "go",
-            "java", "kt", "sh", "bat", "ps1", "yaml", "yml", "toml", "ini", "sql", "xml",
-        ];
-
-        let full_query = if only_code {
-            format!("{} ext:{}", query, code_exts.join(";"))
-        } else {
-            query.to_string()
-        };
-
-        let list = client
-            .query_wait(&full_query)
-            .request_flags(
-                RequestFlags::FileName
-                    | RequestFlags::Path
-                    | RequestFlags::Size
-                    | RequestFlags::Attributes,
-            )
-            .max_results(max_results as u32)
-            .call()
-            .ok()?;
-
-        let mut results = Vec::new();
-        for item in list.iter() {
-            let filename = item
-                .get_string(RequestFlags::FileName)
-                .unwrap_or_else(|| "Unknown".to_string());
-            let path = item
-                .get_string(RequestFlags::Path)
-                .unwrap_or_else(|| "Unknown".to_string());
-            let size = item.get_size(RequestFlags::Size).unwrap_or(0);
-
-            // Fix: Path::new("C:").join("file") gives "C:file" not "C:\file".
-            // Always ensure a backslash separator between the parent path and filename.
-            let full_path = if path.ends_with('\\') || path.ends_with('/') {
-                format!("{}{}", path, filename)
-            } else {
-                format!("{}\\{}", path, filename)
-            };
-
-            let path_modifier = Self::get_path_score_modifier(&full_path);
-            if path_modifier < -1.0 {
-                continue; // Skip system/hidden/ignored files
-            }
-
-            let attrs = item.get_u32(RequestFlags::Attributes).unwrap_or(0);
-            let is_dir = (attrs & 0x10) != 0;
-
-            let ext = if is_dir {
-                "folder".to_string()
-            } else {
-                std::path::Path::new(&filename)
-                    .extension()
-                    .map(|e| e.to_string_lossy().to_string().to_lowercase())
-                    .unwrap_or_default()
-            };
-
-            let source = if is_dir {
-                "FOLDER"
-            } else if only_code || code_exts.contains(&ext.as_str()) {
-                "CODE"
-            } else {
-                "FILE"
-            };
-
-            let q_lower = query.to_lowercase();
-            let name_lower = filename.to_lowercase();
-            let name_no_ext = if let Some(dot) = name_lower.rfind('.') {
-                &name_lower[..dot]
-            } else {
-                &name_lower
-            };
-
-            // ponytail: scoring code duplicated across 6+ searchers. Skipped DRY refactor because they might evolve independently. Combine when you actually need to change the math in all 6 places at once.
-            let mut score = if name_lower == q_lower || name_no_ext == q_lower {
-                3.0 // exact match
-            } else if name_lower.starts_with(&q_lower) || name_no_ext.starts_with(&q_lower) {
-                2.5 // prefix match
-            } else if name_lower.contains(&q_lower) {
-                1.8 // substring match
-            } else {
-                1.0 // fallback (Everything already knows it's relevant)
-            };
-            score += path_modifier;
-
-            let breadcrumb = if source == "FOLDER" {
-                format!("Folder > {}", full_path)
-            } else {
-                format!(
-                    "{} > {}",
-                    if source == "CODE" { "Code" } else { "File" },
-                    full_path
-                )
-            };
-
-            let description = if source == "FOLDER" {
-                "Local folder".to_string()
-            } else {
-                let size_str = if size < 1024 {
-                    format!("{} B", size)
-                } else if size < 1024 * 1024 {
-                    format!("{:.1} KB", size as f64 / 1024.0)
-                } else if size < 1024 * 1024 * 1024 {
-                    format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
-                } else {
-                    format!("{:.1} GB", size as f64 / (1024.0 * 1024.0 * 1024.0))
-                };
-                format!("Local {} file ({})", ext.to_uppercase(), size_str)
-            };
-
-            results.push(SearchResult {
-                entry: CatalogEntry {
-                    id: format!("{}.{}", source.to_lowercase(), full_path),
-                    control_name: filename.clone(),
-                    breadcrumb_path: breadcrumb,
-                    launch_command: full_path.clone(),
-                    source: source.to_string(),
-                    description,
-                    synonyms: filename.to_lowercase(),
-                },
-                score,
-            });
-        }
-
-        Some(results)
-    }
 
     // with_fts_content: if false (general search), skips content-only matches — only filename hits shown.
     //                   if true  (file:/code: prefix), full content search is included.
@@ -873,89 +712,78 @@ impl SearchEngine {
         let mut seen_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut results = Vec::new();
 
-        // ── 1. Metadata search via Everything (if running) ─────────────────
-        if let Some(ev_results) = self.query_everything(query, only_code, max_results) {
-            for r in ev_results {
-                seen_paths.insert(r.entry.launch_command.clone());
-                results.push(r);
-            }
-        }
-
-        // ── 2. SQLite name LIKE fallback (when Everything unavailable) ─────
-        if seen_paths.is_empty() {
-            let name_query = format!("%{}%", q_lower);
-            let query_str = if only_code {
-                let placeholders: Vec<String> = code_exts.iter().map(|_| "?".to_string()).collect();
-                format!(
-                    "SELECT path, name, extension FROM files WHERE name LIKE ? AND extension IN ({}) LIMIT ?",
-                    placeholders.join(",")
-                )
-            } else {
-                "SELECT path, name, extension FROM files WHERE name LIKE ? LIMIT ?".to_string()
-            };
-            if let Ok(mut stmt) = conn.prepare(&query_str) {
-                let mut params_vec: Vec<rusqlite::types::Value> =
-                    vec![rusqlite::types::Value::Text(name_query)];
-                if only_code {
-                    for ext in &code_exts {
-                        params_vec.push(rusqlite::types::Value::Text(ext.to_string()));
-                    }
+        let name_query = format!("%{}%", q_lower);
+        let query_str = if only_code {
+            let placeholders: Vec<String> = code_exts.iter().map(|_| "?".to_string()).collect();
+            format!(
+                "SELECT path, name, extension FROM files WHERE name LIKE ? AND extension IN ({}) LIMIT ?",
+                placeholders.join(",")
+            )
+        } else {
+            "SELECT path, name, extension FROM files WHERE name LIKE ? LIMIT ?".to_string()
+        };
+        if let Ok(mut stmt) = conn.prepare(&query_str) {
+            let mut params_vec: Vec<rusqlite::types::Value> =
+                vec![rusqlite::types::Value::Text(name_query)];
+            if only_code {
+                for ext in &code_exts {
+                    params_vec.push(rusqlite::types::Value::Text(ext.to_string()));
                 }
-                params_vec.push(rusqlite::types::Value::Integer(max_results as i64));
-                let params_ref = rusqlite::params_from_iter(params_vec.iter());
-                if let Ok(rows) = stmt.query_map(params_ref, |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                    ))
-                }) {
-                    for row in rows.filter_map(|r| r.ok()) {
-                        let (path, name, ext) = row;
-                        let path_modifier = Self::get_path_score_modifier(&path);
-                        if path_modifier < -1.0 {
-                            continue;
-                        }
-                        let mut score = score_name(&name);
-                        if score <= 0.0 {
-                            continue;
-                        }
-                        score += path_modifier;
-                        let source = if ext == "folder" {
-                            "FOLDER"
-                        } else if only_code || code_exts.contains(&ext.as_str()) {
-                            "CODE"
-                        } else {
-                            "FILE"
-                        };
-                        let breadcrumb = if source == "FOLDER" {
-                            format!("Folder > {}", path)
-                        } else {
-                            format!(
-                                "{} > {}",
-                                if source == "CODE" { "Code" } else { "File" },
-                                path
-                            )
-                        };
-                        let description = if source == "FOLDER" {
-                            "Local folder".to_string()
-                        } else {
-                            format!("Local {} file", ext.to_uppercase())
-                        };
-                        seen_paths.insert(path.clone());
-                        results.push(SearchResult {
-                            entry: CatalogEntry {
-                                id: format!("{}.{}", source.to_lowercase(), path),
-                                control_name: name.clone(),
-                                breadcrumb_path: breadcrumb,
-                                launch_command: path,
-                                source: source.to_string(),
-                                description,
-                                synonyms: name.to_lowercase(),
-                            },
-                            score,
-                        });
+            }
+            params_vec.push(rusqlite::types::Value::Integer(max_results as i64));
+            let params_ref = rusqlite::params_from_iter(params_vec.iter());
+            if let Ok(rows) = stmt.query_map(params_ref, |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            }) {
+                for row in rows.filter_map(|r| r.ok()) {
+                    let (path, name, ext) = row;
+                    let path_modifier = Self::get_path_score_modifier(&path);
+                    if path_modifier < -1.0 {
+                        continue;
                     }
+                    let mut score = score_name(&name);
+                    if score <= 0.0 {
+                        continue;
+                    }
+                    score += path_modifier;
+                    let source = if ext == "folder" {
+                        "FOLDER"
+                    } else if only_code || code_exts.contains(&ext.as_str()) {
+                        "CODE"
+                    } else {
+                        "FILE"
+                    };
+                    let breadcrumb = if source == "FOLDER" {
+                        format!("Folder > {}", path)
+                    } else {
+                        format!(
+                            "{} > {}",
+                            if source == "CODE" { "Code" } else { "File" },
+                            path
+                        )
+                    };
+                    let description = if source == "FOLDER" {
+                        "Local folder".to_string()
+                    } else {
+                        format!("Local {} file", ext.to_uppercase())
+                    };
+                    seen_paths.insert(path.clone());
+                    results.push(SearchResult {
+                        entry: CatalogEntry {
+                            id: format!("{}.{}", source.to_lowercase(), path),
+                            control_name: name.clone(),
+                            breadcrumb_path: breadcrumb,
+                            launch_command: path,
+                            source: source.to_string(),
+                            description,
+                            synonyms: name.to_lowercase(),
+                        },
+                        score,
+                    });
                 }
             }
         }
