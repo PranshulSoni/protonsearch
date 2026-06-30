@@ -1822,9 +1822,9 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                         // Nothing left to animate.
                         let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
                     } else if height_done && s.search_loading && !window_anim_active {
-                        // Grow finished; only the loading spinner remains, so ease off to a
-                        // gentle 80ms cadence instead of repainting the search row at 60fps.
-                        let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 80, None);
+                        // Keep the UI fully responsive at 120fps (8ms) even when loading.
+                        // Previously this dropped to 80ms (12fps) which caused severe perceived lag.
+                        let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 8, None);
                     }
                     if window_anim_active || height_changed {
                         let _ = InvalidateRect(hwnd, None, FALSE);
