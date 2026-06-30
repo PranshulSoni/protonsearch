@@ -2420,10 +2420,10 @@ impl SearchEngine {
         }
 
         let sql = if q.is_empty() {
-            "SELECT id, title, prompt, response, ts, command FROM ai_chats WHERE command = 'agent' ORDER BY ts DESC".to_string()
+            "SELECT id, title, prompt, response, ts, command FROM ai_chats ORDER BY ts DESC".to_string()
         } else {
             "SELECT id, title, prompt, response, ts, command FROM ai_chats \
-             WHERE command = 'agent' AND (lower(title) LIKE ?1 OR lower(prompt) LIKE ?1 OR lower(response) LIKE ?1) \
+             WHERE (lower(title) LIKE ?1 OR lower(prompt) LIKE ?1 OR lower(response) LIKE ?1) \
              ORDER BY ts DESC".to_string()
         };
         let mut stmt = match conn.prepare(&sql) {
@@ -2460,11 +2460,13 @@ impl SearchEngine {
                 .split_whitespace()
                 .collect::<Vec<&str>>()
                 .join(" ");
+            let is_agent = command == "agent";
+            let default_title = if is_agent { "Untitled Agent Run" } else { "Untitled Chat" };
             let prompt_display = if clean_prompt.len() > 65 {
                 format!("{}...", clean_prompt.chars().take(65).collect::<String>())
             } else if clean_prompt.is_empty() {
                 if title.is_empty() {
-                    "Untitled Agent Run".to_string()
+                    default_title.to_string()
                 } else {
                     title
                 }
@@ -2486,7 +2488,8 @@ impl SearchEngine {
             };
 
             let cmd_upper = command.to_uppercase();
-            let breadcrumb = format!("Agent Run [{}] > {}", cmd_upper, response_snippet);
+            let label = if is_agent { "Agent Run" } else { "AI Chat" };
+            let breadcrumb = format!("{} [{}] > {}", label, cmd_upper, response_snippet);
             let time_str = Self::format_relative_time(ts);
 
             results.push(SearchResult {
@@ -2497,7 +2500,7 @@ impl SearchEngine {
                     launch_command: format!("aichat:{}", id),
                     source: "AI".to_string(),
                     description: format!("{} | Enter to select & continue", time_str),
-                    synonyms: "agent chat history run hermes".to_string(),
+                    synonyms: "agent chat history run hermes conversation".to_string(),
                 },
                 score,
             });
@@ -3589,25 +3592,13 @@ impl SearchEngine {
             });
             results.push(SearchResult {
                 entry: CatalogEntry {
-                    id: "folder.aichats".to_string(),
-                    control_name: "AI History".to_string(),
-                    breadcrumb_path: "AI > Past chats".to_string(),
-                    launch_command: "chats:".to_string(),
-                    source: "FOLDER".to_string(),
-                    description: "Browse and reopen your past AI chats".to_string(),
-                    synonyms: "ai chats history conversations past previous saved".to_string(),
-                },
-                score: 3.1,
-            });
-            results.push(SearchResult {
-                entry: CatalogEntry {
                     id: "folder.agentchats".to_string(),
-                    control_name: "Agent History".to_string(),
-                    breadcrumb_path: "AI > Agent runs".to_string(),
+                    control_name: "History".to_string(),
+                    breadcrumb_path: "AI > History".to_string(),
                     launch_command: "agentchats:".to_string(),
                     source: "FOLDER".to_string(),
-                    description: "Browse and reopen your past Agent runs".to_string(),
-                    synonyms: "agent chats history runs task runs previous saved hermes"
+                    description: "Browse and reopen your past AI chats and agent runs".to_string(),
+                    synonyms: "chats history runs conversations past previous saved hermes"
                         .to_string(),
                 },
                 score: 3.08,
