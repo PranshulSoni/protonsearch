@@ -5473,6 +5473,27 @@ unsafe fn fill_rounded(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, c: COLO
     let _ = DeleteObject(br);
 }
 
+/// Inner text width (px) for a user chat bubble: the message's natural single-line
+/// width, clamped to `max_inner` so short messages hug their content and long ones
+/// wrap. Called from both the measure and paint passes so the two agree on height.
+/// The caller must have selected the body font into `hdc` first.
+unsafe fn bubble_inner_w(hdc: HDC, text_wide: &[u16], max_inner: i32) -> i32 {
+    let mut nat = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
+    let mut tmp = text_wide.to_vec();
+    let _ = DrawTextW(
+        hdc,
+        &mut tmp,
+        &mut nat,
+        DT_LEFT | DT_SINGLELINE | DT_CALCRECT | DT_NOPREFIX,
+    );
+    (nat.right - nat.left).clamp(1, max_inner.max(1))
+}
+
 // ── Markdown rendering for the AI panel ───────────────────────────────────────
 //
 // Both `measure_response` and `paint_response` walk the same parsed blocks so the
@@ -7052,7 +7073,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
             // 1. Measure Pass
             let mut total_h = 0;
-            let card_inner_w = w - pad * 2 - 24;
+            // User messages render as right-aligned bubbles that hug their content but
+            // never span the whole panel (a short "hi" used to draw a full-width bar).
+            let max_bubble_inner = (w - pad * 2) * 72 / 100 - 24;
             let resp_w = w - pad * 2;
 
             for part in &parts {
@@ -7072,13 +7095,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
                 if !prompt.is_empty() {
                     let mut p_wide: Vec<u16> = prompt.encode_utf16().collect();
+                    SelectObject(mdc, s.font_c);
+                    let inner_w = bubble_inner_w(mdc, &p_wide, max_bubble_inner);
                     let mut calc = RECT {
                         left: 0,
                         top: 0,
-                        right: card_inner_w,
+                        right: inner_w,
                         bottom: 0,
                     };
-                    SelectObject(mdc, s.font_c);
                     let _ = DrawTextW(
                         mdc,
                         &mut p_wide,
@@ -7153,13 +7177,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
                 if !prompt.is_empty() {
                     let mut p_wide: Vec<u16> = prompt.encode_utf16().collect();
+                    SelectObject(mdc, s.font_c);
+                    let inner_w = bubble_inner_w(mdc, &p_wide, max_bubble_inner);
                     let mut calc = RECT {
                         left: 0,
                         top: 0,
-                        right: card_inner_w,
+                        right: inner_w,
                         bottom: 0,
                     };
-                    SelectObject(mdc, s.font_c);
                     let _ = DrawTextW(
                         mdc,
                         &mut p_wide.clone(),
@@ -7168,13 +7193,16 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     );
                     let prompt_h = calc.bottom - calc.top;
                     let bubble_h = prompt_h + 16;
+                    let bubble_w = inner_w + 24;
+                    // Right-aligned chat bubble (user side), sized to its content.
+                    let bubble_x = x + w - pad - bubble_w;
 
-                    fill_rounded(mdc, x + pad, current_y, w - pad * 2, bubble_h, 8, bg_user);
+                    fill_rounded(mdc, bubble_x, current_y, bubble_w, bubble_h, 8, bg_user);
 
                     let mut body_rc = RECT {
-                        left: x + pad + 12,
+                        left: bubble_x + 12,
                         top: current_y + 8,
-                        right: x + w - pad - 12,
+                        right: bubble_x + 12 + inner_w,
                         bottom: current_y + 8 + prompt_h,
                     };
                     SetTextColor(mdc, COLORREF(0x00_D0_D0_D0));
