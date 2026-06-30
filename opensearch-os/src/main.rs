@@ -433,6 +433,7 @@ impl State {
             || q.starts_with("folder:")
             || q.starts_with("code:")
             || q.starts_with("img:")
+            || q.starts_with("agents:")
             || q.starts_with("agentchats:")
     }
 
@@ -8777,6 +8778,7 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
             "HOMEPAGE_CLIPBOARD",
         ),
         ("Local Files", "Local > Files", "file:", "HOMEPAGE_LOCAL"),
+        ("Agents", "AI > Agents", "agents:", "HOMEPAGE_AI"),
         (
             "History",
             "AI > History",
@@ -8817,6 +8819,7 @@ fn clean_query_prefix(query: &str) -> &str {
         "img:",
         "image:",
         "screenshots:",
+        "agents:",
         "agentchats:",
     ];
     let q_lower = query.to_lowercase();
@@ -10573,6 +10576,15 @@ mod tests {
         // 60 + 1 + LABEL_HEADER_H(38) + 8*54 + 8 = 539
         assert_eq!(homepage_win_h(60, 54, 8), 539);
         assert_eq!(launcher_top_y(300, 539), 31);
+    }
+
+    #[test]
+    fn homepage_exposes_agents_page() {
+        let results = default_homepage_results();
+        assert!(results.iter().any(|r| {
+            r.entry.control_name == "Agents" && r.entry.launch_command == "agents:"
+        }));
+        assert_eq!(clean_query_prefix("agents: Hermes"), "Hermes");
     }
 
     #[test]
