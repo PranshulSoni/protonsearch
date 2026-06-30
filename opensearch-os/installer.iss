@@ -13,8 +13,6 @@ PrivilegesRequired=lowest
 [Files]
 Source: "target\release\opensearch-os.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "target\release\uninstall.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "target\release\model_int8.onnx"; DestDir: "{app}"; Flags: ignoreversion
-Source: "target\release\DirectML.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\OpenSearch OS"; Filename: "{app}\opensearch-os.exe"
