@@ -322,6 +322,7 @@ struct State {
     icon_app: HICON,
     icon_commit: HICON,
     icon_todo: HICON,
+    icon_agent: HICON,
     icon_clipboard: HICON,
     icon_memory: HICON,
     icon_chrome: HICON,
@@ -723,6 +724,10 @@ unsafe fn run(first_settings_run: bool) {
     let icon_todo = load_icon_from_dll("shell32.dll", 270, 64);
     let icon_clipboard = load_icon_from_dll("shell32.dll", 260, 64);
     let icon_memory = load_icon_from_dll("shell32.dll", 238, 64);
+    let icon_agent = load_png_to_hicon(
+        include_bytes!("../../launcher_source_icons/agent-history.png"),
+        64,
+    );
 
     // Load at exactly the draw size (from 256² sources via Lanczos) so DrawIconEx never rescales
     // the HICON at paint time — a 36→32 GDI rescale is what made these look soft/low-res.
@@ -860,6 +865,7 @@ unsafe fn run(first_settings_run: bool) {
         icon_app,
         icon_commit,
         icon_todo,
+        icon_agent,
         icon_clipboard,
         icon_memory,
         icon_chrome,
@@ -7794,7 +7800,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     "HOMEPAGE_CLIPBOARD" => s.icon_clipboard,
                     "HOMEPAGE_LOCAL" => s.icon_folder,
                     "HOMEPAGE_CODE" | "HOMEPAGE_OCR" => s.icon_file,
-                    "HOMEPAGE_AI" => s.icon_app,
+                    "HOMEPAGE_AI" | "AI" => s.icon_agent,
                     _ => s.icon_app,
                 };
 
@@ -8838,8 +8844,8 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
         ("Local Files", "Local > Files", "file:", "HOMEPAGE_LOCAL"),
         ("Agents", "AI > Agents", "agents:", "HOMEPAGE_AI"),
         (
-            "History",
-            "AI > History",
+            "Agent History",
+            "AI > Agent History",
             "agentchats:",
             "HOMEPAGE_AI",
         ),
