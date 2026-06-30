@@ -8677,8 +8677,8 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
         ),
         ("Local Files", "Local > Files", "file:", "HOMEPAGE_LOCAL"),
         (
-            "Agent History",
-            "AI > Agent runs",
+            "History",
+            "AI > History",
             "agentchats:",
             "HOMEPAGE_AI",
         ),
@@ -8838,9 +8838,9 @@ fn calculate_relevance_score(result: &SearchResult, query: &str) -> f32 {
 
     // 1. Title matching
     if title == q || stem == q {
-        score += 1000.0;
+        score += 10000.0;
     } else if title.starts_with(&q) || stem.starts_with(&q) {
-        score += 800.0;
+        score += 8000.0;
     } else {
         let mut word_prefix_match = false;
         for word in title.split(|c: char| !c.is_alphanumeric()) {
@@ -8850,9 +8850,9 @@ fn calculate_relevance_score(result: &SearchResult, query: &str) -> f32 {
             }
         }
         if word_prefix_match {
-            score += 600.0;
+            score += 6000.0;
         } else if title.contains(&q) || stem.contains(&q) {
-            score += 400.0;
+            score += 4000.0;
         } else {
             let words: Vec<&str> = stem
                 .split(|c: char| !c.is_alphanumeric())
@@ -8862,7 +8862,7 @@ fn calculate_relevance_score(result: &SearchResult, query: &str) -> f32 {
             if !q_words.is_empty() {
                 let matched = q_words.iter().filter(|qw| words.contains(qw)).count();
                 if matched > 0 {
-                    score += 200.0 * (matched as f32 / q_words.len() as f32);
+                    score += 2000.0 * (matched as f32 / q_words.len() as f32);
                 }
             }
         }
@@ -8875,7 +8875,7 @@ fn calculate_relevance_score(result: &SearchResult, query: &str) -> f32 {
             .filter_map(|w| w.chars().next())
             .collect();
         if first_letters.starts_with(&q) {
-            score += 300.0;
+            score += 3000.0;
         }
     }
 
