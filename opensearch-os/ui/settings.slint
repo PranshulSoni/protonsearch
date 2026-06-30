@@ -1290,40 +1290,40 @@ export component SettingsWindow inherits Window {
                                 }
 
                                 HorizontalLayout {
-                                    alignment: start;
-                                    HorizontalLayout {
-                                        spacing: 10px;
+                                    spacing: 10px;
 
-                                        ComboBox {
-                                            width: 110px;
-                                            height: 40px;
-                                            model: root.slot1-model;
-                                            current-value <=> root.slot1-val;
-                                            selected => { root.apply-hotkey(); }
-                                        }
-
-                                        ComboBox {
-                                            width: 110px;
-                                            height: 40px;
-                                            model: root.slot2-model;
-                                            current-value <=> root.slot2-val;
-                                            selected => { root.apply-hotkey(); }
-                                        }
-                                        ComboBox {
-                                            width: 110px;
-                                            height: 40px;
-                                            model: root.slot34-model;
-                                            current-value <=> root.slot3-val;
-                                            selected => { root.apply-hotkey(); }
-                                        }
-                                        ComboBox {
-                                            width: 110px;
-                                            height: 40px;
-                                            model: root.slot34-model;
-                                            current-value <=> root.slot4-val;
-                                            selected => { root.apply-hotkey(); }
-                                        }
+                                    ComboBox {
+                                        width: 110px;
+                                        height: 40px;
+                                        model: root.slot1-model;
+                                        current-value <=> root.slot1-val;
+                                        selected => { root.apply-hotkey(); }
                                     }
+
+                                    ComboBox {
+                                        width: 110px;
+                                        height: 40px;
+                                        model: root.slot2-model;
+                                        current-value <=> root.slot2-val;
+                                        selected => { root.apply-hotkey(); }
+                                    }
+                                    ComboBox {
+                                        width: 110px;
+                                        height: 40px;
+                                        model: root.slot34-model;
+                                        current-value <=> root.slot3-val;
+                                        selected => { root.apply-hotkey(); }
+                                    }
+                                    ComboBox {
+                                        width: 110px;
+                                        height: 40px;
+                                        model: root.slot34-model;
+                                        current-value <=> root.slot4-val;
+                                        selected => { root.apply-hotkey(); }
+                                    }
+                                    
+                                    // Pushes all ComboBoxes to the left cleanly
+                                    Rectangle { horizontal-stretch: 1; }
                                 }
                             }
                         }
