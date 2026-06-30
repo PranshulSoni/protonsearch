@@ -464,7 +464,7 @@ impl State {
             return self.search_h() + 1 + AI_PANEL_H;
         }
         if self.ai_pending || self.ai_answer.is_some() || self.chat_input_active {
-            return self.search_h() + 1 + AI_PANEL_H;
+            return self.search_h() + 1 + 600;
         }
         if self.form_state != FormState::None {
             return self.search_h() + 24;
@@ -725,18 +725,18 @@ unsafe fn run(first_settings_run: bool) {
     let icon_todo = load_icon_from_dll("shell32.dll", 270, 64);
     let icon_clipboard = load_icon_from_dll("shell32.dll", 260, 64);
     let icon_memory = load_icon_from_dll("shell32.dll", 238, 64);
-    let icon_agent = load_image_to_hicon(
+    let icon_agent = load_png_to_hicon(
         include_bytes!("../../icons/AgentLogo.png"),
         64,
     );
-    let icon_agent_chat = load_image_to_hicon(
-        include_bytes!("../../icons/AgentChat.ico"),
+    let icon_agent_chat = load_png_to_hicon(
+        include_bytes!("../../icons/AgentMessageIcon.png"),
         64,
     );
 
     // Load at exactly the draw size (from 256² sources via Lanczos) so DrawIconEx never rescales
     // the HICON at paint time — a 36→32 GDI rescale is what made these look soft/low-res.
-    let icon_new_search = load_image_to_hicon(
+    let icon_new_search = load_png_to_hicon(
         include_bytes!("../../launcher_source_icons/search.png"),
         SEARCH_ICON_SIZE as u32,
     );
@@ -2772,8 +2772,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let s = &mut *sp;
             let in_chat_history_list =
                 s.query.starts_with("chats:") || s.query.starts_with("agentchats:");
-            let is_ai_chat_view = s.ai_answer.is_some() || s.ai_pending || s.chat_input_active;
-            if is_ai_chat_view && !in_chat_history_list {
+            if s.ai_answer.is_some() && !in_chat_history_list {
                 let delta = (wp.0 >> 16) as i16;
                 let step = (delta as i32).abs().max(40);
                 if delta > 0 {
@@ -2848,7 +2847,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 } else {
                     62
                 };
-                let content_bottom = y_start + s.shown_h - footer_h;
+                let actual_panel_h = s.paint_win_h() - SEARCH_H - 1;
+                let content_bottom = y_start + SEARCH_H + 1 + actual_panel_h - footer_h;
                 let _ = win_h;
 
                 let btn_y = content_bottom + 2 + 36;
@@ -2899,7 +2899,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
 
                 let body_top = y_start + SEARCH_H + 1;
                 let footer_h = 62;
-                let content_bottom = y_start + s.shown_h - footer_h;
+                let actual_panel_h = s.paint_win_h() - SEARCH_H - 1;
+                let content_bottom = y_start + SEARCH_H + 1 + actual_panel_h - footer_h;
                 let input_y = content_bottom + 8;
                 let input_x = x_start + 24;
                 let input_w = WIN_W - 48;
@@ -6886,7 +6887,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
         let content_top = body_top + 48;
         let footer_h = 30;
-        let content_bottom = y + h - footer_h;
+        let actual_panel_h = s.paint_win_h() - SEARCH_H - 1;
+        let content_bottom = y + SEARCH_H + 1 + actual_panel_h - footer_h;
 
         // Body — append a caret block so the user sees the insertion point.
         SelectObject(mdc, s.font_c);
@@ -7020,7 +7022,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         } else {
             62
         };
-        let content_bottom = y + h - footer_h;
+        let actual_panel_h = s.paint_win_h() - SEARCH_H - 1;
+        let content_bottom = y + SEARCH_H + 1 + actual_panel_h - footer_h;
 
         let has_answer = s.ai_answer.is_some();
         if s.ai_pending && !has_answer {
@@ -7807,8 +7810,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     "HOMEPAGE_CLIPBOARD" => s.icon_clipboard,
                     "HOMEPAGE_LOCAL" => s.icon_folder,
                     "HOMEPAGE_CODE" | "HOMEPAGE_OCR" => s.icon_file,
-                    "HOMEPAGE_AICHAT" | "AICHAT" => s.icon_agent_chat,
                     "HOMEPAGE_AI" | "AI" => s.icon_agent,
+                    "AI_CHAT" => s.icon_agent_chat,
                     _ => s.icon_app,
                 };
 
@@ -8855,7 +8858,7 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
             "Agent History",
             "AI > Agent History",
             "agentchats:",
-            "HOMEPAGE_AICHAT",
+            "HOMEPAGE_AI",
         ),
     ];
 
@@ -9599,14 +9602,14 @@ unsafe fn load_icon_from_dll(dll_name: &str, index: i32, size: i32) -> HICON {
     }
 }
 
-unsafe fn load_image_to_hicon(bytes: &[u8], size: u32) -> HICON {
+unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
     use windows::Win32::Graphics::Gdi::{
         CreateBitmap, CreateDIBSection, DeleteObject, GetDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
         DIB_RGB_COLORS,
     };
     use windows::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, ICONINFO};
 
-    let img = match image::load_from_memory(bytes) {
+    let img = match image::load_from_memory_with_format(bytes, image::ImageFormat::Png) {
         Ok(img) => {
             let rgba = img.into_rgba8();
             image::imageops::resize(&rgba, size, size, image::imageops::FilterType::Lanczos3)

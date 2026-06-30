@@ -2400,7 +2400,7 @@ impl SearchEngine {
                             actual_name
                         ),
                         launch_command: format!("startnewagent:{}", actual_name),
-                        source: "AI".to_string(),
+                        source: "AI_CHAT".to_string(),
                         description: format!("Create a new chat thread with @{}", actual_name),
                         synonyms: format!(
                             "new conversation chat agent {}",
@@ -2491,7 +2491,7 @@ impl SearchEngine {
                     control_name: prompt_display,
                     breadcrumb_path: breadcrumb,
                     launch_command: format!("aichat:{}", id),
-                    source: "AI".to_string(),
+                    source: "AI_CHAT".to_string(),
                     description: format!("{} | Enter to select & continue", time_str),
                     synonyms: "agent chat history run hermes conversation".to_string(),
                 },
