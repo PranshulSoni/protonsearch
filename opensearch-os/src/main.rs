@@ -5189,10 +5189,14 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
         query: s.query.clone(),
         query_id: s.current_query_id,
     };
-    // Dispatch to both workers; the fast one returns files/folders instantly, the slow one
-    // streams in content/OCR/settings whenever its FTS finishes.
-    if let Some(ref tx) = s.search_tx {
-        let _ = tx.send(req.clone());
+    // Plain queries get instant files/folders from the fast worker AND the full set from the
+    // slow worker. Prefix queries (bookmarks:, commits:, agentchats:, clip:, file:, …) are
+    // understood ONLY by the slow worker — the fast path returns an empty set that would
+    // overwrite the real page (the "appears then disappears" bug) — so those go to slow only.
+    if !s.has_prefix() {
+        if let Some(ref tx) = s.search_tx {
+            let _ = tx.send(req.clone());
+        }
     }
     if let Some(ref tx) = s.search_tx_slow {
         let _ = tx.send(req);
