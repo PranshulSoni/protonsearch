@@ -626,8 +626,6 @@ unsafe fn create_gdi_font(family: &str, size_px: i32, weight_str: &str) -> HFONT
 }
 
 unsafe fn run(first_settings_run: bool) {
-    let _ = windows::Win32::Media::timeBeginPeriod(1);
-
     let hinst = GetModuleHandleW(PCWSTR::null()).unwrap();
     let face: Vec<u16> = "Segoe UI Variable\0".encode_utf16().collect();
     let fp = PCWSTR(face.as_ptr());
