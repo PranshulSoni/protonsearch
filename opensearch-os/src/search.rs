@@ -2071,6 +2071,11 @@ impl SearchEngine {
         self.search_files_generic(query, false, 50, true)
     }
 
+    pub fn search_folders_only(&self, query: &str) -> Vec<SearchResult> {
+        // Dedicated folder: prefix — title match only (no FTS content)
+        self.search_files_generic(query, false, 50, false)
+    }
+
     pub fn search_code_only(&self, query: &str) -> Vec<SearchResult> {
         // Dedicated code: prefix — include full content search
         self.search_files_generic(query, true, 50, true)
@@ -2952,6 +2957,147 @@ impl SearchEngine {
         let q = query.trim();
         let q_lower_trimmed = q.to_lowercase();
 
+        if !with_fts {
+            // FAST SEARCH PATH: Only Apps, Recent Files, and Files/Folders by title
+            let q_clean = q.to_string();
+            let q_lower = q_lower_trimmed.clone();
+            let q_words: Vec<&str> = q_lower.split_whitespace().collect();
+
+            // 1. App matches
+            let mut app_matches = Vec::new();
+            for app in &self.apps {
+                let app_lower = app.name.to_lowercase();
+                let mut score = 0.0f32;
+                if app_lower == q_lower {
+                    score = 120.0;
+                } else if app_lower.starts_with(&q_lower) && q_lower.chars().count() >= 2 {
+                    score = 118.0;
+                } else if app_lower.starts_with(&q_lower) {
+                    score = 116.0;
+                } else if q_lower.starts_with(&app_lower) {
+                    score = 114.0;
+                } else if app_lower.contains(&q_lower) {
+                    score = 112.0;
+                } else if q_lower.contains(&app_lower) {
+                    score = 110.0;
+                } else {
+                    let app_words: Vec<&str> = app_lower.split_whitespace().collect();
+                    let mut matched = 0;
+                    for qw in &q_words {
+                        if app_words.contains(qw) {
+                            matched += 1;
+                        }
+                    }
+                    if matched > 0 && !q_words.is_empty() {
+                        let ratio = matched as f32 / q_words.len() as f32;
+                        if ratio >= 0.5 {
+                            score = 100.0 + ratio;
+                        }
+                    }
+                }
+                if score > 0.0 {
+                    app_matches.push(SearchResult {
+                        entry: CatalogEntry {
+                            id: format!("app.{}", app.name),
+                            control_name: app.name.clone(),
+                            breadcrumb_path: format!("Applications > {}", app.name),
+                            launch_command: format!("shell:AppsFolder\\{}", app.path),
+                            source: "app".to_string(),
+                            description: format!("Launch {}", app.name),
+                            synonyms: app.name.to_lowercase(),
+                        },
+                        score,
+                    });
+                }
+            }
+            app_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+            // 2. Recent matches
+            let mut recent_matches = Vec::new();
+            for rf in &self.recent_files {
+                let name_lower = rf.name.to_lowercase();
+                let name_no_ext = if let Some(dot) = name_lower.rfind('.') {
+                    &name_lower[..dot]
+                } else {
+                    &name_lower
+                };
+                let mut score = 0.0f32;
+                if name_lower == q_lower || name_no_ext == q_lower {
+                    score = 89.0;
+                } else if name_lower.starts_with(&q_lower) || name_no_ext.starts_with(&q_lower) {
+                    score = 86.0;
+                } else if name_lower.contains(&q_lower) {
+                    score = 82.0;
+                } else {
+                    let name_words: Vec<&str> = name_no_ext
+                        .split(|c: char| !c.is_alphanumeric())
+                        .filter(|w| !w.is_empty())
+                        .collect();
+                    let mut matched = 0;
+                    for qw in &q_words {
+                        if name_words.contains(qw) {
+                            matched += 1;
+                        }
+                    }
+                    if matched > 0 && !q_words.is_empty() {
+                        let ratio = matched as f32 / q_words.len() as f32;
+                        if ratio >= 0.5 {
+                            score = 78.0 + ratio;
+                        }
+                    }
+                }
+                if score > 0.0 {
+                    let ext = rf.name.rsplit('.').next().unwrap_or("").to_uppercase();
+                    recent_matches.push(SearchResult {
+                        entry: CatalogEntry {
+                            id: format!("recent.{}", rf.path),
+                            control_name: rf.name.clone(),
+                            breadcrumb_path: format!("Recent > {}", rf.path),
+                            launch_command: rf.path.clone(),
+                            source: "RECENT".to_string(),
+                            description: format!("Recently opened {} file", ext),
+                            synonyms: rf.name.to_lowercase(),
+                        },
+                        score,
+                    });
+                }
+            }
+            recent_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+            // 3. File matches by title
+            let mut file_matches = self.search_local_files_with_fts(&q_lower, false);
+            file_matches.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            for m in &mut file_matches {
+                m.score += 70.0;
+            }
+
+            // Merge and return
+            let mut merged = Vec::new();
+            merged.append(&mut app_matches);
+            merged.append(&mut recent_matches);
+            merged.append(&mut file_matches);
+            merged.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            
+            // Deduplicate
+            let mut unique_results = Vec::new();
+            let mut seen_ids = std::collections::HashSet::new();
+            let mut seen_launches = std::collections::HashSet::new();
+            for r in merged {
+                let is_duplicate = seen_ids.contains(&r.entry.id)
+                    || (!r.entry.launch_command.is_empty()
+                        && seen_launches.contains(&r.entry.launch_command));
+                if !is_duplicate {
+                    seen_ids.insert(r.entry.id.clone());
+                    if !r.entry.launch_command.is_empty() {
+                        seen_launches.insert(r.entry.launch_command.clone());
+                    }
+                    unique_results.push(r);
+                }
+            }
+            unique_results.truncate(top_k);
+            return unique_results;
+        }
+
         // ── Phase 3: System Toggles & Audio Controls ─────────────────────────
         if q_lower_trimmed.starts_with("volume ") || q_lower_trimmed.starts_with("vol ") {
             let num_str = if q_lower_trimmed.starts_with("volume ") {
@@ -3543,6 +3689,11 @@ impl SearchEngine {
         if q_lower_trimmed.starts_with("file:") {
             let sub_query = q_lower_trimmed.strip_prefix("file:").unwrap().trim();
             return self.search_files_only(sub_query);
+        }
+
+        if q_lower_trimmed.starts_with("folder:") {
+            let sub_query = q_lower_trimmed.strip_prefix("folder:").unwrap().trim();
+            return self.search_folders_only(sub_query);
         }
 
         if q_lower_trimmed.starts_with("code:") {

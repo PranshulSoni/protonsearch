@@ -176,6 +176,7 @@ enum FormState {
 enum FilterType {
     All,
     Files,
+    Folders,
     Content,
     Images,
     OCR,
@@ -322,7 +323,7 @@ struct State {
 
     active_filter: FilterType,
     hovered_filter: Option<FilterType>,
-    filter_counts: [usize; 8],
+    filter_counts: [usize; 9],
     filter_scroll_x: i32,
     sort_asc: bool,
     text_selected: bool,
@@ -416,6 +417,7 @@ impl State {
             || q.starts_with("clip:")
             || q.starts_with("clipboard:")
             || q.starts_with("file:")
+            || q.starts_with("folder:")
             || q.starts_with("code:")
             || q.starts_with("img:")
             || q.starts_with("agentchats:")
@@ -945,7 +947,7 @@ unsafe fn run() {
         icon_new_search,
         active_filter: FilterType::All,
         hovered_filter: None,
-        filter_counts: [0; 8],
+        filter_counts: [0; 9],
         filter_scroll_x: 0,
         sort_asc: false,
         text_selected: false,
@@ -7318,6 +7320,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             let filters = [
                 ("All", FilterType::All),
                 ("Files", FilterType::Files),
+                ("Folders", FilterType::Folders),
                 ("Content", FilterType::Content),
                 ("Images", FilterType::Images),
                 ("OCR", FilterType::OCR),
@@ -8517,7 +8520,7 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
 fn clean_query_prefix(query: &str) -> &str {
     let prefixes = [
         "bookmarks:", "history:", "commits:", "todos:", "clip:", "clipboard:",
-        "file:", "code:", "img:", "image:", "screenshots:", "agentchats:"
+        "file:", "folder:", "code:", "img:", "image:", "screenshots:", "agentchats:"
     ];
     let q_lower = query.to_lowercase();
     for p in &prefixes {
@@ -8532,6 +8535,8 @@ fn filter_type_from_prefix(query: &str) -> FilterType {
     let q = query.to_lowercase();
     if q.starts_with("file:") {
         FilterType::Files
+    } else if q.starts_with("folder:") {
+        FilterType::Folders
     } else if q.starts_with("code:") || q.starts_with("commits:") || q.starts_with("todos:") {
         FilterType::Code
     } else if q.starts_with("img:") || q.starts_with("image:") || q.starts_with("screenshots:") {
@@ -8544,7 +8549,7 @@ fn filter_type_from_prefix(query: &str) -> FilterType {
 fn update_query_for_filter(query: &str, ftype: FilterType) -> String {
     let prefixes = [
         "bookmarks:", "history:", "commits:", "todos:", "clip:", "clipboard:",
-        "file:", "code:", "img:", "image:", "screenshots:", "agentchats:"
+        "file:", "folder:", "code:", "img:", "image:", "screenshots:", "agentchats:"
     ];
     let mut clean_query = query.to_string();
     let q_lower = query.to_lowercase();
@@ -8558,6 +8563,7 @@ fn update_query_for_filter(query: &str, ftype: FilterType) -> String {
     match ftype {
         FilterType::All => clean_query,
         FilterType::Files => format!("file: {}", clean_query),
+        FilterType::Folders => format!("folder: {}", clean_query),
         FilterType::Code => format!("code: {}", clean_query),
         FilterType::Images => format!("img: {}", clean_query),
         FilterType::OCR => format!("img: {}", clean_query),
@@ -8569,12 +8575,13 @@ fn filter_index(ftype: FilterType) -> usize {
     match ftype {
         FilterType::All => 0,
         FilterType::Files => 1,
-        FilterType::Content => 2,
-        FilterType::Images => 3,
-        FilterType::OCR => 4,
-        FilterType::Code => 5,
-        FilterType::Settings => 6,
-        FilterType::Commands => 7,
+        FilterType::Folders => 2,
+        FilterType::Content => 3,
+        FilterType::Images => 4,
+        FilterType::OCR => 5,
+        FilterType::Code => 6,
+        FilterType::Settings => 7,
+        FilterType::Commands => 8,
     }
 }
 
@@ -8598,8 +8605,10 @@ fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
         FilterType::All => true,
         FilterType::Files => {
             src == "FILE"
-                || src == "FOLDER"
                 || src == "RECENT"
+        }
+        FilterType::Folders => {
+            src == "FOLDER"
         }
         FilterType::Content => {
             src == "CONTENT"
@@ -8607,6 +8616,7 @@ fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
                 || src == "CODE_CONTENT"
                 || src == "PDF"
                 || src == "DOCX"
+                || src == "OCR"
         }
         FilterType::Images => src == "IMAGE" || cmd.starts_with("copy_image:"),
         FilterType::OCR => src == "OCR",
@@ -8643,12 +8653,13 @@ fn result_matches_filter(r: &SearchResult, ftype: FilterType) -> bool {
     }
 }
 
-fn filter_counts_for_results(results: &[SearchResult]) -> [usize; 8] {
-    let mut counts = [0; 8];
+fn filter_counts_for_results(results: &[SearchResult]) -> [usize; 9] {
+    let mut counts = [0; 9];
     counts[0] = results.len();
     for r in results {
         for ftype in [
             FilterType::Files,
+            FilterType::Folders,
             FilterType::Content,
             FilterType::Images,
             FilterType::OCR,
@@ -8668,6 +8679,7 @@ fn filter_pill_rects(s: &State, x_start: i32, list_y: i32) -> Vec<(FilterType, R
     let filters = [
         ("All", FilterType::All),
         ("Files", FilterType::Files),
+        ("Folders", FilterType::Folders),
         ("Content", FilterType::Content),
         ("Images", FilterType::Images),
         ("OCR", FilterType::OCR),
@@ -10079,17 +10091,19 @@ mod tests {
         };
         let results = vec![
             mk("FILE", "C:\\readme.md"),
+            mk("FOLDER", "C:\\Users"),
             mk("CODE", "C:\\main.rs"),
             mk("Settings", "ms-settings:display"),
             mk("OCR", "C:\\screen.png"),
         ];
         let counts = filter_counts_for_results(&results);
-        assert_eq!(counts[filter_index(FilterType::All)], 4);
+        assert_eq!(counts[filter_index(FilterType::All)], 5);
         assert_eq!(counts[filter_index(FilterType::Files)], 1);
+        assert_eq!(counts[filter_index(FilterType::Folders)], 1);
         assert_eq!(counts[filter_index(FilterType::Code)], 1);
         assert_eq!(counts[filter_index(FilterType::Settings)], 1);
         assert_eq!(counts[filter_index(FilterType::Images)], 0);
-        assert_eq!(counts[filter_index(FilterType::Content)], 0);
+        assert_eq!(counts[filter_index(FilterType::Content)], 1); // OCR counts as content
         assert_eq!(counts[filter_index(FilterType::OCR)], 1);
     }
 
