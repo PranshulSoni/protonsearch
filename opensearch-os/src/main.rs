@@ -76,6 +76,7 @@ const WM_AI_PROGRESS: u32 = WM_USER + 8;
 const WM_TRAYICON: u32 = WM_USER + 9;
 const WM_RELOAD_SETTINGS: u32 = WM_USER + 10;
 const WM_SET_HOTKEY_RECORDING: u32 = WM_USER + 11;
+const WM_LAUNCH_AGENT: u32 = WM_USER + 12;
 
 unsafe fn setup_tray_icon(
     hwnd: windows::Win32::Foundation::HWND,
@@ -3318,6 +3319,39 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             LRESULT(0)
         }
 
+        WM_LAUNCH_AGENT => {
+            let agent_id = wp.0 as i64;
+            if !sp.is_null() {
+                let s = &mut *sp;
+                if let Ok(conn) = rusqlite::Connection::open(&s.db_path) {
+                    let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                    if let Ok(name) = conn.query_row(
+                        "SELECT name FROM agents WHERE id = ?",
+                        [agent_id],
+                        |row| row.get::<_, String>(0)
+                    ) {
+                        let new_title = format!("@{}: [New Conversation]", name);
+                        let chat_id = store_ai_chat(&s.db_path, "agent", &new_title, "", "");
+                        s.ai_pending = false;
+                        s.ai_answer =
+                            Some("Ask me anything! I will execute tasks on your PC using Hermes.".to_string());
+                        s.ai_title = new_title;
+                        s.ai_scroll = 0;
+                        s.ai_follow_bottom = true;
+                        s.active_chat_id = chat_id;
+                        s.chat_input.clear();
+                        s.chat_cursor_pos = 0;
+                        s.chat_input_active = true;
+                        s.reset_results();
+                        s.selected = 0;
+                        s.scroll_offset = 0;
+                        do_show(hwnd, s);
+                    }
+                }
+            }
+            LRESULT(0)
+        }
+
         windows::Win32::UI::WindowsAndMessaging::WM_COMMAND => {
             let cmd = wp.0 & 0xFFFF;
             if cmd == 1 {
@@ -4822,14 +4856,22 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             let _agent_id: i64 = parts.next().and_then(|v| v.parse().ok()).unwrap_or(-1);
             let name = parts.next().unwrap_or("").to_string();
             if !name.is_empty() {
-                s.query = format!("agentchats:@{}", name);
-                s.cursor_pos = s.query.len();
+                let db_path = s.db_path.clone();
+                let new_title = format!("@{}: [New Conversation]", name);
+                let chat_id = store_ai_chat(&db_path, "agent", &new_title, "", "");
+                s.ai_pending = false;
+                s.ai_answer =
+                    Some("Ask me anything! I will execute tasks on your PC using Hermes.".to_string());
+                s.ai_title = new_title;
+                s.ai_scroll = 0;
+                s.ai_follow_bottom = true;
+                s.active_chat_id = chat_id;
+                s.chat_input.clear();
+                s.chat_cursor_pos = 0;
+                s.chat_input_active = true;
                 s.reset_results();
                 s.selected = 0;
                 s.scroll_offset = 0;
-                s.text_selected = false;
-                reset_cursor_blink(hwnd, s);
-                trigger_search(hwnd, s);
                 let _ = InvalidateRect(hwnd, None, FALSE);
             }
             return;
