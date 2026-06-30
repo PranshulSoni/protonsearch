@@ -565,6 +565,7 @@ fn enforce_single_instance() -> Option<windows::Win32::Foundation::HANDLE> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 fn main() {
+    install_panic_logger();
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|arg| arg == "--settings") {
         unsafe {
@@ -599,6 +600,49 @@ fn main() {
     unsafe {
         run(first_settings_run);
     }
+}
+
+/// Install a global panic hook that appends the panic message, source location and a
+/// backtrace to %APPDATA%/opensearch-os/panic.log. This binary is a windowed app with no
+/// console, so a panic otherwise produces only an opaque 0xC000041D exit with no message.
+/// The hook itself never panics (every fallible call is ignored), so it can't recurse.
+fn install_panic_logger() {
+    std::panic::set_hook(Box::new(|info| {
+        use std::io::Write;
+        let loc = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "<unknown location>".to_string());
+        let msg = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "<non-string panic payload>".to_string());
+        let thread = std::thread::current()
+            .name()
+            .unwrap_or("<unnamed>")
+            .to_string();
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let bt = std::backtrace::Backtrace::force_capture();
+        let entry = format!(
+            "\n==== PANIC (epoch {secs}) ====\nthread: {thread}\nlocation: {loc}\nmessage: {msg}\nbacktrace:\n{bt}\n"
+        );
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let dir = std::path::Path::new(&appdata).join("opensearch-os");
+            let _ = std::fs::create_dir_all(&dir);
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join("panic.log"))
+            {
+                let _ = f.write_all(entry.as_bytes());
+            }
+        }
+    }));
 }
 
 unsafe fn create_gdi_font(family: &str, size_px: i32, weight_str: &str) -> HFONT {
@@ -1454,6 +1498,28 @@ unsafe fn hide_preview_window(s: &State) {
 
 // ── WndProc ───────────────────────────────────────────────────────────────────
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
+    // A panic must never unwind across this `extern "system"` boundary — that is UB and
+    // Windows tears the process down with STATUS_FATAL_USER_CALLBACK_EXCEPTION (0xC000041D).
+    // Catch any panic from a message handler (e.g. a bad paint), let the panic hook record
+    // its location to panic.log, and fall back to default handling so the app survives.
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        wnd_proc_inner(hwnd, msg, wp, lp)
+    })) {
+        Ok(res) => res,
+        Err(_) => {
+            if msg == WM_PAINT {
+                // The paint handler may have panicked after BeginPaint without validating
+                // the update region; clear it so we don't spin re-painting + re-panicking.
+                let _ = windows::Win32::Graphics::Gdi::ValidateRect(hwnd, None);
+                LRESULT(0)
+            } else {
+                DefWindowProcW(hwnd, msg, wp, lp)
+            }
+        }
+    }
+}
+
+unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     let sp = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut State;
     #[allow(non_snake_case)]
     let SEARCH_H = if !sp.is_null() {
@@ -7890,21 +7956,27 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     "HOMEPAGE_CODE" => "Code",
                     "HOMEPAGE_OCR" => "OCR",
                     "HOMEPAGE_AI" => "AI",
+                    "HOMEPAGE_AI_CHAT" => "AI",
                     _ => "",
                 };
-                let mut cat: Vec<u16> = cat_str.encode_utf16().collect();
-                let mut rc_cat = RECT {
-                    left: x + list_w / 2,
-                    top: ry,
-                    right: x + list_w - PAD_L,
-                    bottom: ry + s.item_h(),
-                };
-                let _ = DrawTextW(
-                    mdc,
-                    &mut cat,
-                    &mut rc_cat,
-                    DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                );
+                // DrawTextW must never be called with an empty slice: an empty &mut [u16]
+                // yields a dangling pointer that faults inside user32.dll (this was the
+                // startup crash — HOMEPAGE_AI_CHAT fell through to "" above).
+                if !cat_str.is_empty() {
+                    let mut cat: Vec<u16> = cat_str.encode_utf16().collect();
+                    let mut rc_cat = RECT {
+                        left: x + list_w / 2,
+                        top: ry,
+                        right: x + list_w - PAD_L,
+                        bottom: ry + s.item_h(),
+                    };
+                    let _ = DrawTextW(
+                        mdc,
+                        &mut cat,
+                        &mut rc_cat,
+                        DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                    );
+                }
             } else if s.has_prefix() {
                 // ── Flat results layout with headers ───────────────────
                 let starts_section = res_idx == 0
@@ -9609,6 +9681,10 @@ unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
     };
     use windows::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, ICONINFO};
 
+    if size == 0 {
+        return HICON(null_mut());
+    }
+
     let img = match image::load_from_memory_with_format(bytes, image::ImageFormat::Png) {
         Ok(img) => {
             let rgba = img.into_rgba8();
@@ -9618,6 +9694,9 @@ unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
     };
 
     let (width, height) = img.dimensions();
+    if width == 0 || height == 0 {
+        return HICON(null_mut());
+    }
 
     let bmi = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
@@ -9633,6 +9712,9 @@ unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
     };
 
     let hdc = GetDC(HWND(null_mut()));
+    if hdc.is_invalid() {
+        return HICON(null_mut());
+    }
     let mut bits: *mut u8 = null_mut();
     let h_color = CreateDIBSection(
         hdc,
@@ -9643,11 +9725,14 @@ unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
         0,
     );
 
+    let mut hicon = HICON(null_mut());
     if let Ok(h) = h_color {
-        if !bits.is_null() {
-            let slice = std::slice::from_raw_parts_mut(bits, (width * height * 4) as usize);
-            let src = img.as_raw();
-            for i in 0..(width * height) as usize {
+        // Guard the color DIB handle and its backing bits before touching memory.
+        let expected = (width as usize) * (height as usize) * 4;
+        let src = img.as_raw();
+        if !h.0.is_null() && !bits.is_null() && src.len() >= expected {
+            let slice = std::slice::from_raw_parts_mut(bits, expected);
+            for i in 0..(width as usize * height as usize) {
                 // premultiply alpha
                 let a = src[i * 4 + 3] as u32;
                 let r = (src[i * 4] as u32 * a) / 255;
@@ -9660,27 +9745,39 @@ unsafe fn load_png_to_hicon(bytes: &[u8], size: u32) -> HICON {
             }
         }
 
-        let h_mask = CreateBitmap(width as i32, height as i32, 1, 1, Some(std::ptr::null()));
-
-        let mut ii = ICONINFO {
-            fIcon: TRUE,
-            xHotspot: 0,
-            yHotspot: 0,
-            hbmMask: h_mask,
-            hbmColor: h,
-        };
-
-        let hicon = CreateIconIndirect(&mut ii).unwrap_or(HICON(null_mut()));
+        if !h.0.is_null() {
+            // Monochrome AND-mask, EXPLICITLY zero-initialized. The old code passed a
+            // NULL bits pointer (Some(null)) so the mask was uninitialised; on some
+            // systems CreateIconIndirect then read past / dereferenced a bad mask and
+            // faulted inside user32.dll (the 0xC0000005 startup crash). A real zeroed
+            // buffer (over-allocated, always large enough) makes the alpha channel drive
+            // transparency and keeps the call well-defined.
+            let mask_bits = vec![0u8; (width as usize) * (height as usize) + 4];
+            let h_mask = CreateBitmap(
+                width as i32,
+                height as i32,
+                1,
+                1,
+                Some(mask_bits.as_ptr() as *const core::ffi::c_void),
+            );
+            if !h_mask.0.is_null() {
+                let mut ii = ICONINFO {
+                    fIcon: TRUE,
+                    xHotspot: 0,
+                    yHotspot: 0,
+                    hbmMask: h_mask,
+                    hbmColor: h,
+                };
+                hicon = CreateIconIndirect(&mut ii).unwrap_or(HICON(null_mut()));
+                let _ = DeleteObject(h_mask);
+            }
+        }
 
         let _ = DeleteObject(h);
-        let _ = DeleteObject(h_mask);
-        let _ = ReleaseDC(HWND(null_mut()), hdc);
-
-        return hicon;
     }
 
     let _ = ReleaseDC(HWND(null_mut()), hdc);
-    HICON(null_mut())
+    hicon
 }
 
 fn alpha_bounds(img: &image::RgbaImage) -> Option<(u32, u32, u32, u32)> {
