@@ -1817,8 +1817,14 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     if height_changed {
                         s.shown_h = next_h;
                     }
-                    if s.shown_h == s.target_h && !s.search_loading {
+                    let height_done = s.shown_h == s.target_h;
+                    if height_done && !s.search_loading {
+                        // Nothing left to animate.
                         let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
+                    } else if height_done && s.search_loading {
+                        // Grow finished; only the loading spinner remains, so ease off to a
+                        // gentle 80ms cadence instead of repainting the search row at 60fps.
+                        let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 80, None);
                     }
                     if height_changed {
                         let _ = InvalidateRect(hwnd, None, FALSE);
@@ -3589,6 +3595,14 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         };
     }
 
+    // Paint the content ONCE before fading. The open/close animation only changes the
+    // window's alpha via SetLayeredWindowAttributes — a compositor-level operation — so
+    // the painted content stays valid for the whole fade. (Previously every frame did a
+    // full InvalidateRect(None) + UpdateWindow, repainting the entire full-screen-height
+    // layered surface ~7 times during the 115ms fade — the main reason opening felt heavy.)
+    let _ = InvalidateRect(hwnd, None, FALSE);
+    let _ = UpdateWindow(hwnd);
+
     // Animation loop: DwmFlush() syncs to the monitor vblank for butter-smooth frames.
     // PeekMessage inside the loop keeps the system responsive — other apps' messages
     // (keyboard, mouse, etc.) are still processed during the 115ms animation window.
@@ -3610,9 +3624,10 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         };
         let t = ease_out(p);
         let alpha = (t * 255.0) as u8;
+        // Alpha-only frame: DWM recomposites the already-painted content at the new
+        // opacity. No InvalidateRect/UpdateWindow here — that was repainting the whole
+        // surface every frame and is what made the open/close feel heavy.
         let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
-        let _ = InvalidateRect(hwnd, None, FALSE);
-        let _ = UpdateWindow(hwnd);
 
         let is_finished = if appearing { p >= 1.0 } else { p <= 0.0 };
         if is_finished {
@@ -3630,32 +3645,13 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
             break;
         }
 
-        // Drain any queued messages (icon loads, search results, clipboard events, etc.)
-        // so the system stays responsive during the animation. Skip WM_PAINT — the
-        // UpdateWindow above already handled it synchronously for this frame.
+        // Drain queued messages (icon loads, search results, clipboard events, and any
+        // WM_PAINT from content that genuinely changed mid-fade) so the system stays
+        // responsive and the content repaints only when it actually changes — not every
+        // frame. WM_PAINT is only synthesized when a region is invalid, so draining it
+        // here is free when nothing changed.
         let mut msg = std::mem::zeroed::<windows::Win32::UI::WindowsAndMessaging::MSG>();
-        while PeekMessageW(
-            &mut msg,
-            None,
-            0,
-            windows::Win32::UI::WindowsAndMessaging::WM_PAINT - 1,
-            PM_REMOVE,
-        )
-        .as_bool()
-        {
-            let _ = TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-        // Also drain messages after WM_PAINT
-        while PeekMessageW(
-            &mut msg,
-            None,
-            windows::Win32::UI::WindowsAndMessaging::WM_PAINT + 1,
-            0,
-            PM_REMOVE,
-        )
-        .as_bool()
-        {
+        while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
@@ -5438,7 +5434,10 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
     s.current_query_id += 1;
     s.search_loading = true;
     sync_height_animation(_hwnd, s);
-    let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 80, None);
+    // Drive the window grow at 60fps (16ms). This used to be 80ms, which capped the
+    // grow at ~12fps and made navigation feel choppy. The WM_TIMER handler drops back
+    // to a gentle 80ms once the grow finishes and only the loading spinner remains.
+    let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 16, None);
     let req = SearchRequest {
         query: s.query.clone(),
         query_id: s.current_query_id,
