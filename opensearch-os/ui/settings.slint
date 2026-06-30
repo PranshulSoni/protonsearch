@@ -44,7 +44,7 @@ struct SlintAgent {
 
 export component SettingsWindow inherits Window {
     title: "OmniSearch Settings";
-    icon: @image-url("../../icons/OmniSearchTrans.png");
+    icon: @image-url("../../icons/OmniSearchTrans_small.png");
     min-width: 950px;
     min-height: 600px;
     preferred-width: 950px;
@@ -100,7 +100,7 @@ export component SettingsWindow inherits Window {
     in-out property <string> agent-endpoint;
     in-out property <string> agent-model;
     in-out property <bool> agent-always-approve;
-    in-out property <image> agent-logo: @image-url("../../icons/AgentLogo.png");
+    in-out property <image> agent-logo: @image-url("../../icons/OmniSearchTrans_small.png");
 
     // Database settings properties
     in-out property <string> db-last-indexed;
@@ -122,8 +122,8 @@ export component SettingsWindow inherits Window {
     
     // Theme Tokens
     property <bool> is-light: false; // Locked to dark mode for settings app
-    property <color> bg-color: is-light ? #FAFAFA : #1e1e1e;
-    property <color> sidebar-bg: is-light ? #F0F0F0 : #252525;
+    property <color> bg-color: is-light ? #FAFAFA : #202020;
+    property <color> sidebar-bg: is-light ? #F0F0F0 : #151515;
     property <color> card-bg: is-light ? #FFFFFF : #2b2b2b;
     
     property <color> text-primary: is-light ? #111111 : #ffffff;
@@ -147,6 +147,15 @@ export component SettingsWindow inherits Window {
         Rectangle {
             width: 230px;
             background: root.sidebar-bg;
+            
+            // Vertical divider on the right
+            Rectangle {
+                x: parent.width - 1px;
+                y: 0;
+                width: 1px;
+                height: parent.height;
+                background: root.border-color;
+            }
 
             VerticalBox {
                 padding: 0px;
@@ -166,7 +175,7 @@ export component SettingsWindow inherits Window {
                         VerticalLayout {
                             alignment: center;
                             Image {
-                                source: @image-url("../../icons/OmniSearchTrans.png");
+                                source: @image-url("../../icons/OmniSearchTrans_small.png");
                                 width: 36px;
                                 height: 36px;
                                 image-fit: contain;
