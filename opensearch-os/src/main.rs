@@ -1076,7 +1076,7 @@ unsafe fn run() {
 
     let _ = unsafe { windows::Win32::System::DataExchange::AddClipboardFormatListener(hwnd) };
 
-    SetLayeredWindowAttributes(hwnd, COLOR_KEY, 255, LWA_COLORKEY).unwrap();
+    SetLayeredWindowAttributes(hwnd, COLOR_KEY, 255, LWA_COLORKEY | LWA_ALPHA).unwrap();
 
     // DWM rounded corners (Windows 11) - Do not round the transparent box
     let corner = DWMWCP_DONOTROUND;
@@ -1476,7 +1476,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let s = &mut *sp;
             match s.anim {
                 Anim::Hidden | Anim::Hiding { .. } => do_show(hwnd, s),
-                _ => start_hide(hwnd, s),
+                Anim::Visible => start_hide(hwnd, s),
+                Anim::Appearing { .. } => {}
             }
             LRESULT(0)
         }
@@ -1524,7 +1525,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 if next == hwnd || next.0.is_null() {
                     return LRESULT(0);
                 }
-                if s.app_settings.hide_on_lose_focus && !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. }) {
+                if s.app_settings.hide_on_lose_focus && matches!(s.anim, Anim::Visible) {
                     start_hide(hwnd, s);
                 }
             }
@@ -1539,7 +1540,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 if s.app_settings.hide_on_lose_focus
                     && (app_inactive || window_inactive)
                     && !s.note_editing
-                    && !matches!(s.anim, Anim::Hidden | Anim::Hiding { .. })
+                    && matches!(s.anim, Anim::Visible)
                 {
                     start_hide(hwnd, s);
                 }
@@ -1683,7 +1684,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     s.results_stale = false;
                     if is_final {
                         s.search_loading = false;
-                        let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
                     }
                     s.unfiltered_results = results;
                     s.filter_counts = filter_counts_for_results(&s.unfiltered_results);
@@ -1812,26 +1812,25 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
 
                 TIMER_SEARCH_ANIM => {
                     s.search_anim_tick = (s.search_anim_tick + 1) % 8;
+                    let window_anim_active = tick_window_animation(hwnd, s);
                     let next_h = animated_height(s);
                     let height_changed = next_h != s.shown_h;
                     if height_changed {
                         s.shown_h = next_h;
                     }
                     let height_done = s.shown_h == s.target_h;
-                    if height_done && !s.search_loading {
+                    if height_done && !s.search_loading && !window_anim_active {
                         // Nothing left to animate.
                         let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
-                    } else if height_done && s.search_loading {
+                    } else if height_done && s.search_loading && !window_anim_active {
                         // Grow finished; only the loading spinner remains, so ease off to a
                         // gentle 80ms cadence instead of repainting the search row at 60fps.
                         let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 80, None);
                     }
-                    if height_changed {
+                    if window_anim_active || height_changed {
                         let _ = InvalidateRect(hwnd, None, FALSE);
                     } else if s.search_loading {
                         invalidate_search_row(hwnd, s);
-                    } else {
-                        let _ = InvalidateRect(hwnd, None, FALSE);
                     }
                 }
                 _ => {}
@@ -3451,16 +3450,12 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
     }
     let s = &mut *sp;
 
-    // Guard against re-entrant animation calls (e.g. hotkey pressed mid-animation).
-    static mut IN_ANIMATION: bool = false;
-    if IN_ANIMATION {
-        return;
-    }
-    IN_ANIMATION = true;
-
     let start_time = std::time::Instant::now();
-    let duration = ANIM_DURATION_SEC;
-    let start_p = if appearing { 0.0f32 } else { 1.0f32 };
+    let start_p = match (appearing, &s.anim) {
+        (true, Anim::Hiding { .. }) | (false, Anim::Appearing { .. }) => s.current_p(),
+        (true, _) => 0.0,
+        (false, _) => 1.0,
+    };
 
     if appearing {
         // Save the current foreground window so snippet auto-paste can restore focus to it
@@ -3595,71 +3590,8 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
         };
     }
 
-    // Paint the content ONCE before fading. The open/close animation only changes the
-    // window's alpha via SetLayeredWindowAttributes — a compositor-level operation — so
-    // the painted content stays valid for the whole fade. (Previously every frame did a
-    // full InvalidateRect(None) + UpdateWindow, repainting the entire full-screen-height
-    // layered surface ~7 times during the 115ms fade — the main reason opening felt heavy.)
     let _ = InvalidateRect(hwnd, None, FALSE);
-    let _ = UpdateWindow(hwnd);
-
-    // Animation loop: DwmFlush() syncs to the monitor vblank for butter-smooth frames.
-    // PeekMessage inside the loop keeps the system responsive — other apps' messages
-    // (keyboard, mouse, etc.) are still processed during the 115ms animation window.
-    use windows::Win32::UI::WindowsAndMessaging::{
-        DispatchMessageW, PeekMessageW, TranslateMessage, PM_REMOVE,
-    };
-    loop {
-        match s.anim {
-            Anim::Appearing { .. } if appearing => {}
-            Anim::Hiding { .. } if !appearing => {}
-            _ => break,
-        }
-
-        let elapsed = start_time.elapsed().as_secs_f32();
-        let p = if appearing {
-            (start_p + elapsed / duration).min(1.0)
-        } else {
-            (start_p - elapsed / duration).max(0.0)
-        };
-        let t = ease_out(p);
-        let alpha = (t * 255.0) as u8;
-        // Alpha-only frame: DWM recomposites the already-painted content at the new
-        // opacity. No InvalidateRect/UpdateWindow here — that was repainting the whole
-        // surface every frame and is what made the open/close feel heavy.
-        let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
-
-        let is_finished = if appearing { p >= 1.0 } else { p <= 0.0 };
-        if is_finished {
-            if appearing {
-                s.anim = Anim::Visible;
-                s.target_h = s.target_win_h();
-                s.shown_h = s.target_h;
-                s.height_anim_from = s.target_h;
-                s.height_anim_started = std::time::Instant::now();
-                force_foreground(hwnd);
-            } else {
-                s.anim = Anim::Hidden;
-                let _ = ShowWindow(hwnd, SW_HIDE);
-            }
-            break;
-        }
-
-        // Drain queued messages (icon loads, search results, clipboard events, and any
-        // WM_PAINT from content that genuinely changed mid-fade) so the system stays
-        // responsive and the content repaints only when it actually changes — not every
-        // frame. WM_PAINT is only synthesized when a region is invalid, so draining it
-        // here is free when nothing changed.
-        let mut msg = std::mem::zeroed::<windows::Win32::UI::WindowsAndMessaging::MSG>();
-        while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
-            let _ = TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-
-        let _ = DwmFlush(); // Block until next vblank for frame-perfect timing
-    }
-
-    IN_ANIMATION = false;
+    let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 16, None);
 }
 
 // AttachThreadInput trick: allows SetForegroundWindow to succeed even from background context.
@@ -5320,6 +5252,43 @@ fn animated_height(s: &State) -> i32 {
     (s.height_anim_from as f32 + (s.target_h - s.height_anim_from) as f32 * eased) as i32
 }
 
+unsafe fn tick_window_animation(hwnd: HWND, s: &mut State) -> bool {
+    let p = s.current_p();
+    match s.anim {
+        Anim::Appearing { .. } => {
+            let alpha = (ease_out(p) * 255.0).round() as u8;
+            let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
+            if p >= 1.0 {
+                s.anim = Anim::Visible;
+                s.target_h = s.target_win_h();
+                s.shown_h = s.target_h;
+                s.height_anim_from = s.target_h;
+                s.height_anim_started = std::time::Instant::now();
+                let _ =
+                    SetLayeredWindowAttributes(hwnd, COLOR_KEY, 255, LWA_COLORKEY | LWA_ALPHA);
+                applog::log("animate_window: visible");
+                force_foreground(hwnd);
+                false
+            } else {
+                true
+            }
+        }
+        Anim::Hiding { .. } => {
+            let alpha = (ease_out(p) * 255.0).round() as u8;
+            let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
+            if p <= 0.0 {
+                s.anim = Anim::Hidden;
+                let _ = ShowWindow(hwnd, SW_HIDE);
+                applog::log("animate_window: hidden");
+                false
+            } else {
+                true
+            }
+        }
+        _ => false,
+    }
+}
+
 fn search_row_invalidation_rect(client_w: i32, cy: i32, current_h: i32, search_h: i32) -> RECT {
     let x = (client_w - WIN_W) / 2;
     let y = launcher_top_y(cy, current_h);
@@ -5417,7 +5386,6 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
         s.results_stale = false;
         s.search_loading = false;
         s.active_filter = FilterType::All;
-        let _ = KillTimer(_hwnd, TIMER_SEARCH_ANIM);
         s.unfiltered_results = default_homepage_results();
         s.results = s.unfiltered_results.clone();
         // Land on the homepage item the user last visited, not a fixed default.
