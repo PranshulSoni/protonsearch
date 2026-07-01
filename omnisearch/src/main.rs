@@ -9253,7 +9253,11 @@ fn filter_index(ftype: FilterType) -> usize {
 }
 
 fn apply_sort(results: &mut Vec<SearchResult>, sort_asc: bool, query: &str) {
-    if query.trim().is_empty() {
+    let q_trimmed = query.trim().to_lowercase();
+    if q_trimmed.is_empty() {
+        return;
+    }
+    if q_trimmed.starts_with("history:") || q_trimmed.starts_with("clipboard:") || q_trimmed.starts_with("clip:") {
         return;
     }
     if sort_asc {
