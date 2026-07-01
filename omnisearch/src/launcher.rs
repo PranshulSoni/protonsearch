@@ -35,8 +35,9 @@ pub fn launch(cmd: &str) {
         if let Some(last_colon) = rest.rfind(':') {
             let file_path = &rest[..last_colon];
             let line_number = &rest[last_colon + 1..];
-            let _ = Command::new("cmd")
-                .args(["/c", &format!("code -g \"{file_path}\":{line_number}")])
+            let _ = Command::new("code")
+                .arg("-g")
+                .arg(format!("{}:{}", file_path, line_number))
                 .creation_flags(0x08000000) // CREATE_NO_WINDOW
                 .spawn();
         }
