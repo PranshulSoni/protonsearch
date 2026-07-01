@@ -1522,6 +1522,13 @@ thread_local! {
     static ANIM_LOOP_ACTIVE: std::cell::Cell<bool> = std::cell::Cell::new(false);
 }
 
+/// Guards clipboard access across threads; only one thread may hold
+/// the Windows clipboard open at a time.
+static CLIPBOARD_LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+pub fn clipboard_lock() -> &'static std::sync::Mutex<()> {
+    CLIPBOARD_LOCK.get_or_init(|| std::sync::Mutex::new(()))
+}
+
 unsafe fn trigger_anim_loop(hwnd: HWND) {
     ANIM_LOOP_ACTIVE.with(|f| {
         if !f.get() {
@@ -1742,6 +1749,9 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
 
             let db_path = s.db_path.clone();
             let app_name = unsafe { get_active_app_name() };
+
+            // Serialize clipboard access with the background thread (paste_sequentially)
+            let _clip_guard = clipboard_lock().lock().unwrap();
 
             // Try text format
             if let Some(text) = unsafe { paste_from_clipboard(hwnd) } {

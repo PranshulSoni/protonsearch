@@ -446,6 +446,7 @@ fn handle_action(action: &str) {
                         std::thread::spawn(move || {
                             for item in items.into_iter().rev() {
                                 std::thread::sleep(std::time::Duration::from_millis(500));
+                                let _clip_guard = crate::clipboard_lock().lock().unwrap();
                                 use windows::Win32::System::DataExchange::{OpenClipboard, EmptyClipboard, SetClipboardData, CloseClipboard};
                                 use windows::Win32::Foundation::{HANDLE, HWND};
                                 use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
