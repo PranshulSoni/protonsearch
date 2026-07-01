@@ -119,6 +119,7 @@ export component SettingsWindow inherits Window {
     in-out property <string> update-status: "idle"; // "idle", "checking", "available", "downloading", "ready", "uptodate", "error"
     in-out property <string> update-version: "";
     in-out property <int> update-progress: 0;
+    in-out property <string> app-version: "1.0.0";
 
     // Update callbacks
     callback check-for-updates();
@@ -1672,7 +1673,7 @@ export component SettingsWindow inherits Window {
                                     VerticalLayout {
                                         alignment: center;
                                         spacing: 2px;
-                                        Text { text: "0.1.0"; font-size: 18px; font-weight: 600; color: root.text-primary; }
+                                        Text { text: root.app-version; font-size: 18px; font-weight: 600; color: root.text-primary; }
                                         Text { text: "Version"; font-size: 13px; color: root.text-muted; }
                                     }
                                 }

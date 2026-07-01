@@ -125,6 +125,7 @@ pub fn run_settings_window() {
     let settings = AppSettings::load();
     let (api_key, endpoint, model, always_approve) = load_ai_settings();
 
+    ui.set_app_version(CURRENT_VERSION.into());
     ui.set_run_on_startup(settings.run_on_startup);
     ui.set_hide_on_lose_focus(settings.hide_on_lose_focus);
     ui.set_show_taskbar(settings.show_taskbar);
