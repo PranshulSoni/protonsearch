@@ -40,22 +40,40 @@ Type: filesandordirs; Name: "{userappdata}\omnisearch"
 procedure TerminateApp;
 var
   ResultCode: Integer;
-  Retries: Integer;
+  AppPath: String;
+  BackupPath: String;
+  HermesPath: String;
+  HermesBackupPath: String;
 begin
-  Exec('taskkill.exe', '/F /IM omnisearch.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM hermes.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // Force kill processes using full path to taskkill
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM omnisearch.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM hermes.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   
-  // Retry loop: wait up to 5 seconds for the exe file handle to be released.
-  // Re-attempt taskkill halfway through in case a process respawned.
-  Retries := 0;
-  while Retries < 10 do
+  Sleep(500); // let processes terminate
+
+  // Rename fallback for omnisearch.exe
+  AppPath := ExpandConstant('{app}\omnisearch.exe');
+  BackupPath := ExpandConstant('{app}\omnisearch.bak');
+  if FileExists(AppPath) then
   begin
-    Sleep(500);
-    if not FileExists(ExpandConstant('{app}\omnisearch.exe')) then
-      Break;
-    if Retries = 5 then
-      Exec('taskkill.exe', '/F /IM omnisearch.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Retries := Retries + 1;
+    // Attempt to delete any old backup first
+    DeleteFile(BackupPath);
+    // Rename the locked file to .bak so the installer can write a new omnisearch.exe
+    if RenameFile(AppPath, BackupPath) then
+    begin
+      Log('Successfully renamed locked omnisearch.exe to omnisearch.bak');
+    end else begin
+      Log('Failed to rename locked omnisearch.exe');
+    end;
+  end;
+
+  // Rename fallback for hermes.exe
+  HermesPath := ExpandConstant('{app}\hermes.exe');
+  HermesBackupPath := ExpandConstant('{app}\hermes.bak');
+  if FileExists(HermesPath) then
+  begin
+    DeleteFile(HermesBackupPath);
+    RenameFile(HermesPath, HermesBackupPath);
   end;
 end;
 
