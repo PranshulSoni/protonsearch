@@ -15,6 +15,12 @@ path = "src/inspect_db.rs"
 name = "test_slint"
 path = "src/bin/test_slint.rs"
 
+# gpu-test branch: GPU-rendered launcher spike (Slint). Separate target; does not
+# affect the `omnisearch` binary or the settings.slint build path.
+[[bin]]
+name = "gpu-launcher"
+path = "src/gpu_launcher.rs"
+
 [[bin]]
 name = "uninstall"
 path = "src/uninstall.rs"
