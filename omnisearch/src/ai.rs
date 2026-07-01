@@ -350,7 +350,7 @@ fn get_hermes_config() -> AiConfig {
             [],
             |row| row.get::<_, String>(0),
         ) {
-            ALWAYS_APPROVE.store(val.trim() == "1", std::sync::atomic::Ordering::Relaxed);
+            ALWAYS_APPROVE.store(val.trim() == "1", std::sync::atomic::Ordering::Release);
         }
     }
     AiConfig {
@@ -691,7 +691,7 @@ pub fn resolve_run_approval(approval: &HermesApproval, approved: bool) -> Result
     let cfg = get_hermes_config();
     let url = format!("{HERMES_BASE}/v1/runs/{}/approval", approval.run_id);
     let choice = if approved {
-        if ALWAYS_APPROVE.load(std::sync::atomic::Ordering::Relaxed) {
+        if ALWAYS_APPROVE.load(std::sync::atomic::Ordering::Acquire) {
             "always"
         } else {
             "once"
