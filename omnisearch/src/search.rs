@@ -4017,7 +4017,7 @@ impl SearchEngine {
         {
             let lt = q_lower_trimmed.as_str();
             if lt.starts_with("hermes") {
-                let is_running = crate::ai::HERMES_GATEWAY_RUNNING.load(Ordering::Relaxed);
+                let is_running = crate::ai::HERMES_GATEWAY_RUNNING.load(Ordering::SeqCst);
                 let status_label = if is_running {
                     "Hermes Gateway: Running"
                 } else {

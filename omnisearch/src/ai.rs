@@ -441,7 +441,7 @@ pub fn start_hermes_gateway_daemon() {
 }
 
 fn ensure_hermes_gateway_running() -> Result<()> {
-    if !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
+    if !HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
         let hermes_cmd = get_hermes_executable();
         if hermes_cmd == "hermes" {
             let _ = std::process::Command::new("powershell")
@@ -461,7 +461,7 @@ fn ensure_hermes_gateway_running() -> Result<()> {
         )
         .is_ok();
         if running {
-            HERMES_GATEWAY_RUNNING.store(true, std::sync::atomic::Ordering::Relaxed);
+            HERMES_GATEWAY_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
             return Ok(());
         }
 
@@ -476,7 +476,7 @@ fn ensure_hermes_gateway_running() -> Result<()> {
             )
             .is_ok();
             if running {
-                HERMES_GATEWAY_RUNNING.store(true, std::sync::atomic::Ordering::Relaxed);
+                HERMES_GATEWAY_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
                 started = true;
                 break;
             }
@@ -501,7 +501,7 @@ fn fallback_config_from_key(key: &str) -> Option<AiConfig> {
 }
 
 fn get_agent_config() -> AiConfig {
-    if HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
+    if HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
         get_hermes_config()
     } else if let Ok(cfg) = get_config() {
         fallback_config_from_key(&cfg.api_key).unwrap_or_else(get_hermes_config)
@@ -1157,7 +1157,7 @@ mod tests {
         std::env::remove_var("OPENCODE_API_KEY");
         std::env::remove_var("DEEPSEEK_API_KEY");
         std::env::remove_var("OPENSEARCH_AI_KEY");
-        HERMES_GATEWAY_RUNNING.store(false, std::sync::atomic::Ordering::Relaxed);
+        HERMES_GATEWAY_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
 
         let conn = rusqlite::Connection::open(app_dir.join("file_index.db")).unwrap();
         conn.execute(
