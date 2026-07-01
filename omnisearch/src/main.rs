@@ -994,7 +994,7 @@ unsafe fn run(first_settings_run: bool) {
                 std::time::Duration::from_millis(500),
             )
             .is_ok();
-            ai::HERMES_GATEWAY_RUNNING.store(running, std::sync::atomic::Ordering::Relaxed);
+            ai::HERMES_GATEWAY_RUNNING.store(running, std::sync::atomic::Ordering::SeqCst);
             std::thread::sleep(std::time::Duration::from_secs(3));
         }
     });
