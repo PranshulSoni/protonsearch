@@ -45,9 +45,12 @@ OmniSearch brings all of it into one fast, keyboard-first command center. Press 
 
 ## Demo Video
 
-<video src="icons/preview-images/demo-github.mp4" controls width="100%"></video>
+<video controls width="100%">
+  <source src="https://raw.githubusercontent.com/PranshulSoni/omnisearch/lean-build/icons/preview-images/demo-github.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
-[Watch the demo video](icons/preview-images/demo-github.mp4)
+[Watch the demo video](https://raw.githubusercontent.com/PranshulSoni/omnisearch/lean-build/icons/preview-images/demo-github.mp4)
 
 ## Star On GitHub
 
