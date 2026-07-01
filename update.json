@@ -1,5 +1,5 @@
 {
-  "version": "1.0.2",
-  "url": "https://github.com/PranshulSoni/omnisearch/releases/download/v1.0.2/omnisearchsetup.exe",
-  "notes": "Fixes the update installer handoff so the installer opens normally and the app exits cleanly before file replacement."
+  "version": "1.0.3",
+  "url": "https://github.com/PranshulSoni/omnisearch/releases/download/v1.0.3/omnisearchsetup.exe",
+  "notes": "Fix self-update: detach installer process, poll-wait for launcher exit, and retry loop in PrepareToInstall."
 }

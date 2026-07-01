@@ -650,6 +650,7 @@ pub fn run_settings_window() {
             None => return,
         };
 
+        // 1. Ask the main launcher to close gracefully via WM_CLOSE
         let class_name: Vec<u16> = "omnisearch\0".encode_utf16().collect();
         if let Ok(hwnd) = unsafe { windows::Win32::UI::WindowsAndMessaging::FindWindowW(windows::core::PCWSTR(class_name.as_ptr()), None) } {
             if !hwnd.0.is_null() {
@@ -664,12 +665,36 @@ pub fn run_settings_window() {
             }
         }
 
-        // The downloaded file is the Inno setup installer, not the app executable.
-        // Launch the normal installer UI, then exit so setup can replace this process cleanly.
+        // 2. Poll-wait for the launcher window to disappear (up to 3s).
+        //    This ensures the main process has fully exited and released the
+        //    exe file handle before we spawn the installer.
+        for _ in 0..30 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let gone = unsafe {
+                windows::Win32::UI::WindowsAndMessaging::FindWindowW(
+                    windows::core::PCWSTR(class_name.as_ptr()),
+                    None,
+                )
+            };
+            match gone {
+                Ok(h) if h.0.is_null() => break,
+                Err(_) => break,
+                _ => {}
+            }
+        }
+
+        // 3. Launch installer DETACHED so it survives our std::process::exit().
+        //    /SILENT skips the wizard UI since the user already clicked "Install".
+        use std::os::windows::process::CommandExt;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
         let _ = std::process::Command::new(&downloaded_path)
-            .args(["/SUPPRESSMSGBOXES", "/NORESTART"])
+            .args(["/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART"])
+            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
             .spawn();
 
+        // 4. Brief pause to let OS register the detached process, then exit
+        std::thread::sleep(std::time::Duration::from_millis(500));
         std::process::exit(0);
     });
 
