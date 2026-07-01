@@ -45,8 +45,8 @@ OmniSearch brings all of it into one fast, keyboard-first command center. Press 
 
 ## Demo Video
 
-<video controls width="100%">
-  <source src="https://raw.githubusercontent.com/PranshulSoni/omnisearch/lean-build/icons/preview-images/demo-github.mp4" type="video/mp4">
+https://github.com/user-attachments/assets/d37e6edf-e9ba-46a8-98e5-5a96454c4971
+<video src="https://github.com/user-attachments/assets/d37e6edf-e9ba-46a8-98e5-5a96454c4971" controls width="100%">
   Your browser does not support the video tag.
 </video>
 
