@@ -2124,7 +2124,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                             return LRESULT(0);
                         }
                         'v' => {
-                            ai::ALWAYS_APPROVE.store(true, std::sync::atomic::Ordering::Relaxed);
+                            ai::ALWAYS_APPROVE.store(true, std::sync::atomic::Ordering::Release);
                             if let Ok(conn) = rusqlite::Connection::open(&s.db_path) {
                                 let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('always_approve', '1');", []);
                             }
@@ -3029,7 +3029,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                         return LRESULT(0);
                     }
                     if mx >= always_x && mx < always_x + always_w {
-                        ai::ALWAYS_APPROVE.store(true, std::sync::atomic::Ordering::Relaxed);
+                        ai::ALWAYS_APPROVE.store(true, std::sync::atomic::Ordering::Release);
                         if let Ok(conn) = rusqlite::Connection::open(&s.db_path) {
                             let _ = conn.execute("INSERT OR REPLACE INTO ai_settings (key, value) VALUES ('always_approve', '1');", []);
                         }
@@ -4556,7 +4556,7 @@ impl ai::RunCallbacks for UiRunCallbacks {
             }
         }
 
-        if ai::ALWAYS_APPROVE.load(std::sync::atomic::Ordering::Relaxed) {
+        if ai::ALWAYS_APPROVE.load(std::sync::atomic::Ordering::Acquire) {
             std::thread::spawn(move || {
                 let _ = ai::resolve_run_approval(&approval, true);
             });
