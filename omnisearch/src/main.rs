@@ -1415,13 +1415,12 @@ unsafe extern "system" fn preview_wnd_proc(
     }
 }
 
-unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
-    #[allow(non_snake_case)]
-    let SEARCH_H = s.search_h();
+unsafe fn show_preview_window(hwnd_parent: HWND, s: *mut State) {
     use windows::Win32::Graphics::Gdi::{GetObjectW, InvalidateRect, BITMAP};
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, GetWindowRect, SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE,
-        SW_SHOWNOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+        CreateWindowExW, GetWindowRect, SetWindowPos, ShowWindow, GWLP_USERDATA,
+        HWND_TOPMOST, SetWindowLongPtrW, SWP_NOACTIVATE, SW_SHOWNOACTIVATE, WS_EX_TOOLWINDOW,
+        WS_EX_TOPMOST, WS_POPUP,
     };
 
     let mut parent_rect = RECT::default();
@@ -1430,12 +1429,12 @@ unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
     let mut p_w = 260;
     let mut p_h = parent_rect.bottom - parent_rect.top;
 
-    if let Some((_result, path)) = s
+    if let Some((_result, path)) = (*s)
         .results
-        .get(s.selected)
+        .get((*s).selected)
         .and_then(|result| image_path_for_result(result).map(|path| (result, path)))
     {
-        let mut cache = s.clipboard_thumbnails.borrow_mut();
+        let mut cache = (*s).clipboard_thumbnails.borrow_mut();
         let hbitmap = cache.get(path).copied().or_else(|| {
             load_shell_thumbnail(path, 256).inspect(|h| {
                 cache.insert(path.to_string(), *h);
@@ -1455,7 +1454,6 @@ unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
                 let draw_w = (img_w as f32 * scale).round() as i32;
                 let draw_h = (img_h as f32 * scale).round() as i32;
 
-                // Maximum space occupied by image (small 8px padding on all sides)
                 p_w = draw_w + 16;
                 p_h = draw_h + 16;
             }
@@ -1464,13 +1462,11 @@ unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
 
     let p_x = parent_rect.right + 8;
 
-    // Align vertically with the selected item
-    let visual_idx = s.selected - s.scroll_offset;
-    let item_y = s.result_row_y(visual_idx);
-    let item_center = item_y + (s.app_settings.item_height as i32) / 2;
+    let visual_idx = (*s).selected - (*s).scroll_offset;
+    let item_y = (*s).result_row_y(visual_idx);
+    let item_center = item_y + ((*s).app_settings.item_height as i32) / 2;
     let mut p_y = parent_rect.top + item_center - (p_h / 2);
 
-    // Keep it within the screen/parent bounds
     if p_y + p_h > parent_rect.bottom {
         p_y = parent_rect.bottom - p_h;
     }
@@ -1478,7 +1474,7 @@ unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
         p_y = parent_rect.top;
     }
 
-    if s.hwnd_preview.is_none() {
+    if (*s).hwnd_preview.is_none() {
         let preview_class: Vec<u16> = "omnisearch-preview\0".encode_utf16().collect();
         let hinst = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap();
 
@@ -1494,14 +1490,15 @@ unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
             hwnd_parent,
             HMENU(null_mut()),
             hinst,
-            Some(s as *mut State as _),
+            None,
         );
         if let Ok(h) = hwnd_preview {
+            SetWindowLongPtrW(h, GWLP_USERDATA, s as isize);
             let _ = ShowWindow(h, SW_SHOWNOACTIVATE);
-            s.hwnd_preview = Some(h);
+            (*s).hwnd_preview = Some(h);
         }
     } else {
-        let hwnd_preview = s.hwnd_preview.unwrap();
+        let hwnd_preview = (*s).hwnd_preview.unwrap();
         let _ = SetWindowPos(
             hwnd_preview,
             HWND_TOPMOST,
@@ -2669,7 +2666,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                         if let Some(r) = s.results.get(s.selected) {
                             if image_path_for_result(r).is_some() {
                                 s.image_preview_active = true;
-                                show_preview_window(hwnd, s);
+                                show_preview_window(hwnd, sp);
                                 let _ = InvalidateRect(hwnd, None, FALSE);
                             } else if r.entry.source == "app" {
                                 s.submenu_active = !s.submenu_active;
