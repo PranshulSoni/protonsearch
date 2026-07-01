@@ -14,7 +14,6 @@
   <a href="https://github.com/PranshulSoni/omnisearch/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/PranshulSoni/omnisearch?style=flat-square&label=stars&color=yellow" /></a>
   <a href="https://github.com/PranshulSoni/omnisearch/releases"><img alt="release" src="https://img.shields.io/badge/release-v1.0.0-blue?style=flat-square" /></a>
   <a href="https://github.com/PranshulSoni/omnisearch/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/PranshulSoni/omnisearch/total?style=flat-square&label=downloads&color=brightgreen" /></a>
-  <img alt="views" src="https://img.shields.io/badge/views-184-brightgreen?style=flat-square" />
 </p>
 
 OmniSearch is a fast, local-first Windows launcher that helps users find and open anything already on their PC from one keyboard shortcut.
