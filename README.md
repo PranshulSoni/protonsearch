@@ -50,13 +50,11 @@ OmniSearch brings all of it into one fast, keyboard-first command center. Press 
   Your browser does not support the video tag.
 </video>
 
-[Watch the demo video](https://raw.githubusercontent.com/PranshulSoni/omnisearch/lean-build/icons/preview-images/demo-github.mp4)
-
 ## Star On GitHub
 
 If OmniSearch looks useful, star the repo so more Windows users can find it:
 
-[Star OmniSearch on GitHub](https://github.com/PranshulSoni/omnisearch/stargazers)
+[Star OmniSearch on GitHub](https://github.com/PranshulSoni/omnisearch)
 
 ## Installation
 
