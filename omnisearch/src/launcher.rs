@@ -440,7 +440,7 @@ fn handle_action(action: &str) {
             if let Ok(appdata) = std::env::var("APPDATA") {
                 let db_path = std::path::PathBuf::from(appdata)
                     .join("omnisearch")
-                    .join("index.db");
+                    .join("file_index.db");
                 if let Ok(conn) = rusqlite::Connection::open(&db_path) {
                     if let Ok(mut stmt) = conn.prepare("SELECT content FROM clipboard_history WHERE is_image = 0 ORDER BY timestamp DESC LIMIT 3") {
                         let items: Vec<String> = stmt.query_map([], |row| row.get(0)).map(|m| m.filter_map(|r| r.ok()).collect()).unwrap_or_default();
