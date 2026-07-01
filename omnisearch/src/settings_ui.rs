@@ -693,9 +693,9 @@ pub fn run_settings_window() {
             .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
             .spawn();
 
-        // 4. Brief pause to let OS register the detached process, then exit
+        // 4. Brief pause to let OS register the detached process, then quit
         std::thread::sleep(std::time::Duration::from_millis(500));
-        std::process::exit(0);
+        slint::quit_event_loop().ok();
     });
 
     let ui_weak_status = ui.as_weak();
