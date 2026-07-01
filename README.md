@@ -43,6 +43,30 @@ OmniSearch brings all of it into one fast, keyboard-first command center. Press 
 - **Hermes agent support** — use Hermes to run autonomous tasks, execute approved commands, and help control your PC from the launcher.
 - **Made for Windows power users** — replaces the friction of jumping between Start Menu, File Explorer, browser history, Settings, and AI tools.
 
+## Demo Video
+
+Demo video link will be added here after the release video is uploaded.
+
+## Star On GitHub
+
+If OmniSearch looks useful, star the repo so more Windows users can find it:
+
+[Star OmniSearch on GitHub](https://github.com/PranshulSoni/omnisearch/stargazers)
+
+## Installation
+
+Download the latest Windows build from the [OmniSearch releases page](https://github.com/PranshulSoni/omnisearch/releases), then run the installer.
+
+After installation:
+
+1. Launch OmniSearch.
+2. Press `Alt + Space`.
+3. Add or confirm indexed folders in Settings > Database.
+4. Let the first index finish.
+5. Start searching.
+
+If `Alt + Space` is already used by another app, change the launcher hotkey in Settings > Hotkeys.
+
 ## What You Can Search
 
 | Source | What OmniSearch finds |
@@ -121,29 +145,3 @@ Current implementation details:
 - Background indexing for files, browser data, Git activity, clipboard, and OCR.
 
 The goal is simple: open fast, search fast, and stay light enough to leave running all day.
-
-## Install, Demo, Star
-
-### Install
-
-Download the latest Windows build from the [OmniSearch releases page](https://github.com/PranshulSoni/omnisearch/releases), then run the installer.
-
-After installation:
-
-1. Launch OmniSearch.
-2. Press `Alt + Space`.
-3. Add or confirm indexed folders in Settings > Database.
-4. Let the first index finish.
-5. Start searching.
-
-If `Alt + Space` is already used by another app, change the launcher hotkey in Settings > Hotkeys.
-
-### Demo Video
-
-Demo video link will be added here after the release video is uploaded.
-
-### Star On GitHub
-
-If OmniSearch looks useful, star the repo so more Windows users can find it:
-
-[Star OmniSearch on GitHub](https://github.com/PranshulSoni/omnisearch/stargazers)
