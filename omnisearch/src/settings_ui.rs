@@ -223,7 +223,7 @@ pub fn run_settings_window() {
                 unsafe {
                     let _ = PostMessageW(
                         hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 11,
+                        crate::WM_RELOAD_SETTINGS,
                         windows::Win32::Foundation::WPARAM(0),
                         windows::Win32::Foundation::LPARAM(0),
                     );
@@ -243,7 +243,7 @@ pub fn run_settings_window() {
                 unsafe {
                     let _ = PostMessageW(
                         hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 12,
+                        crate::WM_LAUNCH_AGENT,
                         windows::Win32::Foundation::WPARAM(agent_id as usize),
                         windows::Win32::Foundation::LPARAM(0),
                     );

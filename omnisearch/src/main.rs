@@ -83,9 +83,9 @@ const WM_HERMES_APPROVAL: u32 = WM_USER + 7;
 // Hermes Runs API: streaming output progress (lparam = boxed String).
 const WM_AI_PROGRESS: u32 = WM_USER + 8;
 const WM_TRAYICON: u32 = WM_USER + 9;
-const WM_RELOAD_SETTINGS: u32 = WM_USER + 10;
-const WM_SET_HOTKEY_RECORDING: u32 = WM_USER + 11;
-const WM_LAUNCH_AGENT: u32 = WM_USER + 12;
+pub(crate) const WM_RELOAD_SETTINGS: u32 = WM_USER + 10;
+pub(crate) const WM_SET_HOTKEY_RECORDING: u32 = WM_USER + 11;
+pub(crate) const WM_LAUNCH_AGENT: u32 = WM_USER + 12;
 
 unsafe fn setup_tray_icon(
     hwnd: windows::Win32::Foundation::HWND,
