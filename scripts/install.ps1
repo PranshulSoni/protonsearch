@@ -35,7 +35,16 @@ if (-not (Test-Path $installerPath)) {
 }
 
 Write-Host "Running OmniSearch installer..."
-$process = Start-Process -FilePath $installerPath -ArgumentList $InstallerArgs -Wait -PassThru
+$startArgs = @{
+    FilePath = $installerPath
+    Wait = $true
+    PassThru = $true
+}
+if ($InstallerArgs -and $InstallerArgs.Count -gt 0) {
+    $startArgs.ArgumentList = $InstallerArgs
+}
+
+$process = Start-Process @startArgs
 if ($process.ExitCode -ne 0) {
     throw "Installer exited with code $($process.ExitCode)."
 }
