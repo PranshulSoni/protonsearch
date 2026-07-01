@@ -12,7 +12,7 @@
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square" />
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-green?style=flat-square" /></a>
   <a href="https://github.com/PranshulSoni/omnisearch/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/PranshulSoni/omnisearch?style=flat-square&label=stars&color=yellow" /></a>
-  <a href="https://github.com/PranshulSoni/omnisearch/releases"><img alt="release" src="https://img.shields.io/badge/release-v1.0.0-blue?style=flat-square" /></a>
+  <a href="https://github.com/PranshulSoni/omnisearch/releases"><img src="https://badgen.net/github/release/PranshulSoni/omnisearch" alt="Release"/></a>
   <a href="https://github.com/PranshulSoni/omnisearch/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/PranshulSoni/omnisearch/total?style=flat-square&label=downloads&color=brightgreen" /></a>
 </p>
 
