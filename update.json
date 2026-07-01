@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
-  "url": "https://github.com/PranshulSoni/omnisearch/releases/download/v1.0.1/omnisearchsetup.exe",
-  "notes": "Minor update probe build for validating OmniSearch update checks."
+  "version": "1.0.2",
+  "url": "https://github.com/PranshulSoni/omnisearch/releases/download/v1.0.2/omnisearchsetup.exe",
+  "notes": "Fixes the update installer handoff so the installer opens normally and the app exits cleanly before file replacement."
 }
