@@ -355,6 +355,7 @@ struct State {
     last_mouse_x: i32,
     last_mouse_y: i32,
     app_icons: std::collections::HashMap<String, HICON>,
+    pending_icons: std::collections::HashSet<String>,
     clipboard_thumbnails: std::cell::RefCell<std::collections::HashMap<String, HBITMAP>>,
     selected_clip_ids: std::collections::HashSet<String>,
     delete_confirm: bool,
@@ -938,6 +939,7 @@ unsafe fn run(first_settings_run: bool) {
         last_mouse_x: -1,
         last_mouse_y: -1,
         app_icons: std::collections::HashMap::new(),
+        pending_icons: std::collections::HashSet::new(),
         clipboard_thumbnails: std::cell::RefCell::new(std::collections::HashMap::new()),
         selected_clip_ids: std::collections::HashSet::new(),
         delete_confirm: false,
@@ -1714,11 +1716,16 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             let key_box = unsafe { Box::from_raw(lp.0 as *mut String) };
             let key = *key_box;
 
-            // Insert the loaded HICON into the map
-            if let Some(old_hicon) = s.app_icons.insert(key, hicon) {
-                if !old_hicon.0.is_null() && old_hicon != hicon {
-                    unsafe {
-                        let _ = DestroyIcon(old_hicon);
+            // Remove from pending set so the icon can be retried on next search
+            s.pending_icons.remove(&key);
+
+            if !hicon.0.is_null() {
+                // Insert the loaded HICON into the map
+                if let Some(old_hicon) = s.app_icons.insert(key, hicon) {
+                    if !old_hicon.0.is_null() && old_hicon != hicon {
+                        unsafe {
+                            let _ = DestroyIcon(old_hicon);
+                        }
                     }
                 }
             }
@@ -3352,9 +3359,14 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                 if !s.icon_brave.0.is_null() {
                     let _ = DestroyIcon(s.icon_brave);
                 }
-                for &hicon in s.app_icons.values() {
+                for (key, &hicon) in &s.app_icons {
                     if !hicon.0.is_null() {
-                        let _ = DestroyIcon(hicon);
+                        // Window icon handles are owned by other windows (obtained via
+                        // SendMessage(WM_GETICON) or GetClassLongPtrW) and must NOT be
+                        // destroyed — doing so corrupts the system-wide icon cache.
+                        if !key.starts_with("window:") {
+                            let _ = DestroyIcon(hicon);
+                        }
                     }
                 }
                 for &hbmp in s.clipboard_thumbnails.borrow().values() {
@@ -6538,10 +6550,11 @@ unsafe fn trigger_icon_loading(_hwnd: HWND, s: &mut State) {
         let needs_icon =
             (source == "app" || icon_file_path(source, &key).is_some() || is_kill_action)
                 && !is_settings
-                && !s.app_icons.contains_key(&key);
+                && !s.app_icons.contains_key(&key)
+                && !s.pending_icons.contains(&key);
         if needs_icon {
-            // Placeholder so we don't spawn multiple threads for same path
-            s.app_icons.insert(key.clone(), HICON(std::ptr::null_mut()));
+            // Track pending loads so we don't spawn multiple threads for same path
+            s.pending_icons.insert(key.clone());
             let _ = tx.send(IconRequest {
                 key,
                 source: source.to_string(),
