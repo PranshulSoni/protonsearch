@@ -176,3 +176,6 @@ setup_tray_icon: hwnd=HWND(0x180244), hicon=HICON(0x24a0395), NIM_ADD res=BOOL(1
 setup_tray_icon: hwnd=HWND(0x1d05b2), hicon=HICON(0x1c6065b), NIM_ADD res=BOOL(1), last_error=Os { code: 183, kind: AlreadyExists, message: "Cannot create a file when that file already exists." }
 remove_tray_icon: hwnd=HWND(0x1d05b2), NIM_DELETE res=BOOL(1), last_error=Os { code: 183, kind: AlreadyExists, message: "Cannot create a file when that file already exists." }
 setup_tray_icon: hwnd=HWND(0x6f0640), hicon=HICON(0x4300685), NIM_ADD res=BOOL(1), last_error=Os { code: 183, kind: AlreadyExists, message: "Cannot create a file when that file already exists." }
+setup_tray_icon: hwnd=HWND(0x230806), hicon=HICON(0x680061f), NIM_ADD res=BOOL(1), last_error=Os { code: 183, kind: AlreadyExists, message: "Cannot create a file when that file already exists." }
+setup_tray_icon: hwnd=HWND(0x1906be), hicon=HICON(0x30b6b), NIM_ADD res=BOOL(1), last_error=Os { code: 183, kind: AlreadyExists, message: "Cannot create a file when that file already exists." }
+setup_tray_icon: hwnd=HWND(0x30075e), hicon=HICON(0x1a30729), NIM_ADD res=BOOL(1), last_error=Os { code: 183, kind: AlreadyExists, message: "Cannot create a file when that file already exists." }

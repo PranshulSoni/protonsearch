@@ -9136,6 +9136,57 @@ fn clean_query_prefix(query: &str) -> &str {
     query
 }
 
+fn highlighted_text_ranges(text: &str, query: &str) -> Vec<(usize, usize)> {
+    let query_words: Vec<String> = query
+        .to_lowercase()
+        .split_whitespace()
+        .map(|w| w.to_string())
+        .filter(|w| !w.is_empty())
+        .collect();
+    if query_words.is_empty() {
+        return Vec::new();
+    }
+
+    let chars: Vec<char> = text.chars().collect();
+    let mut matches = Vec::new();
+
+    for word in &query_words {
+        let word_len = word.chars().count();
+        if word_len == 0 || word_len > chars.len() {
+            continue;
+        }
+
+        let mut start = 0;
+        while start + word_len <= chars.len() {
+            let segment: String = chars[start..start + word_len]
+                .iter()
+                .collect::<String>()
+                .to_lowercase();
+            if segment == *word {
+                matches.push((start, start + word_len));
+                start += word_len;
+            } else {
+                start += 1;
+            }
+        }
+    }
+
+    matches.sort_by_key(|r| r.0);
+    let mut merged: Vec<(usize, usize)> = Vec::new();
+    for r in matches {
+        if let Some(last) = merged.last_mut() {
+            if r.0 <= last.1 {
+                last.1 = last.1.max(r.1);
+            } else {
+                merged.push(r);
+            }
+        } else {
+            merged.push(r);
+        }
+    }
+    merged
+}
+
 fn filter_type_from_prefix(query: &str) -> FilterType {
     let q = query.to_lowercase();
     if q.starts_with("file:") {
@@ -9481,14 +9532,9 @@ unsafe fn draw_highlighted_text(
     let old_font = SelectObject(hdc, font);
     SetBkMode(hdc, TRANSPARENT);
 
-    let query_words: Vec<String> = query
-        .to_lowercase()
-        .split_whitespace()
-        .map(|w| w.to_string())
-        .filter(|w| !w.is_empty())
-        .collect();
+    let merged = highlighted_text_ranges(text, query);
 
-    if query_words.is_empty() {
+    if merged.is_empty() {
         SetTextColor(hdc, default_color);
         let mut t: Vec<u16> = text.encode_utf16().collect();
         let mut r = RECT {
@@ -9505,31 +9551,6 @@ unsafe fn draw_highlighted_text(
         );
         SelectObject(hdc, old_font);
         return;
-    }
-
-    let text_lower = text.to_lowercase();
-    let mut matches = Vec::new();
-    for word in &query_words {
-        let mut start = 0;
-        while let Some(pos) = text_lower[start..].find(word) {
-            let actual_pos = start + pos;
-            matches.push((actual_pos, actual_pos + word.len()));
-            start = actual_pos + word.len();
-        }
-    }
-
-    matches.sort_by_key(|r| r.0);
-    let mut merged: Vec<(usize, usize)> = Vec::new();
-    for r in matches {
-        if let Some(last) = merged.last_mut() {
-            if r.0 <= last.1 {
-                last.1 = last.1.max(r.1);
-            } else {
-                merged.push(r);
-            }
-        } else {
-            merged.push(r);
-        }
     }
 
     let mut current_idx = 0;
@@ -10873,6 +10894,16 @@ mod tests {
     fn row_geometry_centers_icons_and_text() {
         assert_eq!(centered_in_result_row(100, RESULT_ICON_SIZE, 68), 118);
         assert_eq!(centered_in_result_row(100, RESULT_TEXT_BLOCK_H, 68), 114);
+    }
+
+    #[test]
+    fn highlighted_text_ranges_use_char_indices_not_byte_offsets() {
+        let text = "🔥 Windows Terminal";
+        let ranges = highlighted_text_ranges(text, "te");
+        let char_len = text.chars().count();
+
+        assert_eq!(ranges, vec![(10, 12)]);
+        assert!(ranges.iter().all(|(_, end)| *end <= char_len));
     }
 
     #[test]

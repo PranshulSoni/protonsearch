@@ -21,6 +21,10 @@ OmniSearch is a fast, local-first Windows launcher that helps users find and ope
 
 A fast, local-first Windows launcher to search apps, files, browser history, clipboard, OCR text, Git activity, settings, commands, and AI chats from one shortcut.
 
+<p align="center">
+  <img src="icons/Banner.png" alt="OmniSearch banner" />
+</p>
+
 ## Why OmniSearch?
 
 Your work is already on your PC, but Windows spreads it across too many places.
