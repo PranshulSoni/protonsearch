@@ -40,6 +40,7 @@ OmniSearch brings all of it into one fast, keyboard-first command center. Press 
 - **Built for speed** — native Rust/Win32 app with SQLite FTS5 search.
 - **Keyboard-first workflow** — open with `Alt + Space`, search naturally, press `Enter`.
 - **More than app launching** — search document content, screenshots, clipboard history, code, commits, TODOs, agents, and chats.
+- **A real clipboard workflow** — search clipboard history, pin important items, select multiple clips, copy images, edit text clips, and paste combined selections.
 - **Hermes agent support** — use Hermes to run autonomous tasks, execute approved commands, and help control your PC from the launcher.
 - **Made for Windows power users** — replaces the friction of jumping between Start Menu, File Explorer, browser history, Settings, and AI tools.
 
@@ -76,11 +77,24 @@ If `Alt + Space` is already used by another app, change the launcher hotkey in S
 | File content | Text inside supported documents, PDFs, Markdown, text files, and source files |
 | Images and screenshots | Image files plus OCR text extracted from screenshots and pictures |
 | Browser data | Bookmarks and recent history from Chromium-based browsers and Firefox |
-| Clipboard | Text and image clipboard history, including pinned clipboard items |
+| Clipboard | Text and image clipboard history, pinned clips, multiselect actions, image copy, editing, and bulk cleanup |
 | Git | Repositories, commits, branches, and TODO/FIXME comments |
 | Windows Settings | Modern Windows Settings pages and classic Control Panel pages |
 | Commands | Local OmniSearch actions like clipboard, agents, windows, settings, and system actions |
 | Agents | Saved AI agents, agent chats, and AI chat history |
+
+## Useful Details
+
+OmniSearch also includes smaller workflow features that make it useful every day:
+
+- **Clipboard pinning** — keep important snippets, links, IDs, commands, and copied text at the top of clipboard search.
+- **Clipboard multiselect** — select multiple clipboard items, paste them together, or clean them up in bulk.
+- **Image clipboard support** — keep copied screenshots and images searchable, then copy them back when needed.
+- **Editable clipboard text** — fix or update a saved clipboard item before copying it again.
+- **Clipboard-first commands** — paste recent items sequentially, paste the newest screenshot, clear clipboard contents, or ask AI about clipboard text.
+- **Content search** — search inside supported documents, code files, OCR output, screenshots, and notes instead of only matching filenames.
+- **Browser recall** — find old pages from browser bookmarks and history without opening the browser first.
+- **Windows control surface** — open Windows Settings, Control Panel pages, local commands, windows, and system actions from the same launcher.
 
 ## Hermes Agents
 
