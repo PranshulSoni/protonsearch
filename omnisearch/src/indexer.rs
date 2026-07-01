@@ -401,18 +401,16 @@ struct ExtractJob {
 /// below-normal priority so a fast first-pass index still yields to the foreground.
 fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingUpdate> {
     use std::sync::mpsc;
-    use std::sync::{Arc, Mutex};
 
     let n_workers = std::thread::available_parallelism()
         .map(|n| (n.get() / 2).max(1).min(4))
         .unwrap_or(2);
 
     let (job_tx, job_rx) = mpsc::channel::<ExtractJob>(); // unbounded; jobs are tiny (paths/meta)
-    let job_rx = Arc::new(Mutex::new(job_rx));
-    let (res_tx, res_rx) = mpsc::sync_channel::<PendingUpdate>(256); // bounded → backpressure
+    let (res_tx, res_rx) = mpsc::channel::<PendingUpdate>(); // unbounded → no deadlock risk
 
     for _ in 0..n_workers {
-        let job_rx = Arc::clone(&job_rx);
+        let job_rx = job_rx.clone();
         let res_tx = res_tx.clone();
         thread::spawn(move || {
             // OCR (WinRT) needs COM; below-normal so we don't starve the user.
@@ -429,7 +427,7 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
                 let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
             }
             loop {
-                let job = match job_rx.lock().unwrap().recv() {
+                let job = match job_rx.recv() {
                     Ok(j) => j,
                     Err(_) => break, // feeder dropped → all jobs done
                 };
@@ -443,6 +441,10 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
                     is_dir: 0,
                     content: Some(content),
                 });
+            }
+            // CoUninitialize on thread exit to balance CoInitializeEx
+            unsafe {
+                windows::Win32::System::Com::CoUninitialize();
             }
         });
     }
