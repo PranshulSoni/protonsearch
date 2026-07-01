@@ -1671,13 +1671,9 @@ export component SettingsWindow inherits Window {
                                     spacing: 12px;
                                     VerticalLayout {
                                         alignment: center;
-                                        Text { text: "ℹ"; font-size: 18px; color: root.text-secondary; }
-                                    }
-                                    VerticalLayout {
-                                        alignment: center;
                                         spacing: 2px;
-                                        Text { text: "0.1.0"; font-size: 14px; font-weight: 600; color: root.text-primary; }
-                                        Text { text: "Version"; font-size: 11px; color: root.text-muted; }
+                                        Text { text: "0.1.0"; font-size: 18px; font-weight: 600; color: root.text-primary; }
+                                        Text { text: "Version"; font-size: 13px; color: root.text-muted; }
                                     }
                                 }
                                 
@@ -1690,6 +1686,7 @@ export component SettingsWindow inherits Window {
                                     VerticalLayout {
                                         alignment: center;
                                         Button {
+                                             width: 180px;
                                              text: root.update-status == "idle" ? "Check for Updates" :
                                                    root.update-status == "checking" ? "Checking..." :
                                                    root.update-status == "available" ? "Download Update (v" + root.update-version + ")" :
@@ -1715,6 +1712,7 @@ export component SettingsWindow inherits Window {
                                     VerticalLayout {
                                         alignment: center;
                                         Button {
+                                            width: 180px;
                                             text: "Become a Sponsor";
                                             primary: true;
                                             clicked => { root.open-url("https://github.com/sponsors/PranshulSoni"); }
@@ -1742,11 +1740,7 @@ export component SettingsWindow inherits Window {
                                     spacing: 12px;
                                     VerticalLayout {
                                         alignment: center;
-                                        Text { text: "🌐"; font-size: 18px; color: root.text-secondary; }
-                                    }
-                                    VerticalLayout {
-                                        alignment: center;
-                                        Text { text: "Website"; font-size: 14px; font-weight: 600; color: root.text-primary; }
+                                        Text { text: "Website"; font-size: 18px; font-weight: 600; color: root.text-primary; }
                                     }
                                 }
                                 
@@ -1764,7 +1758,7 @@ export component SettingsWindow inherits Window {
                                             color: website-ta.has-hover ? #4daaf8 : #1d90f3;
                                             font-size: 13px;
                                             website-ta := TouchArea {
-                                                clicked => { root.open-url("https://omnisearch.app"); }
+                                                clicked => { root.open-url("https://omni-search-prod.vercel.app/"); }
                                             }
                                         }
                                     }
