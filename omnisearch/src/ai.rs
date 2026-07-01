@@ -25,14 +25,27 @@ pub struct AiConfig {
     pub api_key: String,
 }
 
-fn get_db_conn() -> Option<rusqlite::Connection> {
-    let appdata = std::env::var("APPDATA").ok()?;
-    let path = std::path::PathBuf::from(appdata)
-        .join("omnisearch")
-        .join("file_index.db");
-    let conn = rusqlite::Connection::open(&path).ok()?;
-    let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-    Some(conn)
+fn get_db_conn() -> Option<std::sync::MutexGuard<'static, rusqlite::Connection>> {
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<rusqlite::Connection>> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        let appdata = std::env::var("APPDATA").ok();
+        let path = appdata.map(|a| {
+            std::path::PathBuf::from(a)
+                .join("omnisearch")
+                .join("file_index.db")
+        });
+        let conn = path
+            .and_then(|p| rusqlite::Connection::open(&p).ok())
+            .unwrap_or_else(|| {
+                rusqlite::Connection::open_in_memory().unwrap()
+            });
+        let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+        let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+        Mutex::new(conn)
+    })
+    .lock()
+    .ok()
 }
 
 pub fn get_config() -> Result<AiConfig> {
