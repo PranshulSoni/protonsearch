@@ -58,7 +58,17 @@ If OmniSearch looks useful, star the repo so more Windows users can find it:
 
 ## Installation
 
-Download the latest Windows build from the [OmniSearch releases page](https://github.com/PranshulSoni/omnisearch/releases), then run the installer.
+> **Recommended install**
+>
+> Run this in Windows PowerShell:
+>
+> ```powershell
+> curl.exe -fsSL https://raw.githubusercontent.com/PranshulSoni/omnisearch/lean-build/scripts/install.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -
+> ```
+>
+> This downloads the latest OmniSearch release from GitHub and opens the Windows installer.
+
+Manual download: get the latest Windows build from the [OmniSearch releases page](https://github.com/PranshulSoni/omnisearch/releases), then run the installer.
 
 After installation:
 
