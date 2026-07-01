@@ -12,7 +12,7 @@ use std::sync::Mutex;
 static UPDATE_URL: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 static DOWNLOADED_PATH: Lazy<Mutex<Option<std::path::PathBuf>>> = Lazy::new(|| Mutex::new(None));
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-const DISPLAY_VERSION: &str = "1.03";
+const DISPLAY_VERSION: &str = "1.04";
 
 fn is_newer_version(current: &str, latest: &str) -> bool {
     let parse = |v: &str| -> Vec<u32> {

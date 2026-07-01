@@ -1,5 +1,5 @@
 {
-  "version": "1.0.3",
-  "url": "https://github.com/PranshulSoni/omnisearch/releases/download/v1.0.3/omnisearchsetup.exe",
-  "notes": "Fix self-update: detach installer process, poll-wait for launcher exit, and retry loop in PrepareToInstall."
+  "version": "1.0.4",
+  "url": "https://github.com/PranshulSoni/omnisearch/releases/download/v1.0.4/omnisearchsetup.exe",
+  "notes": "Version 1.0.4 - Sliding unique backup renaming for robust file lock resolution."
 }
