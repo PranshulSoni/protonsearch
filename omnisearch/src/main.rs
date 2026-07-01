@@ -3703,6 +3703,7 @@ unsafe fn reset_cursor_blink(hwnd: HWND, s: &mut State) {
 }
 
 unsafe fn do_show(hwnd: HWND, s: &mut State) {
+    raise_timer_res();
     reset_cursor_blink(hwnd, s);
     if s.app_settings.show_taskbar && !s.taskbar_shown_by_app {
         use windows::core::PCWSTR;
@@ -3887,6 +3888,7 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
     let _ = KillTimer(hwnd, TIMER_CURSOR_BLINK);
     let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
+    lower_timer_res();
     s.search_loading = false;
     s.form_state = FormState::None;
     s.image_preview_active = false;
@@ -5366,6 +5368,7 @@ unsafe fn tick_window_animation(hwnd: HWND, s: &mut State) -> bool {
             if p <= 0.0 {
                 s.anim = Anim::Hidden;
                 let _ = ShowWindow(hwnd, SW_HIDE);
+                lower_timer_res();
                 applog::log("animate_window: hidden");
                 false
             } else {
@@ -6609,6 +6612,81 @@ unsafe fn draw_result_icon(mdc: HDC, s: &State, icon: HICON, x_base: i32, ry: i3
     );
 }
 
+// ── Cached GDI back-buffer for the launcher paint loop ──────────────────────────
+// Reused across paints so an animation frame doesn't allocate a full-window bitmap +
+// DC every time (paint() runs on every TIMER_SEARCH_ANIM tick during the fade/grow).
+// Sized to the largest window seen; grows as needed, never shrinks. Single UI thread.
+// ponytail: leaks one DC+bitmap at process exit (reclaimed by the OS), and is only
+// recreated on grow — a display-format change isn't handled (rare for this window).
+struct BackBuffer {
+    mdc: windows::Win32::Graphics::Gdi::HDC,
+    bmp: windows::Win32::Graphics::Gdi::HBITMAP,
+    w: i32,
+    h: i32,
+}
+thread_local! {
+    static BACK_BUFFER: std::cell::RefCell<BackBuffer> = std::cell::RefCell::new(BackBuffer {
+        mdc: windows::Win32::Graphics::Gdi::HDC(null_mut()),
+        bmp: windows::Win32::Graphics::Gdi::HBITMAP(null_mut()),
+        w: 0,
+        h: 0,
+    });
+}
+
+/// A memory DC (with a compatible bitmap already selected) sized at least win_w×win_h,
+/// reusing the cached buffer when it's big enough.
+unsafe fn ensure_back_buffer(
+    hdc: windows::Win32::Graphics::Gdi::HDC,
+    win_w: i32,
+    win_h: i32,
+) -> windows::Win32::Graphics::Gdi::HDC {
+    use windows::Win32::Graphics::Gdi::{
+        CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, SelectObject,
+    };
+    BACK_BUFFER.with(|bb| {
+        let mut bb = bb.borrow_mut();
+        if bb.mdc.0.is_null() || bb.w < win_w || bb.h < win_h {
+            let new_w = win_w.max(bb.w).max(1);
+            let new_h = win_h.max(bb.h).max(1);
+            if !bb.mdc.0.is_null() {
+                let _ = DeleteObject(bb.bmp);
+                let _ = DeleteDC(bb.mdc);
+            }
+            let mdc = CreateCompatibleDC(hdc);
+            let bmp = CreateCompatibleBitmap(hdc, new_w, new_h);
+            SelectObject(mdc, bmp);
+            bb.mdc = mdc;
+            bb.bmp = bmp;
+            bb.w = new_w;
+            bb.h = new_h;
+        }
+        bb.mdc
+    })
+}
+
+// System timer resolution is raised to ~1ms while the launcher is visible so the 3–8ms
+// SetTimer animation ticks fire on time (default ~15ms granularity makes the fade/height
+// grow visibly steppy). raise on show, lower when fully hidden — balanced by the flag.
+thread_local! {
+    static HIRES_TIMER: std::cell::Cell<bool> = std::cell::Cell::new(false);
+}
+unsafe fn raise_timer_res() {
+    HIRES_TIMER.with(|f| {
+        if !f.get() {
+            let _ = windows::Win32::Media::timeBeginPeriod(1);
+            f.set(true);
+        }
+    });
+}
+unsafe fn lower_timer_res() {
+    HIRES_TIMER.with(|f| {
+        if f.get() {
+            let _ = windows::Win32::Media::timeEndPeriod(1);
+            f.set(false);
+        }
+    });
+}
+
 unsafe fn paint(hwnd: HWND, s: &State) {
     #[allow(non_snake_case)]
     let SEARCH_H = s.search_h();
@@ -6621,10 +6699,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let win_w = rc.right - rc.left;
     let win_h = rc.bottom - rc.top;
 
-    // Double-buffer
-    let mdc = CreateCompatibleDC(hdc);
-    let bmp = CreateCompatibleBitmap(hdc, win_w, win_h);
-    let old = SelectObject(mdc, bmp);
+    // Double-buffer — cached across paints (see ensure_back_buffer) so an animation
+    // frame doesn't allocate a full-window bitmap + DC every time.
+    let mdc = ensure_back_buffer(hdc, win_w, win_h);
 
     // Clear background with COLOR_KEY (completely transparent)
     fill(mdc, 0, 0, win_w, win_h, COLOR_KEY);
@@ -6770,9 +6847,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         let _ = ReleaseDC(HWND(null_mut()), screen_dc);
 
         let _ = BitBlt(hdc, 0, 0, win_w, win_h, mdc, 0, 0, SRCCOPY);
-        let _ = SelectObject(mdc, old);
-        let _ = DeleteObject(bmp);
-        let _ = DeleteDC(mdc);
+        // back-buffer is cached — don't delete mdc/bmp here
         let _ = EndPaint(hwnd, &ps);
         return;
     }
@@ -8896,9 +8971,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let bw = (ps.rcPaint.right - ps.rcPaint.left).max(0);
     let bh = (ps.rcPaint.bottom - ps.rcPaint.top).max(0);
     let _ = BitBlt(hdc, bx, by, bw, bh, mdc, bx, by, SRCCOPY);
-    let _ = SelectObject(mdc, old);
-    let _ = DeleteObject(bmp);
-    let _ = DeleteDC(mdc);
+    // back-buffer is cached — don't delete mdc/bmp here
 
     if s.image_preview_active {
         if let Some(h) = s.hwnd_preview {
