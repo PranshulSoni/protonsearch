@@ -263,5 +263,5 @@ The goal is simple: open fast, search fast, and stay light enough to leave runni
 
 ## Credits
 
-Name of project and Tester : https://github.com/AryanMotiani
+Name of project and Tester : https://github.com/AryanMotiani \
 Marketing of the project: https://github.com/dweep-desai
