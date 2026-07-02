@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+fn settings_mutex() -> &'static std::sync::Mutex<()> {
+    static LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -168,6 +174,7 @@ impl AppSettings {
     }
 
     pub fn load() -> Self {
+        let _guard = settings_mutex().lock().unwrap();
         let path = Self::get_settings_path();
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -182,6 +189,7 @@ impl AppSettings {
     }
 
     pub fn save(&self) {
+        let _guard = settings_mutex().lock().unwrap();
         let path = Self::get_settings_path();
         if let Ok(content) = serde_json::to_string_pretty(self) {
             let _ = fs::write(path, content);
