@@ -444,6 +444,7 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
                     content: Some(content),
                 });
             }
+            unsafe { windows::Win32::System::Com::CoUninitialize(); }
         });
     }
     drop(res_tx); // workers hold the only senders now → res_rx ends when they finish
