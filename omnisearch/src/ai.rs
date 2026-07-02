@@ -14,10 +14,68 @@ const DEFAULT_ENDPOINT: &str = "https://api.deepseek.com/chat/completions";
 const DEFAULT_MODEL: &str = "deepseek-chat";
 
 // ── API key resolution ────────────────────────────────────────────────────────
-// Order: env var → %APPDATA%/omnisearch/ai_key.txt → hardcoded constant below.
-// Leave the constant empty in source (never commit a real key); the user pastes
-// their DeepSeek key into the file or env var.
-const HARDCODED_KEY: &str = "sk-HrvSzHIYBPsbF4NMpG7S0RvLhZKFHmPV153k1kitFrdV4uSdyLvd9EbftDXwkkpb";
+// Order: env var → %APPDATA%/omnisearch/ai_key.txt → embedded rotated keys → hardcoded constant below.
+const HARDCODED_KEY: &str = "";
+
+const EMBEDDED_KEYS_RAW: Option<&str> = option_env!("OMNISEARCH_KEYS");
+
+fn get_embedded_keys_count() -> usize {
+    if let Some(raw) = EMBEDDED_KEYS_RAW {
+        if raw.trim().is_empty() {
+            0
+        } else {
+            raw.split(',').count()
+        }
+    } else {
+        0
+    }
+}
+
+fn get_rotated_key(index: usize) -> Option<String> {
+    let raw = EMBEDDED_KEYS_RAW?;
+    let parts: Vec<&str> = raw.split(',').collect();
+    let hex_str = parts.get(index)?;
+    
+    let mut bytes = Vec::new();
+    let chars: Vec<char> = hex_str.chars().collect();
+    for i in (0..chars.len()).step_by(2) {
+        if i + 1 < chars.len() {
+            let hex_pair: String = chars[i..=i+1].iter().collect();
+            if let Ok(b) = u8::from_str_radix(&hex_pair, 16) {
+                bytes.push(b ^ 0x5F);
+            }
+        }
+    }
+    String::from_utf8(bytes).ok()
+}
+
+fn get_active_key_index(count: usize) -> usize {
+    if count == 0 {
+        return 0;
+    }
+    if let Some(conn) = get_db_conn() {
+        if let Ok(val) = conn.query_row(
+            "SELECT value FROM ai_settings WHERE key = 'active_key_index'",
+            [],
+            |row| row.get::<_, String>(0),
+        ) {
+            if let Ok(idx) = val.trim().parse::<usize>() {
+                return idx % count;
+            }
+        }
+    }
+    0
+}
+
+fn set_active_key_index(index: usize) {
+    if let Some(conn) = get_db_conn() {
+        let _ = conn.execute(
+            "INSERT INTO ai_settings (key, value) VALUES ('active_key_index', ?1) \
+             ON CONFLICT(key) DO UPDATE SET value = ?1",
+            [index.to_string()],
+        );
+    }
+}
 
 pub struct AiConfig {
     pub endpoint: String,
@@ -110,6 +168,20 @@ pub fn get_config() -> Result<AiConfig> {
         }
     }
 
+    let mut is_embedded = false;
+
+    // Check Embedded Rotated Keys
+    if api_key.is_none() {
+        let count = get_embedded_keys_count();
+        if count > 0 {
+            let idx = get_active_key_index(count);
+            if let Some(k) = get_rotated_key(idx) {
+                api_key = Some(k);
+                is_embedded = true;
+            }
+        }
+    }
+
     // Check Hardcoded Key
     if api_key.is_none() && !HARDCODED_KEY.is_empty() {
         api_key = Some(HARDCODED_KEY.to_string());
@@ -120,7 +192,7 @@ pub fn get_config() -> Result<AiConfig> {
     ))?;
 
     // If key contains cues about OpenCode Zen
-    if key.starts_with("sk-oc-") || key.contains("opencode") || key.starts_with("sk-HrvSzHIY") {
+    if is_embedded || key.starts_with("sk-oc-") || key.contains("opencode") || key.starts_with("sk-HrvSzHIY") {
         is_opencode = true;
     }
 
@@ -233,44 +305,66 @@ pub fn get_config() -> Result<AiConfig> {
 
 /// One-shot chat completion (non-streaming). Returns the assistant's text.
 pub fn complete(system: &str, user: &str) -> Result<String> {
-    let cfg = get_config()?;
+    let count = get_embedded_keys_count();
+    let max_attempts = if count > 0 { count } else { 1 };
 
-    let body = serde_json::json!({
-        "model": cfg.model,
-        "messages": [
-            { "role": "system", "content": system },
-            { "role": "user", "content": user }
-        ],
-        "stream": false,
-        "temperature": 0.3,
-    });
+    for attempt in 0..max_attempts {
+        let cfg = get_config()?;
 
-    let timeout_secs = if cfg.model == "hermes-agent" { 300 } else { 30 };
-    let resp = ureq::post(&cfg.endpoint)
-        .set("Authorization", &format!("Bearer {}", cfg.api_key))
-        .set("Content-Type", "application/json")
-        .timeout(std::time::Duration::from_secs(timeout_secs))
-        .send_json(body);
+        let body = serde_json::json!({
+            "model": cfg.model,
+            "messages": [
+                { "role": "system", "content": system },
+                { "role": "user", "content": user }
+            ],
+            "stream": false,
+            "temperature": 0.3,
+        });
 
-    let resp = match resp {
-        Ok(r) => r,
-        Err(ureq::Error::Status(code, r)) => {
-            let msg = r.into_string().unwrap_or_default();
-            return Err(anyhow!(
-                "AI error {code}: {}",
-                msg.chars().take(300).collect::<String>()
-            ));
+        let timeout_secs = if cfg.model == "hermes-agent" { 300 } else { 30 };
+        let resp = ureq::post(&cfg.endpoint)
+            .set("Authorization", &format!("Bearer {}", cfg.api_key))
+            .set("Content-Type", "application/json")
+            .timeout(std::time::Duration::from_secs(timeout_secs))
+            .send_json(body);
+
+        match resp {
+            Ok(r) => {
+                let v: serde_json::Value = r.into_json()
+                    .map_err(|e| anyhow!("bad AI response: {e}"))?;
+                let text = v["choices"][0]["message"]["content"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("AI response had no content"))?;
+                return Ok(text.trim().to_string());
+            }
+            Err(ureq::Error::Status(code, r)) => {
+                let msg = r.into_string().unwrap_or_default();
+                let is_auth_or_quota = code == 401 || code == 429 || code == 402 ||
+                                       msg.contains("insufficient_quota") ||
+                                       msg.contains("quota") ||
+                                       msg.contains("balance");
+
+                let is_using_embedded = count > 0 && {
+                    let idx = get_active_key_index(count);
+                    get_rotated_key(idx).map(|k| k == cfg.api_key).unwrap_or(false)
+                };
+
+                if is_auth_or_quota && is_using_embedded && attempt + 1 < max_attempts {
+                    let next_idx = (get_active_key_index(count) + 1) % count;
+                    set_active_key_index(next_idx);
+                    continue;
+                }
+
+                return Err(anyhow!(
+                    "AI error {code}: {}",
+                    msg.chars().take(300).collect::<String>()
+                ));
+            }
+            Err(e) => return Err(anyhow!("AI request failed: {e}")),
         }
-        Err(e) => return Err(anyhow!("AI request failed: {e}")),
-    };
+    }
 
-    let v: serde_json::Value = resp
-        .into_json()
-        .map_err(|e| anyhow!("bad AI response: {e}"))?;
-    let text = v["choices"][0]["message"]["content"]
-        .as_str()
-        .ok_or_else(|| anyhow!("AI response had no content"))?;
-    Ok(text.trim().to_string())
+    Err(anyhow!("All embedded API keys failed or were exhausted."))
 }
 
 /// Multi-turn chat completion. Passes conversation history to the API.
@@ -280,47 +374,70 @@ pub fn complete_chat(
     prev_assistant: &str,
     user: &str,
 ) -> Result<String> {
-    let cfg = get_config()?;
+    let count = get_embedded_keys_count();
+    let max_attempts = if count > 0 { count } else { 1 };
 
-    let body = serde_json::json!({
-        "model": cfg.model,
-        "messages": [
-            { "role": "system", "content": system },
-            { "role": "user", "content": prev_user },
-            { "role": "assistant", "content": prev_assistant },
-            { "role": "user", "content": user }
-        ],
-        "stream": false,
-        "temperature": 0.3,
-    });
+    for attempt in 0..max_attempts {
+        let cfg = get_config()?;
 
-    let timeout_secs = if cfg.model == "hermes-agent" { 300 } else { 30 };
-    let resp = ureq::post(&cfg.endpoint)
-        .set("Authorization", &format!("Bearer {}", cfg.api_key))
-        .set("Content-Type", "application/json")
-        .timeout(std::time::Duration::from_secs(timeout_secs))
-        .send_json(body);
+        let body = serde_json::json!({
+            "model": cfg.model,
+            "messages": [
+                { "role": "system", "content": system },
+                { "role": "user", "content": prev_user },
+                { "role": "assistant", "content": prev_assistant },
+                { "role": "user", "content": user }
+            ],
+            "stream": false,
+            "temperature": 0.3,
+        });
 
-    let resp = match resp {
-        Ok(r) => r,
-        Err(ureq::Error::Status(code, r)) => {
-            let msg = r.into_string().unwrap_or_default();
-            return Err(anyhow!(
-                "AI error {code}: {}",
-                msg.chars().take(300).collect::<String>()
-            ));
+        let timeout_secs = if cfg.model == "hermes-agent" { 300 } else { 30 };
+        let resp = ureq::post(&cfg.endpoint)
+            .set("Authorization", &format!("Bearer {}", cfg.api_key))
+            .set("Content-Type", "application/json")
+            .timeout(std::time::Duration::from_secs(timeout_secs))
+            .send_json(body);
+
+        match resp {
+            Ok(r) => {
+                let v: serde_json::Value = r.into_json()
+                    .map_err(|e| anyhow!("bad AI response: {e}"))?;
+                let text = v["choices"][0]["message"]["content"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("AI response had no content"))?;
+                return Ok(text.trim().to_string());
+            }
+            Err(ureq::Error::Status(code, r)) => {
+                let msg = r.into_string().unwrap_or_default();
+                let is_auth_or_quota = code == 401 || code == 429 || code == 402 ||
+                                       msg.contains("insufficient_quota") ||
+                                       msg.contains("quota") ||
+                                       msg.contains("balance");
+
+                let is_using_embedded = count > 0 && {
+                    let idx = get_active_key_index(count);
+                    get_rotated_key(idx).map(|k| k == cfg.api_key).unwrap_or(false)
+                };
+
+                if is_auth_or_quota && is_using_embedded && attempt + 1 < max_attempts {
+                    let next_idx = (get_active_key_index(count) + 1) % count;
+                    set_active_key_index(next_idx);
+                    continue;
+                }
+
+                return Err(anyhow!(
+                    "AI error {code}: {}",
+                    msg.chars().take(300).collect::<String>()
+                ));
+            }
+            Err(e) => return Err(anyhow!("AI request failed: {e}")),
         }
-        Err(e) => return Err(anyhow!("AI request failed: {e}")),
-    };
+    }
 
-    let v: serde_json::Value = resp
-        .into_json()
-        .map_err(|e| anyhow!("bad AI response: {e}"))?;
-    let text = v["choices"][0]["message"]["content"]
-        .as_str()
-        .ok_or_else(|| anyhow!("AI response had no content"))?;
-    Ok(text.trim().to_string())
+    Err(anyhow!("All embedded API keys failed or were exhausted."))
 }
+
 
 fn get_hermes_config() -> AiConfig {
     let mut api_key = "hermes".to_string();
