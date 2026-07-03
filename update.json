@@ -1,5 +1,5 @@
 {
-  "version": "1.0.4",
-  "url": "https://github.com/PranshulSoni/omnisearch/releases/download/v1.0.4/omnisearchsetup.exe",
-  "notes": "Version 1.0.4 - Sliding unique backup renaming for robust file lock resolution."
+  "version": "1.0.5",
+  "url": "https://github.com/PranshulSoni/omnisearch/releases/download/v1.0.5/omnisearchsetup.exe",
+  "notes": "Version 1.0.5 - Stability fixes: UTF-8 crash fixes, UI hang fixes, uninstaller and clipboard repairs, emoji input support."
 }

@@ -562,7 +562,13 @@ pub fn run_settings_window() {
                 }
             });
 
-            let res = match ureq::get(&url).timeout(std::time::Duration::from_secs(60)).call() {
+            // Socket-level timeouts only: a total-request timeout caps the whole body
+            // transfer and made multi-MB installer downloads fail on slow connections.
+            let agent = ureq::AgentBuilder::new()
+                .timeout_connect(std::time::Duration::from_secs(15))
+                .timeout_read(std::time::Duration::from_secs(30))
+                .build();
+            let res = match agent.get(&url).call() {
                 Ok(r) => r,
                 Err(_) => {
                     let _ = slint::invoke_from_event_loop(move || {
