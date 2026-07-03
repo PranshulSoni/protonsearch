@@ -1715,35 +1715,62 @@ export component SettingsWindow inherits Window {
                     // Config Page
                     if root.current-page == 5: VerticalBox {
                         alignment: start;
-                        spacing: 20px;
-                        Text { text: "Config"; font-size: 30px; font-weight: 700; color: root.text-primary; }
+                        spacing: 22px;
+                        Text { text: "Config"; font-size: 34px; font-weight: 700; color: root.text-primary; }
 
                         VerticalBox {
-                            spacing: 12px;
-                            Text { text: "TEXT EXPANSIONS"; font-size: 11px; font-weight: 600; color: root.text-muted; letter-spacing: 1px; }
+                            spacing: 14px;
+                            HorizontalBox {
+                                Text { text: "TEXT EXPANSIONS"; font-size: 12px; font-weight: 700; color: root.text-muted; letter-spacing: 1px; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Text { text: root.snippets.length + " saved"; font-size: 12px; color: root.text-muted; }
+                            }
                             Rectangle {
-                                background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px; height: 184px;
+                                background: root.card-bg; border-radius: 10px; border-color: root.border-color; border-width: 1px; height: 214px;
                                 VerticalBox {
-                                    padding: 16px; spacing: 10px;
+                                    padding: 18px; spacing: 12px;
+                                    VerticalBox {
+                                        spacing: 4px;
+                                        Text { text: "Add expansion"; color: root.text-primary; font-size: 16px; font-weight: 700; }
+                                        Text { text: "Type the trigger in OmniSearch, press Enter, and the saved text is pasted into the previous app."; color: root.text-muted; font-size: 12px; }
+                                    }
                                     HorizontalBox {
                                         spacing: 10px;
-                                        LineEdit { text: root.snippet-name; placeholder-text: "Name"; edited(t) => { root.snippet-name = t; } }
-                                        LineEdit { text: root.snippet-keyword; placeholder-text: "Trigger, e.g. !email"; edited(t) => { root.snippet-keyword = t; } }
+                                        VerticalBox {
+                                            spacing: 6px;
+                                            Text { text: "Name"; color: root.text-muted; font-size: 11px; font-weight: 600; }
+                                            LineEdit { text: root.snippet-name; placeholder-text: "Work email"; edited(t) => { root.snippet-name = t; } }
+                                        }
+                                        VerticalBox {
+                                            spacing: 6px;
+                                            Text { text: "Trigger"; color: root.text-muted; font-size: 11px; font-weight: 600; }
+                                            LineEdit { text: root.snippet-keyword; placeholder-text: "!email"; edited(t) => { root.snippet-keyword = t; } }
+                                        }
                                     }
-                                    LineEdit { text: root.snippet-content; placeholder-text: "Expansion text"; edited(t) => { root.snippet-content = t; } }
+                                    VerticalBox {
+                                        spacing: 6px;
+                                        Text { text: "Expansion text"; color: root.text-muted; font-size: 11px; font-weight: 600; }
+                                        LineEdit { text: root.snippet-content; placeholder-text: "Text to paste"; edited(t) => { root.snippet-content = t; } }
+                                    }
                                     HorizontalBox {
+                                        Text { text: "Name, trigger, and expansion text are required."; color: root.text-muted; font-size: 12px; }
                                         Rectangle { horizontal-stretch: 1; }
                                         Button { text: "Add expansion"; clicked => { root.add-snippet(); } }
                                     }
                                 }
                             }
                             for snippet[i] in root.snippets: Rectangle {
-                                background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px; height: 72px;
+                                background: root.card-bg; border-radius: 10px; border-color: root.border-color; border-width: 1px; height: 84px;
                                 HorizontalBox {
-                                    padding-left: 20px; padding-right: 16px; spacing: 14px;
-                                    VerticalBox { alignment: center; spacing: 2px;
-                                        Text { text: snippet.name; color: root.text-primary; font-size: 14px; font-weight: 600; }
-                                        Text { text: snippet.keyword + "  " + snippet.content; color: root.text-muted; font-size: 12px; overflow: elide; }
+                                    padding-left: 18px; padding-right: 16px; spacing: 16px;
+                                    Rectangle {
+                                        width: 96px; height: 30px; border-radius: 8px; background: root.hover-bg; border-color: root.accent; border-width: 1px;
+                                        Text { text: snippet.keyword; color: root.accent; font-size: 13px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                                    }
+                                    VerticalBox {
+                                        alignment: center; spacing: 4px;
+                                        Text { text: snippet.name; color: root.text-primary; font-size: 15px; font-weight: 700; }
+                                        Text { text: snippet.content; color: root.text-muted; font-size: 12px; overflow: elide; }
                                     }
                                     Rectangle { horizontal-stretch: 1; }
                                     Button { text: "Delete"; clicked => { root.delete-snippet(snippet.id); } }

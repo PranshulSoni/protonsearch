@@ -266,13 +266,16 @@ pub fn run_settings_window() {
         let name = ui.get_snippet_name().to_string();
         let keyword = ui.get_snippet_keyword().to_string();
         let content = ui.get_snippet_content().to_string();
-        if name.trim().is_empty() || content.trim().is_empty() {
+        let name = name.trim();
+        let keyword = keyword.trim().to_lowercase();
+        let content = content.trim();
+        if name.is_empty() || keyword.is_empty() || content.is_empty() {
             return;
         }
         if let Some(conn) = get_db_conn() {
             let _ = conn.execute(
                 "INSERT OR REPLACE INTO snippets (name, content, keyword) VALUES (?1, ?2, ?3);",
-                rusqlite::params![name.trim(), content.trim(), keyword.trim()],
+                rusqlite::params![name, content, keyword],
             );
         }
         ui.set_snippet_name(SharedString::from(""));
