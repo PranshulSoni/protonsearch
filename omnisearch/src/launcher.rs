@@ -1519,11 +1519,13 @@ fn sleep_displays() {
     unsafe {
         use windows::Win32::{
             Foundation::{HWND, LPARAM, WPARAM},
-            UI::WindowsAndMessaging::{SendMessageW, WM_SYSCOMMAND},
+            UI::WindowsAndMessaging::{SendNotifyMessageW, WM_SYSCOMMAND},
         };
 
         const SC_MONITORPOWER: usize = 0xF170;
-        let _ = SendMessageW(
+        // Broadcast without waiting: SendMessageW to HWND_BROADCAST blocks the UI
+        // thread until every top-level window responds - one hung app froze us.
+        let _ = SendNotifyMessageW(
             HWND(-1isize as *mut std::ffi::c_void),
             WM_SYSCOMMAND,
             WPARAM(SC_MONITORPOWER),

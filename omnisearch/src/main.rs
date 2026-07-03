@@ -303,6 +303,9 @@ struct State {
     db_path: std::path::PathBuf,
     query: String,
     cursor_pos: usize,
+    // High half of a UTF-16 surrogate pair from WM_CHAR, waiting for its low half.
+    // Windows delivers astral-plane chars (emoji) as two separate WM_CHAR messages.
+    pending_surrogate: Option<u16>,
     search_input_active: bool,
     chat_input: String,
     chat_cursor_pos: usize,
@@ -893,6 +896,7 @@ unsafe fn run(first_settings_run: bool) {
         db_path: db_path.clone(),
         query: String::new(),
         cursor_pos: 0,
+        pending_surrogate: None,
         search_input_active: true,
         chat_input: String::new(),
         chat_cursor_pos: 0,
@@ -2039,7 +2043,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             let s = &mut *sp;
             if s.form_state != FormState::None {
                 s.search_input_active = true;
-                if let Some(c) = char::from_u32(wp.0 as u32) {
+                if let Some(c) = wm_char_decode(&mut s.pending_surrogate, wp.0 as u32) {
                     if !c.is_control() {
                         if s.text_selected {
                             s.query.clear();
@@ -2055,7 +2059,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                 return LRESULT(0);
             }
             if s.note_editing {
-                if let Some(c) = char::from_u32(wp.0 as u32) {
+                if let Some(c) = wm_char_decode(&mut s.pending_surrogate, wp.0 as u32) {
                     if !c.is_control() {
                         s.note_text.push(c);
                         s.note_scroll = i32::MAX; // follow the caret to the bottom
@@ -2067,7 +2071,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             }
 
             s.submenu_active = false;
-            if let Some(c) = char::from_u32(wp.0 as u32) {
+            if let Some(c) = wm_char_decode(&mut s.pending_surrogate, wp.0 as u32) {
                 if !c.is_control() {
                     if s.chat_input_active {
                         s.chat_input.insert(s.chat_cursor_pos, c);
@@ -6154,6 +6158,24 @@ unsafe fn paint_run_lines(
         y += lh;
     }
     y - top
+}
+
+/// Decode a WM_CHAR wparam into a char, pairing UTF-16 surrogate halves that
+/// Windows delivers as two separate WM_CHAR messages. Without pairing, emoji
+/// and other astral-plane input were silently dropped (char::from_u32 rejects
+/// lone surrogates).
+fn wm_char_decode(pending: &mut Option<u16>, code: u32) -> Option<char> {
+    if (0xD800..0xDC00).contains(&code) {
+        *pending = Some(code as u16);
+        return None;
+    }
+    if (0xDC00..0xE000).contains(&code) {
+        let high = pending.take()?;
+        let combined = 0x10000 + (((high as u32 - 0xD800) << 10) | (code - 0xDC00));
+        return char::from_u32(combined);
+    }
+    *pending = None;
+    char::from_u32(code)
 }
 
 fn word_left(s: &str, pos: usize) -> usize {
@@ -11378,8 +11400,8 @@ fn get_app_path(launch_command: &str) -> String {
 unsafe fn get_window_icon(hwnd: HWND) -> HICON {
     use windows::Win32::Foundation::WPARAM;
     use windows::Win32::UI::WindowsAndMessaging::{
-        GetClassLongPtrW, IsWindow, SendMessageW, GCLP_HICON, GCLP_HICONSM, ICON_BIG, ICON_SMALL,
-        WM_GETICON,
+        GetClassLongPtrW, IsWindow, SendMessageTimeoutW, GCLP_HICON, GCLP_HICONSM, ICON_BIG,
+        ICON_SMALL, SMTO_ABORTIFHUNG, SMTO_NORMAL, WM_GETICON,
     };
 
     // Validate window handle before attempting to get icon.
@@ -11388,14 +11410,29 @@ unsafe fn get_window_icon(hwnd: HWND) -> HICON {
         return HICON(std::ptr::null_mut());
     }
 
-    let mut hicon = HICON(
-        SendMessageW(hwnd, WM_GETICON, WPARAM(ICON_BIG as usize), None).0 as *mut std::ffi::c_void,
-    );
-    if hicon.0.is_null() {
-        hicon = HICON(
-            SendMessageW(hwnd, WM_GETICON, WPARAM(ICON_SMALL as usize), None).0
-                as *mut std::ffi::c_void,
+    // This runs on the UI thread: a plain SendMessageW to a hung window would
+    // freeze the launcher, so query with a short timeout and abort if hung.
+    let query = |kind: u32| -> HICON {
+        let mut result: usize = 0;
+        let ok = SendMessageTimeoutW(
+            hwnd,
+            WM_GETICON,
+            WPARAM(kind as usize),
+            LPARAM(0),
+            SMTO_ABORTIFHUNG | SMTO_NORMAL,
+            150,
+            Some(&mut result),
         );
+        if ok.0 != 0 {
+            HICON(result as *mut std::ffi::c_void)
+        } else {
+            HICON(std::ptr::null_mut())
+        }
+    };
+
+    let mut hicon = query(ICON_BIG);
+    if hicon.0.is_null() {
+        hicon = query(ICON_SMALL);
     }
     if hicon.0.is_null() {
         hicon = HICON(GetClassLongPtrW(hwnd, GCLP_HICON) as *mut std::ffi::c_void);
