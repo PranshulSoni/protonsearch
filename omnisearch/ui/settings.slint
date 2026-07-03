@@ -1570,33 +1570,33 @@ export component SettingsWindow inherits Window {
                     // Plugins Page
                     if root.current-page == 4: VerticalBox {
                         alignment: start;
-                        spacing: 20px;
+                        spacing: 12px;
                         Text { text: "Plugins"; font-size: 30px; font-weight: 700; color: root.text-primary; }
 
                         VerticalBox {
-                            spacing: 12px;
+                            spacing: 6px;
                             Text { text: "ENABLED PLUGINS"; font-size: 11px; font-weight: 600; color: root.text-muted; letter-spacing: 1px; }
 
                             Rectangle {
                                 background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px;
-                                height: root.show-circle-info ? 134px : 74px;
+                                height: root.show-circle-info ? 110px : 54px;
                                 animate height { duration: 150ms; easing: ease-out; }
                                 VerticalLayout {
                                     padding: 0;
                                     HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-top: 16px; padding-bottom: 16px; spacing: 16px;
-                                        Text { text: "\u{e722}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
-                                        VerticalBox { alignment: center; spacing: 2px; Text { text: "Circle to Search"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Select part of the screen and search it visually"; color: root.text-muted; font-size: 12px; } }
+                                        padding-left: 16px; padding-right: 16px; padding-top: 10px; padding-bottom: 10px; spacing: 12px;
+                                        Text { text: "\u{e722}"; font-family: "Segoe MDL2 Assets"; font-size: 18px; color: root.accent; vertical-alignment: center; width: 24px; }
+                                        VerticalBox { alignment: center; spacing: 0; Text { text: "Circle to Search"; color: root.text-primary; font-size: 13px; font-weight: 600; } Text { text: "Select part of the screen and search it visually"; color: root.text-muted; font-size: 11px; } }
                                         Rectangle { horizontal-stretch: 1; }
                                         VerticalLayout {
                                             alignment: center;
                                             Rectangle {
-                                                width: 24px; height: 24px; border-radius: 12px;
+                                                width: 22px; height: 22px; border-radius: 11px;
                                                 background: circle-i-touch.has-hover ? root.border-color : transparent;
                                                 Text {
                                                     text: "\u{e946}";
                                                     font-family: "Segoe MDL2 Assets";
-                                                    font-size: 16px;
+                                                    font-size: 14px;
                                                     color: root.show-circle-info ? root.accent : (circle-i-touch.has-hover ? root.text-primary : root.text-muted);
                                                     horizontal-alignment: center;
                                                     vertical-alignment: center;
@@ -1611,11 +1611,11 @@ export component SettingsWindow inherits Window {
                                         VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-circle-search; toggled => { root.save-settings(); } } }
                                     }
                                     if root.show-circle-info : HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-bottom: 16px; spacing: 12px;
+                                        padding-left: 16px; padding-right: 16px; padding-bottom: 10px; spacing: 12px;
                                         Text {
                                             text: "💡 Trigger: Press Alt + C (Global Hotkey) or search 'lens' / 'circle to search' in the launcher. This freezes the screen so you can drag a selection box to search visually.";
                                             color: root.text-muted;
-                                            font-size: 12px;
+                                            font-size: 11px;
                                             wrap: word-wrap;
                                         }
                                     }
@@ -1623,24 +1623,24 @@ export component SettingsWindow inherits Window {
                             }
                             Rectangle {
                                 background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px;
-                                height: root.show-text-info ? 134px : 74px;
+                                height: root.show-text-info ? 110px : 54px;
                                 animate height { duration: 150ms; easing: ease-out; }
                                 VerticalLayout {
                                     padding: 0;
                                     HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-top: 16px; padding-bottom: 16px; spacing: 16px;
-                                        Text { text: "\u{e8d2}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
-                                        VerticalBox { alignment: center; spacing: 2px; Text { text: "Text Expansions"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Reusable snippets triggered from launcher search"; color: root.text-muted; font-size: 12px; } }
+                                        padding-left: 16px; padding-right: 16px; padding-top: 10px; padding-bottom: 10px; spacing: 12px;
+                                        Text { text: "\u{e8d2}"; font-family: "Segoe MDL2 Assets"; font-size: 18px; color: root.accent; vertical-alignment: center; width: 24px; }
+                                        VerticalBox { alignment: center; spacing: 0; Text { text: "Text Expansions"; color: root.text-primary; font-size: 13px; font-weight: 600; } Text { text: "Reusable snippets triggered from launcher search"; color: root.text-muted; font-size: 11px; } }
                                         Rectangle { horizontal-stretch: 1; }
                                         VerticalLayout {
                                             alignment: center;
                                             Rectangle {
-                                                width: 24px; height: 24px; border-radius: 12px;
+                                                width: 22px; height: 22px; border-radius: 11px;
                                                 background: snip-i-touch.has-hover ? root.border-color : transparent;
                                                 Text {
                                                     text: "\u{e946}";
                                                     font-family: "Segoe MDL2 Assets";
-                                                    font-size: 16px;
+                                                    font-size: 14px;
                                                     color: root.show-text-info ? root.accent : (snip-i-touch.has-hover ? root.text-primary : root.text-muted);
                                                     horizontal-alignment: center;
                                                     vertical-alignment: center;
@@ -1655,11 +1655,11 @@ export component SettingsWindow inherits Window {
                                         VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-text-expansions; toggled => { root.save-settings(); } } }
                                     }
                                     if root.show-text-info : HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-bottom: 16px; spacing: 12px;
+                                        padding-left: 16px; padding-right: 16px; padding-bottom: 10px; spacing: 12px;
                                         Text {
                                             text: "💡 Trigger: Type your custom expansion keyword (or 'snip:' to browse all) in the launcher and press Enter. The expansion text is immediately copied and pasted.";
                                             color: root.text-muted;
-                                            font-size: 12px;
+                                            font-size: 11px;
                                             wrap: word-wrap;
                                         }
                                     }
@@ -1667,24 +1667,24 @@ export component SettingsWindow inherits Window {
                             }
                             Rectangle {
                                 background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px;
-                                height: root.show-color-info ? 134px : 74px;
+                                height: root.show-color-info ? 110px : 54px;
                                 animate height { duration: 150ms; easing: ease-out; }
                                 VerticalLayout {
                                     padding: 0;
                                     HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-top: 16px; padding-bottom: 16px; spacing: 16px;
-                                        Text { text: "\u{e790}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
-                                        VerticalBox { alignment: center; spacing: 2px; Text { text: "Color Picker"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Pick a pixel color and copy its hex value"; color: root.text-muted; font-size: 12px; } }
+                                        padding-left: 16px; padding-right: 16px; padding-top: 10px; padding-bottom: 10px; spacing: 12px;
+                                        Text { text: "\u{e790}"; font-family: "Segoe MDL2 Assets"; font-size: 18px; color: root.accent; vertical-alignment: center; width: 24px; }
+                                        VerticalBox { alignment: center; spacing: 0; Text { text: "Color Picker"; color: root.text-primary; font-size: 13px; font-weight: 600; } Text { text: "Pick a pixel color and copy its hex value"; color: root.text-muted; font-size: 11px; } }
                                         Rectangle { horizontal-stretch: 1; }
                                         VerticalLayout {
                                             alignment: center;
                                             Rectangle {
-                                                width: 24px; height: 24px; border-radius: 12px;
+                                                width: 22px; height: 22px; border-radius: 11px;
                                                 background: color-i-touch.has-hover ? root.border-color : transparent;
                                                 Text {
                                                     text: "\u{e946}";
                                                     font-family: "Segoe MDL2 Assets";
-                                                    font-size: 16px;
+                                                    font-size: 14px;
                                                     color: root.show-color-info ? root.accent : (color-i-touch.has-hover ? root.text-primary : root.text-muted);
                                                     horizontal-alignment: center;
                                                     vertical-alignment: center;
@@ -1699,11 +1699,11 @@ export component SettingsWindow inherits Window {
                                         VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-color-picker; toggled => { root.save-settings(); } } }
                                     }
                                     if root.show-color-info : HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-bottom: 16px; spacing: 12px;
+                                        padding-left: 16px; padding-right: 16px; padding-bottom: 10px; spacing: 12px;
                                         Text {
                                             text: "💡 Trigger: Type 'color' or 'color picker' in the launcher and press Enter. This launches a pixel magnifier tool; clicking copies the selected color's hex code.";
                                             color: root.text-muted;
-                                            font-size: 12px;
+                                            font-size: 11px;
                                             wrap: word-wrap;
                                         }
                                     }
@@ -1711,24 +1711,24 @@ export component SettingsWindow inherits Window {
                             }
                             Rectangle {
                                 background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px;
-                                height: root.show-calc-info ? 134px : 74px;
+                                height: root.show-calc-info ? 110px : 54px;
                                 animate height { duration: 150ms; easing: ease-out; }
                                 VerticalLayout {
                                     padding: 0;
                                     HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-top: 16px; padding-bottom: 16px; spacing: 16px;
-                                        Text { text: "\u{e8ef}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
-                                        VerticalBox { alignment: center; spacing: 2px; Text { text: "Calculator"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Inline math and unit conversion results"; color: root.text-muted; font-size: 12px; } }
+                                        padding-left: 16px; padding-right: 16px; padding-top: 10px; padding-bottom: 10px; spacing: 12px;
+                                        Text { text: "\u{e8ef}"; font-family: "Segoe MDL2 Assets"; font-size: 18px; color: root.accent; vertical-alignment: center; width: 24px; }
+                                        VerticalBox { alignment: center; spacing: 0; Text { text: "Calculator"; color: root.text-primary; font-size: 13px; font-weight: 600; } Text { text: "Inline math and unit conversion results"; color: root.text-muted; font-size: 11px; } }
                                         Rectangle { horizontal-stretch: 1; }
                                         VerticalLayout {
                                             alignment: center;
                                             Rectangle {
-                                                width: 24px; height: 24px; border-radius: 12px;
+                                                width: 22px; height: 22px; border-radius: 11px;
                                                 background: calc-i-touch.has-hover ? root.border-color : transparent;
                                                 Text {
                                                     text: "\u{e946}";
                                                     font-family: "Segoe MDL2 Assets";
-                                                    font-size: 16px;
+                                                    font-size: 14px;
                                                     color: root.show-calc-info ? root.accent : (calc-i-touch.has-hover ? root.text-primary : root.text-muted);
                                                     horizontal-alignment: center;
                                                     vertical-alignment: center;
@@ -1743,11 +1743,11 @@ export component SettingsWindow inherits Window {
                                         VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-calculator; toggled => { root.save-settings(); } } }
                                     }
                                     if root.show-calc-info : HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-bottom: 16px; spacing: 12px;
+                                        padding-left: 16px; padding-right: 16px; padding-bottom: 10px; spacing: 12px;
                                         Text {
                                             text: "💡 Trigger: Type any formula or math equation directly in the search bar (e.g. 'sqrt(16) * 12' or '15% of 350'). The parsed result is shown inline immediately.";
                                             color: root.text-muted;
-                                            font-size: 12px;
+                                            font-size: 11px;
                                             wrap: word-wrap;
                                         }
                                     }
@@ -1755,24 +1755,24 @@ export component SettingsWindow inherits Window {
                             }
                             Rectangle {
                                 background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px;
-                                height: root.show-git-info ? 134px : 74px;
+                                height: root.show-git-info ? 110px : 54px;
                                 animate height { duration: 150ms; easing: ease-out; }
                                 VerticalLayout {
                                     padding: 0;
                                     HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-top: 16px; padding-bottom: 16px; spacing: 16px;
-                                        Text { text: "\u{e8ee}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
-                                        VerticalBox { alignment: center; spacing: 2px; Text { text: "Git Commits"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Recent repository commits in search and filters"; color: root.text-muted; font-size: 12px; } }
+                                        padding-left: 16px; padding-right: 16px; padding-top: 10px; padding-bottom: 10px; spacing: 12px;
+                                        Text { text: "\u{e8ee}"; font-family: "Segoe MDL2 Assets"; font-size: 18px; color: root.accent; vertical-alignment: center; width: 24px; }
+                                        VerticalBox { alignment: center; spacing: 0; Text { text: "Git Commits"; color: root.text-primary; font-size: 13px; font-weight: 600; } Text { text: "Recent repository commits in search and filters"; color: root.text-muted; font-size: 11px; } }
                                         Rectangle { horizontal-stretch: 1; }
                                         VerticalLayout {
                                             alignment: center;
                                             Rectangle {
-                                                width: 24px; height: 24px; border-radius: 12px;
+                                                width: 22px; height: 22px; border-radius: 11px;
                                                 background: git-i-touch.has-hover ? root.border-color : transparent;
                                                 Text {
                                                     text: "\u{e946}";
                                                     font-family: "Segoe MDL2 Assets";
-                                                    font-size: 16px;
+                                                    font-size: 14px;
                                                     color: root.show-git-info ? root.accent : (git-i-touch.has-hover ? root.text-primary : root.text-muted);
                                                     horizontal-alignment: center;
                                                     vertical-alignment: center;
@@ -1787,11 +1787,11 @@ export component SettingsWindow inherits Window {
                                         VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-git-commits; toggled => { root.save-settings(); } } }
                                     }
                                     if root.show-git-info : HorizontalBox {
-                                        padding-left: 20px; padding-right: 20px; padding-bottom: 16px; spacing: 12px;
+                                        padding-left: 16px; padding-right: 16px; padding-bottom: 10px; spacing: 12px;
                                         Text {
                                             text: "Trigger: type 'commits:' or search commit text. Turning this off removes Git commit results, the home shortcut, and related filter counts until re-enabled.";
                                             color: root.text-muted;
-                                            font-size: 12px;
+                                            font-size: 11px;
                                             wrap: word-wrap;
                                         }
                                     }
