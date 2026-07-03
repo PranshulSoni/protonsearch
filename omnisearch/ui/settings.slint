@@ -1530,7 +1530,7 @@ export component SettingsWindow inherits Window {
                                             border-radius: 9px;
                                             background: #3b2a22;
                                             Text {
-                                                text: "âš ";
+                                                text: "⚠️";
                                                 color: #f97316;
                                                 font-size: 16px;
                                                 horizontal-alignment: center;
@@ -1705,7 +1705,14 @@ export component SettingsWindow inherits Window {
                                         width: 96px; height: 30px; border-radius: 8px; background: root.hover-bg; border-color: root.accent; border-width: 1px;
                                         Text { text: snippet.keyword; color: root.accent; font-size: 13px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
                                     }
-                                    Text { text: snippet.name; color: root.text-primary; font-size: 15px; font-weight: 700; vertical-alignment: center; }
+                                    Text {
+                                        text: snippet.name;
+                                        color: root.text-primary;
+                                        font-size: 15px;
+                                        font-weight: 700;
+                                        vertical-alignment: center;
+                                        visible: snippet.name != snippet.keyword;
+                                    }
                                     Rectangle { horizontal-stretch: 1; }
                                     Text { text: snippet.content; color: root.accent; font-size: 14px; font-weight: 600; overflow: elide; vertical-alignment: center; max-width: 300px; horizontal-alignment: right; }
                                     VerticalLayout {
