@@ -5449,11 +5449,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 return;
             } else if let Some(content) = cmd.strip_prefix("copy_snippet:") {
                 copy_to_clipboard(hwnd, content);
-                s.query.clear();
-                s.cursor_pos = 0;
                 s.placeholder_override = Some("Copied to clipboard!".to_string());
-                s.reset_results();
-                reset_cursor_blink(hwnd, s);
                 let _ = unsafe { SetTimer(hwnd, TIMER_CLIPBOARD_MSG, 2000, None) };
                 let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
@@ -7267,36 +7263,48 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         );
     }
 
+    if let Some(ref override_msg) = s.placeholder_override {
+        let right_limit = web_rect.map(|r| r.left - 16).unwrap_or(x + w - PAD_L - 20);
+        let mut msg_text: Vec<u16> = override_msg.encode_utf16().collect();
+        let mut msg_rect = RECT {
+            left: right_limit - 220,
+            top: y,
+            right: right_limit,
+            bottom: y + SEARCH_H,
+        };
+        SelectObject(mdc, s.font_c);
+        SetTextColor(mdc, palette.clr_accent);
+        let _ = DrawTextW(
+            mdc,
+            &mut msg_text,
+            &mut msg_rect,
+            DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+        );
+        SetTextColor(mdc, palette.clr_white);
+    }
+
     SelectObject(mdc, s.font_q);
     SetTextColor(mdc, palette.clr_white);
 
     if s.query.is_empty()
-        && (s.app_settings.show_placeholder || !matches!(s.form_state, FormState::None) || s.placeholder_override.is_some())
+        && (s.app_settings.show_placeholder || !matches!(s.form_state, FormState::None))
     {
-        let ph_str = if let Some(ref override_msg) = s.placeholder_override {
-            override_msg.as_str()
-        } else {
-            match &s.form_state {
-                FormState::CreateSnippetName => "Create Snippet: Enter Name...",
-                FormState::CreateSnippetContent { .. } => "Create Snippet: Enter Content...",
-                FormState::CreateSnippetKeyword { .. } => "Create Snippet: Enter Keyword (optional)...",
-                FormState::CreateQuicklinkName => "Create Quicklink: Enter Name...",
-                FormState::CreateQuicklinkUrl { .. } => {
-                    "Create Quicklink: Enter URL (use {query} placeholder)..."
-                }
-                FormState::CreateQuicklinkKeyword { .. } => "Create Quicklink: Enter Keyword...",
-                FormState::CreateFocusCategoryName => "Create Focus Category: Enter Name...",
-                FormState::CreateFocusCategoryBlocked { .. } => "Focus Category: Enter blocked apps (comma separated, e.g. discord.exe, slack.exe)...",
-                FormState::CreateNoteName => "Create Note: Enter Title...",
-                FormState::None => "Search files, code, PDFs, OCR...",
+        let ph_str = match &s.form_state {
+            FormState::CreateSnippetName => "Create Snippet: Enter Name...",
+            FormState::CreateSnippetContent { .. } => "Create Snippet: Enter Content...",
+            FormState::CreateSnippetKeyword { .. } => "Create Snippet: Enter Keyword (optional)...",
+            FormState::CreateQuicklinkName => "Create Quicklink: Enter Name...",
+            FormState::CreateQuicklinkUrl { .. } => {
+                "Create Quicklink: Enter URL (use {query} placeholder)..."
             }
+            FormState::CreateQuicklinkKeyword { .. } => "Create Quicklink: Enter Keyword...",
+            FormState::CreateFocusCategoryName => "Create Focus Category: Enter Name...",
+            FormState::CreateFocusCategoryBlocked { .. } => "Focus Category: Enter blocked apps (comma separated, e.g. discord.exe, slack.exe)...",
+            FormState::CreateNoteName => "Create Note: Enter Title...",
+            FormState::None => "Search files, code, PDFs, OCR...",
         };
         let mut ph: Vec<u16> = ph_str.encode_utf16().collect();
-        if s.placeholder_override.is_some() {
-            SetTextColor(mdc, palette.clr_accent);
-        } else {
-            SetTextColor(mdc, palette.clr_ph);
-        }
+        SetTextColor(mdc, palette.clr_ph);
         let _ = DrawTextW(
             mdc,
             &mut ph,
