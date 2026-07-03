@@ -2,7 +2,6 @@ slint::include_modules!();
 
 use crate::settings::AppSettings;
 use slint::{CloseRequestResponse, ComponentHandle, SharedString};
-use std::sync::atomic::Ordering;
 use windows::Win32::Foundation::{GetLastError, HWND, LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
@@ -911,7 +910,7 @@ fn save_ai_settings(api_key: &str, endpoint: &str, model: &str, always_approve: 
 fn pick_folder() -> Option<std::path::PathBuf> {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        use windows::core::Interface;
+        
         use windows::Win32::System::Com::{
             CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
         };

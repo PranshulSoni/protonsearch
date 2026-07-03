@@ -1,7 +1,6 @@
 use notify::Watcher;
 use once_cell::sync::Lazy;
 use rusqlite::{params, Connection};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -147,7 +146,7 @@ pub fn start_watcher(db_path: PathBuf) {
         let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
         log_indexer("Watcher started");
 
-        let mut collect = |set: &mut std::collections::HashSet<PathBuf>,
+        let collect = |set: &mut std::collections::HashSet<PathBuf>,
                            res: notify::Result<notify::Event>| {
             if let Ok(ev) = res {
                 if matches!(

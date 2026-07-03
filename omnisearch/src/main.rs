@@ -38,7 +38,6 @@ extern "system" {
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 const WIN_W: i32 = 840;
-const RESULT_H: i32 = 68;
 const MAX_RESULTS: usize = 300;
 const VISIBLE_RESULTS: usize = 8;
 const PAD_L: i32 = 24;
@@ -89,14 +88,14 @@ const WM_LAUNCH_AGENT: u32 = WM_USER + 12;
 
 unsafe fn setup_tray_icon(
     hwnd: windows::Win32::Foundation::HWND,
-    hinst: windows::Win32::Foundation::HMODULE,
+    _hinst: windows::Win32::Foundation::HMODULE,
 ) {
-    use windows::core::PCWSTR;
-    use windows::Win32::Foundation::HINSTANCE;
+    
+    
     use windows::Win32::UI::Shell::{
         Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NOTIFYICONDATAW,
     };
-    use windows::Win32::UI::WindowsAndMessaging::{LoadIconW, HICON, IDI_APPLICATION};
+    
 
     let mut nid = NOTIFYICONDATAW::default();
     nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
@@ -1345,8 +1344,7 @@ unsafe extern "system" fn preview_wnd_proc(
 ) -> LRESULT {
     use windows::Win32::Graphics::Gdi::{
         BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject,
-        EndPaint, GetObjectW, SelectObject, BITMAP, DT_CENTER, DT_END_ELLIPSIS, DT_NOPREFIX,
-        DT_WORDBREAK, PAINTSTRUCT, SRCCOPY,
+        EndPaint, GetObjectW, SelectObject, BITMAP, PAINTSTRUCT, SRCCOPY,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
         DefWindowProcW, GetWindowLongPtrW, SetWindowLongPtrW, GWLP_USERDATA, WM_NCCREATE, WM_PAINT,
@@ -1390,12 +1388,12 @@ unsafe extern "system" fn preview_wnd_proc(
             fill(mdc, 0, 0, 1, win_h, palette.clr_div); // left
             fill(mdc, win_w - 1, 0, 1, win_h, palette.clr_div); // right
 
-            if let Some((result, path)) = s
+            if let Some((_result, path)) = s
                 .results
                 .get(s.selected)
                 .and_then(|result| image_path_for_result(result).map(|path| (result, path)))
             {
-                let mut cache = s.clipboard_thumbnails.borrow_mut();
+                let cache = s.clipboard_thumbnails.borrow_mut();
                 let hbitmap = cache.get(path).copied();
 
                 if let Some(hbitmap) = hbitmap {
@@ -1437,7 +1435,7 @@ unsafe extern "system" fn preview_wnd_proc(
 
 unsafe fn show_preview_window(hwnd_parent: HWND, s: &mut State) {
     #[allow(non_snake_case)]
-    let SEARCH_H = s.search_h();
+    let _SEARCH_H = s.search_h();
     use windows::Win32::Graphics::Gdi::{GetObjectW, InvalidateRect, BITMAP};
     use windows::Win32::UI::WindowsAndMessaging::{
         CreateWindowExW, GetWindowRect, SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE,
@@ -3420,13 +3418,13 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                     TPM_RIGHTBUTTON, TPM_BOTTOMALIGN, SetForegroundWindow, WM_NULL
                 };
                 let hmenu = unsafe { CreatePopupMenu().unwrap() };
-                let mut open_text: Vec<u16> = "Open".encode_utf16().chain(std::iter::once(0)).collect();
+                let open_text: Vec<u16> = "Open".encode_utf16().chain(std::iter::once(0)).collect();
                 let _ = unsafe { AppendMenuW(hmenu, MF_STRING, 1, PCWSTR(open_text.as_ptr())) };
 
-                let mut settings_text: Vec<u16> = "Settings".encode_utf16().chain(std::iter::once(0)).collect();
+                let settings_text: Vec<u16> = "Settings".encode_utf16().chain(std::iter::once(0)).collect();
                 let _ = unsafe { AppendMenuW(hmenu, MF_STRING, 3, PCWSTR(settings_text.as_ptr())) };
 
-                let mut exit_text: Vec<u16> = "Exit".encode_utf16().chain(std::iter::once(0)).collect();
+                let exit_text: Vec<u16> = "Exit".encode_utf16().chain(std::iter::once(0)).collect();
                 let _ = unsafe { AppendMenuW(hmenu, MF_STRING, 2, PCWSTR(exit_text.as_ptr())) };
 
                 let mut pt = POINT::default();
@@ -8819,7 +8817,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 };
 
                 if badge_source != "WINDOW" {
-                    let mut t: Vec<u16> = label.encode_utf16().collect();
+                    let t: Vec<u16> = label.encode_utf16().collect();
                     let mut sz = SIZE::default();
                     SelectObject(mdc, s.font_b);
                     let _ = GetTextExtentPoint32W(mdc, &t, &mut sz);
@@ -9229,42 +9227,6 @@ fn filter_type_from_prefix(query: &str) -> FilterType {
     }
 }
 
-fn update_query_for_filter(query: &str, ftype: FilterType) -> String {
-    let prefixes = [
-        "bookmarks:",
-        "history:",
-        "commits:",
-        "todos:",
-        "clip:",
-        "clipboard:",
-        "file:",
-        "folder:",
-        "code:",
-        "img:",
-        "image:",
-        "screenshots:",
-        "agentchats:",
-    ];
-    let mut clean_query = query.to_string();
-    let q_lower = query.to_lowercase();
-    for p in &prefixes {
-        if q_lower.starts_with(p) {
-            clean_query = query[p.len()..].trim().to_string();
-            break;
-        }
-    }
-
-    match ftype {
-        FilterType::All => clean_query,
-        FilterType::Files => format!("file: {}", clean_query),
-        FilterType::Folders => format!("folder: {}", clean_query),
-        FilterType::Code => format!("code: {}", clean_query),
-        FilterType::Images => format!("img: {}", clean_query),
-        FilterType::OCR => format!("img: {}", clean_query),
-        _ => clean_query,
-    }
-}
-
 fn filter_index(ftype: FilterType) -> usize {
     match ftype {
         FilterType::All => 0,
@@ -9503,7 +9465,7 @@ fn filter_pill_rects(s: &State, x_start: i32, list_y: i32) -> Vec<(FilterType, R
         for &(label, ftype) in &filters {
             let count = s.filter_counts[filter_index(ftype)];
             let full_label = format!("{} {}", label, count);
-            let mut lw: Vec<u16> = full_label.encode_utf16().collect();
+            let lw: Vec<u16> = full_label.encode_utf16().collect();
             let mut sz_lbl = SIZE::default();
             let _ = GetTextExtentPoint32W(hdc, &lw, &mut sz_lbl);
 

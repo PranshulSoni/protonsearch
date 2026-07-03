@@ -516,7 +516,7 @@ impl SearchEngine {
             });
         }
 
-        let mut anchor_categories = vec![
+        let anchor_categories = vec![
             AnchorCategory {
                 _name: "eyes_hurt",
                 target_id: "system.night_light",
@@ -3211,7 +3211,7 @@ impl SearchEngine {
 
         if !with_fts {
             // FAST SEARCH PATH: Only Apps, Recent Files, and Files/Folders by title
-            let q_clean = q.to_string();
+            let _q_clean = q.to_string();
             let q_lower = q_lower_trimmed.clone();
             let q_words: Vec<&str> = q_lower.split_whitespace().collect();
 
