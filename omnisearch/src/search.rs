@@ -344,10 +344,7 @@ fn lean_allowed(r: &SearchResult) -> bool {
     let cmd = r.entry.launch_command.as_str();
 
     // (4) Control panel + modern settings — matched by how Windows opens them.
-    if is_native_settings_result(r)
-        || cmd.starts_with("action:")
-        || s == "ACTION"
-        || s == "SYSTEM"
+    if is_native_settings_result(r) || cmd.starts_with("action:") || s == "ACTION" || s == "SYSTEM"
     {
         return true;
     }
@@ -357,7 +354,7 @@ fn lean_allowed(r: &SearchResult) -> bool {
         || cmd.starts_with("openagent:")
         || cmd.starts_with("mkagent:")
         || cmd.starts_with("aichat:")
-        || cmd.starts_with("https://chatgpt.com/?q=")
+        || is_ai_provider_url(cmd)
     {
         return true;
     }
@@ -404,7 +401,31 @@ fn lean_allowed(r: &SearchResult) -> bool {
             | "HISTORY"
             | "BOOKMARK"
             | "CLIPBOARD"
+            | "CALC"
+            | "SNIPPET"
     )
+}
+
+fn is_ai_provider_url(cmd: &str) -> bool {
+    cmd.starts_with("https://chatgpt.com/")
+}
+
+fn plugin_allowed(r: &SearchResult, settings: &crate::settings::AppSettings) -> bool {
+    let cmd = r.entry.launch_command.as_str();
+    let source = r.entry.source.as_str();
+    if source == "CALC" {
+        return settings.plugin_calculator;
+    }
+    if source == "SNIPPET" || cmd.starts_with("copy_snippet:") {
+        return settings.plugin_text_expansions;
+    }
+    if cmd == "action:color_picker" {
+        return settings.plugin_color_picker;
+    }
+    if cmd == "action:circle_to_search" {
+        return settings.plugin_circle_search;
+    }
+    true
 }
 
 struct CatalogEntryIndex {
@@ -2571,11 +2592,13 @@ impl SearchEngine {
         }
 
         let sql = if q.is_empty() {
-            "SELECT id, title, prompt, response, ts, command FROM ai_chats ORDER BY ts DESC".to_string()
+            "SELECT id, title, prompt, response, ts, command FROM ai_chats ORDER BY ts DESC"
+                .to_string()
         } else {
             "SELECT id, title, prompt, response, ts, command FROM ai_chats \
              WHERE (lower(title) LIKE ?1 OR lower(prompt) LIKE ?1 OR lower(response) LIKE ?1) \
-             ORDER BY ts DESC".to_string()
+             ORDER BY ts DESC"
+                .to_string()
         };
         let mut stmt = match conn.prepare(&sql) {
             Ok(s) => s,
@@ -2612,7 +2635,11 @@ impl SearchEngine {
                 .collect::<Vec<&str>>()
                 .join(" ");
             let is_agent = command == "agent";
-            let default_title = if is_agent { "Untitled Agent Run" } else { "Untitled Chat" };
+            let default_title = if is_agent {
+                "Untitled Agent Run"
+            } else {
+                "Untitled Chat"
+            };
             let prompt_display = if clean_prompt.len() > 65 {
                 format!("{}...", clean_prompt.chars().take(65).collect::<String>())
             } else if clean_prompt.is_empty() {
@@ -3186,6 +3213,8 @@ impl SearchEngine {
     ) -> Vec<SearchResult> {
         let mut results = self.search_raw_with_fts(query, top_k, with_fts);
         results.retain(lean_allowed);
+        let plugin_settings = crate::settings::AppSettings::load();
+        results.retain(|r| plugin_allowed(r, &plugin_settings));
         if results.is_empty() {
             if let Some(empty) = empty_scope_result(query) {
                 return vec![empty];
@@ -3833,6 +3862,21 @@ impl SearchEngine {
             let sub_query = q_lower_trimmed.strip_prefix("snip:").unwrap().trim();
             return self.search_snippets_only(sub_query);
         }
+        if q_lower_trimmed.starts_with("lens:") {
+            return vec![SearchResult {
+                entry: CatalogEntry {
+                    id: "action.circle_to_search".to_string(),
+                    control_name: "Circle to Search".to_string(),
+                    breadcrumb_path: "Plugins > Google Lens".to_string(),
+                    launch_command: "action:circle_to_search".to_string(),
+                    source: "ACTION".to_string(),
+                    description: "Select an area of the screen and search it with Google Lens."
+                        .to_string(),
+                    synonyms: "lens google visual image circle search".to_string(),
+                },
+                score: 12.5,
+            }];
+        }
 
         // Quicklink keyword detection in general search
         let query_trimmed = q.trim();
@@ -3869,6 +3913,24 @@ impl SearchEngine {
                             score: 12.0,
                         }];
                     }
+                } else if let Some((name, content, keyword)) =
+                    self.check_snippet_keyword(first_word)
+                {
+                    return vec![SearchResult {
+                        entry: CatalogEntry {
+                            id: format!(
+                                "snippet_trigger.{}",
+                                name.to_lowercase().replace(' ', "_")
+                            ),
+                            control_name: format!("Expand {}", name),
+                            breadcrumb_path: format!("Snippet [{}] > Paste", keyword),
+                            launch_command: format!("copy_snippet:{}", content),
+                            source: "SNIPPET".to_string(),
+                            description: ellipsize_chars(&content, 63),
+                            synonyms: keyword,
+                        },
+                        score: 12.0,
+                    }];
                 }
             }
         }
@@ -3983,42 +4045,39 @@ impl SearchEngine {
 
         // ── AI browser prefixes: "<provider> <prompt>" opens the AI with the ──
         // prompt prefilled via ?q=. (prefix, label, url-before-encoded-prompt)
-        const AI_PREFIXES: &[(&str, &str, &str)] = &[
-            ("chatgpt", "ChatGPT", "https://chatgpt.com/?q="),
-            ("claude", "Claude", "https://claude.ai/new?q="),
-            (
-                "perplexity",
-                "Perplexity",
-                "https://www.perplexity.ai/search?q=",
-            ),
-            ("gemini", "Gemini", "https://gemini.google.com/app?q="),
-            ("deepseek", "DeepSeek", "https://chat.deepseek.com/?q="),
-            ("grok", "Grok", "https://grok.com/?q="),
-        ];
+        const AI_PREFIXES: &[(&str, &str, &str)] =
+            &[("chatgpt", "ChatGPT", "https://chatgpt.com/?q=")];
         for (prefix, label, url) in AI_PREFIXES {
             let lead = [format!("{} ", prefix), format!("{}:", prefix)]
                 .into_iter()
                 .find(|lead| q_lower_trimmed.starts_with(lead));
             if let Some(lead) = lead {
                 let prompt = q.trim()[lead.len()..].trim();
-                if !prompt.is_empty() {
-                    let encoded = url_encode(prompt);
-                    return vec![SearchResult {
-                        entry: CatalogEntry {
-                            id: format!("{}_search", prefix),
-                            control_name: format!("{}: {}", label, prompt),
-                            breadcrumb_path: format!(
-                                "{} > Ask AI > Opens in default browser",
-                                label
-                            ),
-                            launch_command: format!("{}{}", url, encoded),
-                            source: "LIVE".to_string(),
-                            description: format!("Send '{}' to {}", prompt, label),
-                            synonyms: format!("{} ai chat ask", prefix),
+                let launch_command = if prompt.is_empty() {
+                    url.trim_end_matches("?q=").to_string()
+                } else {
+                    format!("{}{}", url, url_encode(prompt))
+                };
+                return vec![SearchResult {
+                    entry: CatalogEntry {
+                        id: format!("{}_search", prefix),
+                        control_name: if prompt.is_empty() {
+                            format!("Open {}", label)
+                        } else {
+                            format!("{}: {}", label, prompt)
                         },
-                        score: 10.0,
-                    }];
-                }
+                        breadcrumb_path: format!("{} > Ask AI > Opens in default browser", label),
+                        launch_command,
+                        source: "LIVE".to_string(),
+                        description: if prompt.is_empty() {
+                            format!("Open {} in your default browser", label)
+                        } else {
+                            format!("Send '{}' to {}", prompt, label)
+                        },
+                        synonyms: format!("{} ai chat ask", prefix),
+                    },
+                    score: 10.0,
+                }];
             }
         }
 
@@ -5384,7 +5443,10 @@ mod tests {
             ("AI", "openagent:1\u{1f}n"),
             ("AI", "aichat:5"),
             ("LIVE", "https://chatgpt.com/?q=hello"),
+            ("LIVE", "https://chatgpt.com/"),
             ("web", "https://www.google.com/search?q=hello"),
+            ("CALC", "copy:4"),
+            ("SNIPPET", "copy_snippet:hello"),
             ("FOLDER", "commits:"),
             ("FOLDER", "bookmarks:"),
             ("FOLDER", "agents:"),
@@ -5397,17 +5459,34 @@ mod tests {
         }
         // dropped
         for (s, c) in [
-            ("CALC", "copy:4"),
             ("AI", "ai:ask:hi"),
             ("AI", "aichats:"),
             ("FOLDER", "notes:"),
             ("TODO", "x"),
-            ("SNIPPET", "x"),
             ("QUICKLINK", "https://x"),
+            ("LIVE", "https://example.com/?q=hello"),
             ("LIVE", "https://claude.ai/new?q=hello"),
         ] {
             assert!(!lean_allowed(&mk(s, c)), "should drop {s} {c}");
         }
+    }
+
+    #[test]
+    fn ai_prefixes_work_without_space_or_prompt() {
+        let mut engine = SearchEngine::new(std::path::PathBuf::from("test_ai_prefixes.db"), false)
+            .expect("engine");
+
+        let chatgpt = engine.search("chatgpt:", 5);
+        assert_eq!(chatgpt[0].entry.control_name, "Open ChatGPT");
+        assert_eq!(chatgpt[0].entry.launch_command, "https://chatgpt.com/");
+
+        let claude = engine.search("claude:explain this", 5);
+        assert!(
+            claude
+                .iter()
+                .all(|r| !r.entry.launch_command.starts_with("https://claude.ai/")),
+            "non-ChatGPT AI prefixes should not be exposed"
+        );
     }
 
     #[test]
@@ -6491,7 +6570,8 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         name: "Windows Search Settings",
         breadcrumb: "Settings > Privacy & Security > Search Permissions",
         launch_command: "ms-settings:search-permissions",
-        description: "Configure Windows Search permissions, SafeSearch, cloud content, and history.",
+        description:
+            "Configure Windows Search permissions, SafeSearch, cloud content, and history.",
     },
     QuickAction {
         triggers: &[
@@ -8406,6 +8486,20 @@ static QUICK_ACTIONS: &[QuickAction] = &[
         launch_command: "action:color_picker",
         description: "Launch full-screen pixel color picker to copy Hex colors to clipboard.",
     },
+    QuickAction {
+        triggers: &[
+            "circle to search",
+            "circle search",
+            "lens",
+            "google lens",
+            "visual search",
+            "search screen",
+        ],
+        name: "Circle to Search",
+        breadcrumb: "Plugins > Circle to Search > Select part of the screen",
+        launch_command: "action:circle_to_search",
+        description: "Select part of the screen and search it with Google Lens.",
+    },
 ];
 
 fn get_quick_actions(query: &str) -> Vec<SearchResult> {
@@ -9629,6 +9723,26 @@ impl SearchEngine {
             let name: String = row.get(0).ok()?;
             let url: String = row.get(1).ok()?;
             Some((name, url))
+        } else {
+            None
+        }
+    }
+
+    pub fn check_snippet_keyword(&self, first_word: &str) -> Option<(String, String, String)> {
+        let keyword = first_word.trim().to_lowercase();
+        if keyword.is_empty() {
+            return None;
+        }
+        let conn = &self.conn;
+        let mut stmt = conn
+            .prepare("SELECT name, content, keyword FROM snippets WHERE keyword = ?1 LIMIT 1")
+            .ok()?;
+        let mut rows = stmt.query(rusqlite::params![keyword]).ok()?;
+        if let Some(row) = rows.next().ok()? {
+            let name: String = row.get(0).ok()?;
+            let content: String = row.get(1).ok()?;
+            let keyword: Option<String> = row.get(2).ok()?;
+            Some((name, content, keyword.unwrap_or_default()))
         } else {
             None
         }

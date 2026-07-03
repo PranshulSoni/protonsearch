@@ -75,6 +75,18 @@ pub struct AppSettings {
 
     #[serde(default = "default_true")]
     pub show_placeholder: bool,
+
+    #[serde(default = "default_true")]
+    pub plugin_circle_search: bool,
+
+    #[serde(default = "default_true")]
+    pub plugin_text_expansions: bool,
+
+    #[serde(default = "default_true")]
+    pub plugin_color_picker: bool,
+
+    #[serde(default = "default_true")]
+    pub plugin_calculator: bool,
 }
 
 impl Default for AppSettings {
@@ -102,6 +114,10 @@ impl Default for AppSettings {
             result_subtitle_font_weight: default_result_subtitle_font_weight(),
             result_subtitle_font_size: default_result_subtitle_font_size(),
             show_placeholder: default_true(),
+            plugin_circle_search: default_true(),
+            plugin_text_expansions: default_true(),
+            plugin_color_picker: default_true(),
+            plugin_calculator: default_true(),
         }
     }
 }
@@ -172,7 +188,11 @@ fn exe_dir_settings_path() -> Option<PathBuf> {
 
 fn appdata_settings_path() -> Option<PathBuf> {
     let appdata = std::env::var("APPDATA").ok()?;
-    Some(PathBuf::from(appdata).join("omnisearch").join("settings.json"))
+    Some(
+        PathBuf::from(appdata)
+            .join("omnisearch")
+            .join("settings.json"),
+    )
 }
 
 impl AppSettings {

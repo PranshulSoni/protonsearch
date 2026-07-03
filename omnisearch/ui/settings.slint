@@ -42,6 +42,13 @@ struct SlintAgent {
     goal: string,
 }
 
+struct SlintSnippet {
+    id: int,
+    name: string,
+    keyword: string,
+    content: string,
+}
+
 export component SettingsWindow inherits Window {
     title: "OmniSearch Settings";
     icon: @image-url("../../icons/OmniSearchTrans.png");
@@ -52,6 +59,7 @@ export component SettingsWindow inherits Window {
 
     in-out property <[SlintAgent]> available-agents;
     callback launch-agent(int);
+    in-out property <[SlintSnippet]> snippets;
     
     // Properties to bind to Rust
     in-out property <bool> run-on-startup;
@@ -76,6 +84,13 @@ export component SettingsWindow inherits Window {
     in-out property <string> result-subtitle-font-weight;
     in-out property <int> result-subtitle-font-size;
     in-out property <bool> show-placeholder;
+    in-out property <bool> plugin-circle-search;
+    in-out property <bool> plugin-text-expansions;
+    in-out property <bool> plugin-color-picker;
+    in-out property <bool> plugin-calculator;
+    in-out property <string> snippet-name;
+    in-out property <string> snippet-keyword;
+    in-out property <string> snippet-content;
     in-out property <image> desktop-wallpaper;
     in-out property <bool> has-desktop-wallpaper: false;
 
@@ -83,6 +98,8 @@ export component SettingsWindow inherits Window {
     
     // Callbacks to Rust
     callback save-settings();
+    callback add-snippet();
+    callback delete-snippet(int);
     // Re-assemble + validate the hotkey from the four dropdown slots, then apply/save it.
     callback apply-hotkey();
     callback open-url(string);
@@ -377,13 +394,13 @@ export component SettingsWindow inherits Window {
 
                 Rectangle { height: 4px; }
 
-                // Database
-                nav-database := Rectangle {
+                // Plugins
+                nav-plugins := Rectangle {
                     height: 42px;
                     border-radius: 8px;
                     x: 8px;
                     width: parent.width - 16px;
-                    background: root.current-page == 4 ? #353535 : (ta-database.has-hover ? root.hover-bg : transparent);
+                    background: root.current-page == 4 ? #353535 : (ta-plugins.has-hover ? root.hover-bg : transparent);
                     animate background { duration: 120ms; }
                     Rectangle {
                         x: 0px;
@@ -398,7 +415,7 @@ export component SettingsWindow inherits Window {
                         padding-left: 16px;
                         spacing: 10px;
                         Text {
-                            text: "\u{e8ce}";
+                            text: "\u{e71d}";
                             font-family: "Segoe MDL2 Assets";
                             font-size: 16px;
                             color: root.current-page == 4 ? root.text-primary : root.text-muted;
@@ -406,29 +423,25 @@ export component SettingsWindow inherits Window {
                             width: 18px;
                         }
                         Text {
-                            text: "Database";
+                            text: "Plugins";
                             font-size: 14px;
                             font-weight: root.current-page == 4 ? 600 : 400;
                             color: root.current-page == 4 ? root.text-primary : root.text-secondary;
                             vertical-alignment: center;
                         }
                     }
-                    ta-database := TouchArea { clicked => { root.current-page = 4; } }
+                    ta-plugins := TouchArea { clicked => { root.current-page = 4; } }
                 }
 
-                Rectangle { vertical-stretch: 1; }
+                Rectangle { height: 4px; }
 
-                // Thin divider above About
-                Rectangle { height: 1px; background: root.border-color; }
-                Rectangle { height: 8px; }
-
-                // About
-                nav-about := Rectangle {
+                // Config
+                nav-config := Rectangle {
                     height: 42px;
                     border-radius: 8px;
                     x: 8px;
                     width: parent.width - 16px;
-                    background: root.current-page == 5 ? #353535 : (ta-about.has-hover ? root.hover-bg : transparent);
+                    background: root.current-page == 5 ? #353535 : (ta-config.has-hover ? root.hover-bg : transparent);
                     animate background { duration: 120ms; }
                     Rectangle {
                         x: 0px;
@@ -443,7 +456,7 @@ export component SettingsWindow inherits Window {
                         padding-left: 16px;
                         spacing: 10px;
                         Text {
-                            text: "\u{e946}";
+                            text: "\u{e713}";
                             font-family: "Segoe MDL2 Assets";
                             font-size: 16px;
                             color: root.current-page == 5 ? root.text-primary : root.text-muted;
@@ -451,14 +464,100 @@ export component SettingsWindow inherits Window {
                             width: 18px;
                         }
                         Text {
-                            text: "About";
+                            text: "Config";
                             font-size: 14px;
                             font-weight: root.current-page == 5 ? 600 : 400;
                             color: root.current-page == 5 ? root.text-primary : root.text-secondary;
                             vertical-alignment: center;
                         }
                     }
-                    ta-about := TouchArea { clicked => { root.current-page = 5; } }
+                    ta-config := TouchArea { clicked => { root.current-page = 5; } }
+                }
+
+                Rectangle { height: 4px; }
+
+                // Database
+                nav-database := Rectangle {
+                    height: 42px;
+                    border-radius: 8px;
+                    x: 8px;
+                    width: parent.width - 16px;
+                    background: root.current-page == 6 ? #353535 : (ta-database.has-hover ? root.hover-bg : transparent);
+                    animate background { duration: 120ms; }
+                    Rectangle {
+                        x: 0px;
+                        y: 8px;
+                        width: root.current-page == 6 ? 3px : 0px;
+                        height: parent.height - 16px;
+                        border-radius: 2px;
+                        background: root.accent;
+                        animate width { duration: 160ms; easing: ease-in-out; }
+                    }
+                    HorizontalBox {
+                        padding-left: 16px;
+                        spacing: 10px;
+                        Text {
+                            text: "\u{e8ce}";
+                            font-family: "Segoe MDL2 Assets";
+                            font-size: 16px;
+                            color: root.current-page == 6 ? root.text-primary : root.text-muted;
+                            vertical-alignment: center;
+                            width: 18px;
+                        }
+                        Text {
+                            text: "Database";
+                            font-size: 14px;
+                            font-weight: root.current-page == 6 ? 600 : 400;
+                            color: root.current-page == 6 ? root.text-primary : root.text-secondary;
+                            vertical-alignment: center;
+                        }
+                    }
+                    ta-database := TouchArea { clicked => { root.current-page = 6; } }
+                }
+
+                Rectangle { vertical-stretch: 1; }
+
+                // Thin divider above About
+                Rectangle { height: 1px; background: root.border-color; }
+                Rectangle { height: 8px; }
+
+                // About
+                nav-about := Rectangle {
+                    height: 42px;
+                    border-radius: 8px;
+                    x: 8px;
+                    width: parent.width - 16px;
+                    background: root.current-page == 7 ? #353535 : (ta-about.has-hover ? root.hover-bg : transparent);
+                    animate background { duration: 120ms; }
+                    Rectangle {
+                        x: 0px;
+                        y: 8px;
+                        width: root.current-page == 7 ? 3px : 0px;
+                        height: parent.height - 16px;
+                        border-radius: 2px;
+                        background: root.accent;
+                        animate width { duration: 160ms; easing: ease-in-out; }
+                    }
+                    HorizontalBox {
+                        padding-left: 16px;
+                        spacing: 10px;
+                        Text {
+                            text: "\u{e946}";
+                            font-family: "Segoe MDL2 Assets";
+                            font-size: 16px;
+                            color: root.current-page == 7 ? root.text-primary : root.text-muted;
+                            vertical-alignment: center;
+                            width: 18px;
+                        }
+                        Text {
+                            text: "About";
+                            font-size: 14px;
+                            font-weight: root.current-page == 7 ? 600 : 400;
+                            color: root.current-page == 7 ? root.text-primary : root.text-secondary;
+                            vertical-alignment: center;
+                        }
+                    }
+                    ta-about := TouchArea { clicked => { root.current-page = 7; } }
                 }
 
 
@@ -1560,8 +1659,101 @@ export component SettingsWindow inherits Window {
                         }
                     }
                     
-                    // Database Page
+                    // Plugins Page
                     if root.current-page == 4: VerticalBox {
+                        alignment: start;
+                        spacing: 20px;
+                        Text { text: "Plugins"; font-size: 30px; font-weight: 700; color: root.text-primary; }
+
+                        VerticalBox {
+                            spacing: 12px;
+                            Text { text: "ENABLED PLUGINS"; font-size: 11px; font-weight: 600; color: root.text-muted; letter-spacing: 1px; }
+
+                            Rectangle {
+                                background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px; height: 74px;
+                                HorizontalBox {
+                                    padding-left: 20px; padding-right: 20px; spacing: 16px;
+                                    Text { text: "\u{e722}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
+                                    VerticalBox { alignment: center; spacing: 2px; Text { text: "Circle to Search"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Select part of the screen and search it visually"; color: root.text-muted; font-size: 12px; } }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-circle-search; toggled => { root.save-settings(); } } }
+                                }
+                            }
+                            Rectangle {
+                                background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px; height: 74px;
+                                HorizontalBox {
+                                    padding-left: 20px; padding-right: 20px; spacing: 16px;
+                                    Text { text: "\u{e8d2}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
+                                    VerticalBox { alignment: center; spacing: 2px; Text { text: "Text Expansions"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Reusable snippets triggered from launcher search"; color: root.text-muted; font-size: 12px; } }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-text-expansions; toggled => { root.save-settings(); } } }
+                                }
+                            }
+                            Rectangle {
+                                background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px; height: 74px;
+                                HorizontalBox {
+                                    padding-left: 20px; padding-right: 20px; spacing: 16px;
+                                    Text { text: "\u{e790}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
+                                    VerticalBox { alignment: center; spacing: 2px; Text { text: "Color Picker"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Pick a pixel color and copy its hex value"; color: root.text-muted; font-size: 12px; } }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-color-picker; toggled => { root.save-settings(); } } }
+                                }
+                            }
+                            Rectangle {
+                                background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px; height: 74px;
+                                HorizontalBox {
+                                    padding-left: 20px; padding-right: 20px; spacing: 16px;
+                                    Text { text: "\u{e8ef}"; font-family: "Segoe MDL2 Assets"; font-size: 20px; color: root.accent; vertical-alignment: center; width: 28px; }
+                                    VerticalBox { alignment: center; spacing: 2px; Text { text: "Calculator"; color: root.text-primary; font-size: 14px; font-weight: 600; } Text { text: "Inline math and unit conversion results"; color: root.text-muted; font-size: 12px; } }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    VerticalBox { alignment: center; ToggleSwitch { checked <=> root.plugin-calculator; toggled => { root.save-settings(); } } }
+                                }
+                            }
+                        }
+                    }
+
+                    // Config Page
+                    if root.current-page == 5: VerticalBox {
+                        alignment: start;
+                        spacing: 20px;
+                        Text { text: "Config"; font-size: 30px; font-weight: 700; color: root.text-primary; }
+
+                        VerticalBox {
+                            spacing: 12px;
+                            Text { text: "TEXT EXPANSIONS"; font-size: 11px; font-weight: 600; color: root.text-muted; letter-spacing: 1px; }
+                            Rectangle {
+                                background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px; height: 184px;
+                                VerticalBox {
+                                    padding: 16px; spacing: 10px;
+                                    HorizontalBox {
+                                        spacing: 10px;
+                                        LineEdit { text: root.snippet-name; placeholder-text: "Name"; edited(t) => { root.snippet-name = t; } }
+                                        LineEdit { text: root.snippet-keyword; placeholder-text: "Trigger, e.g. !email"; edited(t) => { root.snippet-keyword = t; } }
+                                    }
+                                    LineEdit { text: root.snippet-content; placeholder-text: "Expansion text"; edited(t) => { root.snippet-content = t; } }
+                                    HorizontalBox {
+                                        Rectangle { horizontal-stretch: 1; }
+                                        Button { text: "Add expansion"; clicked => { root.add-snippet(); } }
+                                    }
+                                }
+                            }
+                            for snippet[i] in root.snippets: Rectangle {
+                                background: root.card-bg; border-radius: 8px; border-color: root.border-color; border-width: 1px; height: 72px;
+                                HorizontalBox {
+                                    padding-left: 20px; padding-right: 16px; spacing: 14px;
+                                    VerticalBox { alignment: center; spacing: 2px;
+                                        Text { text: snippet.name; color: root.text-primary; font-size: 14px; font-weight: 600; }
+                                        Text { text: snippet.keyword + "  " + snippet.content; color: root.text-muted; font-size: 12px; overflow: elide; }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    Button { text: "Delete"; clicked => { root.delete-snippet(snippet.id); } }
+                                }
+                            }
+                        }
+                    }
+
+                    // Database Page
+                    if root.current-page == 6: VerticalBox {
                         alignment: start;
                         spacing: 20px;
 
@@ -1649,7 +1841,7 @@ export component SettingsWindow inherits Window {
                     }
                     
                     // About Page
-                    if root.current-page == 5: VerticalBox {
+                    if root.current-page == 7: VerticalBox {
                         alignment: start;
                         spacing: 24px;
                         Text { text: "About"; font-size: 30px; font-weight: 700; color: root.text-primary; }

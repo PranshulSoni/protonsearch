@@ -172,6 +172,11 @@ pub fn run_settings_window() {
     ));
     ui.set_result_subtitle_font_size(settings.result_subtitle_font_size as i32);
     ui.set_show_placeholder(settings.show_placeholder);
+    ui.set_plugin_circle_search(settings.plugin_circle_search);
+    ui.set_plugin_text_expansions(settings.plugin_text_expansions);
+    ui.set_plugin_color_picker(settings.plugin_color_picker);
+    ui.set_plugin_calculator(settings.plugin_calculator);
+    load_snippets_into_ui(&ui);
 
     if let Some(w_path) = get_desktop_wallpaper_path() {
         if let Ok(img) = slint::Image::load_from_path(std::path::Path::new(&w_path)) {
@@ -253,6 +258,40 @@ pub fn run_settings_window() {
         }
     });
 
+    let ui_weak_add_snippet = ui.as_weak();
+    ui.on_add_snippet(move || {
+        let Some(ui) = ui_weak_add_snippet.upgrade() else {
+            return;
+        };
+        let name = ui.get_snippet_name().to_string();
+        let keyword = ui.get_snippet_keyword().to_string();
+        let content = ui.get_snippet_content().to_string();
+        if name.trim().is_empty() || content.trim().is_empty() {
+            return;
+        }
+        if let Some(conn) = get_db_conn() {
+            let _ = conn.execute(
+                "INSERT OR REPLACE INTO snippets (name, content, keyword) VALUES (?1, ?2, ?3);",
+                rusqlite::params![name.trim(), content.trim(), keyword.trim()],
+            );
+        }
+        ui.set_snippet_name(SharedString::from(""));
+        ui.set_snippet_keyword(SharedString::from(""));
+        ui.set_snippet_content(SharedString::from(""));
+        load_snippets_into_ui(&ui);
+    });
+
+    let ui_weak_delete_snippet = ui.as_weak();
+    ui.on_delete_snippet(move |snippet_id| {
+        let Some(ui) = ui_weak_delete_snippet.upgrade() else {
+            return;
+        };
+        if let Some(conn) = get_db_conn() {
+            let _ = conn.execute("DELETE FROM snippets WHERE id = ?1;", [snippet_id]);
+        }
+        load_snippets_into_ui(&ui);
+    });
+
     // Save settings callback
     let ui_weak_save = ui.as_weak();
     ui.on_save_settings(move || {
@@ -286,6 +325,10 @@ pub fn run_settings_window() {
             s.result_subtitle_font_weight = ui.get_result_subtitle_font_weight().to_string();
             s.result_subtitle_font_size = ui.get_result_subtitle_font_size() as u32;
             s.show_placeholder = ui.get_show_placeholder();
+            s.plugin_circle_search = ui.get_plugin_circle_search();
+            s.plugin_text_expansions = ui.get_plugin_text_expansions();
+            s.plugin_color_picker = ui.get_plugin_color_picker();
+            s.plugin_calculator = ui.get_plugin_calculator();
             s.save();
             ui.set_hotkey_available(true);
             ui.set_hotkey_error(SharedString::from("Hotkey available and saved."));
@@ -395,7 +438,10 @@ pub fn run_settings_window() {
                         let db_path = std::path::PathBuf::from(appdata)
                             .join("omnisearch")
                             .join("file_index.db");
-                        let _ = crate::indexer::run_indexer_folders_force(&db_path, vec![std::path::PathBuf::from(path_str_clone)]);
+                        let _ = crate::indexer::run_indexer_folders_force(
+                            &db_path,
+                            vec![std::path::PathBuf::from(path_str_clone)],
+                        );
                     });
                     let folders_vec: Vec<slint::SharedString> = s
                         .scan_folders
@@ -486,36 +532,38 @@ pub fn run_settings_window() {
         }
 
         std::thread::spawn(move || {
-            let res = ureq::get("https://raw.githubusercontent.com/PranshulSoni/omnisearch/main/update.json")
-                .timeout(std::time::Duration::from_secs(10))
-                .call();
-            
+            let res = ureq::get(
+                "https://raw.githubusercontent.com/PranshulSoni/omnisearch/main/update.json",
+            )
+            .timeout(std::time::Duration::from_secs(10))
+            .call();
+
             let status = match res {
-                Ok(response) => {
-                    match response.into_json::<serde_json::Value>() {
-                        Ok(json) => {
-                            let latest_version = json["version"].as_str().unwrap_or("0.0.0");
-                            let download_url = json["url"].as_str().unwrap_or("");
-                            
-                            if is_newer_version(CURRENT_VERSION, latest_version) && !download_url.is_empty() {
-                                if let Ok(mut url_lock) = UPDATE_URL.lock() {
-                                    *url_lock = Some(download_url.to_string());
-                                }
-                                let ver = latest_version.to_string();
-                                let _ = slint::invoke_from_event_loop(move || {
-                                    if let Some(ui) = ui_weak.upgrade() {
-                                        ui.set_update_status("available".into());
-                                        ui.set_update_version(ver.into());
-                                    }
-                                });
-                                return;
-                            } else {
-                                "uptodate"
+                Ok(response) => match response.into_json::<serde_json::Value>() {
+                    Ok(json) => {
+                        let latest_version = json["version"].as_str().unwrap_or("0.0.0");
+                        let download_url = json["url"].as_str().unwrap_or("");
+
+                        if is_newer_version(CURRENT_VERSION, latest_version)
+                            && !download_url.is_empty()
+                        {
+                            if let Ok(mut url_lock) = UPDATE_URL.lock() {
+                                *url_lock = Some(download_url.to_string());
                             }
+                            let ver = latest_version.to_string();
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(ui) = ui_weak.upgrade() {
+                                    ui.set_update_status("available".into());
+                                    ui.set_update_version(ver.into());
+                                }
+                            });
+                            return;
+                        } else {
+                            "uptodate"
                         }
-                        Err(_) => "error",
                     }
-                }
+                    Err(_) => "error",
+                },
                 Err(ureq::Error::Status(404, _)) => "uptodate", // 404 means no updates published yet!
                 Err(_) => "error",
             };
@@ -523,7 +571,7 @@ pub fn run_settings_window() {
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {
                     ui.set_update_status(status.into());
-                    
+
                     if status == "uptodate" {
                         let ui_weak_reset = ui_weak.clone();
                         std::thread::spawn(move || {
@@ -579,13 +627,14 @@ pub fn run_settings_window() {
                 }
             };
 
-            let total_size = res.header("Content-Length")
+            let total_size = res
+                .header("Content-Length")
                 .and_then(|len| len.parse::<u64>().ok())
                 .unwrap_or(0);
 
             let temp_dir = std::env::temp_dir();
             let temp_path = temp_dir.join("omnisearch_update.exe");
-            
+
             let mut file = match std::fs::File::create(&temp_path) {
                 Ok(f) => f,
                 Err(_) => {
@@ -629,7 +678,7 @@ pub fn run_settings_window() {
                     Err(_) => {
                         let _ = slint::invoke_from_event_loop(move || {
                             if let Some(ui) = ui_weak.upgrade() {
-                                    ui.set_update_status("error".into());
+                                ui.set_update_status("error".into());
                             }
                         });
                         return;
@@ -657,7 +706,12 @@ pub fn run_settings_window() {
 
         // 1. Ask the main launcher to close gracefully via WM_CLOSE
         let class_name: Vec<u16> = "omnisearch\0".encode_utf16().collect();
-        if let Ok(hwnd) = unsafe { windows::Win32::UI::WindowsAndMessaging::FindWindowW(windows::core::PCWSTR(class_name.as_ptr()), None) } {
+        if let Ok(hwnd) = unsafe {
+            windows::Win32::UI::WindowsAndMessaging::FindWindowW(
+                windows::core::PCWSTR(class_name.as_ptr()),
+                None,
+            )
+        } {
             if !hwnd.0.is_null() {
                 unsafe {
                     let _ = windows::Win32::UI::WindowsAndMessaging::PostMessageW(
@@ -808,7 +862,11 @@ fn log_settings_ui(msg: &str) {
     let _ = std::fs::create_dir_all(&log_dir);
     let log_path = log_dir.join("settings_ui.log");
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
-        if file.metadata().map(|m| m.len() > 1024 * 1024).unwrap_or(false) {
+        if file
+            .metadata()
+            .map(|m| m.len() > 1024 * 1024)
+            .unwrap_or(false)
+        {
             let _ = file.set_len(0);
         }
         let _ = writeln!(file, "{}", msg);
@@ -836,6 +894,36 @@ fn get_db_conn() -> Option<rusqlite::Connection> {
             None
         }
     }
+}
+
+fn load_snippets_into_ui(ui: &SettingsWindow) {
+    let mut snippets = Vec::new();
+    if let Some(conn) = get_db_conn() {
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS snippets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                content TEXT NOT NULL,
+                keyword TEXT
+            );",
+            [],
+        );
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, name, COALESCE(keyword, ''), content FROM snippets ORDER BY name ASC",
+        ) {
+            if let Ok(rows) = stmt.query_map([], |row| {
+                Ok(SlintSnippet {
+                    id: row.get::<_, i32>(0)?,
+                    name: SharedString::from(row.get::<_, String>(1)?),
+                    keyword: SharedString::from(row.get::<_, String>(2)?),
+                    content: SharedString::from(row.get::<_, String>(3)?),
+                })
+            }) {
+                snippets.extend(rows.filter_map(|row| row.ok()));
+            }
+        }
+    }
+    ui.set_snippets(slint::ModelRc::new(slint::VecModel::from(snippets)));
 }
 
 fn load_ai_settings() -> (String, String, String, bool) {
@@ -913,7 +1001,6 @@ fn save_ai_settings(api_key: &str, endpoint: &str, model: &str, always_approve: 
 fn pick_folder() -> Option<std::path::PathBuf> {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        
         use windows::Win32::System::Com::{
             CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
         };

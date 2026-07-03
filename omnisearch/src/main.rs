@@ -4,6 +4,7 @@
 mod ai;
 mod applog;
 mod browser_indexer;
+mod circle_to_search;
 mod git_indexer;
 mod indexer;
 mod inspect_db;
@@ -90,12 +91,9 @@ unsafe fn setup_tray_icon(
     hwnd: windows::Win32::Foundation::HWND,
     _hinst: windows::Win32::Foundation::HMODULE,
 ) {
-    
-    
     use windows::Win32::UI::Shell::{
         Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NOTIFYICONDATAW,
     };
-    
 
     let mut nid = NOTIFYICONDATAW::default();
     nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
@@ -103,12 +101,7 @@ unsafe fn setup_tray_icon(
     nid.uID = 1;
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    let hicon = unsafe {
-        load_png_to_hicon(
-            include_bytes!("../../icons/OmniSearchTrans.png"),
-            16,
-        )
-    };
+    let hicon = unsafe { load_png_to_hicon(include_bytes!("../../icons/OmniSearchTrans.png"), 16) };
     nid.hIcon = hicon;
     let tip = "OmniSearch".encode_utf16().collect::<Vec<u16>>();
     for (i, &c) in tip.iter().enumerate().take(127) {
@@ -312,6 +305,10 @@ struct State {
     font_h: HFONT,    // bold larger font for markdown headings
     icon_settings: HICON,
     icon_web: HICON,
+    icon_web_action: HICON,
+    icon_chatgpt: HICON,
+    icon_calculator: HICON,
+    icon_color_picker: HICON,
     icon_bookmark: HICON,
     icon_folder: HICON,
     icon_file: HICON,
@@ -442,7 +439,6 @@ impl State {
         !self.query.trim().is_empty()
             && !self.has_prefix()
             && self.form_state == FormState::None
-            && !self.search_loading
             && !self.ai_pending
             && self.ai_answer.is_none()
             && !self.chat_input_active
@@ -582,7 +578,7 @@ fn enforce_single_instance() -> Option<MutexHandle> {
 // ── Entry point ───────────────────────────────────────────────────────────────
 fn main() {
     install_panic_logger();
-    
+
     // Clean up .bak files from previous updates on startup
     if let Ok(current_exe) = std::env::current_exe() {
         let backup_exe = current_exe.with_extension("bak");
@@ -773,7 +769,29 @@ unsafe fn run(first_settings_run: bool) {
             RESULT_ICON_SIZE as u32,
         )
     };
-    let icon_web = load_icon_from_dll("shell32.dll", 14, 64);
+    let icon_web = load_png_to_hicon(
+        include_bytes!("../../icons/google.png"),
+        RESULT_ICON_SIZE as u32,
+    );
+    let icon_web_action = load_png_to_hicon(include_bytes!("../../icons/google.png"), 20);
+    let icon_chatgpt = load_png_to_hicon(
+        include_bytes!("../../icons/chatgptlogo.png"),
+        RESULT_ICON_SIZE as u32,
+    );
+    let icon_calculator = {
+        let mut h = unsafe { get_file_icon("C:\\Windows\\System32\\calc.exe") };
+        if h.0.is_null() {
+            h = unsafe { get_app_icon("C:\\Windows\\System32\\calc.exe") };
+        }
+        if h.0.is_null() {
+            h = load_icon_from_dll("shell32.dll", 23, 64);
+        }
+        h
+    };
+    let icon_color_picker = load_png_to_hicon(
+        include_bytes!("../../icons/color-picker.png"),
+        RESULT_ICON_SIZE as u32,
+    );
     let icon_bookmark = load_icon_from_dll("shell32.dll", 43, 64);
     let icon_folder = load_icon_from_dll("shell32.dll", 3, 64);
     let icon_file = load_icon_from_dll("shell32.dll", 0, 64);
@@ -922,6 +940,10 @@ unsafe fn run(first_settings_run: bool) {
         font_h,
         icon_settings,
         icon_web,
+        icon_web_action,
+        icon_chatgpt,
+        icon_calculator,
+        icon_color_picker,
         icon_bookmark,
         icon_folder,
         icon_file,
@@ -1016,18 +1038,10 @@ unsafe fn run(first_settings_run: bool) {
         configure_hermes_llm(&cfg.endpoint, &cfg.model, &cfg.api_key);
     }
 
-    let icon_main = unsafe {
-        load_png_to_hicon(
-            include_bytes!("../../icons/OmniSearchTrans.png"),
-            32,
-        )
-    };
-    let icon_main_sm = unsafe {
-        load_png_to_hicon(
-            include_bytes!("../../icons/OmniSearchTrans.png"),
-            16,
-        )
-    };
+    let icon_main =
+        unsafe { load_png_to_hicon(include_bytes!("../../icons/OmniSearchTrans.png"), 32) };
+    let icon_main_sm =
+        unsafe { load_png_to_hicon(include_bytes!("../../icons/OmniSearchTrans.png"), 16) };
 
     let class: Vec<u16> = "omnisearch\0".encode_utf16().collect();
     let wc = WNDCLASSEXW {
@@ -1455,9 +1469,8 @@ unsafe extern "system" fn preview_wnd_proc(
 unsafe fn show_preview_window(hwnd_parent: HWND, s: *mut State) {
     use windows::Win32::Graphics::Gdi::{GetObjectW, InvalidateRect, BITMAP};
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, GetWindowRect, SetWindowPos, ShowWindow, GWLP_USERDATA,
-        HWND_TOPMOST, SetWindowLongPtrW, SWP_NOACTIVATE, SW_SHOWNOACTIVATE, WS_EX_TOOLWINDOW,
-        WS_EX_TOPMOST, WS_POPUP,
+        CreateWindowExW, GetWindowRect, SetWindowLongPtrW, SetWindowPos, ShowWindow, GWLP_USERDATA,
+        HWND_TOPMOST, SWP_NOACTIVATE, SW_SHOWNOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
     };
 
     let mut parent_rect = RECT::default();
@@ -3388,6 +3401,18 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                 if !s.icon_web.0.is_null() {
                     let _ = DestroyIcon(s.icon_web);
                 }
+                if !s.icon_web_action.0.is_null() {
+                    let _ = DestroyIcon(s.icon_web_action);
+                }
+                if !s.icon_chatgpt.0.is_null() {
+                    let _ = DestroyIcon(s.icon_chatgpt);
+                }
+                if !s.icon_calculator.0.is_null() {
+                    let _ = DestroyIcon(s.icon_calculator);
+                }
+                if !s.icon_color_picker.0.is_null() {
+                    let _ = DestroyIcon(s.icon_color_picker);
+                }
                 if !s.icon_bookmark.0.is_null() {
                     let _ = DestroyIcon(s.icon_bookmark);
                 }
@@ -3819,7 +3844,9 @@ unsafe fn animate_window(hwnd: HWND, appearing: bool) {
 
     let _ = InvalidateRect(hwnd, None, FALSE);
     let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 3, None);
-    unsafe { trigger_anim_loop(hwnd); }
+    unsafe {
+        trigger_anim_loop(hwnd);
+    }
 }
 
 // AttachThreadInput trick: allows SetForegroundWindow to succeed even from background context.
@@ -4509,18 +4536,24 @@ fn start_follow_up_chat(hwnd: HWND, s: &mut State, follow_up: String) {
                     let updated_prompt = if original_prompt.is_empty() {
                         new_prompt.clone()
                     } else {
-                        format!("{}
+                        format!(
+                            "{}
 ---
-User: {}", original_prompt, new_prompt)
+User: {}",
+                            original_prompt, new_prompt
+                        )
                     };
                     let updated_response = if original_response.is_empty() {
                         new_response.clone()
                     } else {
-                        format!("{}
+                        format!(
+                            "{}
 
 ---
 
-{}", original_response, new_response)
+{}",
+                            original_response, new_response
+                        )
                     };
                     let _ = conn.execute(
                         "UPDATE ai_chats SET prompt = ?, response = ? WHERE id = ?",
@@ -4535,18 +4568,24 @@ User: {}", original_prompt, new_prompt)
                 let updated_prompt = if original_prompt.is_empty() {
                     new_prompt.clone()
                 } else {
-                    format!("{}
+                    format!(
+                        "{}
 ---
-User: {}", original_prompt, new_prompt)
+User: {}",
+                        original_prompt, new_prompt
+                    )
                 };
                 let updated_response = if original_response.is_empty() {
                     new_response.clone()
                 } else {
-                    format!("{}
+                    format!(
+                        "{}
 
 ---
 
-{}", original_response, new_response)
+{}",
+                        original_response, new_response
+                    )
                 };
                 let full_history_resp = format_conversation(&updated_prompt, &updated_response);
                 (true, full_history_resp)
@@ -5415,6 +5454,10 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
             } else if cmd == "action:color_picker" {
                 start_color_picker(hwnd, s);
                 return;
+            } else if cmd == "action:circle_to_search" {
+                do_hide(hwnd, s);
+                circle_to_search::start_lens_search_async();
+                return;
             } else if cmd == "action:reset_window_position" {
                 reset_launcher_window_position(hwnd, s);
                 return;
@@ -5470,7 +5513,9 @@ unsafe fn sync_height_animation(hwnd: HWND, s: &mut State) {
         s.target_h = target;
         s.height_anim_started = std::time::Instant::now();
         let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 3, None);
-        unsafe { trigger_anim_loop(hwnd); }
+        unsafe {
+            trigger_anim_loop(hwnd);
+        }
         let _ = InvalidateRect(hwnd, None, FALSE);
     } else if s.shown_h == 0 {
         s.shown_h = target;
@@ -5502,8 +5547,7 @@ unsafe fn tick_window_animation(hwnd: HWND, s: &mut State) -> bool {
                 s.shown_h = s.target_h;
                 s.height_anim_from = s.target_h;
                 s.height_anim_started = std::time::Instant::now();
-                let _ =
-                    SetLayeredWindowAttributes(hwnd, COLOR_KEY, 255, LWA_COLORKEY | LWA_ALPHA);
+                let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, 255, LWA_COLORKEY | LWA_ALPHA);
                 applog::log("animate_window: visible");
                 force_foreground(hwnd);
                 false
@@ -5539,12 +5583,7 @@ fn search_row_invalidation_rect(client_w: i32, cy: i32, current_h: i32, search_h
     }
 }
 
-fn results_invalidation_rect(
-    client_w: i32,
-    cy: i32,
-    current_h: i32,
-    search_h: i32,
-) -> RECT {
+fn results_invalidation_rect(client_w: i32, cy: i32, current_h: i32, search_h: i32) -> RECT {
     let x = (client_w - WIN_W) / 2;
     let y = launcher_top_y(cy, current_h);
     RECT {
@@ -5645,7 +5684,9 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
     // grow at ~12fps and made navigation feel choppy. The WM_TIMER handler drops back
     // to a gentle 80ms once the grow finishes and only the loading spinner remains.
     let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 8, None);
-    unsafe { trigger_anim_loop(_hwnd); }
+    unsafe {
+        trigger_anim_loop(_hwnd);
+    }
     let req = SearchRequest {
         query: s.query.clone(),
         query_id: s.current_query_id,
@@ -5670,7 +5711,7 @@ fn ease_out(t: f32) -> f32 {
 // fn ease_in(t: f32) -> f32 { t.clamp(0.0, 1.0).powi(4) }
 
 fn search_web_action_rect(x: i32, y: i32, w: i32, search_h: i32) -> RECT {
-    let action_w = 142;
+    let action_w = 148;
     let action_h = 32;
     let right = x + w - PAD_L;
     RECT {
@@ -6607,8 +6648,10 @@ unsafe fn trigger_icon_loading(_hwnd: HWND, s: &mut State) {
                 .and_then(|h| h.parse::<isize>().ok())
                 .unwrap_or(0);
             let win_hwnd = HWND(hwnd_val as *mut std::ffi::c_void);
-            let hicon = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| get_window_icon(win_hwnd)))
-                .unwrap_or(HICON(std::ptr::null_mut()));
+            let hicon = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                get_window_icon(win_hwnd)
+            }))
+            .unwrap_or(HICON(std::ptr::null_mut()));
             s.app_icons.insert(key.clone(), hicon);
             continue;
         }
@@ -6690,7 +6733,10 @@ fn is_file_result_source(source: &str) -> bool {
 }
 
 fn is_content_match_source(source: &str) -> bool {
-    matches!(source, "FILE_CONTENT" | "CODE_CONTENT" | "OCR" | "PDF" | "DOCX")
+    matches!(
+        source,
+        "FILE_CONTENT" | "CODE_CONTENT" | "OCR" | "PDF" | "DOCX"
+    )
 }
 
 fn is_windows_settings_command(command: &str) -> bool {
@@ -6758,7 +6804,11 @@ unsafe fn draw_result_icon(mdc: HDC, s: &State, icon: HICON, x_base: i32, ry: i3
         return;
     }
     let is_agent = icon.0 == s.icon_agent.0 || icon.0 == s.icon_agent_chat.0;
-    let size = if is_agent { AGENT_ICON_SIZE } else { RESULT_ICON_SIZE };
+    let size = if is_agent {
+        AGENT_ICON_SIZE
+    } else {
+        RESULT_ICON_SIZE
+    };
     let ix = x_base - (size - RESULT_ICON_SIZE) / 2;
     let iy = centered_in_result_row(ry, size, s.app_settings.item_height as i32);
     let _ = DrawIconEx(
@@ -7062,13 +7112,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     // Text / placeholder
     let tx = x + PAD_L + SEARCH_ICON_SIZE + 12;
     let show_web_action = s.shows_web_search_action();
-    let right_reserve = if s.search_loading {
-        180
-    } else if show_web_action {
-        178
-    } else {
-        PAD_L
-    };
+    let web_reserve = if show_web_action { 172 } else { 0 };
+    let loading_reserve = if s.search_loading { 166 } else { 0 };
+    let right_reserve = PAD_L + web_reserve + loading_reserve;
     let tw = w - (PAD_L + SEARCH_ICON_SIZE + 12) - right_reserve;
     let mut tr = RECT {
         left: tx,
@@ -7077,9 +7123,16 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         bottom: y + SEARCH_H,
     };
 
+    let web_rect = if show_web_action {
+        Some(search_web_action_rect(x, y, w, s.search_h()))
+    } else {
+        None
+    };
+
     if s.search_loading {
         let spinner_size = 16;
-        let spinner_x = x + w - PAD_L - spinner_size - 4;
+        let spinner_right = web_rect.map(|r| r.left - 14).unwrap_or(x + w - PAD_L - 4);
+        let spinner_x = spinner_right - spinner_size;
         let spinner_y = y + (SEARCH_H - spinner_size) / 2;
         draw_spinner(
             mdc,
@@ -7094,7 +7147,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         SetTextColor(mdc, palette.clr_ph);
         let mut load_text: Vec<u16> = "Searching content...".encode_utf16().collect();
         let mut load_rect = RECT {
-            left: spinner_x - 140,
+            left: (spinner_x - 140).max(tx),
             top: y,
             right: spinner_x - 8,
             bottom: y + SEARCH_H,
@@ -7107,8 +7160,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         );
     }
 
-    if show_web_action {
-        let web_rect = search_web_action_rect(x, y, w, s.search_h());
+    if let Some(web_rect) = web_rect {
         let btn_w = web_rect.right - web_rect.left;
         let btn_h = web_rect.bottom - web_rect.top;
         fill_rounded(
@@ -7120,15 +7172,15 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             10,
             palette.clr_bdgbg,
         );
-        if !s.icon_web.0.is_null() {
-            let icon_size = 16;
-            let icon_x = web_rect.left + 12;
+        if !s.icon_web_action.0.is_null() {
+            let icon_size = 20;
+            let icon_x = web_rect.left + 14;
             let icon_y = web_rect.top + (btn_h - icon_size) / 2;
             let _ = DrawIconEx(
                 mdc,
                 icon_x,
                 icon_y,
-                s.icon_web,
+                s.icon_web_action,
                 icon_size,
                 icon_size,
                 0,
@@ -7141,9 +7193,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
         SetTextColor(mdc, palette.clr_bdgtx);
         let mut web_label: Vec<u16> = "Search web".encode_utf16().collect();
         let mut web_label_rect = RECT {
-            left: web_rect.left + 34,
+            left: web_rect.left + 44,
             top: web_rect.top,
-            right: web_rect.right - 10,
+            right: web_rect.right - 16,
             bottom: web_rect.bottom,
         };
         let _ = DrawTextW(
@@ -7436,7 +7488,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             // Empty agent chat - show a subtle welcome prompt
             SelectObject(mdc, s.font_q);
             SetTextColor(mdc, s.theme.palette().clr_ph);
-            let agent_name = s.ai_title.strip_prefix('@')
+            let agent_name = s
+                .ai_title
+                .strip_prefix('@')
                 .and_then(|t| t.split_once(':').map(|(n, _)| n.trim()))
                 .unwrap_or("Agent");
             let placeholder = format!("Ask {} anything…", agent_name);
@@ -7920,7 +7974,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     }
 
     // ── Results ───────────────────────────────────────────────────────────
-    let is_special_mode = s.ai_pending || s.ai_answer.is_some() || s.note_editing || s.chat_input_active;
+    let is_special_mode =
+        s.ai_pending || s.ai_answer.is_some() || s.note_editing || s.chat_input_active;
     let n = if is_special_mode {
         0
     } else {
@@ -8414,98 +8469,109 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         .get(&res.entry.launch_command)
                         .copied()
                         .filter(|h| !h.0.is_null());
-                    let icon_to_draw = if search::is_native_settings_command(&res.entry.launch_command)
-                        || res.entry.source == "CONTROL"
-                        || res.entry.source == "SETTINGS"
-                    {
-                        s.icon_settings
-                    } else if let Some(hicon) = cached_icon {
-                        hicon
-                    } else if res.entry.source == "WINDOW" {
-                        s.app_icons
-                            .get(&res.entry.launch_command)
-                            .copied()
-                            .filter(|h| !h.0.is_null())
-                            .unwrap_or(s.icon_app)
-                    } else if res.entry.source == "app"
-                        || is_file_result_source(&res.entry.source)
-                        || (res.entry.source == "ACTION"
-                            && res.entry.launch_command.starts_with("kill:"))
-                    {
-                        s.app_icons
-                            .get(&res.entry.launch_command)
-                            .copied()
-                            .filter(|h| !h.0.is_null())
-                            .unwrap_or_else(|| {
-                                if res.entry.source == "app" {
-                                    s.icon_app
-                                } else if res.entry.source == "FOLDER" {
-                                    s.icon_folder
-                                } else {
-                                    s.icon_file
-                                }
-                            })
-                    } else if res.entry.launch_command.starts_with("ms-settings:") {
-                        s.icon_settings
-                    } else if res.entry.source == "web"
-                        || res.entry.source == "HISTORY"
-                        || res.entry.source == "QUICKLINK"
-                        || res.entry.launch_command.starts_with("https://")
-                    {
-                        s.icon_web
-                    } else if res.entry.source == "BOOKMARK" {
-                        s.icon_bookmark
-                    } else if res.entry.source == "FOLDER" {
-                        s.icon_folder
-                    } else if res.entry.source == "COMMIT" {
-                        s.icon_commit
-                    } else if res.entry.source == "TODO"
-                        || res.entry.source == "SNIPPET"
-                        || res
+                    let icon_to_draw =
+                        if search::is_native_settings_command(&res.entry.launch_command)
+                            || res.entry.source == "CONTROL"
+                            || res.entry.source == "SETTINGS"
+                        {
+                            s.icon_settings
+                        } else if let Some(hicon) = cached_icon {
+                            hicon
+                        } else if res.entry.source == "WINDOW" {
+                            s.app_icons
+                                .get(&res.entry.launch_command)
+                                .copied()
+                                .filter(|h| !h.0.is_null())
+                                .unwrap_or(s.icon_app)
+                        } else if res.entry.source == "app"
+                            || is_file_result_source(&res.entry.source)
+                            || (res.entry.source == "ACTION"
+                                && res.entry.launch_command.starts_with("kill:"))
+                        {
+                            s.app_icons
+                                .get(&res.entry.launch_command)
+                                .copied()
+                                .filter(|h| !h.0.is_null())
+                                .unwrap_or_else(|| {
+                                    if res.entry.source == "app" {
+                                        s.icon_app
+                                    } else if res.entry.source == "FOLDER" {
+                                        s.icon_folder
+                                    } else {
+                                        s.icon_file
+                                    }
+                                })
+                        } else if res.entry.launch_command.starts_with("ms-settings:") {
+                            s.icon_settings
+                        } else if res
                             .entry
                             .launch_command
-                            .starts_with("action:create_snippet")
-                    {
-                        s.icon_file
-                    } else if res.entry.source == "CLIPBOARD"
-                        || res.entry.launch_command.starts_with("action:ask_clipboard")
-                    {
-                        s.icon_clipboard
-                    } else if res.entry.launch_command.starts_with("openagent:") {
-                        // Agents in the `agents:` view — same icon as homepage Agents.
-                        s.icon_agent
-                    } else if res.entry.source == "AI_CHAT" {
-                        // Agent runs / chats in the `agentchats:` view — same icon as
-                        // homepage Agent History.
-                        s.icon_agent_chat
-                    } else if res.entry.source == "AI"
-                        || res.entry.source == "MEMORY"
-                        || res
+                            .starts_with("https://chatgpt.com/?q=")
+                        {
+                            s.icon_chatgpt
+                        } else if res.entry.source == "CALC" {
+                            s.icon_calculator
+                        } else if res.entry.launch_command == "action:color_picker" {
+                            s.icon_color_picker
+                        } else if res.entry.source == "web"
+                            || res.entry.source == "HISTORY"
+                            || res.entry.source == "QUICKLINK"
+                            || res.entry.launch_command.starts_with("https://")
+                        {
+                            s.icon_web
+                        } else if res.entry.source == "BOOKMARK" {
+                            s.icon_bookmark
+                        } else if res.entry.source == "FOLDER" {
+                            s.icon_folder
+                        } else if res.entry.source == "COMMIT" {
+                            s.icon_commit
+                        } else if res.entry.source == "TODO"
+                            || res.entry.source == "SNIPPET"
+                            || res
+                                .entry
+                                .launch_command
+                                .starts_with("action:create_snippet")
+                        {
+                            s.icon_file
+                        } else if res.entry.source == "CLIPBOARD"
+                            || res.entry.launch_command.starts_with("action:ask_clipboard")
+                        {
+                            s.icon_clipboard
+                        } else if res.entry.launch_command.starts_with("openagent:") {
+                            // Agents in the `agents:` view — same icon as homepage Agents.
+                            s.icon_agent
+                        } else if res.entry.source == "AI_CHAT" {
+                            // Agent runs / chats in the `agentchats:` view — same icon as
+                            // homepage Agent History.
+                            s.icon_agent_chat
+                        } else if res.entry.source == "AI"
+                            || res.entry.source == "MEMORY"
+                            || res
+                                .entry
+                                .launch_command
+                                .starts_with("action:reload_script_commands")
+                        {
+                            s.icon_app
+                        } else if res.entry.launch_command.starts_with("start_focus_session:")
+                            || res
+                                .entry
+                                .launch_command
+                                .starts_with("action:toggle_focus_session")
+                            || res
+                                .entry
+                                .launch_command
+                                .starts_with("action:create_focus_category")
+                        {
+                            s.icon_app
+                        } else if res
                             .entry
                             .launch_command
-                            .starts_with("action:reload_script_commands")
-                    {
-                        s.icon_app
-                    } else if res.entry.launch_command.starts_with("start_focus_session:")
-                        || res
-                            .entry
-                            .launch_command
-                            .starts_with("action:toggle_focus_session")
-                        || res
-                            .entry
-                            .launch_command
-                            .starts_with("action:create_focus_category")
-                    {
-                        s.icon_app
-                    } else if res
-                        .entry
-                        .launch_command
-                        .starts_with("action:create_quicklink")
-                    {
-                        s.icon_bookmark
-                    } else {
-                        s.icon_app
-                    };
+                            .starts_with("action:create_quicklink")
+                        {
+                            s.icon_bookmark
+                        } else {
+                            s.icon_app
+                        };
 
                     draw_result_icon(mdc, s, icon_to_draw, x + PAD_L, ry);
                 }
@@ -8702,53 +8768,51 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                         .get(&res.entry.launch_command)
                         .copied()
                         .filter(|icon| !icon.0.is_null())
-                        .unwrap_or_else(|| {
-                            match res.entry.source.as_str() {
-                                "app" => s.icon_app,
-                                "FOLDER" => s.icon_folder,
-                                "FILE" | "FILE_CONTENT" | "RECENT" | "CODE" | "CODE_CONTENT"
-                                | "OCR" => s.icon_file,
-                                "ACTION" | "SYSTEM" | "WINDOW" => s.icon_app,
-                                "BOOKMARK" | "QUICKLINK" => {
-                                    let desc = res.entry.description.to_lowercase();
-                                    if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
-                                        s.icon_chrome
-                                    } else if desc.contains("firefox")
-                                        && !s.icon_firefox.0.is_null()
-                                    {
-                                        s.icon_firefox
-                                    } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
-                                        s.icon_edge
-                                    } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
-                                        s.icon_brave
-                                    } else {
-                                        s.icon_bookmark
-                                    }
-                                }
-                                "CLIPBOARD" => s.icon_clipboard,
-                                "COMMIT" => s.icon_commit,
-                                "HISTORY" | "web" => {
-                                    let desc = res.entry.description.to_lowercase();
-                                    if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
-                                        s.icon_chrome
-                                    } else if desc.contains("firefox")
-                                        && !s.icon_firefox.0.is_null()
-                                    {
-                                        s.icon_firefox
-                                    } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
-                                        s.icon_edge
-                                    } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
-                                        s.icon_brave
-                                    } else {
-                                        s.icon_web
-                                    }
-                                }
-                                "MEMORY" | "AI" => s.icon_app,
-                                "PDF" => s.icon_file,
-                                "Settings" | "SETTINGS" | "CONTROL" => s.icon_settings,
-                                "SNIPPET" | "TODO" => s.icon_file,
-                                _ => s.icon_app,
+                        .unwrap_or_else(|| match res.entry.source.as_str() {
+                            "app" => s.icon_app,
+                            "FOLDER" => s.icon_folder,
+                            "FILE" | "FILE_CONTENT" | "RECENT" | "CODE" | "CODE_CONTENT"
+                            | "OCR" => s.icon_file,
+                            "ACTION" if res.entry.launch_command == "action:color_picker" => {
+                                s.icon_color_picker
                             }
+                            "ACTION" | "SYSTEM" | "WINDOW" => s.icon_app,
+                            "BOOKMARK" | "QUICKLINK" => {
+                                let desc = res.entry.description.to_lowercase();
+                                if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
+                                    s.icon_chrome
+                                } else if desc.contains("firefox") && !s.icon_firefox.0.is_null() {
+                                    s.icon_firefox
+                                } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
+                                    s.icon_edge
+                                } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
+                                    s.icon_brave
+                                } else {
+                                    s.icon_bookmark
+                                }
+                            }
+                            "CLIPBOARD" => s.icon_clipboard,
+                            "COMMIT" => s.icon_commit,
+                            "HISTORY" | "web" => {
+                                let desc = res.entry.description.to_lowercase();
+                                if desc.contains("chrome") && !s.icon_chrome.0.is_null() {
+                                    s.icon_chrome
+                                } else if desc.contains("firefox") && !s.icon_firefox.0.is_null() {
+                                    s.icon_firefox
+                                } else if desc.contains("edge") && !s.icon_edge.0.is_null() {
+                                    s.icon_edge
+                                } else if desc.contains("brave") && !s.icon_brave.0.is_null() {
+                                    s.icon_brave
+                                } else {
+                                    s.icon_web
+                                }
+                            }
+                            "MEMORY" | "AI" => s.icon_app,
+                            "PDF" => s.icon_file,
+                            "Settings" | "SETTINGS" | "CONTROL" => s.icon_settings,
+                            "CALC" => s.icon_calculator,
+                            "SNIPPET" | "TODO" => s.icon_file,
+                            _ => s.icon_app,
                         })
                 };
 
@@ -8787,8 +8851,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     palette.clr_gray
                 };
 
-                if is_content_match_source(&res.entry.source) && !res.entry.description.is_empty()
-                {
+                if is_content_match_source(&res.entry.source) && !res.entry.description.is_empty() {
                     let content_top = centered_in_result_row(ry, 54, s.item_h());
 
                     SelectObject(mdc, s.font_n);
@@ -8899,7 +8962,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     } else {
                         SelectObject(mdc, s.font_c);
                         SetTextColor(mdc, default_gray);
-                        let mut crumb: Vec<u16> = res.entry.breadcrumb_path.encode_utf16().collect();
+                        let mut crumb: Vec<u16> =
+                            res.entry.breadcrumb_path.encode_utf16().collect();
                         let mut r2 = RECT {
                             left: tx,
                             top: text_top + 22,
@@ -9358,7 +9422,10 @@ fn apply_sort(results: &mut Vec<SearchResult>, sort_asc: bool, query: &str) {
     if q_trimmed.is_empty() {
         return;
     }
-    if q_trimmed.starts_with("history:") || q_trimmed.starts_with("clipboard:") || q_trimmed.starts_with("clip:") {
+    if q_trimmed.starts_with("history:")
+        || q_trimmed.starts_with("clipboard:")
+        || q_trimmed.starts_with("clip:")
+    {
         return;
     }
     if sort_asc {
@@ -9377,7 +9444,8 @@ fn apply_sort(results: &mut Vec<SearchResult>, sort_asc: bool, query: &str) {
 fn best_match_cmp(a: &SearchResult, b: &SearchResult, query: &str) -> std::cmp::Ordering {
     let score_a = calculate_relevance_score(a, query);
     let score_b = calculate_relevance_score(b, query);
-    score_b.partial_cmp(&score_a)
+    score_b
+        .partial_cmp(&score_a)
         .unwrap_or(std::cmp::Ordering::Equal)
         .then_with(|| {
             a.entry
@@ -9394,10 +9462,7 @@ fn calculate_relevance_score(result: &SearchResult, query: &str) -> f32 {
     }
 
     let title = result.entry.control_name.to_lowercase();
-    let stem = title
-        .rsplit_once('.')
-        .map(|(s, _)| s)
-        .unwrap_or(&title);
+    let stem = title.rsplit_once('.').map(|(s, _)| s).unwrap_or(&title);
 
     let mut score = 0.0;
 
@@ -9460,8 +9525,6 @@ fn calculate_relevance_score(result: &SearchResult, query: &str) -> f32 {
     score
 }
 
-
-
 fn source_priority(source: &str, command: &str) -> f32 {
     if source == "app" {
         60.0
@@ -9479,7 +9542,10 @@ fn source_priority(source: &str, command: &str) -> f32 {
         40.0
     } else if source == "web" {
         30.0
-    } else if matches!(source, "FILE_CONTENT" | "CODE_CONTENT" | "PDF" | "DOCX" | "OCR") {
+    } else if matches!(
+        source,
+        "FILE_CONTENT" | "CODE_CONTENT" | "PDF" | "DOCX" | "OCR"
+    ) {
         20.0
     } else {
         10.0
@@ -11014,13 +11080,19 @@ mod tests {
     #[test]
     fn search_row_invalidation_only_covers_search_header() {
         let rect = search_row_invalidation_rect(900, 300, 581, 60);
-        assert_eq!((rect.left, rect.top, rect.right, rect.bottom), (30, 10, 870, 72));
+        assert_eq!(
+            (rect.left, rect.top, rect.right, rect.bottom),
+            (30, 10, 870, 72)
+        );
     }
 
     #[test]
     fn results_invalidation_starts_below_search_header() {
         let rect = results_invalidation_rect(900, 300, 581, 60);
-        assert_eq!((rect.left, rect.top, rect.right, rect.bottom), (30, 71, 870, 591));
+        assert_eq!(
+            (rect.left, rect.top, rect.right, rect.bottom),
+            (30, 71, 870, 591)
+        );
     }
 
     #[test]
@@ -11047,9 +11119,9 @@ mod tests {
     #[test]
     fn homepage_exposes_agents_page() {
         let results = default_homepage_results();
-        assert!(results.iter().any(|r| {
-            r.entry.control_name == "Agents" && r.entry.launch_command == "agents:"
-        }));
+        assert!(results
+            .iter()
+            .any(|r| { r.entry.control_name == "Agents" && r.entry.launch_command == "agents:" }));
         assert_eq!(clean_query_prefix("agents: Hermes"), "Hermes");
     }
 
@@ -11151,7 +11223,9 @@ mod tests {
         assert!(is_windows_settings_command("ms-settings:display"));
         assert!(is_windows_settings_command("control.exe inetcpl.cpl"));
         assert!(is_windows_settings_command("services.msc"));
-        assert!(!is_windows_settings_command("C:\\Windows\\System32\\taskmgr.exe"));
+        assert!(!is_windows_settings_command(
+            "C:\\Windows\\System32\\taskmgr.exe"
+        ));
     }
 
     #[test]
@@ -11353,8 +11427,7 @@ mod tests {
 
     #[test]
     fn clipboard_image_path_uses_clipboard_images_dir() {
-        let db_path =
-            std::path::PathBuf::from(r"C:\Users\Test\AppData\Roaming\omnisearch\app.db");
+        let db_path = std::path::PathBuf::from(r"C:\Users\Test\AppData\Roaming\omnisearch\app.db");
         let (_, path_str) = clipboard_image_path(&db_path, 123).unwrap();
         assert!(path_str.ends_with(r"omnisearch\clipboard_images\image_123.bmp"));
     }
