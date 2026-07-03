@@ -1521,7 +1521,7 @@ unsafe fn show_preview_window(hwnd_parent: HWND, s: *mut State) {
 
     let p_x = parent_rect.right + 8;
 
-    let visual_idx = (*s).selected - (*s).scroll_offset;
+    let visual_idx = (*s).selected.saturating_sub((*s).scroll_offset);
     let item_y = (&*s).result_row_y(visual_idx);
     let item_center = item_y + ((*s).app_settings.item_height as i32) / 2;
     let mut p_y = parent_rect.top + item_center - (p_h / 2);
@@ -1819,8 +1819,8 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             let db_path = s.db_path.clone();
             let app_name = unsafe { get_active_app_name() };
 
-            // Serialize clipboard access with the background thread (paste_sequentially)
-            let _clip_guard = clipboard_lock().lock().unwrap();
+            // paste_from_clipboard and copy_to_clipboard now acquire clipboard_lock()
+            // internally, so no explicit lock is needed here.
 
             // Try text format
             if let Some(text) = unsafe { paste_from_clipboard(hwnd) } {
@@ -3381,9 +3381,18 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
 
         WM_DESTROY => {
             let _ = unsafe {
+                // Kill ALL active timers before freeing State to prevent use-after-free
+                // from any pending WM_TIMER messages dispatched after Box::from_raw.
+                let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
+                let _ = KillTimer(hwnd, TIMER_CURSOR_BLINK);
+                let _ = KillTimer(hwnd, TIMER_AI_ANIM);
+                let _ = KillTimer(hwnd, TIMER_ICON_BATCH);
                 let _ = KillTimer(hwnd, TIMER_SEARCH_ANIM);
                 windows::Win32::System::DataExchange::RemoveClipboardFormatListener(hwnd)
             };
+            // Clear GWLP_USERDATA before freeing State so any late message that still
+            // re-enters wnd_proc_inner gets sp==null and falls through safely.
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
             if !sp.is_null() {
                 let s = Box::from_raw(sp);
                 if !s.icon_clipboard.0.is_null() {
@@ -10308,6 +10317,8 @@ unsafe fn copy_image_to_clipboard(hwnd: HWND, file_path: &str) -> bool {
     std::ptr::copy_nonoverlapping(dib.as_ptr(), ptr as *mut u8, dib.len());
     let _ = GlobalUnlock(h_mem);
 
+    // Serialize against other clipboard operations (e.g. paste_sequentially on a background thread).
+    let _clip_guard = clipboard_lock().lock().unwrap_or_else(|e| e.into_inner());
     if OpenClipboard(hwnd).is_err() {
         let _ = GlobalFree(h_mem);
         return false;
@@ -10320,6 +10331,7 @@ unsafe fn copy_image_to_clipboard(hwnd: HWND, file_path: &str) -> bool {
     }
     copied
 }
+
 
 fn image_to_dib_bytes(image: image::DynamicImage) -> Option<Vec<u8>> {
     let rgba = image.into_rgba8();
@@ -10774,6 +10786,8 @@ unsafe fn copy_to_clipboard(hwnd: HWND, text: &str) {
     };
     use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
 
+    // Serialize all clipboard access through the shared lock.
+    let _clip_guard = clipboard_lock().lock().unwrap_or_else(|e| e.into_inner());
     if OpenClipboard(hwnd).is_ok() {
         let _ = EmptyClipboard();
         let utf16: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
@@ -10794,6 +10808,10 @@ unsafe fn paste_from_clipboard(hwnd: HWND) -> Option<String> {
     use windows::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
     use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
 
+    // Serialize clipboard access. The WM_CLIPBOARDUPDATE handler already holds
+    // the lock before calling this function; callers that are not inside that guard
+    // will acquire it here so clipboard reads are always serialized.
+    let _clip_guard = clipboard_lock().lock().unwrap_or_else(|e| e.into_inner());
     let mut result = None;
     if OpenClipboard(hwnd).is_ok() {
         if let Ok(h_mem) = GetClipboardData(13) {

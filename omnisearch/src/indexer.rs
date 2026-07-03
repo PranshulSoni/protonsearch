@@ -508,13 +508,25 @@ pub fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Res
         *g = "Starting scan...".to_string();
         save_indexer_state_to_db(db_path, "progress", &g);
     }
-    let res = run_indexer_folders_inner(db_path, folders);
-    IS_INDEXING.store(false, Ordering::SeqCst);
-    save_indexer_state_to_db(db_path, "is_indexing", "0");
-    if let Ok(mut g) = INDEXING_PROGRESS.lock() {
-        *g = "Idle".to_string();
-        save_indexer_state_to_db(db_path, "progress", &g);
+
+    // RAII guard: resets IS_INDEXING to false even if run_indexer_folders_inner panics.
+    // Without this, a panic would leave IS_INDEXING=true permanently until restart.
+    struct IndexingGuard<'a> {
+        db_path: &'a Path,
     }
+    impl Drop for IndexingGuard<'_> {
+        fn drop(&mut self) {
+            IS_INDEXING.store(false, Ordering::SeqCst);
+            save_indexer_state_to_db(self.db_path, "is_indexing", "0");
+            if let Ok(mut g) = INDEXING_PROGRESS.lock() {
+                *g = "Idle".to_string();
+                save_indexer_state_to_db(self.db_path, "progress", &g);
+            }
+        }
+    }
+    let _guard = IndexingGuard { db_path };
+
+    let res = run_indexer_folders_inner(db_path, folders);
     if res.is_ok() {
         if let Ok(mut g) = LAST_INDEX_TIME.lock() {
             unsafe {
@@ -529,6 +541,7 @@ pub fn run_indexer_folders(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Res
     }
     res
 }
+
 
 fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::Result<()> {
     log_indexer(&format!(

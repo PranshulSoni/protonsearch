@@ -110,8 +110,8 @@ export component SettingsWindow inherits Window {
     in-out property <[string]> slot34-model;
     in-out property <string> slot1-val;
     in-out property <string> slot2-val;
-    in-out property <string> slot3-val: "—";
-    in-out property <string> slot4-val: "—";
+    in-out property <string> slot3-val: "â€”";
+    in-out property <string> slot4-val: "â€”";
 
     // Agent settings properties
     in-out property <string> agent-api-key;
@@ -136,12 +136,14 @@ export component SettingsWindow inherits Window {
     in-out property <string> update-status: "idle"; // "idle", "checking", "available", "downloading", "ready", "uptodate", "error"
     in-out property <string> update-version: "";
     in-out property <int> update-progress: 0;
-    in-out property <string> app-version: "1.02";
+    in-out property <string> app-version: "1.0.5";
 
     // Update callbacks
     callback check-for-updates();
     callback download-update();
     callback install-update();
+
+
 
 
     
@@ -172,7 +174,7 @@ export component SettingsWindow inherits Window {
         padding: 0;
         spacing: 0;
         
-        // ── Sidebar ──────────────────────────────────────────────
+        // â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Rectangle {
             width: 230px;
             background: root.sidebar-bg;
@@ -226,7 +228,7 @@ export component SettingsWindow inherits Window {
                 // Nav items
                 Rectangle { height: 12px; }
 
-                // ── Nav item helper component would be ideal but Slint doesn't allow
+                // â”€â”€ Nav item helper component would be ideal but Slint doesn't allow
                 // inline components, so we expand each one.
 
                 // General
@@ -864,7 +866,7 @@ export component SettingsWindow inherits Window {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
                                                     spacing: 12px;
-                                                    Text { text: "⭐"; font-size: 14px; vertical-alignment: center; }
+                                                    Text { text: "â­"; font-size: 14px; vertical-alignment: center; }
                                                     VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
@@ -885,7 +887,7 @@ export component SettingsWindow inherits Window {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
                                                     spacing: 12px;
-                                                    Text { text: "🌐"; font-size: 14px; vertical-alignment: center; }
+                                                    Text { text: "ðŸŒ"; font-size: 14px; vertical-alignment: center; }
                                                     VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
@@ -906,7 +908,7 @@ export component SettingsWindow inherits Window {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
                                                     spacing: 12px;
-                                                    Text { text: "🔍"; font-size: 14px; vertical-alignment: center; }
+                                                    Text { text: "ðŸ”"; font-size: 14px; vertical-alignment: center; }
                                                     VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
@@ -927,7 +929,7 @@ export component SettingsWindow inherits Window {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
                                                     spacing: 12px;
-                                                    Text { text: "📄"; font-size: 14px; vertical-alignment: center; }
+                                                    Text { text: "ðŸ“„"; font-size: 14px; vertical-alignment: center; }
                                                     VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
@@ -950,7 +952,7 @@ export component SettingsWindow inherits Window {
                                                     padding-left: 8px;
                                                     padding-right: 8px;
                                                     spacing: 12px;
-                                                    Text { text: "🤖"; font-size: 14px; vertical-alignment: center; }
+                                                    Text { text: "ðŸ¤–"; font-size: 14px; vertical-alignment: center; }
                                                     VerticalLayout {
                                                         alignment: center;
                                                         spacing: 0;
@@ -1287,7 +1289,7 @@ export component SettingsWindow inherits Window {
                             Text { text: "Hotkeys"; font-size: 30px; font-weight: 700; color: root.text-primary; }
                         }
 
-                        // Open launcher hotkey card — four dropdowns (slots 1 & 2 required)
+                        // Open launcher hotkey card â€” four dropdowns (slots 1 & 2 required)
                         Rectangle {
                             background: root.card-bg;
                             border-radius: 8px;
@@ -1370,7 +1372,7 @@ export component SettingsWindow inherits Window {
 
                         Rectangle { height: 6px; }
 
-                        // Availability banner — validates against real Win32 global hotkey registration.
+                        // Availability banner â€” validates against real Win32 global hotkey registration.
                         if root.hotkey-error != "": Rectangle {
                             height: 42px;
                             border-radius: 8px;
@@ -1630,7 +1632,7 @@ export component SettingsWindow inherits Window {
                                             border-radius: 9px;
                                             background: #3b2a22;
                                             Text {
-                                                text: "⚠";
+                                                text: "âš ";
                                                 color: #f97316;
                                                 font-size: 16px;
                                                 horizontal-alignment: center;

@@ -4072,7 +4072,7 @@ impl SearchEngine {
                         },
                         breadcrumb_path: format!("{} > Ask AI > Opens in default browser", label),
                         launch_command,
-                        source: String::new(),
+                        source: "LIVE".to_string(),
                         description: if prompt.is_empty() {
                             format!("Open {} in your default browser", label)
                         } else {
@@ -8623,11 +8623,17 @@ pub fn try_calc(input: &str) -> Option<f64> {
 }
 
 fn try_pct_of(s: &str) -> Option<f64> {
-    // Match "N% of M" case-insensitively
-    let lower = s.to_lowercase();
-    let idx = lower.find("% of ")?;
+    // Match "N% of M" case-insensitively.
+    // SAFETY: Use ASCII-only case-insensitive search on the original bytes so the
+    // returned index is always valid for slicing `s`. Lowercasing can change UTF-8
+    // byte length (e.g. Kelvin sign \u{212A} lowercases to 'k'), so we must never
+    // reuse an offset from a lowercased copy to slice the original string.
+    let needle = b"% of ";
+    let bytes = s.as_bytes();
+    let idx = (0..bytes.len().saturating_sub(needle.len() - 1))
+        .find(|&i| bytes[i..].get(..needle.len()).map_or(false, |w| w.eq_ignore_ascii_case(needle)))?;
     let pct_str = s[..idx].trim();
-    let rest_str = s[idx + 5..].trim();
+    let rest_str = s[idx + needle.len()..].trim();
     let pct: f64 = pct_str.parse().ok()?;
     let base: f64 = rest_str.parse().ok()?;
     Some(pct / 100.0 * base)
@@ -9268,10 +9274,15 @@ fn format_unix_date(timestamp: i64) -> String {
 
 fn format_timestamp_local(timestamp: i64) -> String {
     let timestamp = normalize_event_timestamp(timestamp);
-    let filetime_val = (timestamp + 11644473600) * 10000000;
+    // Use i128 arithmetic (same as format_unix_date) to prevent overflow on extreme
+    // timestamps such as i64::MAX or hostile git commit dates near year 2^63.
+    let filetime_val = ((timestamp as i128) + 11_644_473_600) * 10_000_000;
+    if filetime_val < 0 {
+        return "1970-01-01 12:00 AM".to_string();
+    }
     let ft = windows::Win32::Foundation::FILETIME {
-        dwLowDateTime: (filetime_val & 0xFFFFFFFF) as u32,
-        dwHighDateTime: (filetime_val >> 32) as u32,
+        dwLowDateTime: (filetime_val & 0xFFFF_FFFF) as u32,
+        dwHighDateTime: ((filetime_val >> 32) & 0xFFFF_FFFF) as u32,
     };
     let mut local_ft = windows::Win32::Foundation::FILETIME::default();
     let mut st = windows::Win32::Foundation::SYSTEMTIME::default();
@@ -9508,6 +9519,9 @@ pub fn try_unit_convert(input: &str) -> Option<(String, String)> {
 }
 
 fn fmt_conv(v: f64) -> String {
+    if !v.is_finite() {
+        return String::new();
+    }
     if v.fract() == 0.0 && v.abs() < 1e12 {
         return format!("{}", v as i64);
     }

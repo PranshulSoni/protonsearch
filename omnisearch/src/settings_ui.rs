@@ -11,7 +11,7 @@ use std::sync::Mutex;
 static UPDATE_URL: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 static DOWNLOADED_PATH: Lazy<Mutex<Option<std::path::PathBuf>>> = Lazy::new(|| Mutex::new(None));
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-const DISPLAY_VERSION: &str = "1.05";
+const DISPLAY_VERSION: &str = "1.0.5";
 
 fn is_newer_version(current: &str, latest: &str) -> bool {
     let parse = |v: &str| -> Vec<u32> {
@@ -351,7 +351,7 @@ pub fn run_settings_window() {
 
             std::thread::spawn(move || {
                 crate::settings_startup::sync_run_on_startup(run_on_startup);
-                save_ai_settings(&api_key, &endpoint, &model, always_approve);
+                save_ai_settings(&api_key.trim(), &endpoint.trim(), &model.trim(), always_approve);
             });
 
             if let Some(hwnd) = find_launcher_hwnd() {
@@ -438,12 +438,13 @@ pub fn run_settings_window() {
                     // Immediately scan/index the newly added folder in the background
                     let path_str_clone = path_str.clone();
                     std::thread::spawn(move || {
-                        let _ = unsafe {
+                        let com_ok = unsafe {
                             windows::Win32::System::Com::CoInitializeEx(
                                 None,
                                 windows::Win32::System::Com::COINIT_MULTITHREADED,
                             )
-                        };
+                        }
+                        .is_ok();
                         let appdata = std::env::var("APPDATA").unwrap_or_default();
                         let db_path = std::path::PathBuf::from(appdata)
                             .join("omnisearch")
@@ -452,6 +453,9 @@ pub fn run_settings_window() {
                             &db_path,
                             vec![std::path::PathBuf::from(path_str_clone)],
                         );
+                        if com_ok {
+                            unsafe { windows::Win32::System::Com::CoUninitialize() };
+                        }
                     });
                     let folders_vec: Vec<slint::SharedString> = s
                         .scan_folders
@@ -520,16 +524,17 @@ pub fn run_settings_window() {
             .join("omnisearch")
             .join("file_index.db");
         std::thread::spawn(move || {
-            let _ = unsafe {
+            let com_ok = unsafe {
                 windows::Win32::System::Com::CoInitializeEx(
                     None,
                     windows::Win32::System::Com::COINIT_MULTITHREADED,
                 )
-            };
+            }
+            .is_ok();
             let folders = crate::indexer::get_scan_folders();
             let _ = crate::indexer::run_indexer_folders(&db_path, folders);
-            unsafe {
-                windows::Win32::System::Com::CoUninitialize();
+            if com_ok {
+                unsafe { windows::Win32::System::Com::CoUninitialize() };
             }
         });
     });
