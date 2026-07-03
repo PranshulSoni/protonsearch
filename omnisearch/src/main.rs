@@ -4850,6 +4850,23 @@ fn ai_scroll_down(s: &mut State, step: i32) {
     }
 }
 
+fn plugin_execution_allowed(source: &str, cmd: &str) -> bool {
+    let settings = crate::settings::AppSettings::load();
+    if source == "CALC" {
+        return settings.plugin_calculator;
+    }
+    if source == "SNIPPET" || cmd.starts_with("copy_snippet:") {
+        return settings.plugin_text_expansions;
+    }
+    if cmd == "action:color_picker" {
+        return settings.plugin_color_picker;
+    }
+    if cmd == "action:circle_to_search" {
+        return settings.plugin_circle_search;
+    }
+    true
+}
+
 unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
     if s.results_stale {
         let _ = KillTimer(hwnd, TIMER_DEBOUNCE);
@@ -4858,6 +4875,13 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
     }
     if let Some(r) = s.results.get(s.selected) {
         let cmd = r.entry.launch_command.clone();
+        if !plugin_execution_allowed(&r.entry.source, &cmd) {
+            s.query = "Plugin is disabled in Settings".to_string();
+            s.cursor_pos = s.query.len();
+            s.reset_results();
+            let _ = InvalidateRect(hwnd, None, FALSE);
+            return;
+        }
         let ctrl_name = r.entry.control_name.clone();
         // A scope command navigates the launcher into that scope. These exact strings are
         // never real launch targets, so trigger on the command alone — not the result's
