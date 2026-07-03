@@ -63,7 +63,7 @@ If OmniSearch looks useful, star the repo so more Windows users can find it:
 > Run this in Windows PowerShell:
 >
 > ```powershell
-> curl.exe -fsSL https://raw.githubusercontent.com/PranshulSoni/omnisearch/lean-build/scripts/install.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -
+> curl.exe -fsSL https://raw.githubusercontent.com/PranshulSoni/omnisearch/main/scripts/install.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -
 > ```
 >
 > This downloads the latest OmniSearch release from GitHub and opens the Windows installer.
