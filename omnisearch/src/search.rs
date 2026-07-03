@@ -357,7 +357,12 @@ fn lean_allowed(r: &SearchResult) -> bool {
         || cmd.starts_with("openagent:")
         || cmd.starts_with("mkagent:")
         || cmd.starts_with("aichat:")
+        || cmd.starts_with("https://chatgpt.com/?q=")
     {
+        return true;
+    }
+
+    if s.eq_ignore_ascii_case("web") {
         return true;
     }
 
@@ -678,15 +683,12 @@ impl SearchEngine {
             [],
         )?;
 
-        // Pre-populate AI settings if empty
+        // Pre-populate AI endpoint/model if empty. Do not seed an API key:
+        // users configure their own key via settings/env/AppData.
         let ai_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM ai_settings", [], |row| row.get(0))
             .unwrap_or(0);
         if ai_count == 0 {
-            let _ = conn.execute(
-                "INSERT INTO ai_settings (key, value) VALUES ('api_key', ?);",
-                ["sk-HrvSzHIYBPsbF4NMpG7S0RvLhZKFHmPV153k1kitFrdV4uSdyLvd9EbftDXwkkpb"],
-            );
             let _ = conn.execute(
                 "INSERT INTO ai_settings (key, value) VALUES ('endpoint', 'https://opencode.ai/zen/v1/chat/completions');",
                 [],
@@ -3994,8 +3996,10 @@ impl SearchEngine {
             ("grok", "Grok", "https://grok.com/?q="),
         ];
         for (prefix, label, url) in AI_PREFIXES {
-            let lead = format!("{} ", prefix);
-            if q_lower_trimmed.starts_with(&lead) {
+            let lead = [format!("{} ", prefix), format!("{}:", prefix)]
+                .into_iter()
+                .find(|lead| q_lower_trimmed.starts_with(lead));
+            if let Some(lead) = lead {
                 let prompt = q.trim()[lead.len()..].trim();
                 if !prompt.is_empty() {
                     let encoded = url_encode(prompt);
@@ -5379,6 +5383,8 @@ mod tests {
             ("AI", "agent:1\u{1f}hi"),
             ("AI", "openagent:1\u{1f}n"),
             ("AI", "aichat:5"),
+            ("LIVE", "https://chatgpt.com/?q=hello"),
+            ("web", "https://www.google.com/search?q=hello"),
             ("FOLDER", "commits:"),
             ("FOLDER", "bookmarks:"),
             ("FOLDER", "agents:"),
@@ -5398,7 +5404,7 @@ mod tests {
             ("TODO", "x"),
             ("SNIPPET", "x"),
             ("QUICKLINK", "https://x"),
-            ("web", "https://google.com"),
+            ("LIVE", "https://claude.ai/new?q=hello"),
         ] {
             assert!(!lean_allowed(&mk(s, c)), "should drop {s} {c}");
         }

@@ -131,12 +131,13 @@ pub fn start_watcher(db_path: PathBuf) {
         }
 
         // OCR (WinRT) needs COM initialized on this thread.
-        let _ = unsafe {
+        let com_initialized = unsafe {
             windows::Win32::System::Com::CoInitializeEx(
                 None,
                 windows::Win32::System::Com::COINIT_MULTITHREADED,
             )
-        };
+        }
+        .is_ok();
 
         let conn = match Connection::open(&db_path_clone) {
             Ok(c) => c,
@@ -183,8 +184,10 @@ pub fn start_watcher(db_path: PathBuf) {
             }
         }
         log_indexer("Watcher thread exited");
-        unsafe {
-            windows::Win32::System::Com::CoUninitialize();
+        if com_initialized {
+            unsafe {
+                windows::Win32::System::Com::CoUninitialize();
+            }
         }
     });
 
@@ -213,12 +216,13 @@ pub fn start_indexer(db_path: PathBuf) {
     thread::spawn(move || {
         log_indexer("Indexer thread started");
         // Initialize COM for WinRT OCR
-        let _ = unsafe {
+        let com_initialized = unsafe {
             windows::Win32::System::Com::CoInitializeEx(
                 None,
                 windows::Win32::System::Com::COINIT_MULTITHREADED,
             )
-        };
+        }
+        .is_ok();
 
         // Set low priority so indexing never slows down foreground apps
         unsafe {
@@ -247,6 +251,11 @@ pub fn start_indexer(db_path: PathBuf) {
             eprintln!("Indexer error: {:?}", e);
         }
         log_indexer("Phase 2 crawl finished.");
+        if com_initialized {
+            unsafe {
+                windows::Win32::System::Com::CoUninitialize();
+            }
+        }
     });
 }
 
@@ -398,27 +407,28 @@ struct ExtractJob {
 /// below-normal priority so a fast first-pass index still yields to the foreground.
 fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingUpdate> {
     use std::sync::mpsc;
+    use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
 
     let n_workers = std::thread::available_parallelism()
         .map(|n| (n.get() / 2).max(1).min(4))
         .unwrap_or(2);
 
-    let (job_tx, job_rx) = mpsc::channel::<ExtractJob>(); // unbounded; jobs are tiny (paths/meta)
-    let job_rx = Arc::new(Mutex::new(job_rx));
+    let jobs = Arc::new(Mutex::new(VecDeque::from(jobs)));
     let (res_tx, res_rx) = mpsc::sync_channel::<PendingUpdate>(256); // bounded → backpressure
 
     for _ in 0..n_workers {
-        let job_rx = Arc::clone(&job_rx);
+        let jobs = Arc::clone(&jobs);
         let res_tx = res_tx.clone();
         thread::spawn(move || {
             // OCR (WinRT) needs COM; below-normal so we don't starve the user.
-            let _ = unsafe {
+            let com_initialized = unsafe {
                 windows::Win32::System::Com::CoInitializeEx(
                     None,
                     windows::Win32::System::Com::COINIT_MULTITHREADED,
                 )
-            };
+            }
+            .is_ok();
             unsafe {
                 use windows::Win32::System::Threading::{
                     GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL,
@@ -426,9 +436,9 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
                 let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
             }
             loop {
-                let job = match job_rx.lock().unwrap().recv() {
-                    Ok(j) => j,
-                    Err(_) => break, // feeder dropped → all jobs done
+                let job = match jobs.lock().ok().and_then(|mut q| q.pop_front()) {
+                    Some(j) => j,
+                    None => break,
                 };
                 let content = extract_content(&job.path, &job.ext).unwrap_or_default();
                 let _ = res_tx.send(PendingUpdate {
@@ -441,19 +451,14 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
                     content: Some(content),
                 });
             }
-            unsafe { windows::Win32::System::Com::CoUninitialize(); }
+            if com_initialized {
+                unsafe {
+                    windows::Win32::System::Com::CoUninitialize();
+                }
+            }
         });
     }
     drop(res_tx); // workers hold the only senders now → res_rx ends when they finish
-
-    // Feed jobs from a separate thread so sending never blocks the result drain.
-    thread::spawn(move || {
-        for job in jobs {
-            if job_tx.send(job).is_err() {
-                break;
-            }
-        }
-    });
 
     res_rx
 }

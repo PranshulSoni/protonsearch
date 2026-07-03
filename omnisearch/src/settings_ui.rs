@@ -222,7 +222,7 @@ pub fn run_settings_window() {
                 unsafe {
                     let _ = PostMessageW(
                         hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 11,
+                        crate::WM_RELOAD_SETTINGS,
                         windows::Win32::Foundation::WPARAM(0),
                         windows::Win32::Foundation::LPARAM(0),
                     );
@@ -242,7 +242,7 @@ pub fn run_settings_window() {
                 unsafe {
                     let _ = PostMessageW(
                         hwnd,
-                        windows::Win32::UI::WindowsAndMessaging::WM_USER + 12,
+                        crate::WM_LAUNCH_AGENT,
                         windows::Win32::Foundation::WPARAM(agent_id as usize),
                         windows::Win32::Foundation::LPARAM(0),
                     );
@@ -688,7 +688,7 @@ pub fn run_settings_window() {
             }
         }
 
-        // 3. Launch installer DETACHED so it survives our std::process::exit().
+        // 3. Launch installer DETACHED so it survives the launcher shutdown.
         //    /SILENT skips the wizard UI since the user already clicked "Install".
         use std::os::windows::process::CommandExt;
         const DETACHED_PROCESS: u32 = 0x00000008;
@@ -808,6 +808,9 @@ fn log_settings_ui(msg: &str) {
     let _ = std::fs::create_dir_all(&log_dir);
     let log_path = log_dir.join("settings_ui.log");
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
+        if file.metadata().map(|m| m.len() > 1024 * 1024).unwrap_or(false) {
+            let _ = file.set_len(0);
+        }
         let _ = writeln!(file, "{}", msg);
     }
 }

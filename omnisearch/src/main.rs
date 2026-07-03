@@ -82,9 +82,9 @@ const WM_HERMES_APPROVAL: u32 = WM_USER + 7;
 // Hermes Runs API: streaming output progress (lparam = boxed String).
 const WM_AI_PROGRESS: u32 = WM_USER + 8;
 const WM_TRAYICON: u32 = WM_USER + 9;
-const WM_RELOAD_SETTINGS: u32 = WM_USER + 10;
-const WM_SET_HOTKEY_RECORDING: u32 = WM_USER + 11;
-const WM_LAUNCH_AGENT: u32 = WM_USER + 12;
+pub(crate) const WM_RELOAD_SETTINGS: u32 = WM_USER + 10;
+pub(crate) const WM_SET_HOTKEY_RECORDING: u32 = WM_USER + 11;
+pub(crate) const WM_LAUNCH_AGENT: u32 = WM_USER + 12;
 
 unsafe fn setup_tray_icon(
     hwnd: windows::Win32::Foundation::HWND,
@@ -435,6 +435,17 @@ impl State {
             || q.starts_with("img:")
             || q.starts_with("agents:")
             || q.starts_with("agentchats:")
+            || q.starts_with("chatgpt:")
+    }
+
+    fn shows_web_search_action(&self) -> bool {
+        !self.query.trim().is_empty()
+            && !self.has_prefix()
+            && self.form_state == FormState::None
+            && !self.search_loading
+            && !self.ai_pending
+            && self.ai_answer.is_none()
+            && !self.chat_input_active
     }
 
     fn reset_results(&mut self) {
@@ -2912,10 +2923,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                     let is_shift = (GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
                     let is_ctrl = (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
                     if (is_shift || is_ctrl) && !s.query.is_empty() {
-                        let encoded = search::url_encode(&s.query);
-                        let url = format!("https://www.google.com/search?q={}", encoded);
-                        launcher::launch(&url);
-                        do_hide(hwnd, s);
+                        open_query_on_web(hwnd, s);
                     } else {
                         execute_selected(hwnd, s);
                     }
@@ -3142,10 +3150,21 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             let mut rc_client = RECT::default();
             let _ = GetClientRect(hwnd, &mut rc_client);
             let win_w = rc_client.right - rc_client.left;
-            let _bx = (win_w - WIN_W) / 2;
+            let x_start = (win_w - WIN_W) / 2;
             let by = s.launcher_top_y();
 
             if my >= by && my < by + SEARCH_H {
+                if s.shows_web_search_action() {
+                    let web_rect = search_web_action_rect(0, by, win_w, s.search_h());
+                    if mx >= web_rect.left
+                        && mx < web_rect.right
+                        && my >= web_rect.top
+                        && my < web_rect.bottom
+                    {
+                        open_query_on_web(hwnd, s);
+                        return LRESULT(0);
+                    }
+                }
                 s.search_input_active = true;
                 if s.ai_answer.is_some() || s.ai_pending || s.chat_input_active {
                     s.chat_input_active = false;
@@ -3153,8 +3172,6 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                     return LRESULT(0);
                 }
             }
-            let win_w = rc_client.right - rc_client.left;
-            let x_start = (win_w - WIN_W) / 2;
 
             if !s.query.is_empty() && !s.has_prefix() {
                 let list_y = by + SEARCH_H + 1;
@@ -5652,6 +5669,29 @@ fn ease_out(t: f32) -> f32 {
 }
 // fn ease_in(t: f32) -> f32 { t.clamp(0.0, 1.0).powi(4) }
 
+fn search_web_action_rect(x: i32, y: i32, w: i32, search_h: i32) -> RECT {
+    let action_w = 142;
+    let action_h = 32;
+    let right = x + w - PAD_L;
+    RECT {
+        left: right - action_w,
+        top: y + (search_h - action_h) / 2,
+        right,
+        bottom: y + (search_h + action_h) / 2,
+    }
+}
+
+unsafe fn open_query_on_web(hwnd: HWND, s: &mut State) {
+    let query = s.query.trim();
+    if query.is_empty() {
+        return;
+    }
+    let encoded = search::url_encode(query);
+    let url = format!("https://www.google.com/search?q={encoded}");
+    launcher::launch(&url);
+    do_hide(hwnd, s);
+}
+
 unsafe fn fill_rounded(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, c: COLORREF) {
     let br = CreateSolidBrush(c);
     let old_brush = SelectObject(hdc, br);
@@ -7021,7 +7061,14 @@ unsafe fn paint(hwnd: HWND, s: &State) {
 
     // Text / placeholder
     let tx = x + PAD_L + SEARCH_ICON_SIZE + 12;
-    let right_reserve = if s.search_loading { 180 } else { PAD_L };
+    let show_web_action = s.shows_web_search_action();
+    let right_reserve = if s.search_loading {
+        180
+    } else if show_web_action {
+        178
+    } else {
+        PAD_L
+    };
     let tw = w - (PAD_L + SEARCH_ICON_SIZE + 12) - right_reserve;
     let mut tr = RECT {
         left: tx,
@@ -7057,6 +7104,53 @@ unsafe fn paint(hwnd: HWND, s: &State) {
             &mut load_text,
             &mut load_rect,
             DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+        );
+    }
+
+    if show_web_action {
+        let web_rect = search_web_action_rect(x, y, w, s.search_h());
+        let btn_w = web_rect.right - web_rect.left;
+        let btn_h = web_rect.bottom - web_rect.top;
+        fill_rounded(
+            mdc,
+            web_rect.left,
+            web_rect.top,
+            btn_w,
+            btn_h,
+            10,
+            palette.clr_bdgbg,
+        );
+        if !s.icon_web.0.is_null() {
+            let icon_size = 16;
+            let icon_x = web_rect.left + 12;
+            let icon_y = web_rect.top + (btn_h - icon_size) / 2;
+            let _ = DrawIconEx(
+                mdc,
+                icon_x,
+                icon_y,
+                s.icon_web,
+                icon_size,
+                icon_size,
+                0,
+                HBRUSH(null_mut()),
+                DI_NORMAL,
+            );
+        }
+
+        SelectObject(mdc, s.font_c);
+        SetTextColor(mdc, palette.clr_bdgtx);
+        let mut web_label: Vec<u16> = "Search web".encode_utf16().collect();
+        let mut web_label_rect = RECT {
+            left: web_rect.left + 34,
+            top: web_rect.top,
+            right: web_rect.right - 10,
+            bottom: web_rect.bottom,
+        };
+        let _ = DrawTextW(
+            mdc,
+            &mut web_label,
+            &mut web_label_rect,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
         );
     }
 
