@@ -1,6 +1,6 @@
 use crate::{ReleaseCapture, SetCapture, VK_ESCAPE};
 use image::{codecs::png::PngEncoder, ColorType};
-use windows::core::{w, PCWSTR};
+use windows::core::PCWSTR;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -353,43 +353,78 @@ unsafe fn bitmap_to_rgba(hbmp: HBITMAP) -> Option<(Vec<u8>, u32, u32)> {
 }
 
 fn upload_to_lens(png: Vec<u8>) {
+    let html_path =
+        std::env::temp_dir().join(format!("omnisearch_lens_{}.html", std::process::id()));
+    let html = lens_upload_html(&base64_encode(&png));
+    if std::fs::write(&html_path, html).is_err() {
+        return;
+    }
+    unsafe {
+        open_path(&html_path);
+    }
     std::thread::spawn(move || {
-        let boundary = "----OmniSearchLensBoundary";
-        let mut body = Vec::new();
-        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-        body.extend_from_slice(b"Content-Disposition: form-data; name=\"encoded_image\"; filename=\"selection.png\"\r\n");
-        body.extend_from_slice(b"Content-Type: image/png\r\n\r\n");
-        body.extend_from_slice(&png);
-        body.extend_from_slice(b"\r\n");
-        body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
-
-        let res = ureq::AgentBuilder::new()
-            .redirects(0)
-            .build()
-            .post("https://lens.google.com/v3/upload?hl=en")
-            .set(
-                "Content-Type",
-                &format!("multipart/form-data; boundary={}", boundary),
-            )
-            .set("User-Agent", "Mozilla/5.0 OmniSearch")
-            .send_bytes(&body);
-
-        let redirect = match res {
-            Err(ureq::Error::Status(_, resp)) => resp.header("Location").map(str::to_string),
-            Ok(resp) => resp.header("Location").map(str::to_string),
-            Err(_) => None,
-        };
-        if let Some(url) = redirect {
-            unsafe { open_url(&url) };
-        }
+        std::thread::sleep(std::time::Duration::from_secs(60));
+        let _ = std::fs::remove_file(html_path);
     });
 }
 
-unsafe fn open_url(url: &str) {
-    let wide: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
+fn lens_upload_html(b64_png: &str) -> String {
+    format!(
+        r#"<!doctype html>
+<html>
+<body>
+<form id="f" action="https://lens.google.com/v3/upload?hl=en" method="POST" enctype="multipart/form-data">
+  <input id="i" name="encoded_image" type="file" accept="image/*">
+</form>
+<script>
+const raw = atob("{}");
+const bytes = new Uint8Array(raw.length);
+for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+const file = new File([new Blob([bytes], {{ type: "image/png" }})], "selection.png", {{ type: "image/png" }});
+const dt = new DataTransfer();
+dt.items.add(file);
+document.getElementById("i").files = dt.files;
+document.getElementById("f").submit();
+</script>
+</body>
+</html>"#,
+        b64_png
+    )
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        out.push(CHARS[((triple >> 18) & 0x3f) as usize] as char);
+        out.push(CHARS[((triple >> 12) & 0x3f) as usize] as char);
+        out.push(if chunk.len() > 1 {
+            CHARS[((triple >> 6) & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            CHARS[(triple & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
+}
+
+unsafe fn open_path(path: &std::path::Path) {
+    let wide: Vec<u16> = path
+        .to_string_lossy()
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     let _ = ShellExecuteW(
         HWND::default(),
-        w!("open"),
+        windows::core::w!("open"),
         PCWSTR(wide.as_ptr()),
         PCWSTR::null(),
         PCWSTR::null(),

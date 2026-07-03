@@ -309,6 +309,7 @@ struct State {
     icon_chatgpt: HICON,
     icon_calculator: HICON,
     icon_color_picker: HICON,
+    icon_lens: HICON,
     icon_bookmark: HICON,
     icon_folder: HICON,
     icon_file: HICON,
@@ -792,6 +793,10 @@ unsafe fn run(first_settings_run: bool) {
         include_bytes!("../../icons/color-picker.png"),
         RESULT_ICON_SIZE as u32,
     );
+    let icon_lens = load_png_to_hicon(
+        include_bytes!("../../icons/lens.png"),
+        RESULT_ICON_SIZE as u32,
+    );
     let icon_bookmark = load_icon_from_dll("shell32.dll", 43, 64);
     let icon_folder = load_icon_from_dll("shell32.dll", 3, 64);
     let icon_file = load_icon_from_dll("shell32.dll", 0, 64);
@@ -944,6 +949,7 @@ unsafe fn run(first_settings_run: bool) {
         icon_chatgpt,
         icon_calculator,
         icon_color_picker,
+        icon_lens,
         icon_bookmark,
         icon_folder,
         icon_file,
@@ -3412,6 +3418,9 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                 }
                 if !s.icon_color_picker.0.is_null() {
                     let _ = DestroyIcon(s.icon_color_picker);
+                }
+                if !s.icon_lens.0.is_null() {
+                    let _ = DestroyIcon(s.icon_lens);
                 }
                 if !s.icon_bookmark.0.is_null() {
                     let _ = DestroyIcon(s.icon_bookmark);
@@ -8535,6 +8544,8 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                             s.icon_chatgpt
                         } else if res.entry.source == "CALC" {
                             s.icon_calculator
+                        } else if res.entry.launch_command == "action:circle_to_search" {
+                            s.icon_lens
                         } else if res.entry.launch_command == "action:color_picker" {
                             s.icon_color_picker
                         } else if res.entry.source == "web"
@@ -8799,6 +8810,9 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                             | "OCR" => s.icon_file,
                             "ACTION" if res.entry.launch_command == "action:color_picker" => {
                                 s.icon_color_picker
+                            }
+                            "ACTION" if res.entry.launch_command == "action:circle_to_search" => {
+                                s.icon_lens
                             }
                             "ACTION" | "SYSTEM" | "WINDOW" => s.icon_app,
                             "BOOKMARK" | "QUICKLINK" => {
