@@ -544,7 +544,55 @@ unsafe fn process_image(data: &[u8], w: u32, h: u32) {
         return;
     }
 
-    let b64 = base64_encode(&png);
+    std::thread::spawn(move || {
+        let agent = ureq::AgentBuilder::new()
+            .redirects(0)
+            .build();
+
+        let boundary = "----WebKitFormBoundaryOmniSearchLens";
+        let mut body = Vec::new();
+        body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+        body.extend_from_slice(b"Content-Disposition: form-data; name=\"encoded_image\"; filename=\"screenshot.png\"\r\n");
+        body.extend_from_slice(b"Content-Type: image/png\r\n\r\n");
+        body.extend_from_slice(&png);
+        body.extend_from_slice(b"\r\n");
+        body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+
+        let res = agent.post("https://lens.google.com/v3/upload?hl=en")
+            .set("Content-Type", &format!("multipart/form-data; boundary={}", boundary))
+            .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .set("Origin", "https://lens.google.com")
+            .set("Referer", "https://lens.google.com/")
+            .send_bytes(&body);
+
+        let mut redirect_url = None;
+        if let Err(ureq::Error::Status(code, resp)) = res {
+            if code == 302 || code == 303 || code == 307 || code == 308 {
+                if let Some(loc) = resp.header("Location") {
+                    redirect_url = Some(loc.to_string());
+                }
+            }
+        } else if let Ok(resp) = res {
+            if let Some(loc) = resp.header("Location") {
+                redirect_url = Some(loc.to_string());
+            }
+        }
+
+        if let Some(url_str) = redirect_url {
+            unsafe {
+                let url: Vec<u16> = url_str.encode_utf16().chain(std::iter::once(0)).collect();
+                let _ = ShellExecuteW(None, &windows::core::w!("open"), PCWSTR(url.as_ptr()), None, None, SW_SHOWNORMAL);
+            }
+        } else {
+            unsafe {
+                fallback_process_image(&png);
+            }
+        }
+    });
+}
+
+unsafe fn fallback_process_image(png: &[u8]) {
+    let b64 = base64_encode(png);
 
     let html = format!(
         r#"<!DOCTYPE html><html><body>
@@ -570,25 +618,25 @@ document.getElementById('f').submit();
 
     let temp_dir = std::env::temp_dir();
     let html_path = temp_dir.join("omnisearch_lens.html");
-    let _ = std::fs::write(&html_path, &html);
+    if std::fs::write(&html_path, &html).is_ok() {
+        let path_str: Vec<u16> = html_path.to_string_lossy()
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let _ = ShellExecuteW(
+            None,
+            &windows::core::w!("open"),
+            PCWSTR(path_str.as_ptr()),
+            None,
+            None,
+            SW_SHOWNORMAL,
+        );
 
-    let path_str: Vec<u16> = html_path.to_string_lossy()
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    let _ = ShellExecuteW(
-        None,
-        &windows::core::w!("open"),
-        PCWSTR(path_str.as_ptr()),
-        None,
-        None,
-        SW_SHOWNORMAL,
-    );
-
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(10));
-        let _ = std::fs::remove_file(&html_path);
-    });
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            let _ = std::fs::remove_file(&html_path);
+        });
+    }
 }
 
 unsafe fn process_text(data: &[u8], w: u32, h: u32) {
