@@ -808,7 +808,7 @@ unsafe fn run(first_settings_run: bool) {
     let icon_clipboard = load_icon_from_dll("shell32.dll", 260, 64);
     let icon_memory = load_icon_from_dll("shell32.dll", 238, 64);
     let icon_agent = load_png_to_hicon(
-        include_bytes!("../../icons/OmniSearchTrans_small.png"),
+        include_bytes!("../../icons/AgentLogo.png"),
         AGENT_ICON_SIZE as u32,
     );
     let icon_agent_chat = load_png_to_hicon(
