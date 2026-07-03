@@ -17,21 +17,20 @@ pub fn log(msg: &str) {
         .as_millis();
 
     for path in [exe_path, appdata_path].into_iter().flatten() {
-        if let Ok(meta) = std::fs::metadata(&path) {
-            if meta.len() > 1024 * 1024 {
-                let _ = std::fs::remove_file(&path);
-            }
-        }
         if let Ok(mut file) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&path)
         {
             use std::io::Write;
+            // Truncate in-place if file exceeds 1MB (atomic: no TOCTOU race).
+            if file.metadata().map(|m| m.len() > 1024 * 1024).unwrap_or(false) {
+                let _ = file.set_len(0);
+            }
             if writeln!(file, "[{}] {}", now_ms, msg).is_ok() {
                 return;
             }
         }
-        // Open/write failed — try the fallback location.
+        // Open/write failed (e.g. read-only dir) — try the fallback location.
     }
 }

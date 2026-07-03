@@ -53,16 +53,14 @@ fn log_git(msg: &str) {
         let log_path = std::path::PathBuf::from(appdata)
             .join("omnisearch")
             .join("git_indexer.log");
-        if let Ok(meta) = std::fs::metadata(&log_path) {
-            if meta.len() > 1024 * 1024 {
-                let _ = std::fs::remove_file(&log_path);
-            }
-        }
         if let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&log_path)
         {
+            if f.metadata().map(|m| m.len() > 1024 * 1024).unwrap_or(false) {
+                let _ = f.set_len(0);
+            }
             let _ = writeln!(f, "{msg}");
         }
     }

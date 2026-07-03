@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+fn settings_mutex() -> &'static std::sync::Mutex<()> {
+    static LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -190,15 +196,21 @@ impl AppSettings {
     }
 
     pub fn load() -> Self {
-        let path = Self::get_settings_path();
-        if path.exists() {
-            if let Ok(content) = fs::read_to_string(&path) {
-                match serde_json::from_str(&content) {
-                    Ok(settings) => return settings,
-                    Err(_) => {
-                        // Keep the corrupt file for inspection instead of silently
-                        // overwriting the user's settings with defaults.
-                        let _ = fs::rename(&path, path.with_extension("json.bak"));
+        // Scope the read lock so it is released before the fallback save() below —
+        // save() locks the same (non-reentrant) mutex and would otherwise deadlock
+        // on first run when no settings file exists yet.
+        {
+            let _guard = settings_mutex().lock().unwrap();
+            let path = Self::get_settings_path();
+            if path.exists() {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    match serde_json::from_str(&content) {
+                        Ok(settings) => return settings,
+                        Err(_) => {
+                            // Keep the corrupt file for inspection instead of silently
+                            // overwriting the user's settings with defaults.
+                            let _ = fs::rename(&path, path.with_extension("json.bak"));
+                        }
                     }
                 }
             }
@@ -209,6 +221,8 @@ impl AppSettings {
     }
 
     pub fn save(&self) {
+        // Serialize file I/O across threads (settings window + launcher).
+        let _guard = settings_mutex().lock().unwrap();
         let Ok(content) = serde_json::to_string_pretty(self) else {
             return;
         };

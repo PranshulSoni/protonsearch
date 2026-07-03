@@ -83,21 +83,65 @@ pub struct AiConfig {
     pub api_key: String,
 }
 
-fn get_db_conn() -> Option<rusqlite::Connection> {
-    let appdata = std::env::var("APPDATA").ok()?;
-    let path = std::path::PathBuf::from(appdata)
-        .join("omnisearch")
-        .join("file_index.db");
-    let conn = rusqlite::Connection::open(&path).ok()?;
+fn appdata_db_path() -> Option<std::path::PathBuf> {
+    std::env::var("APPDATA").ok().map(|a| {
+        std::path::PathBuf::from(a)
+            .join("omnisearch")
+            .join("file_index.db")
+    })
+}
+
+fn open_index_db(path: &Option<std::path::PathBuf>) -> rusqlite::Connection {
+    let conn = path
+        .as_ref()
+        .and_then(|p| rusqlite::Connection::open(p).ok())
+        .unwrap_or_else(|| rusqlite::Connection::open_in_memory().unwrap());
     let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
-    Some(conn)
+    let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+    conn
+}
+
+/// Pooled connection wrapper. Derefs to `Connection` so callers use it unchanged.
+struct ConnCache {
+    path: Option<std::path::PathBuf>,
+    conn: rusqlite::Connection,
+}
+impl std::ops::Deref for ConnCache {
+    type Target = rusqlite::Connection;
+    fn deref(&self) -> &rusqlite::Connection {
+        &self.conn
+    }
+}
+
+/// A single pooled SQLite connection (avoids opening 5-7 per AI request). The
+/// connection is rebuilt only when the APPDATA-derived path changes: a no-op in
+/// production (APPDATA is constant, so it stays pooled), but it lets tests point
+/// the pool at their own temp DB — restoring isolation and keeping test writes
+/// off the real file_index.db.
+fn get_db_conn() -> Option<std::sync::MutexGuard<'static, ConnCache>> {
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<ConnCache>> = OnceLock::new();
+    let desired = appdata_db_path();
+    let mutex = CACHE.get_or_init(|| {
+        Mutex::new(ConnCache {
+            path: desired.clone(),
+            conn: open_index_db(&desired),
+        })
+    });
+    let mut guard = mutex.lock().ok()?;
+    if guard.path != desired {
+        guard.conn = open_index_db(&desired);
+        guard.path = desired;
+    }
+    Some(guard)
 }
 
 pub fn get_config() -> Result<AiConfig> {
-    // One connection for all three settings lookups (api_key/endpoint/model).
-    let conn = get_db_conn();
+    // Each lookup briefly locks the shared pooled connection and releases it.
+    // Do NOT hold the guard across get_active_key_index()/get_rotated_key()
+    // below — those re-lock the same non-reentrant mutex and would deadlock.
     let db_get = |key: &str| -> Option<String> {
-        let c = conn.as_ref()?;
+        let c = get_db_conn()?;
         let val = c
             .query_row(
                 "SELECT value FROM ai_settings WHERE key = ?1",
