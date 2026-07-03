@@ -9030,7 +9030,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     _ => badge_source,
                 };
 
-                if badge_source != "WINDOW" {
+                if !label.is_empty() && badge_source != "WINDOW" {
                     let t: Vec<u16> = label.encode_utf16().collect();
                     let mut sz = SIZE::default();
                     SelectObject(mdc, s.font_b);

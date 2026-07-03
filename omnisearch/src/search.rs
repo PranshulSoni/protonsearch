@@ -3862,7 +3862,11 @@ impl SearchEngine {
             let sub_query = q_lower_trimmed.strip_prefix("snip:").unwrap().trim();
             return self.search_snippets_only(sub_query);
         }
-        if q_lower_trimmed.starts_with("lens:") {
+        if matches!(
+            q_lower_trimmed.as_str(),
+            "lens" | "google lens" | "visual search" | "circle to search" | "circle search"
+        ) || q_lower_trimmed.starts_with("lens:")
+        {
             return vec![SearchResult {
                 entry: CatalogEntry {
                     id: "action.circle_to_search".to_string(),
@@ -4068,7 +4072,7 @@ impl SearchEngine {
                         },
                         breadcrumb_path: format!("{} > Ask AI > Opens in default browser", label),
                         launch_command,
-                        source: "LIVE".to_string(),
+                        source: String::new(),
                         description: if prompt.is_empty() {
                             format!("Open {} in your default browser", label)
                         } else {
@@ -5442,8 +5446,8 @@ mod tests {
             ("AI", "agent:1\u{1f}hi"),
             ("AI", "openagent:1\u{1f}n"),
             ("AI", "aichat:5"),
-            ("LIVE", "https://chatgpt.com/?q=hello"),
-            ("LIVE", "https://chatgpt.com/"),
+            ("", "https://chatgpt.com/?q=hello"),
+            ("", "https://chatgpt.com/"),
             ("web", "https://www.google.com/search?q=hello"),
             ("CALC", "copy:4"),
             ("SNIPPET", "copy_snippet:hello"),

@@ -1739,21 +1739,21 @@ export component SettingsWindow inherits Window {
                                         VerticalBox {
                                             spacing: 6px;
                                             Text { text: "Name"; color: root.text-muted; font-size: 11px; font-weight: 600; }
-                                            LineEdit { text: root.snippet-name; placeholder-text: "Work email"; edited(t) => { root.snippet-name = t; } }
+                                            LineEdit { text <=> root.snippet-name; placeholder-text: "Work email"; }
                                         }
                                         VerticalBox {
                                             spacing: 6px;
                                             Text { text: "Trigger"; color: root.text-muted; font-size: 11px; font-weight: 600; }
-                                            LineEdit { text: root.snippet-keyword; placeholder-text: "!email"; edited(t) => { root.snippet-keyword = t; } }
+                                            LineEdit { text <=> root.snippet-keyword; placeholder-text: "!email"; }
                                         }
                                     }
                                     VerticalBox {
                                         spacing: 6px;
                                         Text { text: "Expansion text"; color: root.text-muted; font-size: 11px; font-weight: 600; }
-                                        LineEdit { text: root.snippet-content; placeholder-text: "Text to paste"; edited(t) => { root.snippet-content = t; } height: 40px; }
+                                        LineEdit { text <=> root.snippet-content; placeholder-text: "Text to paste"; height: 40px; }
                                     }
                                     HorizontalBox {
-                                        Text { text: "Name, trigger, and expansion text are required."; color: root.text-muted; font-size: 12px; }
+                                        Text { text: "Name and expansion text are required. Empty trigger uses the name."; color: root.text-muted; font-size: 12px; }
                                         Rectangle { horizontal-stretch: 1; }
                                         Button { text: "Add expansion"; clicked => { root.add-snippet(); } }
                                     }
