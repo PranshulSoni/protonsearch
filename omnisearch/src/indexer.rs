@@ -795,7 +795,13 @@ pub fn extract_content_subprocess(path_str: &str) {
         _ => None,
     };
     if let Some(mut t) = text {
-        t.truncate(50 * 1024);
+        // Truncate on a char boundary: String::truncate panics mid-UTF-8 sequence,
+        // which would kill this child and silently drop the document's content.
+        let mut end = (50 * 1024).min(t.len());
+        while end > 0 && !t.is_char_boundary(end) {
+            end -= 1;
+        }
+        t.truncate(end);
         use std::io::Write;
         let _ = std::io::stdout().write_all(t.as_bytes());
         let _ = std::io::stdout().flush();

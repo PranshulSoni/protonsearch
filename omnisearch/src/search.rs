@@ -9210,6 +9210,19 @@ fn extract_path_or_url(text: &str) -> Option<String> {
                 .to_string(),
         );
     }
+    // ASCII case-insensitive byte search. Returns a byte index into `haystack` that is
+    // always a char boundary (the needle is ASCII, and a byte matching ASCII can only be
+    // the first byte of a one-byte char). Searching a `to_lowercase()` copy instead and
+    // reusing its indices panics: lowercasing can change byte lengths (e.g. Turkish 'İ').
+    fn find_ascii_ci(haystack: &str, needle: &str) -> Option<usize> {
+        let h = haystack.as_bytes();
+        let n = needle.as_bytes();
+        if n.is_empty() || h.len() < n.len() {
+            return None;
+        }
+        (0..=h.len() - n.len()).find(|&i| h[i..i + n.len()].eq_ignore_ascii_case(n))
+    }
+
     // Detect well-known meeting/service domains without protocol prefix in window titles
     let meeting_domains = [
         "meet.google.com",
@@ -9222,11 +9235,12 @@ fn extract_path_or_url(text: &str) -> Option<String> {
         "whereby.com",
     ];
     for domain in &meeting_domains {
-        if let Some(idx) = text.to_lowercase().find(domain) {
-            // Walk backwards to find 'https://' or start of token
-            let start = if idx >= 8 && &text[idx - 8..idx] == "https://" {
+        if let Some(idx) = find_ascii_ci(text, domain) {
+            let b = text.as_bytes();
+            // Walk backwards to find 'https://' or start of token (byte compare — never panics)
+            let start = if idx >= 8 && b[idx - 8..idx].eq_ignore_ascii_case(b"https://") {
                 idx - 8
-            } else if idx >= 7 && &text[idx - 7..idx] == "http://" {
+            } else if idx >= 7 && b[idx - 7..idx].eq_ignore_ascii_case(b"http://") {
                 idx - 7
             } else {
                 // Construct a proper URL
@@ -9247,9 +9261,10 @@ fn extract_path_or_url(text: &str) -> Option<String> {
             );
         }
     }
-    // Windows absolute path (e.g. C:\Users\...)
+    // Windows absolute path (e.g. C:\Users\...). The char before ':' must be an ASCII
+    // drive letter — this both validates the path and guarantees idx-1 is a char boundary.
     if let Some(idx) = text.find(":\\") {
-        if idx >= 1 {
+        if idx >= 1 && text.as_bytes()[idx - 1].is_ascii_alphabetic() {
             let start = idx - 1;
             let path_part = &text[start..];
             if let Some(sep_idx) = path_part.find(" - ") {
@@ -9263,7 +9278,7 @@ fn extract_path_or_url(text: &str) -> Option<String> {
     }
     // Unix path
     if let Some(idx) = text.find(":/") {
-        if idx >= 1 {
+        if idx >= 1 && text.as_bytes()[idx - 1].is_ascii_alphanumeric() {
             let start = idx - 1;
             let path_part = &text[start..];
             if let Some(sep_idx) = path_part.find(" - ") {

@@ -1162,7 +1162,12 @@ pub fn run(cmd: &str, input: &str) -> Result<String> {
     let input: &str =
         if cmd == "summarize" && (input.starts_with("http://") || input.starts_with("https://")) {
             let mut text = fetch_url_text(input)?;
-            text.truncate(12000); // keep the prompt small
+            // Truncate on a char boundary: String::truncate panics mid-UTF-8 sequence.
+            let mut end = 12000.min(text.len());
+            while end > 0 && !text.is_char_boundary(end) {
+                end -= 1;
+            }
+            text.truncate(end); // keep the prompt small
             if text.trim().is_empty() {
                 return Err(anyhow!("Couldn't extract readable text from that page."));
             }
