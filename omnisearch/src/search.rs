@@ -3923,7 +3923,7 @@ impl SearchEngine {
                                 name.to_lowercase().replace(' ', "_")
                             ),
                             control_name: format!("Expand {}", name),
-                            breadcrumb_path: format!("Snippet [{}] > Paste", keyword),
+                            breadcrumb_path: format!("Snippet [{}] > Copy", keyword),
                             launch_command: format!("copy_snippet:{}", content),
                             source: "SNIPPET".to_string(),
                             description: ellipsize_chars(&content, 63),
@@ -9735,7 +9735,10 @@ impl SearchEngine {
         }
         let conn = &self.conn;
         let mut stmt = conn
-            .prepare("SELECT name, content, keyword FROM snippets WHERE keyword = ?1 LIMIT 1")
+            .prepare(
+                "SELECT name, content, COALESCE(NULLIF(keyword, ''), name) FROM snippets
+                 WHERE lower(COALESCE(NULLIF(keyword, ''), name)) = ?1 LIMIT 1",
+            )
             .ok()?;
         let mut rows = stmt.query(rusqlite::params![keyword]).ok()?;
         if let Some(row) = rows.next().ok()? {

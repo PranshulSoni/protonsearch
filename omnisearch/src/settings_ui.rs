@@ -11,7 +11,7 @@ use std::sync::Mutex;
 static UPDATE_URL: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 static DOWNLOADED_PATH: Lazy<Mutex<Option<std::path::PathBuf>>> = Lazy::new(|| Mutex::new(None));
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-const DISPLAY_VERSION: &str = "1.04";
+const DISPLAY_VERSION: &str = "1.05";
 
 fn is_newer_version(current: &str, latest: &str) -> bool {
     let parse = |v: &str| -> Vec<u32> {
@@ -290,7 +290,7 @@ pub fn run_settings_window() {
             return;
         };
         if let Some(conn) = get_db_conn() {
-            let _ = conn.execute("DELETE FROM snippets WHERE id = ?1;", [snippet_id]);
+            let _ = conn.execute("DELETE FROM snippets WHERE rowid = ?1;", [snippet_id]);
         }
         load_snippets_into_ui(&ui);
     });
@@ -904,15 +904,14 @@ fn load_snippets_into_ui(ui: &SettingsWindow) {
     if let Some(conn) = get_db_conn() {
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS snippets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
+                name TEXT PRIMARY KEY,
                 content TEXT NOT NULL,
                 keyword TEXT
             );",
             [],
         );
         if let Ok(mut stmt) = conn.prepare(
-            "SELECT id, name, COALESCE(keyword, ''), content FROM snippets ORDER BY name ASC",
+            "SELECT rowid, name, COALESCE(NULLIF(keyword, ''), name), content FROM snippets ORDER BY name ASC",
         ) {
             if let Ok(rows) = stmt.query_map([], |row| {
                 Ok(SlintSnippet {

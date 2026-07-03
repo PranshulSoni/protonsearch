@@ -5413,12 +5413,12 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                 return;
             } else if let Some(content) = cmd.strip_prefix("copy_snippet:") {
                 copy_to_clipboard(hwnd, content);
-                let prev_hwnd = s.prev_foreground;
-                do_hide(hwnd, s);
-                // Auto-paste into the previously focused window (Raycast-style snippet behavior)
-                if !prev_hwnd.0.is_null() {
-                    paste_into_window(prev_hwnd);
-                }
+                s.query = content.to_string();
+                s.cursor_pos = s.query.len();
+                s.reset_results();
+                s.selected = 0;
+                reset_cursor_blink(hwnd, s);
+                let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
             } else if let Some(url) = cmd.strip_prefix("open_quicklink:") {
                 let url_w = format!("{}\0", url).encode_utf16().collect::<Vec<u16>>();
