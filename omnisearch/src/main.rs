@@ -1850,7 +1850,9 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             // paste_from_clipboard and copy_to_clipboard now acquire clipboard_lock()
             // internally, so no explicit lock is needed here.
 
-            // Try text format
+            // Try text format. Some apps put both text/HTML and bitmap data on the
+            // clipboard for copied images, so image capture is attempted independently
+            // below instead of living in this branch's `else`.
             if let Some(text) = unsafe { paste_from_clipboard(hwnd) } {
                 let trimmed = text.trim().to_string();
                 if !trimmed.is_empty() {
@@ -1891,9 +1893,8 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                         }
                     });
                 }
-            } else {
-                let _ = unsafe { save_clipboard_image(hwnd, &db_path, &app_name) };
             }
+            let _ = unsafe { save_clipboard_image(hwnd, &db_path, &app_name) };
             LRESULT(0)
         }
 
@@ -5924,9 +5925,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     let ptr = Box::into_raw(Box::new(result));
                     let _ = unsafe {
                         windows::Win32::UI::WindowsAndMessaging::PostMessageW(
-                            windows::Win32::Foundation::HWND(
-                                hwnd_ocr as *mut std::ffi::c_void,
-                            ),
+                            windows::Win32::Foundation::HWND(hwnd_ocr as *mut std::ffi::c_void),
                             WM_OCR_RESULT,
                             WPARAM(0),
                             LPARAM(ptr as isize),
@@ -5958,9 +5957,7 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     let ptr = Box::into_raw(Box::new(result));
                     let _ = unsafe {
                         windows::Win32::UI::WindowsAndMessaging::PostMessageW(
-                            windows::Win32::Foundation::HWND(
-                                hwnd_ocr as *mut std::ffi::c_void,
-                            ),
+                            windows::Win32::Foundation::HWND(hwnd_ocr as *mut std::ffi::c_void),
                             WM_OCR_RESULT,
                             WPARAM(0),
                             LPARAM(ptr as isize),
@@ -11198,13 +11195,15 @@ unsafe fn save_clipboard_image(
     // Kick off background OCR so the image text becomes searchable.
     let ocr_img_path = img_path_str.clone();
     let ocr_db_path = db_path.to_path_buf();
+    let hwnd_refresh = hwnd.0 as isize;
     std::thread::spawn(move || {
-        let _ = unsafe {
+        let com_initialized = unsafe {
             windows::Win32::System::Com::CoInitializeEx(
                 None,
                 windows::Win32::System::Com::COINIT_MULTITHREADED,
             )
-        };
+        }
+        .is_ok();
         if let Some(text) = indexer::ocr_image_file(std::path::Path::new(&ocr_img_path)) {
             if let Ok(conn) = rusqlite::Connection::open(&ocr_db_path) {
                 let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
@@ -11214,7 +11213,19 @@ unsafe fn save_clipboard_image(
                 );
             }
         }
-        unsafe { windows::Win32::System::Com::CoUninitialize(); }
+        let _ = unsafe {
+            windows::Win32::UI::WindowsAndMessaging::PostMessageW(
+                windows::Win32::Foundation::HWND(hwnd_refresh as *mut std::ffi::c_void),
+                WM_REFRESH_SEARCH,
+                WPARAM(0),
+                LPARAM(0),
+            )
+        };
+        if com_initialized {
+            unsafe {
+                windows::Win32::System::Com::CoUninitialize();
+            }
+        }
     });
 
     Some(img_path.to_string_lossy().to_string())
@@ -11524,10 +11535,14 @@ unsafe fn import_windows_clipboard_history(db_path: &std::path::Path) {
                                                                                 rusqlite::params![img_path_str, timestamp],
                                                                             );
                                                                             // Background OCR for searchability
-                                                                            let ocr_path = img_path_str.clone();
-                                                                            let ocr_db = db_path.to_path_buf();
-                                                                            std::thread::spawn(move || {
-                                                                                if let Some(text) = indexer::ocr_image_file(std::path::Path::new(&ocr_path)) {
+                                                                            let ocr_path =
+                                                                                img_path_str
+                                                                                    .clone();
+                                                                            let ocr_db = db_path
+                                                                                .to_path_buf();
+                                                                            std::thread::spawn(
+                                                                                move || {
+                                                                                    if let Some(text) = indexer::ocr_image_file(std::path::Path::new(&ocr_path)) {
                                                                                     if let Ok(c) = rusqlite::Connection::open(&ocr_db) {
                                                                                         let _ = c.busy_timeout(std::time::Duration::from_secs(5));
                                                                                         let _ = c.execute(
@@ -11536,7 +11551,8 @@ unsafe fn import_windows_clipboard_history(db_path: &std::path::Path) {
                                                                                         );
                                                                                     }
                                                                                 }
-                                                                            });
+                                                                                },
+                                                                            );
                                                                         }
                                                                     }
                                                                 }
