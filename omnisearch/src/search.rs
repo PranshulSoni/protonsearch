@@ -188,6 +188,15 @@ pub struct SearchResult {
     pub score: f32,
 }
 
+const MIN_SEARCH_CANDIDATES: usize = 2_000;
+const MAX_SEARCH_CANDIDATES: usize = 5_000;
+
+fn candidate_limit(requested: usize) -> usize {
+    requested
+        .max(MIN_SEARCH_CANDIDATES)
+        .min(MAX_SEARCH_CANDIDATES)
+}
+
 fn content_match_source(extension: &str, only_code: bool) -> &'static str {
     if matches!(extension, "png" | "jpg" | "jpeg" | "bmp" | "gif" | "webp") {
         "OCR"
@@ -1364,10 +1373,10 @@ impl SearchEngine {
                     fts_params_vec.push(rusqlite::types::Value::Text(ext.to_string()));
                 }
             }
-            // Order by bm25 relevance and keep a generous cap so content/OCR matches
-            // aren't cut off by arbitrary rowid order (was LIMIT 50, unordered → misses).
-            let fts_limit = if max_results <= 30 { 30 } else { 300 };
-            fts_params_vec.push(rusqlite::types::Value::Integer(fts_limit));
+            // Order by bm25 relevance and keep the same broad candidate budget as file names,
+            // so content/OCR matches remain available to filters instead of being cut early.
+            let fts_limit = max_results.max(30);
+            fts_params_vec.push(rusqlite::types::Value::Integer(fts_limit as i64));
             let fts_params_ref = rusqlite::params_from_iter(fts_params_vec.iter());
             if let Ok(rows) = stmt_fts.query_map(fts_params_ref, |row| {
                 Ok((
@@ -1457,11 +1466,12 @@ impl SearchEngine {
     }
 
     fn search_local_files_with_fts(&self, query: &str, with_fts: bool) -> Vec<SearchResult> {
+        let limit = candidate_limit(300);
         if !with_fts {
             // Fast phase: instant in-memory filename/folder scan, no SQL full-table LIKE.
-            return self.search_files_in_memory(query, false, 300);
+            return self.search_files_in_memory(query, false, limit);
         }
-        self.search_files_generic(query, false, 300, with_fts)
+        self.search_files_generic(query, false, limit, with_fts)
     }
 
     /*
@@ -2411,7 +2421,7 @@ impl SearchEngine {
             return Vec::new();
         }
 
-        let sql_limit = limit.max(10).min(50) as i64;
+        let sql_limit = limit.max(10).min(500) as i64;
         let mut stmt = match self.conn.prepare(
             "SELECT content, source_app, timestamp, pinned, COALESCE(ocr_text, '')
              FROM clipboard_history
@@ -3471,6 +3481,7 @@ impl SearchEngine {
         top_k: usize,
         with_fts: bool,
     ) -> Vec<SearchResult> {
+        let candidate_k = candidate_limit(top_k);
         // Rebuild the in-memory file index once a background indexing pass finishes, so newly
         // indexed files become searchable without restarting the app.
         let now_indexing = crate::indexer::IS_INDEXING.load(std::sync::atomic::Ordering::Relaxed);
@@ -3489,7 +3500,8 @@ impl SearchEngine {
             let q_words: Vec<&str> = q_lower.split_whitespace().collect();
 
             // 1. Native Settings / Control Panel matches from FTS5.
-            let mut settings_matches = self.search_settings_catalog_fts(&q_lower, top_k.max(30));
+            let mut settings_matches =
+                self.search_settings_catalog_fts(&q_lower, candidate_k.max(30));
 
             // 2. App matches
             let mut app_matches = Vec::new();
@@ -3641,7 +3653,7 @@ impl SearchEngine {
                     unique_results.push(r);
                 }
             }
-            unique_results.truncate(top_k);
+            unique_results.truncate(candidate_k);
             return unique_results;
         }
 
@@ -4912,7 +4924,7 @@ impl SearchEngine {
         let mut conv_results: Vec<SearchResult> = Vec::new();
 
         let mut final_results = get_live_results(q);
-        let mut settings_matches = self.search_settings_catalog_fts(&q_lower, top_k.max(50));
+        let mut settings_matches = self.search_settings_catalog_fts(&q_lower, candidate_k.max(50));
         let mut vec_results: Vec<SearchResult> = scores
             .into_iter()
             .filter(|(_, s)| *s > 0.35)
@@ -5094,7 +5106,7 @@ impl SearchEngine {
         };
 
         let mut clipboard_ocr_matches = if with_fts {
-            self.search_clipboard_image_ocr_matches(q, top_k)
+            self.search_clipboard_image_ocr_matches(q, candidate_k)
         } else {
             Vec::new()
         };
@@ -5242,7 +5254,7 @@ impl SearchEngine {
         }
         final_results = unique_results;
 
-        truncate_preserving_ocr_results(&mut final_results, top_k);
+        truncate_preserving_ocr_results(&mut final_results, candidate_k);
 
         // Quick system actions: match against query
         let mut action_matches = get_quick_actions(q);
@@ -5292,7 +5304,7 @@ impl SearchEngine {
             } else {
                 final_results.push(task_result);
             }
-            truncate_preserving_ocr_results(&mut final_results, top_k);
+            truncate_preserving_ocr_results(&mut final_results, candidate_k);
         }
 
         final_results
@@ -6095,6 +6107,78 @@ mod tests {
             image_hits,
             1,
             "same saved clipboard image should appear once, got {:?}",
+            results
+                .iter()
+                .map(|result| (
+                    &result.entry.control_name,
+                    &result.entry.source,
+                    &result.entry.launch_command
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn search_keeps_low_ranked_ocr_candidates_beyond_requested_top_k() {
+        let db_path = unique_test_db("broad_search_keeps_ocr_candidates");
+        let mut engine = SearchEngine::new(db_path.clone(), false).expect("engine");
+        engine
+            .conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS files (
+                    path TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    extension TEXT NOT NULL,
+                    modified INTEGER NOT NULL,
+                    size INTEGER NOT NULL DEFAULT 0,
+                    is_dir INTEGER NOT NULL DEFAULT 0
+                );",
+                [],
+            )
+            .expect("files table");
+        for idx in 0..20 {
+            engine
+                .conn
+                .execute(
+                    "INSERT INTO files (path, name, extension, modified, size, is_dir)
+                     VALUES (?1, ?2, 'exe', ?3, 1, 0)",
+                    rusqlite::params![
+                        format!("C:\\Users\\tester\\Documents\\omnisearch-{idx}.exe"),
+                        format!("omnisearch-{idx}.exe"),
+                        idx as i64
+                    ],
+                )
+                .expect("insert file");
+        }
+        engine
+            .conn
+            .execute(
+                "INSERT INTO clipboard_history
+                 (content, timestamp, source_app, is_image, pinned, ocr_text)
+                 VALUES (?1, ?2, ?3, 1, 0, ?4)",
+                rusqlite::params![
+                    "C:\\Users\\tester\\AppData\\Roaming\\omnisearch\\clipboard_images\\late.bmp",
+                    4_i64,
+                    "SnippingTool.exe",
+                    "OmniSearch.exe"
+                ],
+            )
+            .expect("insert clipboard image");
+
+        let results = engine.search_with_fts("omnisearch", 5, true);
+        let _ = std::fs::remove_file(&db_path);
+
+        assert!(
+            results.len() > 5,
+            "search should keep a broad matched candidate set, got {} results",
+            results.len()
+        );
+        assert!(
+            results.iter().any(|result| {
+                result.entry.source == "CLIPBOARD"
+                    && result.entry.launch_command.starts_with("copy_image:")
+            }),
+            "OCR filter needs OCR candidates even when file matches rank higher, got {:?}",
             results
                 .iter()
                 .map(|result| (
