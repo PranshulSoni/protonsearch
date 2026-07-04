@@ -219,6 +219,66 @@ fn content_match_source(extension: &str, only_code: bool) -> &'static str {
     }
 }
 
+fn normalize_ocr_search_text(text: &str) -> String {
+    text.to_lowercase()
+        .chars()
+        .filter(|ch| ch.is_alphanumeric())
+        .collect()
+}
+
+fn ocr_text_matches_query(ocr_text: &str, query: &str) -> bool {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return true;
+    }
+    let ocr_lower = ocr_text.to_lowercase();
+    if ocr_lower.contains(&q) {
+        return true;
+    }
+
+    let normalized_ocr = normalize_ocr_search_text(ocr_text);
+    let normalized_q = normalize_ocr_search_text(&q);
+    if normalized_q.len() >= 2 && normalized_ocr.contains(&normalized_q) {
+        return true;
+    }
+
+    let words = q
+        .split_whitespace()
+        .map(normalize_ocr_search_text)
+        .filter(|word| word.len() >= 2)
+        .collect::<Vec<_>>();
+    !words.is_empty() && words.iter().all(|word| normalized_ocr.contains(word))
+}
+
+fn image_path_dedupe_key(path: &str) -> Option<String> {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "bmp" | "gif" | "webp"
+    ) {
+        return None;
+    }
+    Some(format!(
+        "image:{}",
+        path.trim().replace('/', "\\").to_ascii_lowercase()
+    ))
+}
+
+fn result_launch_dedupe_key(entry: &CatalogEntry) -> Option<String> {
+    if entry.launch_command.is_empty() {
+        return None;
+    }
+    if let Some(path) = entry.launch_command.strip_prefix("copy_image:") {
+        return image_path_dedupe_key(path);
+    }
+    image_path_dedupe_key(&entry.launch_command)
+        .or_else(|| Some(format!("cmd:{}", entry.launch_command)))
+}
+
 fn empty_scope_result(query: &str) -> Option<SearchResult> {
     let q = query.trim().to_ascii_lowercase();
     let (prefix, title, detail) = [
@@ -2284,32 +2344,39 @@ impl SearchEngine {
             return Vec::new();
         }
 
-        let like_pattern = format!("%{}%", q_lower);
         let sql_limit = limit.max(10).min(50) as i64;
         let mut stmt = match self.conn.prepare(
             "SELECT content, source_app, timestamp, pinned, COALESCE(ocr_text, '')
              FROM clipboard_history
              WHERE is_image = 1
                AND COALESCE(ocr_text, '') <> ''
-               AND ocr_text LIKE ?
              ORDER BY pinned DESC, timestamp DESC
-             LIMIT ?",
+             LIMIT 500",
         ) {
             Ok(stmt) => stmt,
             Err(_) => return Vec::new(),
         };
 
-        stmt.query_map(rusqlite::params![like_pattern, sql_limit], |row| {
-            Ok(Self::clipboard_image_result(
+        stmt.query_map([], |row| {
+            Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, i64>(2)?,
                 row.get::<_, i32>(3)?,
                 row.get::<_, String>(4)?,
-                42.0,
             ))
         })
-        .map(|rows| rows.filter_map(|row| row.ok()).collect())
+        .map(|rows| {
+            rows.filter_map(|row| row.ok())
+                .filter(|(_, _, _, _, ocr_text)| ocr_text_matches_query(ocr_text, &q_lower))
+                .map(|(content, source_app, timestamp, pinned, ocr_text)| {
+                    Self::clipboard_image_result(
+                        content, source_app, timestamp, pinned, ocr_text, 42.0,
+                    )
+                })
+                .take(sql_limit as usize)
+                .collect()
+        })
         .unwrap_or_default()
     }
 
@@ -2322,7 +2389,7 @@ impl SearchEngine {
         let select_query = if q_lower.is_empty() {
             "SELECT content, source_app, timestamp, is_image, pinned, COALESCE(ocr_text, '') FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 50".to_string()
         } else {
-            "SELECT content, source_app, timestamp, is_image, pinned, COALESCE(ocr_text, '') FROM clipboard_history WHERE content LIKE ? OR source_app LIKE ? OR (is_image = 1 AND ocr_text LIKE ?) ORDER BY pinned DESC, timestamp DESC LIMIT 50".to_string()
+            "SELECT content, source_app, timestamp, is_image, pinned, COALESCE(ocr_text, '') FROM clipboard_history WHERE content LIKE ? OR source_app LIKE ? OR (is_image = 1 AND COALESCE(ocr_text, '') <> '') ORDER BY pinned DESC, timestamp DESC LIMIT 500".to_string()
         };
 
         let mut stmt = match conn.prepare(&select_query) {
@@ -2345,7 +2412,7 @@ impl SearchEngine {
             .unwrap_or_default()
         } else {
             let like_pattern = format!("%{}%", q_lower);
-            stmt.query_map([&like_pattern, &like_pattern, &like_pattern], |row| {
+            stmt.query_map([&like_pattern, &like_pattern], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -2360,6 +2427,13 @@ impl SearchEngine {
         };
 
         for (content, source_app, timestamp, is_image, pinned, ocr_text) in rows {
+            if !q_lower.is_empty()
+                && !content.to_lowercase().contains(&q_lower)
+                && !source_app.to_lowercase().contains(&q_lower)
+                && !(is_image == 1 && ocr_text_matches_query(&ocr_text, &q_lower))
+            {
+                continue;
+            }
             let display_app = std::path::Path::new(&source_app)
                 .file_name()
                 .map(|s| s.to_string_lossy().into_owned())
@@ -2396,6 +2470,9 @@ impl SearchEngine {
                     },
                     score: 3.0,
                 });
+            }
+            if results.len() >= 50 {
+                break;
             }
         }
 
@@ -3484,13 +3561,15 @@ impl SearchEngine {
             let mut seen_ids = std::collections::HashSet::new();
             let mut seen_launches = std::collections::HashSet::new();
             for r in merged {
+                let launch_key = result_launch_dedupe_key(&r.entry);
                 let is_duplicate = seen_ids.contains(&r.entry.id)
-                    || (!r.entry.launch_command.is_empty()
-                        && seen_launches.contains(&r.entry.launch_command));
+                    || launch_key
+                        .as_ref()
+                        .is_some_and(|key| seen_launches.contains(key));
                 if !is_duplicate {
                     seen_ids.insert(r.entry.id.clone());
-                    if !r.entry.launch_command.is_empty() {
-                        seen_launches.insert(r.entry.launch_command.clone());
+                    if let Some(key) = launch_key {
+                        seen_launches.insert(key);
                     }
                     unique_results.push(r);
                 }
@@ -5081,13 +5160,15 @@ impl SearchEngine {
         let mut seen_launches = std::collections::HashSet::new();
 
         for r in final_results {
+            let launch_key = result_launch_dedupe_key(&r.entry);
             let is_duplicate = seen_ids.contains(&r.entry.id)
-                || (!r.entry.launch_command.is_empty()
-                    && seen_launches.contains(&r.entry.launch_command));
+                || launch_key
+                    .as_ref()
+                    .is_some_and(|key| seen_launches.contains(key));
             if !is_duplicate {
                 seen_ids.insert(r.entry.id.clone());
-                if !r.entry.launch_command.is_empty() {
-                    seen_launches.insert(r.entry.launch_command.clone());
+                if let Some(key) = launch_key {
+                    seen_launches.insert(key);
                 }
                 unique_results.push(r);
             }
@@ -5793,6 +5874,122 @@ mod tests {
                     && result.entry.source == "CLIPBOARD"
             }),
             "normal search should include OCR-matched clipboard image, got {:?}",
+            results
+                .iter()
+                .map(|result| (
+                    &result.entry.control_name,
+                    &result.entry.source,
+                    &result.entry.launch_command
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn clipboard_ocr_search_matches_compacted_text() {
+        let db_path = unique_test_db("compact_clipboard_ocr_search");
+        let mut engine = SearchEngine::new(db_path.clone(), false).expect("engine");
+        engine
+            .conn
+            .execute(
+                "INSERT INTO clipboard_history
+                 (content, timestamp, source_app, is_image, pinned, ocr_text)
+                 VALUES (?1, ?2, ?3, 1, 0, ?4)",
+                rusqlite::params![
+                    "C:\\Users\\tester\\AppData\\Roaming\\omnisearch\\clipboard_images\\compact.bmp",
+                    2_i64,
+                    "SnippingTool.exe",
+                    "Omni Search.exe"
+                ],
+            )
+            .expect("insert clipboard image");
+
+        let results = engine.search_with_fts("omnisearch", 20, true);
+        let _ = std::fs::remove_file(&db_path);
+
+        assert!(
+            results.iter().any(|result| {
+                result.entry.launch_command.starts_with("copy_image:")
+                    && result.entry.source == "CLIPBOARD"
+            }),
+            "clipboard OCR should match across OCR spacing/punctuation, got {:?}",
+            results
+                .iter()
+                .map(|result| (
+                    &result.entry.control_name,
+                    &result.entry.source,
+                    &result.entry.launch_command
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn saved_clipboard_image_ocr_is_not_returned_twice() {
+        let db_path = unique_test_db("dedupe_clipboard_ocr_file_twin");
+        let mut engine = SearchEngine::new(db_path.clone(), false).expect("engine");
+        let image_path =
+            "C:\\Users\\tester\\AppData\\Roaming\\omnisearch\\clipboard_images\\clip.bmp";
+        engine
+            .conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS files (
+                    path TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    extension TEXT NOT NULL,
+                    modified INTEGER NOT NULL,
+                    size INTEGER NOT NULL DEFAULT 0,
+                    is_dir INTEGER NOT NULL DEFAULT 0
+                );",
+                [],
+            )
+            .expect("files table");
+        engine
+            .conn
+            .execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(path UNINDEXED, content);",
+                [],
+            )
+            .expect("files fts");
+        engine
+            .conn
+            .execute(
+                "INSERT INTO files (path, name, extension, modified, size, is_dir)
+                 VALUES (?1, 'clip.bmp', 'bmp', 1, 1, 0)",
+                [image_path],
+            )
+            .expect("insert file");
+        engine
+            .conn
+            .execute(
+                "INSERT INTO files_fts (path, content) VALUES (?1, ?2)",
+                rusqlite::params![image_path, "OmniSearch.exe"],
+            )
+            .expect("insert fts");
+        engine
+            .conn
+            .execute(
+                "INSERT INTO clipboard_history
+                 (content, timestamp, source_app, is_image, pinned, ocr_text)
+                 VALUES (?1, ?2, ?3, 1, 0, ?4)",
+                rusqlite::params![image_path, 3_i64, "SnippingTool.exe", "OmniSearch.exe"],
+            )
+            .expect("insert clipboard image");
+
+        let results = engine.search_with_fts("omnisearch", 20, true);
+        let _ = std::fs::remove_file(&db_path);
+
+        let image_hits = results
+            .iter()
+            .filter(|result| {
+                result_launch_dedupe_key(&result.entry)
+                    == Some(format!("image:{}", image_path.to_ascii_lowercase()))
+            })
+            .count();
+        assert_eq!(
+            image_hits,
+            1,
+            "same saved clipboard image should appear once, got {:?}",
             results
                 .iter()
                 .map(|result| (
