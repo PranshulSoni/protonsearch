@@ -23,7 +23,7 @@ A fast, local-first Windows launcher to search apps, files, browser history, cli
 > **Formerly OmniSearch.** ProtonSearch is the same project under a new name. If you're upgrading from an OmniSearch install, your search index, settings, clipboard history, snippets, and AI configuration all carry over automatically on first launch — nothing to reconfigure.
 
 <p align="center">
-  <img src="icons/Banner.png" alt="ProtonSearch banner" />
+  <img src="icons/newbanner.png" alt="ProtonSearch banner" />
 </p>
 
 ## Why ProtonSearch?
