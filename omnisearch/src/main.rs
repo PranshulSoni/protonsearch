@@ -1259,17 +1259,20 @@ unsafe fn run(first_settings_run: bool) {
         let db_path_for_timeline = db_path.clone();
         let hwnd_for_timeline = SendHwnd(HWND(hwnd_usize as *mut std::ffi::c_void));
         std::thread::spawn(move || {
-            let _ = unsafe {
+            let com_initialized = unsafe {
                 windows::Win32::System::Com::CoInitializeEx(
                     None,
                     windows::Win32::System::Com::COINIT_MULTITHREADED,
                 )
-            };
+            }
+            .is_ok();
             unsafe {
                 start_timeline_tracker(db_path_for_timeline, hwnd_for_timeline);
             }
-            unsafe {
-                windows::Win32::System::Com::CoUninitialize();
+            if com_initialized {
+                unsafe {
+                    windows::Win32::System::Com::CoUninitialize();
+                }
             }
         });
 
@@ -1284,12 +1287,15 @@ unsafe fn run(first_settings_run: bool) {
                     // Import Windows Clipboard History in background
                     let db_path_clone = db_path.clone();
                     std::thread::spawn(move || {
-                        let _ = windows::Win32::System::Com::CoInitializeEx(
+                        let com_initialized = windows::Win32::System::Com::CoInitializeEx(
                             None,
                             windows::Win32::System::Com::COINIT_MULTITHREADED,
-                        );
+                        )
+                        .is_ok();
                         import_windows_clipboard_history(&db_path_clone);
-                        windows::Win32::System::Com::CoUninitialize();
+                        if com_initialized {
+                            windows::Win32::System::Com::CoUninitialize();
+                        }
                     });
 
                     // Two independent worker threads, each with its own engine and channel, so a
