@@ -91,6 +91,7 @@ const WM_TRAYICON: u32 = WM_USER + 9;
 pub(crate) const WM_RELOAD_SETTINGS: u32 = WM_USER + 10;
 pub(crate) const WM_SET_HOTKEY_RECORDING: u32 = WM_USER + 11;
 pub(crate) const WM_LAUNCH_AGENT: u32 = WM_USER + 12;
+const WM_OCR_RESULT: u32 = WM_USER + 13;
 
 unsafe fn setup_tray_icon(
     hwnd: windows::Win32::Foundation::HWND,
@@ -3716,6 +3717,33 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             LRESULT(0)
         }
 
+        WM_OCR_RESULT => {
+            // Background MTA thread has finished OCR; retrieve the boxed Option<String>.
+            if lp.0 != 0 {
+                let result = unsafe { *Box::from_raw(lp.0 as *mut Option<String>) };
+                if !sp.is_null() {
+                    let s = &mut *sp;
+                    match result {
+                        Some(text) => {
+                            s.query = text;
+                            s.cursor_pos = s.query.len();
+                            s.reset_results();
+                            trigger_search(hwnd, s);
+                        }
+                        None => {
+                            s.query = "No readable image on clipboard (copy a picture first)"
+                                .to_string();
+                            s.cursor_pos = s.query.len();
+                            s.reset_results();
+                        }
+                    }
+                    reset_cursor_blink(hwnd, s);
+                    let _ = InvalidateRect(hwnd, None, FALSE);
+                }
+            }
+            LRESULT(0)
+        }
+
         WM_LAUNCH_AGENT => {
             let agent_id = wp.0 as i64;
             if !sp.is_null() {
@@ -5842,6 +5870,41 @@ unsafe fn execute_selected(hwnd: HWND, s: &mut State) {
                     s.reset_results();
                     let _ = InvalidateRect(hwnd, None, FALSE);
                 }
+                return;
+            } else if cmd == "action:ocr_clipboard" {
+                // Offload blocking WinRT OCR to a background MTA thread to avoid
+                // deadlocking the STA main window thread.
+                let hwnd_ocr = hwnd.0 as usize;
+                std::thread::spawn(move || {
+                    let _ = unsafe {
+                        windows::Win32::System::Com::CoInitializeEx(
+                            None,
+                            windows::Win32::System::Com::COINIT_MULTITHREADED,
+                        )
+                    };
+                    let result = indexer::ocr_clipboard_image();
+                    unsafe {
+                        windows::Win32::System::Com::CoUninitialize();
+                    }
+                    // Box the Option<String> and post it back to the window proc.
+                    let ptr = Box::into_raw(Box::new(result));
+                    let _ = unsafe {
+                        windows::Win32::UI::WindowsAndMessaging::PostMessageW(
+                            windows::Win32::Foundation::HWND(
+                                hwnd_ocr as *mut std::ffi::c_void,
+                            ),
+                            WM_OCR_RESULT,
+                            WPARAM(0),
+                            LPARAM(ptr as isize),
+                        )
+                    };
+                });
+                // Show a placeholder while OCR is in-flight.
+                s.query = "Scanning image…".to_string();
+                s.cursor_pos = s.query.len();
+                s.reset_results();
+                reset_cursor_blink(hwnd, s);
+                let _ = InvalidateRect(hwnd, None, FALSE);
                 return;
             } else if cmd == "action:create_snippet" {
                 s.form_state = FormState::CreateSnippetName;
@@ -9916,6 +9979,12 @@ fn default_homepage_results() -> Vec<crate::search::SearchResult> {
             "Clipboard History",
             "Clipboard > History",
             "clip:",
+            "HOMEPAGE_CLIPBOARD",
+        ),
+        (
+            "Read Clipboard Image Text",
+            "Clipboard > OCR",
+            "action:ocr_clipboard",
             "HOMEPAGE_CLIPBOARD",
         ),
         ("Local Files", "Local > Files", "file:", "HOMEPAGE_LOCAL"),
