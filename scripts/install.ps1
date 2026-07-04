@@ -1,7 +1,7 @@
 param(
-    [string]$Repo = "PranshulSoni/omnisearch",
-    [string]$AssetPattern = "omnisearchsetup*.exe",
-    [string]$OutputDir = "$env:TEMP\OmniSearchInstaller",
+    [string]$Repo = "PranshulSoni/protonsearch",
+    [string]$AssetPattern = "protonsearchsetup*.exe",
+    [string]$OutputDir = "$env:TEMP\ProtonSearchInstaller",
     [string[]]$InstallerArgs = @()
 )
 
@@ -9,13 +9,13 @@ $ErrorActionPreference = "Stop"
 
 $headers = @{
     "Accept" = "application/vnd.github+json"
-    "User-Agent" = "OmniSearch-Installer"
+    "User-Agent" = "ProtonSearch-Installer"
 }
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $releaseUrl = "https://api.github.com/repos/$Repo/releases/latest"
-Write-Host "Fetching latest OmniSearch release..."
+Write-Host "Fetching latest ProtonSearch release..."
 $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers
 
 $asset = $release.assets |
@@ -28,13 +28,13 @@ if (-not $asset) {
 
 $installerPath = Join-Path $OutputDir $asset.name
 Write-Host "Downloading $($asset.name) from $($release.tag_name)..."
-Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath -Headers @{ "User-Agent" = "OmniSearch-Installer" }
+Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath -Headers @{ "User-Agent" = "ProtonSearch-Installer" }
 
 if (-not (Test-Path $installerPath)) {
     throw "Download failed: $installerPath was not created."
 }
 
-Write-Host "Running OmniSearch installer..."
+Write-Host "Running ProtonSearch installer..."
 $startArgs = @{
     FilePath = $installerPath
     Wait = $true
@@ -49,4 +49,4 @@ if ($process.ExitCode -ne 0) {
     throw "Installer exited with code $($process.ExitCode)."
 }
 
-Write-Host "OmniSearch install complete."
+Write-Host "ProtonSearch install complete."

@@ -6,7 +6,7 @@ This file serves as a guide for AI agents working in this repository. It documen
 
 ## 1. Project Achievements & Features Built
 
-We have built a premium, high-performance, native Windows launcher and search tool (**`omnisearch`**) written in Rust (Win32 API). It features:
+We have built a premium, high-performance, native Windows launcher and search tool (**`protonsearch`**, formerly `omnisearch`) written in Rust (Win32 API). It features:
 
 ### UI & Aesthetics
 * **Window Size & Scale**: Enlarged window (720px width), results (76px height), and fonts (Segoe UI Variable) for a modern, high-contrast feel.
@@ -67,8 +67,8 @@ AI coding agents must follow these rules without exception:
 3. **Suppress flashing windows**: Configure background git/shell command execution with `.creation_flags(0x08000000)` (`CREATE_NO_WINDOW`) to prevent command windows from flashing.
 
 ### Agent Behavior (CRITICAL)
-4. **Never run the launcher in the background**: **Do not** run `cargo run`, `cargo run --release`, or `omnisearch.exe` as background tasks within the agent's workspace. Running the daemon blocks the workspace environment and causes access denial (`os error 5`) during subsequent builds. Allow the user to launch and run the app manually.
+4. **Never run the launcher in the background**: **Do not** run `cargo run`, `cargo run --release`, or `protonsearch.exe` as background tasks within the agent's workspace. Running the daemon blocks the workspace environment and causes access denial (`os error 5`) during subsequent builds. Allow the user to launch and run the app manually.
 5. **Do NOT use graphify**: Do not use graphify or run any graphify-watch/rebuild commands. Graphify is completely disabled.
 6. **Commit and Push after every edit**: Perform a git commit and push after every single edit you make to the codebase.
-7. **Kill app before build or edit**: Before building the app or editing it, make sure you kill any running instance of the app (`taskkill /F /IM omnisearch.exe`).
+7. **Kill app before build or edit**: Before building the app or editing it, make sure you kill any running instance of the app (`taskkill /F /IM protonsearch.exe`).
 

@@ -1,7 +1,7 @@
 param(
-    [string]$Repo = "PranshulSoni/omnisearch",
-    [string]$AssetPattern = "omnisearchsetup*.exe",
-    [string]$OutputDir = "$env:TEMP\OmniSearchUpdate",
+    [string]$Repo = "PranshulSoni/protonsearch",
+    [string]$AssetPattern = "protonsearchsetup*.exe",
+    [string]$OutputDir = "$env:TEMP\ProtonSearchUpdate",
     [string]$TimestampUrl = "http://timestamp.digicert.com",
     [string]$CertThumbprint = "",
     [string]$CertStore = "Cert:\CurrentUser\My",
@@ -50,7 +50,7 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $headers = @{
     "Accept" = "application/vnd.github+json"
-    "User-Agent" = "OmniSearch-Update-Signer"
+    "User-Agent" = "ProtonSearch-Update-Signer"
 }
 
 $releaseUrl = "https://api.github.com/repos/$Repo/releases/latest"
@@ -67,7 +67,7 @@ if (-not $asset) {
 
 $installerPath = Join-Path $OutputDir $asset.name
 Write-Host "Downloading $($asset.name) from $($release.tag_name)..."
-Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath -Headers @{ "User-Agent" = "OmniSearch-Update-Signer" }
+Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installerPath -Headers @{ "User-Agent" = "ProtonSearch-Update-Signer" }
 
 if (-not (Test-Path $installerPath)) {
     throw "Download failed: $installerPath was not created."

@@ -51,6 +51,9 @@ task.md
 voice_log.txt
 HICON
 
+# Tray debug log (logging code removed; keep stale local copies out of git)
+tray_debug.log
+
 # External projects
 Flow.Launcher-dev/
 icons/preview-images/demo.mp4
