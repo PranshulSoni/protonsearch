@@ -11194,6 +11194,29 @@ unsafe fn save_clipboard_image(
         "DELETE FROM clipboard_history WHERE pinned = 0 AND id NOT IN (SELECT id FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 500);",
         [],
     );
+
+    // Kick off background OCR so the image text becomes searchable.
+    let ocr_img_path = img_path_str.clone();
+    let ocr_db_path = db_path.to_path_buf();
+    std::thread::spawn(move || {
+        let _ = unsafe {
+            windows::Win32::System::Com::CoInitializeEx(
+                None,
+                windows::Win32::System::Com::COINIT_MULTITHREADED,
+            )
+        };
+        if let Some(text) = indexer::ocr_image_file(std::path::Path::new(&ocr_img_path)) {
+            if let Ok(conn) = rusqlite::Connection::open(&ocr_db_path) {
+                let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
+                let _ = conn.execute(
+                    "UPDATE clipboard_history SET ocr_text = ? WHERE content = ?;",
+                    rusqlite::params![text, ocr_img_path],
+                );
+            }
+        }
+        unsafe { windows::Win32::System::Com::CoUninitialize(); }
+    });
+
     Some(img_path.to_string_lossy().to_string())
 }
 
@@ -11500,6 +11523,20 @@ unsafe fn import_windows_clipboard_history(db_path: &std::path::Path) {
                                                                                 "INSERT OR IGNORE INTO clipboard_history (content, timestamp, source_app, is_image) VALUES (?, ?, 'Windows History', 1);",
                                                                                 rusqlite::params![img_path_str, timestamp],
                                                                             );
+                                                                            // Background OCR for searchability
+                                                                            let ocr_path = img_path_str.clone();
+                                                                            let ocr_db = db_path.to_path_buf();
+                                                                            std::thread::spawn(move || {
+                                                                                if let Some(text) = indexer::ocr_image_file(std::path::Path::new(&ocr_path)) {
+                                                                                    if let Ok(c) = rusqlite::Connection::open(&ocr_db) {
+                                                                                        let _ = c.busy_timeout(std::time::Duration::from_secs(5));
+                                                                                        let _ = c.execute(
+                                                                                            "UPDATE clipboard_history SET ocr_text = ? WHERE content = ?;",
+                                                                                            rusqlite::params![text, ocr_path],
+                                                                                        );
+                                                                                    }
+                                                                                }
+                                                                            });
                                                                         }
                                                                     }
                                                                 }

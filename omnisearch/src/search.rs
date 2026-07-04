@@ -602,6 +602,10 @@ impl SearchEngine {
             "ALTER TABLE clipboard_history ADD COLUMN pinned INTEGER DEFAULT 0;",
             [],
         );
+        let _ = conn.execute(
+            "ALTER TABLE clipboard_history ADD COLUMN ocr_text TEXT;",
+            [],
+        );
         conn.execute(
             "CREATE TABLE IF NOT EXISTS clipboard_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2224,9 +2228,9 @@ impl SearchEngine {
         let q_lower = query.to_lowercase();
 
         let select_query = if q_lower.is_empty() {
-            "SELECT content, source_app, timestamp, is_image, pinned FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 50".to_string()
+            "SELECT content, source_app, timestamp, is_image, pinned, COALESCE(ocr_text, '') FROM clipboard_history ORDER BY pinned DESC, timestamp DESC LIMIT 50".to_string()
         } else {
-            "SELECT content, source_app, timestamp, is_image, pinned FROM clipboard_history WHERE content LIKE ? OR source_app LIKE ? ORDER BY pinned DESC, timestamp DESC LIMIT 50".to_string()
+            "SELECT content, source_app, timestamp, is_image, pinned, COALESCE(ocr_text, '') FROM clipboard_history WHERE content LIKE ? OR source_app LIKE ? OR (is_image = 1 AND ocr_text LIKE ?) ORDER BY pinned DESC, timestamp DESC LIMIT 50".to_string()
         };
 
         let mut stmt = match conn.prepare(&select_query) {
@@ -2234,7 +2238,7 @@ impl SearchEngine {
             Err(_) => return results,
         };
 
-        let rows: Vec<(String, String, i64, i32, i32)> = if q_lower.is_empty() {
+        let rows: Vec<(String, String, i64, i32, i32, String)> = if q_lower.is_empty() {
             stmt.query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -2242,26 +2246,28 @@ impl SearchEngine {
                     row.get::<_, i64>(2)?,
                     row.get::<_, i32>(3)?,
                     row.get::<_, i32>(4)?,
+                    row.get::<_, String>(5)?,
                 ))
             })
             .map(|m| m.filter_map(|r| r.ok()).collect())
             .unwrap_or_default()
         } else {
             let like_pattern = format!("%{}%", q_lower);
-            stmt.query_map([&like_pattern, &like_pattern], |row| {
+            stmt.query_map([&like_pattern, &like_pattern, &like_pattern], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, i64>(2)?,
                     row.get::<_, i32>(3)?,
                     row.get::<_, i32>(4)?,
+                    row.get::<_, String>(5)?,
                 ))
             })
             .map(|m| m.filter_map(|r| r.ok()).collect())
             .unwrap_or_default()
         };
 
-        for (content, source_app, timestamp, is_image, pinned) in rows {
+        for (content, source_app, timestamp, is_image, pinned, ocr_text) in rows {
             let display_app = std::path::Path::new(&source_app)
                 .file_name()
                 .map(|s| s.to_string_lossy().into_owned())
@@ -2286,6 +2292,12 @@ impl SearchEngine {
                     format!("[Image] Copied from {}", display_app)
                 };
 
+                let description = if !ocr_text.is_empty() {
+                    let preview = if ocr_text.len() > 80 { &ocr_text[..80] } else { &ocr_text };
+                    format!("🔤 {}", preview)
+                } else {
+                    format!("Image history (Saved as {})", filename)
+                };
                 results.push(SearchResult {
                     entry: CatalogEntry {
                         id,
@@ -2293,8 +2305,8 @@ impl SearchEngine {
                         breadcrumb_path: format!("Clipboard > {}", display_app),
                         launch_command: format!("copy_image:{}", content),
                         source: "CLIPBOARD".to_string(),
-                        description: format!("Image history (Saved as {})", filename),
-                        synonyms: format!("image {} clipboard copy", display_app.to_lowercase()),
+                        description,
+                        synonyms: format!("image {} clipboard copy {}", display_app.to_lowercase(), ocr_text.to_lowercase()),
                     },
                     score: 3.0,
                 });
