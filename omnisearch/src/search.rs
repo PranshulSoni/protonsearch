@@ -593,7 +593,20 @@ impl SearchEngine {
             "CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);",
             [],
         );
-        // Add columns if they don't exist
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS clipboard_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT UNIQUE,
+                timestamp INTEGER NOT NULL,
+                source_app TEXT NOT NULL,
+                is_image INTEGER DEFAULT 0,
+                pinned INTEGER DEFAULT 0,
+                ocr_text TEXT
+            );",
+            [],
+        )?;
+        // Add columns for databases created by older versions. Run after CREATE TABLE so
+        // fresh installs get every column even when ALTER would otherwise target no table.
         let _ = conn.execute(
             "ALTER TABLE clipboard_history ADD COLUMN is_image INTEGER DEFAULT 0;",
             [],
@@ -606,17 +619,6 @@ impl SearchEngine {
             "ALTER TABLE clipboard_history ADD COLUMN ocr_text TEXT;",
             [],
         );
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS clipboard_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                content TEXT UNIQUE,
-                timestamp INTEGER NOT NULL,
-                source_app TEXT NOT NULL,
-                is_image INTEGER DEFAULT 0,
-                pinned INTEGER DEFAULT 0
-            );",
-            [],
-        )?;
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS timeline_events (
@@ -2221,6 +2223,96 @@ impl SearchEngine {
         results
     }
 
+    fn clipboard_image_result(
+        content: String,
+        source_app: String,
+        timestamp: i64,
+        pinned: i32,
+        ocr_text: String,
+        score: f32,
+    ) -> SearchResult {
+        let display_app = std::path::Path::new(&source_app)
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| source_app.clone());
+
+        let id = if pinned == 1 {
+            format!("clip.pinned.{}", timestamp)
+        } else {
+            format!("clip.{}", timestamp)
+        };
+
+        let filename = std::path::Path::new(&content)
+            .file_name()
+            .map(|f| f.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "image.bmp".to_string());
+
+        let dims = get_bmp_dimensions(&content);
+        let control_name = if let Some((w, h)) = dims {
+            format!("[Image] {}x{} (Copied from {})", w, h, display_app)
+        } else {
+            format!("[Image] Copied from {}", display_app)
+        };
+
+        let description = if !ocr_text.is_empty() {
+            format!("🔤 {}", ellipsize_chars(&ocr_text, 80))
+        } else {
+            format!("Image history (Saved as {})", filename)
+        };
+
+        SearchResult {
+            entry: CatalogEntry {
+                id,
+                control_name,
+                breadcrumb_path: format!("Clipboard > {}", display_app),
+                launch_command: format!("copy_image:{}", content),
+                source: "CLIPBOARD".to_string(),
+                description,
+                synonyms: format!(
+                    "image {} clipboard copy {}",
+                    display_app.to_lowercase(),
+                    ocr_text.to_lowercase()
+                ),
+            },
+            score,
+        }
+    }
+
+    fn search_clipboard_image_ocr_matches(&self, query: &str, limit: usize) -> Vec<SearchResult> {
+        let q_lower = query.trim().to_lowercase();
+        if q_lower.len() < 2 {
+            return Vec::new();
+        }
+
+        let like_pattern = format!("%{}%", q_lower);
+        let sql_limit = limit.max(10).min(50) as i64;
+        let mut stmt = match self.conn.prepare(
+            "SELECT content, source_app, timestamp, pinned, COALESCE(ocr_text, '')
+             FROM clipboard_history
+             WHERE is_image = 1
+               AND COALESCE(ocr_text, '') <> ''
+               AND ocr_text LIKE ?
+             ORDER BY pinned DESC, timestamp DESC
+             LIMIT ?",
+        ) {
+            Ok(stmt) => stmt,
+            Err(_) => return Vec::new(),
+        };
+
+        stmt.query_map(rusqlite::params![like_pattern, sql_limit], |row| {
+            Ok(Self::clipboard_image_result(
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i32>(3)?,
+                row.get::<_, String>(4)?,
+                42.0,
+            ))
+        })
+        .map(|rows| rows.filter_map(|row| row.ok()).collect())
+        .unwrap_or_default()
+    }
+
     pub fn search_clipboard_history(&self, query: &str) -> Vec<SearchResult> {
         let mut results = Vec::new();
         let conn = &self.conn;
@@ -2280,36 +2372,9 @@ impl SearchEngine {
             };
 
             if is_image == 1 {
-                let filename = std::path::Path::new(&content)
-                    .file_name()
-                    .map(|f| f.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "image.bmp".to_string());
-
-                let dims = get_bmp_dimensions(&content);
-                let control_name = if let Some((w, h)) = dims {
-                    format!("[Image] {}x{} (Copied from {})", w, h, display_app)
-                } else {
-                    format!("[Image] Copied from {}", display_app)
-                };
-
-                let description = if !ocr_text.is_empty() {
-                    let preview = if ocr_text.len() > 80 { &ocr_text[..80] } else { &ocr_text };
-                    format!("🔤 {}", preview)
-                } else {
-                    format!("Image history (Saved as {})", filename)
-                };
-                results.push(SearchResult {
-                    entry: CatalogEntry {
-                        id,
-                        control_name,
-                        breadcrumb_path: format!("Clipboard > {}", display_app),
-                        launch_command: format!("copy_image:{}", content),
-                        source: "CLIPBOARD".to_string(),
-                        description,
-                        synonyms: format!("image {} clipboard copy {}", display_app.to_lowercase(), ocr_text.to_lowercase()),
-                    },
-                    score: 3.0,
-                });
+                results.push(Self::clipboard_image_result(
+                    content, source_app, timestamp, pinned, ocr_text, 3.0,
+                ));
             } else {
                 let desc = ellipsize_chars(&content.replace("\r\n", " ").replace('\n', " "), 100);
 
@@ -2772,8 +2837,8 @@ impl SearchEngine {
 
         let rows = if q_lower.is_empty() {
             let mut stmt = match conn.prepare(
-                "SELECT url, title, source, visit_count FROM browser_items 
-                 WHERE source LIKE '%bookmark%' 
+                "SELECT url, title, source, visit_count FROM browser_items
+                 WHERE source LIKE '%bookmark%'
                  ORDER BY visit_count DESC LIMIT 100",
             ) {
                 Ok(s) => s,
@@ -2794,7 +2859,7 @@ impl SearchEngine {
         } else {
             let name_query = format!("%{}%", q_lower);
             let mut stmt = match conn.prepare(
-                "SELECT url, title, source, visit_count FROM browser_items 
+                "SELECT url, title, source, visit_count FROM browser_items
                  WHERE source LIKE '%bookmark%' AND (title LIKE ?1 OR url LIKE ?1)
                  ORDER BY visit_count DESC LIMIT 100",
             ) {
@@ -2887,8 +2952,8 @@ impl SearchEngine {
 
         let rows = if q_lower.is_empty() {
             let mut stmt = match conn.prepare(
-                "SELECT url, title, source, last_visit_time FROM browser_items 
-                 WHERE source LIKE '%history%' 
+                "SELECT url, title, source, last_visit_time FROM browser_items
+                 WHERE source LIKE '%history%'
                  ORDER BY last_visit_time DESC LIMIT 100",
             ) {
                 Ok(s) => s,
@@ -2909,7 +2974,7 @@ impl SearchEngine {
         } else {
             let name_query = format!("%{}%", q_lower);
             let mut stmt = match conn.prepare(
-                "SELECT url, title, source, last_visit_time FROM browser_items 
+                "SELECT url, title, source, last_visit_time FROM browser_items
                  WHERE source LIKE '%history%' AND (title LIKE ?1 OR url LIKE ?1)
                  ORDER BY last_visit_time DESC LIMIT 100",
             ) {
@@ -2997,7 +3062,7 @@ impl SearchEngine {
 
         let rows = if q_lower.is_empty() {
             let mut stmt = match conn.prepare(
-                "SELECT c.hash, c.author, c.date, c.message, r.name 
+                "SELECT c.hash, c.author, c.date, c.message, r.name
                  FROM git_commits c
                  JOIN git_repos r ON c.repo_id = r.id
                  ORDER BY c.date DESC LIMIT 100",
@@ -3021,7 +3086,7 @@ impl SearchEngine {
         } else {
             let name_query = format!("%{}%", q_lower);
             let mut stmt = match conn.prepare(
-                "SELECT c.hash, c.author, c.date, c.message, r.name 
+                "SELECT c.hash, c.author, c.date, c.message, r.name
                  FROM git_commits c
                  JOIN git_repos r ON c.repo_id = r.id
                  WHERE c.message LIKE ?1 OR c.author LIKE ?1 OR c.hash LIKE ?1
@@ -3108,7 +3173,7 @@ impl SearchEngine {
 
         let rows = if q_lower.is_empty() {
             let mut stmt = match conn.prepare(
-                "SELECT t.file_path, t.line_number, t.todo_text, r.name 
+                "SELECT t.file_path, t.line_number, t.todo_text, r.name
                  FROM git_todos t
                  JOIN git_repos r ON t.repo_id = r.id
                  ORDER BY t.id DESC LIMIT 100",
@@ -3131,7 +3196,7 @@ impl SearchEngine {
         } else {
             let name_query = format!("%{}%", q_lower);
             let mut stmt = match conn.prepare(
-                "SELECT t.file_path, t.line_number, t.todo_text, r.name 
+                "SELECT t.file_path, t.line_number, t.todo_text, r.name
                  FROM git_todos t
                  JOIN git_repos r ON t.repo_id = r.id
                  WHERE t.todo_text LIKE ?1 OR t.file_path LIKE ?1
@@ -4882,6 +4947,12 @@ impl SearchEngine {
             },
         };
 
+        let mut clipboard_ocr_matches = if with_fts {
+            self.search_clipboard_image_ocr_matches(q, top_k)
+        } else {
+            Vec::new()
+        };
+
         let mut file_matches = self.search_local_files_with_fts(&q_lower, with_fts);
         file_matches.sort_unstable_by(|a, b| {
             b.score
@@ -4984,6 +5055,7 @@ impl SearchEngine {
         merged.append(&mut settings_matches);
         merged.append(&mut app_matches);
         merged.append(&mut recent_matches);
+        merged.append(&mut clipboard_ocr_matches);
         merged.append(&mut file_matches);
         merged.append(&mut vec_results);
         merged.append(&mut project_results);
@@ -5663,6 +5735,73 @@ mod tests {
         );
         assert_eq!(workday_memory_query_days("what did i do today"), Some(0));
         assert_eq!(workday_memory_query_days("open chrome yesterday"), None);
+    }
+
+    fn unique_test_db(name: &str) -> std::path::PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        std::env::temp_dir().join(format!("omnisearch_{name}_{stamp}.db"))
+    }
+
+    #[test]
+    fn fresh_clipboard_schema_includes_ocr_text() {
+        let db_path = unique_test_db("fresh_clipboard_schema");
+        let _engine = SearchEngine::new(db_path.clone(), false).expect("engine");
+        let conn = Connection::open(&db_path).expect("test db");
+        let columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(clipboard_history)")
+            .expect("pragma")
+            .query_map([], |row| row.get::<_, String>(1))
+            .expect("columns")
+            .filter_map(|row| row.ok())
+            .collect();
+        let _ = std::fs::remove_file(&db_path);
+
+        assert!(
+            columns.iter().any(|column| column == "ocr_text"),
+            "fresh clipboard_history schema should include ocr_text, got {columns:?}"
+        );
+    }
+
+    #[test]
+    fn normal_search_finds_clipboard_image_ocr_text() {
+        let db_path = unique_test_db("normal_clipboard_ocr_search");
+        let mut engine = SearchEngine::new(db_path.clone(), false).expect("engine");
+        engine
+            .conn
+            .execute(
+                "INSERT INTO clipboard_history
+                 (content, timestamp, source_app, is_image, pinned, ocr_text)
+                 VALUES (?1, ?2, ?3, 1, 0, ?4)",
+                rusqlite::params![
+                    "C:\\Users\\tester\\AppData\\Roaming\\omnisearch\\clipboard_images\\clip.bmp",
+                    1_i64,
+                    "SnippingTool.exe",
+                    "quarterly revenue target"
+                ],
+            )
+            .expect("insert clipboard image");
+
+        let results = engine.search_with_fts("quarterly revenue", 20, true);
+        let _ = std::fs::remove_file(&db_path);
+
+        assert!(
+            results.iter().any(|result| {
+                result.entry.launch_command.starts_with("copy_image:")
+                    && result.entry.source == "CLIPBOARD"
+            }),
+            "normal search should include OCR-matched clipboard image, got {:?}",
+            results
+                .iter()
+                .map(|result| (
+                    &result.entry.control_name,
+                    &result.entry.source,
+                    &result.entry.launch_command
+                ))
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
