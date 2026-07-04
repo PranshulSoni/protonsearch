@@ -45,8 +45,8 @@ const PAD_L: i32 = 24;
 const BADGE_W: i32 = 54;
 const BADGE_H: i32 = 18;
 const SEARCH_ICON_SIZE: i32 = 44;
-const SEARCH_LENS_BUTTON_SIZE: i32 = 32;
-const SEARCH_LENS_ICON_SIZE: i32 = 26;
+const SEARCH_LENS_BUTTON_SIZE: i32 = 36;
+const SEARCH_LENS_ICON_SIZE: i32 = 30;
 const SEARCH_WEB_BUTTON_W: i32 = 124;
 const SEARCH_ACTION_GAP: i32 = 8;
 const RESULT_ICON_SIZE: i32 = 32;
@@ -861,7 +861,7 @@ unsafe fn run(first_settings_run: bool) {
     );
     let icon_lens = load_png_to_hicon(
         include_bytes!("../../icons/lens.png"),
-        RESULT_ICON_SIZE as u32,
+        SEARCH_LENS_ICON_SIZE as u32,
     );
     let icon_bookmark = load_icon_from_dll("shell32.dll", 43, 64);
     let icon_folder = load_icon_from_dll("shell32.dll", 3, 64);
@@ -6454,7 +6454,7 @@ fn search_web_action_rect(x: i32, y: i32, w: i32, search_h: i32, lens_visible: b
     let right = if lens_visible {
         search_lens_action_rect(x, y, w, search_h).left - SEARCH_ACTION_GAP
     } else {
-        x + w - PAD_L
+        x + w - PAD_L - 8
     };
     RECT {
         left: right - SEARCH_WEB_BUTTON_W,
@@ -7893,7 +7893,7 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let show_web_action = s.shows_web_search_action();
     let show_lens_action = s.shows_lens_action();
     let web_reserve = if show_web_action {
-        SEARCH_WEB_BUTTON_W + SEARCH_ACTION_GAP
+        SEARCH_WEB_BUTTON_W + SEARCH_ACTION_GAP + (if show_lens_action { 0 } else { 8 })
     } else {
         0
     };
