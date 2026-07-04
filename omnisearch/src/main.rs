@@ -11384,6 +11384,12 @@ unsafe fn capture_clipboard_image_data(
                 let mut bmp: BITMAP = std::mem::zeroed();
                 let size = std::mem::size_of::<BITMAP>() as i32;
                 if GetObjectW(hbitmap, size, Some(&mut bmp as *mut BITMAP as *mut _)) != 0 {
+                    let Some(byte_len) = clipboard_bitmap_byte_len(bmp.bmWidth, bmp.bmHeight)
+                    else {
+                        let _ = ReleaseDC(HWND(std::ptr::null_mut()), hdc_screen);
+                        let _ = CloseClipboard();
+                        return None;
+                    };
                     let bih = BITMAPINFOHEADER {
                         biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
                         biWidth: bmp.bmWidth,
@@ -11391,7 +11397,7 @@ unsafe fn capture_clipboard_image_data(
                         biPlanes: 1,
                         biBitCount: 32,   // Convert to 32-bit BGRA
                         biCompression: 0, // BI_RGB
-                        biSizeImage: (bmp.bmWidth * bmp.bmHeight * 4) as u32,
+                        biSizeImage: byte_len as u32,
                         biXPelsPerMeter: 0,
                         biYPelsPerMeter: 0,
                         biClrUsed: 0,
@@ -11403,7 +11409,7 @@ unsafe fn capture_clipboard_image_data(
                         bmiColors: [std::mem::zeroed(); 1],
                     };
 
-                    let mut buf = vec![0u8; (bmp.bmWidth * bmp.bmHeight * 4) as usize];
+                    let mut buf = vec![0u8; byte_len];
 
                     let res = GetDIBits(
                         hdc_screen,
@@ -11451,6 +11457,19 @@ fn bmp_file_bytes(
     bytes.extend_from_slice(&file_header);
     bytes.extend_from_slice(&info_header);
     bytes.extend_from_slice(buf);
+    Some(bytes)
+}
+
+fn clipboard_bitmap_byte_len(width: i32, height: i32) -> Option<usize> {
+    if width <= 0 || height <= 0 || width > 6000 || height > 6000 {
+        return None;
+    }
+    let bytes = (width as usize)
+        .checked_mul(height as usize)?
+        .checked_mul(4)?;
+    if bytes > 50 * 1024 * 1024 {
+        return None;
+    }
     Some(bytes)
 }
 
@@ -12417,6 +12436,15 @@ mod tests {
         assert_eq!(&bmp[0..2], b"BM");
         assert_eq!(u32::from_le_bytes(bmp[10..14].try_into().unwrap()), 54);
         assert_eq!(bmp.len(), 58);
+    }
+
+    #[test]
+    fn clipboard_bitmap_byte_len_rejects_invalid_or_huge_images() {
+        assert_eq!(clipboard_bitmap_byte_len(10, 20), Some(800));
+        assert_eq!(clipboard_bitmap_byte_len(0, 20), None);
+        assert_eq!(clipboard_bitmap_byte_len(20, -1), None);
+        assert_eq!(clipboard_bitmap_byte_len(7000, 20), None);
+        assert_eq!(clipboard_bitmap_byte_len(6000, 6000), None);
     }
 
     #[test]
