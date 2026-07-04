@@ -1947,6 +1947,116 @@ export component SettingsWindow inherits Window {
                             }
                         }
 
+                        // Section: Status & Statistics
+                        VerticalBox {
+                            spacing: 12px;
+                            Text {
+                                text: "STATUS & STATISTICS";
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: root.text-muted;
+                                letter-spacing: 1px;
+                            }
+                            
+                            Rectangle {
+                                background: root.card-bg;
+                                border-radius: 8px;
+                                border-color: root.border-color;
+                                border-width: 1px;
+                                
+                                VerticalBox {
+                                    padding: 16px;
+                                    spacing: 16px;
+                                    
+                                    // Row 1: Status
+                                    HorizontalBox {
+                                        padding: 0;
+                                        spacing: 12px;
+                                        alignment: start;
+                                        
+                                        VerticalBox {
+                                            padding: 0;
+                                            spacing: 4px;
+                                            Text {
+                                                text: "Index Status";
+                                                color: root.text-muted;
+                                                font-size: 12px;
+                                                font-weight: 500;
+                                            }
+                                            HorizontalBox {
+                                                padding: 0;
+                                                spacing: 8px;
+                                                alignment: start;
+                                                
+                                                // Live indicator light
+                                                Rectangle {
+                                                    width: 10px;
+                                                    height: 10px;
+                                                    border-radius: 5px;
+                                                    background: root.db-is-indexing ? #007acc : #4caf50;
+                                                    y: 4px;
+                                                }
+                                                
+                                                Text {
+                                                    text: root.db-is-indexing ? root.db-status : (root.db-status == "Idle" ? "Ready (Up to date)" : root.db-status);
+                                                    color: root.db-is-indexing ? #007acc : root.text-primary;
+                                                    font-size: 14px;
+                                                    font-weight: 600;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Separator line
+                                    Rectangle {
+                                        height: 1px;
+                                        background: root.border-color;
+                                    }
+                                    
+                                    // Row 2: Statistics
+                                    HorizontalBox {
+                                        padding: 0;
+                                        spacing: 32px;
+                                        
+                                        VerticalBox {
+                                            padding: 0;
+                                            spacing: 4px;
+                                            Text {
+                                                text: "Indexed Items";
+                                                color: root.text-muted;
+                                                font-size: 12px;
+                                                font-weight: 500;
+                                            }
+                                            Text {
+                                                text: "" + root.db-file-count;
+                                                color: root.text-primary;
+                                                font-size: 20px;
+                                                font-weight: 700;
+                                            }
+                                        }
+                                        
+                                        VerticalBox {
+                                            padding: 0;
+                                            spacing: 4px;
+                                            Text {
+                                                text: "Last Rebuild Completed";
+                                                color: root.text-muted;
+                                                font-size: 12px;
+                                                font-weight: 500;
+                                            }
+                                            Text {
+                                                text: root.db-last-indexed;
+                                                color: root.text-primary;
+                                                font-size: 14px;
+                                                font-weight: 600;
+                                                y: 4px;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // Section: Folders
                         VerticalBox {
                             spacing: 12px;
