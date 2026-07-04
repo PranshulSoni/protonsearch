@@ -217,6 +217,11 @@ extern "system" fn overlay_wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 LRESULT(0)
             }
             WM_DESTROY => {
+                // Clear GWLP_USERDATA before freeing so any message still in flight for this
+                // hwnd (WM_NCDESTROY, or anything queued before DestroyWindow was called) sees
+                // a null data_ptr and safely no-ops via the check above, instead of
+                // dereferencing freed memory.
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
                 let data = Box::from_raw(data_ptr);
                 let _ = DeleteObject(data.bmp);
                 LRESULT(0)

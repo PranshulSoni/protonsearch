@@ -92,6 +92,12 @@ pub(crate) const WM_RELOAD_SETTINGS: u32 = WM_USER + 10;
 pub(crate) const WM_SET_HOTKEY_RECORDING: u32 = WM_USER + 11;
 pub(crate) const WM_LAUNCH_AGENT: u32 = WM_USER + 12;
 const WM_OCR_RESULT: u32 = WM_USER + 13;
+// Deferred post-animation actions: tick_window_animation runs with the caller's &mut
+// State still live, so it posts these instead of calling ShowWindow/force_foreground
+// directly - both can synchronously dispatch WM_ACTIVATE etc. back into this wndproc,
+// which would derive its own &mut State from the same GWLP_USERDATA pointer.
+const WM_ANIM_FOREGROUND: u32 = WM_USER + 14;
+const WM_ANIM_HIDE_WINDOW: u32 = WM_USER + 15;
 
 fn clipboard_ocr_empty_message() -> &'static str {
     "No readable text found in the clipboard image"
@@ -1741,6 +1747,17 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             } else {
                 ANIM_LOOP_ACTIVE.with(|f| f.set(false));
             }
+            LRESULT(0)
+        }
+
+        // Deferred from tick_window_animation - see WM_ANIM_FOREGROUND/WM_ANIM_HIDE_WINDOW
+        // constant comments. Neither touches State, so no aliasing risk here.
+        WM_ANIM_FOREGROUND => {
+            force_foreground(hwnd);
+            LRESULT(0)
+        }
+        WM_ANIM_HIDE_WINDOW => {
+            let _ = ShowWindow(hwnd, SW_HIDE);
             LRESULT(0)
         }
 
@@ -4167,6 +4184,11 @@ unsafe fn reset_launcher_window_position(hwnd: HWND, s: &mut State) {
         )
     };
 
+    // Written before SetWindowPos: it can synchronously dispatch WM_WINDOWPOSCHANGED etc.
+    // back into this wndproc, which would derive its own &mut State from the same
+    // GWLP_USERDATA pointer as this function's `s` — writing after would alias it.
+    s.cx = WIN_W / 2;
+    s.cy = work_h / 2;
     let _ = SetWindowPos(
         hwnd,
         HWND(null_mut()),
@@ -4176,8 +4198,6 @@ unsafe fn reset_launcher_window_position(hwnd: HWND, s: &mut State) {
         work_h,
         SWP_NOACTIVATE | SWP_NOZORDER,
     );
-    s.cx = WIN_W / 2;
-    s.cy = work_h / 2;
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
 
@@ -4238,6 +4258,12 @@ unsafe fn start_color_picker(hwnd: HWND, s: &mut State) {
             )
         };
 
+    // Computed before SetWindowPos (which can synchronously dispatch WM_WINDOWPOSCHANGED
+    // etc. back into this wndproc, re-deriving &mut State from the same pointer) so no
+    // write here depends on, or races, that reentrant path.
+    s.color_picker_mx = pt.x - monitor_left;
+    s.color_picker_my = pt.y - monitor_top;
+
     // Resize and position the window to cover the entire active monitor
     let _ = SetWindowPos(
         hwnd,
@@ -4251,9 +4277,6 @@ unsafe fn start_color_picker(hwnd: HWND, s: &mut State) {
 
     // Set mouse capture
     let _ = SetCapture(hwnd);
-    s.color_picker_mx = pt.x - monitor_left;
-    s.color_picker_my = pt.y - monitor_top;
-
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
 
@@ -4288,6 +4311,10 @@ unsafe fn stop_color_picker(hwnd: HWND, s: &mut State) {
     let win_x = work_left + (work_w - WIN_W) / 2;
     let win_y = work_top;
 
+    // Written before SetWindowPos for the same reason as start_color_picker above.
+    s.cx = WIN_W / 2;
+    s.cy = work_h / 2;
+
     let _ = SetWindowPos(
         hwnd,
         HWND(null_mut()),
@@ -4297,9 +4324,6 @@ unsafe fn stop_color_picker(hwnd: HWND, s: &mut State) {
         work_h,
         SWP_NOACTIVATE | SWP_NOZORDER,
     );
-
-    s.cx = WIN_W / 2;
-    s.cy = work_h / 2;
 
     let _ = InvalidateRect(hwnd, None, FALSE);
 }
@@ -4341,8 +4365,11 @@ unsafe fn do_hide(hwnd: HWND, s: &mut State) {
     s.selected = s.homepage_sel.min(s.results.len().saturating_sub(1));
     s.scroll_offset = 0;
 
-    let _ = ShowWindow(hwnd, SW_HIDE);
+    // Write anim state before ShowWindow: hiding the active window can synchronously
+    // dispatch WM_ACTIVATE back into this wndproc, which derives its own &mut State from
+    // the same GWLP_USERDATA pointer — writing after the call would alias it.
     s.anim = Anim::Hidden;
+    let _ = ShowWindow(hwnd, SW_HIDE);
 }
 
 fn format_conversation(prompt: &str, response: &str) -> String {
@@ -6241,7 +6268,7 @@ unsafe fn tick_window_animation(hwnd: HWND, s: &mut State) -> bool {
                 s.height_anim_started = std::time::Instant::now();
                 let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, 255, LWA_COLORKEY | LWA_ALPHA);
                 applog::log("animate_window: visible");
-                force_foreground(hwnd);
+                let _ = PostMessageW(hwnd, WM_ANIM_FOREGROUND, WPARAM(0), LPARAM(0));
                 false
             } else {
                 true
@@ -6252,7 +6279,7 @@ unsafe fn tick_window_animation(hwnd: HWND, s: &mut State) -> bool {
             let _ = SetLayeredWindowAttributes(hwnd, COLOR_KEY, alpha, LWA_COLORKEY | LWA_ALPHA);
             if p <= 0.0 {
                 s.anim = Anim::Hidden;
-                let _ = ShowWindow(hwnd, SW_HIDE);
+                let _ = PostMessageW(hwnd, WM_ANIM_HIDE_WINDOW, WPARAM(0), LPARAM(0));
                 lower_timer_res();
                 applog::log("animate_window: hidden");
                 false
