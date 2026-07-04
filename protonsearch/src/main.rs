@@ -42,7 +42,7 @@ const DEFAULT_WIN_W: i32 = 840;
 const MIN_WIN_W: i32 = 560;
 const SCREEN_EDGE_GAP: i32 = 32;
 const MAX_RESULTS: usize = 300;
-const VISIBLE_RESULTS: usize = 8;
+
 const PAD_L: i32 = 24;
 const BADGE_W: i32 = 54;
 const BADGE_H: i32 = 18;
