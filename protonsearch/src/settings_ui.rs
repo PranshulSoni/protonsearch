@@ -964,7 +964,7 @@ pub fn run_settings_window() {
 
             let ui_weak = ui_weak_status.clone();
             let (tx, rx) = std::sync::mpsc::channel();
-            let _ = slint::invoke_from_event_loop(move || {
+            let schedule_result = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {
                     ui.set_db_is_indexing(is_indexing);
                     ui.set_db_status(slint::SharedString::from(progress));
@@ -975,12 +975,28 @@ pub fn run_settings_window() {
                     let _ = tx.send(false);
                 }
             });
+            if schedule_result.is_err() {
+                // The event loop itself is gone (not just busy) - no closure was ever
+                // queued, so tx will never send and every future tick would time out
+                // forever. This is the only case worth stopping for.
+                log_settings_ui("Settings status thread: event loop gone, exiting");
+                break;
+            }
 
             match rx.recv_timeout(std::time::Duration::from_millis(500)) {
                 Ok(true) => {} // UI still alive
-                _ => {
+                Ok(false) => {
+                    // upgrade() inside the closure returned None: the window is confirmed gone.
                     log_settings_ui("Settings status thread UI is dead, exiting");
                     break;
+                }
+                Err(_) => {
+                    // Timed out or disconnected: the round-trip didn't complete in 500ms, which
+                    // just means the UI thread hasn't run the closure yet (e.g. it's blocked in
+                    // a modal folder-picker dialog or the install-update flow's sleeps) - not
+                    // proof the window is dead. Skip this tick and try again in 3s instead of
+                    // permanently stopping status updates for the rest of the Settings session.
+                    log_settings_ui("Settings status thread: UI busy, will retry next tick");
                 }
             }
         }
