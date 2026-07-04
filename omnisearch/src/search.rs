@@ -279,6 +279,73 @@ fn result_launch_dedupe_key(entry: &CatalogEntry) -> Option<String> {
         .or_else(|| Some(format!("cmd:{}", entry.launch_command)))
 }
 
+fn is_ocr_filter_visible_result(result: &SearchResult) -> bool {
+    result.entry.source == "OCR"
+        || (result.entry.source == "CLIPBOARD"
+            && result.entry.launch_command.starts_with("copy_image:")
+            && result.entry.description.starts_with("🔤 "))
+}
+
+fn search_result_identity(result: &SearchResult) -> String {
+    result_launch_dedupe_key(&result.entry).unwrap_or_else(|| format!("id:{}", result.entry.id))
+}
+
+fn truncate_preserving_ocr_results(results: &mut Vec<SearchResult>, top_k: usize) {
+    if top_k == 0 {
+        results.clear();
+        return;
+    }
+    if results.len() <= top_k {
+        return;
+    }
+
+    let total_ocr = results
+        .iter()
+        .filter(|result| is_ocr_filter_visible_result(result))
+        .count();
+    let target_ocr = total_ocr.min(top_k.min(20));
+    if target_ocr == 0 {
+        results.truncate(top_k);
+        return;
+    }
+
+    let mut kept = results.iter().take(top_k).cloned().collect::<Vec<_>>();
+    let mut kept_ocr = kept
+        .iter()
+        .filter(|result| is_ocr_filter_visible_result(result))
+        .count();
+    if kept_ocr >= target_ocr {
+        *results = kept;
+        return;
+    }
+
+    let mut seen = kept
+        .iter()
+        .map(search_result_identity)
+        .collect::<std::collections::HashSet<_>>();
+    for candidate in results
+        .iter()
+        .skip(top_k)
+        .filter(|result| is_ocr_filter_visible_result(result))
+    {
+        if kept_ocr >= target_ocr {
+            break;
+        }
+        let key = search_result_identity(candidate);
+        if !seen.insert(key) {
+            continue;
+        }
+        let replace_at = kept
+            .iter()
+            .rposition(|result| !is_ocr_filter_visible_result(result))
+            .unwrap_or_else(|| kept.len().saturating_sub(1));
+        kept[replace_at] = candidate.clone();
+        kept_ocr += 1;
+    }
+
+    *results = kept;
+}
+
 fn empty_scope_result(query: &str) -> Option<SearchResult> {
     let q = query.trim().to_ascii_lowercase();
     let (prefix, title, detail) = [
@@ -5175,7 +5242,7 @@ impl SearchEngine {
         }
         final_results = unique_results;
 
-        final_results.truncate(top_k);
+        truncate_preserving_ocr_results(&mut final_results, top_k);
 
         // Quick system actions: match against query
         let mut action_matches = get_quick_actions(q);
@@ -5225,7 +5292,7 @@ impl SearchEngine {
             } else {
                 final_results.push(task_result);
             }
-            final_results.truncate(top_k);
+            truncate_preserving_ocr_results(&mut final_results, top_k);
         }
 
         final_results
@@ -5639,6 +5706,44 @@ mod tests {
         ] {
             assert!(!lean_allowed(&mk(s, c)), "should drop {s} {c}");
         }
+    }
+
+    #[test]
+    fn truncation_preserves_ocr_results_for_filter_visibility() {
+        let mut results = (0..10)
+            .map(|idx| SearchResult {
+                entry: CatalogEntry {
+                    id: format!("file.{idx}"),
+                    control_name: format!("file {idx}"),
+                    breadcrumb_path: "File".to_string(),
+                    launch_command: format!("C:\\files\\{idx}.txt"),
+                    source: "FILE".to_string(),
+                    description: "Local file".to_string(),
+                    synonyms: String::new(),
+                },
+                score: 100.0 - idx as f32,
+            })
+            .collect::<Vec<_>>();
+        results.push(SearchResult {
+            entry: CatalogEntry {
+                id: "clip.1".to_string(),
+                control_name: "[Image] Copied from SnippingTool.exe".to_string(),
+                breadcrumb_path: "Clipboard > SnippingTool.exe".to_string(),
+                launch_command: "copy_image:C:\\clip.bmp".to_string(),
+                source: "CLIPBOARD".to_string(),
+                description: "🔤 OmniSearch.exe".to_string(),
+                synonyms: "omnisearch.exe".to_string(),
+            },
+            score: 1.0,
+        });
+
+        truncate_preserving_ocr_results(&mut results, 5);
+
+        assert_eq!(results.len(), 5);
+        assert!(
+            results.iter().any(is_ocr_filter_visible_result),
+            "OCR filter needs at least one OCR result after top-k truncation"
+        );
     }
 
     #[test]
