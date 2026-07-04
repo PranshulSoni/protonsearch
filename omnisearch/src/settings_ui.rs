@@ -214,6 +214,47 @@ pub fn run_settings_window() {
     ui.set_plugin_git_commits(settings.plugin_git_commits);
     load_snippets_into_ui(&ui);
 
+    // Populate initial database status & statistics instantly on startup
+    if let Some(conn) = get_db_conn() {
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS indexer_state (key TEXT PRIMARY KEY, value TEXT);
+             CREATE TABLE IF NOT EXISTS files (
+                path TEXT PRIMARY KEY, name TEXT NOT NULL,
+                extension TEXT NOT NULL, modified INTEGER NOT NULL,
+                size INTEGER NOT NULL DEFAULT 0, is_dir INTEGER NOT NULL DEFAULT 0);"
+        );
+        let is_indexing = conn
+            .query_row(
+                "SELECT value FROM indexer_state WHERE key = 'is_indexing'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap_or_else(|_| "0".to_string())
+            == "1";
+        let progress = conn
+            .query_row(
+                "SELECT value FROM indexer_state WHERE key = 'progress'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap_or_else(|_| "Idle".to_string());
+        let last_time = conn
+            .query_row(
+                "SELECT value FROM indexer_state WHERE key = 'last_index_time'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap_or_else(|_| "Never".to_string());
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, i64>(0))
+            .unwrap_or(0) as i32;
+
+        ui.set_db_is_indexing(is_indexing);
+        ui.set_db_status(slint::SharedString::from(progress));
+        ui.set_db_last_indexed(slint::SharedString::from(last_time));
+        ui.set_db_file_count(count);
+    }
+
     if let Some(w_path) = get_desktop_wallpaper_path() {
         if let Ok(img) = slint::Image::load_from_path(std::path::Path::new(&w_path)) {
             ui.set_desktop_wallpaper(img);
@@ -883,12 +924,6 @@ pub fn run_settings_window() {
             // Poll at 3-second intervals — we don't need sub-second UI accuracy here.
             std::thread::sleep(std::time::Duration::from_secs(3));
 
-            let ui_weak = ui_weak_status.clone();
-            if ui_weak.upgrade().is_none() {
-                log_settings_ui("Settings status thread UI upgrade is None, exiting");
-                break;
-            }
-
             // Ensure required tables exist (no-op if already there).
             let _ = conn.execute_batch(
                 "CREATE TABLE IF NOT EXISTS indexer_state (key TEXT PRIMARY KEY, value TEXT);
@@ -927,14 +962,27 @@ pub fn run_settings_window() {
                 .query_row("SELECT COUNT(*) FROM files", [], |row| row.get::<_, i64>(0))
                 .unwrap_or(0) as i32;
 
+            let ui_weak = ui_weak_status.clone();
+            let (tx, rx) = std::sync::mpsc::channel();
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_weak.upgrade() {
                     ui.set_db_is_indexing(is_indexing);
                     ui.set_db_status(slint::SharedString::from(progress));
                     ui.set_db_last_indexed(slint::SharedString::from(last_time));
                     ui.set_db_file_count(count);
+                    let _ = tx.send(true);
+                } else {
+                    let _ = tx.send(false);
                 }
             });
+
+            match rx.recv_timeout(std::time::Duration::from_millis(500)) {
+                Ok(true) => {} // UI still alive
+                _ => {
+                    log_settings_ui("Settings status thread UI is dead, exiting");
+                    break;
+                }
+            }
         }
     });
 
