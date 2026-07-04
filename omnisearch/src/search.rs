@@ -958,27 +958,6 @@ impl SearchEngine {
     fn get_path_score_modifier(full_path: &str) -> f32 {
         let path_lower = full_path.to_lowercase();
 
-        // Penalize system/tool/hidden directories
-        if path_lower.contains("\\node_modules\\")
-            || path_lower.contains("\\target\\")
-            || path_lower.contains("\\.git\\")
-            || path_lower.contains("\\appdata\\")
-            || path_lower.contains("\\.cargo\\")
-            || path_lower.contains("\\.rustup\\")
-            || path_lower.contains("\\.npm\\")
-            || path_lower.contains("\\.antigravity")
-            || path_lower.contains("\\.cursor\\")
-            || path_lower.contains("\\venv\\")
-            || path_lower.contains("\\.venv\\")
-            || path_lower.contains("\\__macosx\\")
-            || path_lower.contains("\\bin\\")
-            || path_lower.contains("\\obj\\")
-            || path_lower.contains("\\temp\\")
-            || path_lower.contains("\\tmp\\")
-        {
-            return -2.0; // Excluded from results
-        }
-
         // Boost user's active/primary directories
         if path_lower.contains("\\desktop\\")
             || path_lower.contains("\\documents\\")
@@ -1039,9 +1018,6 @@ impl SearchEngine {
         ];
         let mut results = Vec::new();
         for row in &self.file_index {
-            if row.path_modifier < -1.0 {
-                continue;
-            }
             let name_no_ext_lower = match row.name_lower.rfind('.') {
                 Some(d) => &row.name_lower[..d],
                 None => row.name_lower.as_str(),
@@ -1170,9 +1146,6 @@ impl SearchEngine {
                     for row in rows.filter_map(|r| r.ok()) {
                         let (path, name, ext, _modified) = row;
                         let path_modifier = Self::get_path_score_modifier(&path);
-                        if path_modifier < -1.0 {
-                            continue;
-                        }
                         // Score: recent + boosted path + image bonus
                         let image_bonus = if image_exts.contains(&ext.as_str()) {
                             0.5
@@ -1282,9 +1255,6 @@ impl SearchEngine {
                 for row in rows.filter_map(|r| r.ok()) {
                     let (path, name, ext) = row;
                     let path_modifier = Self::get_path_score_modifier(&path);
-                    if path_modifier < -1.0 {
-                        continue;
-                    }
                     let mut score = score_name(&name);
                     if score <= 0.0 {
                         continue;
@@ -1401,9 +1371,6 @@ impl SearchEngine {
                         continue;
                     }
                     let path_modifier = Self::get_path_score_modifier(&path);
-                    if path_modifier < -1.0 {
-                        continue;
-                    }
                     let snippet = snippet_raw
                         .replace('\n', " ")
                         .replace('\r', " ")
@@ -2116,11 +2083,6 @@ impl SearchEngine {
                 .file_name()
                 .map(|f| f.to_string_lossy().into_owned())
                 .unwrap_or_else(|| path.clone());
-
-            let is_code = path.contains("\\target\\") || path.contains("\\node_modules\\");
-            if is_code {
-                continue;
-            } // skip build targets
 
             let control_name = if is_dir == 1 {
                 format!("📁 Folder: {}", name)
@@ -6179,6 +6141,54 @@ mod tests {
                     && result.entry.launch_command.starts_with("copy_image:")
             }),
             "OCR filter needs OCR candidates even when file matches rank higher, got {:?}",
+            results
+                .iter()
+                .map(|result| (
+                    &result.entry.control_name,
+                    &result.entry.source,
+                    &result.entry.launch_command
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn exact_filename_match_can_surface_target_debug_exe() {
+        let db_path = unique_test_db("target_debug_exact_filename");
+        let mut engine = SearchEngine::new(db_path.clone(), false).expect("engine");
+        let target_path =
+            "C:\\Users\\tester\\Documents\\Project\\omnisearch\\target\\debug\\omnisearch.exe";
+        engine
+            .conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS files (
+                    path TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    extension TEXT NOT NULL,
+                    modified INTEGER NOT NULL,
+                    size INTEGER NOT NULL DEFAULT 0,
+                    is_dir INTEGER NOT NULL DEFAULT 0
+                );",
+                [],
+            )
+            .expect("files table");
+        engine
+            .conn
+            .execute(
+                "INSERT INTO files (path, name, extension, modified, size, is_dir)
+                 VALUES (?1, 'omnisearch.exe', 'exe', 1, 1, 0)",
+                [target_path],
+            )
+            .expect("insert target exe");
+
+        let results = engine.search_with_fts("omnisearch.exe", 20, true);
+        let _ = std::fs::remove_file(&db_path);
+
+        assert!(
+            results
+                .iter()
+                .any(|result| result.entry.launch_command == target_path),
+            "exact filename search should include target debug exe, got {:?}",
             results
                 .iter()
                 .map(|result| (
