@@ -28,6 +28,17 @@ fn is_indexable_content(ext: &str) -> bool {
         || IMAGE_EXTENSIONS.contains(&ext)
 }
 
+fn is_in_low_priority_dir(path: &Path) -> bool {
+    path.components().any(|c| {
+        if let Some(s) = c.as_os_str().to_str() {
+            let s_lower = s.to_lowercase();
+            s_lower == "target" || s_lower == "build"
+        } else {
+            false
+        }
+    })
+}
+
 /// Extract searchable text for a file (document text or image OCR), or None.
 fn extract_content(path: &Path, ext: &str) -> Option<String> {
     if TEXT_EXTENSIONS.contains(&ext) {
@@ -460,8 +471,6 @@ fn is_builtin_ignored_dir(name: &str) -> bool {
     }
     match name_lower.as_str() {
         "node_modules"
-        | "target"
-        | "build"
         | "dist"
         | "venv"
         | ".venv"
@@ -744,6 +753,9 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
     let mut pending_updates = Vec::new();
     let mut extract_jobs: Vec<ExtractJob> = Vec::new();
 
+    let mut low_priority_updates = Vec::new();
+    let mut low_priority_extract_jobs = Vec::new();
+
     for folder in folders {
         log_indexer(&format!("Evaluating folder for index: {:?}", folder));
         if !folder.exists() {
@@ -819,18 +831,24 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
             };
 
             if db_modified.is_none() || db_modified.unwrap() != modified || needs_fts_check {
+                let is_low_priority = is_in_low_priority_dir(&path);
                 if is_file && should_fts {
                     // Defer the slow content/OCR extraction to the parallel pool below.
-                    extract_jobs.push(ExtractJob {
+                    let job = ExtractJob {
                         path: path.to_path_buf(),
                         name,
                         ext,
                         modified,
                         size: file_size,
-                    });
+                    };
+                    if is_low_priority {
+                        low_priority_extract_jobs.push(job);
+                    } else {
+                        extract_jobs.push(job);
+                    }
                 } else {
                     // Folders / non-indexable files: just the name+meta row, no extraction.
-                    pending_updates.push(PendingUpdate {
+                    let update = PendingUpdate {
                         path: path_str,
                         name,
                         extension: ext,
@@ -838,9 +856,14 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
                         size: file_size,
                         is_dir: if is_dir { 1 } else { 0 },
                         content: None,
-                    });
-                    if pending_updates.len() >= 1000 {
-                        flush_updates(&mut conn, &mut pending_updates)?;
+                    };
+                    if is_low_priority {
+                        low_priority_updates.push(update);
+                    } else {
+                        pending_updates.push(update);
+                        if pending_updates.len() >= 1000 {
+                            flush_updates(&mut conn, &mut pending_updates)?;
+                        }
                     }
                 }
             }
@@ -859,14 +882,14 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
         ));
     }
 
-    log_indexer("Flushing name/meta updates to database...");
+    log_indexer("Flushing normal priority name/meta updates to database...");
     flush_updates(&mut conn, &mut pending_updates)?;
 
     // Extract document text + image OCR for changed files in parallel (the slow part),
     // flushing results as they stream back so memory stays bounded.
     if !extract_jobs.is_empty() {
         log_indexer(&format!(
-            "Extracting content/OCR for {} files in parallel...",
+            "Extracting content/OCR for {} normal priority files in parallel...",
             extract_jobs.len()
         ));
         let total_jobs = extract_jobs.len();
@@ -888,6 +911,45 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
             }
         }
         flush_updates(&mut conn, &mut pending_updates)?;
+    }
+
+    if !low_priority_updates.is_empty() {
+        log_indexer("Flushing low priority (target/build) name/meta updates to database...");
+        let mut chunk = Vec::new();
+        for update in low_priority_updates {
+            chunk.push(update);
+            if chunk.len() >= 1000 {
+                flush_updates(&mut conn, &mut chunk)?;
+            }
+        }
+        flush_updates(&mut conn, &mut chunk)?;
+    }
+
+    if !low_priority_extract_jobs.is_empty() {
+        log_indexer(&format!(
+            "Extracting content/OCR for {} low priority (target/build) files in parallel...",
+            low_priority_extract_jobs.len()
+        ));
+        let total_jobs = low_priority_extract_jobs.len();
+        let mut processed_jobs = 0;
+        let mut pending_low = Vec::new();
+        for update in spawn_extractors(low_priority_extract_jobs) {
+            processed_jobs += 1;
+            if processed_jobs % 10 == 0 || processed_jobs == total_jobs {
+                if let Ok(mut g) = INDEXING_PROGRESS.lock() {
+                    *g = format!(
+                        "Extracting (low-priority): {}/{} files (OCR/Text)...",
+                        processed_jobs, total_jobs
+                    );
+                    save_indexer_state_to_db(db_path, "progress", &g);
+                }
+            }
+            pending_low.push(update);
+            if pending_low.len() >= 500 {
+                flush_updates(&mut conn, &mut pending_low)?;
+            }
+        }
+        flush_updates(&mut conn, &mut pending_low)?;
     }
 
     // Deleted files cleanup skipped to prevent memory bloat of seen_paths (#8)
