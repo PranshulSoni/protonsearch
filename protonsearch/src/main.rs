@@ -6578,6 +6578,9 @@ unsafe fn fill_rounded(hdc: HDC, x: i32, y: i32, w: i32, h: i32, r: i32, c: COLO
 /// wrap. Called from both the measure and paint passes so the two agree on height.
 /// The caller must have selected the body font into `hdc` first.
 unsafe fn bubble_inner_w(hdc: HDC, text_wide: &[u16], max_inner: i32) -> i32 {
+    if text_wide.is_empty() {
+        return 1;
+    }
     let mut nat = RECT {
         left: 0,
         top: 0,
@@ -10691,6 +10694,9 @@ unsafe fn draw_highlighted_text(
     x: i32,
     y: i32,
 ) {
+    if text.is_empty() {
+        return;
+    }
     let old_font = SelectObject(hdc, font);
     SetBkMode(hdc, TRANSPARENT);
 
