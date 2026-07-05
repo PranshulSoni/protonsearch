@@ -128,7 +128,7 @@ fn get_db_conn() -> Option<std::sync::MutexGuard<'static, ConnCache>> {
             conn: open_index_db(&desired),
         })
     });
-    let mut guard = mutex.lock().ok()?;
+    let mut guard = mutex.lock().unwrap_or_else(|e| e.into_inner());
     if guard.path != desired {
         guard.conn = open_index_db(&desired);
         guard.path = desired;
