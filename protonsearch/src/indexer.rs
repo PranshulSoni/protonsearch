@@ -1021,6 +1021,10 @@ fn safe_extract_docx_text(path: &Path) -> Option<String> {
 /// stdout, then exit. pdf_extract/docx_lite can stack-overflow on malformed files, and a
 /// stack overflow is an abort that `catch_unwind` cannot catch — so we run them here, in a
 /// throwaway process. If it overflows, this child dies and the parent just skips the content.
+/// Ordinary panics (both crates also panic via internal `.unwrap()`/indexing bugs on malformed
+/// input, not just overflow) ARE catchable, so they're caught here too: the child then exits
+/// cleanly with no content instead of aborting, and the same bad file doesn't re-crash a fresh
+/// subprocess (and spam panic.log) on every re-scan.
 pub fn extract_content_subprocess(path_str: &str) {
     let path = Path::new(path_str);
     let ext = path
@@ -1029,8 +1033,20 @@ pub fn extract_content_subprocess(path_str: &str) {
         .unwrap_or("")
         .to_lowercase();
     let text = match ext.as_str() {
-        "pdf" => pdf_extract::extract_text(path).ok(),
-        "docx" => docx_lite::extract_text(path).ok(),
+        "pdf" => match std::panic::catch_unwind(|| pdf_extract::extract_text(path)) {
+            Ok(r) => r.ok(),
+            Err(_) => {
+                log_indexer(&format!("PDF extraction panicked internally for {:?}", path));
+                None
+            }
+        },
+        "docx" => match std::panic::catch_unwind(|| docx_lite::extract_text(path)) {
+            Ok(r) => r.ok(),
+            Err(_) => {
+                log_indexer(&format!("DOCX extraction panicked internally for {:?}", path));
+                None
+            }
+        },
         _ => None,
     };
     if let Some(mut t) = text {
