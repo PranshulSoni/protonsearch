@@ -3741,6 +3741,17 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                         let _ = DeleteObject(hbmp);
                     }
                 }
+                // Best-effort: force a clean WAL checkpoint into the main file before
+                // exiting. An ordinary WAL commit is already crash-safe, but a *checkpoint*
+                // (merging WAL content into the main file) writes the main file directly and
+                // isn't equally protected against an abrupt process kill mid-operation — this
+                // has caused real corruption when the process was force-killed later (e.g.
+                // during a dev rebuild) while an automatic checkpoint happened to be pending.
+                // Doing it explicitly here, at a moment we control, minimizes that window.
+                if let Ok(conn) = rusqlite::Connection::open(&s.db_path) {
+                    let _ = conn.busy_timeout(std::time::Duration::from_secs(3));
+                    let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+                }
             }
             remove_tray_icon(hwnd);
             PostQuitMessage(0);
