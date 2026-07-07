@@ -207,6 +207,36 @@ fn path_in_ignored_dir_with_config(
 
 /// Index a single file immediately: upsert name/meta, plus content/OCR for indexable types.
 /// Used by the filesystem watcher so new files are searchable in milliseconds.
+/// Builds a path-prefix range matching `path` itself plus everything nested under it, without
+/// SQL LIKE/GLOB wildcards (so a literal `%`/`_`/`*` in a real filename can't break it).
+/// `\u{10FFFF}` sorts after any character a real path can contain, so `col >= prefix AND col <
+/// prefix_end` selects exactly `{path, path's entire subtree}` — used to remove a deleted
+/// folder's indexed children even though the OS no longer lets us stat it to walk them.
+fn path_and_subtree_range(path: &Path) -> Option<(String, String, String)> {
+    let path_str = path.to_str()?.to_string();
+    let prefix = format!("{path_str}{}", std::path::MAIN_SEPARATOR);
+    let prefix_end = format!("{prefix}\u{10FFFF}");
+    Some((path_str, prefix, prefix_end))
+}
+
+/// Removes `path` — and, if it was a folder, every indexed row nested under it — from the
+/// index. Called on delete: by then the OS won't let us stat the path to tell file vs. folder
+/// apart, so this matches both shapes unconditionally.
+fn remove_path_and_descendants(conn: &Connection, path: &Path) -> rusqlite::Result<()> {
+    let Some((exact, prefix, prefix_end)) = path_and_subtree_range(path) else {
+        return Ok(());
+    };
+    conn.execute(
+        "DELETE FROM files_fts WHERE path = ?1 OR (path >= ?2 AND path < ?3)",
+        params![exact, prefix, prefix_end],
+    )?;
+    conn.execute(
+        "DELETE FROM files WHERE path = ?1 OR (path >= ?2 AND path < ?3)",
+        params![exact, prefix, prefix_end],
+    )?;
+    Ok(())
+}
+
 fn index_one_file(conn: &Connection, path: &Path) {
     let ext = path
         .extension()
@@ -221,7 +251,13 @@ fn index_one_file(conn: &Connection, path: &Path) {
     }
     let meta = match std::fs::metadata(path) {
         Ok(m) if m.is_file() => m,
-        _ => return,
+        Ok(_) => return, // exists but isn't a file (e.g. a directory) — nothing to do here
+        Err(_) => {
+            // Raced with a delete: the create/modify event fired but the path is already
+            // gone. Clean up any stale row instead of silently leaving it behind forever.
+            let _ = remove_path_and_descendants(conn, path);
+            return;
+        }
     };
     let path_str = match path.to_str() {
         Some(s) => s.to_string(),
@@ -315,15 +351,22 @@ pub fn start_watcher(db_path: PathBuf) {
         log_indexer("Watcher started");
         let ignored_dirs = configured_ignored_dirs();
 
-        let collect = |set: &mut std::collections::HashSet<PathBuf>,
+        // Maps each touched path to whether its *latest* event in this batch was a removal.
+        // A HashMap (not a HashSet) is required here so a rapid delete-then-recreate of the
+        // same path within one debounce window resolves to the correct final action instead
+        // of just deduplicating the path and losing which thing actually happened to it.
+        let collect = |map: &mut std::collections::HashMap<PathBuf, bool>,
                        res: notify::Result<notify::Event>| {
             if let Ok(ev) = res {
-                if matches!(
-                    ev.kind,
-                    notify::EventKind::Create(_) | notify::EventKind::Modify(_)
-                ) {
+                let removed = matches!(ev.kind, notify::EventKind::Remove(_));
+                let relevant = removed
+                    || matches!(
+                        ev.kind,
+                        notify::EventKind::Create(_) | notify::EventKind::Modify(_)
+                    );
+                if relevant {
                     for p in ev.paths {
-                        set.insert(p);
+                        map.insert(p, removed);
                     }
                 }
             }
@@ -334,7 +377,7 @@ pub fn start_watcher(db_path: PathBuf) {
                 Ok(r) => r,
                 Err(_) => break,
             };
-            let mut paths = std::collections::HashSet::new();
+            let mut paths = std::collections::HashMap::new();
             collect(&mut paths, first);
             let deadline = std::time::Instant::now() + std::time::Duration::from_millis(800);
             while let Ok(r) =
@@ -345,9 +388,15 @@ pub fn start_watcher(db_path: PathBuf) {
                     break;
                 }
             }
-            for p in paths {
+            for (p, removed) in paths {
                 if !path_in_ignored_dir_with_config(&p, &ignored_dirs) {
-                    index_one_file(&conn, &p);
+                    if removed {
+                        if let Err(e) = remove_path_and_descendants(&conn, &p) {
+                            log_indexer(&format!("Watcher: failed to remove {:?}: {}", p, e));
+                        }
+                    } else {
+                        index_one_file(&conn, &p);
+                    }
                 }
             }
         }
@@ -525,6 +574,7 @@ struct PendingUpdate {
     modified: i64,
     size: i64,
     is_dir: i64,
+    last_seen_scan: i64,
     content: Option<String>,
 }
 
@@ -535,7 +585,7 @@ fn flush_updates(conn: &mut Connection, updates: &mut Vec<PendingUpdate>) -> any
     let tx = conn.transaction()?;
     {
         let mut insert_file_stmt = tx.prepare(
-            "INSERT OR REPLACE INTO files (path, name, extension, modified, size, is_dir) VALUES (?, ?, ?, ?, ?, ?)"
+            "INSERT OR REPLACE INTO files (path, name, extension, modified, size, is_dir, last_seen_scan) VALUES (?, ?, ?, ?, ?, ?, ?)"
         )?;
         let mut delete_fts_stmt = tx.prepare("DELETE FROM files_fts WHERE path = ?")?;
         let mut insert_fts_stmt =
@@ -550,7 +600,8 @@ fn flush_updates(conn: &mut Connection, updates: &mut Vec<PendingUpdate>) -> any
                 update.extension,
                 update.modified,
                 update.size,
-                update.is_dir
+                update.is_dir,
+                update.last_seen_scan
             ])?;
 
             if let Some(content) = update.content {
@@ -569,6 +620,7 @@ struct ExtractJob {
     ext: String,
     modified: i64,
     size: i64,
+    scan_id: i64,
 }
 
 /// Extract document text + image OCR for the given files in parallel (the slow part of
@@ -618,6 +670,7 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
                     modified: job.modified,
                     size: job.size,
                     is_dir: 0,
+                    last_seen_scan: job.scan_id,
                     content: Some(content),
                 });
             }
@@ -631,6 +684,73 @@ fn spawn_extractors(jobs: Vec<ExtractJob>) -> std::sync::mpsc::Receiver<PendingU
     drop(res_tx); // workers hold the only senders now → res_rx ends when they finish
 
     res_rx
+}
+
+/// Cheaply stamps `last_seen_scan` on files that already matched the DB (no content/metadata
+/// change, so `flush_updates` never touches them) — batched the same way `pending_updates` is,
+/// so peak memory stays at "one batch," not "every unchanged file in the scan."
+fn flush_touched_paths(
+    conn: &mut Connection,
+    touched: &mut Vec<String>,
+    scan_id: i64,
+) -> anyhow::Result<()> {
+    if touched.is_empty() {
+        return Ok(());
+    }
+    let tx = conn.transaction()?;
+    {
+        let mut stmt = tx.prepare("UPDATE files SET last_seen_scan = ?1 WHERE path = ?2")?;
+        for path in touched.drain(..) {
+            stmt.execute(params![scan_id, path])?;
+        }
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Removes rows under `folder` that weren't confirmed present in the scan identified by
+/// `scan_id` — i.e. files that existed at the start of this run's last full crawl but are no
+/// longer on disk. Only ever called for folders this specific run actually walked, so a
+/// priority-only scan can't sweep folders outside its scope. The stale-path list is collected
+/// first (bounded to just this folder's actual deletions, not the whole table) so the FTS
+/// cleanup can target exactly those paths before the `files` rows themselves are removed.
+fn sweep_deleted_under_folder(
+    conn: &mut Connection,
+    folder: &Path,
+    scan_id: i64,
+) -> anyhow::Result<()> {
+    let Some((exact, prefix, prefix_end)) = path_and_subtree_range(folder) else {
+        return Ok(());
+    };
+    let tx = conn.transaction()?;
+    let stale_paths: Vec<String> = {
+        let mut stmt = tx.prepare(
+            "SELECT path FROM files WHERE (path = ?1 OR (path >= ?2 AND path < ?3)) AND last_seen_scan < ?4",
+        )?;
+        let rows = stmt.query_map(params![exact, prefix, prefix_end, scan_id], |r| {
+            r.get::<_, String>(0)
+        })?;
+        rows.filter_map(|r| r.ok()).collect()
+    };
+    if stale_paths.is_empty() {
+        tx.commit()?;
+        return Ok(());
+    }
+    {
+        let mut del_fts = tx.prepare("DELETE FROM files_fts WHERE path = ?")?;
+        let mut del_file = tx.prepare("DELETE FROM files WHERE path = ?")?;
+        for p in &stale_paths {
+            del_fts.execute([p])?;
+            del_file.execute([p])?;
+        }
+    }
+    tx.commit()?;
+    log_indexer(&format!(
+        "Swept {} deleted path(s) under {:?}",
+        stale_paths.len(),
+        folder
+    ));
+    Ok(())
 }
 
 fn save_indexer_state_to_db(db_path: &Path, key: &str, value: &str) {
@@ -743,6 +863,10 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
         "ALTER TABLE files ADD COLUMN is_dir INTEGER NOT NULL DEFAULT 0",
         [],
     );
+    let _ = conn.execute(
+        "ALTER TABLE files ADD COLUMN last_seen_scan INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
 
     conn.execute(
         "CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(
@@ -751,11 +875,22 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
         );",
         [],
     )?;
-    // Removed unbounded memory caching of db_files, fts_paths, seen_paths (#8)
-    // They grew infinitely on large drives and caused memory leaks.
+    // A bounded scan-and-sweep replaces the old unbounded db_files/fts_paths/seen_paths
+    // caching (#8), which held every known path in memory for the whole scan and leaked on
+    // large drives. Every row visited this run is stamped with `scan_id` (either via its
+    // normal insert/update, or — for files that haven't changed — via the cheap batched
+    // `touched_paths` touch below). Once a folder's walk finishes, anything under it that
+    // *wasn't* stamped this run no longer exists on disk and is swept — bounded to just that
+    // folder's orphan count, not the whole table, and never held longer than one sweep call.
+    let scan_id: i64 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    let folders_for_sweep = folders.clone();
     let mut file_count = 0;
     let mut pending_updates = Vec::new();
     let mut extract_jobs: Vec<ExtractJob> = Vec::new();
+    let mut touched_paths: Vec<String> = Vec::new();
 
     let mut low_priority_updates = Vec::new();
     let mut low_priority_extract_jobs = Vec::new();
@@ -844,6 +979,7 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
                         ext,
                         modified,
                         size: file_size,
+                        scan_id,
                     };
                     if is_low_priority {
                         low_priority_extract_jobs.push(job);
@@ -859,6 +995,7 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
                         modified,
                         size: file_size,
                         is_dir: if is_dir { 1 } else { 0 },
+                        last_seen_scan: scan_id,
                         content: None,
                     };
                     if is_low_priority {
@@ -869,6 +1006,14 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
                             flush_updates(&mut conn, &mut pending_updates)?;
                         }
                     }
+                }
+            } else {
+                // Unchanged since last scan: skip the full re-write, but still cheaply mark
+                // this path as confirmed-present so the end-of-run sweep doesn't mistake an
+                // untouched-because-unchanged file for one that was deleted.
+                touched_paths.push(path_str);
+                if touched_paths.len() >= 1000 {
+                    flush_touched_paths(&mut conn, &mut touched_paths, scan_id)?;
                 }
             }
 
@@ -888,6 +1033,7 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
 
     log_indexer("Flushing normal priority name/meta updates to database...");
     flush_updates(&mut conn, &mut pending_updates)?;
+    flush_touched_paths(&mut conn, &mut touched_paths, scan_id)?;
 
     // Extract document text + image OCR for changed files in parallel (the slow part),
     // flushing results as they stream back so memory stays bounded.
@@ -956,7 +1102,15 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
         flush_updates(&mut conn, &mut pending_low)?;
     }
 
-    // Deleted files cleanup skipped to prevent memory bloat of seen_paths (#8)
+    // Every row under a folder we actually walked this run now has last_seen_scan == scan_id
+    // (or newer, if touched again since). Anything left behind with an older stamp no longer
+    // exists on disk — sweep it, scoped to just the folders this call covers so an unrelated
+    // priority-only scan can never sweep folders it didn't touch.
+    for folder in &folders_for_sweep {
+        if let Err(e) = sweep_deleted_under_folder(&mut conn, folder, scan_id) {
+            log_indexer(&format!("Sweep failed for {:?}: {}", folder, e));
+        }
+    }
 
     log_indexer("run_indexer_folders completed successfully");
     Ok(())
@@ -1348,5 +1502,116 @@ mod tests {
         assert!(is_ignored_dir_with_config(".angular", &configured));
         assert!(is_ignored_dir_with_config("node_modules", &configured));
         assert!(!is_ignored_dir_with_config("src", &configured));
+    }
+
+    fn unique_temp_path(name: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        std::env::temp_dir().join(format!("protonsearch_indexer_test_{name}_{stamp}"))
+    }
+
+    fn row_exists(conn: &Connection, path: &Path) -> bool {
+        conn.query_row(
+            "SELECT COUNT(*) FROM files WHERE path = ?",
+            [path.to_str().unwrap()],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+            > 0
+    }
+
+    /// Reproduces the exact "dynamic indexing" bug report: a full crawl indexes a file, the
+    /// file is deleted from disk, and a second crawl must actually remove its row instead of
+    /// leaving a stale entry behind forever (the old, deliberately-disabled behavior).
+    #[test]
+    fn full_crawl_removes_files_deleted_from_disk() {
+        let db_path = unique_temp_path("db").with_extension("db");
+        let scan_dir = unique_temp_path("dir");
+        std::fs::create_dir_all(&scan_dir).expect("create scan dir");
+        let keep_path = scan_dir.join("keep_me.txt");
+        let delete_path = scan_dir.join("delete_me.txt");
+        std::fs::write(&keep_path, b"kept content").expect("write keep file");
+        std::fs::write(&delete_path, b"doomed content").expect("write delete file");
+
+        run_indexer_folders_force(&db_path, vec![scan_dir.clone()]).expect("first crawl");
+        {
+            let conn = Connection::open(&db_path).expect("open test db");
+            assert!(
+                row_exists(&conn, &keep_path),
+                "kept file should be indexed after first crawl"
+            );
+            assert!(
+                row_exists(&conn, &delete_path),
+                "doomed file should be indexed after first crawl"
+            );
+        }
+
+        std::fs::remove_file(&delete_path).expect("delete test file from disk");
+        run_indexer_folders_force(&db_path, vec![scan_dir.clone()]).expect("second crawl");
+        {
+            let conn = Connection::open(&db_path).expect("open test db");
+            assert!(
+                row_exists(&conn, &keep_path),
+                "kept file must still be indexed after the second crawl"
+            );
+            assert!(
+                !row_exists(&conn, &delete_path),
+                "deleted file must be swept from the index, not left stale forever"
+            );
+        }
+
+        let _ = std::fs::remove_file(&keep_path);
+        let _ = std::fs::remove_dir_all(&scan_dir);
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_file(format!("{}-wal", db_path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", db_path.display()));
+    }
+
+    /// The live-watcher counterpart: `remove_path_and_descendants` is what the watcher calls
+    /// on a delete event. Verifies it removes both the exact file and (for a deleted folder)
+    /// everything indexed underneath it, without disturbing sibling paths.
+    #[test]
+    fn remove_path_and_descendants_clears_file_and_folder_subtree() {
+        let db_path = unique_temp_path("remove_db").with_extension("db");
+        let scan_dir = unique_temp_path("remove_dir");
+        let sub_dir = scan_dir.join("sub");
+        std::fs::create_dir_all(&sub_dir).expect("create nested scan dir");
+        let lone_file = scan_dir.join("lone.txt");
+        let nested_file = sub_dir.join("nested.txt");
+        let sibling_file = scan_dir.join("sibling.txt");
+        std::fs::write(&lone_file, b"a").expect("write lone file");
+        std::fs::write(&nested_file, b"b").expect("write nested file");
+        std::fs::write(&sibling_file, b"c").expect("write sibling file");
+
+        run_indexer_folders_force(&db_path, vec![scan_dir.clone()]).expect("initial crawl");
+
+        let conn = Connection::open(&db_path).expect("open test db");
+        assert!(row_exists(&conn, &lone_file));
+        assert!(row_exists(&conn, &nested_file));
+        assert!(row_exists(&conn, &sibling_file));
+
+        // Simulate the watcher's delete handling: remove a lone file directly, and remove a
+        // whole folder (whose children can no longer be individually stat'd once it's gone).
+        remove_path_and_descendants(&conn, &lone_file).expect("remove lone file");
+        remove_path_and_descendants(&conn, &sub_dir).expect("remove sub_dir subtree");
+
+        assert!(!row_exists(&conn, &lone_file), "lone file should be gone");
+        assert!(
+            !row_exists(&conn, &nested_file),
+            "nested file under the deleted folder should be gone too"
+        );
+        assert!(
+            row_exists(&conn, &sibling_file),
+            "untouched sibling file must survive"
+        );
+
+        drop(conn);
+        let _ = std::fs::remove_file(&sibling_file);
+        let _ = std::fs::remove_dir_all(&scan_dir);
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_file(format!("{}-wal", db_path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", db_path.display()));
     }
 }
