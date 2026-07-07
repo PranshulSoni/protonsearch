@@ -67,7 +67,7 @@ const CONTENT_HEADER_H: i32 = 80;
 // reused CONTENT_HEADER_H (80px) here, leaving ~54px of dead space before the first row.
 // ponytail: one constant + a mode-aware header_h() keeps paint, hit-test and sizing in sync.
 const LABEL_HEADER_H: i32 = 38;
-const HEIGHT_ANIM_MS: u128 = 90;
+const HEIGHT_ANIM_MS: u128 = 140;
 const WM_MOUSELEAVE: u32 = 0x02A3;
 
 fn launcher_width_for_work_area(work_w: i32, desired_w: i32) -> i32 {
@@ -178,7 +178,7 @@ struct SearchRequest {
 }
 // ── Animation ─────────────────────────────────────────────────────────────────
 // const ANIM_TICK_MS: u32 = 1;
-const ANIM_DURATION_SEC: f32 = 0.100; // 220ms
+const ANIM_DURATION_SEC: f32 = 0.120; // 120ms
                                       // const MAX_ALPHA: u8 = 255;
 
 // ── Genie Morph Dimensions ────────────────────────────────────────────────────
@@ -252,39 +252,36 @@ impl Theme {
     fn palette(self) -> ThemePalette {
         match self {
             Theme::Darker => ThemePalette {
-                bg: COLORREF(0x00_2F_2F_2F),
-                bg_sel: COLORREF(0x00_4D_4D_4D),
-                bg_hover: COLORREF(0x00_38_38_38),
-                clr_div: COLORREF(0x00_3B_3B_3B),
-                clr_white: COLORREF(0x00_FF_FF_FF),
-                clr_gray: COLORREF(0x00_8F_8F_8F),
-                clr_gray_sel: COLORREF(0x00_8F_8F_8F),
-                clr_ph: COLORREF(0x00_8F_8F_8F),
-                clr_bdgbg: COLORREF(0x00_3B_3B_3B),
-                clr_bdgtx: COLORREF(0x00_FF_FF_FF),
-                clr_accent: COLORREF(0x00_E5_99_4C),
-                // Neutral footer shade matching the gray bg (#2f2f2f). Was #191d23, a
-                // navy leftover from an older accent theme that clashed with the new
-                // neutral dark theme — this is the "clipboard guide" mismatch.
-                bg_footer: COLORREF(0x00_26_26_26),
-                scrollbar_track: COLORREF(0x00_28_28_28),
-                scrollbar_thumb: COLORREF(0x00_4D_4D_4D),
+                bg: COLORREF(0x00_18_16_16),           // #161618
+                bg_sel: COLORREF(0x00_2A_27_27),       // #27272A
+                bg_hover: COLORREF(0x00_22_1F_1F),     // #1F1F22
+                clr_div: COLORREF(0x00_32_2D_2D),      // #2D2D32
+                clr_white: COLORREF(0x00_F6_F4_F4),    // #F4F4F6
+                clr_gray: COLORREF(0x00_A6_9F_9F),     // #9F9FA6
+                clr_gray_sel: COLORREF(0x00_A6_9F_9F), // #9F9FA6
+                clr_ph: COLORREF(0x00_5B_52_52),       // #52525B
+                clr_bdgbg: COLORREF(0x00_27_24_24),    // #242427
+                clr_bdgtx: COLORREF(0x00_E7_E4_E4),    // #E4E4E7
+                clr_accent: COLORREF(0x00_F6_82_3B),   // #3B82F6 (Accent blue)
+                bg_footer: COLORREF(0x00_1E_1C_1C),    // #1C1C1E
+                scrollbar_track: COLORREF(0x00_1A_18_18), // #18181A
+                scrollbar_thumb: COLORREF(0x00_46_3F_3F), // #3F3F46
             },
             Theme::NordDarker => ThemePalette {
-                bg: COLORREF(0x00_40_34_2E),           // 2e3440
-                bg_sel: COLORREF(0x00_6B_58_4E),       // 4e586b
-                bg_hover: COLORREF(0x00_52_42_3B),     // 3b4252
-                clr_div: COLORREF(0x00_6A_56_4C),      // 4c566a
-                clr_white: COLORREF(0x00_F0_E9_E5),    // e5e9f0
-                clr_gray: COLORREF(0x00_83_6C_60),     // 606c83
-                clr_gray_sel: COLORREF(0x00_AB_91_83), // 8391ab
+                bg: COLORREF(0x00_40_34_2E),           // #2E3440
+                bg_sel: COLORREF(0x00_6B_58_4E),       // #4E586B
+                bg_hover: COLORREF(0x00_52_42_3B),     // #3B4252
+                clr_div: COLORREF(0x00_6A_56_4C),      // #4C566A
+                clr_white: COLORREF(0x00_F0_E9_E5),    // #E5E9F0
+                clr_gray: COLORREF(0x00_83_6C_60),     // #606C83
+                clr_gray_sel: COLORREF(0x00_AB_91_83), // #8391AB
                 clr_ph: COLORREF(0x00_6B_58_4E),
                 clr_bdgbg: COLORREF(0x00_52_42_3B),
                 clr_bdgtx: COLORREF(0x00_F0_E9_E5),
-                clr_accent: COLORREF(0x00_AB_91_83),
-                bg_footer: COLORREF(0x00_33_29_24), // nord darker footer shade (#242933)
-                scrollbar_track: COLORREF(0x00_2D_26_22), // original Nord scrollbar track (#22262d)
-                scrollbar_thumb: COLORREF(0x00_70_62_58), // original Nord scrollbar thumb (#586270)
+                clr_accent: COLORREF(0x00_D0_C0_88),   // #88C0D0 (Nord frost blue)
+                bg_footer: COLORREF(0x00_33_29_24),    // #242933
+                scrollbar_track: COLORREF(0x00_2D_26_22), // #22262D
+                scrollbar_thumb: COLORREF(0x00_70_62_58), // #586270
             },
             Theme::Light => ThemePalette {
                 bg: COLORREF(0x00_FA_FA_FA),
@@ -1700,11 +1697,7 @@ unsafe fn hide_preview_window(s: &State) {
 }
 
 // ── WndProc ───────────────────────────────────────────────────────────────────
-const WM_NEXT_ANIM_FRAME: u32 = WM_USER + 50;
 
-thread_local! {
-    static ANIM_LOOP_ACTIVE: std::cell::Cell<bool> = std::cell::Cell::new(false);
-}
 
 /// Guards clipboard access across threads; only one thread may hold
 /// the Windows clipboard open at a time.
@@ -1713,19 +1706,7 @@ pub fn clipboard_lock() -> &'static std::sync::Mutex<()> {
     CLIPBOARD_LOCK.get_or_init(|| std::sync::Mutex::new(()))
 }
 
-unsafe fn trigger_anim_loop(hwnd: HWND) {
-    ANIM_LOOP_ACTIVE.with(|f| {
-        if !f.get() {
-            f.set(true);
-            let _ = windows::Win32::UI::WindowsAndMessaging::PostMessageW(
-                hwnd,
-                WM_NEXT_ANIM_FRAME,
-                WPARAM(0),
-                LPARAM(0),
-            );
-        }
-    });
-}
+
 
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     // A panic must never unwind across this `extern "system"` boundary — that is UB and
@@ -1759,43 +1740,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
     };
 
     match msg {
-        WM_NEXT_ANIM_FRAME => {
-            if !sp.is_null() {
-                let s = &mut *sp;
-                s.search_anim_tick = (s.search_anim_tick + 1) % 8;
-                let window_anim_active = tick_window_animation(hwnd, s);
-                let next_h = animated_height(s);
-                let height_changed = next_h != s.shown_h;
-                if height_changed {
-                    s.shown_h = next_h;
-                }
-                let height_done = s.shown_h == s.target_h;
-                let animating = !height_done || window_anim_active;
 
-                if window_anim_active || height_changed {
-                    let _ = InvalidateRect(hwnd, None, FALSE);
-                    unsafe {
-                        let _ = windows::Win32::Graphics::Dwm::DwmFlush();
-                        let _ = windows::Win32::Graphics::Gdi::UpdateWindow(hwnd);
-                    }
-                } else if s.search_loading {
-                    invalidate_search_row(hwnd, s);
-                    unsafe {
-                        let _ = windows::Win32::Graphics::Dwm::DwmFlush();
-                        let _ = windows::Win32::Graphics::Gdi::UpdateWindow(hwnd);
-                    }
-                }
-
-                if animating {
-                    let _ = unsafe { windows::Win32::UI::WindowsAndMessaging::PostMessageW(hwnd, WM_NEXT_ANIM_FRAME, WPARAM(0), LPARAM(0)) };
-                } else {
-                    ANIM_LOOP_ACTIVE.with(|f| f.set(false));
-                }
-            } else {
-                ANIM_LOOP_ACTIVE.with(|f| f.set(false));
-            }
-            LRESULT(0)
-        }
 
         // Deferred from tick_window_animation - see WM_ANIM_FOREGROUND/WM_ANIM_HIDE_WINDOW
         // constant comments. Neither touches State, so no aliasing risk here.
@@ -2197,8 +2142,14 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                     }
                     if window_anim_active || height_changed {
                         let _ = InvalidateRect(hwnd, None, FALSE);
+                        unsafe {
+                            let _ = windows::Win32::Graphics::Gdi::UpdateWindow(hwnd);
+                        }
                     } else if s.search_loading {
                         invalidate_search_row(hwnd, s);
+                        unsafe {
+                            let _ = windows::Win32::Graphics::Gdi::UpdateWindow(hwnd);
+                        }
                     }
                 }
                 TIMER_CLIPBOARD_MSG => {
@@ -4165,10 +4116,7 @@ unsafe fn animate_window(hwnd: HWND, s: &mut State, appearing: bool) {
     }
 
     let _ = InvalidateRect(hwnd, None, FALSE);
-    let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 3, None);
-    unsafe {
-        trigger_anim_loop(hwnd);
-    }
+    let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 8, None);
 }
 
 // AttachThreadInput trick: allows SetForegroundWindow to succeed even from background context.
@@ -6298,10 +6246,7 @@ unsafe fn sync_height_animation(hwnd: HWND, s: &mut State) {
         s.height_anim_from = s.shown_h.max(s.search_h());
         s.target_h = target;
         s.height_anim_started = std::time::Instant::now();
-        let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 3, None);
-        unsafe {
-            trigger_anim_loop(hwnd);
-        }
+        let _ = SetTimer(hwnd, TIMER_SEARCH_ANIM, 8, None);
         let _ = InvalidateRect(hwnd, None, FALSE);
     } else if s.shown_h == 0 {
         s.shown_h = target;
@@ -6484,9 +6429,6 @@ unsafe fn trigger_search(_hwnd: HWND, s: &mut State) {
     // grow at ~12fps and made navigation feel choppy. The WM_TIMER handler drops back
     // to a gentle 80ms once the grow finishes and only the loading spinner remains.
     let _ = SetTimer(_hwnd, TIMER_SEARCH_ANIM, 8, None);
-    unsafe {
-        trigger_anim_loop(_hwnd);
-    }
     let req = SearchRequest {
         query: s.query.clone(),
         query_id: s.current_query_id,
@@ -7921,26 +7863,20 @@ unsafe fn paint(hwnd: HWND, s: &State) {
     let p = s.current_p();
     let t = ease_out(p);
 
-    let pill_w = 96;
-    let pill_h = SEARCH_H;
-    let pill_r = 32;
+    let w = win_w;
+    let h = s.paint_win_h();
+    let x = 0;
 
-    let end_w = win_w;
-    let end_h = s.paint_win_h();
+    // Slide down offset: starts at -12px and slides to 0px
+    let offset_y = ((1.0 - t) * -12.0) as i32;
+    let y = s.launcher_top_y() + offset_y;
+    let r = 12; // Premium rounded corners (constant)
 
-    let w = (pill_w as f32 + (end_w - pill_w) as f32 * t) as i32;
-    let h = (pill_h as f32 + (end_h - pill_h) as f32 * t) as i32;
-    let x = (win_w - w) / 2;
-    let start_y = s.cy - pill_h / 2;
-    let end_y = s.launcher_top_y();
-    let y = (start_y as f32 + (end_y - start_y) as f32 * t) as i32;
-    let r = (pill_r as f32 + (8 - pill_r) as f32 * t) as i32;
-
-    // Fill background / Draw Glowing Border around the morphing rounded rect
+    // Fill background / Draw Glowing Border around the rounded rect
     draw_rounded_border_and_bg(mdc, x, y, w, h, r, palette.bg, palette.clr_div);
 
-    // Create rounded clipping region matching the inner background area of the morphing shape
-    let clip_rgn = CreateRoundRectRgn(x + 1, y + 1, x + w - 1, y + h - 1, r - 1, r - 1);
+    // Create rounded clipping region matching the inner background area of the shape
+    let clip_rgn = CreateRoundRectRgn(x + 2, y + 2, x + w - 2, y + h - 2, r - 2, r - 2);
     let _ = SelectClipRgn(mdc, clip_rgn);
 
     // ── Search row ────────────────────────────────────────────────────────
@@ -9192,11 +9128,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     let border_h = s.item_h() - 4;
                     fill_rounded(
                         mdc,
-                        x + 8,
+                        x + 10,
                         border_y,
-                        list_w - 16,
+                        list_w - 20,
                         border_h,
-                        4,
+                        8,
                         palette.bg_sel,
                     );
                 } else if is_hovered {
@@ -9204,11 +9140,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     let border_h = s.item_h() - 4;
                     fill_rounded(
                         mdc,
-                        x + 8,
+                        x + 10,
                         border_y,
-                        list_w - 16,
+                        list_w - 20,
                         border_h,
-                        4,
+                        8,
                         palette.bg_hover,
                     );
                 }
@@ -9376,31 +9312,31 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                 if is_selected {
                     fill_rounded(
                         mdc,
-                        x + 8,
+                        x + 10,
                         ry + 2,
-                        list_w - 16,
+                        list_w - 20,
                         s.item_h() - 4,
-                        4,
+                        8,
                         palette.bg_sel,
                     );
                 } else if is_hovered {
                     fill_rounded(
                         mdc,
-                        x + 8,
+                        x + 10,
                         ry + 2,
-                        list_w - 16,
+                        list_w - 20,
                         s.item_h() - 4,
-                        4,
+                        8,
                         palette.bg_hover,
                     );
                 } else if is_checked {
                     fill_rounded(
                         mdc,
-                        x + 8,
+                        x + 10,
                         ry + 2,
-                        list_w - 16,
+                        list_w - 20,
                         s.item_h() - 4,
-                        4,
+                        8,
                         palette.bg_hover,
                     );
                 }
@@ -9687,11 +9623,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     let border_h = s.item_h() - 4;
                     fill_rounded(
                         mdc,
-                        x + 8,
+                        x + 10,
                         border_y,
-                        list_w - 16,
+                        list_w - 20,
                         border_h,
-                        4,
+                        8,
                         palette.bg_sel,
                     );
                 } else if is_hovered {
@@ -9699,11 +9635,11 @@ unsafe fn paint(hwnd: HWND, s: &State) {
                     let border_h = s.item_h() - 4;
                     fill_rounded(
                         mdc,
-                        x + 8,
+                        x + 10,
                         border_y,
-                        list_w - 16,
+                        list_w - 20,
                         border_h,
-                        4,
+                        8,
                         palette.bg_hover,
                     );
                 }
@@ -10822,8 +10758,14 @@ unsafe fn draw_rounded_border_and_bg(
     bg: COLORREF,
     border: COLORREF,
 ) {
-    fill_rounded(hdc, x, y, w, h, r, border);
-    fill_rounded(hdc, x + 1, y + 1, w - 2, h - 2, r - 1, bg);
+    let shadow_color = if (bg.0 & 0xFF) > 200 {
+        COLORREF(0x00_D4_D4_D8)
+    } else {
+        COLORREF(0x00_12_10_10)
+    };
+    fill_rounded(hdc, x, y, w, h, r, shadow_color);
+    fill_rounded(hdc, x + 1, y + 1, w - 2, h - 2, r - 1, border);
+    fill_rounded(hdc, x + 2, y + 2, w - 4, h - 4, r - 2, bg);
 }
 
 fn source_section_label_res(res: &SearchResult) -> &'static str {
@@ -10981,7 +10923,7 @@ unsafe fn badge(hdc: HDC, s: &State, source: &str, x: i32, y: i32) {
     } else {
         ("SET", palette.clr_bdgbg, palette.clr_bdgtx)
     };
-    fill_rounded(hdc, x, y, BADGE_W, BADGE_H, 5, bg_color);
+    fill_rounded(hdc, x, y, BADGE_W, BADGE_H, 9, bg_color);
     SelectObject(hdc, s.font_b);
     SetTextColor(hdc, tx_color);
     SetBkMode(hdc, TRANSPARENT);
