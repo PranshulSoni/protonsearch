@@ -733,6 +733,10 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             "Providers",
             "Enable the Linux-native providers you want available.",
         );
+        let (agent_page, agent_scroll) = settings_page(
+            "Agent",
+            "Use the installed Hermes Agent and reopen its saved sessions.",
+        );
         let (hotkey_page, hotkey_scroll) = settings_page(
             "Hotkey",
             "The compositor-owned shortcut used to toggle ProtonSearch.",
@@ -750,6 +754,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         stack.add_titled(&appearance_scroll, Some("appearance"), "Appearance");
         stack.add_titled(&search_scroll, Some("search"), "Search");
         stack.add_titled(&providers_scroll, Some("providers"), "Providers");
+        stack.add_titled(&agent_scroll, Some("agent"), "Agent");
         stack.add_titled(&hotkey_scroll, Some("hotkey"), "Hotkey");
         stack.add_titled(&safety_scroll, Some("safety"), "Safety & Linux");
         stack.add_titled(&indexing_scroll, Some("indexing"), "Indexing & Database");
@@ -881,15 +886,35 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         let browser_history = CheckButton::with_label("Enable browser history search");
         browser_history.set_active(current.enable_browser_history);
         providers_page.append(&browser_history);
+
+        let agent_label = Label::new(Some("Hermes Agent integration"));
+        agent_label.set_halign(Align::Start);
+        agent_label.add_css_class("settings-section-title");
+        agent_page.append(&agent_label);
+        let agent_status = if crate::system::command_available("hermes")
+            || crate::system::command_available("hermes-agent")
+        {
+            "Hermes Agent detected on PATH. Agent results open ProtonSearch's internal prompt window."
+        } else {
+            "Hermes Agent is not installed. Install it separately, then restart ProtonSearch."
+        };
+        let agent_status_label = Label::new(Some(agent_status));
+        agent_status_label.set_wrap(true);
+        agent_status_label.set_halign(Align::Start);
+        agent_status_label.add_css_class("settings-help");
+        agent_page.append(&agent_status_label);
         let hermes = CheckButton::with_label("Enable Hermes Agent integration");
         hermes.set_active(current.enable_hermes);
         hermes.set_tooltip_text(Some(
-            "Uses the installed Hermes Agent desktop app when the hermes command is available",
+            "Uses the installed Hermes Agent command when available",
         ));
-        providers_page.append(&hermes);
+        agent_page.append(&hermes);
         let agent_history = CheckButton::with_label("Enable Hermes Agent history");
         agent_history.set_active(current.enable_agent_history);
-        providers_page.append(&agent_history);
+        agent_history.set_tooltip_text(Some(
+            "Lists recent Hermes sessions and opens them in the ProtonSearch Agent window",
+        ));
+        agent_page.append(&agent_history);
 
         let safety_label = Label::new(Some("Safety and diagnostics"));
         safety_label.set_halign(Align::Start);
