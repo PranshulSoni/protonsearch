@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use protonsearch_linux::{
-    actions, capabilities, desktop, gui, hyprland, providers, search, settings, system, xdg,
+    actions, capabilities, desktop, gui, hyprland, platform, providers, search, settings, system,
+    xdg,
 };
 use std::path::PathBuf;
 
@@ -82,12 +83,13 @@ fn main() -> Result<()> {
 }
 
 fn print_doctor(paths: &xdg::XdgPaths) {
+    let platform = platform::detect();
     let report = serde_json::json!({
         "platform": "linux",
-        "distribution": system::os_release(),
-        "session_type": std::env::var("XDG_SESSION_TYPE").unwrap_or_else(|_| "unknown".to_string()),
-        "desktop": std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "unknown".to_string()),
-        "wayland": std::env::var_os("WAYLAND_DISPLAY").is_some(),
+        "distribution": platform.distribution,
+        "desktop": platform.desktop,
+        "display_server": platform.display_server,
+        "package_manager": platform.distribution.package_manager,
         "xdg_config": paths.config,
         "xdg_data": paths.data,
         "xdg_state": paths.state,

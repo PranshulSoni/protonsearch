@@ -1,4 +1,5 @@
 use crate::hyprland;
+use crate::platform;
 use crate::system;
 use serde::Serialize;
 
@@ -135,6 +136,7 @@ fn core(id: &str, name: &str, provider: &str, available: bool, reason: &str) -> 
 
 fn simple_command(id: &str, name: &str, command: &str, package: &str) -> Capability {
     let available = system::command_available(command);
+    let package = package_for(command, package);
     Capability {
         id: id.to_string(),
         name: name.to_string(),
@@ -145,24 +147,26 @@ fn simple_command(id: &str, name: &str, command: &str, package: &str) -> Capabil
             CapabilityState::PackageMissing
         },
         provider: command.to_string(),
-        package: Some(package.to_string()),
+        package: Some(package.clone()),
         reason: if available {
-            "executable detected"
+            "executable detected".to_string()
         } else {
-            "install the optional Arch package if this capability is needed"
-        }
-        .to_string(),
+            format!(
+                "install {package} with the detected package manager if this capability is needed"
+            )
+        },
     }
 }
 
 fn deferred_command(id: &str, name: &str, command: &str, package: &str) -> Capability {
+    let package = package_for(command, package);
     Capability {
         id: id.to_string(),
         name: name.to_string(),
         description: format!("Optional provider through {command}"),
         state: CapabilityState::ConfigurationMissing,
         provider: command.to_string(),
-        package: Some(package.to_string()),
+        package: Some(package),
         reason: "provider is intentionally deferred; the launcher shows Coming Soon".to_string(),
     }
 }
@@ -174,6 +178,7 @@ fn opener() -> Capability {
         "xdg-open"
     };
     let available = system::command_available(provider);
+    let package = package_for(provider, "xdg-utils");
     Capability {
         id: "open-target".to_string(),
         name: "Open files and URLs".to_string(),
@@ -184,13 +189,12 @@ fn opener() -> Capability {
             CapabilityState::PackageMissing
         },
         provider: provider.to_string(),
-        package: Some("xdg-utils".to_string()),
+        package: Some(package.clone()),
         reason: if available {
-            "desktop opener detected"
+            "desktop opener detected".to_string()
         } else {
-            "install xdg-utils or a desktop GLib runtime"
-        }
-        .to_string(),
+            format!("install {package} or a desktop GLib runtime")
+        },
     }
 }
 
@@ -203,6 +207,7 @@ fn network_manager() -> Capability {
         )
         .map(|result| result.status == Some(0))
         .unwrap_or(false);
+    let package = package_for("nmcli", "networkmanager");
     Capability {
         id: "wifi".to_string(),
         name: "Wi-Fi controls".to_string(),
@@ -215,7 +220,7 @@ fn network_manager() -> Capability {
             CapabilityState::Available
         },
         provider: "nmcli".to_string(),
-        package: Some("networkmanager".to_string()),
+        package: Some(package),
         reason: if !executable {
             "nmcli is not installed".to_string()
         } else if !service {
@@ -224,6 +229,13 @@ fn network_manager() -> Capability {
             "NetworkManager detected".to_string()
         },
     }
+}
+
+fn package_for(command: &str, fallback: &str) -> String {
+    platform::dependency_for(command)
+        .and_then(|dependency| dependency.package(platform::detect().distribution.family))
+        .unwrap_or(fallback)
+        .to_string()
 }
 
 fn hyprland_capability() -> Capability {

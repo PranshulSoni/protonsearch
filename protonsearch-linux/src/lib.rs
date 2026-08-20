@@ -11,6 +11,7 @@ pub mod desktop;
 pub mod gui;
 pub mod hyprland;
 pub mod icons;
+pub mod platform;
 pub mod providers;
 pub mod search;
 pub mod settings;
