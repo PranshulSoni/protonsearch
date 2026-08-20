@@ -3,43 +3,79 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct LinuxSettings {
+    pub schema_version: u32,
+    pub run_on_startup: bool,
+    pub hide_on_lose_focus: bool,
+    pub theme_mode: String,
+    pub show_taskbar: bool,
+    pub window_width: u32,
+    pub item_height: u32,
+    pub search_bar_height: u32,
+    pub show_placeholder: bool,
     pub include_hidden: bool,
-    pub search_roots: Vec<String>,
-    pub ignored_names: Vec<String>,
     pub show_terminal_apps: bool,
     pub enable_system_actions: bool,
     pub enable_hyprland: bool,
+    pub enable_calculator: bool,
+    pub enable_git_commits: bool,
+    pub enable_clipboard_history: bool,
+    pub enable_ocr: bool,
+    pub enable_browser_history: bool,
     pub confirm_power_actions: bool,
     pub log_level: String,
     /// Compositor-facing shortcut notation, e.g. `ALT,SPACE` for Hyprland.
     pub hotkey: String,
+    pub search_roots: Vec<String>,
+    pub ignored_names: Vec<String>,
 }
 
 impl Default for LinuxSettings {
     fn default() -> Self {
         Self {
+            schema_version: 1,
+            run_on_startup: true,
+            hide_on_lose_focus: true,
+            theme_mode: "Dark".to_string(),
+            show_taskbar: false,
+            window_width: 720,
+            item_height: 76,
+            search_bar_height: 60,
+            show_placeholder: true,
             include_hidden: false,
-            search_roots: Vec::new(),
-            ignored_names: Vec::new(),
             show_terminal_apps: true,
             enable_system_actions: true,
             enable_hyprland: true,
+            enable_calculator: true,
+            enable_git_commits: true,
+            enable_clipboard_history: true,
+            enable_ocr: true,
+            enable_browser_history: true,
             confirm_power_actions: true,
             log_level: "info".to_string(),
             hotkey: "ALT,SPACE".to_string(),
+            search_roots: Vec::new(),
+            ignored_names: Vec::new(),
         }
     }
 }
 
 pub fn load(paths: &XdgPaths) -> LinuxSettings {
     let path = paths.settings_file();
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|contents| serde_json::from_str(&contents).ok())
-        .unwrap_or_default()
+    let Ok(contents) = fs::read_to_string(&path) else {
+        return LinuxSettings::default();
+    };
+
+    match serde_json::from_str(&contents) {
+        Ok(settings) => settings,
+        Err(_) => {
+            let backup = path.with_extension("json.bak");
+            let _ = fs::rename(&path, backup);
+            LinuxSettings::default()
+        }
+    }
 }
 
 pub fn save(paths: &XdgPaths, settings: &LinuxSettings) -> Result<()> {
@@ -224,4 +260,71 @@ pub fn catalogue() -> Vec<LinuxSettingItem> {
             action: "doctor",
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn paths(root: &std::path::Path) -> XdgPaths {
+        XdgPaths {
+            config: root.join("config"),
+            data: root.join("data"),
+            state: root.join("state"),
+            cache: root.join("cache"),
+            home: root.join("home"),
+            runtime: None,
+        }
+    }
+
+    #[test]
+    fn defaults_cover_linux_parity_fields() {
+        let settings = LinuxSettings::default();
+        assert_eq!(settings.schema_version, 1);
+        assert!(settings.run_on_startup);
+        assert_eq!(settings.theme_mode, "Dark");
+        assert!(settings.enable_calculator);
+        assert!(settings.enable_git_commits);
+    }
+
+    #[test]
+    fn legacy_json_receives_new_defaults() {
+        let root = std::env::temp_dir().join(format!(
+            "protonsearch-settings-legacy-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let paths = paths(&root);
+        fs::create_dir_all(paths.config_dir()).unwrap();
+        fs::write(
+            paths.settings_file(),
+            r#"{"include_hidden":true,"hotkey":"SUPER,SPACE"}"#,
+        )
+        .unwrap();
+
+        let settings = load(&paths);
+        assert!(settings.include_hidden);
+        assert_eq!(settings.hotkey, "SUPER,SPACE");
+        assert!(settings.run_on_startup);
+        assert_eq!(settings.schema_version, 1);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn malformed_json_is_backed_up_before_defaults() {
+        let root = std::env::temp_dir().join(format!(
+            "protonsearch-settings-malformed-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let paths = paths(&root);
+        fs::create_dir_all(paths.config_dir()).unwrap();
+        fs::write(paths.settings_file(), b"not-json").unwrap();
+
+        let settings = load(&paths);
+        assert_eq!(settings, LinuxSettings::default());
+        assert!(!paths.settings_file().exists());
+        assert!(paths.settings_file().with_extension("json.bak").exists());
+        let _ = fs::remove_dir_all(root);
+    }
 }
