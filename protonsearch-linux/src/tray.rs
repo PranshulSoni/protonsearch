@@ -117,7 +117,12 @@ impl Tray for ProtonTray {
         };
         let settings = StandardItem {
             label: "Open Settings".to_string(),
-            icon_name: "preferences-system-symbolic".to_string(),
+            // Reuse the installed ProtonSearch brand instead of asking the
+            // desktop theme for a generic settings icon. Several tray
+            // implementations render that fallback as a tiny pixel-art
+            // glyph, while the branded icon is available in both user and
+            // Arch package installs.
+            icon_name: "protonsearch".to_string(),
             activate: Box::new(|tray: &mut Self| tray.open_settings()),
             ..Default::default()
         };

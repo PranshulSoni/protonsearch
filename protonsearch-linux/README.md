@@ -25,6 +25,34 @@ The app stores user settings under `$XDG_CONFIG_HOME/protonsearch` and data
 under `$XDG_DATA_HOME/protonsearch`, so every user gets their own folders and
 configuration.
 
+The installer builds and installs the optimized release binary. It asks before
+installing missing optional Arch providers; it never silently installs packages
+or overwrites an existing `Alt + Space` binding. To install all detected
+optional providers explicitly:
+
+```sh
+./packaging/install-linux.sh --install-optional
+```
+
+To install ProtonSearch without changing packages:
+
+```sh
+./packaging/install-linux.sh --no-install-optional
+```
+
+After installation, run `protonsearch-linux doctor` to see which providers are
+available on the current desktop. Wi-Fi, Bluetooth, audio, brightness, power,
+display, screenshot, OCR, PDF, clipboard, and browser providers are capability
+checked at runtime. A missing provider produces a readable explanation rather
+than a blank result or raw diagnostic object. Some providers also require the
+desktop service or hardware permissions to be active (for example NetworkManager
+for Wi-Fi and a backlight device for brightness).
+
+Hermes Agent is an optional external application. If its `hermes` command is
+already installed, the Agents and Agent History sources use it automatically.
+The ProtonSearch installer does not download third-party AI software or handle
+its credentials; install Hermes through its own trusted distribution method.
+
 ## Images and clipboard previews
 
 Choose `Images` or type `images:` to browse supported images found in the
@@ -64,3 +92,18 @@ Linux does not provide one universal global-shortcut API across every desktop
 environment. Hyprland and Sway are configured automatically; on other desktop
 environments the installer leaves existing shortcuts untouched and prints the
 exact executable to assign to `Alt + Space` in the desktop keyboard settings.
+
+## Release checklist
+
+```sh
+cargo test --all-targets
+cargo build --release --locked
+./packaging/install-linux.sh --no-install-optional
+protonsearch-linux doctor
+systemctl --user status protonsearch.service
+```
+
+The Linux settings window keeps its own dark theme so it remains readable while
+the launcher changes between system, dark, and light mode. The Indexing &
+Database page documents the current bounded on-demand search model; it does not
+claim to maintain a continuously rebuilt database.

@@ -30,7 +30,7 @@ work on the current desktop.
 | Browser history/bookmarks | Browser profile providers | Supported when profile is readable |
 | Text expansions/snippets | Linux workflow/snippet provider | Partial |
 | Circle to Search / color picker | Portal or desktop-specific tools | Optional/deferred |
-| AI agent API settings | No Linux agent runtime in this package | Not available |
+| AI agent API settings | Hermes Agent desktop integration and session history when `hermes` is installed | Supported when installed |
 | Indexed database/rebuild | Bounded on-demand search; roots and exclusions are authoritative | Different implementation |
 | Windows Update/activation | Distribution/package manager workflow | Not applicable |
 
@@ -63,3 +63,17 @@ work on the current desktop.
 4. Destructive session actions always require an explicit confirmation at the
    point of activation; a preference may control whether the UI asks first,
    but it must not make the CLI unsafe.
+
+## Installation and capability contract
+
+The Arch/user installer checks optional provider executables and offers an
+explicit `pacman` installation prompt. `--no-install-optional` is available for
+minimal or audited installs, while `--install-optional` is available for
+non-interactive release provisioning. The `doctor` command reports the actual
+provider state for the current machine, including missing packages, inactive
+services, unsupported hardware, and Hermes availability.
+
+Linux intentionally does not download Hermes Agent or other third-party tools.
+When `hermes` is on the user's `PATH`, Agents opens its desktop workspace and
+Agent History reads the installed session list. This keeps credentials and
+third-party updates under the user's control.

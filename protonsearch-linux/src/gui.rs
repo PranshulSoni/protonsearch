@@ -530,6 +530,10 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             "Safety and Linux",
             "Power-action confirmation, diagnostics, and platform notes.",
         );
+        let (indexing_page, indexing_scroll) = settings_page(
+            "Indexing and database",
+            "Understand how Linux search stays responsive and bounded.",
+        );
 
         stack.add_titled(&general_scroll, Some("general"), "General");
         stack.add_titled(&appearance_scroll, Some("appearance"), "Appearance");
@@ -537,6 +541,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         stack.add_titled(&providers_scroll, Some("providers"), "Providers");
         stack.add_titled(&hotkey_scroll, Some("hotkey"), "Hotkey");
         stack.add_titled(&safety_scroll, Some("safety"), "Safety & Linux");
+        stack.add_titled(&indexing_scroll, Some("indexing"), "Indexing & Database");
 
         let startup = CheckButton::with_label("Run ProtonSearch in the background at login");
         startup.set_active(current.run_on_startup);
@@ -700,6 +705,61 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         native_note.set_halign(Align::Start);
         native_note.add_css_class("settings-help");
         safety_page.append(&native_note);
+
+        let indexing_title = Label::new(Some("Linux search model"));
+        indexing_title.set_halign(Align::Start);
+        indexing_title.add_css_class("settings-section-title");
+        indexing_page.append(&indexing_title);
+        let indexing_note = Label::new(Some(
+            "Linux uses bounded on-demand providers instead of a continuously polling background index. File and folder results are searched only when a query needs them; Git, clipboard, browser, image, OCR, and agent providers are independently bounded. This keeps the resident launcher idle when it is hidden and avoids a permanent CPU or memory watcher.",
+        ));
+        indexing_note.set_wrap(true);
+        indexing_note.set_halign(Align::Start);
+        indexing_note.add_css_class("settings-help");
+        indexing_page.append(&indexing_note);
+
+        let roots_title = Label::new(Some("Authoritative search roots"));
+        roots_title.set_halign(Align::Start);
+        roots_title.add_css_class("settings-section-title");
+        indexing_page.append(&roots_title);
+        let roots_text = paths
+            .search_roots(
+                &current
+                    .search_roots
+                    .iter()
+                    .map(std::path::PathBuf::from)
+                    .collect::<Vec<_>>(),
+            )
+            .into_iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let roots_value = Label::new(Some(if roots_text.is_empty() {
+            "No readable search roots detected"
+        } else {
+            &roots_text
+        }));
+        roots_value.set_selectable(true);
+        roots_value.set_wrap(true);
+        roots_value.set_halign(Align::Start);
+        roots_value.add_css_class("settings-help");
+        indexing_page.append(&roots_value);
+
+        let data_title = Label::new(Some("ProtonSearch data"));
+        data_title.set_halign(Align::Start);
+        data_title.add_css_class("settings-section-title");
+        indexing_page.append(&data_title);
+        let data_value = Label::new(Some(&format!(
+            "Settings: {}\nState: {}\nCache: {}\n\nNo database rebuild is required for the current Linux provider model.",
+            paths.settings_file().display(),
+            paths.state_dir().display(),
+            paths.cache_dir().display(),
+        )));
+        data_value.set_selectable(true);
+        data_value.set_wrap(true);
+        data_value.set_halign(Align::Start);
+        data_value.add_css_class("settings-help");
+        indexing_page.append(&data_value);
 
         let hotkey_title = Label::new(Some("Launcher hotkey"));
         hotkey_title.set_halign(Align::Start);

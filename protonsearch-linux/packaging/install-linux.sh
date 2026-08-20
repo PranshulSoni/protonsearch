@@ -219,3 +219,5 @@ fi
 echo "ProtonSearch installed for ${USER:-the current user}."
 echo "Binary: ${BIN_PATH}"
 echo "Settings: ${CONFIG_HOME}/protonsearch/settings.json"
+echo "Check providers with: ${BIN_PATH} doctor"
+echo "Hermes Agent is detected when its 'hermes' command is on PATH; install it separately if you want AI providers."
