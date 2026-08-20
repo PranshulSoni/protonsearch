@@ -12,6 +12,7 @@ pub struct LinuxSettings {
     pub theme_mode: String,
     pub show_taskbar: bool,
     pub window_width: u32,
+    pub window_height: u32,
     pub item_height: u32,
     pub search_bar_height: u32,
     pub show_placeholder: bool,
@@ -37,10 +38,11 @@ impl Default for LinuxSettings {
         Self {
             schema_version: 1,
             run_on_startup: true,
-            hide_on_lose_focus: true,
+            hide_on_lose_focus: false,
             theme_mode: "Dark".to_string(),
             show_taskbar: false,
             window_width: 720,
+            window_height: 500,
             item_height: 76,
             search_bar_height: 60,
             show_placeholder: true,
@@ -343,6 +345,7 @@ mod tests {
         assert_eq!(settings.schema_version, 1);
         assert!(settings.run_on_startup);
         assert_eq!(settings.theme_mode, "Dark");
+        assert_eq!(settings.window_height, 500);
         assert!(settings.enable_calculator);
         assert!(settings.enable_git_commits);
     }

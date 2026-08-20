@@ -425,10 +425,6 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             .default_height(700)
             .build();
         window.add_css_class("settings-window");
-        window.add_css_class(&format!(
-            "settings-theme-{}",
-            theme_class(&current.theme_mode)
-        ));
         install_css();
         let root = GtkBox::new(Orientation::Horizontal, 0);
         root.add_css_class("settings-shell");
@@ -454,7 +450,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
 
         let (general_page, general_scroll) = settings_page(
             "General",
-            "Startup, focus behavior, and launcher visibility.",
+            "Startup and launcher visibility.",
         );
         let (appearance_page, appearance_scroll) = settings_page(
             "Appearance and layout",
@@ -490,9 +486,6 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             "Uses the ProtonSearch systemd user service when it is installed",
         ));
         general_page.append(&startup);
-        let hide_on_focus_loss = CheckButton::with_label("Hide launcher when it loses focus");
-        hide_on_focus_loss.set_active(current.hide_on_lose_focus);
-        general_page.append(&hide_on_focus_loss);
         let show_taskbar = CheckButton::with_label("Show a taskbar/dock entry when supported");
         show_taskbar.set_active(current.show_taskbar);
         show_taskbar.set_tooltip_text(Some(
@@ -529,6 +522,14 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         let width = SpinButton::with_range(480.0, 1600.0, 10.0);
         width.set_value(f64::from(current.window_width.clamp(480, 1600)));
         appearance_page.append(&width);
+
+        let height_label = Label::new(Some("Launcher height"));
+        height_label.set_halign(Align::Start);
+        height_label.add_css_class("settings-label");
+        appearance_page.append(&height_label);
+        let height = SpinButton::with_range(420.0, 1200.0, 10.0);
+        height.set_value(f64::from(current.window_height.clamp(420, 1200)));
+        appearance_page.append(&height);
 
         let item_height_label = Label::new(Some("Result row height"));
         item_height_label.set_halign(Align::Start);
@@ -651,11 +652,16 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
 
         let save = Button::with_label("Save settings");
         save.set_halign(Align::End);
+        let save_status = Label::new(None);
+        save_status.set_hexpand(true);
+        save_status.set_halign(Align::Start);
+        save_status.add_css_class("settings-help");
         let footer = GtkBox::new(Orientation::Horizontal, 8);
         footer.set_margin_top(10);
         footer.set_margin_bottom(12);
         footer.set_margin_start(18);
         footer.set_margin_end(18);
+        footer.append(&save_status);
         footer.append(&save);
 
         sidebar.append(&stack_sidebar);
@@ -669,11 +675,9 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         window.set_child(Some(&root));
 
         let paths_for_save = paths.clone();
-        let window_for_save = window.clone();
         save.connect_clicked(move |_| {
             let mut next = current.clone();
             next.run_on_startup = startup.is_active();
-            next.hide_on_lose_focus = hide_on_focus_loss.is_active();
             next.show_taskbar = show_taskbar.is_active();
             next.show_placeholder = show_placeholder.is_active();
             next.theme_mode = theme
@@ -681,6 +685,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
                 .map(|id| id.to_string())
                 .unwrap_or_else(|| "dark".to_string());
             next.window_width = width.value_as_int().clamp(480, 1600) as u32;
+            next.window_height = height.value_as_int().clamp(420, 1200) as u32;
             next.item_height = item_height.value_as_int().clamp(52, 120) as u32;
             next.search_bar_height = search_bar_height.value_as_int().clamp(42, 100) as u32;
             next.include_hidden = include_hidden.is_active();
@@ -699,10 +704,10 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
                 .unwrap_or_else(|| "info".to_string());
             let appearance_changed = next.theme_mode != current.theme_mode
                 || next.window_width != current.window_width
+                || next.window_height != current.window_height
                 || next.item_height != current.item_height
                 || next.search_bar_height != current.search_bar_height
-                || next.show_placeholder != current.show_placeholder
-                || next.hide_on_lose_focus != current.hide_on_lose_focus;
+                || next.show_placeholder != current.show_placeholder;
             let hotkey_text = hotkey.text();
             let requested_hotkey = if hotkey_text.trim().is_empty() {
                 "ALT,SPACE"
@@ -750,7 +755,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             if appearance_changed {
                 restart_launcher_service_if_active();
             }
-            window_for_save.close();
+            save_status.set_text("Settings saved — ProtonSearch updated.");
         });
         window.present();
     });
@@ -1033,7 +1038,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
         .application(application)
         .title("ProtonSearch")
         .default_width(linux_settings.window_width.clamp(480, 1600) as i32)
-        .default_height(500)
+        .default_height(linux_settings.window_height.clamp(420, 1200) as i32)
         .build();
     // Keep an explicit application-owned reference. This matters when the
     // launcher is started directly from a compositor keybind: the local
@@ -1135,15 +1140,6 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
 
     let items = Rc::new(RefCell::new(Vec::<Item>::new()));
     let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
-    if linux_settings.hide_on_lose_focus {
-        let window_for_focus = window.clone();
-        let animation_for_focus = animation.clone();
-        window.connect_is_active_notify(move |window| {
-            if !window.is_active() && window.is_visible() {
-                animate_hide(&window_for_focus, &animation_for_focus);
-            }
-        });
-    }
     let generation = Rc::new(Cell::new(0_u64));
     let (sender, receiver) = mpsc::channel::<(u64, String, Vec<Item>)>();
     let (request_sender, request_receiver) =
@@ -1168,7 +1164,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
         }
     });
 
-    let row_height = linux_settings.item_height.clamp(52, 120);
+    let row_height = Rc::new(Cell::new(linux_settings.item_height.clamp(52, 120)));
     let update = |list: &ListBox, status: &Label, items: &[Item], query: &str, row_height: u32| {
         while let Some(child) = list.first_child() {
             list.remove(&child);
@@ -1198,7 +1194,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
 
     let initial_items = providers::collect(&paths, &linux_settings, "");
     *items.borrow_mut() = initial_items.clone();
-    update(&list, &status, &initial_items, "", row_height);
+    update(&list, &status, &initial_items, "", row_height.get());
 
     let generation_for_changed = generation.clone();
     let request_sender_for_changed = request_sender.clone();
@@ -1225,6 +1221,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let items_for_receiver = items.clone();
     let list_for_receiver = list.clone();
     let status_for_receiver = status.clone();
+    let row_height_for_receiver = row_height.clone();
     glib::timeout_add_local(Duration::from_millis(50), move || {
         while let Ok((result_generation, query, results)) = receiver.try_recv() {
             if result_generation == generation_for_receiver.get() {
@@ -1234,7 +1231,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                     &status_for_receiver,
                     &results,
                     &query,
-                    row_height,
+                    row_height_for_receiver.get(),
                 );
             }
         }
@@ -1244,6 +1241,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let window_for_commands = window.clone();
     let entry_for_commands = entry.clone();
     let search_shell_for_commands = search_shell.clone();
+    let row_height_for_commands = row_height.clone();
     let animation_for_commands = animation.clone();
     let paths_for_commands = paths.clone();
     let settings_for_commands = settings_state.clone();
@@ -1268,10 +1266,13 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                     window_for_commands.remove_css_class("light");
                     window_for_commands.remove_css_class("system");
                     window_for_commands.add_css_class(theme_class(&next_settings.theme_mode));
-                    window_for_commands
-                        .set_default_size(next_settings.window_width.clamp(480, 1600) as i32, 500);
+                    window_for_commands.set_default_size(
+                        next_settings.window_width.clamp(480, 1600) as i32,
+                        next_settings.window_height.clamp(420, 1200) as i32,
+                    );
                     search_shell_for_commands
                         .set_height_request(next_settings.search_bar_height.clamp(42, 100) as i32);
+                    row_height_for_commands.set(next_settings.item_height.clamp(52, 120));
                     if next_settings.show_placeholder {
                         entry_for_commands
                             .set_placeholder_text(Some("Search files, code, PDFs, OCR..."));
