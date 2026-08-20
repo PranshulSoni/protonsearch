@@ -88,6 +88,10 @@ pub fn spawn_detached_command(program: &str, args: &[&str]) -> Result<()> {
 }
 
 pub fn run(program: &str, args: &[&str]) -> Result<CommandResult> {
+    run_with_timeout(program, args, COMMAND_TIMEOUT)
+}
+
+pub fn run_with_timeout(program: &str, args: &[&str], timeout: Duration) -> Result<CommandResult> {
     if !command_available(program) {
         anyhow::bail!("executable unavailable: {program}");
     }
@@ -101,7 +105,7 @@ pub fn run(program: &str, args: &[&str]) -> Result<CommandResult> {
     let mut child = command
         .spawn()
         .with_context(|| format!("spawn {program}"))?;
-    finish_child(program, &mut child, None)
+    finish_child(program, &mut child, None, timeout)
 }
 
 pub fn run_with_input(program: &str, args: &[&str], input: &str) -> Result<CommandResult> {
@@ -121,10 +125,15 @@ pub fn run_with_input(program: &str, args: &[&str], input: &str) -> Result<Comma
     let mut child = command
         .spawn()
         .with_context(|| format!("spawn {program}"))?;
-    finish_child(program, &mut child, Some(input))
+    finish_child(program, &mut child, Some(input), COMMAND_TIMEOUT)
 }
 
-fn finish_child(program: &str, child: &mut Child, input: Option<&str>) -> Result<CommandResult> {
+fn finish_child(
+    program: &str,
+    child: &mut Child,
+    input: Option<&str>,
+    timeout: Duration,
+) -> Result<CommandResult> {
     let mut stdin = child.stdin.take();
     let mut stdout_pipe = child.stdout.take();
     let mut stderr_pipe = child.stderr.take();
@@ -210,7 +219,7 @@ fn finish_child(program: &str, child: &mut Child, input: Option<&str>) -> Result
         if let Some(status) = child_status {
             break status.code();
         }
-        if started.elapsed() >= COMMAND_TIMEOUT {
+        if started.elapsed() >= timeout {
             timed_out = true;
             kill_process_group(child.id());
             let _ = child.kill();

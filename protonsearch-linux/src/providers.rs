@@ -234,7 +234,7 @@ fn add_home_sources(linux_settings: &LinuxSettings, results: &mut Vec<Item>) {
                 target: if query == "agents:" && linux_settings.enable_hermes && hermes_available()
                 {
                     Target::Action {
-                        id: "open-hermes".to_string(),
+                        id: "open-agent".to_string(),
                         args: Vec::new(),
                         confirmed: false,
                     }
@@ -267,7 +267,7 @@ fn add_hermes_agent(enabled: bool, results: &mut Vec<Item>) {
             source: "AI".to_string(),
             kind: "AGENT".to_string(),
             target: Target::Action {
-                id: "open-hermes".to_string(),
+                id: "open-agent".to_string(),
                 args: Vec::new(),
                 confirmed: false,
             },
@@ -322,7 +322,7 @@ fn add_hermes_history(query: &str, enabled: bool, results: &mut Vec<Item>) {
             source: "Hermes Agent History".to_string(),
             kind: "AGENT".to_string(),
             target: Target::Action {
-                id: "open-hermes".to_string(),
+                id: "open-agent".to_string(),
                 args: if session_id.is_empty() {
                     Vec::new()
                 } else {

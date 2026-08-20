@@ -18,7 +18,7 @@ use gtk4::{
     ComboBoxText, Entry, EventControllerKey, Image, Label, ListBox, ListBoxRow, MessageDialog,
     MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
     RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
-    StackTransitionType,
+    StackTransitionType, TextView, WrapMode,
 };
 use std::cell::{Cell, RefCell};
 use std::fs;
@@ -376,6 +376,32 @@ stacksidebar row:selected {
     margin-top: 10px;
 }
 
+textview.agent-transcript {
+    background-color: #18191a;
+    color: #f1f2f3;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+textview.agent-transcript text {
+    background-color: transparent;
+    color: #f1f2f3;
+}
+
+window.settings-window.settings-theme-light textview.agent-transcript,
+window.proton-window.light textview.agent-transcript {
+    background-color: #ffffff;
+    color: #202225;
+    border-color: rgba(32, 35, 38, 0.18);
+}
+
+window.settings-window.settings-theme-light textview.agent-transcript text,
+window.proton-window.light textview.agent-transcript text {
+    background-color: transparent;
+    color: #202225;
+}
+
 window.settings-window.settings-theme-light {
     background-color: #f4f5f6;
 }
@@ -467,6 +493,157 @@ fn settings_page(title: &str, description: &str) -> (GtkBox, ScrolledWindow) {
         .hexpand(true)
         .build();
     (page, scroll)
+}
+
+fn open_agent_window(parent: &ApplicationWindow, session: Option<String>) {
+    let Some(application) = parent.application() else {
+        return;
+    };
+    let window = ApplicationWindow::builder()
+        .application(&application)
+        .title("ProtonSearch Agent")
+        .default_width(720)
+        .default_height(560)
+        .build();
+    window.set_transient_for(Some(parent));
+    window.set_modal(false);
+    window.add_css_class("settings-window");
+
+    let root = GtkBox::new(Orientation::Vertical, 12);
+    root.set_margin_top(22);
+    root.set_margin_bottom(18);
+    root.set_margin_start(22);
+    root.set_margin_end(22);
+
+    let heading = Label::new(Some("ProtonSearch Agent"));
+    heading.set_halign(Align::Start);
+    heading.add_css_class("settings-heading");
+    root.append(&heading);
+
+    let description = Label::new(Some(
+        "Hermes Agent runs in a worker so the launcher and this conversation remain responsive.",
+    ));
+    description.set_wrap(true);
+    description.set_halign(Align::Start);
+    description.add_css_class("settings-help");
+    root.append(&description);
+
+    let transcript = TextView::new();
+    transcript.set_editable(false);
+    transcript.set_cursor_visible(false);
+    transcript.set_wrap_mode(WrapMode::WordChar);
+    transcript.set_vexpand(true);
+    transcript.set_hexpand(true);
+    transcript.add_css_class("agent-transcript");
+    let transcript_scroll = ScrolledWindow::builder()
+        .child(&transcript)
+        .vexpand(true)
+        .hexpand(true)
+        .build();
+    root.append(&transcript_scroll);
+
+    let status = Label::new(Some(if session.is_some() {
+        "Ready to continue this Hermes session"
+    } else {
+        "Ready"
+    }));
+    status.set_halign(Align::Start);
+    status.add_css_class("settings-help");
+    root.append(&status);
+
+    let prompt = Entry::new();
+    prompt.set_hexpand(true);
+    prompt.set_placeholder_text(Some("Ask Hermes Agent something…"));
+    prompt.set_activates_default(true);
+    let send = Button::with_label("Send");
+    send.set_receives_default(true);
+    let input_row = GtkBox::new(Orientation::Horizontal, 8);
+    input_row.set_hexpand(true);
+    input_row.append(&prompt);
+    input_row.append(&send);
+    root.append(&input_row);
+    window.set_child(Some(&root));
+
+    let (sender, receiver) = mpsc::channel::<Result<String, String>>();
+    let status_for_receiver = status.clone();
+    let transcript_for_receiver = transcript.clone();
+    let send_for_receiver = send.clone();
+    let weak_window = window.downgrade();
+    glib::timeout_add_local(Duration::from_millis(80), move || {
+        let Some(_window) = weak_window.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
+        while let Ok(result) = receiver.try_recv() {
+            send_for_receiver.set_sensitive(true);
+            match result {
+                Ok(response) => {
+                    status_for_receiver.set_text("Response received");
+                    let buffer = transcript_for_receiver.buffer();
+                    let previous = buffer
+                        .text(&buffer.start_iter(), &buffer.end_iter(), false)
+                        .to_string();
+                    let text = if previous.trim().is_empty() {
+                        format!("Hermes Agent\n\n{response}")
+                    } else {
+                        format!("{previous}\n\n{response}")
+                    };
+                    buffer.set_text(&text);
+                }
+                Err(error) => {
+                    status_for_receiver.set_text(&format!("Agent error: {error}"));
+                }
+            }
+        }
+        glib::ControlFlow::Continue
+    });
+
+    let session_for_prompt = session;
+    send.connect_clicked(move |button| {
+        let value = prompt.text().trim().to_string();
+        if value.is_empty() || !button.is_sensitive() {
+            return;
+        }
+        button.set_sensitive(false);
+        status.set_text("Hermes is thinking…");
+        let sender_for_worker = sender.clone();
+        let session = session_for_prompt.clone();
+        thread::spawn(move || {
+            let command = if crate::system::command_available("hermes") {
+                "hermes"
+            } else if crate::system::command_available("hermes-agent") {
+                "hermes-agent"
+            } else {
+                let _ = sender_for_worker.send(Err(
+                    "Hermes Agent is not installed. Install Hermes, then retry.".to_string(),
+                ));
+                return;
+            };
+            let mut args = Vec::new();
+            if let Some(session) = session.as_deref() {
+                args.extend(["--resume", session]);
+            }
+            args.extend(["-z", value.as_str()]);
+            let result = crate::system::run_with_timeout(command, &args, Duration::from_secs(90));
+            let response = match result {
+                Ok(output) if output.status == Some(0) && !output.stdout.trim().is_empty() => {
+                    Ok(output.stdout)
+                }
+                Ok(output) if output.timed_out => Err(
+                    "Hermes did not respond within 90 seconds. Check Hermes status and retry."
+                        .to_string(),
+                ),
+                Ok(output) => Err(if output.stderr.is_empty() {
+                    format!("Hermes exited with status {:?}.", output.status)
+                } else {
+                    format!("Hermes: {}", output.stderr)
+                }),
+                Err(error) => Err(format!("Could not run Hermes: {error}")),
+            };
+            let _ = sender_for_worker.send(response);
+        });
+        prompt.set_text("");
+    });
+    window.present();
 }
 
 pub fn run_settings(paths: XdgPaths) -> Result<()> {
@@ -1133,6 +1310,12 @@ fn activate_item(
         }
         Target::Notice(message) => set_launcher_status(status, &message),
         target => {
+            if let Target::Action { id, args, .. } = &target {
+                if id == "open-agent" {
+                    open_agent_window(window, args.first().cloned());
+                    return;
+                }
+            }
             if let Some((confirmed_target, label)) = confirmation_target(&target) {
                 set_launcher_status(status, &format!("Confirmation required: {label}"));
                 let dialog = MessageDialog::builder()
