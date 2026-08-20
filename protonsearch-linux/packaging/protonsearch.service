@@ -1,0 +1,15 @@
+[Unit]
+Description=ProtonSearch Linux launcher
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart="%h/.local/bin/protonsearch-linux" daemon
+Restart=always
+RestartSec=3
+Environment=RUST_BACKTRACE=1
+Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=default.target

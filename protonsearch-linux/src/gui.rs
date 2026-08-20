@@ -1,0 +1,1485 @@
+//! GTK launcher window for the Linux implementation.
+//!
+//! Wayland deliberately leaves global shortcut ownership to the compositor.
+//! On Hyprland the window is opened with a normal `bind` command documented in
+//! `docs/linux/LAUNCHER.md`; the same desktop entry can be assigned a shortcut
+//! by other desktop environments.
+
+use crate::providers::{self, Item, Target};
+use crate::settings;
+use crate::xdg::XdgPaths;
+use anyhow::Result;
+use gtk4::gdk;
+use gtk4::gio;
+use gtk4::glib;
+use gtk4::prelude::*;
+use gtk4::{
+    Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton, Entry,
+    EventControllerKey, Image, Label, ListBox, ListBoxRow, MessageDialog, MessageType, Orientation,
+    PropagationPhase, ResponseType, Revealer, RevealerTransitionType, ScrolledWindow,
+    SelectionMode,
+};
+use std::cell::{Cell, RefCell};
+use std::fs;
+use std::io::{BufRead, Cursor, Write};
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::process::{Command, Stdio};
+use std::rc::Rc;
+use std::sync::mpsc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::thread;
+use std::time::{Duration, Instant};
+
+const APPLICATION_ID: &str = "com.protonsearch.Linux";
+const LAUNCHER_CSS: &str = r#"
+window.proton-window {
+    background-color: rgba(31, 32, 34, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 12px;
+}
+
+.launcher-root {
+    background-color: transparent;
+}
+
+.search-shell {
+    background-color: #2b2c2e;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 0 10px;
+}
+
+.search-icon {
+    color: #c6c9cc;
+}
+
+entry.search-entry {
+    min-height: 42px;
+    background-color: transparent;
+    color: #f4f5f6;
+    caret-color: #f4f5f6;
+    border: none;
+    box-shadow: none;
+    padding: 0 6px;
+    font-size: 15px;
+}
+
+entry.search-entry:focus {
+    border: none;
+    box-shadow: none;
+}
+
+entry.error {
+    border: 1px solid #ef6b73;
+}
+
+.category-row {
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+.category-chip {
+    color: #979b9f;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.category-chip.active {
+    color: #f2f3f4;
+    background-color: #4b4d50;
+}
+
+.status-label {
+    color: #85898d;
+    font-size: 11px;
+}
+
+list.result-list {
+    background-color: transparent;
+}
+
+row.result-row {
+    background-color: transparent;
+    border-radius: 7px;
+    margin: 1px 0;
+}
+
+row.result-row:hover {
+    background-color: #3b3d40;
+}
+
+row.result-row:selected {
+    background-color: #4b4d50;
+}
+
+.result-icon {
+    margin-right: 10px;
+}
+
+.result-thumbnail {
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 6px;
+}
+
+.image-preview {
+    background-color: rgba(17, 18, 19, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 4px;
+}
+
+.preview-image {
+    min-width: 180px;
+    min-height: 120px;
+    border-radius: 6px;
+}
+
+.preview-title {
+    color: #f1f2f3;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.preview-hint, .empty-state-hint {
+    color: #85898d;
+    font-size: 10px;
+}
+
+.empty-state-title {
+    color: #c6c9cc;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.asset-icon {
+    min-width: 32px;
+    min-height: 32px;
+}
+
+.result-title {
+    color: #f1f2f3;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.result-subtitle {
+    color: #8f9498;
+    font-size: 11px;
+}
+
+.source-badge {
+    color: #bfc3c6;
+    background-color: rgba(255, 255, 255, 0.09);
+    border-radius: 3px;
+    padding: 2px 5px;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.footer-hint {
+    color: #777c80;
+    font-size: 10px;
+}
+
+.settings-window {
+    background-color: #202122;
+}
+
+.settings-heading {
+    color: #f1f2f3;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.settings-heading-row {
+    min-height: 42px;
+}
+
+.settings-label {
+    color: #f1f2f3;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.settings-help {
+    color: #9da1a5;
+    font-size: 11px;
+}
+"#;
+
+pub fn run(paths: XdgPaths) -> Result<()> {
+    let Some((socket_guard, commands)) = start_ipc(&paths, true) else {
+        return Ok(());
+    };
+    run_application(paths, socket_guard, commands)
+}
+
+pub fn run_resident(paths: XdgPaths) -> Result<()> {
+    loop {
+        if let Some((socket_guard, commands)) = start_ipc(&paths, false) {
+            return run_application(paths, socket_guard, commands);
+        }
+        thread::sleep(Duration::from_secs(1));
+    }
+}
+
+fn run_application(
+    paths: XdgPaths,
+    socket_guard: SocketGuard,
+    commands: mpsc::Receiver<UiCommand>,
+) -> Result<()> {
+    let _tray = crate::tray::ProtonTray::start(&paths);
+    let application = Application::builder()
+        .application_id(APPLICATION_ID)
+        // A compositor keybind may launch a fresh window while another
+        // launcher invocation is still closing. Each invocation must receive
+        // its own window instead of being forwarded as an unsupported file
+        // open request to an existing instance.
+        .flags(gio::ApplicationFlags::NON_UNIQUE)
+        .build();
+    let commands = Rc::new(RefCell::new(Some(commands)));
+    let commands_for_activate = commands.clone();
+    application.connect_activate(move |application| {
+        if let Some(commands) = commands_for_activate.borrow_mut().take() {
+            build_window(application, paths.clone(), commands);
+        }
+    });
+    // Do not pass the CLI subcommand (`gui`) into GApplication. GTK treats
+    // positional arguments as files to open, which would bypass activation
+    // and immediately exit with an "cannot open files" warning.
+    let program = std::env::args()
+        .next()
+        .unwrap_or_else(|| "protonsearch-linux".to_string());
+    application.run_with_args(&[program]);
+    drop(socket_guard);
+    Ok(())
+}
+
+pub fn run_settings(paths: XdgPaths) -> Result<()> {
+    let application = Application::builder()
+        .application_id("com.protonsearch.Linux.Settings")
+        .flags(gio::ApplicationFlags::NON_UNIQUE)
+        .build();
+    application.connect_activate(move |application| {
+        let current = settings::load(&paths);
+        let window = ApplicationWindow::builder()
+            .application(application)
+            .title("ProtonSearch Settings")
+            .default_width(760)
+            .default_height(560)
+            .build();
+        window.add_css_class("settings-window");
+        install_css();
+        let root = GtkBox::new(Orientation::Vertical, 12);
+        root.set_margin_top(22);
+        root.set_margin_bottom(22);
+        root.set_margin_start(24);
+        root.set_margin_end(24);
+
+        let heading = GtkBox::new(Orientation::Horizontal, 12);
+        heading.add_css_class("settings-heading-row");
+        let logo = crate::icons::protonsearch(38);
+        heading.append(&logo);
+        let title = Label::new(Some("General"));
+        title.set_halign(Align::Start);
+        title.add_css_class("settings-heading");
+        heading.append(&title);
+        root.append(&heading);
+        let intro = Label::new(Some(
+            "Control search roots, privacy boundaries, and optional Linux providers.",
+        ));
+        intro.set_halign(Align::Start);
+        intro.add_css_class("result-subtitle");
+        root.append(&intro);
+
+        let include_hidden = CheckButton::with_label("Include hidden files in search");
+        include_hidden.set_active(current.include_hidden);
+        root.append(&include_hidden);
+        let system_actions = CheckButton::with_label("Enable system actions");
+        system_actions.set_active(current.enable_system_actions);
+        root.append(&system_actions);
+        let hyprland = CheckButton::with_label("Enable Hyprland providers");
+        hyprland.set_active(current.enable_hyprland);
+        root.append(&hyprland);
+
+        let hotkey_title = Label::new(Some("Launcher hotkey"));
+        hotkey_title.set_halign(Align::Start);
+        hotkey_title.add_css_class("settings-label");
+        root.append(&hotkey_title);
+        let hotkey_help = Label::new(Some(
+            "Hyprland notation. Default: ALT,SPACE. The installer manages the global binding safely.",
+        ));
+        hotkey_help.set_halign(Align::Start);
+        hotkey_help.add_css_class("settings-help");
+        root.append(&hotkey_help);
+        let hotkey = Entry::builder()
+            .placeholder_text("ALT,SPACE")
+            .text(&current.hotkey)
+            .build();
+        root.append(&hotkey);
+
+        let roots_label = Label::new(Some("Additional search roots (comma or newline separated)"));
+        roots_label.set_halign(Align::Start);
+        root.append(&roots_label);
+        let roots = Entry::builder()
+            .placeholder_text("/home/user/Projects, /mnt/data")
+            .text(current.search_roots.join("\n"))
+            .build();
+        root.append(&roots);
+
+        let ignored_label = Label::new(Some("Ignored directory names (comma separated)"));
+        ignored_label.set_halign(Align::Start);
+        root.append(&ignored_label);
+        let ignored = Entry::builder()
+            .placeholder_text("node_modules, target, .cache")
+            .text(current.ignored_names.join(", "))
+            .build();
+        root.append(&ignored);
+
+        let save = Button::with_label("Save settings");
+        save.set_halign(Align::End);
+        root.append(&save);
+        window.set_child(Some(&root));
+
+        let paths_for_save = paths.clone();
+        let window_for_save = window.clone();
+        save.connect_clicked(move |_| {
+            let mut next = current.clone();
+            next.include_hidden = include_hidden.is_active();
+            next.enable_system_actions = system_actions.is_active();
+            next.enable_hyprland = hyprland.is_active();
+            let hotkey_text = hotkey.text();
+            let requested_hotkey = if hotkey_text.trim().is_empty() {
+                "ALT,SPACE"
+            } else {
+                hotkey_text.trim()
+            };
+            let Some(normalized_hotkey) = normalize_hotkey(requested_hotkey) else {
+                hotkey.add_css_class("error");
+                hotkey.set_tooltip_text(Some(
+                    "Use compositor notation such as ALT,SPACE or SUPER,ENTER",
+                ));
+                return;
+            };
+            hotkey.remove_css_class("error");
+            next.hotkey = normalized_hotkey;
+            next.search_roots = roots
+                .text()
+                .split([',', '\n'])
+                .map(str::trim)
+                .filter(|path| !path.is_empty())
+                .map(str::to_string)
+                .collect();
+            next.ignored_names = ignored
+                .text()
+                .split(',')
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_string)
+                .collect();
+            if let Err(error) = settings::save(&paths_for_save, &next) {
+                eprintln!("ProtonSearch: could not save settings: {error:#}");
+                return;
+            }
+            if next.enable_hyprland {
+                apply_hyprland_hotkey(&current.hotkey, &next.hotkey);
+            } else {
+                unbind_hyprland_hotkey(&current.hotkey);
+            }
+            notify_launcher(&paths_for_save, "reload");
+            window_for_save.close();
+        });
+        window.present();
+    });
+    let program = std::env::args()
+        .next()
+        .unwrap_or_else(|| "protonsearch-linux".to_string());
+    application.run_with_args(&[program]);
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+enum UiCommand {
+    Toggle,
+    Reload,
+}
+
+struct SocketGuard {
+    path: std::path::PathBuf,
+    stop: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+impl Drop for SocketGuard {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        // Wake a non-blocking listener so shutdown does not leave a worker
+        // thread behind when the GTK application exits.
+        let _ = UnixStream::connect(&self.path);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+fn start_ipc(
+    paths: &XdgPaths,
+    notify_existing: bool,
+) -> Option<(SocketGuard, mpsc::Receiver<UiCommand>)> {
+    let socket = ipc_socket(paths);
+    let directory = socket.parent()?.to_path_buf();
+    let _ = fs::create_dir_all(&directory);
+    if socket.exists() {
+        match UnixStream::connect(&socket) {
+            Ok(mut stream) => {
+                if notify_existing {
+                    let _ = stream.set_write_timeout(Some(Duration::from_millis(250)));
+                    let _ = stream.write_all(b"toggle\n");
+                    let _ = stream.shutdown(std::net::Shutdown::Both);
+                }
+                return None;
+            }
+            Err(_) => {
+                let _ = fs::remove_file(&socket);
+            }
+        }
+    }
+    let listener = match UnixListener::bind(&socket) {
+        Ok(listener) => listener,
+        Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {
+            if notify_existing {
+                if let Ok(mut stream) = UnixStream::connect(&socket) {
+                    let _ = stream.set_write_timeout(Some(Duration::from_millis(250)));
+                    let _ = stream.write_all(b"toggle\n");
+                    let _ = stream.shutdown(std::net::Shutdown::Both);
+                }
+            }
+            return None;
+        }
+        Err(_) => return None,
+    };
+    let _ = listener.set_nonblocking(true);
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_for_thread = stop.clone();
+    let (sender, receiver) = mpsc::channel();
+    let thread = thread::spawn(move || {
+        while !stop_for_thread.load(Ordering::Acquire) {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    let mut message = String::new();
+                    let _ = std::io::BufReader::new(stream).read_line(&mut message);
+                    for line in message.lines().map(str::trim) {
+                        let command = match line {
+                            "toggle" => Some(UiCommand::Toggle),
+                            "reload" => Some(UiCommand::Reload),
+                            _ => None,
+                        };
+                        if let Some(command) = command {
+                            let _ = sender.send(command);
+                        }
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(40));
+                }
+                Err(_) => break,
+            }
+        }
+    });
+    Some((
+        SocketGuard {
+            path: socket,
+            stop,
+            thread: Some(thread),
+        },
+        receiver,
+    ))
+}
+
+fn ipc_socket(paths: &XdgPaths) -> std::path::PathBuf {
+    paths
+        .runtime
+        .as_ref()
+        .map(|runtime| runtime.join("protonsearch/launcher.sock"))
+        .unwrap_or_else(|| paths.state_dir().join("launcher.sock"))
+}
+
+fn notify_launcher(paths: &XdgPaths, command: &str) {
+    let Ok(mut stream) = UnixStream::connect(ipc_socket(paths)) else {
+        return;
+    };
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(250)));
+    let _ = stream.write_all(format!("{command}\n").as_bytes());
+    let _ = stream.shutdown(std::net::Shutdown::Both);
+}
+
+fn confirmation_target(target: &Target) -> Option<(Target, &'static str)> {
+    let Target::Action {
+        id,
+        args,
+        confirmed: false,
+    } = target
+    else {
+        return None;
+    };
+    let label = match id.as_str() {
+        "power-suspend" => "Suspend computer",
+        "power-reboot" => "Restart computer",
+        "poweroff" => "Power off computer",
+        "power-logout" => "Log out",
+        _ => return None,
+    };
+    Some((
+        Target::Action {
+            id: id.clone(),
+            args: args.clone(),
+            confirmed: true,
+        },
+        label,
+    ))
+}
+
+fn set_launcher_status(status: &Label, message: &str) {
+    status.set_text(message);
+    status.set_tooltip_text(None);
+}
+
+fn activate_target(
+    paths: &XdgPaths,
+    window: &ApplicationWindow,
+    status: &Label,
+    animation: &Rc<RefCell<Option<glib::SourceId>>>,
+    target: Target,
+) {
+    let keep_launcher_open = matches!(&target, Target::Action { .. });
+    match providers::activate(paths, &target) {
+        Ok(Some(feedback)) => {
+            set_launcher_status(status, feedback.lines().next().unwrap_or(feedback.as_str()));
+        }
+        Ok(None) if keep_launcher_open => {
+            set_launcher_status(status, "Action completed");
+        }
+        Ok(None) => {
+            animate_hide(window, animation);
+        }
+        Err(error) => {
+            set_launcher_status(status, &format!("Action failed: {error}"));
+            status.set_tooltip_text(Some(&format!("{error:#}")));
+            eprintln!("ProtonSearch: {error:#}");
+        }
+    }
+}
+
+fn activate_item(
+    paths: &XdgPaths,
+    window: &ApplicationWindow,
+    entry: &Entry,
+    status: &Label,
+    animation: &Rc<RefCell<Option<glib::SourceId>>>,
+    item: Item,
+) {
+    match item.target {
+        Target::Query(query) => {
+            entry.set_text(&query);
+            entry.grab_focus();
+        }
+        Target::Notice(message) => set_launcher_status(status, &message),
+        target => {
+            if let Some((confirmed_target, label)) = confirmation_target(&target) {
+                set_launcher_status(status, &format!("Confirmation required: {label}"));
+                let dialog = MessageDialog::builder()
+                    .transient_for(window)
+                    .modal(true)
+                    .message_type(MessageType::Warning)
+                    .buttons(ButtonsType::Cancel)
+                    .text("Confirm session action")
+                    .secondary_text(format!("{label} now? This action cannot be undone."))
+                    .build();
+                dialog.set_title(Some(label));
+                dialog
+                    .add_button(label, ResponseType::Accept)
+                    .add_css_class("destructive-action");
+                dialog.set_default_response(ResponseType::Cancel);
+
+                let paths_for_confirmation = paths.clone();
+                let window_for_confirmation = window.clone();
+                let entry_for_confirmation = entry.clone();
+                let status_for_confirmation = status.clone();
+                let animation_for_confirmation = animation.clone();
+                dialog.connect_response(move |dialog, response| {
+                    dialog.close();
+                    if response == ResponseType::Accept {
+                        activate_target(
+                            &paths_for_confirmation,
+                            &window_for_confirmation,
+                            &status_for_confirmation,
+                            &animation_for_confirmation,
+                            confirmed_target.clone(),
+                        );
+                    } else {
+                        set_launcher_status(&status_for_confirmation, "Action cancelled");
+                        entry_for_confirmation.grab_focus();
+                    }
+                });
+                dialog.present();
+            } else {
+                activate_target(paths, window, status, animation, target);
+            }
+        }
+    }
+}
+
+fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Receiver<UiCommand>) {
+    let linux_settings = settings::load(&paths);
+    let settings_state = Rc::new(RefCell::new(linux_settings.clone()));
+    let window = ApplicationWindow::builder()
+        .application(application)
+        .title("ProtonSearch")
+        .default_width(760)
+        .default_height(500)
+        .build();
+    // Keep an explicit application-owned reference. This matters when the
+    // launcher is started directly from a compositor keybind: the local
+    // window variable is otherwise dropped when this builder function returns.
+    application.add_window(&window);
+    window.set_decorated(false);
+    window.set_resizable(false);
+    window.add_css_class("proton-window");
+    install_css();
+
+    let root = GtkBox::new(Orientation::Vertical, 10);
+    root.add_css_class("launcher-root");
+    root.set_margin_top(18);
+    root.set_margin_bottom(14);
+    root.set_margin_start(18);
+    root.set_margin_end(18);
+
+    let search_shell = GtkBox::new(Orientation::Horizontal, 6);
+    search_shell.add_css_class("search-shell");
+    search_shell.set_hexpand(true);
+
+    let search_icon = crate::icons::protonsearch(34);
+    search_icon.add_css_class("search-icon");
+    search_shell.append(&search_icon);
+
+    let entry = Entry::builder()
+        .placeholder_text("Search files, code, PDFs, OCR...")
+        .hexpand(true)
+        .build();
+    entry.add_css_class("search-entry");
+    entry.set_tooltip_text(Some(
+        "Type to search; Enter opens the selected result; Escape closes",
+    ));
+    search_shell.append(&entry);
+    root.append(&search_shell);
+
+    let category_row = GtkBox::new(Orientation::Horizontal, 2);
+    category_row.add_css_class("category-row");
+    for (label, prefix, active) in [
+        ("All", "", true),
+        ("Files", "file:", false),
+        ("Folders", "folder:", false),
+        ("Content", "content:", false),
+        ("Images", "images:", false),
+        ("OCR", "ocr:", false),
+        ("Code", "code:", false),
+        ("Settings", "settings:", false),
+        ("Commands", "commands:", false),
+    ] {
+        let chip = Button::with_label(label);
+        chip.set_has_frame(false);
+        chip.add_css_class("category-chip");
+        if active {
+            chip.add_css_class("active");
+        }
+        category_row.append(&chip);
+        let entry_for_chip = entry.clone();
+        chip.connect_clicked(move |_| {
+            entry_for_chip.set_text(prefix);
+            entry_for_chip.grab_focus();
+        });
+    }
+    let status = Label::new(Some("Quick Search"));
+    status.set_halign(Align::End);
+    status.set_hexpand(true);
+    status.add_css_class("status-label");
+    category_row.append(&status);
+    root.append(&category_row);
+
+    let preview_revealer = Revealer::builder()
+        .transition_type(RevealerTransitionType::SlideDown)
+        .transition_duration(140)
+        .reveal_child(false)
+        .build();
+    let preview_box = GtkBox::new(Orientation::Horizontal, 10);
+    preview_box.add_css_class("image-preview");
+    preview_box.set_hexpand(true);
+    preview_revealer.set_child(Some(&preview_box));
+    root.append(&preview_revealer);
+
+    let list = ListBox::new();
+    list.add_css_class("result-list");
+    list.set_selection_mode(SelectionMode::Multiple);
+    list.set_activate_on_single_click(true);
+    list.set_vexpand(true);
+
+    let scroll = ScrolledWindow::builder().child(&list).vexpand(true).build();
+    root.append(&scroll);
+
+    let footer = Label::new(Some(
+        "↑↓ navigate   •   Ctrl+Space multi-select   •   Enter copy/open   •   Esc close",
+    ));
+    footer.set_halign(Align::End);
+    footer.add_css_class("footer-hint");
+    root.append(&footer);
+    window.set_child(Some(&root));
+
+    let items = Rc::new(RefCell::new(Vec::<Item>::new()));
+    let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
+    let generation = Rc::new(Cell::new(0_u64));
+    let (sender, receiver) = mpsc::channel::<(u64, String, Vec<Item>)>();
+    let (request_sender, request_receiver) =
+        mpsc::channel::<(u64, String, settings::LinuxSettings)>();
+    let worker_paths = paths.clone();
+    thread::spawn(move || {
+        while let Ok((mut request_generation, mut query, mut worker_settings)) =
+            request_receiver.recv()
+        {
+            // If typing produced multiple requests while a search was in
+            // flight, only compute the newest one after the current search.
+            while let Ok((next_generation, next_query, next_settings)) = request_receiver.try_recv()
+            {
+                request_generation = next_generation;
+                query = next_query;
+                worker_settings = next_settings;
+            }
+            let results = providers::collect(&worker_paths, &worker_settings, &query);
+            if sender.send((request_generation, query, results)).is_err() {
+                break;
+            }
+        }
+    });
+
+    let update = |list: &ListBox, status: &Label, items: &[Item], query: &str| {
+        while let Some(child) = list.first_child() {
+            list.remove(&child);
+        }
+        for item in items {
+            list.append(&result_row(item));
+        }
+        if items.is_empty() {
+            let message = empty_state_message(query);
+            list.append(&empty_state_row(&message));
+            status.set_text(&message);
+        } else {
+            let source_count = items
+                .iter()
+                .map(|item| item.source.as_str())
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+            status.set_text(&format!("{source_count} sources · {} results", items.len()));
+        }
+        list.unselect_all();
+        if let Some(row) = list.row_at_index(0) {
+            list.select_row(Some(&row));
+        } else {
+            list.select_row(None::<&ListBoxRow>);
+        }
+    };
+
+    let initial_items = providers::collect(&paths, &linux_settings, "");
+    *items.borrow_mut() = initial_items.clone();
+    update(&list, &status, &initial_items, "");
+
+    let generation_for_changed = generation.clone();
+    let request_sender_for_changed = request_sender.clone();
+    let settings_for_changed = settings_state.clone();
+    let debounce_source = Rc::new(RefCell::new(None::<glib::SourceId>));
+    entry.connect_changed(move |entry| {
+        let next_generation = generation_for_changed.get().saturating_add(1);
+        generation_for_changed.set(next_generation);
+        let query = entry.text().to_string();
+        if let Some(source) = debounce_source.borrow_mut().take() {
+            source.remove();
+        }
+        let request_sender = request_sender_for_changed.clone();
+        let settings = settings_for_changed.borrow().clone();
+        let debounce_source_for_timeout = debounce_source.clone();
+        let source = glib::timeout_add_local_once(Duration::from_millis(90), move || {
+            debounce_source_for_timeout.borrow_mut().take();
+            let _ = request_sender.send((next_generation, query, settings));
+        });
+        *debounce_source.borrow_mut() = Some(source);
+    });
+
+    let generation_for_receiver = generation.clone();
+    let items_for_receiver = items.clone();
+    let list_for_receiver = list.clone();
+    let status_for_receiver = status.clone();
+    glib::timeout_add_local(Duration::from_millis(50), move || {
+        while let Ok((result_generation, query, results)) = receiver.try_recv() {
+            if result_generation == generation_for_receiver.get() {
+                *items_for_receiver.borrow_mut() = results.clone();
+                update(&list_for_receiver, &status_for_receiver, &results, &query);
+            }
+        }
+        glib::ControlFlow::Continue
+    });
+
+    let window_for_commands = window.clone();
+    let entry_for_commands = entry.clone();
+    let animation_for_commands = animation.clone();
+    let paths_for_commands = paths.clone();
+    let settings_for_commands = settings_state.clone();
+    let request_sender_for_commands = request_sender.clone();
+    let generation_for_commands = generation.clone();
+    glib::timeout_add_local(Duration::from_millis(50), move || {
+        while let Ok(command) = commands.try_recv() {
+            match command {
+                UiCommand::Toggle if window_for_commands.is_visible() => {
+                    animate_hide(&window_for_commands, &animation_for_commands);
+                }
+                UiCommand::Toggle => {
+                    animate_show(
+                        &window_for_commands,
+                        &entry_for_commands,
+                        &animation_for_commands,
+                    );
+                }
+                UiCommand::Reload => {
+                    let next_settings = settings::load(&paths_for_commands);
+                    *settings_for_commands.borrow_mut() = next_settings.clone();
+                    let next_generation = generation_for_commands.get().saturating_add(1);
+                    generation_for_commands.set(next_generation);
+                    let _ = request_sender_for_commands.send((
+                        next_generation,
+                        entry_for_commands.text().to_string(),
+                        next_settings,
+                    ));
+                }
+            }
+        }
+        glib::ControlFlow::Continue
+    });
+
+    let list_for_enter = list.clone();
+    let items_for_enter = items.clone();
+    let paths_for_enter = paths.clone();
+    let window_for_enter = window.clone();
+    let entry_for_enter = entry.clone();
+    let status_for_enter = status.clone();
+    let animation_for_enter = animation.clone();
+    entry.connect_activate(move |_| {
+        let selected_items = list_for_enter
+            .selected_rows()
+            .into_iter()
+            .filter_map(|row| items_for_enter.borrow().get(row.index() as usize).cloned())
+            .collect::<Vec<_>>();
+        if selected_items.len() > 1
+            && selected_items.iter().all(|item| item.source == "Clipboard")
+        {
+            match providers::activate_clipboard_batch(&selected_items) {
+                Ok((text_count, image_count)) => {
+                    let message = if image_count > 1 {
+                        format!(
+                            "Copied {text_count} text item(s) and combined {image_count} images into one clipboard image"
+                        )
+                    } else if image_count > 0 {
+                        format!(
+                            "Copied {text_count} text item(s) and {image_count} image"
+                        )
+                    } else {
+                        format!("Copied {text_count} clipboard items together")
+                    };
+                    set_launcher_status(&status_for_enter, &message);
+                    animate_hide(&window_for_enter, &animation_for_enter);
+                }
+                Err(error) => {
+                    set_launcher_status(&status_for_enter, &format!("Clipboard action failed: {error}"));
+                }
+            }
+            return;
+        }
+        if let Some(row) = list_for_enter
+            .selected_row()
+            .or_else(|| list_for_enter.row_at_index(0))
+        {
+            let index = row.index();
+            let Some(item) = items_for_enter.borrow().get(index as usize).cloned() else {
+                return;
+            };
+            activate_item(
+                &paths_for_enter,
+                &window_for_enter,
+                &entry_for_enter,
+                &status_for_enter,
+                &animation_for_enter,
+                item,
+            );
+        }
+    });
+
+    let paths_for_activation = paths.clone();
+    let items_for_activation = items.clone();
+    let list_for_activation = list.clone();
+    let window_for_activation = window.clone();
+    let entry_for_activation = entry.clone();
+    let status_for_activation = status.clone();
+    let animation_for_activation = animation.clone();
+    let preview_revealer_for_activation = preview_revealer.clone();
+    let preview_box_for_activation = preview_box.clone();
+    list.connect_row_activated(move |_, row| {
+        let selected_items = list_for_activation
+            .selected_rows()
+            .into_iter()
+            .filter_map(|selected| {
+                items_for_activation
+                    .borrow()
+                    .get(selected.index() as usize)
+                    .cloned()
+            })
+            .collect::<Vec<_>>();
+        if selected_items.len() > 1
+            && selected_items.iter().all(|item| item.source == "Clipboard")
+        {
+            match providers::activate_clipboard_batch(&selected_items) {
+                Ok((text_count, image_count)) => {
+                    let message = if image_count > 1 {
+                        format!(
+                            "Copied {text_count} text item(s) and combined {image_count} images into one clipboard image"
+                        )
+                    } else if image_count > 0 {
+                        format!(
+                            "Copied {text_count} text item(s) and {image_count} image"
+                        )
+                    } else {
+                        format!("Copied {text_count} clipboard items together")
+                    };
+                    set_launcher_status(&status_for_activation, &message);
+                    animate_hide(&window_for_activation, &animation_for_activation);
+                }
+                Err(error) => {
+                    eprintln!("ProtonSearch: clipboard action failed: {error:#}");
+                    set_launcher_status(
+                        &status_for_activation,
+                        &format!("Clipboard action failed: {error}"),
+                    );
+                }
+            }
+            return;
+        }
+        let index = row.index();
+        let Some(item) = items_for_activation.borrow().get(index as usize).cloned() else {
+            return;
+        };
+        if item.kind == "IMAGE" {
+            show_image_preview(
+                &preview_revealer_for_activation,
+                &preview_box_for_activation,
+                Some(&item),
+            );
+            return;
+        }
+        activate_item(
+            &paths_for_activation,
+            &window_for_activation,
+            &entry_for_activation,
+            &status_for_activation,
+            &animation_for_activation,
+            item,
+        );
+    });
+
+    let key_controller = EventControllerKey::new();
+    let window_for_escape = window.clone();
+    let animation_for_escape = animation.clone();
+    let list_for_navigation = list.clone();
+    let items_for_preview = items.clone();
+    let preview_revealer_for_key = preview_revealer.clone();
+    let preview_box_for_key = preview_box.clone();
+    key_controller.connect_key_pressed(move |_, key, _, state| {
+        if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R) {
+            let selected = list_for_navigation
+                .selected_row()
+                .or_else(|| list_for_navigation.row_at_index(0))
+                .and_then(|row| {
+                    items_for_preview
+                        .borrow()
+                        .get(row.index() as usize)
+                        .cloned()
+                });
+            show_image_preview(
+                &preview_revealer_for_key,
+                &preview_box_for_key,
+                selected.as_ref(),
+            );
+            return glib::Propagation::Proceed;
+        }
+        if key == gdk::Key::Escape {
+            animate_hide(&window_for_escape, &animation_for_escape);
+            return glib::Propagation::Stop;
+        }
+        if key == gdk::Key::space && state.contains(gdk::ModifierType::CONTROL_MASK) {
+            if let Some(row) = list_for_navigation
+                .selected_row()
+                .or_else(|| list_for_navigation.row_at_index(0))
+            {
+                let selected = list_for_navigation
+                    .selected_rows()
+                    .iter()
+                    .any(|selected| selected.index() == row.index());
+                if selected {
+                    list_for_navigation.unselect_row(&row);
+                } else {
+                    list_for_navigation.select_row(Some(&row));
+                }
+            }
+            return glib::Propagation::Stop;
+        }
+        if matches!(
+            key,
+            gdk::Key::Down
+                | gdk::Key::Up
+                | gdk::Key::Page_Down
+                | gdk::Key::Page_Up
+                | gdk::Key::Home
+                | gdk::Key::End
+        ) {
+            let count = list_for_navigation.observe_children().n_items() as i32;
+            if count == 0 {
+                return glib::Propagation::Stop;
+            }
+            let current = list_for_navigation
+                .selected_row()
+                .map(|row| row.index())
+                .unwrap_or(0);
+            let next = match key {
+                gdk::Key::Down => (current + 1).min(count - 1),
+                gdk::Key::Up => current.saturating_sub(1),
+                gdk::Key::Page_Down => (current + 6).min(count - 1),
+                gdk::Key::Page_Up => current.saturating_sub(6),
+                gdk::Key::Home => 0,
+                _ => count - 1,
+            };
+            if let Some(row) = list_for_navigation.row_at_index(next) {
+                // Multiple selection is available for clipboard workflows,
+                // but ordinary arrow navigation must behave like a single
+                // active cursor. Holding Ctrl intentionally preserves the
+                // existing selection set.
+                if !state.contains(gdk::ModifierType::CONTROL_MASK) {
+                    list_for_navigation.unselect_all();
+                }
+                list_for_navigation.select_row(Some(&row));
+                row.grab_focus();
+            }
+            return glib::Propagation::Stop;
+        }
+        glib::Propagation::Proceed
+    });
+    let preview_revealer_for_release = preview_revealer.clone();
+    key_controller.connect_key_released(move |_, key, _, _| {
+        if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R) {
+            preview_revealer_for_release.set_reveal_child(false);
+        }
+    });
+    key_controller.set_propagation_phase(PropagationPhase::Capture);
+    window.add_controller(key_controller);
+    // The resident service starts hidden. The compositor shortcut sends a
+    // toggle over the IPC socket and reveals the launcher on demand.
+    window.hide();
+}
+
+fn cancel_animation(animation: &Rc<RefCell<Option<glib::SourceId>>>) {
+    if let Some(source) = animation.borrow_mut().take() {
+        source.remove();
+    }
+}
+
+fn animate_show(
+    window: &ApplicationWindow,
+    entry: &Entry,
+    animation: &Rc<RefCell<Option<glib::SourceId>>>,
+) {
+    cancel_animation(animation);
+    window.set_opacity(0.0);
+    window.present();
+    entry.grab_focus();
+    let weak_window = window.downgrade();
+    let animation_for_tick = animation.clone();
+    let started = Instant::now();
+    let source = glib::timeout_add_local(Duration::from_millis(16), move || {
+        let progress = (started.elapsed().as_secs_f64() / 0.16).min(1.0);
+        let Some(window) = weak_window.upgrade() else {
+            *animation_for_tick.borrow_mut() = None;
+            return glib::ControlFlow::Break;
+        };
+        window.set_opacity(progress);
+        if progress >= 1.0 {
+            *animation_for_tick.borrow_mut() = None;
+            glib::ControlFlow::Break
+        } else {
+            glib::ControlFlow::Continue
+        }
+    });
+    *animation.borrow_mut() = Some(source);
+}
+
+fn animate_hide(window: &ApplicationWindow, animation: &Rc<RefCell<Option<glib::SourceId>>>) {
+    if !window.is_visible() {
+        return;
+    }
+    cancel_animation(animation);
+    let weak_window = window.downgrade();
+    let animation_for_tick = animation.clone();
+    let started = Instant::now();
+    let source = glib::timeout_add_local(Duration::from_millis(16), move || {
+        let progress = (started.elapsed().as_secs_f64() / 0.12).min(1.0);
+        let Some(window) = weak_window.upgrade() else {
+            *animation_for_tick.borrow_mut() = None;
+            return glib::ControlFlow::Break;
+        };
+        window.set_opacity(1.0 - progress);
+        if progress >= 1.0 {
+            window.hide();
+            window.set_opacity(1.0);
+            *animation_for_tick.borrow_mut() = None;
+            glib::ControlFlow::Break
+        } else {
+            glib::ControlFlow::Continue
+        }
+    });
+    *animation.borrow_mut() = Some(source);
+}
+
+fn result_row(item: &Item) -> ListBoxRow {
+    let row = ListBoxRow::new();
+    row.add_css_class("result-row");
+    let content = GtkBox::new(Orientation::Horizontal, 8);
+    content.set_margin_top(8);
+    content.set_margin_bottom(8);
+    content.set_margin_start(12);
+    content.set_margin_end(12);
+
+    let icon = result_icon(item);
+    content.append(&icon);
+
+    let text = GtkBox::new(Orientation::Vertical, 2);
+    text.set_hexpand(true);
+
+    let title = Label::new(Some(&item.title));
+    title.set_halign(Align::Start);
+    title.set_xalign(0.0);
+    title.add_css_class("result-title");
+    text.append(&title);
+
+    let subtitle = Label::new(Some(&item.subtitle));
+    subtitle.set_halign(Align::Start);
+    subtitle.set_xalign(0.0);
+    subtitle.add_css_class("result-subtitle");
+    text.append(&subtitle);
+    content.append(&text);
+
+    let badge = Label::new(Some(&item.kind));
+    badge.set_halign(Align::End);
+    badge.add_css_class("source-badge");
+    badge.set_tooltip_text(Some(&item.source));
+    content.append(&badge);
+
+    let revealer = Revealer::builder()
+        .transition_type(RevealerTransitionType::SlideDown)
+        .transition_duration(120)
+        .build();
+    revealer.set_child(Some(&content));
+    revealer.set_reveal_child(true);
+    row.set_child(Some(&revealer));
+    row
+}
+
+fn empty_state_message(query: &str) -> String {
+    let query = query.trim().to_ascii_lowercase();
+    if query.starts_with("images:") || query.starts_with("image:") || query.starts_with("ocr:") {
+        return "No image files found".to_string();
+    }
+    if query.starts_with("clipboard:") || query.starts_with("clip:") {
+        return "No clipboard history found".to_string();
+    }
+    if query.starts_with("git:") || query.starts_with("commits:") {
+        return "No Git commits found".to_string();
+    }
+    "No results found".to_string()
+}
+
+fn empty_state_row(message: &str) -> ListBoxRow {
+    let row = ListBoxRow::new();
+    row.set_selectable(false);
+    row.set_activatable(false);
+    let box_ = GtkBox::new(Orientation::Vertical, 5);
+    box_.set_valign(Align::Center);
+    box_.set_vexpand(true);
+    box_.set_margin_top(48);
+    box_.set_margin_bottom(48);
+    let title = Label::new(Some(message));
+    title.add_css_class("empty-state-title");
+    title.set_halign(Align::Center);
+    let hint = Label::new(Some("Try another search or choose a different category"));
+    hint.add_css_class("empty-state-hint");
+    hint.set_halign(Align::Center);
+    box_.append(&title);
+    box_.append(&hint);
+    row.set_child(Some(&box_));
+    row
+}
+
+fn show_image_preview(revealer: &Revealer, preview_box: &GtkBox, item: Option<&Item>) {
+    let Some(item) = item else {
+        revealer.set_reveal_child(false);
+        return;
+    };
+    let Some(image) = preview_image_for_item(item) else {
+        revealer.set_reveal_child(false);
+        return;
+    };
+    while let Some(child) = preview_box.first_child() {
+        preview_box.remove(&child);
+    }
+    image.set_pixel_size(360);
+    image.set_tooltip_text(Some("Image preview · release Alt to close"));
+    image.add_css_class("preview-image");
+    preview_box.append(&image);
+    let text = GtkBox::new(Orientation::Vertical, 3);
+    text.set_valign(Align::Center);
+    let title = Label::new(Some(&item.title));
+    title.set_halign(Align::Start);
+    title.add_css_class("preview-title");
+    let hint = Label::new(Some("Release Alt to close preview · Enter opens image"));
+    hint.set_halign(Align::Start);
+    hint.add_css_class("preview-hint");
+    text.append(&title);
+    text.append(&hint);
+    preview_box.append(&text);
+    revealer.set_reveal_child(true);
+}
+
+fn preview_image_for_item(item: &Item) -> Option<Image> {
+    match &item.target {
+        Target::Path(path) if crate::search::is_image_path(path) && path.is_file() => {
+            scaled_image(path, 720, 480)
+        }
+        Target::Cliphist(line) if item.kind == "IMAGE" => scaled_clipboard_image(line, 720, 480),
+        _ => None,
+    }
+}
+
+fn scaled_clipboard_image(line: &str, max_width: i32, max_height: i32) -> Option<Image> {
+    if !crate::system::command_available("cliphist") {
+        return None;
+    }
+    let mut child = Command::new("cliphist")
+        .args(["decode"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        if stdin.write_all(format!("{line}\n").as_bytes()).is_err() {
+            let _ = child.kill();
+            return None;
+        }
+    }
+    let output = child.wait_with_output().ok()?;
+    if !output.status.success() || output.stdout.len() > 16 * 1024 * 1024 {
+        return None;
+    }
+    let pixbuf = gdk_pixbuf::Pixbuf::from_read(Cursor::new(output.stdout)).ok()?;
+    let scale = (max_width as f64 / pixbuf.width() as f64)
+        .min(max_height as f64 / pixbuf.height() as f64)
+        .min(1.0);
+    let width = (pixbuf.width() as f64 * scale).round().max(1.0) as i32;
+    let height = (pixbuf.height() as f64 * scale).round().max(1.0) as i32;
+    let pixbuf = pixbuf.scale_simple(width, height, gdk_pixbuf::InterpType::Bilinear)?;
+    let texture = gdk::Texture::for_pixbuf(&pixbuf);
+    Some(Image::from_paintable(Some(&texture)))
+}
+
+fn result_icon(item: &Item) -> Image {
+    if let Some(name) = result_asset_name(item) {
+        if let Some(image) = crate::icons::source(name, 32) {
+            return image;
+        }
+    }
+
+    if item.kind == "IMAGE" && matches!(&item.target, Target::Cliphist(_)) {
+        if let Target::Cliphist(line) = &item.target {
+            if let Some(image) = scaled_clipboard_image(line, 64, 64) {
+                image.set_pixel_size(48);
+                image.add_css_class("result-thumbnail");
+                return image;
+            }
+        }
+        let image = Image::from_icon_name("image-x-generic-symbolic");
+        image.set_pixel_size(48);
+        image.add_css_class("result-thumbnail");
+        return image;
+    }
+
+    let image = match &item.target {
+        Target::Application(entry) if entry.name.eq_ignore_ascii_case("ProtonSearch") => {
+            crate::icons::protonsearch(32)
+        }
+        Target::Application(entry) => entry
+            .icon
+            .as_deref()
+            .filter(|icon| icon.starts_with('/'))
+            .map(Image::from_file)
+            .unwrap_or_else(|| {
+                Image::from_icon_name(
+                    entry
+                        .icon
+                        .as_deref()
+                        .unwrap_or("application-x-executable-symbolic"),
+                )
+            }),
+        Target::Path(path) if path.is_dir() => Image::from_icon_name("folder-symbolic"),
+        Target::Path(path) if crate::search::is_image_path(path) => {
+            let Some(image) = scaled_image(path, 64, 64) else {
+                return Image::from_icon_name("image-x-generic-symbolic");
+            };
+            image.set_pixel_size(48);
+            image.add_css_class("result-thumbnail");
+            return image;
+        }
+        Target::Url(_) => Image::from_icon_name("web-browser-symbolic"),
+        Target::Copy(_) => Image::from_icon_name("edit-copy-symbolic"),
+        Target::Cliphist(_) => Image::from_icon_name("edit-copy-symbolic"),
+        Target::Query(_) => Image::from_icon_name("folder-open-symbolic"),
+        Target::Notice(_) => Image::from_icon_name("dialog-information-symbolic"),
+        Target::Action { .. } => Image::from_icon_name("system-run-symbolic"),
+        Target::Path(_) => Image::from_icon_name("text-x-generic-symbolic"),
+    };
+    image.set_pixel_size(32);
+    image.add_css_class("result-icon");
+    image
+}
+
+fn scaled_image(path: &std::path::Path, width: i32, height: i32) -> Option<Image> {
+    let pixbuf = gdk_pixbuf::Pixbuf::from_file_at_scale(path, width, height, true).ok()?;
+    let texture = gdk::Texture::for_pixbuf(&pixbuf);
+    Some(Image::from_paintable(Some(&texture)))
+}
+
+fn result_asset_name(item: &Item) -> Option<&'static str> {
+    if item.kind == "SETTING" || item.source == "Settings" {
+        return Some("settings");
+    }
+    if item.kind == "COMMAND" || item.source == "Commands" {
+        return Some("commands");
+    }
+    if item.kind != "SOURCE" {
+        return None;
+    }
+    match item.title.as_str() {
+        "Browser Bookmarks" => Some("browser-bookmarks"),
+        "Browser History" => Some("browser-history"),
+        "Git Commits" => Some("git-commits"),
+        "Clipboard History" => Some("clipboard-history"),
+        "Local Files" => Some("local-files"),
+        "Agents" => Some("agents"),
+        "Agent History" => Some("agent-history"),
+        _ => Some("all"),
+    }
+}
+
+fn install_css() {
+    let provider = gtk4::CssProvider::new();
+    provider.load_from_data(LAUNCHER_CSS);
+    if let Some(display) = gdk::Display::default() {
+        gtk4::style_context_add_provider_for_display(
+            &display,
+            &provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    }
+}
+
+fn apply_hyprland_hotkey(previous: &str, next: &str) {
+    let Some(next) = normalize_hotkey(next) else {
+        eprintln!("ProtonSearch: invalid hotkey; expected comma-separated Hyprland keys");
+        return;
+    };
+    if !crate::system::command_available("hyprctl") {
+        return;
+    }
+    if hyprland_uses_lua_config() {
+        eprintln!(
+            "ProtonSearch: Hyprland Lua bindings are managed by packaging/install-linux.sh; no runtime binding was changed"
+        );
+        return;
+    }
+    let previous = normalize_hotkey(previous).unwrap_or_else(|| "ALT,SPACE".to_string());
+    let _ = crate::system::run("hyprctl", &["keyword", "unbind", &previous]);
+    let Ok(executable) = std::env::current_exe() else {
+        eprintln!("ProtonSearch: could not resolve the launcher executable");
+        return;
+    };
+    let executable = executable.to_string_lossy().replace('\'', "'\\''");
+    let binding = format!("{next},exec,'{executable}' gui");
+    if let Ok(result) = crate::system::run("hyprctl", &["keyword", "bind", &binding]) {
+        if result.status != Some(0) {
+            eprintln!("ProtonSearch: Hyprland rejected the launcher hotkey");
+        }
+    }
+}
+
+fn unbind_hyprland_hotkey(value: &str) {
+    if !crate::system::command_available("hyprctl") {
+        return;
+    }
+    if hyprland_uses_lua_config() {
+        eprintln!(
+            "ProtonSearch: Hyprland Lua bindings are installer-managed; no runtime binding was removed"
+        );
+        return;
+    }
+    let value = normalize_hotkey(value).unwrap_or_else(|| "ALT,SPACE".to_string());
+    let _ = crate::system::run("hyprctl", &["keyword", "unbind", &value]);
+}
+
+fn hyprland_uses_lua_config() -> bool {
+    let mut candidates = Vec::new();
+    if let Some(config) = std::env::var_os("HYPRLAND_CONFIG") {
+        candidates.push(std::path::PathBuf::from(config));
+    }
+    if let Ok(paths) = XdgPaths::discover() {
+        candidates.push(paths.config.join("hypr/hyprland.lua"));
+    }
+    candidates
+        .iter()
+        .any(|path| path.is_file() && path.extension().is_some_and(|ext| ext == "lua"))
+}
+
+fn normalize_hotkey(value: &str) -> Option<String> {
+    let value = value.trim().to_ascii_uppercase();
+    if value.is_empty() || value.len() > 80 || value.contains(';') || value.contains('\n') {
+        return None;
+    }
+    let parts = value.split(',').map(str::trim).collect::<Vec<_>>();
+    if parts.len() < 2 || parts.iter().any(|part| part.is_empty()) {
+        return None;
+    }
+    if parts
+        .iter()
+        .flat_map(|part| part.chars())
+        .any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '_' | '+' | '-' | ' ')))
+    {
+        return None;
+    }
+    Some(parts.join(","))
+}

@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=ProtonSearch
+GenericName=Application Launcher
+Comment=Fast Linux launcher for apps, files, settings, and actions
+Exec="protonsearch-linux" gui
+TryExec=protonsearch-linux
+Terminal=false
+StartupNotify=true
+StartupWMClass=com.protonsearch.Linux
+Icon=protonsearch
+Categories=Utility;
+Keywords=launcher;search;apps;files;settings;
+Actions=Settings;
+
+[Desktop Action Settings]
+Name=Open ProtonSearch Settings
+Exec="protonsearch-linux" settings-ui

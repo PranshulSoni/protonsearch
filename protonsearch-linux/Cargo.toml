@@ -1,0 +1,31 @@
+[package]
+name = "protonsearch-linux"
+version = "1.0.0"
+edition = "2021"
+description = "Linux-native ProtonSearch backend and launcher tools"
+license = "MIT"
+
+[lib]
+name = "protonsearch_linux"
+path = "src/lib.rs"
+
+[[bin]]
+name = "protonsearch-linux"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+gtk4 = "0.10"
+gdk-pixbuf = "0.21"
+ksni = { version = "0.3.6", default-features = false, features = ["blocking", "async-io"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2.5"
+wait-timeout = "0.2"
+libc = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
