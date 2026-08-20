@@ -18,6 +18,7 @@ optdepends=(
   'brightnessctl: brightness actions'
   'playerctl: MPRIS media actions'
   'power-profiles-daemon: power profile actions'
+  'upower: battery status provider'
 )
 source=(
   '../../target/release/protonsearch-linux'
