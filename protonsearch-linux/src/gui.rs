@@ -39,6 +39,7 @@ window.proton-window {
     background-color: rgba(31, 32, 34, 0.98);
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 12px;
+    font-family: sans;
 }
 
 .launcher-root {
@@ -193,7 +194,11 @@ window.proton-window.light {
 }
 
 window.proton-window.light .launcher-root {
-    background-color: transparent;
+    background-color: #f6f7f8;
+}
+
+window.proton-window.light list.result-list {
+    background-color: #f6f7f8;
 }
 
 window.proton-window.light .search-shell {
@@ -236,9 +241,12 @@ window.proton-window.light row.result-row {
     background-color: transparent;
 }
 
-window.proton-window.light row.result-row:hover,
+window.proton-window.light row.result-row:hover {
+    background-color: #e9edf1;
+}
+
 window.proton-window.light row.result-row:selected {
-    background-color: #d9dde1;
+    background-color: #d7e5f5;
 }
 
 window.proton-window.light .image-preview {
@@ -253,6 +261,11 @@ window.proton-window.light .preview-title {
 window.proton-window.light .source-badge {
     color: #4f5861;
     background-color: rgba(32, 35, 38, 0.09);
+}
+
+window.proton-window.light .result-icon,
+window.proton-window.light .asset-icon {
+    color: #4b535b;
 }
 
 .settings-window {

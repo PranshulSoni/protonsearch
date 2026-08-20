@@ -6,13 +6,17 @@
 
 use crate::system;
 use crate::xdg::XdgPaths;
+use gdk_pixbuf::Pixbuf;
 use ksni::blocking::{Handle, TrayMethods};
 use ksni::menu::StandardItem;
-use ksni::{MenuItem, Tray};
+use ksni::{Icon, MenuItem, Tray};
+use std::io::Cursor;
 use std::io::Write;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::Duration;
+
+const PROTONSEARCH_ICON: &[u8] = include_bytes!("../assets/branding/protonsearch.png");
 
 pub struct ProtonTray {
     socket: PathBuf,
@@ -55,7 +59,38 @@ impl Tray for ProtonTray {
     }
 
     fn icon_name(&self) -> String {
-        "protonsearch".to_string()
+        String::new()
+    }
+
+    fn icon_pixmap(&self) -> Vec<Icon> {
+        let Ok(pixbuf) = Pixbuf::from_read(Cursor::new(PROTONSEARCH_ICON)) else {
+            return Vec::new();
+        };
+        let width = pixbuf.width();
+        let height = pixbuf.height();
+        let channels = pixbuf.n_channels();
+        let rowstride = pixbuf.rowstride() as usize;
+        let bytes = pixbuf.read_pixel_bytes();
+        let pixels = bytes.as_ref();
+        let mut data = Vec::with_capacity((width * height * 4) as usize);
+
+        for y in 0..height as usize {
+            let row = &pixels[y * rowstride..];
+            for x in 0..width as usize {
+                let offset = x * channels as usize;
+                let red = row[offset];
+                let green = row[offset + 1];
+                let blue = row[offset + 2];
+                let alpha = if channels >= 4 { row[offset + 3] } else { 255 };
+                data.extend_from_slice(&[alpha, red, green, blue]);
+            }
+        }
+
+        vec![Icon {
+            width,
+            height,
+            data,
+        }]
     }
 
     fn icon_theme_path(&self) -> String {
