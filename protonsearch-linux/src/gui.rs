@@ -273,25 +273,59 @@ window.proton-window.light row.result-row:hover {
     background-color: #e9edf1;
 }
 
+window.proton-window.light row.result-row:focus,
 window.proton-window.light row.result-row:selected {
     background-color: #d7e5f5;
 }
 
+window.proton-window.light row.result-row:hover label.result-title,
+window.proton-window.light row.result-row:focus label.result-title,
 window.proton-window.light row.result-row:selected label.result-title {
     color: #17202a;
 }
 
+window.proton-window.light row.result-row:hover label.result-subtitle,
+window.proton-window.light row.result-row:focus label.result-subtitle,
 window.proton-window.light row.result-row:selected label.result-subtitle {
     color: #435363;
 }
 
+window.proton-window.light row.result-row:hover label.source-badge,
+window.proton-window.light row.result-row:focus label.source-badge,
 window.proton-window.light row.result-row:selected label.source-badge {
     color: #263746;
     background-color: rgba(38, 55, 70, 0.12);
 }
 
+window.proton-window.light row.result-row:hover label,
+window.proton-window.light row.result-row:focus label,
 window.proton-window.light row.result-row:selected label {
     color: #202326;
+}
+
+/* Keep the native ListBox selected-row foreground from reintroducing the
+ * dark-theme accent color in light mode. The extra list/row qualifiers are
+ * intentional: GTK's theme gives selected descendants a more specific rule
+ * than a plain label class. */
+window.proton-window.light list.result-list row.result-row label.result-title {
+    color: #17202a;
+}
+
+window.proton-window.light list.result-list row.result-row label.result-subtitle {
+    color: #435363;
+}
+
+window.proton-window.light list.result-list row.result-row label.source-badge {
+    color: #263746;
+}
+
+window.proton-window.light row.result-row:hover .result-icon,
+window.proton-window.light row.result-row:focus .result-icon,
+window.proton-window.light row.result-row:selected .result-icon,
+window.proton-window.light row.result-row:hover .asset-icon,
+window.proton-window.light row.result-row:focus .asset-icon,
+window.proton-window.light row.result-row:selected .asset-icon {
+    color: #34424f;
 }
 
 window.proton-window.light .image-preview {
@@ -1983,6 +2017,12 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
     title.set_xalign(0.0);
     title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     title.set_single_line_mode(true);
+    if light_theme {
+        title.set_markup(&format!(
+            "<span foreground=\"#17202a\">{}</span>",
+            glib::markup_escape_text(&item.title)
+        ));
+    }
     title.add_css_class("result-title");
     text.append(&title);
 
@@ -1991,6 +2031,12 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
     subtitle.set_xalign(0.0);
     subtitle.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     subtitle.set_single_line_mode(true);
+    if light_theme {
+        subtitle.set_markup(&format!(
+            "<span foreground=\"#435363\">{}</span>",
+            glib::markup_escape_text(&item.subtitle)
+        ));
+    }
     subtitle.add_css_class("result-subtitle");
     text.append(&subtitle);
     content.append(&text);
@@ -1998,6 +2044,12 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
     let badge = Label::new(Some(&item.kind));
     badge.set_halign(Align::End);
     badge.set_hexpand(false);
+    if light_theme {
+        badge.set_markup(&format!(
+            "<span foreground=\"#263746\">{}</span>",
+            glib::markup_escape_text(&item.kind)
+        ));
+    }
     badge.add_css_class("source-badge");
     badge.set_tooltip_text(Some(&item.source));
     content.append(&badge);
