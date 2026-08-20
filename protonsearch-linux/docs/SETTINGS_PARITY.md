@@ -67,10 +67,12 @@ work on the current desktop.
 
 ## Installation and capability contract
 
-The Arch/user installer checks optional provider executables and offers an
-explicit `pacman` installation prompt. `--no-install-optional` is available for
-minimal or audited installs, while `--install-optional` is available for
-non-interactive release provisioning. The `doctor` command reports the actual
+The user installer detects the Linux family and checks optional provider
+executables using `pacman`, `apt-get`, or `dnf`. It maps package names per
+family and offers an explicit installation prompt. `--no-install-optional` is
+available for minimal or audited installs, while `--install-optional` is
+available for non-interactive release provisioning. The `doctor` command
+reports the actual distribution, package manager, desktop, display server, and
 provider state for the current machine, including missing packages, inactive
 services, unsupported hardware, and Hermes availability.
 

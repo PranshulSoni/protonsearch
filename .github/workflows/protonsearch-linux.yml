@@ -1,0 +1,85 @@
+name: ProtonSearch Linux
+
+on:
+  push:
+    paths:
+      - "protonsearch-linux/**"
+      - ".github/workflows/protonsearch-linux.yml"
+  pull_request:
+    paths:
+      - "protonsearch-linux/**"
+      - ".github/workflows/protonsearch-linux.yml"
+
+jobs:
+  ubuntu:
+    name: Ubuntu build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libgdk-pixbuf-2.0-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test and build release
+        working-directory: protonsearch-linux
+        run: |
+          cargo test --all-targets
+          cargo build --release --locked
+          bash -n packaging/install-linux.sh packaging/debian/build-deb.sh packaging/fedora/build-rpm.sh
+
+  debian:
+    name: Debian package-family compile check
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y build-essential curl pkg-config libgtk-4-dev libgdk-pixbuf-2.0-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test and build release
+        working-directory: protonsearch-linux
+        run: |
+          cargo test --all-targets
+          cargo build --release --locked
+
+  fedora:
+    name: Fedora package-family compile check
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          dnf install -y gcc gcc-c++ make curl pkg-config gtk4-devel gdk-pixbuf2-devel
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test and build release
+        working-directory: protonsearch-linux
+        run: |
+          cargo test --all-targets
+          cargo build --release --locked
+
+  arch:
+    name: Arch package-family compile check
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed base-devel curl pkgconf gtk4 gdk-pixbuf
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test and build release
+        working-directory: protonsearch-linux
+        run: |
+          cargo test --all-targets
+          cargo build --release --locked
+
+  mint-manual:
+    name: Linux Mint desktop validation remains manual
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep Mint desktop testing explicit
+        run: echo "Linux Mint/Cinnamon requires a real VM or desktop session; see docs/DISTRIBUTION_TEST_MATRIX.md"

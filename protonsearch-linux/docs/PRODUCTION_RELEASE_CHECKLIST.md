@@ -1,13 +1,25 @@
-# ProtonSearch Arch Linux production checklist
+# ProtonSearch Linux production checklist
 
-This is the release gate for `arch-linux-1.0.0`. A feature is only marked
+This is the release gate for `arch-linux-1.0.0` and the multi-distribution
+Linux release. A feature is only marked
 complete when its behavior is verified in the release build or explicitly
 marked Linux-dependent/deferred.
+
+The cross-distribution matrix is maintained in
+[`DISTRIBUTION_TEST_MATRIX.md`](DISTRIBUTION_TEST_MATRIX.md). The shared
+architecture and mappings are implemented, but only the Arch/Hyprland desktop
+environment has been executed in this workspace.
 
 ## Pipeline
 
 - [x] Repository and architecture inspection started
 - [ ] Windows-versus-Linux feature matrix completed
+- [x] Multi-distribution platform abstraction implemented
+- [x] Arch/Debian/Fedora dependency mappings implemented
+- [ ] Ubuntu clean desktop validation
+- [ ] Linux Mint clean Cinnamon validation
+- [ ] Debian clean desktop validation
+- [ ] Fedora clean GNOME validation
 - [x] Release performance profile recorded
 - [ ] Settings dependency audit completed
 - [ ] Linux Settings implementation verified page by page
@@ -31,7 +43,8 @@ marked Linux-dependent/deferred.
 ## Current verified baseline
 
 - Linux release binary builds with `cargo build --release --locked`.
-- Automated suite currently passes 28 tests.
+- Automated suite currently passes 33 tests, including distribution parsing and
+  package-name mapping tests.
 - `protonsearch.service` is enabled and resident on the development machine.
 - File/folder separation, image thumbnails, clipboard image handling, light
   theme contrast, bounded search providers, action worker isolation, and tray

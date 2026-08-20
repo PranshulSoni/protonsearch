@@ -15,6 +15,35 @@ SKIP_SERVICE=${PROTONSEARCH_SKIP_SERVICE:-0}
 SKIP_HOTKEY=${PROTONSEARCH_SKIP_HOTKEY:-0}
 INSTALL_OPTIONAL=${PROTONSEARCH_INSTALL_OPTIONAL:-ask}
 
+# /etc/os-release is the standard machine-readable Linux identity source.
+if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+fi
+DISTRO_ID=${ID:-unknown}
+DISTRO_LIKE=${ID_LIKE:-}
+DISTRO_FAMILY=other
+case "${DISTRO_ID} ${DISTRO_LIKE}" in
+    *arch*|*endeavouros*|*manjaro*|*garuda*|*artix*) DISTRO_FAMILY=arch ;;
+    *debian*|*ubuntu*|*linuxmint*|*mint*|*pop*|*elementary*) DISTRO_FAMILY=debian ;;
+    *fedora*|*rhel*|*centos*|*rocky*|*almalinux*) DISTRO_FAMILY=fedora ;;
+esac
+
+PACKAGE_MANAGER=
+case "${DISTRO_FAMILY}" in
+    arch) command -v pacman >/dev/null 2>&1 && PACKAGE_MANAGER=pacman ;;
+    debian) command -v apt-get >/dev/null 2>&1 && PACKAGE_MANAGER=apt-get ;;
+    fedora) command -v dnf >/dev/null 2>&1 && PACKAGE_MANAGER=dnf ;;
+esac
+if [[ -z "${PACKAGE_MANAGER}" ]]; then
+    for candidate in pacman apt-get dnf; do
+        if command -v "${candidate}" >/dev/null 2>&1; then
+            PACKAGE_MANAGER=${candidate}
+            break
+        fi
+    done
+fi
+
 usage() {
     cat <<'EOF'
 Usage: packaging/install-linux.sh [--skip-service] [--skip-hotkey]
@@ -23,8 +52,8 @@ Usage: packaging/install-linux.sh [--skip-service] [--skip-hotkey]
 Installs ProtonSearch for the current user, enables its resident service,
 installs the desktop entry and branded icon, and configures Alt+Space when
 the current compositor has a supported configuration format. Missing optional
-Arch providers are detected and offered for installation; no package or
-service is changed without confirmation.
+providers are detected and offered for installation through the detected
+package manager; no package or service is changed without confirmation.
 EOF
 }
 
@@ -40,34 +69,33 @@ for argument in "$@"; do
 done
 
 offer_optional_packages() {
-    command -v pacman >/dev/null 2>&1 || {
-        echo "ProtonSearch: pacman is unavailable; optional providers were not installed." >&2
+    if [[ -z "${PACKAGE_MANAGER}" ]]; then
+        echo "ProtonSearch: no supported package manager (pacman, apt-get, or dnf) was detected; optional providers were not installed." >&2
         return 0
-    }
+    fi
 
     local missing=()
     local package command_name
     local providers=(
-        "xdg-utils:gio"
-        "wl-clipboard:wl-paste"
-        "cliphist:cliphist"
-        "sqlite:sqlite3"
-        "poppler:pdftotext"
-        "grim:grim"
-        "slurp:slurp"
-        "networkmanager:nmcli"
-        "bluez-utils:bluetoothctl"
-        "wireplumber:wpctl"
-        "brightnessctl:brightnessctl"
-        "playerctl:playerctl"
-        "power-profiles-daemon:powerprofilesctl"
-        "upower:upower"
+        "gio"
+        "wl-paste"
+        "cliphist"
+        "sqlite3"
+        "pdftotext"
+        "grim"
+        "slurp"
+        "nmcli"
+        "bluetoothctl"
+        "wpctl"
+        "brightnessctl"
+        "playerctl"
+        "powerprofilesctl"
+        "upower"
     )
-    for provider in "${providers[@]}"; do
-        package=${provider%%:*}
-        command_name=${provider#*:}
+    for command_name in "${providers[@]}"; do
         if ! command -v "${command_name}" >/dev/null 2>&1; then
-            missing+=("${package}")
+            package=$(package_for_command "${command_name}")
+            [[ -n "${package}" ]] && missing+=("${package}")
         fi
     done
     if [[ ${#missing[@]} -eq 0 ]]; then
@@ -86,7 +114,7 @@ offer_optional_packages() {
     done
     echo "ProtonSearch: optional providers missing: ${unique_missing[*]}"
     if [[ "${INSTALL_OPTIONAL}" == 0 ]]; then
-        echo "ProtonSearch: optional installation disabled; install packages later with pacman if needed."
+        echo "ProtonSearch: optional installation disabled; install packages later with ${PACKAGE_MANAGER} if needed."
         return 0
     fi
     if [[ "${INSTALL_OPTIONAL}" != 1 && ! -t 0 ]]; then
@@ -95,13 +123,53 @@ offer_optional_packages() {
         return 0
     fi
     if [[ "${INSTALL_OPTIONAL}" != 1 ]]; then
-        read -r -p "Install missing optional ProtonSearch providers with pacman? [y/N] " answer
+        read -r -p "Install missing optional ProtonSearch providers with ${PACKAGE_MANAGER}? [y/N] " answer
         [[ "${answer}" =~ ^[Yy]$ ]] || {
             echo "ProtonSearch: optional providers were not installed."
             return 0
         }
     fi
-    sudo pacman -S --needed "${unique_missing[@]}"
+    install_optional_packages "${unique_missing[@]}"
+}
+
+package_for_command() {
+    local command_name=$1
+    case "${DISTRO_FAMILY}:${command_name}" in
+        arch:gio|debian:gio|fedora:gio) echo "xdg-utils" ;;
+        arch:wl-paste|debian:wl-paste|fedora:wl-paste) echo "wl-clipboard" ;;
+        arch:cliphist|debian:cliphist|fedora:cliphist) echo "cliphist" ;;
+        arch:sqlite3) echo "sqlite" ;;
+        debian:sqlite3) echo "sqlite3" ;;
+        fedora:sqlite3) echo "sqlite" ;;
+        arch:pdftotext) echo "poppler" ;;
+        debian:pdftotext|fedora:pdftotext) echo "poppler-utils" ;;
+        arch:grim|debian:grim|fedora:grim) echo "grim" ;;
+        arch:slurp|debian:slurp|fedora:slurp) echo "slurp" ;;
+        arch:nmcli) echo "networkmanager" ;;
+        debian:nmcli) echo "network-manager" ;;
+        fedora:nmcli) echo "NetworkManager" ;;
+        arch:bluetoothctl) echo "bluez-utils" ;;
+        debian:bluetoothctl|fedora:bluetoothctl) echo "bluez" ;;
+        arch:wpctl|debian:wpctl|fedora:wpctl) echo "wireplumber" ;;
+        arch:brightnessctl|debian:brightnessctl|fedora:brightnessctl) echo "brightnessctl" ;;
+        arch:playerctl|debian:playerctl|fedora:playerctl) echo "playerctl" ;;
+        arch:powerprofilesctl|debian:powerprofilesctl|fedora:powerprofilesctl) echo "power-profiles-daemon" ;;
+        arch:upower|debian:upower|fedora:upower) echo "upower" ;;
+        *) echo "" ;;
+    esac
+}
+
+install_optional_packages() {
+    local packages=("$@")
+    case "${PACKAGE_MANAGER}" in
+        pacman) sudo pacman -S --needed --noconfirm "${packages[@]}" ;;
+        apt-get) sudo apt-get install -y "${packages[@]}" ;;
+        dnf) sudo dnf install -y "${packages[@]}" ;;
+        *)
+            echo "ProtonSearch: cannot install optional packages; package manager is unsupported." >&2
+            return 1
+            ;;
+    esac
 }
 
 offer_optional_packages

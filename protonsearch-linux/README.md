@@ -2,6 +2,25 @@
 
 Linux-native launcher and search providers for ProtonSearch.
 
+## Distribution support
+
+ProtonSearch uses one shared Linux backend with runtime detection for the
+distribution family, package manager, desktop environment, display server,
+and available capabilities.
+
+| Distribution | Family | Validation status |
+| --- | --- | --- |
+| Arch Linux | Arch | Officially tested on Arch/Hyprland |
+| Ubuntu | Debian | Compatibility mapping added; desktop validation pending |
+| Linux Mint | Debian | Compatibility mapping added; Cinnamon validation pending |
+| Debian | Debian | Compatibility mapping added; desktop validation pending |
+| Fedora | Fedora/RHEL | Compatibility mapping added; GNOME validation pending |
+
+Other Arch, Debian/Ubuntu, Fedora/RHEL, and unknown distributions use generic
+Linux capability detection and are community-compatible until they complete
+the release matrix. A successful build alone never marks a distribution
+officially tested.
+
 ## Install from a source checkout
 
 ```sh
@@ -25,10 +44,11 @@ The app stores user settings under `$XDG_CONFIG_HOME/protonsearch` and data
 under `$XDG_DATA_HOME/protonsearch`, so every user gets their own folders and
 configuration.
 
-The installer builds and installs the optimized release binary. It asks before
-installing missing optional Arch providers; it never silently installs packages
-or overwrites an existing `Alt + Space` binding. To install all detected
-optional providers explicitly:
+The installer builds and installs the optimized release binary. It detects
+`pacman`, `apt-get`, or `dnf`, maps optional providers to distribution-specific
+package names, asks before installing missing packages, and never silently
+overwrites an existing `Alt + Space` binding. To install all detected optional
+providers explicitly:
 
 ```sh
 ./packaging/install-linux.sh --install-optional
@@ -40,13 +60,14 @@ To install ProtonSearch without changing packages:
 ./packaging/install-linux.sh --no-install-optional
 ```
 
-After installation, run `protonsearch-linux doctor` to see which providers are
-available on the current desktop. Wi-Fi, Bluetooth, audio, brightness, power,
-display, screenshot, PDF, clipboard, and browser providers are capability
-checked at runtime. A missing provider produces a readable explanation rather
-than a blank result or raw diagnostic object. Some providers also require the
-desktop service or hardware permissions to be active (for example NetworkManager
-for Wi-Fi and a backlight device for brightness).
+After installation, run `protonsearch-linux doctor` to see the detected
+distribution, family, package manager, desktop, display server, and providers.
+Wi-Fi, Bluetooth, audio, brightness, power, display, screenshot, PDF,
+clipboard, and browser providers are capability checked at runtime. A missing
+provider produces a readable explanation rather than a blank result or raw
+diagnostic object. Some providers also require a desktop service or hardware
+permissions to be active (for example NetworkManager for Wi-Fi and a backlight
+device for brightness).
 
 Hermes Agent is an optional external application. If its `hermes` command is
 already installed, the Agents and Agent History sources use it automatically.
@@ -94,9 +115,10 @@ protonsearch-linux agent "Ask Hermes a question"
 ```
 
 Linux does not provide one universal global-shortcut API across every desktop
-environment. Hyprland and Sway are configured automatically; on other desktop
-environments the installer leaves existing shortcuts untouched and prints the
-exact executable to assign to `Alt + Space` in the desktop keyboard settings.
+environment. Hyprland and Sway are configured automatically; on GNOME, KDE,
+Cinnamon, XFCE, i3, and other desktops the installer leaves existing shortcuts
+untouched and prints the exact executable to assign to `Alt + Space` in the
+desktop keyboard settings. Wayland and X11 are detected independently.
 
 ## Release checklist
 
