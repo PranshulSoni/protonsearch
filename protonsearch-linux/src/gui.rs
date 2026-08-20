@@ -17,7 +17,7 @@ use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
     ComboBoxText, Entry, EventControllerKey, Image, Label, ListBox, ListBoxRow, MessageDialog,
     MessageType, Orientation, PropagationPhase, ResponseType, Revealer, RevealerTransitionType,
-    ScrolledWindow, SelectionMode, SpinButton,
+    ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar, StackTransitionType,
 };
 use std::cell::{Cell, RefCell};
 use std::fs;
@@ -216,6 +216,37 @@ window.proton-window.light row.result-row:selected {
     background-color: #202122;
 }
 
+.settings-shell {
+    background-color: #202122;
+}
+
+.settings-sidebar {
+    background-color: #18191a;
+    padding: 18px 10px;
+}
+
+.settings-sidebar-title {
+    color: #f1f2f3;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+stacksidebar row {
+    color: #aeb3b8;
+    border-radius: 6px;
+    padding: 7px 10px;
+}
+
+stacksidebar row:hover {
+    background-color: #2d3033;
+}
+
+stacksidebar row:selected {
+    color: #ffffff;
+    background-color: #45494d;
+}
+
 .settings-heading {
     color: #f1f2f3;
     font-size: 24px;
@@ -312,6 +343,31 @@ fn run_application(
     Ok(())
 }
 
+fn settings_page(title: &str, description: &str) -> (GtkBox, ScrolledWindow) {
+    let page = GtkBox::new(Orientation::Vertical, 12);
+    page.set_margin_top(24);
+    page.set_margin_bottom(24);
+    page.set_margin_start(28);
+    page.set_margin_end(28);
+
+    let heading = Label::new(Some(title));
+    heading.set_halign(Align::Start);
+    heading.add_css_class("settings-heading");
+    page.append(&heading);
+
+    let intro = Label::new(Some(description));
+    intro.set_halign(Align::Start);
+    intro.add_css_class("result-subtitle");
+    page.append(&intro);
+
+    let scroll = ScrolledWindow::builder()
+        .child(&page)
+        .vexpand(true)
+        .hexpand(true)
+        .build();
+    (page, scroll)
+}
+
 pub fn run_settings(paths: XdgPaths) -> Result<()> {
     let application = Application::builder()
         .application_id("com.protonsearch.Linux.Settings")
@@ -331,51 +387,83 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             current.theme_mode.to_ascii_lowercase()
         ));
         install_css();
-        let root = GtkBox::new(Orientation::Vertical, 12);
-        root.set_margin_top(22);
-        root.set_margin_bottom(22);
-        root.set_margin_start(24);
-        root.set_margin_end(24);
+        let root = GtkBox::new(Orientation::Horizontal, 0);
+        root.add_css_class("settings-shell");
 
-        let heading = GtkBox::new(Orientation::Horizontal, 12);
-        heading.add_css_class("settings-heading-row");
-        let logo = crate::icons::protonsearch(38);
-        heading.append(&logo);
-        let title = Label::new(Some("General"));
-        title.set_halign(Align::Start);
-        title.add_css_class("settings-heading");
-        heading.append(&title);
-        root.append(&heading);
-        let intro = Label::new(Some(
-            "Linux-native equivalents of ProtonSearch Windows settings. Desktop-dependent controls are labelled below.",
-        ));
-        intro.set_halign(Align::Start);
-        intro.add_css_class("result-subtitle");
-        root.append(&intro);
+        let sidebar = GtkBox::new(Orientation::Vertical, 10);
+        sidebar.add_css_class("settings-sidebar");
+        sidebar.set_width_request(190);
+        let logo = crate::icons::protonsearch(48);
+        logo.set_halign(Align::Center);
+        sidebar.append(&logo);
+        let sidebar_title = Label::new(Some("ProtonSearch"));
+        sidebar_title.add_css_class("settings-sidebar-title");
+        sidebar_title.set_halign(Align::Center);
+        sidebar.append(&sidebar_title);
+
+        let stack = Stack::new();
+        stack.set_vexpand(true);
+        stack.set_hexpand(true);
+        stack.set_transition_type(StackTransitionType::SlideLeftRight);
+        let stack_sidebar = StackSidebar::new();
+        stack_sidebar.set_stack(&stack);
+        stack_sidebar.set_vexpand(true);
+
+        let (general_page, general_scroll) = settings_page(
+            "General",
+            "Startup, focus behavior, and launcher visibility.",
+        );
+        let (appearance_page, appearance_scroll) = settings_page(
+            "Appearance and layout",
+            "Theme and dimensions applied to the running launcher.",
+        );
+        let (search_page, search_scroll) = settings_page(
+            "Search",
+            "Search roots, privacy boundaries, and application visibility.",
+        );
+        let (providers_page, providers_scroll) = settings_page(
+            "Providers",
+            "Enable the Linux-native providers you want available.",
+        );
+        let (hotkey_page, hotkey_scroll) = settings_page(
+            "Hotkey",
+            "The compositor-owned shortcut used to toggle ProtonSearch.",
+        );
+        let (safety_page, safety_scroll) = settings_page(
+            "Safety and Linux",
+            "Power-action confirmation, diagnostics, and platform notes.",
+        );
+
+        stack.add_titled(&general_scroll, Some("general"), "General");
+        stack.add_titled(&appearance_scroll, Some("appearance"), "Appearance");
+        stack.add_titled(&search_scroll, Some("search"), "Search");
+        stack.add_titled(&providers_scroll, Some("providers"), "Providers");
+        stack.add_titled(&hotkey_scroll, Some("hotkey"), "Hotkey");
+        stack.add_titled(&safety_scroll, Some("safety"), "Safety & Linux");
 
         let startup = CheckButton::with_label("Run ProtonSearch in the background at login");
         startup.set_active(current.run_on_startup);
         startup.set_tooltip_text(Some(
             "Uses the ProtonSearch systemd user service when it is installed",
         ));
-        root.append(&startup);
+        general_page.append(&startup);
         let hide_on_focus_loss = CheckButton::with_label("Hide launcher when it loses focus");
         hide_on_focus_loss.set_active(current.hide_on_lose_focus);
-        root.append(&hide_on_focus_loss);
+        general_page.append(&hide_on_focus_loss);
         let show_taskbar = CheckButton::with_label("Show a taskbar/dock entry when supported");
         show_taskbar.set_active(current.show_taskbar);
         show_taskbar.set_tooltip_text(Some(
             "Wayland compositors and desktop shells decide whether this is available",
         ));
-        root.append(&show_taskbar);
+        general_page.append(&show_taskbar);
         let show_placeholder = CheckButton::with_label("Show the launcher search placeholder");
         show_placeholder.set_active(current.show_placeholder);
-        root.append(&show_placeholder);
+        general_page.append(&show_placeholder);
 
         let appearance_label = Label::new(Some("Appearance and layout"));
         appearance_label.set_halign(Align::Start);
         appearance_label.add_css_class("settings-section-title");
-        root.append(&appearance_label);
+        appearance_page.append(&appearance_label);
         let theme = ComboBoxText::new();
         theme.append(Some("system"), "System theme");
         theme.append(Some("dark"), "Dark");
@@ -389,99 +477,99 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         theme.set_tooltip_text(Some(
             "Uses GTK colors; exact appearance follows the current desktop theme",
         ));
-        root.append(&theme);
+        appearance_page.append(&theme);
 
         let width_label = Label::new(Some("Launcher width"));
         width_label.set_halign(Align::Start);
         width_label.add_css_class("settings-label");
-        root.append(&width_label);
+        appearance_page.append(&width_label);
         let width = SpinButton::with_range(480.0, 1600.0, 10.0);
         width.set_value(f64::from(current.window_width.clamp(480, 1600)));
-        root.append(&width);
+        appearance_page.append(&width);
 
         let item_height_label = Label::new(Some("Result row height"));
         item_height_label.set_halign(Align::Start);
         item_height_label.add_css_class("settings-label");
-        root.append(&item_height_label);
+        appearance_page.append(&item_height_label);
         let item_height = SpinButton::with_range(52.0, 120.0, 4.0);
         item_height.set_value(f64::from(current.item_height.clamp(52, 120)));
-        root.append(&item_height);
+        appearance_page.append(&item_height);
 
         let search_bar_height_label = Label::new(Some("Search bar height"));
         search_bar_height_label.set_halign(Align::Start);
         search_bar_height_label.add_css_class("settings-label");
-        root.append(&search_bar_height_label);
+        appearance_page.append(&search_bar_height_label);
         let search_bar_height = SpinButton::with_range(42.0, 100.0, 2.0);
         search_bar_height.set_value(f64::from(current.search_bar_height.clamp(42, 100)));
-        root.append(&search_bar_height);
+        appearance_page.append(&search_bar_height);
 
         let search_label = Label::new(Some("Search"));
         search_label.set_halign(Align::Start);
         search_label.add_css_class("settings-section-title");
-        root.append(&search_label);
+        search_page.append(&search_label);
         let include_hidden = CheckButton::with_label("Include hidden files in search");
         include_hidden.set_active(current.include_hidden);
-        root.append(&include_hidden);
+        search_page.append(&include_hidden);
         let terminal_apps = CheckButton::with_label("Include terminal applications");
         terminal_apps.set_active(current.show_terminal_apps);
-        root.append(&terminal_apps);
+        search_page.append(&terminal_apps);
 
         let roots_label = Label::new(Some("Additional search roots (comma or newline separated)"));
         roots_label.set_halign(Align::Start);
         roots_label.add_css_class("settings-label");
-        root.append(&roots_label);
+        search_page.append(&roots_label);
         let roots = Entry::builder()
             .placeholder_text("/home/user/Projects, /mnt/data")
             .text(current.search_roots.join("\n"))
             .build();
-        root.append(&roots);
+        search_page.append(&roots);
 
         let ignored_label = Label::new(Some("Ignored directory names (comma separated)"));
         ignored_label.set_halign(Align::Start);
         ignored_label.add_css_class("settings-label");
-        root.append(&ignored_label);
+        search_page.append(&ignored_label);
         let ignored = Entry::builder()
             .placeholder_text("node_modules, target, .cache")
             .text(current.ignored_names.join(", "))
             .build();
-        root.append(&ignored);
+        search_page.append(&ignored);
 
         let providers_label = Label::new(Some("Providers"));
         providers_label.set_halign(Align::Start);
         providers_label.add_css_class("settings-section-title");
-        root.append(&providers_label);
+        providers_page.append(&providers_label);
         let system_actions = CheckButton::with_label("Enable system actions");
         system_actions.set_active(current.enable_system_actions);
-        root.append(&system_actions);
+        providers_page.append(&system_actions);
         let hyprland = CheckButton::with_label("Enable Hyprland providers");
         hyprland.set_active(current.enable_hyprland);
-        root.append(&hyprland);
+        providers_page.append(&hyprland);
         let calculator = CheckButton::with_label("Enable calculator");
         calculator.set_active(current.enable_calculator);
-        root.append(&calculator);
+        providers_page.append(&calculator);
         let git_commits = CheckButton::with_label("Enable Git commit search");
         git_commits.set_active(current.enable_git_commits);
-        root.append(&git_commits);
+        providers_page.append(&git_commits);
         let clipboard_history = CheckButton::with_label("Enable clipboard history");
         clipboard_history.set_active(current.enable_clipboard_history);
-        root.append(&clipboard_history);
+        providers_page.append(&clipboard_history);
         let ocr = CheckButton::with_label("Enable OCR image search");
         ocr.set_active(current.enable_ocr);
-        root.append(&ocr);
+        providers_page.append(&ocr);
         let browser_history = CheckButton::with_label("Enable browser history search");
         browser_history.set_active(current.enable_browser_history);
-        root.append(&browser_history);
+        providers_page.append(&browser_history);
 
         let safety_label = Label::new(Some("Safety and diagnostics"));
         safety_label.set_halign(Align::Start);
         safety_label.add_css_class("settings-section-title");
-        root.append(&safety_label);
+        safety_page.append(&safety_label);
         let confirm_power = CheckButton::with_label("Ask before power and session actions");
         confirm_power.set_active(current.confirm_power_actions);
         confirm_power.set_tooltip_text(Some(
             "Explicit confirmation remains required for destructive CLI actions",
         ));
-        root.append(&confirm_power);
+        safety_page.append(&confirm_power);
         let log_level = ComboBoxText::new();
         for level in ["error", "warn", "info", "debug"] {
             log_level.append(Some(level), level);
@@ -492,7 +580,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         };
         log_level.set_active_id(Some(log_id));
         log_level.set_tooltip_text(Some("Controls diagnostic verbosity for future providers"));
-        root.append(&log_level);
+        safety_page.append(&log_level);
 
         let native_note = Label::new(Some(
             "Windows-only Registry, taskbar, wallpaper, Win32 window placement, agent API, and updater controls are intentionally not shown here. Wi-Fi, Bluetooth, audio, brightness, display, power, keyboard, mouse, notifications, privacy, date/time, users, region, and software settings are available from the launcher’s Linux-native commands.",
@@ -500,33 +588,42 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         native_note.set_wrap(true);
         native_note.set_halign(Align::Start);
         native_note.add_css_class("settings-help");
-        root.append(&native_note);
+        safety_page.append(&native_note);
 
         let hotkey_title = Label::new(Some("Launcher hotkey"));
         hotkey_title.set_halign(Align::Start);
         hotkey_title.add_css_class("settings-label");
-        root.append(&hotkey_title);
+        hotkey_page.append(&hotkey_title);
         let hotkey_help = Label::new(Some(
             "Hyprland notation. Default: ALT,SPACE. The installer manages the global binding safely.",
         ));
         hotkey_help.set_halign(Align::Start);
         hotkey_help.add_css_class("settings-help");
-        root.append(&hotkey_help);
+        hotkey_page.append(&hotkey_help);
         let hotkey = Entry::builder()
             .placeholder_text("ALT,SPACE")
             .text(&current.hotkey)
             .build();
-        root.append(&hotkey);
+        hotkey_page.append(&hotkey);
 
         let save = Button::with_label("Save settings");
         save.set_halign(Align::End);
-        root.append(&save);
-        let scroll = ScrolledWindow::builder()
-            .child(&root)
-            .vexpand(true)
-            .hexpand(true)
-            .build();
-        window.set_child(Some(&scroll));
+        let footer = GtkBox::new(Orientation::Horizontal, 8);
+        footer.set_margin_top(10);
+        footer.set_margin_bottom(12);
+        footer.set_margin_start(18);
+        footer.set_margin_end(18);
+        footer.append(&save);
+
+        sidebar.append(&stack_sidebar);
+        root.append(&sidebar);
+        let content = GtkBox::new(Orientation::Vertical, 0);
+        content.set_hexpand(true);
+        content.set_vexpand(true);
+        content.append(&stack);
+        content.append(&footer);
+        root.append(&content);
+        window.set_child(Some(&root));
 
         let paths_for_save = paths.clone();
         let window_for_save = window.clone();
@@ -557,6 +654,12 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
                 .active_id()
                 .map(|id| id.to_string())
                 .unwrap_or_else(|| "info".to_string());
+            let appearance_changed = next.theme_mode != current.theme_mode
+                || next.window_width != current.window_width
+                || next.item_height != current.item_height
+                || next.search_bar_height != current.search_bar_height
+                || next.show_placeholder != current.show_placeholder
+                || next.hide_on_lose_focus != current.hide_on_lose_focus;
             let hotkey_text = hotkey.text();
             let requested_hotkey = if hotkey_text.trim().is_empty() {
                 "ALT,SPACE"
@@ -601,6 +704,9 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
                 unbind_hyprland_hotkey(&current.hotkey);
             }
             notify_launcher(&paths_for_save, "reload");
+            if appearance_changed {
+                restart_launcher_service_if_active();
+            }
             window_for_save.close();
         });
         window.present();
@@ -741,6 +847,23 @@ fn sync_startup_service(enabled: bool) -> anyhow::Result<()> {
             "systemd user service could not be {verb}d: {}",
             result.stderr.trim()
         )
+    }
+}
+
+fn restart_launcher_service_if_active() {
+    let Ok(active) = crate::system::run(
+        "systemctl",
+        &["--user", "is-active", "--quiet", "protonsearch.service"],
+    ) else {
+        return;
+    };
+    if active.status != Some(0) {
+        return;
+    }
+    if let Err(error) =
+        crate::system::run("systemctl", &["--user", "restart", "protonsearch.service"])
+    {
+        eprintln!("ProtonSearch: could not apply launcher appearance: {error:#}");
     }
 }
 
