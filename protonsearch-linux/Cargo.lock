@@ -851,6 +851,7 @@ name = "protonsearch-linux"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-channel",
  "gdk-pixbuf",
  "gtk4",
  "ksni",

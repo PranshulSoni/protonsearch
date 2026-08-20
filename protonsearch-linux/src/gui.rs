@@ -475,7 +475,7 @@ pub fn run_resident(paths: XdgPaths) -> Result<()> {
 fn run_application(
     paths: XdgPaths,
     socket_guard: SocketGuard,
-    commands: mpsc::Receiver<UiCommand>,
+    commands: async_channel::Receiver<UiCommand>,
 ) -> Result<()> {
     let _tray = crate::tray::ProtonTray::start(&paths);
     let application = Application::builder()
@@ -1138,7 +1138,7 @@ impl Drop for SocketGuard {
 fn start_ipc(
     paths: &XdgPaths,
     notify_existing: bool,
-) -> Option<(SocketGuard, mpsc::Receiver<UiCommand>)> {
+) -> Option<(SocketGuard, async_channel::Receiver<UiCommand>)> {
     let socket = ipc_socket(paths);
     let directory = socket.parent()?.to_path_buf();
     let _ = fs::create_dir_all(&directory);
@@ -1171,14 +1171,16 @@ fn start_ipc(
         }
         Err(_) => return None,
     };
-    let _ = listener.set_nonblocking(true);
     let stop = Arc::new(AtomicBool::new(false));
     let stop_for_thread = stop.clone();
-    let (sender, receiver) = mpsc::channel();
+    let (sender, receiver) = async_channel::unbounded();
     let thread = thread::spawn(move || {
         while !stop_for_thread.load(Ordering::Acquire) {
             match listener.accept() {
                 Ok((stream, _)) => {
+                    if stop_for_thread.load(Ordering::Acquire) {
+                        break;
+                    }
                     let mut message = String::new();
                     let _ = std::io::BufReader::new(stream).read_line(&mut message);
                     for line in message.lines().map(str::trim) {
@@ -1188,12 +1190,9 @@ fn start_ipc(
                             _ => None,
                         };
                         if let Some(command) = command {
-                            let _ = sender.send(command);
+                            let _ = sender.send_blocking(command);
                         }
                     }
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(40));
                 }
                 Err(_) => break,
             }
@@ -1295,7 +1294,7 @@ fn activate_target(
     window: &ApplicationWindow,
     status: &Label,
     animation: &Rc<RefCell<Option<glib::SourceId>>>,
-    action_sender: &mpsc::Sender<anyhow::Result<Option<String>>>,
+    action_sender: &async_channel::Sender<anyhow::Result<Option<String>>>,
     target: Target,
 ) {
     if matches!(&target, Target::Action { .. }) {
@@ -1305,7 +1304,7 @@ fn activate_target(
         set_launcher_status(status, "Running action…");
         thread::spawn(move || {
             let result = providers::activate(&paths_for_worker, &target_for_worker);
-            let _ = sender_for_worker.send(result);
+            let _ = sender_for_worker.send_blocking(result);
         });
         return;
     }
@@ -1334,7 +1333,7 @@ fn activate_item(
     entry: &Entry,
     status: &Label,
     animation: &Rc<RefCell<Option<glib::SourceId>>>,
-    action_sender: &mpsc::Sender<anyhow::Result<Option<String>>>,
+    action_sender: &async_channel::Sender<anyhow::Result<Option<String>>>,
     item: Item,
 ) {
     match item.target {
@@ -1396,7 +1395,11 @@ fn activate_item(
     }
 }
 
-fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Receiver<UiCommand>) {
+fn build_window(
+    application: &Application,
+    paths: XdgPaths,
+    commands: async_channel::Receiver<UiCommand>,
+) {
     let linux_settings = settings::load(&paths);
     let settings_state = Rc::new(RefCell::new(linux_settings.clone()));
     let window = ApplicationWindow::builder()
@@ -1512,8 +1515,9 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let items = Rc::new(RefCell::new(Vec::<Item>::new()));
     let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
     let generation = Rc::new(Cell::new(0_u64));
-    let (sender, receiver) = mpsc::channel::<(u64, String, Vec<Item>)>();
-    let (action_sender, action_receiver) = mpsc::channel::<anyhow::Result<Option<String>>>();
+    let (sender, receiver) = async_channel::unbounded::<(u64, String, Vec<Item>)>();
+    let (action_sender, action_receiver) =
+        async_channel::unbounded::<anyhow::Result<Option<String>>>();
     let (request_sender, request_receiver) =
         mpsc::channel::<(u64, String, settings::LinuxSettings)>();
     let worker_paths = paths.clone();
@@ -1530,7 +1534,10 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                 worker_settings = next_settings;
             }
             let results = providers::collect(&worker_paths, &worker_settings, &query);
-            if sender.send((request_generation, query, results)).is_err() {
+            if sender
+                .send_blocking((request_generation, query, results))
+                .is_err()
+            {
                 break;
             }
         }
@@ -1607,8 +1614,8 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let status_for_receiver = status.clone();
     let row_height_for_receiver = row_height.clone();
     let settings_for_receiver = settings_state.clone();
-    glib::timeout_add_local(Duration::from_millis(50), move || {
-        while let Ok((result_generation, query, results)) = receiver.try_recv() {
+    glib::MainContext::default().spawn_local(async move {
+        while let Ok((result_generation, query, results)) = receiver.recv().await {
             if result_generation == generation_for_receiver.get() {
                 *items_for_receiver.borrow_mut() = results.clone();
                 update(
@@ -1621,19 +1628,16 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                 );
             }
         }
-        glib::ControlFlow::Continue
     });
 
     let action_status = status.clone();
-    glib::timeout_add_local(Duration::from_millis(80), move || {
-        while let Ok(result) = action_receiver.try_recv() {
+    glib::MainContext::default().spawn_local(async move {
+        while let Ok(result) = action_receiver.recv().await {
             match result {
-                Ok(Some(feedback)) => {
-                    set_launcher_status(
-                        &action_status,
-                        feedback.lines().next().unwrap_or(feedback.as_str()),
-                    );
-                }
+                Ok(Some(feedback)) => set_launcher_status(
+                    &action_status,
+                    feedback.lines().next().unwrap_or(feedback.as_str()),
+                ),
                 Ok(None) => set_launcher_status(&action_status, "Action completed"),
                 Err(error) => {
                     set_launcher_status(&action_status, &format!("Action failed: {error}"));
@@ -1642,7 +1646,6 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                 }
             }
         }
-        glib::ControlFlow::Continue
     });
 
     let window_for_commands = window.clone();
@@ -1654,8 +1657,8 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let settings_for_commands = settings_state.clone();
     let request_sender_for_commands = request_sender.clone();
     let generation_for_commands = generation.clone();
-    glib::timeout_add_local(Duration::from_millis(50), move || {
-        while let Ok(command) = commands.try_recv() {
+    glib::MainContext::default().spawn_local(async move {
+        while let Ok(command) = commands.recv().await {
             match command {
                 UiCommand::Toggle if window_for_commands.is_visible() => {
                     animate_hide(&window_for_commands, &animation_for_commands);
@@ -1697,7 +1700,6 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                 }
             }
         }
-        glib::ControlFlow::Continue
     });
 
     let list_for_enter = list.clone();
