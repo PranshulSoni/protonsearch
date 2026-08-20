@@ -1,0 +1,51 @@
+pkgname=protonsearch-linux
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Linux-native launcher and search providers for ProtonSearch'
+arch=('x86_64')
+license=('MIT')
+depends=('gtk4' 'gdk-pixbuf2')
+optdepends=(
+  'wl-clipboard: Wayland clipboard integration'
+  'cliphist: clipboard history provider'
+  'grim: screenshot capture'
+  'slurp: interactive screenshot region selection'
+  'tesseract: OCR search'
+  'poppler: PDF text search'
+  'networkmanager: Wi-Fi actions through nmcli'
+  'bluez-utils: Bluetooth actions through bluetoothctl'
+  'wireplumber: audio actions through wpctl'
+  'brightnessctl: brightness actions'
+  'playerctl: MPRIS media actions'
+  'power-profiles-daemon: power profile actions'
+)
+source=(
+  '../../target/release/protonsearch-linux'
+  '../../assets/branding/protonsearch.png'
+  '../../assets/branding/protonsearch-128.png'
+  '../../README.md'
+  '../../docs/SETTINGS_PARITY.md'
+  'protonsearch-linux.desktop'
+  'protonsearch.service'
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm755 "${srcdir}/protonsearch-linux" \
+    "${pkgdir}/usr/bin/protonsearch-linux"
+
+  install -Dm644 "${srcdir}/protonsearch-linux.desktop" \
+    "${pkgdir}/usr/share/applications/protonsearch-linux.desktop"
+  install -Dm644 "${srcdir}/protonsearch.png" \
+    "${pkgdir}/usr/share/icons/hicolor/256x256/apps/protonsearch.png"
+  install -Dm644 "${srcdir}/protonsearch-128.png" \
+    "${pkgdir}/usr/share/icons/hicolor/128x128/apps/protonsearch.png"
+
+  install -Dm644 "${srcdir}/protonsearch.service" \
+    "${pkgdir}/usr/lib/systemd/user/protonsearch.service"
+
+  install -Dm644 "${srcdir}/README.md" \
+    "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+  install -Dm644 "${srcdir}/SETTINGS_PARITY.md" \
+    "${pkgdir}/usr/share/doc/${pkgname}/SETTINGS_PARITY.md"
+}
