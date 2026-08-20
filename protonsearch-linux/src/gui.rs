@@ -188,11 +188,21 @@ row.result-row:selected {
 }
 
 window.proton-window.light {
-    background-color: rgba(246, 247, 248, 0.98);
+    background-color: #f6f7f8;
+    border-color: rgba(32, 35, 38, 0.18);
+}
+
+window.proton-window.light .launcher-root {
+    background-color: transparent;
 }
 
 window.proton-window.light .search-shell {
-    background-color: #e5e7e9;
+    background-color: #ffffff;
+    border-color: rgba(32, 35, 38, 0.16);
+}
+
+window.proton-window.light .search-icon {
+    color: #4b535b;
 }
 
 window.proton-window.light entry.search-entry,
@@ -201,15 +211,48 @@ window.proton-window.light .empty-state-title {
     color: #202326;
 }
 
+window.proton-window.light entry.search-entry {
+    caret-color: #202326;
+}
+
+window.proton-window.light .category-chip {
+    color: #687078;
+}
+
+window.proton-window.light .category-chip.active {
+    color: #202326;
+    background-color: #d7dce1;
+}
+
 window.proton-window.light .result-subtitle,
 window.proton-window.light .status-label,
-window.proton-window.light .footer-hint {
+window.proton-window.light .footer-hint,
+window.proton-window.light .preview-hint,
+window.proton-window.light .empty-state-hint {
     color: #5e646a;
+}
+
+window.proton-window.light row.result-row {
+    background-color: transparent;
 }
 
 window.proton-window.light row.result-row:hover,
 window.proton-window.light row.result-row:selected {
     background-color: #d9dde1;
+}
+
+window.proton-window.light .image-preview {
+    background-color: #ffffff;
+    border-color: rgba(32, 35, 38, 0.16);
+}
+
+window.proton-window.light .preview-title {
+    color: #202326;
+}
+
+window.proton-window.light .source-badge {
+    color: #4f5861;
+    background-color: rgba(32, 35, 38, 0.09);
 }
 
 .settings-window {
@@ -384,7 +427,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         window.add_css_class("settings-window");
         window.add_css_class(&format!(
             "settings-theme-{}",
-            current.theme_mode.to_ascii_lowercase()
+            theme_class(&current.theme_mode)
         ));
         install_css();
         let root = GtkBox::new(Orientation::Horizontal, 0);
@@ -999,7 +1042,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     window.set_decorated(false);
     window.set_resizable(false);
     window.add_css_class("proton-window");
-    window.add_css_class(&linux_settings.theme_mode.to_ascii_lowercase());
+    window.add_css_class(theme_class(&linux_settings.theme_mode));
     install_css();
 
     let root = GtkBox::new(Orientation::Vertical, 10);
@@ -1200,6 +1243,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
 
     let window_for_commands = window.clone();
     let entry_for_commands = entry.clone();
+    let search_shell_for_commands = search_shell.clone();
     let animation_for_commands = animation.clone();
     let paths_for_commands = paths.clone();
     let settings_for_commands = settings_state.clone();
@@ -1220,6 +1264,20 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                 }
                 UiCommand::Reload => {
                     let next_settings = settings::load(&paths_for_commands);
+                    window_for_commands.remove_css_class("dark");
+                    window_for_commands.remove_css_class("light");
+                    window_for_commands.remove_css_class("system");
+                    window_for_commands.add_css_class(theme_class(&next_settings.theme_mode));
+                    window_for_commands
+                        .set_default_size(next_settings.window_width.clamp(480, 1600) as i32, 500);
+                    search_shell_for_commands
+                        .set_height_request(next_settings.search_bar_height.clamp(42, 100) as i32);
+                    if next_settings.show_placeholder {
+                        entry_for_commands
+                            .set_placeholder_text(Some("Search files, code, PDFs, OCR..."));
+                    } else {
+                        entry_for_commands.set_placeholder_text(None);
+                    }
                     *settings_for_commands.borrow_mut() = next_settings.clone();
                     let next_generation = generation_for_commands.get().saturating_add(1);
                     generation_for_commands.set(next_generation);
@@ -1772,6 +1830,14 @@ fn install_css() {
             &provider,
             gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
+    }
+}
+
+fn theme_class(theme_mode: &str) -> &'static str {
+    match theme_mode.trim().to_ascii_lowercase().as_str() {
+        "light" => "light",
+        "system" => "system",
+        _ => "dark",
     }
 }
 
