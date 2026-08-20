@@ -79,6 +79,12 @@ pub fn detect() -> Vec<Capability> {
             "powerprofilesctl",
             "power-profiles-daemon",
         ),
+        simple_command(
+            "hermes-agent",
+            "Hermes Agent integration",
+            "hermes",
+            "hermes-agent",
+        ),
         battery_capability(),
         hyprland_capability(),
     ]

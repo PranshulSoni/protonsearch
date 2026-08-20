@@ -178,8 +178,8 @@ row.result-row:selected {
 .source-badge {
     color: #bfc3c6;
     background-color: rgba(255, 255, 255, 0.09);
-    border-radius: 3px;
-    padding: 2px 5px;
+    border-radius: 999px;
+    padding: 3px 8px;
     font-size: 9px;
     font-weight: 700;
 }
@@ -661,6 +661,15 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         let browser_history = CheckButton::with_label("Enable browser history search");
         browser_history.set_active(current.enable_browser_history);
         providers_page.append(&browser_history);
+        let hermes = CheckButton::with_label("Enable Hermes Agent integration");
+        hermes.set_active(current.enable_hermes);
+        hermes.set_tooltip_text(Some(
+            "Uses the installed Hermes Agent desktop app when the hermes command is available",
+        ));
+        providers_page.append(&hermes);
+        let agent_history = CheckButton::with_label("Enable Hermes Agent history");
+        agent_history.set_active(current.enable_agent_history);
+        providers_page.append(&agent_history);
 
         let safety_label = Label::new(Some("Safety and diagnostics"));
         safety_label.set_halign(Align::Start);
@@ -755,6 +764,8 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             next.enable_clipboard_history = clipboard_history.is_active();
             next.enable_ocr = ocr.is_active();
             next.enable_browser_history = browser_history.is_active();
+            next.enable_hermes = hermes.is_active();
+            next.enable_agent_history = agent_history.is_active();
             next.confirm_power_actions = confirm_power.is_active();
             next.log_level = log_level
                 .active_id()

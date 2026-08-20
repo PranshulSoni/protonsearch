@@ -71,6 +71,8 @@ enum Scope {
     Notes,
     Snippets,
     Quicklinks,
+    Agents,
+    AgentHistory,
     Windows,
 }
 
@@ -86,7 +88,7 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
     if query.is_empty() {
         match scope {
             Scope::All => {
-                add_home_sources(&mut results);
+                add_home_sources(linux_settings, &mut results);
             }
             Scope::Folders => add_files(paths, linux_settings, "", scope, &mut results),
             Scope::Files => add_files(paths, linux_settings, "", scope, &mut results),
@@ -102,6 +104,10 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
             ),
             Scope::Notes | Scope::Snippets | Scope::Quicklinks => {
                 add_local_workflows(paths, "", scope, &mut results)
+            }
+            Scope::Agents => add_hermes_agent(linux_settings.enable_hermes, &mut results),
+            Scope::AgentHistory => {
+                add_hermes_history("", linux_settings.enable_agent_history, &mut results)
             }
             Scope::Images => add_content(paths, linux_settings, "", Scope::Images, &mut results),
             Scope::Clipboard => add_clipboard("", &mut results),
@@ -123,6 +129,16 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
         Scope::All | Scope::Notes | Scope::Snippets | Scope::Quicklinks
     ) {
         add_local_workflows(paths, &query_lower, scope, &mut results);
+    }
+    if scope == Scope::Agents {
+        add_hermes_agent(linux_settings.enable_hermes, &mut results);
+    }
+    if scope == Scope::AgentHistory {
+        add_hermes_history(
+            &query_lower,
+            linux_settings.enable_agent_history,
+            &mut results,
+        );
     }
     if scope == Scope::All || scope == Scope::Apps {
         add_applications(paths, linux_settings, &query, scope, &mut results);
@@ -173,7 +189,7 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
     trim(results)
 }
 
-fn add_home_sources(results: &mut Vec<Item>) {
+fn add_home_sources(linux_settings: &LinuxSettings, results: &mut Vec<Item>) {
     let sources = [
         (
             "Browser Bookmarks",
@@ -211,16 +227,107 @@ fn add_home_sources(results: &mut Vec<Item>) {
                 subtitle: subtitle.to_string(),
                 source: source.to_string(),
                 kind: "SOURCE".to_string(),
-                target: if matches!(query, "agents:" | "agent-history:") {
+                target: if query == "agents:" && linux_settings.enable_hermes && hermes_available()
+                {
+                    Target::Action {
+                        id: "open-hermes".to_string(),
+                        args: Vec::new(),
+                        confirmed: false,
+                    }
+                } else if query == "agent-history:"
+                    && linux_settings.enable_agent_history
+                    && hermes_available()
+                {
+                    Target::Query(query.to_string())
+                } else if matches!(query, "agents:" | "agent-history:") {
                     Target::Notice(
-                        "AI providers are not configured on this Linux installation yet."
-                            .to_string(),
-                    )
+                    "Hermes Agent is not installed. Install hermes-agent to enable AI providers."
+                        .to_string(),
+                )
                 } else {
                     Target::Query(query.to_string())
                 },
             }),
     );
+}
+
+fn hermes_available() -> bool {
+    system::command_available("hermes") || system::command_available("hermes-agent")
+}
+
+fn add_hermes_agent(enabled: bool, results: &mut Vec<Item>) {
+    if enabled && hermes_available() {
+        results.push(Item {
+            title: "Hermes Agent".to_string(),
+            subtitle: "Open the installed Hermes Agent desktop workspace".to_string(),
+            source: "AI".to_string(),
+            kind: "AGENT".to_string(),
+            target: Target::Action {
+                id: "open-hermes".to_string(),
+                args: Vec::new(),
+                confirmed: false,
+            },
+        });
+    } else {
+        results.push(Item {
+            title: "Hermes Agent unavailable".to_string(),
+            subtitle: "Install hermes-agent to enable AI providers".to_string(),
+            source: "AI".to_string(),
+            kind: "INFO".to_string(),
+            target: Target::Notice(
+                "Hermes Agent is not installed. Install hermes-agent to enable AI providers."
+                    .to_string(),
+            ),
+        });
+    }
+}
+
+fn add_hermes_history(query: &str, enabled: bool, results: &mut Vec<Item>) {
+    if !enabled || !hermes_available() {
+        add_hermes_agent(enabled, results);
+        return;
+    }
+    let Ok(output) = system::run("hermes", &["sessions", "list", "--limit", "50"]) else {
+        return;
+    };
+    if output.timed_out || output.status != Some(0) {
+        return;
+    }
+    for line in output.stdout.lines() {
+        let columns = line
+            .split("  ")
+            .map(str::trim)
+            .filter(|column| !column.is_empty())
+            .collect::<Vec<_>>();
+        if columns.len() < 3 || columns[0].eq_ignore_ascii_case("title") {
+            continue;
+        }
+        let title = columns[0];
+        let preview = columns.get(1).copied().unwrap_or("Hermes session");
+        let last_active = columns.get(2).copied().unwrap_or("");
+        let session_id = columns.get(3).copied().unwrap_or("");
+        if !query.is_empty()
+            && !title.to_ascii_lowercase().contains(query)
+            && !preview.to_ascii_lowercase().contains(query)
+        {
+            continue;
+        }
+        results.push(Item {
+            title: title.to_string(),
+            subtitle: format!("{preview} · Last active {last_active}"),
+            source: "Hermes Agent History".to_string(),
+            kind: "AGENT".to_string(),
+            target: Target::Action {
+                id: "open-hermes".to_string(),
+                args: if session_id.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![session_id.to_string()]
+                },
+                confirmed: false,
+            },
+        });
+    }
 }
 
 fn parse_scope(raw_query: &str) -> (Scope, String) {
@@ -247,7 +354,8 @@ fn parse_scope(raw_query: &str) -> (Scope, String) {
         "snippet" | "snippets" | "snip" => Scope::Snippets,
         "quicklink" | "quicklinks" | "ql" => Scope::Quicklinks,
         "window" | "windows" | "switch" => Scope::Windows,
-        "agents" | "agent" | "agent-history" => Scope::Notes,
+        "agents" | "agent" => Scope::Agents,
+        "agent-history" | "agentchats" => Scope::AgentHistory,
         _ => return (Scope::All, trimmed.to_string()),
     };
     (scope, rest.trim().to_string())
@@ -1434,6 +1542,18 @@ pub fn activate(paths: &XdgPaths, target: &Target) -> anyhow::Result<Option<Stri
                 "open-settings" => {
                     let executable = std::env::current_exe()?;
                     system::spawn_detached(&executable, &["settings-ui"])?;
+                    Ok(None)
+                }
+                "open-hermes" => {
+                    if !system::command_available("hermes") {
+                        anyhow::bail!("Hermes Agent is unavailable; install hermes-agent first")
+                    }
+                    if let Some(session) = args.first() {
+                        system::spawn_detached_command("hermes", &["desktop", "--skip-build"])?;
+                        let _ = session;
+                    } else {
+                        system::spawn_detached_command("hermes", &["desktop", "--skip-build"])?;
+                    }
                     Ok(None)
                 }
                 "capture-screen" => {

@@ -25,6 +25,8 @@ pub struct LinuxSettings {
     pub enable_clipboard_history: bool,
     pub enable_ocr: bool,
     pub enable_browser_history: bool,
+    pub enable_hermes: bool,
+    pub enable_agent_history: bool,
     pub confirm_power_actions: bool,
     pub log_level: String,
     /// Compositor-facing shortcut notation, e.g. `ALT,SPACE` for Hyprland.
@@ -55,6 +57,8 @@ impl Default for LinuxSettings {
             enable_clipboard_history: true,
             enable_ocr: true,
             enable_browser_history: true,
+            enable_hermes: true,
+            enable_agent_history: true,
             confirm_power_actions: true,
             log_level: "info".to_string(),
             hotkey: "ALT,SPACE".to_string(),

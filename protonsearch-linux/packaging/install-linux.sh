@@ -13,14 +13,18 @@ ICON_DIR_128="${DATA_HOME}/icons/hicolor/128x128/apps"
 SERVICE_DIR="${CONFIG_HOME}/systemd/user"
 SKIP_SERVICE=${PROTONSEARCH_SKIP_SERVICE:-0}
 SKIP_HOTKEY=${PROTONSEARCH_SKIP_HOTKEY:-0}
+INSTALL_OPTIONAL=${PROTONSEARCH_INSTALL_OPTIONAL:-ask}
 
 usage() {
     cat <<'EOF'
 Usage: packaging/install-linux.sh [--skip-service] [--skip-hotkey]
+       [--install-optional] [--no-install-optional]
 
 Installs ProtonSearch for the current user, enables its resident service,
 installs the desktop entry and branded icon, and configures Alt+Space when
-the current compositor has a supported configuration format.
+the current compositor has a supported configuration format. Missing optional
+Arch providers are detected and offered for installation; no package or
+service is changed without confirmation.
 EOF
 }
 
@@ -28,10 +32,80 @@ for argument in "$@"; do
     case "$argument" in
         --skip-service) SKIP_SERVICE=1 ;;
         --skip-hotkey) SKIP_HOTKEY=1 ;;
+        --install-optional) INSTALL_OPTIONAL=1 ;;
+        --no-install-optional) INSTALL_OPTIONAL=0 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: ${argument}" >&2; usage >&2; exit 2 ;;
     esac
 done
+
+offer_optional_packages() {
+    command -v pacman >/dev/null 2>&1 || {
+        echo "ProtonSearch: pacman is unavailable; optional providers were not installed." >&2
+        return 0
+    }
+
+    local missing=()
+    local package command_name
+    local providers=(
+        "xdg-utils:gio"
+        "wl-clipboard:wl-paste"
+        "cliphist:cliphist"
+        "sqlite:sqlite3"
+        "tesseract:tesseract"
+        "poppler:pdftotext"
+        "grim:grim"
+        "slurp:slurp"
+        "networkmanager:nmcli"
+        "bluez-utils:bluetoothctl"
+        "wireplumber:wpctl"
+        "brightnessctl:brightnessctl"
+        "playerctl:playerctl"
+        "power-profiles-daemon:powerprofilesctl"
+        "upower:upower"
+    )
+    for provider in "${providers[@]}"; do
+        package=${provider%%:*}
+        command_name=${provider#*:}
+        if ! command -v "${command_name}" >/dev/null 2>&1; then
+            missing+=("${package}")
+        fi
+    done
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        echo "ProtonSearch: all optional Linux providers are already available."
+        return 0
+    fi
+
+    local unique_missing=()
+    local candidate already_seen
+    for candidate in "${missing[@]}"; do
+        already_seen=0
+        for package in "${unique_missing[@]}"; do
+            [[ "${package}" == "${candidate}" ]] && already_seen=1 && break
+        done
+        [[ ${already_seen} -eq 0 ]] && unique_missing+=("${candidate}")
+    done
+    echo "ProtonSearch: optional providers missing: ${unique_missing[*]}"
+    if [[ "${INSTALL_OPTIONAL}" == 0 ]]; then
+        echo "ProtonSearch: optional installation disabled; install packages later with pacman if needed."
+        return 0
+    fi
+    if [[ "${INSTALL_OPTIONAL}" != 1 && ! -t 0 ]]; then
+        echo "ProtonSearch: non-interactive install; no optional packages were changed." >&2
+        echo "ProtonSearch: rerun with --install-optional to opt in explicitly." >&2
+        return 0
+    fi
+    if [[ "${INSTALL_OPTIONAL}" != 1 ]]; then
+        read -r -p "Install missing optional ProtonSearch providers with pacman? [y/N] " answer
+        [[ "${answer}" =~ ^[Yy]$ ]] || {
+            echo "ProtonSearch: optional providers were not installed."
+            return 0
+        }
+    fi
+    sudo pacman -S --needed "${unique_missing[@]}"
+}
+
+offer_optional_packages
 
 if [[ ! -x "${ROOT_DIR}/target/release/protonsearch-linux" ]]; then
     command -v cargo >/dev/null 2>&1 || {

@@ -207,11 +207,24 @@ pub fn execute(
         "media-next" => command_changed(&action, "playerctl", &["next"]),
         "media-previous" => command_changed(&action, "playerctl", &["previous"]),
         "media-status" => command_message(&action, "playerctl", &["metadata"]),
-        "battery-status" => Ok(ActionResult {
-            action: action.to_string(),
-            changed: false,
-            message: serde_json::to_string(&system::battery_status())?,
-        }),
+        "battery-status" => {
+            let battery = system::battery_status();
+            let message = if !battery.present {
+                "No battery detected on this device".to_string()
+            } else {
+                let percentage = battery
+                    .percentage
+                    .as_deref()
+                    .unwrap_or("percentage unavailable");
+                let state = battery.state.as_deref().unwrap_or("state unavailable");
+                format!("Battery {percentage} · {state}")
+            };
+            Ok(ActionResult {
+                action: action.to_string(),
+                changed: false,
+                message,
+            })
+        }
         "power-profile-status" => command_message(&action, "powerprofilesctl", &["get"]),
         "power-profile" => {
             let profile = args
