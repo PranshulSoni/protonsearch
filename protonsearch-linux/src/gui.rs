@@ -187,6 +187,31 @@ row.result-row:selected {
     font-size: 10px;
 }
 
+window.proton-window.light {
+    background-color: rgba(246, 247, 248, 0.98);
+}
+
+window.proton-window.light .search-shell {
+    background-color: #e5e7e9;
+}
+
+window.proton-window.light entry.search-entry,
+window.proton-window.light .result-title,
+window.proton-window.light .empty-state-title {
+    color: #202326;
+}
+
+window.proton-window.light .result-subtitle,
+window.proton-window.light .status-label,
+window.proton-window.light .footer-hint {
+    color: #5e646a;
+}
+
+window.proton-window.light row.result-row:hover,
+window.proton-window.light row.result-row:selected {
+    background-color: #d9dde1;
+}
+
 .settings-window {
     background-color: #202122;
 }
@@ -820,7 +845,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let window = ApplicationWindow::builder()
         .application(application)
         .title("ProtonSearch")
-        .default_width(760)
+        .default_width(linux_settings.window_width.clamp(480, 1600) as i32)
         .default_height(500)
         .build();
     // Keep an explicit application-owned reference. This matters when the
@@ -830,6 +855,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     window.set_decorated(false);
     window.set_resizable(false);
     window.add_css_class("proton-window");
+    window.add_css_class(&linux_settings.theme_mode.to_ascii_lowercase());
     install_css();
 
     let root = GtkBox::new(Orientation::Vertical, 10);
@@ -842,15 +868,16 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let search_shell = GtkBox::new(Orientation::Horizontal, 6);
     search_shell.add_css_class("search-shell");
     search_shell.set_hexpand(true);
+    search_shell.set_height_request(linux_settings.search_bar_height.clamp(42, 100) as i32);
 
     let search_icon = crate::icons::protonsearch(34);
     search_icon.add_css_class("search-icon");
     search_shell.append(&search_icon);
 
-    let entry = Entry::builder()
-        .placeholder_text("Search files, code, PDFs, OCR...")
-        .hexpand(true)
-        .build();
+    let entry = Entry::builder().hexpand(true).build();
+    if linux_settings.show_placeholder {
+        entry.set_placeholder_text(Some("Search files, code, PDFs, OCR..."));
+    }
     entry.add_css_class("search-entry");
     entry.set_tooltip_text(Some(
         "Type to search; Enter opens the selected result; Escape closes",
@@ -921,6 +948,15 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
 
     let items = Rc::new(RefCell::new(Vec::<Item>::new()));
     let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
+    if linux_settings.hide_on_lose_focus {
+        let window_for_focus = window.clone();
+        let animation_for_focus = animation.clone();
+        window.connect_is_active_notify(move |window| {
+            if !window.is_active() && window.is_visible() {
+                animate_hide(&window_for_focus, &animation_for_focus);
+            }
+        });
+    }
     let generation = Rc::new(Cell::new(0_u64));
     let (sender, receiver) = mpsc::channel::<(u64, String, Vec<Item>)>();
     let (request_sender, request_receiver) =
@@ -945,12 +981,13 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
         }
     });
 
-    let update = |list: &ListBox, status: &Label, items: &[Item], query: &str| {
+    let row_height = linux_settings.item_height.clamp(52, 120);
+    let update = |list: &ListBox, status: &Label, items: &[Item], query: &str, row_height: u32| {
         while let Some(child) = list.first_child() {
             list.remove(&child);
         }
         for item in items {
-            list.append(&result_row(item));
+            list.append(&result_row(item, row_height));
         }
         if items.is_empty() {
             let message = empty_state_message(query);
@@ -974,7 +1011,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
 
     let initial_items = providers::collect(&paths, &linux_settings, "");
     *items.borrow_mut() = initial_items.clone();
-    update(&list, &status, &initial_items, "");
+    update(&list, &status, &initial_items, "", row_height);
 
     let generation_for_changed = generation.clone();
     let request_sender_for_changed = request_sender.clone();
@@ -1005,7 +1042,13 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
         while let Ok((result_generation, query, results)) = receiver.try_recv() {
             if result_generation == generation_for_receiver.get() {
                 *items_for_receiver.borrow_mut() = results.clone();
-                update(&list_for_receiver, &status_for_receiver, &results, &query);
+                update(
+                    &list_for_receiver,
+                    &status_for_receiver,
+                    &results,
+                    &query,
+                    row_height,
+                );
             }
         }
         glib::ControlFlow::Continue
@@ -1336,8 +1379,9 @@ fn animate_hide(window: &ApplicationWindow, animation: &Rc<RefCell<Option<glib::
     *animation.borrow_mut() = Some(source);
 }
 
-fn result_row(item: &Item) -> ListBoxRow {
+fn result_row(item: &Item, row_height: u32) -> ListBoxRow {
     let row = ListBoxRow::new();
+    row.set_height_request(row_height as i32);
     row.add_css_class("result-row");
     let content = GtkBox::new(Orientation::Horizontal, 8);
     content.set_margin_top(8);
