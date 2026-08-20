@@ -61,7 +61,7 @@ pub fn execute(
             ],
         ),
         "audio-mute" | "audio-unmute" => {
-            let value = if action.ends_with("mute") { "1" } else { "0" };
+            let value = audio_mute_value(&action);
             command_changed(
                 &action,
                 "wpctl",
@@ -335,6 +335,14 @@ fn confirmed_system_action(
     command_changed(action, program, args)
 }
 
+fn audio_mute_value(action: &str) -> &'static str {
+    match action {
+        "audio-mute" => "1",
+        "audio-unmute" => "0",
+        _ => unreachable!("audio_mute_value called for unsupported action: {action}"),
+    }
+}
+
 fn output_message(result: &system::CommandResult) -> String {
     if !result.stdout.is_empty() {
         result.stdout.clone()
@@ -342,5 +350,26 @@ fn output_message(result: &system::CommandResult) -> String {
         result.stderr.clone()
     } else {
         "provider completed without output".to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{audio_mute_value, confirmed_system_action};
+
+    #[test]
+    fn audio_mute_actions_map_to_expected_wpctl_values() {
+        assert_eq!(audio_mute_value("audio-mute"), "1");
+        assert_eq!(audio_mute_value("audio-unmute"), "0");
+    }
+
+    #[test]
+    fn destructive_actions_require_confirmation_without_running_command() {
+        let result =
+            confirmed_system_action("poweroff", "a-command-that-is-not-installed", &[], false)
+                .expect("unconfirmed actions should return a result");
+
+        assert!(!result.changed);
+        assert!(result.message.contains("confirmation required"));
     }
 }
