@@ -590,6 +590,11 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
                 eprintln!("ProtonSearch: could not save settings: {error:#}");
                 return;
             }
+            if next.run_on_startup != current.run_on_startup {
+                if let Err(error) = sync_startup_service(next.run_on_startup) {
+                    eprintln!("ProtonSearch: could not update startup service: {error:#}");
+                }
+            }
             if next.enable_hyprland {
                 apply_hyprland_hotkey(&current.hotkey, &next.hotkey);
             } else {
@@ -721,6 +726,22 @@ fn notify_launcher(paths: &XdgPaths, command: &str) {
     let _ = stream.set_write_timeout(Some(Duration::from_millis(250)));
     let _ = stream.write_all(format!("{command}\n").as_bytes());
     let _ = stream.shutdown(std::net::Shutdown::Both);
+}
+
+fn sync_startup_service(enabled: bool) -> anyhow::Result<()> {
+    let verb = if enabled { "enable" } else { "disable" };
+    let result = crate::system::run(
+        "systemctl",
+        &["--user", verb, "--now", "protonsearch.service"],
+    )?;
+    if result.status == Some(0) {
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "systemd user service could not be {verb}d: {}",
+            result.stderr.trim()
+        )
+    }
 }
 
 fn confirmation_target(target: &Target) -> Option<(Target, &'static str)> {
