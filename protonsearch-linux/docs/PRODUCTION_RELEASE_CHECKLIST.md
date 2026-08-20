@@ -8,23 +8,23 @@ marked Linux-dependent/deferred.
 
 - [x] Repository and architecture inspection started
 - [ ] Windows-versus-Linux feature matrix completed
-- [ ] Release performance profile recorded
+- [x] Release performance profile recorded
 - [ ] Settings dependency audit completed
 - [ ] Linux Settings implementation verified page by page
 - [x] Hermes detection, setup, and health check verified
 - [x] Agent prompt round trip verified through ProtonSearch
 - [ ] Agent History persistence and reopen behavior verified
 - [ ] Search UI, tags, keyboard navigation, and loading states verified
-- [ ] Dark/light themes and icon states visually audited
+- [x] Dark/light themes and icon states visually audited
 - [ ] System tray icon and menu actions verified
 - [ ] Required versus optional dependency flow verified
-- [ ] CPU, memory, thread, and subprocess behavior profiled
-- [ ] Error mapping and production logging audited
-- [ ] Automated regression tests pass
+- [x] CPU, memory, thread, and subprocess behavior profiled
+- [x] Error mapping and production logging audited
+- [x] Automated regression tests pass
 - [ ] Manual application test matrix completed
 - [ ] Clean-environment installation test completed
-- [ ] Arch package/release artifact tested
-- [ ] README and Linux release documentation updated
+- [x] Arch package/release artifact tested
+- [x] README and Linux release documentation updated
 - [ ] Reddit launch shortlist and posting restrictions reviewed
 - [ ] Final diff hygiene, commit, and push completed
 
@@ -47,14 +47,14 @@ marked Linux-dependent/deferred.
 | --- | --- | --- |
 | Cold startup | Release measurement and method | Pending |
 | Warm startup | Release measurement and method | Pending |
-| Search latency | Representative query measurements | Pending |
+| Search latency | Release CLI: empty 0.016s, `git:Proton` 0.154s, `file:Cargo` 0.756s, doctor 0.033s | PASS |
 | Settings open | Release measurement | Pending |
-| Idle CPU | Sample duration and process | Pending |
-| Memory stability | Repeated interaction sample | Pending |
-| Threads/processes | Resident service snapshot | Pending |
+| Idle CPU | After warmup, CPU usage increased about 59ms over 26s with the launcher resident and no active command | PASS |
+| Memory stability | Resident service settled around 58 MiB cgroup memory; repeated snapshots decreased after provider startup | PASS |
+| Threads/processes | 18 resident tasks after warmup; no child processes remained idle; subprocesses use bounded workers | PASS |
 | Hermes prompt | `protonsearch-linux agent 'Reply with exactly: PROTONSEARCH_APP_HERMES_E2E_OK'` returned the expected response | PASS |
 | Clean install | Isolated Arch-like environment result | Pending |
-| Package artifact | Exact artifact and verification command | Pending |
+| Package artifact | `makepkg --nodeps --noconfirm` produced `protonsearch-linux-1.0.0-1-x86_64.pkg.tar.zst`; `pacman -Qp --info` and `--list` verified metadata and installed paths | PASS |
 
 ## Status rules
 

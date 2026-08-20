@@ -19,12 +19,13 @@ optdepends=(
   'power-profiles-daemon: power profile actions'
   'upower: battery status provider'
 )
+_source_root="${startdir// /%20}/../.."
 source=(
-  '../../target/release/protonsearch-linux'
-  '../../assets/branding/protonsearch.png'
-  '../../assets/branding/protonsearch-128.png'
-  '../../README.md'
-  '../../docs/SETTINGS_PARITY.md'
+  "protonsearch-linux::file://${_source_root}/target/release/protonsearch-linux"
+  "protonsearch.png::file://${_source_root}/assets/branding/protonsearch.png"
+  "protonsearch-128.png::file://${_source_root}/assets/branding/protonsearch-128.png"
+  "README.md::file://${_source_root}/README.md"
+  "SETTINGS_PARITY.md::file://${_source_root}/docs/SETTINGS_PARITY.md"
   'protonsearch-linux.desktop'
   'protonsearch.service'
 )
