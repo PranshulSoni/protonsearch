@@ -16,8 +16,9 @@ use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
     ComboBoxText, Entry, EventControllerKey, Image, Label, ListBox, ListBoxRow, MessageDialog,
-    MessageType, Orientation, PropagationPhase, ResponseType, Revealer, RevealerTransitionType,
-    ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar, StackTransitionType,
+    MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
+    RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
+    StackTransitionType,
 };
 use std::cell::{Cell, RefCell};
 use std::fs;
@@ -227,6 +228,15 @@ window.proton-window.light entry.search-entry > text > placeholder {
     opacity: 1;
 }
 
+window.proton-window.light entry.search-entry text,
+window.proton-window.light entry.search-entry selection {
+    color: #202326;
+}
+
+window.proton-window.light entry.search-entry selection {
+    background-color: #b9d7d0;
+}
+
 window.proton-window.light .category-chip {
     color: #687078;
     background-color: transparent;
@@ -278,6 +288,10 @@ window.proton-window.light row.result-row:selected label.result-subtitle {
 window.proton-window.light row.result-row:selected label.source-badge {
     color: #263746;
     background-color: rgba(38, 55, 70, 0.12);
+}
+
+window.proton-window.light row.result-row:selected label {
+    color: #202326;
 }
 
 window.proton-window.light .image-preview {
@@ -1171,7 +1185,13 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     list.set_activate_on_single_click(true);
     list.set_vexpand(true);
 
-    let scroll = ScrolledWindow::builder().child(&list).vexpand(true).build();
+    let scroll = ScrolledWindow::builder()
+        .child(&list)
+        .vexpand(true)
+        .hexpand(true)
+        .hscrollbar_policy(PolicyType::Never)
+        .vscrollbar_policy(PolicyType::Automatic)
+        .build();
     root.append(&scroll);
 
     let footer = Label::new(Some(
@@ -1643,8 +1663,10 @@ fn animate_hide(window: &ApplicationWindow, animation: &Rc<RefCell<Option<glib::
 fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
     let row = ListBoxRow::new();
     row.set_height_request(row_height as i32);
+    row.set_hexpand(true);
     row.add_css_class("result-row");
     let content = GtkBox::new(Orientation::Horizontal, 8);
+    content.set_hexpand(true);
     content.set_margin_top(8);
     content.set_margin_bottom(8);
     content.set_margin_start(12);
@@ -1655,22 +1677,28 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
 
     let text = GtkBox::new(Orientation::Vertical, 2);
     text.set_hexpand(true);
+    text.set_halign(Align::Fill);
 
     let title = Label::new(Some(&item.title));
     title.set_halign(Align::Start);
     title.set_xalign(0.0);
+    title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    title.set_single_line_mode(true);
     title.add_css_class("result-title");
     text.append(&title);
 
     let subtitle = Label::new(Some(&item.subtitle));
     subtitle.set_halign(Align::Start);
     subtitle.set_xalign(0.0);
+    subtitle.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    subtitle.set_single_line_mode(true);
     subtitle.add_css_class("result-subtitle");
     text.append(&subtitle);
     content.append(&text);
 
     let badge = Label::new(Some(&item.kind));
     badge.set_halign(Align::End);
+    badge.set_hexpand(false);
     badge.add_css_class("source-badge");
     badge.set_tooltip_text(Some(&item.source));
     content.append(&badge);
@@ -1679,6 +1707,8 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
         .transition_type(RevealerTransitionType::SlideDown)
         .transition_duration(120)
         .build();
+    revealer.set_hexpand(true);
+    revealer.set_halign(Align::Fill);
     revealer.set_child(Some(&content));
     revealer.set_reveal_child(true);
     row.set_child(Some(&revealer));
