@@ -10,7 +10,6 @@ optdepends=(
   'cliphist: clipboard history provider'
   'grim: screenshot capture'
   'slurp: interactive screenshot region selection'
-  'tesseract: OCR search'
   'poppler: PDF text search'
   'networkmanager: Wi-Fi actions through nmcli'
   'bluez-utils: Bluetooth actions through bluetoothctl'

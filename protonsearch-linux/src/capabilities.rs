@@ -54,7 +54,7 @@ pub fn detect() -> Vec<Capability> {
             "sqlite3",
             "sqlite",
         ),
-        simple_command("ocr", "Image and screenshot OCR", "tesseract", "tesseract"),
+        deferred_command("ocr", "Image and screenshot OCR", "tesseract", "tesseract"),
         simple_command("pdf-content", "PDF content search", "pdftotext", "poppler"),
         simple_command("screenshot", "Area screenshot capture", "grim", "grim"),
         network_manager(),
@@ -152,6 +152,18 @@ fn simple_command(id: &str, name: &str, command: &str, package: &str) -> Capabil
             "install the optional Arch package if this capability is needed"
         }
         .to_string(),
+    }
+}
+
+fn deferred_command(id: &str, name: &str, command: &str, package: &str) -> Capability {
+    Capability {
+        id: id.to_string(),
+        name: name.to_string(),
+        description: format!("Optional provider through {command}"),
+        state: CapabilityState::ConfigurationMissing,
+        provider: command.to_string(),
+        package: Some(package.to_string()),
+        reason: "provider is intentionally deferred; the launcher shows Coming Soon".to_string(),
     }
 }
 

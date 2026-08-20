@@ -42,7 +42,7 @@ To install ProtonSearch without changing packages:
 
 After installation, run `protonsearch-linux doctor` to see which providers are
 available on the current desktop. Wi-Fi, Bluetooth, audio, brightness, power,
-display, screenshot, OCR, PDF, clipboard, and browser providers are capability
+display, screenshot, PDF, clipboard, and browser providers are capability
 checked at runtime. A missing provider produces a readable explanation rather
 than a blank result or raw diagnostic object. Some providers also require the
 desktop service or hardware permissions to be active (for example NetworkManager
@@ -67,8 +67,8 @@ than exposing cliphist's binary-data metadata; clicking one opens its preview.
 
 If a category has no matches, ProtonSearch shows a centered explanation such
 as `No image files found`, `No clipboard history found`, or `No Git commits
-found` instead of leaving the launcher blank. OCR text search remains optional
-and uses `tesseract` when it is available.
+found` instead of leaving the launcher blank. OCR text search is intentionally
+deferred; use the Images category for image filename search until OCR ships.
 
 Git search uses `git` directly, discovers repositories in the home/XDG folders
 and common mounted user project folders, and shows recent commit messages and

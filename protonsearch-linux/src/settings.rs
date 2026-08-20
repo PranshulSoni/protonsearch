@@ -165,8 +165,8 @@ pub fn catalogue() -> Vec<LinuxSettingItem> {
         },
         LinuxSettingItem {
             id: "providers.ocr",
-            name: "OCR provider",
-            description: "Enable image text search when tesseract is installed",
+            name: "OCR provider (coming soon)",
+            description: "Image text search is intentionally deferred",
             action: "settings",
         },
         LinuxSettingItem {

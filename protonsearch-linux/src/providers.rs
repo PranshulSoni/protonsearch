@@ -81,6 +81,10 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
     let query_lower = query.to_ascii_lowercase();
     let mut results = Vec::new();
 
+    if scope == Scope::Ocr {
+        return vec![ocr_coming_soon()];
+    }
+
     if let Some(item) = disabled_explicit_provider(scope, linux_settings) {
         return vec![item];
     }
@@ -388,6 +392,18 @@ fn disabled_provider(provider: &str, setting: &str) -> Item {
         source: provider.to_string(),
         kind: "INFO".to_string(),
         target: Target::Notice(message),
+    }
+}
+
+fn ocr_coming_soon() -> Item {
+    let message =
+        "OCR search is coming soon. Image filename search is available from the Images category.";
+    Item {
+        title: "OCR search coming soon".to_string(),
+        subtitle: message.to_string(),
+        source: "OCR".to_string(),
+        kind: "INFO".to_string(),
+        target: Target::Notice(message.to_string()),
     }
 }
 
@@ -1798,8 +1814,6 @@ mod tests {
             "git:commit",
             "clipboard:",
             "clipboard:secret",
-            "ocr:",
-            "ocr:text",
             "history:",
             "history:docs",
         ] {
@@ -1825,6 +1839,17 @@ mod tests {
         assert!(results
             .iter()
             .any(|item| { item.kind == "INFO" && item.title == "Calculator disabled" }));
+    }
+
+    #[test]
+    fn ocr_scope_reports_coming_soon_without_scanning() {
+        for query in ["ocr:", "ocr:invoice"] {
+            let results = collect(&paths(), &LinuxSettings::default(), query);
+            assert_eq!(results.len(), 1, "query {query}");
+            assert_eq!(results[0].title, "OCR search coming soon");
+            assert!(results[0].subtitle.contains("coming soon"));
+            assert!(matches!(results[0].target, Target::Notice(_)));
+        }
     }
 
     #[test]

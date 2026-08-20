@@ -660,8 +660,12 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         let clipboard_history = CheckButton::with_label("Enable clipboard history");
         clipboard_history.set_active(current.enable_clipboard_history);
         providers_page.append(&clipboard_history);
-        let ocr = CheckButton::with_label("Enable OCR image search");
+        let ocr = CheckButton::with_label("OCR image search (coming soon)");
         ocr.set_active(current.enable_ocr);
+        ocr.set_sensitive(false);
+        ocr.set_tooltip_text(Some(
+            "OCR is intentionally deferred. Use Images for image filename search.",
+        ));
         providers_page.append(&ocr);
         let browser_history = CheckButton::with_label("Enable browser history search");
         browser_history.set_active(current.enable_browser_history);
@@ -1212,7 +1216,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
 
     let entry = Entry::builder().hexpand(true).build();
     if linux_settings.show_placeholder {
-        entry.set_placeholder_text(Some("Search files, code, PDFs, OCR..."));
+        entry.set_placeholder_text(Some("Search files, code, PDFs..."));
     }
     entry.add_css_class("search-entry");
     entry.set_tooltip_text(Some(
@@ -1461,7 +1465,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                     row_height_for_commands.set(next_settings.item_height.clamp(52, 120));
                     if next_settings.show_placeholder {
                         entry_for_commands
-                            .set_placeholder_text(Some("Search files, code, PDFs, OCR..."));
+                            .set_placeholder_text(Some("Search files, code, PDFs..."));
                     } else {
                         entry_for_commands.set_placeholder_text(None);
                     }

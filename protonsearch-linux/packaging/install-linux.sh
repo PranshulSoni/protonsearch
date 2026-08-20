@@ -52,7 +52,6 @@ offer_optional_packages() {
         "wl-clipboard:wl-paste"
         "cliphist:cliphist"
         "sqlite:sqlite3"
-        "tesseract:tesseract"
         "poppler:pdftotext"
         "grim:grim"
         "slurp:slurp"

@@ -26,7 +26,8 @@ work on the current desktop.
 | Calculator | Built-in calculator provider | Supported |
 | Git commits | Bounded Git provider | Supported |
 | Clipboard history and image preview | Wayland clipboard/cliphist provider | Supported when installed |
-| OCR and PDF search | Tesseract/poppler providers | Supported when installed |
+| OCR search | Deferred provider with an explicit Coming Soon result | Deferred |
+| PDF search | Poppler `pdftotext` provider | Supported when installed |
 | Browser history/bookmarks | Browser profile providers | Supported when profile is readable |
 | Text expansions/snippets | Linux workflow/snippet provider | Partial |
 | Circle to Search / color picker | Portal or desktop-specific tools | Optional/deferred |
