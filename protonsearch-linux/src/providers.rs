@@ -67,6 +67,7 @@ enum Scope {
     Content,
     Clipboard,
     Images,
+    Ocr,
     Notes,
     Snippets,
     Quicklinks,
@@ -78,6 +79,10 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
     let query_lower = query.to_ascii_lowercase();
     let mut results = Vec::new();
 
+    if let Some(item) = disabled_explicit_provider(scope, linux_settings) {
+        return vec![item];
+    }
+
     if query.is_empty() {
         match scope {
             Scope::All => {
@@ -85,19 +90,23 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
             }
             Scope::Folders => add_files(paths, linux_settings, "", scope, &mut results),
             Scope::Files => add_files(paths, linux_settings, "", scope, &mut results),
-            Scope::Apps => add_applications(paths, "", scope, &mut results),
+            Scope::Apps => add_applications(paths, linux_settings, "", scope, &mut results),
             Scope::Settings => add_settings(paths, "", &mut results),
             Scope::Commands => add_commands(paths, "", &mut results),
             Scope::Recent => add_recent(paths, "", &mut results),
-            Scope::Browser | Scope::Bookmarks | Scope::History => {
-                add_browser("", scope, &mut results)
-            }
+            Scope::Browser | Scope::Bookmarks | Scope::History => add_browser(
+                "",
+                scope,
+                linux_settings.enable_browser_history,
+                &mut results,
+            ),
             Scope::Notes | Scope::Snippets | Scope::Quicklinks => {
                 add_local_workflows(paths, "", scope, &mut results)
             }
             Scope::Images => add_content(paths, linux_settings, "", Scope::Images, &mut results),
             Scope::Clipboard => add_clipboard("", &mut results),
             Scope::Git => add_git(paths, "", &mut results),
+            Scope::Ocr => add_content(paths, linux_settings, "", Scope::Ocr, &mut results),
             Scope::Content | Scope::Windows => {}
         }
         return trim(results);
@@ -116,7 +125,7 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
         add_local_workflows(paths, &query_lower, scope, &mut results);
     }
     if scope == Scope::All || scope == Scope::Apps {
-        add_applications(paths, &query, scope, &mut results);
+        add_applications(paths, linux_settings, &query, scope, &mut results);
     }
     if linux_settings.enable_hyprland && (scope == Scope::All || scope == Scope::Windows) {
         add_windows(&query_lower, &mut results);
@@ -126,21 +135,35 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
     }
     if scope == Scope::All {
         add_recent(paths, &query_lower, &mut results);
-        add_browser(&query_lower, Scope::Browser, &mut results);
+        add_browser(
+            &query_lower,
+            Scope::Browser,
+            linux_settings.enable_browser_history,
+            &mut results,
+        );
     }
     if calculator::evaluate(&query).is_some() && (scope == Scope::All || scope == Scope::Commands) {
-        add_calculator(&query, &mut results);
+        if linux_settings.enable_calculator {
+            add_calculator(&query, &mut results);
+        } else if scope == Scope::Commands {
+            results.push(disabled_provider("Calculator", "enable_calculator"));
+        }
     }
     if scope == Scope::Recent {
         add_recent(paths, &query_lower, &mut results);
     }
     if matches!(scope, Scope::Browser | Scope::Bookmarks | Scope::History) {
-        add_browser(&query_lower, scope, &mut results);
+        add_browser(
+            &query_lower,
+            scope,
+            linux_settings.enable_browser_history,
+            &mut results,
+        );
     }
     if scope == Scope::Git {
         add_git(paths, &query_lower, &mut results);
     }
-    if matches!(scope, Scope::Content | Scope::Images) {
+    if matches!(scope, Scope::Content | Scope::Images | Scope::Ocr) {
         add_content(paths, linux_settings, &query_lower, scope, &mut results);
     }
     if scope == Scope::Clipboard {
@@ -217,7 +240,8 @@ fn parse_scope(raw_query: &str) -> (Scope, String) {
         "recent" => Scope::Recent,
         "git" | "commit" | "commits" => Scope::Git,
         "content" | "code" => Scope::Content,
-        "ocr" | "image" | "images" => Scope::Images,
+        "ocr" => Scope::Ocr,
+        "image" | "images" => Scope::Images,
         "clip" | "clipboard" => Scope::Clipboard,
         "note" | "notes" => Scope::Notes,
         "snippet" | "snippets" | "snip" => Scope::Snippets,
@@ -229,6 +253,36 @@ fn parse_scope(raw_query: &str) -> (Scope, String) {
     (scope, rest.trim().to_string())
 }
 
+fn disabled_explicit_provider(scope: Scope, linux_settings: &LinuxSettings) -> Option<Item> {
+    let (provider, setting) = match scope {
+        Scope::Commands if !linux_settings.enable_system_actions => {
+            ("System actions", "enable_system_actions")
+        }
+        Scope::Git if !linux_settings.enable_git_commits => ("Git commits", "enable_git_commits"),
+        Scope::Clipboard if !linux_settings.enable_clipboard_history => {
+            ("Clipboard history", "enable_clipboard_history")
+        }
+        Scope::Ocr if !linux_settings.enable_ocr => ("OCR", "enable_ocr"),
+        Scope::History if !linux_settings.enable_browser_history => {
+            ("Browser history", "enable_browser_history")
+        }
+        _ => return None,
+    };
+    Some(disabled_provider(provider, setting))
+}
+
+fn disabled_provider(provider: &str, setting: &str) -> Item {
+    let message =
+        format!("{provider} is disabled. Enable {setting} in Linux settings to use this provider.");
+    Item {
+        title: format!("{provider} disabled"),
+        subtitle: message.clone(),
+        source: provider.to_string(),
+        kind: "INFO".to_string(),
+        target: Target::Notice(message),
+    }
+}
+
 fn trim(mut results: Vec<Item>) -> Vec<Item> {
     let mut seen = HashSet::new();
     results.retain(|item| seen.insert(format!("{}\n{}", item.title, item.subtitle)));
@@ -236,14 +290,20 @@ fn trim(mut results: Vec<Item>) -> Vec<Item> {
     results
 }
 
-fn add_applications(paths: &XdgPaths, query: &str, scope: Scope, results: &mut Vec<Item>) {
+fn add_applications(
+    paths: &XdgPaths,
+    linux_settings: &LinuxSettings,
+    query: &str,
+    scope: Scope,
+    results: &mut Vec<Item>,
+) {
     if scope != Scope::All && scope != Scope::Apps {
         return;
     }
     let entries = if query.trim().is_empty() {
-        desktop::discover_applications(paths)
+        desktop::discover_applications_filtered(paths, linux_settings.show_terminal_apps)
     } else {
-        desktop::matching_applications(paths, query)
+        desktop::matching_applications_filtered(paths, query, linux_settings.show_terminal_apps)
     };
     results.extend(entries.into_iter().take(35).map(|entry| {
         Item {
@@ -767,9 +827,9 @@ fn percent_decode(value: &str) -> String {
     output
 }
 
-fn add_browser(query: &str, scope: Scope, results: &mut Vec<Item>) {
+fn add_browser(query: &str, scope: Scope, enable_history: bool, results: &mut Vec<Item>) {
     let include_bookmarks = matches!(scope, Scope::Browser | Scope::Bookmarks);
-    let include_history = matches!(scope, Scope::Browser | Scope::History);
+    let include_history = enable_history && matches!(scope, Scope::Browser | Scope::History);
     for (browser, path) in browser_files() {
         if include_bookmarks && path.file_name().is_some_and(|name| name == "Bookmarks") {
             add_bookmarks(&browser, &path, query, results);
@@ -787,6 +847,12 @@ fn add_browser(query: &str, scope: Scope, results: &mut Vec<Item>) {
         {
             add_history(&browser, &path, query, results);
         }
+    }
+    if matches!(scope, Scope::Browser) && !enable_history {
+        results.push(disabled_provider(
+            "Browser history",
+            "enable_browser_history",
+        ));
     }
 }
 
@@ -1166,9 +1232,10 @@ fn add_content(
     scope: Scope,
     results: &mut Vec<Item>,
 ) {
+    let image_scope = matches!(scope, Scope::Images | Scope::Ocr);
     let options = SearchOptions {
         include_hidden: linux_settings.include_hidden,
-        max_results: if scope == Scope::Images { 100 } else { 30 },
+        max_results: if image_scope { 100 } else { 30 },
         max_entries: 12_000,
         max_depth: 20,
         extra_roots: linux_settings
@@ -1179,7 +1246,7 @@ fn add_content(
         ignored_names: linux_settings.ignored_names.clone(),
     };
     let mut image_paths = HashSet::new();
-    if scope == Scope::Images {
+    if image_scope {
         // Filename matches remain useful even when the optional OCR provider
         // is not installed. An empty query enumerates image folders and XDG
         // user directories so opening Images is useful immediately.
@@ -1194,23 +1261,28 @@ fn add_content(
             });
         }
     }
-    for file in search::search_content(paths, query, &options) {
-        let is_image = matches!(file.kind.as_str(), "image" | "ocr");
-        if scope == Scope::Images && !is_image {
-            continue;
+    if scope != Scope::Images || linux_settings.enable_ocr {
+        for file in search::search_content(paths, query, &options) {
+            let is_image = matches!(file.kind.as_str(), "image" | "ocr");
+            if is_image && !linux_settings.enable_ocr {
+                continue;
+            }
+            if image_scope && !is_image {
+                continue;
+            }
+            if image_scope && !image_paths.insert(file.path.clone()) {
+                continue;
+            }
+            results.push(Item {
+                title: file.name,
+                subtitle: format!("{} · {}", file.kind, file.path.display()),
+                source: if is_image { "OCR" } else { "Content" }.to_string(),
+                kind: if is_image { "OCR" } else { "CONTENT" }.to_string(),
+                target: Target::Path(file.path),
+            });
         }
-        if scope == Scope::Images && !image_paths.insert(file.path.clone()) {
-            continue;
-        }
-        results.push(Item {
-            title: file.name,
-            subtitle: format!("{} · {}", file.kind, file.path.display()),
-            source: if is_image { "OCR" } else { "Content" }.to_string(),
-            kind: if is_image { "OCR" } else { "CONTENT" }.to_string(),
-            target: Target::Path(file.path),
-        });
     }
-    if scope == Scope::Images && !system::command_available("tesseract") {
+    if image_scope && linux_settings.enable_ocr && !system::command_available("tesseract") {
         results.push(Item {
             title: "OCR provider unavailable".to_string(),
             subtitle: "Install tesseract to search text inside images".to_string(),
@@ -1562,4 +1634,79 @@ fn copy_clipboard_bytes(bytes: &[u8], mime_type: &str) -> anyhow::Result<()> {
         anyhow::bail!("wl-copy could not update the image clipboard");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn paths() -> XdgPaths {
+        XdgPaths {
+            home: PathBuf::from("/nonexistent/protonsearch-test-home"),
+            config: PathBuf::from("/nonexistent/protonsearch-test-config"),
+            data: PathBuf::from("/nonexistent/protonsearch-test-data"),
+            state: PathBuf::from("/nonexistent/protonsearch-test-state"),
+            cache: PathBuf::from("/nonexistent/protonsearch-test-cache"),
+            runtime: None,
+        }
+    }
+
+    fn disabled_settings() -> LinuxSettings {
+        LinuxSettings {
+            enable_system_actions: false,
+            enable_calculator: false,
+            enable_git_commits: false,
+            enable_clipboard_history: false,
+            enable_ocr: false,
+            enable_browser_history: false,
+            ..LinuxSettings::default()
+        }
+    }
+
+    #[test]
+    fn disabled_explicit_scopes_report_provider_state_for_empty_and_non_empty_queries() {
+        let settings = disabled_settings();
+        for query in [
+            "commands:",
+            "commands:wifi",
+            "git:",
+            "git:commit",
+            "clipboard:",
+            "clipboard:secret",
+            "ocr:",
+            "ocr:text",
+            "history:",
+            "history:docs",
+        ] {
+            let results = collect(&paths(), &settings, query);
+            assert_eq!(results.len(), 1, "query {query}");
+            assert_eq!(results[0].kind, "INFO", "query {query}");
+            assert!(
+                matches!(results[0].target, Target::Notice(_)),
+                "query {query}"
+            );
+            assert!(
+                results[0].subtitle.contains("disabled") || results[0].title.ends_with("disabled"),
+                "query {query}"
+            );
+        }
+    }
+
+    #[test]
+    fn disabled_calculator_is_reported_for_an_explicit_command_scope() {
+        let mut settings = LinuxSettings::default();
+        settings.enable_calculator = false;
+        let results = collect(&paths(), &settings, "commands:2 + 2");
+        assert!(results
+            .iter()
+            .any(|item| { item.kind == "INFO" && item.title == "Calculator disabled" }));
+    }
+
+    #[test]
+    fn all_empty_search_keeps_existing_source_cards_when_providers_are_disabled() {
+        let results = collect(&paths(), &disabled_settings(), "");
+        for title in ["Browser History", "Git Commits", "Clipboard History"] {
+            assert!(results.iter().any(|item| item.title == title), "{title}");
+        }
+    }
 }

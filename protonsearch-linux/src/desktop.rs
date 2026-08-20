@@ -22,6 +22,13 @@ pub struct DesktopEntry {
 }
 
 pub fn discover_applications(paths: &XdgPaths) -> Vec<DesktopEntry> {
+    discover_applications_filtered(paths, true)
+}
+
+pub fn discover_applications_filtered(
+    paths: &XdgPaths,
+    show_terminal_apps: bool,
+) -> Vec<DesktopEntry> {
     let current_desktop = env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
     let mut entries = HashMap::<String, DesktopEntry>::new();
     for directory in paths.application_dirs() {
@@ -46,6 +53,7 @@ pub fn discover_applications(paths: &XdgPaths) -> Vec<DesktopEntry> {
         }
     }
     let mut entries = entries.into_values().collect::<Vec<_>>();
+    filter_terminal_entries(&mut entries, show_terminal_apps);
     entries.sort_by_key(|entry| entry.name.to_lowercase());
     entries
 }
@@ -193,8 +201,16 @@ fn executable_available(executable: &str) -> bool {
 }
 
 pub fn matching_applications(paths: &XdgPaths, query: &str) -> Vec<DesktopEntry> {
+    matching_applications_filtered(paths, query, true)
+}
+
+pub fn matching_applications_filtered(
+    paths: &XdgPaths,
+    query: &str,
+    show_terminal_apps: bool,
+) -> Vec<DesktopEntry> {
     let query = query.to_lowercase();
-    discover_applications(paths)
+    discover_applications_filtered(paths, show_terminal_apps)
         .into_iter()
         .filter(|entry| {
             entry.name.to_lowercase().contains(&query)
@@ -208,6 +224,12 @@ pub fn matching_applications(paths: &XdgPaths, query: &str) -> Vec<DesktopEntry>
                     .any(|keyword| keyword.to_lowercase().contains(&query))
         })
         .collect()
+}
+
+fn filter_terminal_entries(entries: &mut Vec<DesktopEntry>, show_terminal_apps: bool) {
+    if !show_terminal_apps {
+        entries.retain(|entry| !entry.terminal);
+    }
 }
 
 pub fn launch(entry: &DesktopEntry) -> Result<Child> {
@@ -331,6 +353,20 @@ mod tests {
     use super::*;
     use std::io::Write;
 
+    fn entry(terminal: bool) -> DesktopEntry {
+        DesktopEntry {
+            id: "test.desktop".to_string(),
+            path: PathBuf::from("/tmp/test.desktop"),
+            name: "Test".to_string(),
+            generic_name: None,
+            comment: None,
+            exec: "test".to_string(),
+            icon: None,
+            terminal,
+            keywords: Vec::new(),
+        }
+    }
+
     #[test]
     fn parses_desktop_entry_without_shell_execution() {
         let path =
@@ -364,5 +400,18 @@ mod tests {
             tokenize_exec("demo --title 'hello world'").unwrap(),
             vec!["demo", "--title", "hello world"]
         );
+    }
+
+    #[test]
+    fn terminal_entries_are_filtered_without_mutating_launch_metadata() {
+        let mut entries = vec![entry(true), entry(false)];
+        filter_terminal_entries(&mut entries, false);
+        assert_eq!(entries.len(), 1);
+        assert!(!entries[0].terminal);
+
+        let mut entries = vec![entry(true), entry(false)];
+        filter_terminal_entries(&mut entries, true);
+        assert_eq!(entries.len(), 2);
+        assert!(entries[0].terminal);
     }
 }
