@@ -11,8 +11,8 @@ marked Linux-dependent/deferred.
 - [ ] Release performance profile recorded
 - [ ] Settings dependency audit completed
 - [ ] Linux Settings implementation verified page by page
-- [ ] Hermes detection, setup, and health check verified
-- [ ] Agent prompt round trip verified through ProtonSearch
+- [x] Hermes detection, setup, and health check verified
+- [x] Agent prompt round trip verified through ProtonSearch
 - [ ] Agent History persistence and reopen behavior verified
 - [ ] Search UI, tags, keyboard navigation, and loading states verified
 - [ ] Dark/light themes and icon states visually audited
@@ -37,8 +37,9 @@ marked Linux-dependent/deferred.
   theme contrast, bounded search providers, action worker isolation, and tray
   registration have existing implementation coverage.
 - OCR is intentionally deferred and must show a Coming Soon result.
-- Hermes discovery and session listing exist, but the real ProtonSearch Agent
-  prompt round trip is not yet accepted as verified by this checklist.
+- Hermes v0.19.1 is detected and session listing is available. The release
+  CLI prompt path returned `PROTONSEARCH_APP_HERMES_E2E_OK`; the internal Agent
+  window is also wired to the same bounded Hermes worker.
 
 ## Release evidence to record
 
@@ -51,7 +52,7 @@ marked Linux-dependent/deferred.
 | Idle CPU | Sample duration and process | Pending |
 | Memory stability | Repeated interaction sample | Pending |
 | Threads/processes | Resident service snapshot | Pending |
-| Hermes prompt | Prompt, response, and logs without secrets | Pending |
+| Hermes prompt | `protonsearch-linux agent 'Reply with exactly: PROTONSEARCH_APP_HERMES_E2E_OK'` returned the expected response | PASS |
 | Clean install | Isolated Arch-like environment result | Pending |
 | Package artifact | Exact artifact and verification command | Pending |
 

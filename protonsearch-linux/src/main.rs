@@ -16,6 +16,7 @@ fn main() -> Result<()> {
         Some("daemon") | Some("service") => gui::run_resident(paths)?,
         Some("settings-ui") => gui::run_settings(paths)?,
         Some("doctor") | Some("--print-capabilities") => print_doctor(&paths),
+        Some("agent") => run_agent(args.collect::<Vec<_>>().join(" "))?,
         Some("settings") | Some("--settings") => print_json(&settings::catalogue()),
         Some("apps") => {
             let query = args.collect::<Vec<_>>().join(" ");
@@ -102,9 +103,41 @@ fn print_json(value: &impl serde::Serialize) {
     }
 }
 
+fn run_agent(prompt: String) -> Result<()> {
+    let prompt = prompt.trim();
+    if prompt.is_empty() {
+        anyhow::bail!("agent requires a prompt");
+    }
+    let command = if system::command_available("hermes") {
+        "hermes"
+    } else if system::command_available("hermes-agent") {
+        "hermes-agent"
+    } else {
+        anyhow::bail!("Hermes Agent is not installed; install it before using agent prompts");
+    };
+    let result =
+        system::run_with_timeout(command, &["-z", prompt], std::time::Duration::from_secs(90))?;
+    if result.timed_out {
+        anyhow::bail!("Hermes did not respond within 90 seconds");
+    }
+    if result.status != Some(0) {
+        anyhow::bail!(
+            "Hermes exited with status {:?}: {}",
+            result.status,
+            if result.stderr.is_empty() {
+                "no diagnostic output"
+            } else {
+                &result.stderr
+            }
+        );
+    }
+    println!("{}", result.stdout);
+    Ok(())
+}
+
 fn print_help() {
     println!(
-        "ProtonSearch Linux\n\nCommands:\n  gui                   open or toggle the graphical launcher\n  daemon                run the resident background launcher service\n  settings-ui           open Linux settings\n  doctor                 detect Linux providers\n  search <query>        search XDG roots\n  search-all <query>    search all Linux providers\n  apps [query]          list or search .desktop applications\n  launch <entry>        launch a visible desktop entry\n  settings              list Linux-only settings\n  action <id> [args]    run an allowlisted provider action\n  hyprland              show read-only Hyprland IPC/config data\n  open <path-or-url>    use the desktop preferred opener\n\nLauncher prefixes include app:, file:, folder:, settings:, browser:, history:, git:, content:, ocr:, clip:, notes:, snippets:, and quicklinks:.\n\nDestructive session actions require --confirm. Packages are never installed automatically."
+        "ProtonSearch Linux\n\nCommands:\n  gui                   open or toggle the graphical launcher\n  daemon                run the resident background launcher service\n  settings-ui           open Linux settings\n  doctor                 detect Linux providers\n  agent <prompt>        send one prompt through the installed Hermes Agent\n  search <query>        search XDG roots\n  search-all <query>    search all Linux providers\n  apps [query]          list or search .desktop applications\n  launch <entry>        launch a visible desktop entry\n  settings              list Linux-only settings\n  action <id> [args]    run an allowlisted provider action\n  hyprland              show read-only Hyprland IPC/config data\n  open <path-or-url>    use the desktop preferred opener\n\nLauncher prefixes include app:, file:, folder:, settings:, browser:, history:, git:, content:, ocr:, clip:, notes:, snippets:, and quicklinks:.\n\nDestructive session actions require --confirm. Packages are never installed automatically."
     );
 }
 

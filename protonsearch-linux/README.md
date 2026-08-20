@@ -50,6 +50,10 @@ for Wi-Fi and a backlight device for brightness).
 
 Hermes Agent is an optional external application. If its `hermes` command is
 already installed, the Agents and Agent History sources use it automatically.
+Open an Agent result for the internal prompt window, or use
+`protonsearch-linux agent "Ask Hermes a question"` for a release-build smoke
+test and one-shot prompt. Agent prompts run in a bounded worker so the
+launcher stays responsive.
 The ProtonSearch installer does not download third-party AI software or handle
 its credentials; install Hermes through its own trusted distribution method.
 
@@ -85,6 +89,7 @@ PNG so all selected images can be pasted in a single operation.
 protonsearch-linux doctor
 protonsearch-linux search "filename"
 protonsearch-linux settings
+protonsearch-linux agent "Ask Hermes a question"
 ./packaging/uninstall-linux.sh
 ```
 
