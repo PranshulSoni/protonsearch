@@ -220,6 +220,13 @@ window.proton-window.light entry.search-entry {
     caret-color: #202326;
 }
 
+window.proton-window.light entry.search-entry placeholder,
+window.proton-window.light entry.search-entry text.placeholder,
+window.proton-window.light entry.search-entry > text > placeholder {
+    color: #202326;
+    opacity: 1;
+}
+
 window.proton-window.light .category-chip {
     color: #687078;
     background-color: transparent;
@@ -260,15 +267,15 @@ window.proton-window.light row.result-row:selected {
     background-color: #d7e5f5;
 }
 
-window.proton-window.light row.result-row:selected .result-title {
+window.proton-window.light row.result-row:selected label.result-title {
     color: #17202a;
 }
 
-window.proton-window.light row.result-row:selected .result-subtitle {
+window.proton-window.light row.result-row:selected label.result-subtitle {
     color: #435363;
 }
 
-window.proton-window.light row.result-row:selected .source-badge {
+window.proton-window.light row.result-row:selected label.source-badge {
     color: #263746;
     background-color: rgba(38, 55, 70, 0.12);
 }
@@ -1202,12 +1209,17 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     });
 
     let row_height = Rc::new(Cell::new(linux_settings.item_height.clamp(52, 120)));
-    let update = |list: &ListBox, status: &Label, items: &[Item], query: &str, row_height: u32| {
+    let update = |list: &ListBox,
+                  status: &Label,
+                  items: &[Item],
+                  query: &str,
+                  row_height: u32,
+                  light_theme: bool| {
         while let Some(child) = list.first_child() {
             list.remove(&child);
         }
         for item in items {
-            list.append(&result_row(item, row_height));
+            list.append(&result_row(item, row_height, light_theme));
         }
         if items.is_empty() {
             let message = empty_state_message(query);
@@ -1231,7 +1243,14 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
 
     let initial_items = providers::collect(&paths, &linux_settings, "");
     *items.borrow_mut() = initial_items.clone();
-    update(&list, &status, &initial_items, "", row_height.get());
+    update(
+        &list,
+        &status,
+        &initial_items,
+        "",
+        row_height.get(),
+        theme_class(&linux_settings.theme_mode) == "light",
+    );
 
     let generation_for_changed = generation.clone();
     let request_sender_for_changed = request_sender.clone();
@@ -1259,6 +1278,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let list_for_receiver = list.clone();
     let status_for_receiver = status.clone();
     let row_height_for_receiver = row_height.clone();
+    let settings_for_receiver = settings_state.clone();
     glib::timeout_add_local(Duration::from_millis(50), move || {
         while let Ok((result_generation, query, results)) = receiver.try_recv() {
             if result_generation == generation_for_receiver.get() {
@@ -1269,6 +1289,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                     &results,
                     &query,
                     row_height_for_receiver.get(),
+                    theme_class(&settings_for_receiver.borrow().theme_mode) == "light",
                 );
             }
         }
@@ -1619,7 +1640,7 @@ fn animate_hide(window: &ApplicationWindow, animation: &Rc<RefCell<Option<glib::
     *animation.borrow_mut() = Some(source);
 }
 
-fn result_row(item: &Item, row_height: u32) -> ListBoxRow {
+fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
     let row = ListBoxRow::new();
     row.set_height_request(row_height as i32);
     row.add_css_class("result-row");
@@ -1629,7 +1650,7 @@ fn result_row(item: &Item, row_height: u32) -> ListBoxRow {
     content.set_margin_start(12);
     content.set_margin_end(12);
 
-    let icon = result_icon(item);
+    let icon = result_icon(item, light_theme);
     content.append(&icon);
 
     let text = GtkBox::new(Orientation::Vertical, 2);
@@ -1771,9 +1792,9 @@ fn scaled_clipboard_image(line: &str, max_width: i32, max_height: i32) -> Option
     Some(Image::from_paintable(Some(&texture)))
 }
 
-fn result_icon(item: &Item) -> Image {
+fn result_icon(item: &Item, light_theme: bool) -> Image {
     if let Some(name) = result_asset_name(item) {
-        if let Some(image) = crate::icons::source(name, 32) {
+        if let Some(image) = crate::icons::source_for_theme(name, 32, light_theme) {
             return image;
         }
     }

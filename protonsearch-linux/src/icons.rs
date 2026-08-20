@@ -50,7 +50,34 @@ const SOURCE_ICONS: &[(&str, &[u8])] = &[
 ];
 
 fn image_from_bytes(bytes: &'static [u8], size: i32) -> Option<Image> {
+    image_from_bytes_with_tint(bytes, size, None)
+}
+
+fn image_from_bytes_with_tint(
+    bytes: &'static [u8],
+    size: i32,
+    tint: Option<(u8, u8, u8)>,
+) -> Option<Image> {
     let pixbuf = Pixbuf::from_read(Cursor::new(bytes)).ok()?;
+    if let Some((red, green, blue)) = tint {
+        let channels = pixbuf.n_channels() as usize;
+        let rowstride = pixbuf.rowstride() as usize;
+        let width = pixbuf.width() as usize;
+        let height = pixbuf.height() as usize;
+        // Source artwork is intentionally white for the dark launcher. Tint
+        // it at runtime for light mode while preserving anti-aliased alpha.
+        unsafe {
+            let pixels = pixbuf.pixels();
+            for y in 0..height {
+                for x in 0..width {
+                    let offset = y * rowstride + x * channels;
+                    pixels[offset] = red;
+                    pixels[offset + 1] = green;
+                    pixels[offset + 2] = blue;
+                }
+            }
+        }
+    }
     let texture = gdk::Texture::for_pixbuf(&pixbuf);
     let image = Image::from_paintable(Some(&texture));
     image.set_pixel_size(size);
@@ -63,8 +90,15 @@ pub fn protonsearch(size: i32) -> Image {
 }
 
 pub fn source(name: &str, size: i32) -> Option<Image> {
+    source_for_theme(name, size, false)
+}
+
+pub fn source_for_theme(name: &str, size: i32, light_theme: bool) -> Option<Image> {
     SOURCE_ICONS
         .iter()
         .find(|(key, _)| *key == name)
-        .and_then(|(_, bytes)| image_from_bytes(bytes, size))
+        .and_then(|(_, bytes)| {
+            let tint = light_theme.then_some((73, 82, 92));
+            image_from_bytes_with_tint(bytes, size, tint)
+        })
 }
