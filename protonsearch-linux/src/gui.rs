@@ -1080,8 +1080,20 @@ fn activate_target(
     window: &ApplicationWindow,
     status: &Label,
     animation: &Rc<RefCell<Option<glib::SourceId>>>,
+    action_sender: &mpsc::Sender<anyhow::Result<Option<String>>>,
     target: Target,
 ) {
+    if matches!(&target, Target::Action { .. }) {
+        let paths_for_worker = paths.clone();
+        let target_for_worker = target.clone();
+        let sender_for_worker = action_sender.clone();
+        set_launcher_status(status, "Running action…");
+        thread::spawn(move || {
+            let result = providers::activate(&paths_for_worker, &target_for_worker);
+            let _ = sender_for_worker.send(result);
+        });
+        return;
+    }
     let keep_launcher_open = matches!(&target, Target::Action { .. });
     match providers::activate(paths, &target) {
         Ok(Some(feedback)) => {
@@ -1107,6 +1119,7 @@ fn activate_item(
     entry: &Entry,
     status: &Label,
     animation: &Rc<RefCell<Option<glib::SourceId>>>,
+    action_sender: &mpsc::Sender<anyhow::Result<Option<String>>>,
     item: Item,
 ) {
     match item.target {
@@ -1137,6 +1150,7 @@ fn activate_item(
                 let entry_for_confirmation = entry.clone();
                 let status_for_confirmation = status.clone();
                 let animation_for_confirmation = animation.clone();
+                let action_sender_for_confirmation = action_sender.clone();
                 dialog.connect_response(move |dialog, response| {
                     dialog.close();
                     if response == ResponseType::Accept {
@@ -1145,6 +1159,7 @@ fn activate_item(
                             &window_for_confirmation,
                             &status_for_confirmation,
                             &animation_for_confirmation,
+                            &action_sender_for_confirmation,
                             confirmed_target.clone(),
                         );
                     } else {
@@ -1154,7 +1169,7 @@ fn activate_item(
                 });
                 dialog.present();
             } else {
-                activate_target(paths, window, status, animation, target);
+                activate_target(paths, window, status, animation, action_sender, target);
             }
         }
     }
@@ -1277,6 +1292,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
     let generation = Rc::new(Cell::new(0_u64));
     let (sender, receiver) = mpsc::channel::<(u64, String, Vec<Item>)>();
+    let (action_sender, action_receiver) = mpsc::channel::<anyhow::Result<Option<String>>>();
     let (request_sender, request_receiver) =
         mpsc::channel::<(u64, String, settings::LinuxSettings)>();
     let worker_paths = paths.clone();
@@ -1387,6 +1403,27 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
         glib::ControlFlow::Continue
     });
 
+    let action_status = status.clone();
+    glib::timeout_add_local(Duration::from_millis(80), move || {
+        while let Ok(result) = action_receiver.try_recv() {
+            match result {
+                Ok(Some(feedback)) => {
+                    set_launcher_status(
+                        &action_status,
+                        feedback.lines().next().unwrap_or(feedback.as_str()),
+                    );
+                }
+                Ok(None) => set_launcher_status(&action_status, "Action completed"),
+                Err(error) => {
+                    set_launcher_status(&action_status, &format!("Action failed: {error}"));
+                    action_status.set_tooltip_text(Some(&format!("{error:#}")));
+                    eprintln!("ProtonSearch: {error:#}");
+                }
+            }
+        }
+        glib::ControlFlow::Continue
+    });
+
     let window_for_commands = window.clone();
     let entry_for_commands = entry.clone();
     let search_shell_for_commands = search_shell.clone();
@@ -1449,6 +1486,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let entry_for_enter = entry.clone();
     let status_for_enter = status.clone();
     let animation_for_enter = animation.clone();
+    let action_sender_for_enter = action_sender.clone();
     entry.connect_activate(move |_| {
         let selected_items = list_for_enter
             .selected_rows()
@@ -1494,6 +1532,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
                 &entry_for_enter,
                 &status_for_enter,
                 &animation_for_enter,
+                &action_sender_for_enter,
                 item,
             );
         }
@@ -1506,6 +1545,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
     let entry_for_activation = entry.clone();
     let status_for_activation = status.clone();
     let animation_for_activation = animation.clone();
+    let action_sender_for_activation = action_sender.clone();
     let preview_revealer_for_activation = preview_revealer.clone();
     let preview_box_for_activation = preview_box.clone();
     list.connect_row_activated(move |_, row| {
@@ -1566,6 +1606,7 @@ fn build_window(application: &Application, paths: XdgPaths, commands: mpsc::Rece
             &entry_for_activation,
             &status_for_activation,
             &animation_for_activation,
+            &action_sender_for_activation,
             item,
         );
     });

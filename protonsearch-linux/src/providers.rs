@@ -1545,15 +1545,20 @@ pub fn activate(paths: &XdgPaths, target: &Target) -> anyhow::Result<Option<Stri
                     Ok(None)
                 }
                 "open-hermes" => {
-                    if !system::command_available("hermes") {
-                        anyhow::bail!("Hermes Agent is unavailable; install hermes-agent first")
-                    }
-                    if let Some(session) = args.first() {
-                        system::spawn_detached_command("hermes", &["desktop", "--skip-build"])?;
-                        let _ = session;
+                    let command = if system::command_available("hermes") {
+                        "hermes"
+                    } else if system::command_available("hermes-agent") {
+                        "hermes-agent"
                     } else {
-                        system::spawn_detached_command("hermes", &["desktop", "--skip-build"])?;
-                    }
+                        anyhow::bail!("Hermes Agent is unavailable; install hermes-agent first")
+                    };
+                    // The packaged Hermes command exposes the desktop
+                    // workspace. Keep the session argument available for a
+                    // future deep-link once Hermes publishes a stable CLI
+                    // contract, while still opening the desktop reliably on
+                    // both `hermes` and `hermes-agent` installs.
+                    let _session = args.first();
+                    system::spawn_detached_command(command, &["desktop", "--skip-build"])?;
                     Ok(None)
                 }
                 "capture-screen" => {
