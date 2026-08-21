@@ -44,10 +44,10 @@ impl Default for LinuxSettings {
             hide_on_lose_focus: false,
             theme_mode: "Dark".to_string(),
             show_taskbar: false,
-            window_width: 720,
-            window_height: 500,
-            item_height: 76,
-            search_bar_height: 60,
+            window_width: 840,
+            window_height: 560,
+            item_height: 68,
+            search_bar_height: 56,
             show_placeholder: true,
             include_hidden: false,
             show_terminal_apps: true,
@@ -351,7 +351,10 @@ mod tests {
         assert_eq!(settings.schema_version, 1);
         assert!(settings.run_on_startup);
         assert_eq!(settings.theme_mode, "Dark");
-        assert_eq!(settings.window_height, 500);
+        assert_eq!(settings.window_width, 840);
+        assert_eq!(settings.window_height, 560);
+        assert_eq!(settings.item_height, 68);
+        assert_eq!(settings.search_bar_height, 56);
         assert!(settings.enable_calculator);
         assert!(settings.enable_git_commits);
     }

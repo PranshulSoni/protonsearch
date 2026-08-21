@@ -16,8 +16,8 @@ use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
-    ComboBoxText, Entry, EventControllerKey, Image, Label, ListBox, ListBoxRow, MessageDialog,
-    MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
+    ComboBoxText, Entry, EventControllerKey, FlowBox, Image, Label, ListBox, ListBoxRow,
+    MessageDialog, MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
     RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
     StackTransitionType, TextView, WrapMode,
 };
@@ -38,41 +38,54 @@ use std::time::{Duration, Instant};
 const APPLICATION_ID: &str = "com.protonsearch.Linux";
 const LAUNCHER_CSS: &str = r#"
 window.proton-window {
-    background-color: rgba(31, 32, 34, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 12px;
+    background-color: #17191c;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px;
     font-family: sans;
 }
 
 .launcher-root {
-    background-color: transparent;
+    background-color: #202327;
+    border-radius: 16px;
 }
 
 .search-shell {
-    background-color: #2b2c2e;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    padding: 0 10px;
+    background-color: #2a2e33;
+    border: 1px solid #3b434b;
+    border-radius: 12px;
+    padding: 0 12px;
 }
 
 .search-icon {
-    color: #c6c9cc;
+    color: #f3f5f7;
 }
 
 entry.search-entry {
-    min-height: 42px;
+    min-height: 44px;
     background-color: transparent;
-    color: #f4f5f6;
-    caret-color: #f4f5f6;
+    color: #f3f5f7;
+    caret-color: #82c7bb;
     border: none;
     box-shadow: none;
-    padding: 0 6px;
-    font-size: 15px;
+    padding: 0 8px;
+    font-size: 16px;
 }
 
 entry.search-entry:focus {
     border: none;
-    box-shadow: none;
+    box-shadow: inset 0 0 0 1px #82c7bb;
+}
+
+entry.search-entry placeholder,
+entry.search-entry text.placeholder,
+entry.search-entry > text > placeholder {
+    color: #a7b0b8;
+    opacity: 1;
+}
+
+entry.search-entry selection {
+    color: #172027;
+    background-color: #82c7bb;
 }
 
 entry.error {
@@ -80,53 +93,75 @@ entry.error {
 }
 
 .category-row {
-    margin-top: 2px;
-    margin-bottom: 2px;
+    margin-top: 4px;
+    margin-bottom: 4px;
 }
 
 .category-chip {
-    color: #979b9f;
+    color: #a7b0b8;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
     font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 4px;
+    font-weight: 600;
+    padding: 6px 9px;
+    border-radius: 999px;
 }
 
 .category-chip.active {
-    color: #f2f3f4;
-    background-color: #4b4d50;
+    color: #e8f5f2;
+    background-color: #38504d;
+}
+
+button.category-chip:hover {
+    color: #f3f5f7;
+    background-color: #2d353a;
+}
+
+button.category-chip.active label,
+button.category-chip.active:hover label {
+    color: #e8f5f2;
 }
 
 .status-label {
-    color: #85898d;
+    color: #737d86;
     font-size: 11px;
 }
 
 list.result-list {
     background-color: transparent;
+    padding: 2px 0;
 }
 
 row.result-row {
     background-color: transparent;
-    border-radius: 7px;
-    margin: 1px 0;
+    border-radius: 10px;
+    margin: 2px 0;
 }
 
 row.result-row:hover {
-    background-color: #3b3d40;
+    background-color: #2d3339;
 }
 
-row.result-row:selected {
-    background-color: #4b4d50;
+list.result-list > row.result-row:selected {
+    background-color: #30383e;
+}
+
+list.result-list > row.result-row.cursor-row,
+list.result-list > row.result-row.cursor-row:selected,
+list.result-list > row.result-row.cursor-row:focus {
+    background-color: #38444f;
+    box-shadow: inset 2px 0 0 #82c7bb;
 }
 
 .result-icon {
-    margin-right: 10px;
+    margin-right: 0;
 }
 
 .result-thumbnail {
-    min-width: 48px;
-    min-height: 48px;
-    border-radius: 6px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 8px;
 }
 
 .preview-title {
@@ -141,38 +176,59 @@ row.result-row:selected {
 }
 
 .empty-state-title {
-    color: #c6c9cc;
+    color: #f3f5f7;
     font-size: 14px;
     font-weight: 600;
 }
 
 .asset-icon {
-    min-width: 32px;
-    min-height: 32px;
+    min-width: 34px;
+    min-height: 34px;
 }
 
 .result-title {
-    color: #f1f2f3;
-    font-size: 13px;
+    color: #f3f5f7;
+    font-size: 14px;
     font-weight: 600;
 }
 
 .result-subtitle {
-    color: #8f9498;
-    font-size: 11px;
+    color: #a7b0b8;
+    font-size: 12px;
 }
 
 .source-badge {
-    color: #bfc3c6;
-    background-color: rgba(255, 255, 255, 0.09);
+    color: #b8c8c7;
+    background-color: #313941;
     border-radius: 999px;
-    padding: 3px 8px;
+    padding: 4px 9px;
     font-size: 9px;
     font-weight: 700;
 }
 
+.badge-file, .badge-folder, .badge-image, .badge-command,
+.badge-setting, .badge-source, .badge-clipboard {
+    background-color: #313941;
+}
+
+row.result-row.cursor-row .source-badge,
+row.result-row.cursor-row:selected .source-badge {
+    color: #e8f5f2;
+    background-color: #49635e;
+}
+
+list.result-list > row.result-row:selected label.result-title,
+list.result-list > row.result-row.cursor-row label.result-title {
+    color: #f8fbfc;
+}
+
+list.result-list > row.result-row:selected label.result-subtitle,
+list.result-list > row.result-row.cursor-row label.result-subtitle {
+    color: #c4d0d4;
+}
+
 .footer-hint {
-    color: #777c80;
+    color: #737d86;
     font-size: 10px;
 }
 
@@ -258,71 +314,76 @@ window.proton-image-preview.light .preview-error {
 }
 
 window.proton-window.light {
-    background-color: #f6f7f8;
-    border-color: rgba(32, 35, 38, 0.18);
+    background-color: #eef1f3;
+    border-color: rgba(23, 32, 39, 0.18);
 }
 
 window.proton-window.light .launcher-root {
-    background-color: #f6f7f8;
+    background-color: #ffffff;
 }
 
 window.proton-window.light list.result-list {
-    background-color: #f6f7f8;
+    background-color: #ffffff;
 }
 
 window.proton-window.light .search-shell {
-    background-color: #ffffff;
-    border-color: rgba(32, 35, 38, 0.16);
+    background-color: #f8fafb;
+    border-color: #cbd5d9;
 }
 
 window.proton-window.light .search-icon {
-    color: #4b535b;
+    color: #26343d;
 }
 
 window.proton-window.light entry.search-entry,
 window.proton-window.light .result-title,
 window.proton-window.light .empty-state-title {
-    color: #202326;
+    color: #172027;
 }
 
 window.proton-window.light entry.search-entry {
-    caret-color: #202326;
+    caret-color: #26796d;
 }
 
 window.proton-window.light entry.search-entry placeholder,
 window.proton-window.light entry.search-entry text.placeholder,
 window.proton-window.light entry.search-entry > text > placeholder {
-    color: #202326;
+    color: #53636d;
     opacity: 1;
 }
 
 window.proton-window.light entry.search-entry text,
 window.proton-window.light entry.search-entry selection {
-    color: #202326;
+    color: #172027;
 }
 
 window.proton-window.light entry.search-entry selection {
-    background-color: #b9d7d0;
+    background-color: #b8ded7;
 }
 
 window.proton-window.light .category-chip {
-    color: #687078;
+    color: #53636d;
     background-color: transparent;
 }
 
 window.proton-window.light button.category-chip label {
-    color: #4f5861;
+    color: #53636d;
+}
+
+window.proton-window.light button.category-chip:hover {
+    color: #172027;
+    background-color: #e8eef1;
 }
 
 window.proton-window.light button.category-chip.active,
-window.proton-window.light button.category-chip:checked {
-    color: #202326;
-    background-color: #d7dce1;
+window.proton-window.light button.category-chip.active:hover {
+    color: #155a51;
+    background-color: #d7eae6;
 }
 
 window.proton-window.light button.category-chip.active label,
-window.proton-window.light button.category-chip:checked label {
-    color: #202326;
+window.proton-window.light button.category-chip.active:hover label {
+    color: #155a51;
 }
 
 window.proton-window.light .result-subtitle,
@@ -341,59 +402,50 @@ window.proton-window.light row.result-row:hover {
     background-color: #e9edf1;
 }
 
-window.proton-window.light row.result-row:focus,
-window.proton-window.light row.result-row:selected {
-    background-color: #d7e5f5;
+window.proton-window.light list.result-list > row.result-row:selected {
+    background-color: #e4ecef;
 }
 
-window.proton-window.light row.result-row:hover label.result-title,
-window.proton-window.light row.result-row:focus label.result-title,
-window.proton-window.light row.result-row:selected label.result-title {
+window.proton-window.light list.result-list > row.result-row.cursor-row,
+window.proton-window.light list.result-list > row.result-row.cursor-row:selected,
+window.proton-window.light list.result-list > row.result-row.cursor-row:focus {
+    background-color: #d7eae6;
+    box-shadow: inset 2px 0 0 #26796d;
+}
+
+window.proton-window.light list.result-list > row.result-row:selected label.result-title,
+window.proton-window.light list.result-list > row.result-row.cursor-row label.result-title {
     color: #17202a;
 }
 
-window.proton-window.light row.result-row:hover label.result-subtitle,
-window.proton-window.light row.result-row:focus label.result-subtitle,
-window.proton-window.light row.result-row:selected label.result-subtitle {
-    color: #435363;
+window.proton-window.light list.result-list > row.result-row:selected label.result-subtitle,
+window.proton-window.light list.result-list > row.result-row.cursor-row label.result-subtitle {
+    color: #38515b;
 }
 
-window.proton-window.light row.result-row:hover label.source-badge,
-window.proton-window.light row.result-row:focus label.source-badge,
-window.proton-window.light row.result-row:selected label.source-badge {
-    color: #263746;
-    background-color: rgba(38, 55, 70, 0.12);
+window.proton-window.light list.result-list > row.result-row:selected label.source-badge,
+window.proton-window.light list.result-list > row.result-row.cursor-row label.source-badge {
+    color: #155a51;
+    background-color: #c1dfd9;
 }
 
-window.proton-window.light row.result-row:hover label,
-window.proton-window.light row.result-row:focus label,
-window.proton-window.light row.result-row:selected label {
-    color: #202326;
-}
-
-/* Keep the native ListBox selected-row foreground from reintroducing the
- * dark-theme accent color in light mode. The extra list/row qualifiers are
- * intentional: GTK's theme gives selected descendants a more specific rule
- * than a plain label class. */
-window.proton-window.light list.result-list row.result-row label.result-title {
-    color: #17202a;
-}
-
-window.proton-window.light list.result-list row.result-row label.result-subtitle {
-    color: #435363;
-}
-
-window.proton-window.light list.result-list row.result-row label.source-badge {
-    color: #263746;
+window.proton-window.light .source-badge,
+window.proton-window.light .badge-file,
+window.proton-window.light .badge-folder,
+window.proton-window.light .badge-image,
+window.proton-window.light .badge-command,
+window.proton-window.light .badge-setting,
+window.proton-window.light .badge-source,
+window.proton-window.light .badge-clipboard {
+    color: #53636d;
+    background-color: #e4eceb;
 }
 
 window.proton-window.light row.result-row:hover .result-icon,
-window.proton-window.light row.result-row:focus .result-icon,
-window.proton-window.light row.result-row:selected .result-icon,
+window.proton-window.light row.result-row.cursor-row .result-icon,
 window.proton-window.light row.result-row:hover .asset-icon,
-window.proton-window.light row.result-row:focus .asset-icon,
-window.proton-window.light row.result-row:selected .asset-icon {
-    color: #34424f;
+window.proton-window.light row.result-row.cursor-row .asset-icon {
+    color: #1f655c;
 }
 
 window.proton-window.light .image-preview {
@@ -2119,8 +2171,15 @@ fn build_window(
     search_shell.append(&entry);
     root.append(&search_shell);
 
-    let category_row = GtkBox::new(Orientation::Horizontal, 2);
+    let category_row = FlowBox::new();
     category_row.add_css_class("category-row");
+    category_row.set_hexpand(true);
+    category_row.set_selection_mode(SelectionMode::None);
+    category_row.set_row_spacing(2);
+    category_row.set_column_spacing(2);
+    category_row.set_min_children_per_line(1);
+    category_row.set_max_children_per_line(9);
+    let active_category = Rc::new(RefCell::new(None::<Button>));
     for (label, prefix, active) in [
         ("All", "", true),
         ("Files", "file:", false),
@@ -2137,20 +2196,36 @@ fn build_window(
         chip.add_css_class("category-chip");
         if active {
             chip.add_css_class("active");
+            *active_category.borrow_mut() = Some(chip.clone());
         }
-        category_row.append(&chip);
+        category_row.insert(&chip, -1);
         let entry_for_chip = entry.clone();
+        let active_category_for_chip = active_category.clone();
+        let chip_for_callback = chip.clone();
         chip.connect_clicked(move |_| {
+            if let Some(previous) = active_category_for_chip
+                .borrow_mut()
+                .replace(chip_for_callback.clone())
+            {
+                previous.remove_css_class("active");
+            }
+            chip_for_callback.add_css_class("active");
             entry_for_chip.set_text(prefix);
             entry_for_chip.grab_focus();
         });
     }
+    let category_bar = GtkBox::new(Orientation::Horizontal, 4);
+    category_bar.set_hexpand(true);
+    category_bar.append(&category_row);
+
     let status = Label::new(Some("Quick Search"));
     status.set_halign(Align::End);
-    status.set_hexpand(true);
+    status.set_hexpand(false);
+    status.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    status.set_max_width_chars(18);
     status.add_css_class("status-label");
-    category_row.append(&status);
-    root.append(&category_row);
+    category_bar.append(&status);
+    root.append(&category_bar);
 
     let list = ListBox::new();
     list.add_css_class("result-list");
@@ -2210,6 +2285,7 @@ fn build_window(
     });
 
     let row_height = Rc::new(Cell::new(linux_settings.item_height.clamp(52, 120)));
+    let cursor_index = Rc::new(Cell::new(0_i32));
     let initial_items = providers::collect(&paths, &linux_settings, "");
     *items.borrow_mut() = initial_items.clone();
     update_results(
@@ -2250,10 +2326,12 @@ fn build_window(
     let row_height_for_receiver = row_height.clone();
     let settings_for_receiver = settings_state.clone();
     let paths_for_receiver = paths.clone();
+    let cursor_index_for_receiver = cursor_index.clone();
     glib::MainContext::default().spawn_local(async move {
         while let Ok((result_generation, query, results)) = receiver.recv().await {
             if result_generation == generation_for_receiver.get() {
                 *items_for_receiver.borrow_mut() = results.clone();
+                cursor_index_for_receiver.set(0);
                 update_results(
                     &list_for_receiver,
                     &status_for_receiver,
@@ -2351,6 +2429,7 @@ fn build_window(
     let action_sender_for_enter = action_sender.clone();
     let previews_for_enter = previews.clone();
     let preview_generation_for_enter = preview_load_generation.clone();
+    let cursor_index_for_enter = cursor_index.clone();
     entry.connect_activate(move |_| {
         let selected_items = list_for_enter
             .selected_rows()
@@ -2386,6 +2465,8 @@ fn build_window(
             .selected_row()
             .or_else(|| list_for_enter.row_at_index(0))
         {
+            cursor_index_for_enter.set(row.index());
+            set_cursor_row(&list_for_enter, row.index());
             let index = row.index();
             let Some(item) = items_for_enter.borrow().get(index as usize).cloned() else {
                 return;
@@ -2423,7 +2504,10 @@ fn build_window(
     let action_sender_for_activation = action_sender.clone();
     let previews_for_activation = previews.clone();
     let preview_generation_for_activation = preview_load_generation.clone();
+    let cursor_index_for_activation = cursor_index.clone();
     list.connect_row_activated(move |_, row| {
+        cursor_index_for_activation.set(row.index());
+        set_cursor_row(&list_for_activation, row.index());
         let selected_items = list_for_activation
             .selected_rows()
             .into_iter()
@@ -2498,6 +2582,8 @@ fn build_window(
     let previews_for_key = previews.clone();
     let preview_generation_for_key = preview_load_generation.clone();
     let alt_preview_active_for_key = alt_preview_active.clone();
+    let cursor_index_for_key = cursor_index.clone();
+    let settings_state_for_key = settings_state.clone();
     key_controller.connect_key_pressed(move |_, key, _, state| {
         if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R) {
             let selected = list_for_navigation
@@ -2527,17 +2613,14 @@ fn build_window(
             return glib::Propagation::Stop;
         }
         if key == gdk::Key::space && state.contains(gdk::ModifierType::CONTROL_MASK) {
-            if let Some(row) = list_for_navigation
-                .selected_row()
-                .or_else(|| list_for_navigation.row_at_index(0))
-            {
+            if let Some(row) = list_for_navigation.row_at_index(cursor_index_for_key.get()) {
                 let selected = list_for_navigation
                     .selected_rows()
                     .iter()
                     .any(|selected| selected.index() == row.index());
                 if selected {
                     list_for_navigation.unselect_row(&row);
-                } else {
+                } else if !selected {
                     list_for_navigation.select_row(Some(&row));
                 }
             }
@@ -2556,19 +2639,23 @@ fn build_window(
             if count == 0 {
                 return glib::Propagation::Stop;
             }
-            let current = list_for_navigation
-                .selected_row()
-                .map(|row| row.index())
-                .unwrap_or(0);
+            let current = cursor_index_for_key.get().clamp(0, count - 1);
+            let page_step = {
+                let current_settings = settings_state_for_key.borrow();
+                (current_settings.window_height.saturating_sub(150)
+                    / current_settings.item_height.max(1))
+                .max(1) as i32
+            };
             let next = match key {
                 gdk::Key::Down => (current + 1).min(count - 1),
                 gdk::Key::Up => current.saturating_sub(1),
-                gdk::Key::Page_Down => (current + 6).min(count - 1),
-                gdk::Key::Page_Up => current.saturating_sub(6),
+                gdk::Key::Page_Down => (current + page_step).min(count - 1),
+                gdk::Key::Page_Up => current.saturating_sub(page_step),
                 gdk::Key::Home => 0,
                 _ => count - 1,
             };
             if let Some(row) = list_for_navigation.row_at_index(next) {
+                cursor_index_for_key.set(next);
                 // Multiple selection is available for clipboard workflows,
                 // but ordinary arrow navigation must behave like a single
                 // active cursor. Holding Ctrl intentionally preserves the
@@ -2577,7 +2664,7 @@ fn build_window(
                     list_for_navigation.unselect_all();
                 }
                 list_for_navigation.select_row(Some(&row));
-                row.grab_focus();
+                set_cursor_row(&list_for_navigation, next);
             }
             return glib::Propagation::Stop;
         }
@@ -2692,8 +2779,24 @@ fn update_results(
     list.unselect_all();
     if let Some(row) = list.row_at_index(0) {
         list.select_row(Some(&row));
+        set_cursor_row(list, 0);
     } else {
         list.select_row(None::<&ListBoxRow>);
+    }
+}
+
+fn set_cursor_row(list: &ListBox, index: i32) {
+    let mut child = list.first_child();
+    while let Some(widget) = child {
+        let next = widget.next_sibling();
+        if let Ok(row) = widget.downcast::<ListBoxRow>() {
+            if row.index() == index {
+                row.add_css_class("cursor-row");
+            } else {
+                row.remove_css_class("cursor-row");
+            }
+        }
+        child = next;
     }
 }
 
@@ -2710,7 +2813,12 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     content.set_margin_end(12);
 
     let icon = result_icon(item, light_theme, paths);
-    content.append(&icon);
+    let icon_slot = GtkBox::new(Orientation::Horizontal, 0);
+    icon_slot.set_size_request(40, -1);
+    icon_slot.set_halign(Align::Center);
+    icon_slot.set_valign(Align::Center);
+    icon_slot.append(&icon);
+    content.append(&icon_slot);
 
     let text = GtkBox::new(Orientation::Vertical, 2);
     text.set_hexpand(true);
@@ -2721,12 +2829,6 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     title.set_xalign(0.0);
     title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     title.set_single_line_mode(true);
-    if light_theme {
-        title.set_markup(&format!(
-            "<span foreground=\"#17202a\">{}</span>",
-            glib::markup_escape_text(&item.title)
-        ));
-    }
     title.add_css_class("result-title");
     text.append(&title);
 
@@ -2735,12 +2837,6 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     subtitle.set_xalign(0.0);
     subtitle.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     subtitle.set_single_line_mode(true);
-    if light_theme {
-        subtitle.set_markup(&format!(
-            "<span foreground=\"#435363\">{}</span>",
-            glib::markup_escape_text(&item.subtitle)
-        ));
-    }
     subtitle.add_css_class("result-subtitle");
     text.append(&subtitle);
     content.append(&text);
@@ -2748,13 +2844,10 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     let badge = Label::new(Some(&item.kind));
     badge.set_halign(Align::End);
     badge.set_hexpand(false);
-    if light_theme {
-        badge.set_markup(&format!(
-            "<span foreground=\"#263746\">{}</span>",
-            glib::markup_escape_text(&item.kind)
-        ));
-    }
+    badge.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    badge.set_max_width_chars(12);
     badge.add_css_class("source-badge");
+    badge.add_css_class(badge_class(&item.kind));
     badge.set_tooltip_text(Some(&item.source));
     content.append(&badge);
 
@@ -2768,6 +2861,19 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     revealer.set_reveal_child(true);
     row.set_child(Some(&revealer));
     row
+}
+
+fn badge_class(kind: &str) -> &'static str {
+    match kind.to_ascii_uppercase().as_str() {
+        "FILE" => "badge-file",
+        "FOLDER" => "badge-folder",
+        "IMAGE" => "badge-image",
+        "COMMAND" => "badge-command",
+        "SETTING" => "badge-setting",
+        "CLIPBOARD" => "badge-clipboard",
+        "SOURCE" => "badge-source",
+        _ => "badge-source",
+    }
 }
 
 fn empty_state_message(query: &str) -> String {
