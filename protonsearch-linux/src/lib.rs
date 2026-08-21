@@ -18,4 +18,5 @@ pub mod search;
 pub mod settings;
 pub mod system;
 pub mod tray;
+pub mod update;
 pub mod xdg;

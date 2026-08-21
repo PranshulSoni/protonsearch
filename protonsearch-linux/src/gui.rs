@@ -7,6 +7,7 @@
 
 use crate::providers::{self, Item, Target};
 use crate::settings;
+use crate::update;
 use crate::xdg::XdgPaths;
 use anyhow::Result;
 use gtk4::gdk;
@@ -833,6 +834,10 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             "Indexing and database",
             "Understand how Linux search stays responsive and bounded.",
         );
+        let (updates_page, updates_scroll) = settings_page(
+            "Updates",
+            "Check official ProtonSearch releases and install verified Linux updates safely.",
+        );
 
         stack.add_titled(&general_scroll, Some("general"), "General");
         stack.add_titled(&appearance_scroll, Some("appearance"), "Appearance");
@@ -842,6 +847,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         stack.add_titled(&hotkey_scroll, Some("hotkey"), "Hotkey");
         stack.add_titled(&safety_scroll, Some("safety"), "Safety & Linux");
         stack.add_titled(&indexing_scroll, Some("indexing"), "Indexing & Database");
+        stack.add_titled(&updates_scroll, Some("updates"), "Updates");
 
         let startup = CheckButton::with_label("Run ProtonSearch in the background at login");
         startup.set_active(current.run_on_startup);
@@ -1085,6 +1091,182 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         data_value.add_css_class("settings-help");
         indexing_page.append(&data_value);
 
+        let update_snapshot = Rc::new(RefCell::new(update::load(&paths)));
+        let update_current = Label::new(None);
+        let update_latest = Label::new(None);
+        let update_status = Label::new(None);
+        let update_release = Label::new(None);
+        let update_package = Label::new(None);
+        let update_notes = Label::new(None);
+        for label in [
+            &update_current,
+            &update_latest,
+            &update_status,
+            &update_release,
+            &update_package,
+            &update_notes,
+        ] {
+            label.set_halign(Align::Start);
+            label.set_wrap(true);
+            label.set_selectable(true);
+            label.add_css_class("settings-help");
+            updates_page.append(label);
+        }
+        let update_check = Button::with_label("Check for updates");
+        let update_notes_button = Button::with_label("View release notes");
+        let update_install = Button::with_label("Download and install");
+        let update_buttons = GtkBox::new(Orientation::Horizontal, 8);
+        update_buttons.append(&update_check);
+        update_buttons.append(&update_notes_button);
+        update_buttons.append(&update_install);
+        updates_page.append(&update_buttons);
+        let automatic_updates = CheckButton::with_label("Automatically check for updates once per day");
+        automatic_updates.set_active(current.auto_update_checks);
+        automatic_updates.set_tooltip_text(Some(
+            "Checks GitHub after startup at most once every 24 hours; installation always requires approval.",
+        ));
+        updates_page.append(&automatic_updates);
+        let update_help = Label::new(Some(
+            "Only releases from the official ProtonSearch GitHub repository are considered. Downloads require a matching SHA-256 checksum before installation. Package-managed installs use the system package manager; user-data directories are preserved.",
+        ));
+        update_help.set_wrap(true);
+        update_help.set_halign(Align::Start);
+        update_help.add_css_class("settings-help");
+        updates_page.append(&update_help);
+        render_update_snapshot(
+            &update_snapshot.borrow(),
+            &update_current,
+            &update_latest,
+            &update_status,
+            &update_release,
+            &update_package,
+            &update_notes,
+            &update_notes_button,
+            &update_install,
+        );
+        if let Some(install_state) = update::load_install_state(&paths) {
+            update_status.set_text(&format!(
+                "{}: {}",
+                match install_state.stage {
+                    update::InstallStage::Complete => "Update complete",
+                    update::InstallStage::Failed => "Update failed",
+                    _ => "Update in progress",
+                },
+                install_state.message
+            ));
+        }
+
+        let (update_tx, update_rx) = mpsc::channel::<UpdateUiMessage>();
+        let update_receiver = Rc::new(RefCell::new(update_rx));
+        let paths_for_update = paths.clone();
+        let tx_for_check = update_tx.clone();
+        let check_for_updates = Rc::new(move |force: bool| {
+            let paths = paths_for_update.clone();
+            let tx = tx_for_check.clone();
+            let _ = tx.send(UpdateUiMessage::Checking);
+            thread::spawn(move || {
+                let result = update::check(&paths, force).map_err(|error| error.to_string());
+                let _ = tx.send(UpdateUiMessage::Checked(result));
+            });
+        });
+        let check_for_click = check_for_updates.clone();
+        update_check.connect_clicked(move |_| check_for_click(true));
+        let update_url = update_snapshot.clone();
+        update_notes_button.connect_clicked(move |_| {
+            if let Some(url) = update_url.borrow().release_url.as_deref() {
+                if let Err(error) = crate::system::open_target(url) {
+                    eprintln!("ProtonSearch: could not open release notes: {error:#}");
+                }
+            }
+        });
+        let paths_for_install = paths.clone();
+        let snapshot_for_install = update_snapshot.clone();
+        let tx_for_install = update_tx.clone();
+        update_install.connect_clicked(move |_| {
+            let snapshot = snapshot_for_install.borrow().clone();
+            let paths = paths_for_install.clone();
+            let tx = tx_for_install.clone();
+            thread::spawn(move || {
+                let result = update::download_and_verify(&paths, &snapshot, |done, total| {
+                    let _ = tx.send(UpdateUiMessage::DownloadProgress(done, total));
+                })
+                .map_err(|error| error.to_string());
+                let _ = tx.send(UpdateUiMessage::Downloaded(result));
+            });
+        });
+        let auto_check = automatic_updates.is_active();
+        if auto_check {
+            let check_for_startup = check_for_updates.clone();
+            glib::timeout_add_local_once(Duration::from_secs(3), move || check_for_startup(false));
+        }
+        let receiver_for_ui = update_receiver.clone();
+        let snapshot_for_ui = update_snapshot.clone();
+        let update_current_for_ui = update_current.clone();
+        let update_latest_for_ui = update_latest.clone();
+        let update_status_for_ui = update_status.clone();
+        let update_release_for_ui = update_release.clone();
+        let update_package_for_ui = update_package.clone();
+        let update_notes_for_ui = update_notes.clone();
+        let update_install_for_ui = update_install.clone();
+        let update_check_for_ui = update_check.clone();
+        let paths_for_update_ui = paths.clone();
+        glib::timeout_add_local(Duration::from_millis(200), move || {
+            while let Ok(message) = receiver_for_ui.borrow().try_recv() {
+                match message {
+                    UpdateUiMessage::Checking => {
+                        update_status_for_ui.set_text("Checking for updates…");
+                        update_check_for_ui.set_sensitive(false);
+                        update_install_for_ui.set_sensitive(false);
+                    }
+                    UpdateUiMessage::Checked(result) => match result {
+                        Ok(snapshot) => {
+                            *snapshot_for_ui.borrow_mut() = snapshot.clone();
+                            render_update_snapshot(
+                                &snapshot,
+                                &update_current_for_ui,
+                                &update_latest_for_ui,
+                                &update_status_for_ui,
+                                &update_release_for_ui,
+                                &update_package_for_ui,
+                                &update_notes_for_ui,
+                                &update_notes_button,
+                                &update_install_for_ui,
+                            );
+                            update_check_for_ui.set_sensitive(true);
+                        }
+                        Err(error) => {
+                            update_status_for_ui.set_text(&format!("Unable to check for updates: {error}"));
+                            update_check_for_ui.set_sensitive(true);
+                        }
+                    },
+                    UpdateUiMessage::DownloadProgress(done, total) => {
+                        let status = total
+                            .map(|total| format!("Downloading update… {}%", done.saturating_mul(100) / total.max(1)))
+                            .unwrap_or_else(|| "Downloading update…".to_string());
+                        update_status_for_ui.set_text(&status);
+                    }
+                    UpdateUiMessage::Downloaded(result) => match result {
+                        Ok(downloaded) => {
+                            match update::launch_install_helper(&paths_for_update_ui, &downloaded) {
+                                Ok(()) => update_status_for_ui.set_text(
+                                    "Update verified. ProtonSearch is restarting to install it…",
+                                ),
+                                Err(error) => update_status_for_ui
+                                    .set_text(&format!("Update could not start: {error}")),
+                            }
+                            update_check_for_ui.set_sensitive(true);
+                        }
+                        Err(error) => {
+                            update_status_for_ui.set_text(&format!("Update verification failed: {error}"));
+                            update_install_for_ui.set_sensitive(true);
+                            update_check_for_ui.set_sensitive(true);
+                        }
+                    },
+                }
+            }
+            glib::ControlFlow::Continue
+        });
+
         let hotkey_title = Label::new(Some("Launcher hotkey"));
         hotkey_title.set_halign(Align::Start);
         hotkey_title.add_css_class("settings-label");
@@ -1150,6 +1332,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             next.enable_browser_history = browser_history.is_active();
             next.enable_hermes = hermes.is_active();
             next.enable_agent_history = agent_history.is_active();
+            next.auto_update_checks = automatic_updates.is_active();
             next.confirm_power_actions = confirm_power.is_active();
             next.log_level = log_level
                 .active_id()
@@ -1217,6 +1400,63 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         .unwrap_or_else(|| "protonsearch-linux".to_string());
     application.run_with_args(&[program]);
     Ok(())
+}
+
+enum UpdateUiMessage {
+    Checking,
+    Checked(Result<update::UpdateSnapshot, String>),
+    DownloadProgress(u64, Option<u64>),
+    Downloaded(Result<update::DownloadedUpdate, String>),
+}
+
+fn render_update_snapshot(
+    snapshot: &update::UpdateSnapshot,
+    current: &Label,
+    latest: &Label,
+    status: &Label,
+    release: &Label,
+    package: &Label,
+    notes: &Label,
+    notes_button: &Button,
+    install: &Button,
+) {
+    current.set_text(&format!("Current version: v{}", snapshot.current_version));
+    latest.set_text(&format!(
+        "Latest version: {}",
+        snapshot
+            .latest_version
+            .as_deref()
+            .map(|version| format!("v{version}"))
+            .unwrap_or_else(|| "Not checked".to_string())
+    ));
+    status.set_text(if snapshot.message.is_empty() {
+        "No update check has been completed yet."
+    } else {
+        &snapshot.message
+    });
+    release.set_text(&format!(
+        "Release date: {}\nRelease: {}",
+        snapshot.release_date.as_deref().unwrap_or("Unknown"),
+        snapshot.release_name.as_deref().unwrap_or("Unknown")
+    ));
+    package.set_text(&format!(
+        "Package: {}\nAsset: {}\nSHA-256: {}",
+        snapshot
+            .target
+            .as_ref()
+            .map(|target| target.installation.label())
+            .unwrap_or("Unknown"),
+        snapshot.asset_name.as_deref().unwrap_or("None selected"),
+        snapshot.sha256.as_deref().unwrap_or("Not provided")
+    ));
+    notes.set_text(
+        snapshot
+            .release_notes
+            .as_deref()
+            .unwrap_or("Release notes will appear after checking for updates."),
+    );
+    notes_button.set_sensitive(snapshot.release_url.is_some());
+    install.set_sensitive(snapshot.installable);
 }
 
 #[derive(Debug, Clone, Copy)]

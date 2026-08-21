@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+VERSION=${PROTONSEARCH_VERSION:-1.0.0}
 OUTPUT_DIR=${PROTONSEARCH_OUTPUT_DIR:-"${ROOT_DIR}/target/packages"}
 RPM_TOP=$(mktemp -d "${TMPDIR:-/tmp}/protonsearch-rpm.XXXXXX")
 trap 'rm -rf -- "${RPM_TOP}"' EXIT
@@ -18,8 +19,9 @@ fi
 mkdir -p "${RPM_TOP}/SOURCES" "${RPM_TOP}/SPECS" "${OUTPUT_DIR}"
 install -Dm755 "${ROOT_DIR}/target/release/protonsearch-linux" \
     "${RPM_TOP}/SOURCES/protonsearch-linux"
-install -Dm644 "${ROOT_DIR}/packaging/fedora/protonsearch-linux.spec" \
-    "${RPM_TOP}/SPECS/protonsearch-linux.spec"
+sed "s/^Version:.*/Version:        ${VERSION}/" \
+    "${ROOT_DIR}/packaging/fedora/protonsearch-linux.spec" \
+    >"${RPM_TOP}/SPECS/protonsearch-linux.spec"
 install -Dm644 "${ROOT_DIR}/packaging/protonsearch-linux.desktop" \
     "${RPM_TOP}/SOURCES/protonsearch-linux.desktop"
 install -Dm644 "${ROOT_DIR}/assets/branding/protonsearch.png" \

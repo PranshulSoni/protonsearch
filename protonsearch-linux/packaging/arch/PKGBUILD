@@ -1,5 +1,5 @@
 pkgname=protonsearch-linux
-pkgver=1.0.0
+pkgver=${PROTONSEARCH_VERSION:-1.0.0}
 pkgrel=1
 pkgdesc='Linux-native launcher and search providers for ProtonSearch'
 arch=('x86_64')

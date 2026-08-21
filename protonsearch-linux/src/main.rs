@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use protonsearch_linux::{
     actions, capabilities, desktop, gui, hyprland, platform, providers, search, settings, system,
-    xdg,
+    update, xdg,
 };
 use std::io::Read;
 use std::path::PathBuf;
@@ -16,6 +16,11 @@ fn main() -> Result<()> {
         Some("help") | Some("--help") => print_help(),
         Some("gui") | Some("run") | Some("--gui") => gui::run(paths)?,
         Some("daemon") | Some("service") => gui::run_resident(paths)?,
+        Some("update-helper") => {
+            let job = args.next().context("update-helper requires a job file")?;
+            update::run_helper(&paths, std::path::Path::new(&job))?;
+        }
+        Some("version") => println!("{}", update::current_version()),
         Some("clipboard-capture-text") => {
             let mut bytes = Vec::new();
             std::io::stdin().read_to_end(&mut bytes)?;
@@ -150,7 +155,7 @@ fn run_agent(prompt: String) -> Result<()> {
 
 fn print_help() {
     println!(
-        "ProtonSearch Linux\n\nCommands:\n  gui                   open or toggle the graphical launcher\n  daemon                run the resident background launcher service\n  settings-ui           open Linux settings\n  doctor                 detect Linux providers\n  agent <prompt>        send one prompt through the installed Hermes Agent\n  search <query>        search XDG roots\n  search-all <query>    search all Linux providers\n  apps [query]          list or search .desktop applications\n  launch <entry>        launch a visible desktop entry\n  settings              list Linux-only settings\n  action <id> [args]    run an allowlisted provider action\n  hyprland              show read-only Hyprland IPC/config data\n  open <path-or-url>    use the desktop preferred opener\n\nLauncher prefixes include app:, file:, folder:, settings:, browser:, history:, git:, content:, ocr:, clip:, notes:, snippets:, and quicklinks:.\n\nDestructive session actions require --confirm. Packages are never installed automatically."
+        "ProtonSearch Linux\n\nCommands:\n  gui                   open or toggle the graphical launcher\n  daemon                run the resident background launcher service\n  settings-ui           open Linux settings\n  doctor                 detect Linux providers\n  version                print the installed ProtonSearch version\n  agent <prompt>        send one prompt through the installed Hermes Agent\n  search <query>        search XDG roots\n  search-all <query>    search all Linux providers\n  apps [query]          list or search .desktop applications\n  launch <entry>        launch a visible desktop entry\n  settings              list Linux-only settings\n  action <id> [args]    run an allowlisted provider action\n  hyprland              show read-only Hyprland IPC/config data\n  open <path-or-url>    use the desktop preferred opener\n\nLauncher prefixes include app:, file:, folder:, settings:, browser:, history:, git:, content:, ocr:, clip:, notes:, snippets:, and quicklinks:.\n\nDestructive session actions require --confirm. Packages are never installed automatically."
     );
 }
 
