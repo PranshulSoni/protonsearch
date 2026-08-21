@@ -79,7 +79,7 @@ offer_optional_packages() {
     local providers=(
         "gio"
         "wl-paste"
-        "cliphist"
+        "xclip"
         "sqlite3"
         "pdftotext"
         "grim"
@@ -137,7 +137,7 @@ package_for_command() {
     case "${DISTRO_FAMILY}:${command_name}" in
         arch:gio|debian:gio|fedora:gio) echo "xdg-utils" ;;
         arch:wl-paste|debian:wl-paste|fedora:wl-paste) echo "wl-clipboard" ;;
-        arch:cliphist|debian:cliphist|fedora:cliphist) echo "cliphist" ;;
+        arch:xclip|debian:xclip|fedora:xclip) echo "xclip" ;;
         arch:sqlite3) echo "sqlite" ;;
         debian:sqlite3) echo "sqlite3" ;;
         fedora:sqlite3) echo "sqlite" ;;

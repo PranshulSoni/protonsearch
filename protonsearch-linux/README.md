@@ -82,17 +82,22 @@ its credentials; install Hermes through its own trusted distribution method.
 
 Choose `Images` or type `images:` to browse supported images found in the
 user's home/XDG folders and configured search roots. Results use bounded
-thumbnails; select an image and hold `Alt` for the inline preview. The same
-preview behavior is available for image entries in `clipboard:` history when
-`cliphist` and `wl-clipboard` are installed. Pressing `Enter` on a clipboard
-image restores the binary image to the Wayland clipboard. Screenshot actions
-also copy the generated PNG to the clipboard, so the new screenshot is added
-to clipboard history automatically. Image history rows use thumbnails rather
-than exposing cliphist's binary-data metadata; clicking one opens its preview.
+thumbnails; select an image and hold `Alt` for a separate preview window. The
+same preview behavior is available for image entries in `clipboard:` history.
+ProtonSearch monitors the GTK/GDK clipboard directly on Wayland and X11, stores
+a bounded history in the user's XDG state directory, and does not require
+`cliphist`. `wl-clipboard` and `xclip` are optional compatibility fallbacks
+for desktops where GDK cannot expose a clipboard payload directly. Pressing `Enter` on a clipboard image restores the binary image to
+the desktop clipboard. Screenshot actions also copy the generated PNG to the
+clipboard, so the new screenshot is added to history automatically. Image
+history rows use thumbnails rather than exposing binary metadata; clicking one
+opens its preview.
 
 If a category has no matches, ProtonSearch shows a centered explanation such
-as `No image files found`, `No clipboard history found`, or `No Git commits
-found` instead of leaving the launcher blank. OCR text search is intentionally
+as `No image files found`, `Clipboard history is empty`, or `No Git commits
+found` instead of leaving the launcher blank. If the graphical clipboard
+backend is unavailable, the launcher reports that separately from an empty
+history. OCR text search is intentionally
 deferred; use the Images category for image filename search until OCR ships.
 
 Git search uses `git` directly, discovers repositories in the home/XDG folders

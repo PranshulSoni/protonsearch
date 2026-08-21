@@ -7,6 +7,7 @@
 pub mod actions;
 pub mod calculator;
 pub mod capabilities;
+pub mod clipboard;
 pub mod desktop;
 pub mod gui;
 pub mod hyprland;

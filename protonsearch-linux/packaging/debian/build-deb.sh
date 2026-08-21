@@ -38,7 +38,7 @@ Priority: optional
 Architecture: ${ARCH}
 Maintainer: ProtonSearch contributors
 Depends: libgtk-4-1, libgdk-pixbuf-2.0-0
-Suggests: wl-clipboard, cliphist, grim, slurp, poppler-utils, network-manager, bluez, wireplumber, brightnessctl, playerctl, power-profiles-daemon, upower
+Suggests: wl-clipboard, xclip, grim, slurp, poppler-utils, network-manager, bluez, wireplumber, brightnessctl, playerctl, power-profiles-daemon, upower
 Description: Linux-native ProtonSearch launcher
  Fast launcher and search providers with runtime distribution and desktop detection.
 EOF

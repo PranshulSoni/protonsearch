@@ -24,7 +24,7 @@ use std::cell::{Cell, RefCell};
 use std::fs;
 use std::io::{BufRead, Cursor, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::process::{Command, Stdio};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::{
@@ -128,20 +128,6 @@ row.result-row:selected {
     border-radius: 6px;
 }
 
-.image-preview {
-    background-color: rgba(17, 18, 19, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    padding: 10px;
-    margin-bottom: 4px;
-}
-
-.preview-image {
-    min-width: 180px;
-    min-height: 120px;
-    border-radius: 6px;
-}
-
 .preview-title {
     color: #f1f2f3;
     font-size: 12px;
@@ -187,6 +173,87 @@ row.result-row:selected {
 .footer-hint {
     color: #777c80;
     font-size: 10px;
+}
+
+window.proton-image-preview {
+    background-color: #151617;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+}
+
+.preview-shell {
+    background-color: #151617;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.preview-toolbar {
+    min-height: 32px;
+}
+
+.preview-window-title {
+    color: #f1f2f3;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.preview-close {
+    min-width: 30px;
+    min-height: 30px;
+    padding: 0;
+    border-radius: 7px;
+    color: #c9cdd1;
+}
+
+.preview-close:hover {
+    background-color: #3b3d40;
+    color: #ffffff;
+}
+
+.preview-surface {
+    background-color: #0d0e0f;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    min-width: 420px;
+    min-height: 300px;
+}
+
+.preview-loading,
+.preview-error {
+    color: #9da3a8;
+    font-size: 12px;
+}
+
+window.proton-image-preview.light {
+    background-color: #f4f5f6;
+    border-color: rgba(32, 35, 38, 0.18);
+}
+
+window.proton-image-preview.light .preview-shell {
+    background-color: #f4f5f6;
+}
+
+window.proton-image-preview.light .preview-window-title {
+    color: #202326;
+}
+
+window.proton-image-preview.light .preview-close {
+    color: #4b535b;
+}
+
+window.proton-image-preview.light .preview-close:hover {
+    background-color: #dfe4e8;
+    color: #202326;
+}
+
+window.proton-image-preview.light .preview-surface {
+    background-color: #ffffff;
+    border-color: rgba(32, 35, 38, 0.14);
+}
+
+window.proton-image-preview.light .preview-loading,
+window.proton-image-preview.light .preview-error {
+    color: #5e646a;
 }
 
 window.proton-window.light {
@@ -486,6 +553,23 @@ fn run_application(
         // open request to an existing instance.
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
+    let clipboard_monitor = Rc::new(RefCell::new(None::<crate::clipboard::ClipboardMonitor>));
+    let clipboard_monitor_for_startup = clipboard_monitor.clone();
+    let clipboard_paths = paths.clone();
+    application.connect_startup(
+        move |_| match crate::clipboard::start(clipboard_paths.clone()) {
+            Ok(monitor) => {
+                *clipboard_monitor_for_startup.borrow_mut() = Some(monitor);
+            }
+            Err(error) => {
+                crate::clipboard::mark_unavailable(
+                    &clipboard_paths,
+                    format!("Clipboard monitoring is unavailable: {error}"),
+                );
+                eprintln!("ProtonSearch: clipboard monitoring unavailable: {error:#}");
+            }
+        },
+    );
     let commands = Rc::new(RefCell::new(Some(commands)));
     let commands_for_activate = commands.clone();
     application.connect_activate(move |application| {
@@ -1420,6 +1504,331 @@ fn activate_item(
     }
 }
 
+#[derive(Clone)]
+enum PreviewSource {
+    File(PathBuf),
+    StoredClipboard { paths: XdgPaths, id: u64 },
+}
+
+struct LoadedPreview {
+    pixels: Vec<u8>,
+    width: i32,
+    height: i32,
+    stride: usize,
+}
+
+#[derive(Clone)]
+struct PreviewHandle {
+    window: ApplicationWindow,
+    image: Image,
+    title: Label,
+    status: Label,
+}
+
+type PreviewState = Rc<RefCell<Option<PreviewHandle>>>;
+
+fn preview_source_for_item(paths: &XdgPaths, item: &Item) -> Option<PreviewSource> {
+    match &item.target {
+        Target::Path(path) if crate::search::is_image_path(path) => {
+            Some(PreviewSource::File(path.clone()))
+        }
+        Target::Clipboard(id) if item.kind == "IMAGE" => Some(PreviewSource::StoredClipboard {
+            paths: paths.clone(),
+            id: *id,
+        }),
+        _ => None,
+    }
+}
+
+fn preview_bounds(parent: &ApplicationWindow) -> (u32, u32) {
+    let fallback = (900_u32, 680_u32);
+    let Some(surface) = parent.surface() else {
+        return fallback;
+    };
+    let Some(monitor) = gtk4::prelude::WidgetExt::display(parent).monitor_at_surface(&surface)
+    else {
+        return fallback;
+    };
+    let geometry = monitor.geometry();
+    (
+        ((geometry.width() as f64) * 0.72)
+            .round()
+            .clamp(520.0, 1200.0) as u32,
+        ((geometry.height() as f64) * 0.72)
+            .round()
+            .clamp(400.0, 900.0) as u32,
+    )
+}
+
+fn load_preview_bytes(
+    source: PreviewSource,
+    max_width: u32,
+    max_height: u32,
+) -> anyhow::Result<LoadedPreview> {
+    let pixbuf = match source {
+        PreviewSource::File(path) => {
+            gdk_pixbuf::Pixbuf::from_file_at_scale(path, max_width as i32, max_height as i32, true)?
+        }
+        PreviewSource::StoredClipboard { paths, id } => {
+            let bytes = crate::clipboard::image_bytes(&paths, id)?;
+            let pixbuf = gdk_pixbuf::Pixbuf::from_read(Cursor::new(bytes))?;
+            let (width, height) =
+                fit_preview_dimensions(pixbuf.width(), pixbuf.height(), max_width, max_height);
+            if width != pixbuf.width() || height != pixbuf.height() {
+                pixbuf
+                    .scale_simple(width, height, gdk_pixbuf::InterpType::Bilinear)
+                    .ok_or_else(|| anyhow::anyhow!("could not scale clipboard image"))?
+            } else {
+                pixbuf
+            }
+        }
+    };
+    let width = pixbuf.width();
+    let height = pixbuf.height();
+    let stride = width as usize * 4;
+    let pixels = if pixbuf.has_alpha() && pixbuf.n_channels() == 4 {
+        let rowstride = pixbuf.rowstride() as usize;
+        let source = unsafe { pixbuf.pixels() };
+        let mut pixels = vec![0_u8; stride * height as usize];
+        for row in 0..height as usize {
+            let source_row = &source[row * rowstride..row * rowstride + stride];
+            pixels[row * stride..(row + 1) * stride].copy_from_slice(source_row);
+        }
+        pixels
+    } else {
+        let rowstride = pixbuf.rowstride() as usize;
+        let channels = pixbuf.n_channels() as usize;
+        let source = unsafe { pixbuf.pixels() };
+        let mut pixels = vec![0_u8; stride * height as usize];
+        for row in 0..height as usize {
+            for column in 0..width as usize {
+                let source_offset = row * rowstride + column * channels;
+                let target_offset = row * stride + column * 4;
+                pixels[target_offset..target_offset + 3]
+                    .copy_from_slice(&source[source_offset..source_offset + 3]);
+                pixels[target_offset + 3] = 255;
+            }
+        }
+        pixels
+    };
+    Ok(LoadedPreview {
+        pixels,
+        width,
+        height,
+        stride,
+    })
+}
+
+fn fit_preview_dimensions(width: i32, height: i32, max_width: u32, max_height: u32) -> (i32, i32) {
+    if width <= 0 || height <= 0 {
+        return (1, 1);
+    }
+    let scale = (max_width as f64 / width as f64)
+        .min(max_height as f64 / height as f64)
+        .min(1.0);
+    (
+        (width as f64 * scale).round().max(1.0) as i32,
+        (height as f64 * scale).round().max(1.0) as i32,
+    )
+}
+
+fn set_preview_theme(previews: &PreviewState, theme_mode: &str) {
+    if let Some(preview) = previews.borrow().as_ref() {
+        preview.window.remove_css_class("dark");
+        preview.window.remove_css_class("light");
+        preview.window.remove_css_class("system");
+        preview.window.add_css_class(theme_class(theme_mode));
+    }
+}
+
+fn close_image_preview(previews: &PreviewState, load_generation: &Rc<Cell<u64>>) {
+    load_generation.set(load_generation.get().saturating_add(1));
+    let preview = previews.borrow_mut().take();
+    if let Some(preview) = preview {
+        preview.window.close();
+    }
+}
+
+fn open_image_preview(
+    parent: &ApplicationWindow,
+    paths: &XdgPaths,
+    previews: &PreviewState,
+    load_generation: &Rc<Cell<u64>>,
+    item: &Item,
+) -> bool {
+    let Some(source) = preview_source_for_item(paths, item) else {
+        return false;
+    };
+
+    let preview = if let Some(preview) = previews.borrow().as_ref() {
+        preview.clone()
+    } else {
+        let Some(application) = parent.application() else {
+            return false;
+        };
+        let window = ApplicationWindow::builder()
+            .application(&application)
+            .title("ProtonSearch Image Preview")
+            .default_width(720)
+            .default_height(540)
+            .build();
+        window.set_decorated(false);
+        window.set_resizable(true);
+        window.set_modal(false);
+        window.set_hide_on_close(true);
+        window.set_transient_for(Some(parent));
+        window.add_css_class("proton-image-preview");
+        window.add_css_class(if parent.has_css_class("light") {
+            "light"
+        } else {
+            "dark"
+        });
+
+        let shell = GtkBox::new(Orientation::Vertical, 10);
+        shell.add_css_class("preview-shell");
+        shell.set_hexpand(true);
+        shell.set_vexpand(true);
+
+        let toolbar = GtkBox::new(Orientation::Horizontal, 8);
+        toolbar.add_css_class("preview-toolbar");
+        let title = Label::new(Some("Image preview"));
+        title.set_halign(Align::Start);
+        title.set_hexpand(true);
+        title.add_css_class("preview-window-title");
+        toolbar.append(&title);
+
+        let close_button = Button::from_icon_name("window-close-symbolic");
+        close_button.set_tooltip_text(Some("Close preview (Escape)"));
+        close_button.add_css_class("preview-close");
+        toolbar.append(&close_button);
+        shell.append(&toolbar);
+
+        let surface = GtkBox::new(Orientation::Vertical, 8);
+        surface.add_css_class("preview-surface");
+        surface.set_hexpand(true);
+        surface.set_vexpand(true);
+        surface.set_halign(Align::Fill);
+        surface.set_valign(Align::Fill);
+
+        let image = Image::from_icon_name("image-x-generic-symbolic");
+        image.set_halign(Align::Center);
+        image.set_valign(Align::Center);
+        image.set_hexpand(true);
+        image.set_vexpand(true);
+        surface.append(&image);
+
+        let status = Label::new(Some("Loading image…"));
+        status.set_halign(Align::Center);
+        status.add_css_class("preview-loading");
+        surface.append(&status);
+        shell.append(&surface);
+        window.set_child(Some(&shell));
+
+        let preview_state = previews.clone();
+        let generation_for_close = load_generation.clone();
+        let weak_preview_state = Rc::downgrade(&preview_state);
+        window.connect_close_request(move |window| {
+            generation_for_close.set(generation_for_close.get().saturating_add(1));
+            if let Some(previews) = weak_preview_state.upgrade() {
+                previews.borrow_mut().take();
+            }
+            window.hide();
+            glib::Propagation::Stop
+        });
+
+        let window_for_close = window.clone();
+        close_button.connect_clicked(move |_| window_for_close.close());
+
+        let window_for_keys = window.clone();
+        let key_controller = EventControllerKey::new();
+        key_controller.connect_key_pressed(move |_, key, _, _| {
+            if key == gdk::Key::Escape {
+                window_for_keys.close();
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
+        window.add_controller(key_controller);
+
+        let preview = PreviewHandle {
+            window,
+            image,
+            title,
+            status,
+        };
+        *previews.borrow_mut() = Some(preview.clone());
+        preview
+    };
+
+    let request_id = load_generation.get().saturating_add(1);
+    load_generation.set(request_id);
+    preview.title.set_text(&item.title);
+    preview.status.set_text("Loading image…");
+    preview.status.remove_css_class("preview-error");
+    preview.status.add_css_class("preview-loading");
+    preview
+        .image
+        .set_icon_name(Some("image-x-generic-symbolic"));
+    preview.window.present();
+
+    let (sender, receiver) = async_channel::bounded::<Result<LoadedPreview, String>>(1);
+    let (max_width, max_height) = preview_bounds(parent);
+    thread::spawn(move || {
+        let result =
+            load_preview_bytes(source, max_width, max_height).map_err(|error| error.to_string());
+        let _ = sender.send_blocking(result);
+    });
+
+    let weak_previews = Rc::downgrade(previews);
+    let load_generation_for_result = load_generation.clone();
+    glib::MainContext::default().spawn_local(async move {
+        let Ok(result) = receiver.recv().await else {
+            return;
+        };
+        if load_generation_for_result.get() != request_id {
+            return;
+        }
+        let Some(previews) = weak_previews.upgrade() else {
+            return;
+        };
+        let Some(preview) = previews.borrow().as_ref().cloned() else {
+            return;
+        };
+        match result {
+            Ok(loaded) => {
+                let bytes = glib::Bytes::from(&loaded.pixels);
+                let texture = gdk::MemoryTexture::new(
+                    loaded.width,
+                    loaded.height,
+                    gdk::MemoryFormat::R8g8b8a8,
+                    &bytes,
+                    loaded.stride,
+                );
+                preview.image.set_paintable(Some(&texture));
+                preview.image.set_tooltip_text(Some("Image preview"));
+                preview.status.set_text(&format!(
+                    "{} × {} · Escape closes",
+                    loaded.width, loaded.height
+                ));
+                preview.status.remove_css_class("preview-error");
+                preview.status.add_css_class("preview-loading");
+                preview
+                    .window
+                    .set_default_size((loaded.width + 28).max(520), (loaded.height + 86).max(400));
+            }
+            Err(error) => {
+                preview
+                    .status
+                    .set_text(&format!("Could not load image: {error}"));
+                preview.status.remove_css_class("preview-loading");
+                preview.status.add_css_class("preview-error");
+            }
+        }
+    });
+    true
+}
+
 fn build_window(
     application: &Application,
     paths: XdgPaths,
@@ -1503,17 +1912,6 @@ fn build_window(
     category_row.append(&status);
     root.append(&category_row);
 
-    let preview_revealer = Revealer::builder()
-        .transition_type(RevealerTransitionType::SlideDown)
-        .transition_duration(140)
-        .reveal_child(false)
-        .build();
-    let preview_box = GtkBox::new(Orientation::Horizontal, 10);
-    preview_box.add_css_class("image-preview");
-    preview_box.set_hexpand(true);
-    preview_revealer.set_child(Some(&preview_box));
-    root.append(&preview_revealer);
-
     let list = ListBox::new();
     list.add_css_class("result-list");
     list.set_selection_mode(SelectionMode::Multiple);
@@ -1540,6 +1938,9 @@ fn build_window(
     let items = Rc::new(RefCell::new(Vec::<Item>::new()));
     let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
     let generation = Rc::new(Cell::new(0_u64));
+    let previews: PreviewState = Rc::new(RefCell::new(None));
+    let preview_load_generation = Rc::new(Cell::new(0_u64));
+    let alt_preview_active = Rc::new(Cell::new(false));
     let (sender, receiver) = async_channel::unbounded::<(u64, String, Vec<Item>)>();
     let (action_sender, action_receiver) =
         async_channel::unbounded::<anyhow::Result<Option<String>>>();
@@ -1569,47 +1970,16 @@ fn build_window(
     });
 
     let row_height = Rc::new(Cell::new(linux_settings.item_height.clamp(52, 120)));
-    let update = |list: &ListBox,
-                  status: &Label,
-                  items: &[Item],
-                  query: &str,
-                  row_height: u32,
-                  light_theme: bool| {
-        while let Some(child) = list.first_child() {
-            list.remove(&child);
-        }
-        for item in items {
-            list.append(&result_row(item, row_height, light_theme));
-        }
-        if items.is_empty() {
-            let message = empty_state_message(query);
-            list.append(&empty_state_row(&message));
-            status.set_text(&message);
-        } else {
-            let source_count = items
-                .iter()
-                .map(|item| item.source.as_str())
-                .collect::<std::collections::HashSet<_>>()
-                .len();
-            status.set_text(&format!("{source_count} sources · {} results", items.len()));
-        }
-        list.unselect_all();
-        if let Some(row) = list.row_at_index(0) {
-            list.select_row(Some(&row));
-        } else {
-            list.select_row(None::<&ListBoxRow>);
-        }
-    };
-
     let initial_items = providers::collect(&paths, &linux_settings, "");
     *items.borrow_mut() = initial_items.clone();
-    update(
+    update_results(
         &list,
         &status,
         &initial_items,
         "",
         row_height.get(),
         theme_class(&linux_settings.theme_mode) == "light",
+        &paths,
     );
 
     let generation_for_changed = generation.clone();
@@ -1639,17 +2009,19 @@ fn build_window(
     let status_for_receiver = status.clone();
     let row_height_for_receiver = row_height.clone();
     let settings_for_receiver = settings_state.clone();
+    let paths_for_receiver = paths.clone();
     glib::MainContext::default().spawn_local(async move {
         while let Ok((result_generation, query, results)) = receiver.recv().await {
             if result_generation == generation_for_receiver.get() {
                 *items_for_receiver.borrow_mut() = results.clone();
-                update(
+                update_results(
                     &list_for_receiver,
                     &status_for_receiver,
                     &results,
                     &query,
                     row_height_for_receiver.get(),
                     theme_class(&settings_for_receiver.borrow().theme_mode) == "light",
+                    &paths_for_receiver,
                 );
             }
         }
@@ -1680,6 +2052,7 @@ fn build_window(
     let animation_for_commands = animation.clone();
     let paths_for_commands = paths.clone();
     let settings_for_commands = settings_state.clone();
+    let previews_for_commands = previews.clone();
     let request_sender_for_commands = request_sender.clone();
     let generation_for_commands = generation.clone();
     glib::MainContext::default().spawn_local(async move {
@@ -1701,6 +2074,7 @@ fn build_window(
                     window_for_commands.remove_css_class("light");
                     window_for_commands.remove_css_class("system");
                     window_for_commands.add_css_class(theme_class(&next_settings.theme_mode));
+                    set_preview_theme(&previews_for_commands, &next_settings.theme_mode);
                     window_for_commands.set_default_size(
                         next_settings.window_width.clamp(480, 1600) as i32,
                         next_settings.window_height.clamp(420, 1200) as i32,
@@ -1735,6 +2109,8 @@ fn build_window(
     let status_for_enter = status.clone();
     let animation_for_enter = animation.clone();
     let action_sender_for_enter = action_sender.clone();
+    let previews_for_enter = previews.clone();
+    let preview_generation_for_enter = preview_load_generation.clone();
     entry.connect_activate(move |_| {
         let selected_items = list_for_enter
             .selected_rows()
@@ -1744,7 +2120,7 @@ fn build_window(
         if selected_items.len() > 1
             && selected_items.iter().all(|item| item.source == "Clipboard")
         {
-            match providers::activate_clipboard_batch(&selected_items) {
+            match providers::activate_clipboard_batch(&paths_for_enter, &selected_items) {
                 Ok((text_count, image_count)) => {
                     let message = if image_count > 1 {
                         format!(
@@ -1774,6 +2150,17 @@ fn build_window(
             let Some(item) = items_for_enter.borrow().get(index as usize).cloned() else {
                 return;
             };
+            if item.kind == "IMAGE"
+                && open_image_preview(
+                    &window_for_enter,
+                    &paths_for_enter,
+                    &previews_for_enter,
+                    &preview_generation_for_enter,
+                    &item,
+                )
+            {
+                return;
+            }
             activate_item(
                 &paths_for_enter,
                 &window_for_enter,
@@ -1794,8 +2181,8 @@ fn build_window(
     let status_for_activation = status.clone();
     let animation_for_activation = animation.clone();
     let action_sender_for_activation = action_sender.clone();
-    let preview_revealer_for_activation = preview_revealer.clone();
-    let preview_box_for_activation = preview_box.clone();
+    let previews_for_activation = previews.clone();
+    let preview_generation_for_activation = preview_load_generation.clone();
     list.connect_row_activated(move |_, row| {
         let selected_items = list_for_activation
             .selected_rows()
@@ -1810,7 +2197,7 @@ fn build_window(
         if selected_items.len() > 1
             && selected_items.iter().all(|item| item.source == "Clipboard")
         {
-            match providers::activate_clipboard_batch(&selected_items) {
+            match providers::activate_clipboard_batch(&paths_for_activation, &selected_items) {
                 Ok((text_count, image_count)) => {
                     let message = if image_count > 1 {
                         format!(
@@ -1841,12 +2228,15 @@ fn build_window(
             return;
         };
         if item.kind == "IMAGE" {
-            show_image_preview(
-                &preview_revealer_for_activation,
-                &preview_box_for_activation,
-                Some(&item),
-            );
-            return;
+            if open_image_preview(
+                &window_for_activation,
+                &paths_for_activation,
+                &previews_for_activation,
+                &preview_generation_for_activation,
+                &item,
+            ) {
+                return;
+            }
         }
         activate_item(
             &paths_for_activation,
@@ -1864,8 +2254,10 @@ fn build_window(
     let animation_for_escape = animation.clone();
     let list_for_navigation = list.clone();
     let items_for_preview = items.clone();
-    let preview_revealer_for_key = preview_revealer.clone();
-    let preview_box_for_key = preview_box.clone();
+    let paths_for_preview = paths.clone();
+    let previews_for_key = previews.clone();
+    let preview_generation_for_key = preview_load_generation.clone();
+    let alt_preview_active_for_key = alt_preview_active.clone();
     key_controller.connect_key_pressed(move |_, key, _, state| {
         if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R) {
             let selected = list_for_navigation
@@ -1877,11 +2269,17 @@ fn build_window(
                         .get(row.index() as usize)
                         .cloned()
                 });
-            show_image_preview(
-                &preview_revealer_for_key,
-                &preview_box_for_key,
-                selected.as_ref(),
-            );
+            let is_previewing = selected.as_ref().is_some_and(|item| {
+                item.kind == "IMAGE"
+                    && open_image_preview(
+                        &window_for_escape,
+                        &paths_for_preview,
+                        &previews_for_key,
+                        &preview_generation_for_key,
+                        item,
+                    )
+            });
+            alt_preview_active_for_key.set(is_previewing);
             return glib::Propagation::Proceed;
         }
         if key == gdk::Key::Escape {
@@ -1945,10 +2343,14 @@ fn build_window(
         }
         glib::Propagation::Proceed
     });
-    let preview_revealer_for_release = preview_revealer.clone();
+    let previews_for_release = previews.clone();
+    let preview_generation_for_release = preview_load_generation.clone();
+    let alt_preview_active_for_release = alt_preview_active.clone();
     key_controller.connect_key_released(move |_, key, _, _| {
-        if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R) {
-            preview_revealer_for_release.set_reveal_child(false);
+        if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R)
+            && alt_preview_active_for_release.replace(false)
+        {
+            close_image_preview(&previews_for_release, &preview_generation_for_release);
         }
     });
     key_controller.set_propagation_phase(PropagationPhase::Capture);
@@ -2020,7 +2422,42 @@ fn animate_hide(window: &ApplicationWindow, animation: &Rc<RefCell<Option<glib::
     *animation.borrow_mut() = Some(source);
 }
 
-fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
+fn update_results(
+    list: &ListBox,
+    status: &Label,
+    items: &[Item],
+    query: &str,
+    row_height: u32,
+    light_theme: bool,
+    paths: &XdgPaths,
+) {
+    while let Some(child) = list.first_child() {
+        list.remove(&child);
+    }
+    for item in items {
+        list.append(&result_row(item, row_height, light_theme, paths));
+    }
+    if items.is_empty() {
+        let message = empty_state_message(query);
+        list.append(&empty_state_row(&message));
+        status.set_text(&message);
+    } else {
+        let source_count = items
+            .iter()
+            .map(|item| item.source.as_str())
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        status.set_text(&format!("{source_count} sources · {} results", items.len()));
+    }
+    list.unselect_all();
+    if let Some(row) = list.row_at_index(0) {
+        list.select_row(Some(&row));
+    } else {
+        list.select_row(None::<&ListBoxRow>);
+    }
+}
+
+fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths) -> ListBoxRow {
     let row = ListBoxRow::new();
     row.set_height_request(row_height as i32);
     row.set_hexpand(true);
@@ -2032,7 +2469,7 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool) -> ListBoxRow {
     content.set_margin_start(12);
     content.set_margin_end(12);
 
-    let icon = result_icon(item, light_theme);
+    let icon = result_icon(item, light_theme, paths);
     content.append(&icon);
 
     let text = GtkBox::new(Orientation::Vertical, 2);
@@ -2099,7 +2536,7 @@ fn empty_state_message(query: &str) -> String {
         return "No image files found".to_string();
     }
     if query.starts_with("clipboard:") || query.starts_with("clip:") {
-        return "No clipboard history found".to_string();
+        return "Clipboard history is empty. Copy something to see it here.".to_string();
     }
     if query.starts_with("git:") || query.starts_with("commits:") {
         return "No Git commits found".to_string();
@@ -2128,68 +2565,8 @@ fn empty_state_row(message: &str) -> ListBoxRow {
     row
 }
 
-fn show_image_preview(revealer: &Revealer, preview_box: &GtkBox, item: Option<&Item>) {
-    let Some(item) = item else {
-        revealer.set_reveal_child(false);
-        return;
-    };
-    let Some(image) = preview_image_for_item(item) else {
-        revealer.set_reveal_child(false);
-        return;
-    };
-    while let Some(child) = preview_box.first_child() {
-        preview_box.remove(&child);
-    }
-    image.set_pixel_size(360);
-    image.set_tooltip_text(Some("Image preview · release Alt to close"));
-    image.add_css_class("preview-image");
-    preview_box.append(&image);
-    let text = GtkBox::new(Orientation::Vertical, 3);
-    text.set_valign(Align::Center);
-    let title = Label::new(Some(&item.title));
-    title.set_halign(Align::Start);
-    title.add_css_class("preview-title");
-    let hint = Label::new(Some("Release Alt to close preview · Enter opens image"));
-    hint.set_halign(Align::Start);
-    hint.add_css_class("preview-hint");
-    text.append(&title);
-    text.append(&hint);
-    preview_box.append(&text);
-    revealer.set_reveal_child(true);
-}
-
-fn preview_image_for_item(item: &Item) -> Option<Image> {
-    match &item.target {
-        Target::Path(path) if crate::search::is_image_path(path) && path.is_file() => {
-            scaled_image(path, 720, 480)
-        }
-        Target::Cliphist(line) if item.kind == "IMAGE" => scaled_clipboard_image(line, 720, 480),
-        _ => None,
-    }
-}
-
-fn scaled_clipboard_image(line: &str, max_width: i32, max_height: i32) -> Option<Image> {
-    if !crate::system::command_available("cliphist") {
-        return None;
-    }
-    let mut child = Command::new("cliphist")
-        .args(["decode"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    if let Some(mut stdin) = child.stdin.take() {
-        if stdin.write_all(format!("{line}\n").as_bytes()).is_err() {
-            let _ = child.kill();
-            return None;
-        }
-    }
-    let output = child.wait_with_output().ok()?;
-    if !output.status.success() || output.stdout.len() > 16 * 1024 * 1024 {
-        return None;
-    }
-    let pixbuf = gdk_pixbuf::Pixbuf::from_read(Cursor::new(output.stdout)).ok()?;
+fn scaled_clipboard_bytes(bytes: &[u8], max_width: i32, max_height: i32) -> Option<Image> {
+    let pixbuf = gdk_pixbuf::Pixbuf::from_read(Cursor::new(bytes.to_vec())).ok()?;
     let scale = (max_width as f64 / pixbuf.width() as f64)
         .min(max_height as f64 / pixbuf.height() as f64)
         .min(1.0);
@@ -2200,20 +2577,24 @@ fn scaled_clipboard_image(line: &str, max_width: i32, max_height: i32) -> Option
     Some(Image::from_paintable(Some(&texture)))
 }
 
-fn result_icon(item: &Item, light_theme: bool) -> Image {
+fn result_icon(item: &Item, light_theme: bool, paths: &XdgPaths) -> Image {
     if let Some(name) = result_asset_name(item) {
         if let Some(image) = crate::icons::source_for_theme(name, 32, light_theme) {
             return image;
         }
     }
 
-    if item.kind == "IMAGE" && matches!(&item.target, Target::Cliphist(_)) {
-        if let Target::Cliphist(line) = &item.target {
-            if let Some(image) = scaled_clipboard_image(line, 64, 64) {
-                image.set_pixel_size(48);
-                image.add_css_class("result-thumbnail");
-                return image;
-            }
+    if item.kind == "IMAGE" {
+        let image = match &item.target {
+            Target::Clipboard(id) => crate::clipboard::image_bytes(paths, *id)
+                .ok()
+                .and_then(|bytes| scaled_clipboard_bytes(&bytes, 64, 64)),
+            _ => None,
+        };
+        if let Some(image) = image {
+            image.set_pixel_size(48);
+            image.add_css_class("result-thumbnail");
+            return image;
         }
         let image = Image::from_icon_name("image-x-generic-symbolic");
         image.set_pixel_size(48);
@@ -2249,7 +2630,7 @@ fn result_icon(item: &Item, light_theme: bool) -> Image {
         }
         Target::Url(_) => Image::from_icon_name("web-browser-symbolic"),
         Target::Copy(_) => Image::from_icon_name("edit-copy-symbolic"),
-        Target::Cliphist(_) => Image::from_icon_name("edit-copy-symbolic"),
+        Target::Clipboard(_) => Image::from_icon_name("edit-copy-symbolic"),
         Target::Query(_) => Image::from_icon_name("folder-open-symbolic"),
         Target::Notice(_) => Image::from_icon_name("dialog-information-symbolic"),
         Target::Action { .. } => Image::from_icon_name("system-run-symbolic"),
@@ -2381,4 +2762,53 @@ fn normalize_hotkey(value: &str) -> Option<String> {
         return None;
     }
     Some(parts.join(","))
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+
+    #[test]
+    fn fit_preview_preserves_landscape_aspect_ratio() {
+        assert_eq!(fit_preview_dimensions(4000, 2000, 1200, 900), (1200, 600));
+    }
+
+    #[test]
+    fn fit_preview_preserves_portrait_aspect_ratio() {
+        assert_eq!(fit_preview_dimensions(1200, 2400, 900, 900), (450, 900));
+    }
+
+    #[test]
+    fn fit_preview_does_not_upscale_small_images() {
+        assert_eq!(fit_preview_dimensions(320, 180, 1200, 900), (320, 180));
+    }
+
+    #[test]
+    fn fit_preview_handles_unusual_aspect_ratios() {
+        assert_eq!(fit_preview_dimensions(10000, 100, 1200, 900), (1200, 12));
+    }
+
+    #[test]
+    fn image_paths_with_spaces_and_unicode_are_file_sources() {
+        let path = PathBuf::from("/tmp/Пример folder/image with spaces.webp");
+        let item = Item {
+            title: "image with spaces.webp".to_string(),
+            subtitle: path.display().to_string(),
+            source: "Local".to_string(),
+            kind: "IMAGE".to_string(),
+            target: Target::Path(path.clone()),
+        };
+        assert!(crate::search::is_image_path(&path));
+        assert!(matches!(
+            preview_source_for_item(&XdgPaths {
+                home: PathBuf::from("/tmp"),
+                config: PathBuf::from("/tmp"),
+                data: PathBuf::from("/tmp"),
+                state: PathBuf::from("/tmp"),
+                cache: PathBuf::from("/tmp"),
+                runtime: None,
+            }, &item),
+            Some(PreviewSource::File(candidate)) if candidate == path
+        ));
+    }
 }

@@ -6,8 +6,8 @@ arch=('x86_64')
 license=('MIT')
 depends=('gtk4' 'gdk-pixbuf2')
 optdepends=(
-  'wl-clipboard: Wayland clipboard integration'
-  'cliphist: clipboard history provider'
+  'wl-clipboard: optional command-line clipboard fallback'
+  'xclip: optional X11 clipboard fallback'
   'grim: screenshot capture'
   'slurp: interactive screenshot region selection'
   'poppler: PDF text search'

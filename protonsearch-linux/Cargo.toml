@@ -16,7 +16,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 async-channel = "2"
-gtk4 = "0.10"
+gtk4 = { version = "0.10", features = ["v4_6"] }
 gdk-pixbuf = "0.21"
 ksni = { version = "0.3.6", default-features = false, features = ["blocking", "async-io"] }
 serde = { version = "1", features = ["derive"] }

@@ -6,12 +6,16 @@
 
 use crate::actions;
 use crate::calculator;
+use crate::clipboard;
 use crate::desktop::{self, DesktopEntry};
 use crate::search::{self, FileResult, SearchOptions};
 use crate::settings::{self, LinuxSettings};
 use crate::system;
 use crate::xdg::XdgPaths;
 use gdk_pixbuf::{Colorspace, InterpType, Pixbuf};
+use gtk4::gdk;
+use gtk4::glib;
+use gtk4::prelude::*;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
@@ -35,7 +39,7 @@ pub enum Target {
         confirmed: bool,
     },
     Copy(String),
-    Cliphist(String),
+    Clipboard(u64),
     /// Change the launcher query without spawning another process.
     Query(String),
     /// A safe informational home-card action.
@@ -114,7 +118,7 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
                 add_hermes_history("", linux_settings.enable_agent_history, &mut results)
             }
             Scope::Images => add_content(paths, linux_settings, "", Scope::Images, &mut results),
-            Scope::Clipboard => add_clipboard("", &mut results),
+            Scope::Clipboard => add_clipboard(paths, "", &mut results),
             Scope::Git => add_git(paths, "", &mut results),
             Scope::Ocr => add_content(paths, linux_settings, "", Scope::Ocr, &mut results),
             Scope::Content | Scope::Windows => {}
@@ -187,7 +191,7 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
         add_content(paths, linux_settings, &query_lower, scope, &mut results);
     }
     if scope == Scope::Clipboard {
-        add_clipboard(&query_lower, &mut results);
+        add_clipboard(paths, &query_lower, &mut results);
     }
 
     trim(results)
@@ -1419,88 +1423,65 @@ fn add_content(
     }
 }
 
-fn add_clipboard(query: &str, results: &mut Vec<Item>) {
-    if system::command_available("cliphist") {
-        let Ok(output) = system::run("cliphist", &["list"]) else {
-            return;
+fn add_clipboard(paths: &XdgPaths, query: &str, results: &mut Vec<Item>) {
+    let status = clipboard::status(paths);
+    if !status.available {
+        results.push(clipboard_provider_error(&status.message));
+        return;
+    }
+    let Ok(history) = clipboard::history(paths) else {
+        results.push(clipboard_provider_error(
+            "The clipboard history database could not be read. It will be recreated automatically.",
+        ));
+        return;
+    };
+    for entry in history.into_iter().take(100) {
+        let (title, searchable) = if entry.is_image() {
+            (
+                "Clipboard image".to_string(),
+                format!(
+                    "image {}",
+                    entry.mime_type.as_deref().unwrap_or("image/png")
+                ),
+            )
+        } else {
+            let text = entry.text.clone().unwrap_or_default();
+            (
+                text.lines()
+                    .next()
+                    .unwrap_or("Clipboard")
+                    .chars()
+                    .take(80)
+                    .collect(),
+                text,
+            )
         };
-        for line in output.stdout.lines().take(100) {
-            let Some((id, preview)) = line.split_once('\t') else {
-                continue;
-            };
-            if preview.to_ascii_lowercase().contains(query) {
-                let is_image = clipboard_preview_is_image(preview);
-                results.push(Item {
-                    title: if is_image {
-                        "Clipboard image".to_string()
-                    } else {
-                        preview.to_string()
-                    },
-                    subtitle: if is_image {
-                        format!("Clipboard image #{id} · Enter copies")
-                    } else {
-                        format!("Clipboard history #{id} · Enter copies")
-                    },
-                    source: "Clipboard".to_string(),
-                    kind: if is_image { "IMAGE" } else { "CLIP" }.to_string(),
-                    target: Target::Cliphist(line.to_string()),
-                });
-            }
+        if !query.is_empty() && !searchable.to_ascii_lowercase().contains(query) {
+            continue;
         }
-        return;
+        results.push(Item {
+            title,
+            subtitle: if entry.is_image() {
+                format!("Clipboard image #{} · Enter copies", entry.id)
+            } else {
+                format!("Clipboard history #{} · Enter copies", entry.id)
+            },
+            source: "Clipboard".to_string(),
+            kind: if entry.is_image() { "IMAGE" } else { "CLIP" }.to_string(),
+            target: Target::Clipboard(entry.id),
+        });
     }
-    let Ok(text) = read_clipboard() else { return };
-    if text.trim().is_empty() || !text.to_ascii_lowercase().contains(query) {
-        return;
-    }
-    results.push(Item {
-        title: text
-            .lines()
-            .next()
-            .unwrap_or("Clipboard")
-            .chars()
-            .take(80)
-            .collect(),
-        subtitle: "Current Wayland clipboard · Enter copies it again".to_string(),
+}
+
+fn clipboard_provider_error(message: &str) -> Item {
+    let message = format!("Clipboard monitoring unavailable: {message}");
+    Item {
+        title: "Clipboard provider unavailable".to_string(),
+        subtitle: message.clone(),
         source: "Clipboard".to_string(),
-        kind: "CLIP".to_string(),
-        target: Target::Copy(text),
-    });
-}
-
-fn clipboard_preview_is_image(preview: &str) -> bool {
-    let preview = preview.to_ascii_lowercase();
-    preview.contains("binary data")
-        && [
-            "png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff", "image/",
-        ]
-        .iter()
-        .any(|format| preview.contains(format))
-}
-
-fn clipboard_image_mime(preview: &str) -> &'static str {
-    let preview = preview.to_ascii_lowercase();
-    if preview.contains("jpg") || preview.contains("jpeg") {
-        "image/jpeg"
-    } else if preview.contains("gif") {
-        "image/gif"
-    } else if preview.contains("webp") {
-        "image/webp"
-    } else if preview.contains("bmp") {
-        "image/bmp"
-    } else {
-        "image/png"
+        kind: "INFO".to_string(),
+        target: Target::Notice(message),
     }
-}
-
-fn read_clipboard() -> anyhow::Result<String> {
-    if system::command_available("wl-paste") {
-        let output = system::run("wl-paste", &["--no-newline"])?;
-        if output.status == Some(0) {
-            return Ok(output.stdout);
-        }
-    }
-    anyhow::bail!("no clipboard provider available")
 }
 
 pub fn activate(paths: &XdgPaths, target: &Target) -> anyhow::Result<Option<String>> {
@@ -1521,13 +1502,14 @@ pub fn activate(paths: &XdgPaths, target: &Target) -> anyhow::Result<Option<Stri
             copy_clipboard(text)?;
             Ok(None)
         }
-        Target::Cliphist(line) => {
-            if clipboard_preview_is_image(line) {
-                let bytes = decode_cliphist_image(line)?;
-                copy_clipboard_bytes(&bytes, clipboard_image_mime(line))?;
-                return Ok(None);
+        Target::Clipboard(id) => {
+            let item = clipboard::entry(paths, *id)?;
+            if item.is_image() {
+                let bytes = clipboard::image_bytes(paths, *id)?;
+                copy_clipboard_bytes(&bytes, &clipboard::image_mime_type(paths, *id)?)?;
+            } else {
+                copy_clipboard(&clipboard::text(paths, *id)?)?;
             }
-            copy_clipboard(&decode_cliphist_text(line)?)?;
             Ok(None)
         }
         Target::Query(_) | Target::Notice(_) => {
@@ -1609,47 +1591,53 @@ pub fn activate(paths: &XdgPaths, target: &Target) -> anyhow::Result<Option<Stri
 /// represented together on the single Wayland clipboard, so the last selected
 /// image is restored after any selected text and the caller receives counts for
 /// user feedback.
-pub fn activate_clipboard_batch(items: &[Item]) -> anyhow::Result<(usize, usize)> {
+pub fn activate_clipboard_batch(
+    paths: &XdgPaths,
+    items: &[Item],
+) -> anyhow::Result<(usize, usize)> {
     let mut text_items = Vec::new();
-    let mut image_lines = Vec::new();
+    let mut image_ids = Vec::new();
     for item in items {
         if item.source != "Clipboard" {
             continue;
         }
         match &item.target {
             Target::Copy(text) => text_items.push(text.clone()),
-            Target::Cliphist(line) if clipboard_preview_is_image(line) => {
-                image_lines.push(line.clone());
+            Target::Clipboard(id) if clipboard::entry(paths, *id)?.is_image() => {
+                image_ids.push(*id);
             }
-            Target::Cliphist(line) => text_items.push(decode_cliphist_text(line)?),
+            Target::Clipboard(id) => text_items.push(clipboard::text(paths, *id)?),
             _ => {}
         }
     }
     if !text_items.is_empty() {
         copy_clipboard(&text_items.join("\n"))?;
     }
-    let image_count = image_lines.len();
+    let image_count = image_ids.len();
     if image_count == 1 {
-        let line = &image_lines[0];
-        let bytes = decode_cliphist_image(line)?;
-        copy_clipboard_bytes(&bytes, clipboard_image_mime(line))?;
+        let id = image_ids[0];
+        let bytes = clipboard::image_bytes(paths, id)?;
+        copy_clipboard_bytes(&bytes, &clipboard::image_mime_type(paths, id)?)?;
     } else if image_count > 1 {
-        let sheet = compose_clipboard_images(&image_lines)?;
+        let decoded_images = image_ids
+            .iter()
+            .map(|id| clipboard::image_bytes(paths, *id))
+            .collect::<Result<Vec<_>, _>>()?;
+        let sheet = compose_clipboard_images(&decoded_images)?;
         copy_clipboard_bytes(&sheet, "image/png")?;
     }
     Ok((text_items.len(), image_count))
 }
 
-fn compose_clipboard_images(lines: &[String]) -> anyhow::Result<Vec<u8>> {
+fn compose_clipboard_images(images: &[Vec<u8>]) -> anyhow::Result<Vec<u8>> {
     const MAX_IMAGES: usize = 16;
     const COLUMNS: i32 = 2;
     const CELL: i32 = 480;
     const GAP: i32 = 12;
-    let lines = &lines[..lines.len().min(MAX_IMAGES)];
+    let image_bytes = &images[..images.len().min(MAX_IMAGES)];
     let mut images = Vec::new();
-    for line in lines {
-        let bytes = decode_cliphist_image(line)?;
-        let image = Pixbuf::from_read(Cursor::new(bytes))?;
+    for bytes in image_bytes {
+        let image = Pixbuf::from_read(Cursor::new(bytes.clone()))?;
         let scale = (CELL as f64 / image.width() as f64)
             .min(CELL as f64 / image.height() as f64)
             .min(1.0);
@@ -1676,15 +1664,6 @@ fn compose_clipboard_images(lines: &[String]) -> anyhow::Result<Vec<u8>> {
         image.copy_area(0, 0, image.width(), image.height(), &sheet, x, y);
     }
     Ok(sheet.save_to_bufferv("png", &[])?)
-}
-
-fn decode_cliphist_text(line: &str) -> anyhow::Result<String> {
-    let input = format!("{line}\n");
-    let output = system::run_with_input("cliphist", &["decode"], &input)?;
-    if output.timed_out || output.status != Some(0) {
-        anyhow::bail!("cliphist could not decode the clipboard item");
-    }
-    Ok(output.stdout)
 }
 
 fn capture_screen(paths: &XdgPaths) -> anyhow::Result<()> {
@@ -1719,15 +1698,19 @@ fn capture_screen(paths: &XdgPaths) -> anyhow::Result<()> {
     if result.timed_out || result.status != Some(0) {
         anyhow::bail!("grim could not capture the screen");
     }
-    if system::command_available("wl-copy") {
-        let image = fs::read(&output_path)?;
-        copy_clipboard_bytes(&image, "image/png")?;
-    }
+    let image = fs::read(&output_path)?;
+    // The internal GTK/GDK backend is the primary path, so screenshots also
+    // enter ProtonSearch history on systems that do not ship wl-clipboard.
+    copy_clipboard_bytes(&image, "image/png")?;
     system::open_target(&output_path_string)?;
     Ok(())
 }
 
 fn copy_clipboard(text: &str) -> anyhow::Result<()> {
+    if let Some(display) = gdk::Display::default() {
+        display.clipboard().set_text(text);
+        return Ok(());
+    }
     if system::command_available("wl-copy") {
         let output = system::run_with_input("wl-copy", &[], text)?;
         if output.timed_out || output.status != Some(0) {
@@ -1735,32 +1718,43 @@ fn copy_clipboard(text: &str) -> anyhow::Result<()> {
         }
         return Ok(());
     }
-    anyhow::bail!("wl-copy is unavailable; install wl-clipboard")
-}
-
-fn decode_cliphist_image(line: &str) -> anyhow::Result<Vec<u8>> {
-    let mut child = Command::new("cliphist")
-        .args(["decode"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()?;
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(format!("{line}\n").as_bytes())?;
+    if system::command_available("xclip") {
+        let output = system::run_with_input("xclip", &["-selection", "clipboard"], text)?;
+        if output.status == Some(0) && !output.timed_out {
+            return Ok(());
+        }
     }
-    let output = child.wait_with_output()?;
-    if !output.status.success() {
-        anyhow::bail!("cliphist could not decode the clipboard image");
+    if system::command_available("xsel") {
+        let output = system::run_with_input("xsel", &["--clipboard", "--input"], text)?;
+        if output.status == Some(0) && !output.timed_out {
+            return Ok(());
+        }
     }
-    if output.stdout.len() > 16 * 1024 * 1024 {
-        anyhow::bail!("clipboard image is too large");
-    }
-    Ok(output.stdout)
+    anyhow::bail!("no graphical clipboard backend is available")
 }
 
 fn copy_clipboard_bytes(bytes: &[u8], mime_type: &str) -> anyhow::Result<()> {
+    if let Some(display) = gdk::Display::default() {
+        let texture = gdk::Texture::from_bytes(&glib::Bytes::from(bytes))?;
+        display.clipboard().set_texture(&texture);
+        return Ok(());
+    }
     if !system::command_available("wl-copy") {
-        anyhow::bail!("wl-copy is unavailable; install wl-clipboard");
+        if system::command_available("xclip") {
+            let mut child = Command::new("xclip")
+                .args(["-selection", "clipboard", "-t", mime_type, "-i"])
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()?;
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(bytes)?;
+            }
+            if child.wait()?.success() {
+                return Ok(());
+            }
+        }
+        anyhow::bail!("no graphical clipboard backend is available");
     }
     let mut child = Command::new("wl-copy")
         .args(["--type", mime_type])

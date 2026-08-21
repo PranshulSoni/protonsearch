@@ -25,7 +25,7 @@ work on the current desktop.
 | Placeholder visibility | Search entry placeholder | Supported |
 | Calculator | Built-in calculator provider | Supported |
 | Git commits | Bounded Git provider | Supported |
-| Clipboard history and image preview | Wayland clipboard/cliphist provider | Supported when installed |
+| Clipboard history and image preview | Internal GTK/GDK monitor and persistent XDG store on Wayland/X11 | Supported when a graphical session is available |
 | OCR search | Deferred provider with an explicit Coming Soon result | Deferred |
 | PDF search | Poppler `pdftotext` provider | Supported when installed |
 | Browser history/bookmarks | Browser profile providers | Supported when profile is readable |

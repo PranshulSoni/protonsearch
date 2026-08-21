@@ -37,17 +37,15 @@ pub fn detect() -> Vec<Capability> {
             "",
         ),
         opener(),
-        simple_command(
+        internal_clipboard(
             "clipboard",
-            "Wayland clipboard access",
-            "wl-paste",
-            "wl-clipboard",
+            "Clipboard access",
+            "Current desktop clipboard through GTK/GDK",
         ),
-        simple_command(
+        internal_clipboard(
             "clipboard-history",
             "Persistent clipboard history",
-            "cliphist",
-            "cliphist",
+            "ProtonSearch-owned clipboard history through GTK/GDK",
         ),
         simple_command(
             "browser-history",
@@ -131,6 +129,29 @@ fn core(id: &str, name: &str, provider: &str, available: bool, reason: &str) -> 
         provider: provider.to_string(),
         package: None,
         reason: reason.to_string(),
+    }
+}
+
+fn internal_clipboard(id: &str, name: &str, description: &str) -> Capability {
+    let available =
+        std::env::var_os("WAYLAND_DISPLAY").is_some() || std::env::var_os("DISPLAY").is_some();
+    Capability {
+        id: id.to_string(),
+        name: name.to_string(),
+        description: description.to_string(),
+        state: if available {
+            CapabilityState::Available
+        } else {
+            CapabilityState::ConfigurationMissing
+        },
+        provider: "GTK/GDK".to_string(),
+        package: None,
+        reason: if available {
+            "graphical clipboard backend detected; ProtonSearch captures changes without polling"
+                .to_string()
+        } else {
+            "no Wayland or X11 display is available in this session".to_string()
+        },
     }
 }
 

@@ -8,7 +8,7 @@ BuildArch:      x86_64
 Requires:       gtk4
 Requires:       gdk-pixbuf2
 Suggests:        wl-clipboard
-Suggests:        cliphist
+Suggests:        xclip
 Suggests:        grim
 Suggests:        slurp
 Suggests:        poppler-utils

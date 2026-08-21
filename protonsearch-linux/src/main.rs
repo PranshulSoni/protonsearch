@@ -3,6 +3,7 @@ use protonsearch_linux::{
     actions, capabilities, desktop, gui, hyprland, platform, providers, search, settings, system,
     xdg,
 };
+use std::io::Read;
 use std::path::PathBuf;
 
 fn main() -> Result<()> {
@@ -15,6 +16,16 @@ fn main() -> Result<()> {
         Some("help") | Some("--help") => print_help(),
         Some("gui") | Some("run") | Some("--gui") => gui::run(paths)?,
         Some("daemon") | Some("service") => gui::run_resident(paths)?,
+        Some("clipboard-capture-text") => {
+            let mut bytes = Vec::new();
+            std::io::stdin().read_to_end(&mut bytes)?;
+            protonsearch_linux::clipboard::ingest_text(&paths, &bytes)?;
+        }
+        Some("clipboard-capture-image") => {
+            let mut bytes = Vec::new();
+            std::io::stdin().read_to_end(&mut bytes)?;
+            protonsearch_linux::clipboard::ingest_image(&paths, &bytes)?;
+        }
         Some("settings-ui") => gui::run_settings(paths)?,
         Some("doctor") | Some("--print-capabilities") => print_doctor(&paths),
         Some("agent") => run_agent(args.collect::<Vec<_>>().join(" "))?,
