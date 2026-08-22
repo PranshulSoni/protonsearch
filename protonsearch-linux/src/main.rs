@@ -100,6 +100,7 @@ fn main() -> Result<()> {
 
 fn print_doctor(paths: &xdg::XdgPaths) {
     let platform = platform::detect();
+    let hermes = hermes_report();
     let report = serde_json::json!({
         "platform": "linux",
         "distribution": platform.distribution,
@@ -110,8 +111,31 @@ fn print_doctor(paths: &xdg::XdgPaths) {
         "xdg_data": paths.data,
         "xdg_state": paths.state,
         "capabilities": capabilities::detect(),
+        "hermes": hermes,
     });
     print_json(&report);
+}
+
+fn hermes_report() -> serde_json::Value {
+    let readiness = protonsearch_linux::hermes::readiness();
+    serde_json::json!({
+        "installed": readiness.command.is_some(),
+        "command": readiness.command.map(|command| command.program()),
+        "executable": readiness.executable,
+        "version": readiness.version,
+        "gateway": match readiness.gateway {
+            protonsearch_linux::hermes::GatewayState::Running => "running",
+            protonsearch_linux::hermes::GatewayState::Unavailable => "unavailable",
+        },
+        "ready": readiness.ready,
+        "note": if readiness.ready {
+            "Local Hermes gateway is reachable"
+        } else if readiness.command.is_some() {
+            "Hermes is installed; configure/start its local gateway and provider before using streaming runs"
+        } else {
+            "Install Hermes separately to enable the Agent tab"
+        },
+    })
 }
 
 fn print_json(value: &impl serde::Serialize) {

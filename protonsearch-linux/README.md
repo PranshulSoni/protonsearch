@@ -69,14 +69,24 @@ diagnostic object. Some providers also require a desktop service or hardware
 permissions to be active (for example NetworkManager for Wi-Fi and a backlight
 device for brightness).
 
-Hermes Agent is an optional external application. If its `hermes` command is
-already installed, the Agents and Agent History sources use it automatically.
-Open an Agent result for the internal prompt window, or use
-`protonsearch-linux agent "Ask Hermes a question"` for a release-build smoke
-test and one-shot prompt. Agent prompts run in a bounded worker so the
-launcher stays responsive.
-The ProtonSearch installer does not download third-party AI software or handle
-its credentials; install Hermes through its own trusted distribution method.
+Hermes Agent is an optional dependency. If its `hermes` or legacy
+`hermes-agent` command is already installed, the Agents and Agent History
+sources open an Agent workspace inside the ProtonSearch launcher. The
+conversation list and messages are stored per user at
+`$XDG_STATE_HOME/protonsearch/agent-history.json`.
+
+When Hermes' authenticated local gateway is reachable at `127.0.0.1:8642`,
+ProtonSearch uses its Runs API and consumes progress events in the launcher.
+Otherwise it uses the installed Hermes CLI as a compatibility fallback. Agent
+work always runs outside the GTK thread, and missing installation/provider
+configuration is shown as an actionable in-app status instead of freezing the
+launcher. Use `protonsearch-linux doctor` to inspect the secret-free Hermes
+installation and gateway status.
+
+The ProtonSearch installer does not download third-party AI software or copy
+its credentials. Install Hermes through its own trusted distribution method;
+the installer detects it and explains the next step without silently enabling
+messaging integrations.
 
 ## Images and clipboard previews
 

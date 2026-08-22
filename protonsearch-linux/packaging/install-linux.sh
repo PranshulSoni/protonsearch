@@ -287,4 +287,13 @@ echo "ProtonSearch installed for ${USER:-the current user}."
 echo "Binary: ${BIN_PATH}"
 echo "Settings: ${CONFIG_HOME}/protonsearch/settings.json"
 echo "Check providers with: ${BIN_PATH} doctor"
-echo "Hermes Agent is detected when its 'hermes' command is on PATH; install it separately if you want AI providers."
+if command -v hermes >/dev/null 2>&1; then
+    echo "Hermes Agent: detected ($(hermes --version 2>/dev/null | head -n 1 || true))."
+    echo "Hermes Agent: ProtonSearch will use its local gateway when it is configured and reachable."
+elif command -v hermes-agent >/dev/null 2>&1; then
+    echo "Hermes Agent: legacy 'hermes-agent' command detected."
+    echo "Hermes Agent: ProtonSearch will use it for the in-launcher Agent tab."
+else
+    echo "Hermes Agent: optional and not installed. Install it from its official distribution, then restart ProtonSearch."
+fi
+echo "Hermes is never installed silently and credentials are never copied by ProtonSearch."
