@@ -222,13 +222,15 @@ button.category-chip:hover .category-icon {
 }
 
 list.result-list {
-    background-color: transparent;
+    /* The list is part of the launcher surface, not a nested panel. */
+    background-color: #202327;
     padding: 2px 0;
 }
 
 row.result-row {
     background-color: transparent;
-    border-radius: 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
     margin: 2px 0;
 }
 
@@ -237,14 +239,15 @@ row.compact-row {
 }
 
 row.source-row {
-    background-color: #252a2f;
-    border: 1px solid #30373d;
-    margin: 4px 0;
+    /* Home source rows use the same surface as ordinary results. */
+    background-color: transparent;
+    border-color: transparent;
+    margin: 2px 0;
 }
 
 row.source-row:hover {
-    background-color: #2d353a;
-    border-color: #465159;
+    background-color: #252b30;
+    border-color: #343d43;
 }
 
 row.source-row .result-title {
@@ -261,12 +264,13 @@ row.source-row .asset-icon {
 }
 
 row.result-row:hover {
-    background-color: #2d3339;
+    background-color: #252b30;
+    border-color: #343d43;
 }
 
 list.result-list > row.result-row:selected {
-    background-color: #30383e;
-    border: 1px solid #53616a;
+    background-color: #2b3338;
+    border-color: #46535a;
 }
 
 list.result-list > row.result-row.cursor-row,
@@ -574,12 +578,12 @@ window.proton-window.light row.result-row {
 }
 
 window.proton-window.light row.source-row {
-    background-color: #f7f9fa;
-    border-color: #e0e6e9;
+    background-color: transparent;
+    border-color: transparent;
 }
 
 window.proton-window.light row.source-row:hover {
-    background-color: #e9edf1;
+    background-color: #f3f6f7;
     border-color: #cbd5d9;
 }
 
@@ -588,12 +592,13 @@ window.proton-window.light row.source-row .result-subtitle {
 }
 
 window.proton-window.light row.result-row:hover {
-    background-color: #e9edf1;
+    background-color: #f3f6f7;
+    border-color: #d8e1e4;
 }
 
 window.proton-window.light list.result-list > row.result-row:selected {
-    background-color: #e4ecef;
-    border-color: #b6c9cc;
+    background-color: #e8f1ef;
+    border-color: #b6cfca;
 }
 
 window.proton-window.light list.result-list > row.result-row.cursor-row,
