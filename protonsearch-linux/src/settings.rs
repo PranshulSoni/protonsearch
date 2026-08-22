@@ -3,6 +3,32 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
+pub const HOME_FILTER_IDS: &[&str] = &[
+    "all",
+    "files",
+    "apps",
+    "folders",
+    "content",
+    "images",
+    "ocr",
+    "code",
+    "settings",
+    "commands",
+    "clipboard",
+    "agents",
+];
+
+pub const DEFAULT_HOME_FILTERS: &[&str] = &[
+    "all",
+    "files",
+    "apps",
+    "folders",
+    "images",
+    "commands",
+    "clipboard",
+    "agents",
+];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct LinuxSettings {
@@ -34,6 +60,10 @@ pub struct LinuxSettings {
     pub hotkey: String,
     pub search_roots: Vec<String>,
     pub ignored_names: Vec<String>,
+    /// Filter IDs visible in the launcher rail, in display order.
+    pub home_filters: Vec<String>,
+    /// All filter IDs in the user's preferred order.
+    pub home_filter_order: Vec<String>,
 }
 
 impl Default for LinuxSettings {
@@ -66,8 +96,50 @@ impl Default for LinuxSettings {
             hotkey: "ALT,SPACE".to_string(),
             search_roots: Vec::new(),
             ignored_names: Vec::new(),
+            home_filters: DEFAULT_HOME_FILTERS
+                .iter()
+                .map(|id| (*id).to_string())
+                .collect(),
+            home_filter_order: HOME_FILTER_IDS.iter().map(|id| (*id).to_string()).collect(),
         }
     }
+}
+
+pub fn normalize_home_filters(settings: &mut LinuxSettings) {
+    let order_was_missing = settings.home_filter_order.is_empty();
+    if order_was_missing {
+        settings.home_filter_order = HOME_FILTER_IDS.iter().map(|id| (*id).to_string()).collect();
+    }
+
+    let mut order = Vec::with_capacity(HOME_FILTER_IDS.len());
+    for id in settings.home_filter_order.iter().map(String::as_str) {
+        if HOME_FILTER_IDS.contains(&id) && !order.iter().any(|existing| existing == id) {
+            order.push(id.to_string());
+        }
+    }
+    for id in HOME_FILTER_IDS {
+        if !order.iter().any(|existing| existing == id) {
+            order.push((*id).to_string());
+        }
+    }
+    if let Some(all_index) = order.iter().position(|id| id == "all") {
+        order.remove(all_index);
+    }
+    order.insert(0, "all".to_string());
+    settings.home_filter_order = order;
+
+    if settings.home_filters.is_empty() {
+        settings.home_filters = DEFAULT_HOME_FILTERS
+            .iter()
+            .map(|id| (*id).to_string())
+            .collect();
+    }
+    settings.home_filters.retain(|id| {
+        HOME_FILTER_IDS.contains(&id.as_str()) && settings.home_filter_order.contains(id)
+    });
+    settings.home_filters.retain(|id| id != "all");
+    settings.home_filters.insert(0, "all".to_string());
+    settings.home_filters.dedup();
 }
 
 pub fn load(paths: &XdgPaths) -> LinuxSettings {
@@ -77,7 +149,10 @@ pub fn load(paths: &XdgPaths) -> LinuxSettings {
     };
 
     match serde_json::from_str(&contents) {
-        Ok(settings) => settings,
+        Ok(mut settings) => {
+            normalize_home_filters(&mut settings);
+            settings
+        }
         Err(_) => {
             let backup = path.with_extension("json.bak");
             let _ = fs::rename(&path, backup);
@@ -357,6 +432,12 @@ mod tests {
         assert_eq!(settings.search_bar_height, 56);
         assert!(settings.enable_calculator);
         assert!(settings.enable_git_commits);
+        assert!(settings.home_filters.contains(&"all".to_string()));
+        assert!(settings.home_filters.contains(&"files".to_string()));
+        assert_eq!(
+            settings.home_filter_order.first().map(String::as_str),
+            Some("all")
+        );
     }
 
     #[test]
@@ -379,6 +460,31 @@ mod tests {
         assert_eq!(settings.hotkey, "SUPER,SPACE");
         assert!(settings.run_on_startup);
         assert_eq!(settings.schema_version, 1);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn legacy_filter_preferences_are_normalized() {
+        let root = std::env::temp_dir().join(format!(
+            "protonsearch-settings-filters-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let paths = paths(&root);
+        fs::create_dir_all(paths.config_dir()).unwrap();
+        fs::write(
+            paths.settings_file(),
+            r#"{"home_filters":["files"],"home_filter_order":["files","all"]}"#,
+        )
+        .unwrap();
+
+        let settings = load(&paths);
+        assert_eq!(settings.home_filters, vec!["all", "files"]);
+        assert_eq!(
+            settings.home_filter_order.first().map(String::as_str),
+            Some("all")
+        );
+        assert!(settings.home_filter_order.contains(&"apps".to_string()));
         let _ = fs::remove_dir_all(root);
     }
 

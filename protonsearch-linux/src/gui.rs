@@ -16,8 +16,8 @@ use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
-    ComboBoxText, Entry, EventControllerKey, FlowBox, Image, Label, ListBox, ListBoxRow,
-    MessageDialog, MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
+    ComboBoxText, Entry, EventControllerKey, Image, Label, ListBox, ListBoxRow, MessageDialog,
+    MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
     RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
     StackTransitionType, TextView, WrapMode,
 };
@@ -1090,6 +1090,59 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         terminal_apps.set_active(current.show_terminal_apps);
         search_page.append(&terminal_apps);
 
+        let home_filters_title = Label::new(Some("Home screen filters"));
+        home_filters_title.set_halign(Align::Start);
+        home_filters_title.add_css_class("settings-section-title");
+        search_page.append(&home_filters_title);
+        let home_filters_help = Label::new(Some(
+            "Choose which compact filters appear beside the search field. All is always kept available; use the arrows to change their order.",
+        ));
+        home_filters_help.set_wrap(true);
+        home_filters_help.set_halign(Align::Start);
+        home_filters_help.add_css_class("settings-help");
+        search_page.append(&home_filters_help);
+        let home_filter_order = Rc::new(RefCell::new(current.home_filter_order.clone()));
+        let home_filter_checks = Rc::new(RefCell::new(Vec::<(String, CheckButton)>::new()));
+        let home_filter_order_label = Label::new(None);
+        home_filter_order_label.set_wrap(true);
+        home_filter_order_label.set_halign(Align::Start);
+        home_filter_order_label.add_css_class("settings-help");
+        refresh_home_filter_order_label(&home_filter_order_label, &home_filter_order.borrow());
+        search_page.append(&home_filter_order_label);
+        for filter_id in current.home_filter_order.iter() {
+            let row = GtkBox::new(Orientation::Horizontal, 6);
+            row.set_hexpand(true);
+            let check = CheckButton::with_label(home_filter_label(filter_id));
+            check.set_active(current.home_filters.iter().any(|id| id == filter_id));
+            check.set_sensitive(filter_id != "all");
+            row.append(&check);
+            let spacer = GtkBox::new(Orientation::Horizontal, 0);
+            spacer.set_hexpand(true);
+            row.append(&spacer);
+            let up = Button::with_label("↑");
+            let down = Button::with_label("↓");
+            up.set_tooltip_text(Some("Move this filter earlier"));
+            down.set_tooltip_text(Some("Move this filter later"));
+            let order_for_up = home_filter_order.clone();
+            let label_for_up = home_filter_order_label.clone();
+            let id_for_up = filter_id.clone();
+            up.connect_clicked(move |_| {
+                move_home_filter(&order_for_up, &id_for_up, -1, &label_for_up);
+            });
+            let order_for_down = home_filter_order.clone();
+            let label_for_down = home_filter_order_label.clone();
+            let id_for_down = filter_id.clone();
+            down.connect_clicked(move |_| {
+                move_home_filter(&order_for_down, &id_for_down, 1, &label_for_down);
+            });
+            row.append(&up);
+            row.append(&down);
+            search_page.append(&row);
+            home_filter_checks
+                .borrow_mut()
+                .push((filter_id.clone(), check));
+        }
+
         let roots_label = Label::new(Some("Additional search roots (comma or newline separated)"));
         roots_label.set_halign(Align::Start);
         roots_label.add_css_class("settings-label");
@@ -1471,6 +1524,8 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         window.set_child(Some(&root));
 
         let paths_for_save = paths.clone();
+        let home_filter_order_for_save = home_filter_order.clone();
+        let home_filter_checks_for_save = home_filter_checks.clone();
         save.connect_clicked(move |_| {
             let mut next = current.clone();
             next.run_on_startup = startup.is_active();
@@ -1536,6 +1591,21 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
                 .filter(|name| !name.is_empty())
                 .map(str::to_string)
                 .collect();
+            next.home_filter_order = home_filter_order_for_save.borrow().clone();
+            let selected_home_filters = home_filter_checks_for_save
+                .borrow()
+                .iter()
+                .filter_map(|(id, check)| check.is_active().then_some(id.clone()))
+                .collect::<std::collections::HashSet<_>>();
+            next.home_filters = next
+                .home_filter_order
+                .iter()
+                .filter(|id| selected_home_filters.contains(*id))
+                .cloned()
+                .collect();
+            settings::normalize_home_filters(&mut next);
+            let filters_changed = next.home_filters != current.home_filters
+                || next.home_filter_order != current.home_filter_order;
             if let Err(error) = settings::save(&paths_for_save, &next) {
                 eprintln!("ProtonSearch: could not save settings: {error:#}");
                 return;
@@ -1551,7 +1621,7 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
                 unbind_hyprland_hotkey(&current.hotkey);
             }
             notify_launcher(&paths_for_save, "reload");
-            if appearance_changed {
+            if appearance_changed || filters_changed {
                 restart_launcher_service_if_active();
             }
             save_status.set_text("Settings saved — ProtonSearch updated.");
@@ -2299,27 +2369,15 @@ fn build_window(
     search_header.append(&search_shell);
     root.append(&search_header);
 
-    let category_row = FlowBox::new();
+    let category_row = GtkBox::new(Orientation::Horizontal, 2);
     category_row.add_css_class("category-row");
-    category_row.set_hexpand(true);
-    category_row.set_selection_mode(SelectionMode::None);
-    category_row.set_row_spacing(2);
-    category_row.set_column_spacing(2);
-    category_row.set_min_children_per_line(1);
-    category_row.set_max_children_per_line(9);
+    category_row.set_halign(Align::Start);
     let active_category = Rc::new(RefCell::new(None::<Button>));
     let category_buttons = Rc::new(RefCell::new(Vec::<(String, Button)>::new()));
-    for (label, prefix, icon_name, active) in [
-        ("All", "", "all", true),
-        ("Files", "file:", "files", false),
-        ("Folders", "folder:", "folders", false),
-        ("Content", "content:", "content", false),
-        ("Images", "images:", "images", false),
-        ("OCR", "ocr:", "ocr", false),
-        ("Code", "code:", "source-code", false),
-        ("Settings", "settings:", "settings", false),
-        ("Commands", "commands:", "commands", false),
-    ] {
+    for filter_id in &linux_settings.home_filters {
+        let Some((label, prefix, icon_name)) = home_filter_spec(filter_id) else {
+            continue;
+        };
         let chip = Button::new();
         chip.set_has_frame(false);
         chip.add_css_class("category-chip");
@@ -2330,11 +2388,11 @@ fn build_window(
         chip_label.set_single_line_mode(true);
         chip_content.append(&chip_label);
         chip.set_child(Some(&chip_content));
-        if active {
+        if *filter_id == "all" {
             chip.add_css_class("active");
             *active_category.borrow_mut() = Some(chip.clone());
         }
-        category_row.insert(&chip, -1);
+        category_row.append(&chip);
         category_buttons
             .borrow_mut()
             .push((prefix.to_string(), chip.clone()));
@@ -2353,9 +2411,17 @@ fn build_window(
             entry_for_chip.grab_focus();
         });
     }
+    let category_scroller = ScrolledWindow::builder()
+        .child(&category_row)
+        .hexpand(true)
+        .vexpand(false)
+        .hscrollbar_policy(PolicyType::Automatic)
+        .vscrollbar_policy(PolicyType::Never)
+        .min_content_height(34)
+        .build();
     let category_bar = GtkBox::new(Orientation::Horizontal, 4);
     category_bar.set_hexpand(true);
-    category_bar.append(&category_row);
+    category_bar.append(&category_scroller);
 
     let status = Label::new(Some("Quick Search"));
     status.set_halign(Align::End);
@@ -2999,16 +3065,6 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     text.append(&subtitle);
     content.append(&text);
 
-    let badge = Label::new(Some(badge_label(&item.kind)));
-    badge.set_halign(Align::End);
-    badge.set_hexpand(false);
-    badge.set_ellipsize(gtk4::pango::EllipsizeMode::End);
-    badge.set_max_width_chars(12);
-    badge.add_css_class("source-badge");
-    badge.add_css_class(badge_class(&item.kind));
-    badge.set_tooltip_text(Some(&item.source));
-    content.append(&badge);
-
     let revealer = Revealer::builder()
         .transition_type(RevealerTransitionType::SlideDown)
         .transition_duration(120)
@@ -3021,51 +3077,11 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     row
 }
 
-fn badge_class(kind: &str) -> &'static str {
-    match kind.to_ascii_uppercase().as_str() {
-        "FILE" => "badge-file",
-        "FOLDER" => "badge-folder",
-        "IMAGE" => "badge-image",
-        "CODE" => "badge-code",
-        "COMMAND" => "badge-command",
-        "SETTING" => "badge-setting",
-        "CLIP" | "CLIPBOARD" => "badge-clipboard",
-        "SOURCE" => "badge-source",
-        _ => "badge-source",
-    }
-}
-
-fn badge_label(kind: &str) -> &'static str {
-    match kind.to_ascii_uppercase().as_str() {
-        "FILE" => "File",
-        "FOLDER" => "Folder",
-        "IMAGE" => "Image",
-        "CODE" => "Code",
-        "COMMAND" => "Command",
-        "SETTING" => "Setting",
-        "CLIP" | "CLIPBOARD" => "Clipboard",
-        "CONTENT" => "Content",
-        "OCR" => "OCR",
-        "APP" => "App",
-        "AGENT" => "Agent",
-        "BOOKMARK" => "Bookmark",
-        "HISTORY" => "History",
-        "COMMIT" => "Commit",
-        "REPO" => "Repository",
-        "RECENT" => "Recent",
-        "NOTE" => "Note",
-        "CALC" | "CALCULATOR" => "Calculator",
-        "WINDOW" => "Window",
-        "INFO" => "Info",
-        "SOURCE" => "Source",
-        _ => "Source",
-    }
-}
-
 fn category_icon(name: &str) -> Image {
     let icon_name = match name {
         "all" => "view-grid-symbolic",
         "files" => "document-open-symbolic",
+        "apps" => "application-x-executable-symbolic",
         "folders" => "folder-symbolic",
         "content" => "text-x-generic-symbolic",
         "images" => "image-x-generic-symbolic",
@@ -3073,12 +3089,62 @@ fn category_icon(name: &str) -> Image {
         "source-code" => "text-x-script-symbolic",
         "settings" => "emblem-system-symbolic",
         "commands" => "system-run-symbolic",
+        "clipboard" => "edit-paste-symbolic",
+        "agents" => "avatar-default-symbolic",
         _ => "view-grid-symbolic",
     };
     let image = Image::from_icon_name(icon_name);
     image.set_pixel_size(16);
     image.add_css_class("category-icon");
     image
+}
+
+fn home_filter_spec(id: &str) -> Option<(&'static str, &'static str, &'static str)> {
+    Some(match id {
+        "all" => ("All", "", "all"),
+        "files" => ("Files", "file:", "files"),
+        "apps" => ("Applications", "app:", "apps"),
+        "folders" => ("Folders", "folder:", "folders"),
+        "content" => ("Content", "content:", "content"),
+        "images" => ("Images", "images:", "images"),
+        "ocr" => ("OCR", "ocr:", "ocr"),
+        "code" => ("Code", "code:", "source-code"),
+        "settings" => ("Settings", "settings:", "settings"),
+        "commands" => ("Commands", "commands:", "commands"),
+        "clipboard" => ("Clipboard", "clip:", "clipboard"),
+        "agents" => ("Agents", "agents:", "agents"),
+        _ => return None,
+    })
+}
+
+fn home_filter_label(id: &str) -> &'static str {
+    home_filter_spec(id)
+        .map(|(label, _, _)| label)
+        .unwrap_or("Filter")
+}
+
+fn refresh_home_filter_order_label(label: &Label, order: &[String]) {
+    let text = order
+        .iter()
+        .map(|id| home_filter_label(id))
+        .collect::<Vec<_>>()
+        .join("  ·  ");
+    label.set_text(&format!("Order: {text}"));
+}
+
+fn move_home_filter(order: &Rc<RefCell<Vec<String>>>, id: &str, delta: i32, order_label: &Label) {
+    if id == "all" {
+        return;
+    }
+    let mut order = order.borrow_mut();
+    let Some(index) = order.iter().position(|value| value == id) else {
+        return;
+    };
+    let next = (index as i32 + delta).clamp(1, order.len().saturating_sub(1) as i32) as usize;
+    if next != index {
+        order.swap(index, next);
+        refresh_home_filter_order_label(order_label, &order);
+    }
 }
 
 fn sync_active_category(
