@@ -38,27 +38,19 @@ use std::time::{Duration, Instant, SystemTime};
 const APPLICATION_ID: &str = "com.protonsearch.Linux";
 const LAUNCHER_CSS: &str = r#"
 window.proton-window {
-    background-color: #17191c;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 16px;
+    background-color: #202327;
+    border: none;
+    border-radius: 0;
     font-family: sans;
 }
 
 .launcher-root {
     background-color: #202327;
-    border-radius: 16px;
+    border-radius: 0;
 }
 
 .search-header {
     min-height: 48px;
-}
-
-.brand-slot {
-    min-width: 44px;
-    min-height: 44px;
-    background-color: #252a2f;
-    border: 1px solid #3b434b;
-    border-radius: 12px;
 }
 
 .brand-logo {
@@ -66,30 +58,20 @@ window.proton-window {
     min-height: 38px;
 }
 
-.search-shell {
-    background-color: #2a2e33;
-    border: 1px solid #3b434b;
-    border-radius: 12px;
-    padding: 0 12px;
-}
-
-.search-icon {
-    color: #f3f5f7;
-}
-
 entry.search-entry {
     min-height: 44px;
-    background-color: transparent;
+    background-color: #2a2e33;
+    border: 1px solid #3b434b;
+    border-radius: 10px;
+    padding: 0 12px;
     color: #f3f5f7;
     caret-color: #82c7bb;
-    border: none;
     box-shadow: none;
-    padding: 0 8px;
     font-size: 17px;
 }
 
 entry.search-entry:focus {
-    border: none;
+    border-color: #82c7bb;
     box-shadow: inset 0 0 0 1px #82c7bb;
 }
 
@@ -103,16 +85,6 @@ entry.search-entry > text > placeholder {
 entry.search-entry selection {
     color: #172027;
     background-color: #82c7bb;
-}
-
-.shortcut-badge {
-    color: #a7b0b8;
-    background-color: #363c42;
-    border: 1px solid #4a535b;
-    border-radius: 7px;
-    padding: 5px 8px;
-    font-size: 10px;
-    font-weight: 700;
 }
 
 entry.error {
@@ -387,30 +359,21 @@ window.proton-image-preview.light .preview-error {
 }
 
 window.proton-window.light {
-    background-color: #eef1f3;
-    border-color: rgba(23, 32, 39, 0.18);
+    background-color: #ffffff;
+    border-color: transparent;
 }
 
 window.proton-window.light .launcher-root {
     background-color: #ffffff;
 }
 
-window.proton-window.light .brand-slot {
-    background-color: #f8fafb;
-    border-color: #cbd5d9;
-}
-
 window.proton-window.light list.result-list {
     background-color: #ffffff;
 }
 
-window.proton-window.light .search-shell {
+window.proton-window.light entry.search-entry {
     background-color: #f8fafb;
     border-color: #cbd5d9;
-}
-
-window.proton-window.light .search-icon {
-    color: #26343d;
 }
 
 window.proton-window.light entry.search-entry,
@@ -421,12 +384,6 @@ window.proton-window.light .empty-state-title {
 
 window.proton-window.light entry.search-entry {
     caret-color: #26796d;
-}
-
-window.proton-window.light .shortcut-badge {
-    color: #38515b;
-    background-color: #e4eceb;
-    border-color: #c1d5d1;
 }
 
 window.proton-window.light entry.search-entry placeholder,
@@ -486,6 +443,14 @@ window.proton-window.light .footer-hint,
 window.proton-window.light .preview-hint,
 window.proton-window.light .empty-state-hint {
     color: #5e646a;
+}
+
+window.proton-window.light row.result-row .result-title {
+    color: #172027;
+}
+
+window.proton-window.light row.result-row .result-subtitle {
+    color: #53636d;
 }
 
 window.proton-window.light row.result-row {
@@ -2922,28 +2887,19 @@ fn build_window(
 
     let root = GtkBox::new(Orientation::Vertical, 10);
     root.add_css_class("launcher-root");
-    root.set_margin_top(18);
-    root.set_margin_bottom(14);
-    root.set_margin_start(18);
-    root.set_margin_end(18);
+    root.set_margin_top(10);
+    root.set_margin_bottom(10);
+    root.set_margin_start(10);
+    root.set_margin_end(10);
 
     let search_header = GtkBox::new(Orientation::Horizontal, 10);
     search_header.add_css_class("search-header");
     search_header.set_hexpand(true);
 
-    let brand_slot = GtkBox::new(Orientation::Horizontal, 0);
-    brand_slot.add_css_class("brand-slot");
-    brand_slot.set_halign(Align::Center);
-    brand_slot.set_valign(Align::Center);
     let brand_logo = crate::icons::protonsearch(38);
     brand_logo.add_css_class("brand-logo");
-    brand_slot.append(&brand_logo);
-    search_header.append(&brand_slot);
-
-    let search_shell = GtkBox::new(Orientation::Horizontal, 6);
-    search_shell.add_css_class("search-shell");
-    search_shell.set_hexpand(true);
-    search_shell.set_height_request(linux_settings.search_bar_height.clamp(42, 100) as i32);
+    brand_logo.set_valign(Align::Center);
+    search_header.append(&brand_logo);
 
     let entry = Entry::builder().hexpand(true).build();
     if linux_settings.show_placeholder {
@@ -2953,15 +2909,8 @@ fn build_window(
     entry.set_tooltip_text(Some(
         "Type to search; Enter opens the selected result; Escape closes",
     ));
-    search_shell.append(&entry);
-
-    let shortcut_badge = Label::new(Some("Ctrl+K"));
-    shortcut_badge.add_css_class("shortcut-badge");
-    shortcut_badge.set_halign(Align::Center);
-    shortcut_badge.set_valign(Align::Center);
-    shortcut_badge.set_tooltip_text(Some("Focus the search field"));
-    search_shell.append(&shortcut_badge);
-    search_header.append(&search_shell);
+    entry.set_height_request(linux_settings.search_bar_height.clamp(42, 100) as i32);
+    search_header.append(&entry);
     root.append(&search_header);
 
     let category_row = GtkBox::new(Orientation::Horizontal, 2);
@@ -3238,7 +3187,6 @@ fn build_window(
 
     let window_for_commands = window.clone();
     let entry_for_commands = entry.clone();
-    let search_shell_for_commands = search_shell.clone();
     let row_height_for_commands = row_height.clone();
     let animation_for_commands = animation.clone();
     let paths_for_commands = paths.clone();
@@ -3277,7 +3225,7 @@ fn build_window(
                         .set_width_request(next_settings.window_width.clamp(480, 1600) as i32);
                     base_width_for_commands.set(next_settings.window_width.clamp(480, 1600));
                     base_height_for_commands.set(next_settings.window_height.clamp(420, 1200));
-                    search_shell_for_commands
+                    entry_for_commands
                         .set_height_request(next_settings.search_bar_height.clamp(42, 100) as i32);
                     row_height_for_commands.set(next_settings.item_height.clamp(52, 120));
                     if next_settings.show_placeholder {
