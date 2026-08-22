@@ -41,6 +41,8 @@ pub struct LinuxSettings {
     pub window_height: u32,
     pub item_height: u32,
     pub search_bar_height: u32,
+    /// Quick image preview style: `floating` or `side`.
+    pub image_preview_mode: String,
     pub show_placeholder: bool,
     pub include_hidden: bool,
     pub show_terminal_apps: bool,
@@ -78,6 +80,7 @@ impl Default for LinuxSettings {
             window_height: 560,
             item_height: 68,
             search_bar_height: 56,
+            image_preview_mode: "floating".to_string(),
             show_placeholder: true,
             include_hidden: false,
             show_terminal_apps: true,
@@ -142,6 +145,21 @@ pub fn normalize_home_filters(settings: &mut LinuxSettings) {
     settings.home_filters.dedup();
 }
 
+pub fn normalize_image_preview_mode(settings: &mut LinuxSettings) {
+    if !matches!(
+        settings
+            .image_preview_mode
+            .trim()
+            .to_ascii_lowercase()
+            .as_str(),
+        "floating" | "side"
+    ) {
+        settings.image_preview_mode = "floating".to_string();
+    } else {
+        settings.image_preview_mode = settings.image_preview_mode.trim().to_ascii_lowercase();
+    }
+}
+
 pub fn load(paths: &XdgPaths) -> LinuxSettings {
     let path = paths.settings_file();
     let Ok(contents) = fs::read_to_string(&path) else {
@@ -151,6 +169,7 @@ pub fn load(paths: &XdgPaths) -> LinuxSettings {
     match serde_json::from_str(&contents) {
         Ok(mut settings) => {
             normalize_home_filters(&mut settings);
+            normalize_image_preview_mode(&mut settings);
             settings
         }
         Err(_) => {
@@ -430,6 +449,7 @@ mod tests {
         assert_eq!(settings.window_height, 560);
         assert_eq!(settings.item_height, 68);
         assert_eq!(settings.search_bar_height, 56);
+        assert_eq!(settings.image_preview_mode, "floating");
         assert!(settings.enable_calculator);
         assert!(settings.enable_git_commits);
         assert!(settings.home_filters.contains(&"all".to_string()));

@@ -737,6 +737,38 @@ entry.agent-prompt {
     box-shadow: none;
 }
 
+.quick-side-preview {
+    min-width: 300px;
+    background-color: #181a1d;
+    border-left: 1px solid #3b434b;
+    padding: 14px;
+}
+
+.quick-side-preview-title {
+    color: #f1f2f3;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.quick-side-preview-surface {
+    background-color: #111315;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+window.proton-window.light .quick-side-preview {
+    background-color: #f2f3f4;
+    border-left-color: #d2d6da;
+}
+
+window.proton-window.light .quick-side-preview-title {
+    color: #202225;
+}
+
+window.proton-window.light .quick-side-preview-surface {
+    background-color: #ffffff;
+}
+
 window.settings-window.settings-theme-light textview.agent-transcript,
 window.proton-window.light textview.agent-transcript {
     background-color: #ffffff;
@@ -1427,6 +1459,23 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         search_label.set_halign(Align::Start);
         search_label.add_css_class("settings-section-title");
         search_page.append(&search_label);
+        let image_preview_label = Label::new(Some("Image quick preview"));
+        image_preview_label.set_halign(Align::Start);
+        image_preview_label.add_css_class("settings-label");
+        search_page.append(&image_preview_label);
+        let image_preview_mode = ComboBoxText::new();
+        image_preview_mode.append(Some("floating"), "Floating preview");
+        image_preview_mode.append(Some("side"), "Expand preview to the right");
+        let image_preview_mode_id = if current.image_preview_mode == "side" {
+            "side"
+        } else {
+            "floating"
+        };
+        image_preview_mode.set_active_id(Some(image_preview_mode_id));
+        image_preview_mode.set_tooltip_text(Some(
+            "Choose the temporary preview shown while holding Alt on an image",
+        ));
+        search_page.append(&image_preview_mode);
         let include_hidden = CheckButton::with_label("Include hidden files in search");
         include_hidden.set_active(current.include_hidden);
         search_page.append(&include_hidden);
@@ -1883,6 +1932,10 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             next.window_height = height.value_as_int().clamp(420, 1200) as u32;
             next.item_height = item_height.value_as_int().clamp(52, 120) as u32;
             next.search_bar_height = search_bar_height.value_as_int().clamp(42, 100) as u32;
+            next.image_preview_mode = image_preview_mode
+                .active_id()
+                .map(|id| id.to_string())
+                .unwrap_or_else(|| "floating".to_string());
             next.include_hidden = include_hidden.is_active();
             next.show_terminal_apps = terminal_apps.is_active();
             next.enable_system_actions = system_actions.is_active();
@@ -2348,6 +2401,51 @@ struct PreviewHandle {
 
 type PreviewState = Rc<RefCell<Option<PreviewHandle>>>;
 
+#[derive(Clone)]
+struct SidePreviewHandle {
+    panel: GtkBox,
+    image: Image,
+    title: Label,
+    status: Label,
+}
+
+type SidePreviewState = Rc<RefCell<Option<SidePreviewHandle>>>;
+
+fn build_side_preview() -> SidePreviewHandle {
+    let panel = GtkBox::new(Orientation::Vertical, 10);
+    panel.add_css_class("quick-side-preview");
+    panel.set_width_request(320);
+    panel.set_hexpand(false);
+    panel.set_vexpand(true);
+    let title = Label::new(Some("Image preview"));
+    title.set_halign(Align::Start);
+    title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    title.add_css_class("quick-side-preview-title");
+    panel.append(&title);
+    let surface = GtkBox::new(Orientation::Vertical, 8);
+    surface.add_css_class("quick-side-preview-surface");
+    surface.set_hexpand(true);
+    surface.set_vexpand(true);
+    let image = Image::from_icon_name("image-x-generic-symbolic");
+    image.set_halign(Align::Center);
+    image.set_valign(Align::Center);
+    image.set_hexpand(true);
+    image.set_vexpand(true);
+    surface.append(&image);
+    let status = Label::new(Some("Hold Alt to preview"));
+    status.set_halign(Align::Center);
+    status.add_css_class("preview-loading");
+    surface.append(&status);
+    panel.append(&surface);
+    panel.set_visible(false);
+    SidePreviewHandle {
+        panel,
+        image,
+        title,
+        status,
+    }
+}
+
 fn preview_source_for_item(paths: &XdgPaths, item: &Item) -> Option<PreviewSource> {
     match &item.target {
         Target::Path(path) if crate::search::is_image_path(path) => {
@@ -2361,8 +2459,12 @@ fn preview_source_for_item(paths: &XdgPaths, item: &Item) -> Option<PreviewSourc
     }
 }
 
-fn preview_bounds(parent: &ApplicationWindow) -> (u32, u32) {
-    let fallback = (900_u32, 680_u32);
+fn preview_bounds(parent: &ApplicationWindow, quick: bool) -> (u32, u32) {
+    let fallback = if quick {
+        (360_u32, 260_u32)
+    } else {
+        (900_u32, 680_u32)
+    };
     let Some(surface) = parent.surface() else {
         return fallback;
     };
@@ -2371,14 +2473,34 @@ fn preview_bounds(parent: &ApplicationWindow) -> (u32, u32) {
         return fallback;
     };
     let geometry = monitor.geometry();
-    (
-        ((geometry.width() as f64) * 0.72)
-            .round()
-            .clamp(520.0, 1200.0) as u32,
-        ((geometry.height() as f64) * 0.72)
-            .round()
-            .clamp(400.0, 900.0) as u32,
-    )
+    if quick {
+        (360, 260)
+    } else {
+        (
+            ((geometry.width() as f64) * 0.72)
+                .round()
+                .clamp(520.0, 1200.0) as u32,
+            ((geometry.height() as f64) * 0.72)
+                .round()
+                .clamp(400.0, 900.0) as u32,
+        )
+    }
+}
+
+fn side_preview_width(parent: &ApplicationWindow, base_width: u32) -> u32 {
+    let fallback = 320_u32;
+    let Some(surface) = parent.surface() else {
+        return fallback;
+    };
+    let Some(monitor) = gtk4::prelude::WidgetExt::display(parent).monitor_at_surface(&surface)
+    else {
+        return fallback;
+    };
+    let available = monitor.geometry().width().max(1) as u32;
+    available
+        .saturating_sub(base_width)
+        .saturating_sub(24)
+        .clamp(220, 320)
 }
 
 fn load_preview_bytes(
@@ -2470,12 +2592,105 @@ fn close_image_preview(previews: &PreviewState, load_generation: &Rc<Cell<u64>>)
     }
 }
 
+fn close_side_preview(side: &SidePreviewState, load_generation: &Rc<Cell<u64>>) {
+    load_generation.set(load_generation.get().saturating_add(1));
+    if let Some(preview) = side.borrow().as_ref() {
+        preview.panel.set_visible(false);
+    }
+}
+
+fn open_side_preview(
+    paths: &XdgPaths,
+    side: &SidePreviewState,
+    load_generation: &Rc<Cell<u64>>,
+    item: &Item,
+) -> bool {
+    let Some(source) = preview_source_for_item(paths, item) else {
+        return false;
+    };
+    let Some(preview) = side.borrow().as_ref().cloned() else {
+        return false;
+    };
+    let request_id = load_generation.get().saturating_add(1);
+    load_generation.set(request_id);
+    preview.panel.set_visible(true);
+    preview.title.set_text(&item.title);
+    preview.status.set_text("Loading preview…");
+    preview.status.remove_css_class("preview-error");
+    preview.status.add_css_class("preview-loading");
+    preview
+        .image
+        .set_icon_name(Some("image-x-generic-symbolic"));
+
+    let (sender, receiver) = async_channel::bounded::<Result<LoadedPreview, String>>(1);
+    thread::spawn(move || {
+        let result = load_preview_bytes(source, 280, 440).map_err(|error| error.to_string());
+        let _ = sender.send_blocking(result);
+    });
+    let weak_side = Rc::downgrade(side);
+    let generation_for_result = load_generation.clone();
+    glib::MainContext::default().spawn_local(async move {
+        let Ok(result) = receiver.recv().await else {
+            return;
+        };
+        if generation_for_result.get() != request_id {
+            return;
+        }
+        let Some(side) = weak_side.upgrade() else {
+            return;
+        };
+        let Some(preview) = side.borrow().as_ref().cloned() else {
+            return;
+        };
+        match result {
+            Ok(loaded) => {
+                let bytes = glib::Bytes::from(&loaded.pixels);
+                let texture = gdk::MemoryTexture::new(
+                    loaded.width,
+                    loaded.height,
+                    gdk::MemoryFormat::R8g8b8a8,
+                    &bytes,
+                    loaded.stride,
+                );
+                preview.image.set_paintable(Some(&texture));
+                preview
+                    .status
+                    .set_text(&format!("{} × {}", loaded.width, loaded.height));
+                preview.status.remove_css_class("preview-loading");
+            }
+            Err(_) => {
+                preview.status.set_text("Preview unavailable");
+                preview.status.remove_css_class("preview-loading");
+                preview.status.add_css_class("preview-error");
+            }
+        }
+    });
+    true
+}
+
+fn open_quick_preview(
+    parent: &ApplicationWindow,
+    paths: &XdgPaths,
+    floating: &PreviewState,
+    side: &SidePreviewState,
+    load_generation: &Rc<Cell<u64>>,
+    item: &Item,
+    mode: &str,
+) -> bool {
+    if mode == "side" {
+        open_side_preview(paths, side, load_generation, item)
+    } else {
+        open_image_preview(parent, paths, floating, load_generation, item, true)
+    }
+}
+
 fn open_image_preview(
     parent: &ApplicationWindow,
     paths: &XdgPaths,
     previews: &PreviewState,
     load_generation: &Rc<Cell<u64>>,
     item: &Item,
+    quick: bool,
 ) -> bool {
     let Some(source) = preview_source_for_item(paths, item) else {
         return false;
@@ -2490,8 +2705,8 @@ fn open_image_preview(
         let window = ApplicationWindow::builder()
             .application(&application)
             .title("ProtonSearch Image Preview")
-            .default_width(720)
-            .default_height(540)
+            .default_width(if quick { 380 } else { 720 })
+            .default_height(if quick { 300 } else { 540 })
             .build();
         window.set_decorated(false);
         window.set_resizable(true);
@@ -2594,7 +2809,7 @@ fn open_image_preview(
     preview.window.present();
 
     let (sender, receiver) = async_channel::bounded::<Result<LoadedPreview, String>>(1);
-    let (max_width, max_height) = preview_bounds(parent);
+    let (max_width, max_height) = preview_bounds(parent, quick);
     thread::spawn(move || {
         let result =
             load_preview_bytes(source, max_width, max_height).map_err(|error| error.to_string());
@@ -2634,9 +2849,17 @@ fn open_image_preview(
                 ));
                 preview.status.remove_css_class("preview-error");
                 preview.status.add_css_class("preview-loading");
-                preview
-                    .window
-                    .set_default_size((loaded.width + 28).max(520), (loaded.height + 86).max(400));
+                if quick {
+                    preview.window.set_default_size(
+                        (loaded.width + 28).clamp(360, 480),
+                        (loaded.height + 86).clamp(260, 360),
+                    );
+                } else {
+                    preview.window.set_default_size(
+                        (loaded.width + 28).max(520),
+                        (loaded.height + 86).max(400),
+                    );
+                }
             }
             Err(error) => {
                 preview
@@ -2817,7 +3040,16 @@ fn build_window(
         agent_stack_for_back.set_visible_child_name("launcher");
         entry_for_agent_back.grab_focus();
     });
-    window.set_child(Some(&agent_stack));
+    root.set_width_request(linux_settings.window_width.clamp(480, 1600) as i32);
+    let side_handle = build_side_preview();
+    let side_panel = side_handle.panel.clone();
+    let side_previews: SidePreviewState = Rc::new(RefCell::new(Some(side_handle)));
+    let launcher_shell = GtkBox::new(Orientation::Horizontal, 0);
+    launcher_shell.set_hexpand(true);
+    launcher_shell.set_vexpand(true);
+    launcher_shell.append(&agent_stack);
+    launcher_shell.append(&side_panel);
+    window.set_child(Some(&launcher_shell));
 
     let items = Rc::new(RefCell::new(Vec::<Item>::new()));
     let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
@@ -2825,6 +3057,9 @@ fn build_window(
     let previews: PreviewState = Rc::new(RefCell::new(None));
     let preview_load_generation = Rc::new(Cell::new(0_u64));
     let alt_preview_active = Rc::new(Cell::new(false));
+    let side_preview_active = Rc::new(Cell::new(false));
+    let base_width = Rc::new(Cell::new(linux_settings.window_width.clamp(480, 1600)));
+    let base_height = Rc::new(Cell::new(linux_settings.window_height.clamp(420, 1200)));
     let (sender, receiver) = async_channel::unbounded::<(u64, String, Vec<Item>)>();
     let (action_sender, action_receiver) =
         async_channel::unbounded::<anyhow::Result<Option<String>>>();
@@ -2947,6 +3182,9 @@ fn build_window(
     let paths_for_commands = paths.clone();
     let settings_for_commands = settings_state.clone();
     let previews_for_commands = previews.clone();
+    let root_for_commands = root.clone();
+    let base_width_for_commands = base_width.clone();
+    let base_height_for_commands = base_height.clone();
     let request_sender_for_commands = request_sender.clone();
     let generation_for_commands = generation.clone();
     glib::MainContext::default().spawn_local(async move {
@@ -2973,6 +3211,10 @@ fn build_window(
                         next_settings.window_width.clamp(480, 1600) as i32,
                         next_settings.window_height.clamp(420, 1200) as i32,
                     );
+                    root_for_commands
+                        .set_width_request(next_settings.window_width.clamp(480, 1600) as i32);
+                    base_width_for_commands.set(next_settings.window_width.clamp(480, 1600));
+                    base_height_for_commands.set(next_settings.window_height.clamp(420, 1200));
                     search_shell_for_commands
                         .set_height_request(next_settings.search_bar_height.clamp(42, 100) as i32);
                     row_height_for_commands.set(next_settings.item_height.clamp(52, 120));
@@ -3057,6 +3299,7 @@ fn build_window(
                     &previews_for_enter,
                     &preview_generation_for_enter,
                     &item,
+                    false,
                 )
             {
                 return;
@@ -3141,6 +3384,7 @@ fn build_window(
                 &previews_for_activation,
                 &preview_generation_for_activation,
                 &item,
+                false,
             ) {
                 return;
             }
@@ -3168,8 +3412,13 @@ fn build_window(
     let items_for_preview = items.clone();
     let paths_for_preview = paths.clone();
     let previews_for_key = previews.clone();
+    let side_previews_for_key = side_previews.clone();
     let preview_generation_for_key = preview_load_generation.clone();
     let alt_preview_active_for_key = alt_preview_active.clone();
+    let side_preview_active_for_key = side_preview_active.clone();
+    let base_width_for_key = base_width.clone();
+    let base_height_for_key = base_height.clone();
+    let root_for_key = root.clone();
     let cursor_index_for_key = cursor_index.clone();
     let settings_state_for_key = settings_state.clone();
     key_controller.connect_key_pressed(move |_, key, _, state| {
@@ -3192,16 +3441,31 @@ fn build_window(
                         .get(row.index() as usize)
                         .cloned()
                 });
+            let mode = settings_state_for_key.borrow().image_preview_mode.clone();
             let is_previewing = selected.as_ref().is_some_and(|item| {
                 item.kind == "IMAGE"
-                    && open_image_preview(
+                    && open_quick_preview(
                         &window_for_escape,
                         &paths_for_preview,
                         &previews_for_key,
+                        &side_previews_for_key,
                         &preview_generation_for_key,
                         item,
+                        &mode,
                     )
             });
+            if mode == "side" && is_previewing {
+                side_preview_active_for_key.set(true);
+                let side_width = side_preview_width(&window_for_escape, base_width_for_key.get());
+                if let Some(side) = side_previews_for_key.borrow().as_ref() {
+                    side.panel.set_width_request(side_width as i32);
+                }
+                root_for_key.set_width_request(base_width_for_key.get() as i32);
+                window_for_escape.set_default_size(
+                    (base_width_for_key.get() + side_width).min(1920) as i32,
+                    base_height_for_key.get() as i32,
+                );
+            }
             alt_preview_active_for_key.set(is_previewing);
             return glib::Propagation::Proceed;
         }
@@ -3273,23 +3537,98 @@ fn build_window(
                 }
                 list_for_navigation.select_row(Some(&row));
                 set_cursor_row(&list_for_navigation, next);
+                if alt_preview_active_for_key.get() {
+                    if let Some(item) = items_for_preview.borrow().get(next as usize).cloned() {
+                        let mode = settings_state_for_key.borrow().image_preview_mode.clone();
+                        let previewing = item.kind == "IMAGE"
+                            && open_quick_preview(
+                                &window_for_escape,
+                                &paths_for_preview,
+                                &previews_for_key,
+                                &side_previews_for_key,
+                                &preview_generation_for_key,
+                                &item,
+                                &mode,
+                            );
+                        if mode == "side" && previewing {
+                            side_preview_active_for_key.set(true);
+                            let side_width =
+                                side_preview_width(&window_for_escape, base_width_for_key.get());
+                            if let Some(side) = side_previews_for_key.borrow().as_ref() {
+                                side.panel.set_width_request(side_width as i32);
+                            }
+                            window_for_escape.set_default_size(
+                                (base_width_for_key.get() + side_width).min(1920) as i32,
+                                base_height_for_key.get() as i32,
+                            );
+                        } else if !previewing {
+                            close_image_preview(&previews_for_key, &preview_generation_for_key);
+                            close_side_preview(&side_previews_for_key, &preview_generation_for_key);
+                            if side_preview_active_for_key.replace(false) {
+                                root_for_key.set_width_request(base_width_for_key.get() as i32);
+                                window_for_escape.set_default_size(
+                                    base_width_for_key.get() as i32,
+                                    base_height_for_key.get() as i32,
+                                );
+                            }
+                            alt_preview_active_for_key.set(false);
+                        }
+                    }
+                }
             }
             return glib::Propagation::Stop;
         }
         glib::Propagation::Proceed
     });
     let previews_for_release = previews.clone();
+    let side_previews_for_release = side_previews.clone();
     let preview_generation_for_release = preview_load_generation.clone();
     let alt_preview_active_for_release = alt_preview_active.clone();
+    let side_preview_active_for_release = side_preview_active.clone();
+    let window_for_release = window.clone();
+    let base_width_for_release = base_width.clone();
+    let base_height_for_release = base_height.clone();
+    let root_for_release = root.clone();
     key_controller.connect_key_released(move |_, key, _, _| {
         if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R)
             && alt_preview_active_for_release.replace(false)
         {
             close_image_preview(&previews_for_release, &preview_generation_for_release);
+            close_side_preview(&side_previews_for_release, &preview_generation_for_release);
+            if side_preview_active_for_release.replace(false) {
+                root_for_release.set_width_request(base_width_for_release.get() as i32);
+                window_for_release.set_default_size(
+                    base_width_for_release.get() as i32,
+                    base_height_for_release.get() as i32,
+                );
+            }
         }
     });
     key_controller.set_propagation_phase(PropagationPhase::Capture);
     window.add_controller(key_controller);
+    let previews_for_focus_loss = previews.clone();
+    let side_previews_for_focus_loss = side_previews.clone();
+    let generation_for_focus_loss = preview_load_generation.clone();
+    let alt_for_focus_loss = alt_preview_active.clone();
+    let side_active_for_focus_loss = side_preview_active.clone();
+    let root_for_focus_loss = root.clone();
+    let base_width_for_focus_loss = base_width.clone();
+    let base_height_for_focus_loss = base_height.clone();
+    window.connect_is_active_notify(move |window| {
+        if window.is_active() {
+            return;
+        }
+        alt_for_focus_loss.set(false);
+        close_image_preview(&previews_for_focus_loss, &generation_for_focus_loss);
+        close_side_preview(&side_previews_for_focus_loss, &generation_for_focus_loss);
+        if side_active_for_focus_loss.replace(false) {
+            root_for_focus_loss.set_width_request(base_width_for_focus_loss.get() as i32);
+            window.set_default_size(
+                base_width_for_focus_loss.get() as i32,
+                base_height_for_focus_loss.get() as i32,
+            );
+        }
+    });
     // The resident service starts hidden. The compositor shortcut sends a
     // toggle over the IPC socket and reveals the launcher on demand.
     window.hide();
