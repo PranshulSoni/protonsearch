@@ -5,6 +5,7 @@
 //! `docs/linux/LAUNCHER.md`; the same desktop entry can be assigned a shortcut
 //! by other desktop environments.
 
+use crate::actions::StatusPanel;
 use crate::providers::{self, Item, Target};
 use crate::settings;
 use crate::update;
@@ -18,7 +19,7 @@ use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
     ComboBoxText, Entry, EventControllerFocus, EventControllerKey, EventControllerScroll,
     EventControllerScrollFlags, GestureClick, Image, Label, ListBox, ListBoxRow, MessageDialog,
-    MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
+    MessageType, Orientation, PolicyType, ProgressBar, PropagationPhase, ResponseType, Revealer,
     RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
     StackTransitionType,
 };
@@ -143,6 +144,81 @@ button.category-chip:hover .category-icon {
 .status-label {
     color: #737d86;
     font-size: 11px;
+}
+
+.status-panel {
+    background-color: #252a2f;
+    border: 1px solid #3b454c;
+    border-radius: 14px;
+    padding: 22px;
+}
+
+.status-header {
+    min-height: 42px;
+}
+
+.status-icon {
+    min-width: 42px;
+    min-height: 42px;
+}
+
+.status-heading {
+    color: #f3f5f7;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.status-subheading,
+.status-property-label {
+    color: #9da8b0;
+    font-size: 12px;
+}
+
+.status-value {
+    color: #f3f5f7;
+    font-size: 38px;
+    font-weight: 700;
+}
+
+.status-summary {
+    color: #b7c4c8;
+    font-size: 15px;
+}
+
+.status-property-value {
+    color: #f3f5f7;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.status-close {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    border-radius: 8px;
+    color: #c5cdd1;
+}
+
+.status-close:hover {
+    background-color: #3b454c;
+    color: #ffffff;
+}
+
+.status-refresh {
+    min-height: 32px;
+    padding: 0 14px;
+}
+
+.status-progress trough {
+    min-height: 8px;
+    border-radius: 999px;
+    background-color: #394249;
+}
+
+.status-progress progress {
+    min-height: 8px;
+    border-radius: 999px;
+    background-color: #82c7bb;
 }
 
 list.result-list {
@@ -372,6 +448,39 @@ window.proton-window.light {
 
 window.proton-window.light .launcher-root {
     background-color: #ffffff;
+}
+
+window.proton-window.light .status-panel {
+    background-color: #f7f9fa;
+    border-color: #d4dde1;
+}
+
+window.proton-window.light .status-heading,
+window.proton-window.light .status-value,
+window.proton-window.light .status-property-value {
+    color: #172027;
+}
+
+window.proton-window.light .status-subheading,
+window.proton-window.light .status-property-label {
+    color: #5e6b73;
+}
+
+window.proton-window.light .status-summary {
+    color: #3f515a;
+}
+
+window.proton-window.light .status-close {
+    color: #53636d;
+}
+
+window.proton-window.light .status-close:hover {
+    background-color: #e1e8eb;
+    color: #172027;
+}
+
+window.proton-window.light .status-progress trough {
+    background-color: #d7e0e4;
 }
 
 window.proton-window.light list.result-list {
@@ -2249,6 +2358,170 @@ fn confirmation_target(target: &Target) -> Option<(Target, &'static str)> {
     ))
 }
 
+#[derive(Clone)]
+struct StatusUi {
+    stack: Stack,
+    panel: GtkBox,
+    icon: Image,
+    title: Label,
+    value: Label,
+    summary: Label,
+    progress: ProgressBar,
+    properties: GtkBox,
+    refresh: Button,
+    target: Rc<RefCell<Option<Target>>>,
+}
+
+impl StatusUi {
+    fn show_launcher(&self) {
+        self.stack.set_visible_child_name("launcher");
+    }
+
+    fn close(&self, entry: &Entry) {
+        self.show_launcher();
+        entry.grab_focus();
+    }
+}
+
+fn build_status_ui(stack: &Stack, entry: &Entry) -> StatusUi {
+    let panel = GtkBox::new(Orientation::Vertical, 18);
+    panel.set_hexpand(true);
+    panel.set_vexpand(true);
+    panel.set_valign(Align::Center);
+    panel.set_margin_top(22);
+    panel.set_margin_bottom(22);
+    panel.set_margin_start(22);
+    panel.set_margin_end(22);
+    panel.add_css_class("status-panel");
+
+    let header = GtkBox::new(Orientation::Horizontal, 12);
+    header.add_css_class("status-header");
+    let icon = Image::from_icon_name("applications-system-symbolic");
+    icon.set_pixel_size(42);
+    icon.add_css_class("status-icon");
+    header.append(&icon);
+    let heading_box = GtkBox::new(Orientation::Vertical, 2);
+    heading_box.set_hexpand(true);
+    let title = Label::new(Some("System status"));
+    title.set_halign(Align::Start);
+    title.add_css_class("status-heading");
+    let subheading = Label::new(Some("ProtonSearch · refreshed on demand"));
+    subheading.set_halign(Align::Start);
+    subheading.add_css_class("status-subheading");
+    heading_box.append(&title);
+    heading_box.append(&subheading);
+    header.append(&heading_box);
+    let close = Button::with_label("×");
+    close.set_tooltip_text(Some("Close status panel (Esc)"));
+    close.add_css_class("status-close");
+    header.append(&close);
+    panel.append(&header);
+
+    let center = GtkBox::new(Orientation::Vertical, 8);
+    center.set_halign(Align::Center);
+    center.set_valign(Align::Center);
+    center.set_vexpand(true);
+    let value = Label::new(Some("—"));
+    value.set_halign(Align::Center);
+    value.add_css_class("status-value");
+    let summary = Label::new(Some("Information is available"));
+    summary.set_halign(Align::Center);
+    summary.set_wrap(true);
+    summary.add_css_class("status-summary");
+    center.append(&value);
+    center.append(&summary);
+    let progress = ProgressBar::new();
+    progress.set_show_text(false);
+    progress.set_hexpand(true);
+    progress.set_width_request(280);
+    progress.add_css_class("status-progress");
+    progress.set_visible(false);
+    center.append(&progress);
+    panel.append(&center);
+
+    let properties = GtkBox::new(Orientation::Vertical, 8);
+    properties.set_hexpand(true);
+    panel.append(&properties);
+
+    let footer = GtkBox::new(Orientation::Horizontal, 8);
+    footer.set_halign(Align::End);
+    let refresh = Button::with_label("Refresh");
+    refresh.add_css_class("status-refresh");
+    footer.append(&refresh);
+    panel.append(&footer);
+
+    let status_ui = StatusUi {
+        stack: stack.clone(),
+        panel: panel.clone(),
+        icon,
+        title,
+        value,
+        summary,
+        progress,
+        properties,
+        refresh,
+        target: Rc::new(RefCell::new(None)),
+    };
+    let status_ui_for_close = status_ui.clone();
+    let entry_for_close = entry.clone();
+    close.connect_clicked(move |_| status_ui_for_close.close(&entry_for_close));
+    let status_ui_for_escape = status_ui.clone();
+    let entry_for_escape = entry.clone();
+    let key_controller = EventControllerKey::new();
+    key_controller.connect_key_pressed(move |_, key, _, _| {
+        if key == gdk::Key::Escape {
+            status_ui_for_escape.close(&entry_for_escape);
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    panel.add_controller(key_controller);
+    status_ui
+}
+
+fn render_status_panel(status_ui: &StatusUi, panel: StatusPanel, target: Target) {
+    status_ui.icon.set_icon_name(Some(&panel.icon_name));
+    status_ui.title.set_text(&panel.title);
+    status_ui
+        .value
+        .set_text(panel.value.as_deref().unwrap_or("—"));
+    status_ui.summary.set_text(
+        panel
+            .summary
+            .as_deref()
+            .unwrap_or("Information is available"),
+    );
+    if let Some(progress) = panel.progress {
+        status_ui.progress.set_fraction(progress.clamp(0.0, 1.0));
+        status_ui.progress.set_visible(true);
+    } else {
+        status_ui.progress.set_visible(false);
+    }
+    while let Some(child) = status_ui.properties.first_child() {
+        status_ui.properties.remove(&child);
+    }
+    for property in panel.properties {
+        let row = GtkBox::new(Orientation::Horizontal, 12);
+        row.set_hexpand(true);
+        let label = Label::new(Some(&property.label));
+        label.set_halign(Align::Start);
+        label.set_hexpand(true);
+        label.add_css_class("status-property-label");
+        let value = Label::new(Some(&property.value));
+        value.set_halign(Align::End);
+        value.set_wrap(true);
+        value.set_max_width_chars(48);
+        value.add_css_class("status-property-value");
+        row.append(&label);
+        row.append(&value);
+        status_ui.properties.append(&row);
+    }
+    *status_ui.target.borrow_mut() = Some(target);
+    status_ui.stack.set_visible_child_name("status");
+    status_ui.refresh.grab_focus();
+}
+
 fn set_launcher_status(status: &Label, message: &str) {
     status.set_text(message);
     status.set_tooltip_text(None);
@@ -2259,7 +2532,7 @@ fn activate_target(
     window: &ApplicationWindow,
     status: &Label,
     animation: &Rc<RefCell<Option<glib::SourceId>>>,
-    action_sender: &async_channel::Sender<anyhow::Result<Option<String>>>,
+    action_sender: &async_channel::Sender<(Target, anyhow::Result<Option<StatusPanel>>)>,
     target: Target,
 ) {
     if matches!(&target, Target::Action { .. }) {
@@ -2269,18 +2542,13 @@ fn activate_target(
         set_launcher_status(status, "Running action…");
         thread::spawn(move || {
             let result = providers::activate(&paths_for_worker, &target_for_worker);
-            let _ = sender_for_worker.send_blocking(result);
+            let _ = sender_for_worker.send_blocking((target_for_worker, result));
         });
         return;
     }
     match providers::activate(paths, &target) {
-        Ok(Some(feedback)) => {
-            let feedback = feedback.lines().next().unwrap_or(feedback.as_str());
-            if is_generic_success_message(feedback) {
-                set_launcher_status(status, "Quick Search");
-            } else {
-                set_launcher_status(status, feedback);
-            }
+        Ok(Some(_)) => {
+            set_launcher_status(status, "Quick Search");
         }
         Ok(None) => {
             animate_hide(window, animation);
@@ -2293,32 +2561,13 @@ fn activate_target(
     }
 }
 
-fn is_generic_success_message(message: &str) -> bool {
-    let normalized = message
-        .trim()
-        .trim_end_matches(|character: char| matches!(character, '.' | '!' | '?' | '…'))
-        .to_ascii_lowercase();
-    matches!(
-        normalized.as_str(),
-        "action completed"
-            | "action successful"
-            | "completed successfully"
-            | "command executed"
-            | "opened successfully"
-            | "operation completed"
-            | "success"
-            | "successful"
-            | "done"
-    )
-}
-
 fn activate_item(
     paths: &XdgPaths,
     window: &ApplicationWindow,
     entry: &Entry,
     status: &Label,
     animation: &Rc<RefCell<Option<glib::SourceId>>>,
-    action_sender: &async_channel::Sender<anyhow::Result<Option<String>>>,
+    action_sender: &async_channel::Sender<(Target, anyhow::Result<Option<StatusPanel>>)>,
     agent_stack: &Stack,
     agent_ui: &AgentUi,
     item: Item,
@@ -3100,7 +3349,16 @@ fn build_window(
     launcher_shell.set_vexpand(true);
     launcher_shell.append(&agent_stack);
     launcher_shell.append(&side_panel);
-    window.set_child(Some(&launcher_shell));
+    let view_stack = Stack::new();
+    view_stack.set_hexpand(true);
+    view_stack.set_vexpand(true);
+    view_stack.set_transition_type(StackTransitionType::Crossfade);
+    view_stack.set_transition_duration(120);
+    view_stack.add_named(&launcher_shell, Some("launcher"));
+    let status_ui = build_status_ui(&view_stack, &entry);
+    view_stack.add_named(&status_ui.panel, Some("status"));
+    view_stack.set_visible_child_name("launcher");
+    window.set_child(Some(&view_stack));
 
     let items = Rc::new(RefCell::new(Vec::<Item>::new()));
     let multi_selected = Rc::new(RefCell::new(HashSet::<i32>::new()));
@@ -3114,7 +3372,23 @@ fn build_window(
     let base_height = Rc::new(Cell::new(linux_settings.window_height.clamp(420, 1200)));
     let (sender, receiver) = async_channel::unbounded::<(u64, String, Vec<Item>)>();
     let (action_sender, action_receiver) =
-        async_channel::unbounded::<anyhow::Result<Option<String>>>();
+        async_channel::unbounded::<(Target, anyhow::Result<Option<StatusPanel>>)>();
+    let status_ui_for_refresh = status_ui.clone();
+    let action_sender_for_refresh = action_sender.clone();
+    let paths_for_refresh_base = paths.clone();
+    status_ui.refresh.connect_clicked(move |_| {
+        let Some(target) = status_ui_for_refresh.target.borrow().clone() else {
+            return;
+        };
+        let paths_for_refresh = paths_for_refresh_base.clone();
+        let sender_for_refresh = action_sender_for_refresh.clone();
+        let target_for_refresh = target.clone();
+        status_ui_for_refresh.refresh.set_sensitive(false);
+        thread::spawn(move || {
+            let result = providers::activate(&paths_for_refresh, &target_for_refresh);
+            let _ = sender_for_refresh.send_blocking((target_for_refresh, result));
+        });
+    });
     let (request_sender, request_receiver) =
         mpsc::channel::<(u64, String, settings::LinuxSettings)>();
     let worker_paths = paths.clone();
@@ -3215,19 +3489,21 @@ fn build_window(
     });
 
     let action_status = status.clone();
+    let status_ui_for_receiver = status_ui.clone();
     glib::MainContext::default().spawn_local(async move {
-        while let Ok(result) = action_receiver.recv().await {
+        while let Ok((target, result)) = action_receiver.recv().await {
             match result {
-                Ok(Some(feedback)) => {
-                    let feedback = feedback.lines().next().unwrap_or(feedback.as_str());
-                    if is_generic_success_message(feedback) {
-                        set_launcher_status(&action_status, "Quick Search");
-                    } else {
-                        set_launcher_status(&action_status, feedback);
-                    }
+                Ok(Some(panel)) => {
+                    status_ui_for_receiver.refresh.set_sensitive(true);
+                    render_status_panel(&status_ui_for_receiver, panel, target);
                 }
-                Ok(None) => set_launcher_status(&action_status, "Quick Search"),
+                Ok(None) => {
+                    status_ui_for_receiver.refresh.set_sensitive(true);
+                    set_launcher_status(&action_status, "Quick Search");
+                }
                 Err(error) => {
+                    status_ui_for_receiver.refresh.set_sensitive(true);
+                    status_ui_for_receiver.show_launcher();
                     set_launcher_status(&action_status, &format!("Action failed: {error}"));
                     action_status.set_tooltip_text(Some(&format!("{error:#}")));
                     eprintln!("ProtonSearch: {error:#}");
@@ -3485,6 +3761,8 @@ fn build_window(
     let animation_for_escape = animation.clone();
     let agent_stack_for_escape = agent_stack.clone();
     let entry_for_agent_escape = entry.clone();
+    let status_ui_for_escape = status_ui.clone();
+    let entry_for_status_escape = entry.clone();
     let list_for_navigation = list.clone();
     let scroll_for_navigation = scroll.clone();
     let items_for_preview = items.clone();
@@ -3550,6 +3828,10 @@ fn build_window(
             return glib::Propagation::Proceed;
         }
         if key == gdk::Key::Escape {
+            if status_ui_for_escape.stack.visible_child_name().as_deref() == Some("status") {
+                status_ui_for_escape.close(&entry_for_status_escape);
+                return glib::Propagation::Stop;
+            }
             if agent_stack_for_escape.visible_child_name().as_deref() == Some("agent") {
                 agent_stack_for_escape.set_visible_child_name("launcher");
                 entry_for_agent_escape.grab_focus();
@@ -4327,27 +4609,6 @@ mod preview_tests {
                 runtime: None,
             }, &item),
             Some(PreviewSource::File(candidate)) if candidate == path
-        ));
-    }
-
-    #[test]
-    fn generic_success_feedback_is_suppressed() {
-        for message in [
-            "Action completed",
-            "Action successful.",
-            "Completed successfully!",
-            "Command executed",
-            "Opened successfully…",
-            "Operation completed.",
-            "Success",
-            "Successful",
-            "Done!",
-        ] {
-            assert!(is_generic_success_message(message), "{message}");
-        }
-        assert!(!is_generic_success_message("Battery 100% · charging"));
-        assert!(!is_generic_success_message(
-            "Action failed: permission denied"
         ));
     }
 }

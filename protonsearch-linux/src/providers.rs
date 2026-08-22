@@ -1484,7 +1484,7 @@ fn clipboard_provider_error(message: &str) -> Item {
     }
 }
 
-pub fn activate(paths: &XdgPaths, target: &Target) -> anyhow::Result<Option<String>> {
+pub fn activate(paths: &XdgPaths, target: &Target) -> anyhow::Result<Option<actions::StatusPanel>> {
     match target {
         Target::Application(entry) => {
             desktop::launch(entry)?;
@@ -1565,22 +1565,7 @@ pub fn activate(paths: &XdgPaths, target: &Target) -> anyhow::Result<Option<Stri
                 }
                 _ => {
                     let result = actions::execute(paths, id, args, *confirmed)?;
-                    if matches!(
-                        id.as_str(),
-                        "wifi-status"
-                            | "bluetooth-status"
-                            | "audio-status"
-                            | "brightness-status"
-                            | "battery-status"
-                            | "power-profile-status"
-                            | "media-status"
-                            | "hyprland-status"
-                            | "doctor"
-                    ) {
-                        Ok(Some(result.message))
-                    } else {
-                        Ok(None)
-                    }
+                    Ok(result.status)
                 }
             }
         }
