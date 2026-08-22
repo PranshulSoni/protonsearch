@@ -1982,11 +1982,17 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             let filters_changed = next.home_filters != current.home_filters
                 || next.home_filter_order != current.home_filter_order;
             if let Err(error) = settings::save(&paths_for_save, &next) {
+                save_status.set_text(&format!("Could not save settings: {error}"));
                 eprintln!("ProtonSearch: could not save settings: {error:#}");
                 return;
             }
+            let mut startup_update_failed = false;
             if next.run_on_startup != current.run_on_startup {
                 if let Err(error) = sync_startup_service(next.run_on_startup) {
+                    startup_update_failed = true;
+                    save_status.set_text(&format!(
+                        "Settings saved, but startup service could not be updated: {error}"
+                    ));
                     eprintln!("ProtonSearch: could not update startup service: {error:#}");
                 }
             }
@@ -1999,7 +2005,9 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             if appearance_changed || filters_changed {
                 restart_launcher_service_if_active();
             }
-            save_status.set_text("Settings saved — ProtonSearch updated.");
+            if !startup_update_failed {
+                save_status.set_text("");
+            }
         });
         window.present();
     });
@@ -2265,13 +2273,14 @@ fn activate_target(
         });
         return;
     }
-    let keep_launcher_open = matches!(&target, Target::Action { .. });
     match providers::activate(paths, &target) {
         Ok(Some(feedback)) => {
-            set_launcher_status(status, feedback.lines().next().unwrap_or(feedback.as_str()));
-        }
-        Ok(None) if keep_launcher_open => {
-            set_launcher_status(status, "Action completed");
+            let feedback = feedback.lines().next().unwrap_or(feedback.as_str());
+            if is_generic_success_message(feedback) {
+                set_launcher_status(status, "Quick Search");
+            } else {
+                set_launcher_status(status, feedback);
+            }
         }
         Ok(None) => {
             animate_hide(window, animation);
@@ -2282,6 +2291,25 @@ fn activate_target(
             eprintln!("ProtonSearch: {error:#}");
         }
     }
+}
+
+fn is_generic_success_message(message: &str) -> bool {
+    let normalized = message
+        .trim()
+        .trim_end_matches(|character: char| matches!(character, '.' | '!' | '?' | '…'))
+        .to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "action completed"
+            | "action successful"
+            | "completed successfully"
+            | "command executed"
+            | "opened successfully"
+            | "operation completed"
+            | "success"
+            | "successful"
+            | "done"
+    )
 }
 
 fn activate_item(
@@ -3190,11 +3218,15 @@ fn build_window(
     glib::MainContext::default().spawn_local(async move {
         while let Ok(result) = action_receiver.recv().await {
             match result {
-                Ok(Some(feedback)) => set_launcher_status(
-                    &action_status,
-                    feedback.lines().next().unwrap_or(feedback.as_str()),
-                ),
-                Ok(None) => set_launcher_status(&action_status, "Action completed"),
+                Ok(Some(feedback)) => {
+                    let feedback = feedback.lines().next().unwrap_or(feedback.as_str());
+                    if is_generic_success_message(feedback) {
+                        set_launcher_status(&action_status, "Quick Search");
+                    } else {
+                        set_launcher_status(&action_status, feedback);
+                    }
+                }
+                Ok(None) => set_launcher_status(&action_status, "Quick Search"),
                 Err(error) => {
                     set_launcher_status(&action_status, &format!("Action failed: {error}"));
                     action_status.set_tooltip_text(Some(&format!("{error:#}")));
@@ -3285,27 +3317,17 @@ fn build_window(
             .into_iter()
             .filter_map(|row| items_for_enter.borrow().get(row.index() as usize).cloned())
             .collect::<Vec<_>>();
-        if selected_items.len() > 1
-            && selected_items.iter().all(|item| item.source == "Clipboard")
+        if selected_items.len() > 1 && selected_items.iter().all(|item| item.source == "Clipboard")
         {
             match providers::activate_clipboard_batch(&paths_for_enter, &selected_items) {
-                Ok((text_count, image_count)) => {
-                    let message = if image_count > 1 {
-                        format!(
-                            "Copied {text_count} text item(s) and combined {image_count} images into one clipboard image"
-                        )
-                    } else if image_count > 0 {
-                        format!(
-                            "Copied {text_count} text item(s) and {image_count} image"
-                        )
-                    } else {
-                        format!("Copied {text_count} clipboard items together")
-                    };
-                    set_launcher_status(&status_for_enter, &message);
+                Ok(_) => {
                     animate_hide(&window_for_enter, &animation_for_enter);
                 }
                 Err(error) => {
-                    set_launcher_status(&status_for_enter, &format!("Clipboard action failed: {error}"));
+                    set_launcher_status(
+                        &status_for_enter,
+                        &format!("Clipboard action failed: {error}"),
+                    );
                 }
             }
             return;
@@ -3374,23 +3396,10 @@ fn build_window(
                     .cloned()
             })
             .collect::<Vec<_>>();
-        if selected_items.len() > 1
-            && selected_items.iter().all(|item| item.source == "Clipboard")
+        if selected_items.len() > 1 && selected_items.iter().all(|item| item.source == "Clipboard")
         {
             match providers::activate_clipboard_batch(&paths_for_activation, &selected_items) {
-                Ok((text_count, image_count)) => {
-                    let message = if image_count > 1 {
-                        format!(
-                            "Copied {text_count} text item(s) and combined {image_count} images into one clipboard image"
-                        )
-                    } else if image_count > 0 {
-                        format!(
-                            "Copied {text_count} text item(s) and {image_count} image"
-                        )
-                    } else {
-                        format!("Copied {text_count} clipboard items together")
-                    };
-                    set_launcher_status(&status_for_activation, &message);
+                Ok(_) => {
                     animate_hide(&window_for_activation, &animation_for_activation);
                 }
                 Err(error) => {
@@ -4318,6 +4327,27 @@ mod preview_tests {
                 runtime: None,
             }, &item),
             Some(PreviewSource::File(candidate)) if candidate == path
+        ));
+    }
+
+    #[test]
+    fn generic_success_feedback_is_suppressed() {
+        for message in [
+            "Action completed",
+            "Action successful.",
+            "Completed successfully!",
+            "Command executed",
+            "Opened successfully…",
+            "Operation completed.",
+            "Success",
+            "Successful",
+            "Done!",
+        ] {
+            assert!(is_generic_success_message(message), "{message}");
+        }
+        assert!(!is_generic_success_message("Battery 100% · charging"));
+        assert!(!is_generic_success_message(
+            "Action failed: permission denied"
         ));
     }
 }
