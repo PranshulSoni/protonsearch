@@ -18,13 +18,14 @@ use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
     ComboBoxText, Entry, EventControllerFocus, EventControllerKey, EventControllerScroll,
-    EventControllerScrollFlags, GestureClick, Image, Label, ListBox, ListBoxRow, MessageDialog,
-    MessageType, Orientation, Picture, PolicyType, ProgressBar, PropagationPhase, ResponseType,
-    Revealer, RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack,
-    StackSidebar, StackTransitionType,
+    EventControllerScrollFlags, GestureClick, Grid, Image, Label, ListBox, ListBoxRow,
+    MessageDialog, MessageType, Orientation, Picture, PolicyType, ProgressBar, PropagationPhase,
+    ResponseType, Revealer, RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton,
+    Stack, StackSidebar, StackTransitionType,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
+use std::ffi::CString;
 use std::fs;
 use std::io::{BufRead, Cursor, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -50,6 +51,97 @@ window.proton-window {
 .launcher-root {
     background-color: #202327;
     border-radius: 0;
+}
+
+.dashboard {
+    padding: 12px 0 4px;
+}
+
+.dashboard-hero {
+    padding: 10px 4px 14px;
+}
+
+.dashboard-time {
+    color: #f3f5f7;
+    font-size: 34px;
+    font-weight: 700;
+}
+
+.dashboard-date {
+    color: #9da8b0;
+    font-size: 12px;
+}
+
+.dashboard-kicker {
+    color: #82c7bb;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+}
+
+.dashboard-grid {
+}
+
+button.dashboard-card {
+    min-height: 76px;
+    padding: 12px;
+    color: #f3f5f7;
+    background-color: #252a2f;
+    border: 1px solid #333d44;
+    border-radius: 12px;
+    box-shadow: none;
+}
+
+button.dashboard-card:hover,
+button.dashboard-card:focus {
+    background-color: #2c353a;
+    border-color: #82c7bb;
+}
+
+.dashboard-card-icon {
+    min-width: 22px;
+    min-height: 22px;
+    color: #82c7bb;
+}
+
+.dashboard-card-title {
+    color: #9da8b0;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.dashboard-card-value {
+    color: #f3f5f7;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.dashboard-card-detail {
+    color: #7f8b93;
+    font-size: 10px;
+}
+
+.dashboard-actions {
+    margin-top: 10px;
+}
+
+button.dashboard-action {
+    min-height: 34px;
+    padding: 0 12px;
+    color: #c8d3d4;
+    background-color: #2a3035;
+    border: 1px solid #39444a;
+    border-radius: 9px;
+    box-shadow: none;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+button.dashboard-action:hover,
+button.dashboard-action:focus {
+    color: #f3f5f7;
+    background-color: #38504d;
+    border-color: #82c7bb;
 }
 
 .search-header {
@@ -454,6 +546,45 @@ window.proton-window.light .launcher-root {
     background-color: #ffffff;
 }
 
+window.proton-window.light .dashboard-time,
+window.proton-window.light .dashboard-card-value {
+    color: #172027;
+}
+
+window.proton-window.light .dashboard-date,
+window.proton-window.light .dashboard-card-title {
+    color: #53636d;
+}
+
+window.proton-window.light .dashboard-card-detail {
+    color: #6b7a82;
+}
+
+window.proton-window.light button.dashboard-card {
+    color: #172027;
+    background-color: #f5f8f9;
+    border-color: #d4dde1;
+}
+
+window.proton-window.light button.dashboard-card:hover,
+window.proton-window.light button.dashboard-card:focus {
+    background-color: #eaf3f1;
+    border-color: #4b9d91;
+}
+
+window.proton-window.light button.dashboard-action {
+    color: #30434b;
+    background-color: #f1f5f6;
+    border-color: #cbd5d9;
+}
+
+window.proton-window.light button.dashboard-action:hover,
+window.proton-window.light button.dashboard-action:focus {
+    color: #172027;
+    background-color: #e1efec;
+    border-color: #4b9d91;
+}
+
 window.proton-window.light .status-panel {
     background-color: #f7f9fa;
     border-color: #d4dde1;
@@ -848,6 +979,12 @@ entry.agent-prompt {
     padding: 10px;
 }
 
+.quick-side-preview-detail {
+    color: #d2dade;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
 window.proton-window.light .quick-side-preview {
     background-color: #f2f3f4;
     border-left-color: #d2d6da;
@@ -855,6 +992,10 @@ window.proton-window.light .quick-side-preview {
 
 window.proton-window.light .quick-side-preview-title {
     color: #202225;
+}
+
+window.proton-window.light .quick-side-preview-detail {
+    color: #4f5d65;
 }
 
 window.proton-window.light .quick-side-preview-surface {
@@ -2580,6 +2721,308 @@ fn build_status_ui(
     status_ui
 }
 
+fn dashboard_card(
+    entry: &Entry,
+    title: &str,
+    value: &str,
+    detail: &str,
+    icon_name: &str,
+    query: &str,
+) -> Button {
+    let button = Button::new();
+    button.set_has_frame(true);
+    button.add_css_class("dashboard-card");
+    button.set_hexpand(true);
+    let content = GtkBox::new(Orientation::Horizontal, 10);
+    content.set_halign(Align::Start);
+    let icon = Image::from_icon_name(icon_name);
+    icon.set_pixel_size(22);
+    icon.add_css_class("dashboard-card-icon");
+    content.append(&icon);
+    let text = GtkBox::new(Orientation::Vertical, 2);
+    text.set_halign(Align::Start);
+    let title_label = Label::new(Some(title));
+    title_label.set_halign(Align::Start);
+    title_label.add_css_class("dashboard-card-title");
+    text.append(&title_label);
+    let value_label = Label::new(Some(value));
+    value_label.set_halign(Align::Start);
+    value_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    value_label.add_css_class("dashboard-card-value");
+    text.append(&value_label);
+    let detail_label = Label::new(Some(detail));
+    detail_label.set_halign(Align::Start);
+    detail_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    detail_label.add_css_class("dashboard-card-detail");
+    text.append(&detail_label);
+    content.append(&text);
+    button.set_child(Some(&content));
+    let entry_for_card = entry.clone();
+    let query = query.to_string();
+    button.connect_clicked(move |_| {
+        entry_for_card.set_text(&query);
+        entry_for_card.grab_focus();
+    });
+    button
+}
+
+fn dashboard_action(entry: &Entry, label: &str, query: &str) -> Button {
+    let button = Button::with_label(label);
+    button.set_has_frame(true);
+    button.add_css_class("dashboard-action");
+    let entry_for_action = entry.clone();
+    let query = query.to_string();
+    button.connect_clicked(move |_| {
+        entry_for_action.set_text(&query);
+        entry_for_action.grab_focus();
+    });
+    button
+}
+
+fn format_dashboard_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+    let mut value = bytes as f64;
+    let mut unit = 0;
+    while value >= 1024.0 && unit < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{} {}", bytes, UNITS[unit])
+    } else {
+        format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+fn dashboard_memory() -> (String, String) {
+    let Ok(contents) = fs::read_to_string("/proc/meminfo") else {
+        return (
+            "Unavailable".to_string(),
+            "Memory data unavailable".to_string(),
+        );
+    };
+    let mut total = 0_u64;
+    let mut available = 0_u64;
+    for line in contents.lines() {
+        let mut fields = line.split_whitespace();
+        let Some(name) = fields.next() else { continue };
+        let Some(value) = fields.next().and_then(|value| value.parse::<u64>().ok()) else {
+            continue;
+        };
+        match name {
+            "MemTotal:" => total = value.saturating_mul(1024),
+            "MemAvailable:" => available = value.saturating_mul(1024),
+            _ => {}
+        }
+    }
+    if total == 0 {
+        return (
+            "Unavailable".to_string(),
+            "Memory data unavailable".to_string(),
+        );
+    }
+    let used = total.saturating_sub(available);
+    (
+        format_dashboard_bytes(used),
+        format!("of {} used", format_dashboard_bytes(total)),
+    )
+}
+
+fn dashboard_storage() -> (String, String) {
+    let Ok(path) = CString::new("/") else {
+        return (
+            "Unavailable".to_string(),
+            "Storage data unavailable".to_string(),
+        );
+    };
+    let mut stats = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    // SAFETY: `path` is a valid NUL-terminated path and `stats` points to
+    // writable storage for the libc call.
+    let result = unsafe { libc::statvfs(path.as_ptr(), stats.as_mut_ptr()) };
+    if result != 0 {
+        return (
+            "Unavailable".to_string(),
+            "Storage data unavailable".to_string(),
+        );
+    }
+    // SAFETY: statvfs initialized the structure on success.
+    let stats = unsafe { stats.assume_init() };
+    let block_size = stats.f_frsize.max(stats.f_bsize) as u64;
+    let total = (stats.f_blocks as u64).saturating_mul(block_size);
+    let available = (stats.f_bavail as u64).saturating_mul(block_size);
+    (
+        format_dashboard_bytes(total.saturating_sub(available)),
+        format!("of {} used", format_dashboard_bytes(total)),
+    )
+}
+
+fn dashboard_network() -> (String, String) {
+    let mut active = Vec::new();
+    if let Ok(entries) = fs::read_dir("/sys/class/net") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name == "lo" {
+                continue;
+            }
+            let state = fs::read_to_string(entry.path().join("operstate")).unwrap_or_default();
+            if state.trim() == "up" {
+                active.push(name);
+            }
+        }
+    }
+    if active.is_empty() {
+        ("Offline".to_string(), "No active interface".to_string())
+    } else {
+        (
+            "Connected".to_string(),
+            active.into_iter().take(2).collect::<Vec<_>>().join(" · "),
+        )
+    }
+}
+
+fn dashboard_clock() -> (String, String) {
+    let Ok(now) = glib::DateTime::now_local() else {
+        return ("—".to_string(), "Local time unavailable".to_string());
+    };
+    let time = now
+        .format("%H:%M")
+        .map(|value| value.to_string())
+        .unwrap_or_else(|_| "—".to_string());
+    let date = now
+        .format("%a, %d %b")
+        .map(|value| value.to_string())
+        .unwrap_or_else(|_| "Local time".to_string());
+    (time, date)
+}
+
+fn build_dashboard(entry: &Entry, linux_settings: &settings::LinuxSettings) -> GtkBox {
+    let dashboard = GtkBox::new(Orientation::Vertical, 10);
+    dashboard.add_css_class("dashboard");
+    dashboard.set_hexpand(true);
+
+    let hero = GtkBox::new(Orientation::Vertical, 2);
+    hero.add_css_class("dashboard-hero");
+    let kicker = Label::new(Some("PROTON SEARCH · AT A GLANCE"));
+    kicker.set_halign(Align::Start);
+    kicker.add_css_class("dashboard-kicker");
+    hero.append(&kicker);
+    let (time, date) = dashboard_clock();
+    let time_label = Label::new(Some(&time));
+    time_label.set_halign(Align::Start);
+    time_label.add_css_class("dashboard-time");
+    hero.append(&time_label);
+    let date_label = Label::new(Some(&date));
+    date_label.set_halign(Align::Start);
+    date_label.add_css_class("dashboard-date");
+    hero.append(&date_label);
+    dashboard.append(&hero);
+
+    let battery = crate::system::battery_status();
+    let battery_value = if battery.present {
+        battery
+            .percentage
+            .filter(|value| {
+                let value = value.trim();
+                !value.is_empty() && !value.eq_ignore_ascii_case("nan")
+            })
+            .map(|value| format!("{}%", value.trim_end_matches('%')))
+            .unwrap_or_else(|| "Unknown".to_string())
+    } else {
+        "No battery".to_string()
+    };
+    let battery_detail = battery
+        .state
+        .clone()
+        .unwrap_or_else(|| "Power status unavailable".to_string());
+    let (memory_value, memory_detail) = dashboard_memory();
+    let (storage_value, storage_detail) = dashboard_storage();
+    let (network_value, network_detail) = dashboard_network();
+    let bluetooth_value = if crate::system::command_available("bluetoothctl") {
+        "Available"
+    } else {
+        "Not detected"
+    };
+    let bluetooth_detail = if bluetooth_value == "Available" {
+        "Open Bluetooth search"
+    } else {
+        "bluetoothctl not installed"
+    };
+    let theme_value = match linux_settings.theme_mode.as_str() {
+        "light" => "Light",
+        "system" => "System",
+        _ => "Dark",
+    };
+
+    let grid = Grid::new();
+    grid.add_css_class("dashboard-grid");
+    grid.set_hexpand(true);
+    grid.set_row_spacing(8);
+    grid.set_column_spacing(8);
+    let cards = [
+        dashboard_card(
+            entry,
+            "Battery",
+            &battery_value,
+            &battery_detail,
+            "battery-symbolic",
+            "battery",
+        ),
+        dashboard_card(
+            entry,
+            "Network",
+            &network_value,
+            &network_detail,
+            "network-wireless-symbolic",
+            "settings: wifi",
+        ),
+        dashboard_card(
+            entry,
+            "Memory",
+            &memory_value,
+            &memory_detail,
+            "drive-harddisk-symbolic",
+            "settings: memory",
+        ),
+        dashboard_card(
+            entry,
+            "Storage",
+            &storage_value,
+            &storage_detail,
+            "drive-harddisk-symbolic",
+            "settings: storage",
+        ),
+        dashboard_card(
+            entry,
+            "Bluetooth",
+            bluetooth_value,
+            bluetooth_detail,
+            "bluetooth-symbolic",
+            "settings: bluetooth",
+        ),
+        dashboard_card(
+            entry,
+            "Theme",
+            theme_value,
+            "Open appearance settings",
+            "preferences-desktop-theme-symbolic",
+            "settings: appearance",
+        ),
+    ];
+    for (index, card) in cards.into_iter().enumerate() {
+        grid.attach(&card, (index % 2) as i32, (index / 2) as i32, 1, 1);
+    }
+    dashboard.append(&grid);
+
+    let actions = GtkBox::new(Orientation::Horizontal, 8);
+    actions.add_css_class("dashboard-actions");
+    actions.set_halign(Align::Start);
+    actions.append(&dashboard_action(entry, "Settings", "settings:"));
+    actions.append(&dashboard_action(entry, "Commands", "commands:"));
+    actions.append(&dashboard_action(entry, "Open Agent", "agents:"));
+    dashboard.append(&actions);
+    dashboard
+}
+
 fn render_status_panel(status_ui: &StatusUi, panel: StatusPanel, target: Target) {
     status_ui.icon.set_icon_name(Some(&panel.icon_name));
     status_ui.title.set_text(&panel.title);
@@ -2753,6 +3196,7 @@ type PreviewState = Rc<RefCell<Option<PreviewHandle>>>;
 struct SidePreviewHandle {
     panel: GtkBox,
     image: Picture,
+    detail: Label,
     title: Label,
     status: Label,
 }
@@ -2782,6 +3226,14 @@ fn build_side_preview() -> SidePreviewHandle {
     image.set_hexpand(true);
     image.set_vexpand(true);
     surface.append(&image);
+    let detail = Label::new(Some("Select a result to inspect it here"));
+    detail.set_halign(Align::Start);
+    detail.set_valign(Align::Start);
+    detail.set_wrap(true);
+    detail.set_max_width_chars(36);
+    detail.add_css_class("quick-side-preview-detail");
+    detail.set_visible(false);
+    surface.append(&detail);
     let status = Label::new(Some("Hold Alt to preview"));
     status.set_halign(Align::Center);
     status.add_css_class("preview-loading");
@@ -2791,6 +3243,7 @@ fn build_side_preview() -> SidePreviewHandle {
     SidePreviewHandle {
         panel,
         image,
+        detail,
         title,
         status,
     }
@@ -3011,6 +3464,8 @@ fn open_side_preview(
     preview.status.remove_css_class("preview-error");
     preview.status.add_css_class("preview-loading");
     preview.image.set_paintable(None::<&gdk::Paintable>);
+    preview.image.set_visible(true);
+    preview.detail.set_visible(false);
 
     let (sender, receiver) = async_channel::bounded::<Result<LoadedPreview, String>>(1);
     thread::spawn(move || {
@@ -3288,6 +3743,88 @@ fn open_image_preview(
     true
 }
 
+fn context_preview_detail(item: &Item) -> String {
+    match &item.target {
+        Target::Path(path) => {
+            let metadata = fs::metadata(path).ok();
+            if metadata.as_ref().is_some_and(|value| value.is_dir()) {
+                let children = fs::read_dir(path)
+                    .map(|entries| entries.filter_map(|entry| entry.ok()).take(8).count())
+                    .unwrap_or(0);
+                return format!(
+                    "Folder\n{} direct item{}\n{}",
+                    children,
+                    if children == 1 { "" } else { "s" },
+                    path.display()
+                );
+            }
+            let size = metadata.map(|value| format_dashboard_bytes(value.len()));
+            let mut detail = format!(
+                "{}\n{}\n{}",
+                item.kind,
+                size.unwrap_or_else(|| "Size unavailable".to_string()),
+                path.display()
+            );
+            if let Ok(bytes) = fs::read(path) {
+                if bytes.len() <= 32 * 1024 && !bytes.contains(&0) {
+                    let preview = String::from_utf8_lossy(&bytes);
+                    let preview = preview.trim();
+                    if !preview.is_empty() {
+                        let excerpt = preview.chars().take(900).collect::<String>();
+                        detail.push_str("\n\n");
+                        detail.push_str(&excerpt);
+                        if preview.chars().count() > 900 {
+                            detail.push_str("…");
+                        }
+                    }
+                }
+            }
+            detail
+        }
+        Target::Application(application) => format!(
+            "Application\n{}\n{}\n{}",
+            application
+                .generic_name
+                .as_deref()
+                .unwrap_or("Desktop application"),
+            application.path.display(),
+            application.exec
+        ),
+        Target::Clipboard(_) => format!("{}\n{}", item.source, item.subtitle),
+        Target::Action { id, .. } => format!("Command\n{}\n{}", id, item.subtitle),
+        Target::Url(url) => format!("Link\n{}", url),
+        Target::Copy(value) => format!("Copied text\n{}", value),
+        Target::Query(query) => format!("Search\n{}", query),
+        Target::Notice(message) => message.clone(),
+    }
+}
+
+fn update_context_preview(
+    paths: &XdgPaths,
+    side: &SidePreviewState,
+    load_generation: &Rc<Cell<u64>>,
+    item: &Item,
+) {
+    if item.kind.eq_ignore_ascii_case("IMAGE")
+        && open_side_preview(paths, side, load_generation, item)
+    {
+        return;
+    }
+    load_generation.set(load_generation.get().saturating_add(1));
+    let Some(preview) = side.borrow().as_ref().cloned() else {
+        return;
+    };
+    preview.panel.set_visible(true);
+    preview.title.set_text(&item.title);
+    preview.image.set_paintable(None::<&gdk::Paintable>);
+    preview.image.set_visible(false);
+    preview.detail.set_text(&context_preview_detail(item));
+    preview.detail.set_visible(true);
+    preview.status.set_text(&item.subtitle);
+    preview.status.remove_css_class("preview-loading");
+    preview.status.remove_css_class("preview-error");
+}
+
 fn build_window(
     application: &Application,
     paths: XdgPaths,
@@ -3429,6 +3966,9 @@ fn build_window(
     category_scroller.add_controller(filter_scroll_controller);
     root.append(&category_bar);
 
+    let dashboard = build_dashboard(&entry, &linux_settings);
+    root.append(&dashboard);
+
     let list = ListBox::new();
     list.add_css_class("result-list");
     list.set_selection_mode(SelectionMode::Multiple);
@@ -3442,6 +3982,7 @@ fn build_window(
         .hscrollbar_policy(PolicyType::Never)
         .vscrollbar_policy(PolicyType::Automatic)
         .build();
+    scroll.set_visible(false);
     root.append(&scroll);
 
     let footer = Label::new(Some(
@@ -3570,6 +4111,13 @@ fn build_window(
     let settings_for_changed = settings_state.clone();
     let active_category_for_changed = active_category.clone();
     let category_buttons_for_changed = category_buttons.clone();
+    let dashboard_for_changed = dashboard.clone();
+    let scroll_for_changed = scroll.clone();
+    let side_panel_for_changed = side_panel.clone();
+    let window_for_changed = window.clone();
+    let root_for_changed = root.clone();
+    let base_width_for_changed = base_width.clone();
+    let base_height_for_changed = base_height.clone();
     let debounce_source = Rc::new(RefCell::new(None::<glib::SourceId>));
     entry.connect_changed(move |entry| {
         let next_generation = generation_for_changed.get().saturating_add(1);
@@ -3581,6 +4129,17 @@ fn build_window(
             &category_scroller,
             &query,
         );
+        let home = query.trim().is_empty();
+        dashboard_for_changed.set_visible(home);
+        scroll_for_changed.set_visible(!home);
+        if home {
+            side_panel_for_changed.set_visible(false);
+            root_for_changed.set_width_request(base_width_for_changed.get() as i32);
+            window_for_changed.set_default_size(
+                base_width_for_changed.get() as i32,
+                base_height_for_changed.get() as i32,
+            );
+        }
         if let Some(source) = debounce_source.borrow_mut().take() {
             source.remove();
         }
@@ -3604,9 +4163,17 @@ fn build_window(
     let paths_for_receiver = paths.clone();
     let cursor_index_for_receiver = cursor_index.clone();
     let multi_selected_for_receiver = multi_selected.clone();
+    let dashboard_for_receiver = dashboard.clone();
+    let side_panel_for_receiver = side_panel.clone();
     glib::MainContext::default().spawn_local(async move {
         while let Ok((result_generation, query, results)) = receiver.recv().await {
             if result_generation == generation_for_receiver.get() {
+                let home = query.trim().is_empty();
+                dashboard_for_receiver.set_visible(home);
+                scroll_for_receiver.set_visible(!home);
+                if home {
+                    side_panel_for_receiver.set_visible(false);
+                }
                 *items_for_receiver.borrow_mut() = results.clone();
                 cursor_index_for_receiver.set(0);
                 multi_selected_for_receiver.borrow_mut().clear();
@@ -3871,6 +4438,14 @@ fn build_window(
     let cursor_index_for_mouse = cursor_index.clone();
     let scroll_for_mouse = scroll.clone();
     let list_for_mouse = list.clone();
+    let items_for_selected = items.clone();
+    let entry_for_selected = entry.clone();
+    let paths_for_selected = paths.clone();
+    let side_previews_for_selected = side_previews.clone();
+    let preview_generation_for_selected = preview_load_generation.clone();
+    let window_for_selected = window.clone();
+    let base_width_for_selected = base_width.clone();
+    let base_height_for_selected = base_height.clone();
     list.connect_row_selected(move |_, row| {
         let Some(row) = row else {
             return;
@@ -3878,6 +4453,29 @@ fn build_window(
         cursor_index_for_mouse.set(row.index());
         set_cursor_row(&list_for_mouse, row.index());
         ensure_result_visible(&scroll_for_mouse, row);
+        if !entry_for_selected.text().trim().is_empty() {
+            if let Some(item) = items_for_selected
+                .borrow()
+                .get(row.index() as usize)
+                .cloned()
+            {
+                update_context_preview(
+                    &paths_for_selected,
+                    &side_previews_for_selected,
+                    &preview_generation_for_selected,
+                    &item,
+                );
+                if let Some(side) = side_previews_for_selected.borrow().as_ref() {
+                    let side_width =
+                        side_preview_width(&window_for_selected, base_width_for_selected.get());
+                    side.panel.set_width_request(side_width as i32);
+                    window_for_selected.set_default_size(
+                        (base_width_for_selected.get() + side_width).min(1920) as i32,
+                        base_height_for_selected.get() as i32,
+                    );
+                }
+            }
+        }
     });
 
     let multi_selected_for_click = multi_selected.clone();
@@ -4143,9 +4741,11 @@ fn build_window(
         if alt_for_focus_loss.get() && previews_for_focus_loss.borrow().is_some() {
             return;
         }
-        alt_for_focus_loss.set(false);
+        let was_alt_preview = alt_for_focus_loss.replace(false);
         close_image_preview(&previews_for_focus_loss, &generation_for_focus_loss);
-        close_side_preview(&side_previews_for_focus_loss, &generation_for_focus_loss);
+        if was_alt_preview {
+            close_side_preview(&side_previews_for_focus_loss, &generation_for_focus_loss);
+        }
         if side_active_for_focus_loss.replace(false) {
             root_for_focus_loss.set_width_request(base_width_for_focus_loss.get() as i32);
             window.set_default_size(
