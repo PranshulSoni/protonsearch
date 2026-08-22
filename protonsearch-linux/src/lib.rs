@@ -5,11 +5,13 @@
 //! launcher entry point.
 
 pub mod actions;
+pub mod agent;
 pub mod calculator;
 pub mod capabilities;
 pub mod clipboard;
 pub mod desktop;
 pub mod gui;
+pub mod hermes;
 pub mod hyprland;
 pub mod icons;
 pub mod platform;

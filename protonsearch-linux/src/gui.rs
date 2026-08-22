@@ -19,7 +19,7 @@ use gtk4::{
     ComboBoxText, Entry, EventControllerKey, Image, Label, ListBox, ListBoxRow, MessageDialog,
     MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
     RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
-    StackTransitionType, TextView, WrapMode,
+    StackTransitionType,
 };
 use std::cell::{Cell, RefCell};
 use std::fs;
@@ -33,7 +33,7 @@ use std::sync::{
     Arc,
 };
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 const APPLICATION_ID: &str = "com.protonsearch.Linux";
 const LAUNCHER_CSS: &str = r#"
@@ -654,6 +654,89 @@ textview.agent-transcript text {
     color: #f1f2f3;
 }
 
+.agent-root {
+    background-color: #202327;
+    min-height: 420px;
+}
+
+.agent-sidebar {
+    background-color: #181a1d;
+    min-width: 190px;
+    padding: 16px 10px;
+}
+
+.agent-content {
+    background-color: #202327;
+}
+
+.agent-header {
+    min-height: 42px;
+}
+
+.agent-status {
+    color: #9da6af;
+    font-size: 11px;
+}
+
+.agent-history-list row,
+.agent-new-chat,
+.agent-back {
+    color: #d9dde1;
+    border-radius: 8px;
+}
+
+.agent-history-list row {
+    padding: 9px 8px;
+    margin: 2px 0;
+}
+
+.agent-history-list row:hover,
+.agent-history-list row:selected {
+    background-color: #30363d;
+    color: #ffffff;
+}
+
+.agent-chat {
+    background-color: transparent;
+    padding: 8px 2px;
+}
+
+.agent-message {
+    padding: 11px 14px;
+    margin: 5px 4px;
+    border-radius: 12px;
+    font-size: 13px;
+}
+
+.agent-user {
+    background-color: #3a5361;
+    color: #ffffff;
+}
+
+.agent-assistant {
+    background-color: #2a2e33;
+    color: #f1f2f3;
+}
+
+.agent-empty {
+    color: #969da5;
+    padding: 30px;
+}
+
+.agent-input-row {
+    background-color: #292e34;
+    border: 1px solid #3b434b;
+    border-radius: 11px;
+    padding: 6px;
+}
+
+entry.agent-prompt {
+    background-color: transparent;
+    color: #f1f2f3;
+    border: none;
+    box-shadow: none;
+}
+
 window.settings-window.settings-theme-light textview.agent-transcript,
 window.proton-window.light textview.agent-transcript {
     background-color: #ffffff;
@@ -777,155 +860,388 @@ fn settings_page(title: &str, description: &str) -> (GtkBox, ScrolledWindow) {
     (page, scroll)
 }
 
-fn open_agent_window(parent: &ApplicationWindow, session: Option<String>) {
-    let Some(application) = parent.application() else {
-        return;
-    };
-    let window = ApplicationWindow::builder()
-        .application(&application)
-        .title("ProtonSearch Agent")
-        .default_width(720)
-        .default_height(560)
-        .build();
-    window.set_transient_for(Some(parent));
-    window.set_modal(false);
-    window.add_css_class("settings-window");
+#[derive(Clone)]
+struct AgentUi {
+    history: ListBox,
+    chat: ListBox,
+    prompt: Entry,
+    send: Button,
+    status: Label,
+    back: Button,
+    new_chat: Button,
+    paths: XdgPaths,
+    conversations: Rc<RefCell<Vec<crate::agent::Conversation>>>,
+    active: Rc<RefCell<Option<String>>>,
+}
 
-    let root = GtkBox::new(Orientation::Vertical, 12);
-    root.set_margin_top(22);
-    root.set_margin_bottom(18);
-    root.set_margin_start(22);
-    root.set_margin_end(22);
+fn build_agent_view(paths: &XdgPaths) -> (GtkBox, AgentUi) {
+    let conversations = Rc::new(RefCell::new(crate::agent::load_history(paths)));
+    let active = Rc::new(RefCell::new(None::<String>));
+    let history = ListBox::new();
+    history.set_selection_mode(SelectionMode::Single);
+    history.add_css_class("agent-history-list");
+    history.set_width_request(190);
 
-    let heading = Label::new(Some("ProtonSearch Agent"));
-    heading.set_halign(Align::Start);
-    heading.add_css_class("settings-heading");
-    root.append(&heading);
-
-    let description = Label::new(Some(
-        "Hermes Agent runs in a worker so the launcher and this conversation remain responsive.",
-    ));
-    description.set_wrap(true);
-    description.set_halign(Align::Start);
-    description.add_css_class("settings-help");
-    root.append(&description);
-
-    let transcript = TextView::new();
-    transcript.set_editable(false);
-    transcript.set_cursor_visible(false);
-    transcript.set_wrap_mode(WrapMode::WordChar);
-    transcript.set_vexpand(true);
-    transcript.set_hexpand(true);
-    transcript.add_css_class("agent-transcript");
-    let transcript_scroll = ScrolledWindow::builder()
-        .child(&transcript)
+    let sidebar = GtkBox::new(Orientation::Vertical, 10);
+    sidebar.add_css_class("agent-sidebar");
+    let sidebar_title = Label::new(Some("Conversations"));
+    sidebar_title.set_halign(Align::Start);
+    sidebar_title.add_css_class("settings-section-title");
+    sidebar.append(&sidebar_title);
+    let new_chat = Button::with_label("＋ New chat");
+    new_chat.add_css_class("agent-new-chat");
+    sidebar.append(&new_chat);
+    let history_scroll = ScrolledWindow::builder()
+        .child(&history)
         .vexpand(true)
         .hexpand(true)
+        .hscrollbar_policy(PolicyType::Never)
         .build();
-    root.append(&transcript_scroll);
+    sidebar.append(&history_scroll);
 
-    let status = Label::new(Some(if session.is_some() {
-        "Ready to continue this Hermes session"
-    } else {
-        "Ready"
-    }));
-    status.set_halign(Align::Start);
-    status.add_css_class("settings-help");
-    root.append(&status);
+    let content = GtkBox::new(Orientation::Vertical, 12);
+    content.add_css_class("agent-content");
+    content.set_margin_top(18);
+    content.set_margin_bottom(18);
+    content.set_margin_start(18);
+    content.set_margin_end(18);
+    let header = GtkBox::new(Orientation::Horizontal, 10);
+    header.add_css_class("agent-header");
+    let back = Button::with_label("‹ Back");
+    back.add_css_class("agent-back");
+    header.append(&back);
+    let heading = Label::new(Some("ProtonSearch Agent"));
+    heading.set_halign(Align::Start);
+    heading.set_hexpand(true);
+    heading.add_css_class("settings-heading");
+    header.append(&heading);
+    let hermes_readiness = crate::hermes::readiness();
+    let status_text = match hermes_readiness.command {
+        None => "Hermes Agent is not installed".to_string(),
+        Some(command) if hermes_readiness.ready => format!(
+            "{} · local gateway ready",
+            hermes_readiness
+                .version
+                .unwrap_or_else(|| command.program().to_string())
+        ),
+        Some(command) => format!(
+            "{} installed · local gateway not running",
+            hermes_readiness
+                .version
+                .unwrap_or_else(|| command.program().to_string())
+        ),
+    };
+    let status = Label::new(Some(&status_text));
+    status.set_halign(Align::End);
+    status.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    status.set_max_width_chars(34);
+    status.add_css_class("agent-status");
+    header.append(&status);
+    content.append(&header);
+
+    let chat = ListBox::new();
+    chat.set_selection_mode(SelectionMode::None);
+    chat.add_css_class("agent-chat");
+    let chat_scroll = ScrolledWindow::builder()
+        .child(&chat)
+        .vexpand(true)
+        .hexpand(true)
+        .hscrollbar_policy(PolicyType::Never)
+        .build();
+    content.append(&chat_scroll);
 
     let prompt = Entry::new();
     prompt.set_hexpand(true);
-    prompt.set_placeholder_text(Some("Ask Hermes Agent something…"));
+    prompt.set_placeholder_text(Some("Ask Hermes Agent anything…"));
     prompt.set_activates_default(true);
+    prompt.add_css_class("agent-prompt");
     let send = Button::with_label("Send");
+    send.add_css_class("suggested-action");
     send.set_receives_default(true);
     let input_row = GtkBox::new(Orientation::Horizontal, 8);
-    input_row.set_hexpand(true);
+    input_row.add_css_class("agent-input-row");
     input_row.append(&prompt);
     input_row.append(&send);
-    root.append(&input_row);
-    window.set_child(Some(&root));
+    content.append(&input_row);
+    let hint = Label::new(Some(
+        "Enter sends · Esc returns to search · responses run in the background",
+    ));
+    hint.set_halign(Align::End);
+    hint.add_css_class("footer-hint");
+    content.append(&hint);
 
-    let (sender, receiver) = mpsc::channel::<Result<String, String>>();
-    let status_for_receiver = status.clone();
-    let transcript_for_receiver = transcript.clone();
-    let send_for_receiver = send.clone();
-    let weak_window = window.downgrade();
-    glib::timeout_add_local(Duration::from_millis(80), move || {
-        let Some(_window) = weak_window.upgrade() else {
-            return glib::ControlFlow::Break;
-        };
-        while let Ok(result) = receiver.try_recv() {
-            send_for_receiver.set_sensitive(true);
-            match result {
-                Ok(response) => {
-                    status_for_receiver.set_text("Response received");
-                    let buffer = transcript_for_receiver.buffer();
-                    let previous = buffer
-                        .text(&buffer.start_iter(), &buffer.end_iter(), false)
-                        .to_string();
-                    let text = if previous.trim().is_empty() {
-                        format!("Hermes Agent\n\n{response}")
-                    } else {
-                        format!("{previous}\n\n{response}")
-                    };
-                    buffer.set_text(&text);
+    let root = GtkBox::new(Orientation::Horizontal, 0);
+    root.add_css_class("agent-root");
+    root.append(&sidebar);
+    root.append(&content);
+    let ui = AgentUi {
+        history,
+        chat,
+        prompt,
+        send,
+        status,
+        back,
+        new_chat,
+        paths: paths.clone(),
+        conversations,
+        active,
+    };
+    agent_render_history(&ui);
+    agent_render_chat(&ui);
+    (root, ui)
+}
+
+fn agent_render_history(ui: &AgentUi) {
+    while let Some(child) = ui.history.first_child() {
+        ui.history.remove(&child);
+    }
+    for conversation in ui.conversations.borrow().iter().rev() {
+        let label = Label::new(Some(&conversation.title));
+        label.set_halign(Align::Start);
+        label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+        label.set_max_width_chars(22);
+        let row = ListBoxRow::new();
+        row.set_child(Some(&label));
+        row.set_tooltip_text(Some(&format!("{} messages", conversation.messages.len())));
+        row.set_widget_name(&conversation.id);
+        ui.history.append(&row);
+    }
+}
+
+fn agent_render_chat(ui: &AgentUi) {
+    while let Some(child) = ui.chat.first_child() {
+        ui.chat.remove(&child);
+    }
+    let active = ui.active.borrow().clone();
+    let Some(active) = active else {
+        let empty = Label::new(Some("Start a new conversation with Hermes Agent."));
+        empty.add_css_class("agent-empty");
+        empty.set_vexpand(true);
+        ui.chat.append(&empty);
+        return;
+    };
+    let Some(conversation) = ui
+        .conversations
+        .borrow()
+        .iter()
+        .find(|conversation| conversation.id == active)
+        .cloned()
+    else {
+        return;
+    };
+    if conversation.messages.is_empty() {
+        let empty = Label::new(Some(
+            "Ask Hermes anything. Your conversation will be saved here.",
+        ));
+        empty.add_css_class("agent-empty");
+        ui.chat.append(&empty);
+    }
+    for message in conversation.messages {
+        let bubble = Label::new(Some(&message.text));
+        bubble.set_wrap(true);
+        bubble.set_selectable(true);
+        bubble.set_xalign(0.0);
+        bubble.set_halign(if message.role == "user" {
+            Align::End
+        } else {
+            Align::Start
+        });
+        bubble.set_hexpand(false);
+        bubble.set_max_width_chars(90);
+        bubble.add_css_class("agent-message");
+        bubble.add_css_class(if message.role == "user" {
+            "agent-user"
+        } else {
+            "agent-assistant"
+        });
+        let row = ListBoxRow::new();
+        row.set_selectable(false);
+        row.set_activatable(false);
+        row.set_child(Some(&bubble));
+        ui.chat.append(&row);
+    }
+}
+
+fn agent_new_conversation(ui: &AgentUi, session: Option<String>) {
+    let id = session.clone().unwrap_or_else(|| {
+        let stamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        format!("chat-{stamp}")
+    });
+    if !ui.conversations.borrow().iter().any(|item| item.id == id) {
+        ui.conversations
+            .borrow_mut()
+            .push(crate::agent::Conversation {
+                id: id.clone(),
+                title: "New conversation".to_string(),
+                hermes_session: session,
+                messages: Vec::new(),
+            });
+        let _ = crate::agent::save_history(&ui.paths, &ui.conversations.borrow());
+    } else if let Some(session) = session {
+        if let Some(conversation) = ui
+            .conversations
+            .borrow_mut()
+            .iter_mut()
+            .find(|conversation| conversation.id == id)
+        {
+            conversation.hermes_session = Some(session);
+        }
+    }
+    *ui.active.borrow_mut() = Some(id);
+    agent_render_history(ui);
+    agent_render_chat(ui);
+    ui.prompt.grab_focus();
+}
+
+fn connect_agent_actions(ui: &AgentUi) {
+    let (sender, receiver) = async_channel::unbounded::<(String, crate::hermes::HermesEvent)>();
+    let ui_for_receiver = ui.clone();
+    glib::MainContext::default().spawn_local(async move {
+        while let Ok((id, event)) = receiver.recv().await {
+            match event {
+                crate::hermes::HermesEvent::Output(line) => {
+                    if let Some(conversation) = ui_for_receiver
+                        .conversations
+                        .borrow_mut()
+                        .iter_mut()
+                        .find(|conversation| conversation.id == id)
+                    {
+                        if let Some(last) = conversation.messages.last_mut() {
+                            if last.role == "assistant" {
+                                if !last.text.is_empty() {
+                                    last.text.push('\n');
+                                }
+                                last.text.push_str(&line);
+                            } else {
+                                conversation.messages.push(crate::agent::Message {
+                                    role: "assistant".to_string(),
+                                    text: line,
+                                });
+                            }
+                        } else {
+                            conversation.messages.push(crate::agent::Message {
+                                role: "assistant".to_string(),
+                                text: line,
+                            });
+                        }
+                    }
+                    ui_for_receiver.status.set_text("Hermes is responding…");
+                    agent_render_chat(&ui_for_receiver);
                 }
-                Err(error) => {
-                    status_for_receiver.set_text(&format!("Agent error: {error}"));
+                crate::hermes::HermesEvent::Diagnostic(line) => {
+                    if !line.trim().is_empty() {
+                        ui_for_receiver.status.set_text(&format!("Hermes: {line}"));
+                    }
+                }
+                crate::hermes::HermesEvent::Approval { tool, summary } => {
+                    ui_for_receiver
+                        .status
+                        .set_text(&format!("Approval needed for {tool}: {summary}"));
+                }
+                crate::hermes::HermesEvent::Finished(exit) => {
+                    ui_for_receiver.send.set_sensitive(true);
+                    if exit.success {
+                        let _ = crate::agent::save_history(
+                            &ui_for_receiver.paths,
+                            &ui_for_receiver.conversations.borrow(),
+                        );
+                        ui_for_receiver.status.set_text("Response received");
+                    } else {
+                        ui_for_receiver
+                            .status
+                            .set_text("Hermes could not complete the request");
+                    }
+                    agent_render_chat(&ui_for_receiver);
+                    agent_render_history(&ui_for_receiver);
                 }
             }
         }
-        glib::ControlFlow::Continue
     });
 
-    let session_for_prompt = session;
-    send.connect_clicked(move |button| {
-        let value = prompt.text().trim().to_string();
-        if value.is_empty() || !button.is_sensitive() {
-            return;
-        }
-        button.set_sensitive(false);
-        status.set_text("Hermes is thinking…");
-        let sender_for_worker = sender.clone();
-        let session = session_for_prompt.clone();
-        thread::spawn(move || {
-            let command = if crate::system::command_available("hermes") {
-                "hermes"
-            } else if crate::system::command_available("hermes-agent") {
-                "hermes-agent"
-            } else {
-                let _ = sender_for_worker.send(Err(
-                    "Hermes Agent is not installed. Install Hermes, then retry.".to_string(),
-                ));
+    let submit: Rc<dyn Fn()> = {
+        let ui = ui.clone();
+        let sender = sender.clone();
+        Rc::new(move || {
+            let value = ui.prompt.text().trim().to_string();
+            if value.is_empty() || !ui.send.is_sensitive() {
+                return;
+            }
+            if ui.active.borrow().is_none() {
+                agent_new_conversation(&ui, None);
+            }
+            let Some(id) = ui.active.borrow().clone() else {
                 return;
             };
-            let mut args = Vec::new();
-            if let Some(session) = session.as_deref() {
-                args.extend(["--resume", session]);
-            }
-            args.extend(["-z", value.as_str()]);
-            let result = crate::system::run_with_timeout(command, &args, Duration::from_secs(90));
-            let response = match result {
-                Ok(output) if output.status == Some(0) && !output.stdout.trim().is_empty() => {
-                    Ok(output.stdout)
+            let session = ui
+                .conversations
+                .borrow()
+                .iter()
+                .find(|conversation| conversation.id == id)
+                .and_then(|conversation| conversation.hermes_session.clone());
+            if let Some(conversation) = ui
+                .conversations
+                .borrow_mut()
+                .iter_mut()
+                .find(|conversation| conversation.id == id)
+            {
+                if conversation.title == "New conversation" {
+                    conversation.title = value.chars().take(42).collect();
                 }
-                Ok(output) if output.timed_out => Err(
-                    "Hermes did not respond within 90 seconds. Check Hermes status and retry."
-                        .to_string(),
-                ),
-                Ok(output) => Err(if output.stderr.is_empty() {
-                    format!("Hermes exited with status {:?}.", output.status)
-                } else {
-                    format!("Hermes: {}", output.stderr)
-                }),
-                Err(error) => Err(format!("Could not run Hermes: {error}")),
-            };
-            let _ = sender_for_worker.send(response);
-        });
-        prompt.set_text("");
+                conversation.messages.push(crate::agent::Message {
+                    role: "user".to_string(),
+                    text: value.clone(),
+                });
+                let _ = crate::agent::save_history(&ui.paths, &ui.conversations.borrow());
+            }
+            agent_render_chat(&ui);
+            agent_render_history(&ui);
+            ui.prompt.set_text("");
+            ui.send.set_sensitive(false);
+            ui.status.set_text("Hermes is thinking…");
+            let sender_for_worker = sender.clone();
+            let sender_for_error = sender.clone();
+            thread::spawn(move || {
+                let id_for_callback = id.clone();
+                let result = crate::hermes::run_prompt_best_effort_async(
+                    value,
+                    session.as_deref(),
+                    move |event| {
+                        let _ = sender_for_worker.send_blocking((id_for_callback.clone(), event));
+                    },
+                );
+                if let Err(error) = result {
+                    let _ = sender_for_error.send_blocking((
+                        id,
+                        crate::hermes::HermesEvent::Diagnostic(format!("{error}")),
+                    ));
+                    let _ = sender_for_error.send_blocking((
+                        String::new(),
+                        crate::hermes::HermesEvent::Finished(crate::hermes::HermesExit {
+                            status: None,
+                            success: false,
+                        }),
+                    ));
+                }
+            });
+        })
+    };
+    let submit_for_click = submit.clone();
+    ui.send.connect_clicked(move |_| submit_for_click());
+    let submit_for_enter = submit.clone();
+    ui.prompt.connect_activate(move |_| submit_for_enter());
+
+    let ui_for_new = ui.clone();
+    ui.new_chat
+        .connect_clicked(move |_| agent_new_conversation(&ui_for_new, None));
+    let ui_for_history = ui.clone();
+    ui.history.connect_row_selected(move |_, row| {
+        if let Some(row) = row {
+            agent_new_conversation(&ui_for_history, Some(row.widget_name().to_string()));
+        }
     });
-    window.present();
 }
 
 pub fn run_settings(paths: XdgPaths) -> Result<()> {
@@ -1916,6 +2232,8 @@ fn activate_item(
     status: &Label,
     animation: &Rc<RefCell<Option<glib::SourceId>>>,
     action_sender: &async_channel::Sender<anyhow::Result<Option<String>>>,
+    agent_stack: &Stack,
+    agent_ui: &AgentUi,
     item: Item,
 ) {
     match item.target {
@@ -1926,8 +2244,10 @@ fn activate_item(
         Target::Notice(message) => set_launcher_status(status, &message),
         target => {
             if let Target::Action { id, args, .. } = &target {
-                if id == "open-agent" {
-                    open_agent_window(window, args.first().cloned());
+                if id == "open-agent" || id == "open-hermes" {
+                    agent_new_conversation(agent_ui, args.first().cloned());
+                    agent_stack.set_visible_child_name("agent");
+                    agent_ui.prompt.grab_focus();
                     return;
                 }
             }
@@ -2453,7 +2773,23 @@ fn build_window(
     footer.set_halign(Align::End);
     footer.add_css_class("footer-hint");
     root.append(&footer);
-    window.set_child(Some(&root));
+    let (agent_root, agent_ui) = build_agent_view(&paths);
+    connect_agent_actions(&agent_ui);
+    let agent_stack = Stack::new();
+    agent_stack.set_hexpand(true);
+    agent_stack.set_vexpand(true);
+    agent_stack.set_transition_type(StackTransitionType::SlideLeftRight);
+    agent_stack.set_transition_duration(160);
+    agent_stack.add_named(&root, Some("launcher"));
+    agent_stack.add_named(&agent_root, Some("agent"));
+    agent_stack.set_visible_child_name("launcher");
+    let agent_stack_for_back = agent_stack.clone();
+    let entry_for_agent_back = entry.clone();
+    agent_ui.back.connect_clicked(move |_| {
+        agent_stack_for_back.set_visible_child_name("launcher");
+        entry_for_agent_back.grab_focus();
+    });
+    window.set_child(Some(&agent_stack));
 
     let items = Rc::new(RefCell::new(Vec::<Item>::new()));
     let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
@@ -2639,6 +2975,8 @@ fn build_window(
     let status_for_enter = status.clone();
     let animation_for_enter = animation.clone();
     let action_sender_for_enter = action_sender.clone();
+    let agent_stack_for_enter = agent_stack.clone();
+    let agent_ui_for_enter = agent_ui.clone();
     let previews_for_enter = previews.clone();
     let preview_generation_for_enter = preview_load_generation.clone();
     let cursor_index_for_enter = cursor_index.clone();
@@ -2702,6 +3040,8 @@ fn build_window(
                 &status_for_enter,
                 &animation_for_enter,
                 &action_sender_for_enter,
+                &agent_stack_for_enter,
+                &agent_ui_for_enter,
                 item,
             );
         }
@@ -2715,6 +3055,8 @@ fn build_window(
     let status_for_activation = status.clone();
     let animation_for_activation = animation.clone();
     let action_sender_for_activation = action_sender.clone();
+    let agent_stack_for_activation = agent_stack.clone();
+    let agent_ui_for_activation = agent_ui.clone();
     let previews_for_activation = previews.clone();
     let preview_generation_for_activation = preview_load_generation.clone();
     let cursor_index_for_activation = cursor_index.clone();
@@ -2782,6 +3124,8 @@ fn build_window(
             &status_for_activation,
             &animation_for_activation,
             &action_sender_for_activation,
+            &agent_stack_for_activation,
+            &agent_ui_for_activation,
             item,
         );
     });
@@ -2790,6 +3134,8 @@ fn build_window(
     let entry_for_shortcut = entry.clone();
     let window_for_escape = window.clone();
     let animation_for_escape = animation.clone();
+    let agent_stack_for_escape = agent_stack.clone();
+    let entry_for_agent_escape = entry.clone();
     let list_for_navigation = list.clone();
     let items_for_preview = items.clone();
     let paths_for_preview = paths.clone();
@@ -2828,7 +3174,12 @@ fn build_window(
             return glib::Propagation::Proceed;
         }
         if key == gdk::Key::Escape {
-            animate_hide(&window_for_escape, &animation_for_escape);
+            if agent_stack_for_escape.visible_child_name().as_deref() == Some("agent") {
+                agent_stack_for_escape.set_visible_child_name("launcher");
+                entry_for_agent_escape.grab_focus();
+            } else {
+                animate_hide(&window_for_escape, &animation_for_escape);
+            }
             return glib::Propagation::Stop;
         }
         if key == gdk::Key::space && state.contains(gdk::ModifierType::CONTROL_MASK) {
