@@ -1069,6 +1069,443 @@ window.settings-window.settings-theme-system {
 }
 "#;
 
+#[derive(Clone, Copy)]
+struct ThemePalette {
+    app_background: &'static str,
+    surface: &'static str,
+    surface_hover: &'static str,
+    surface_active: &'static str,
+    surface_selected: &'static str,
+    input_background: &'static str,
+    border: &'static str,
+    border_subtle: &'static str,
+    text_primary: &'static str,
+    text_secondary: &'static str,
+    text_muted: &'static str,
+    accent: &'static str,
+    accent_hover: &'static str,
+    accent_foreground: &'static str,
+    success: &'static str,
+    warning: &'static str,
+    danger: &'static str,
+    code_background: &'static str,
+    code_foreground: &'static str,
+    code_keyword: &'static str,
+    code_string: &'static str,
+    code_comment: &'static str,
+    scrollbar: &'static str,
+    light: bool,
+}
+
+impl ThemePalette {
+    fn for_mode(mode: &str) -> Self {
+        if theme_class(mode) == "light" {
+            Self {
+                app_background: "#f4f5f6",
+                surface: "#ffffff",
+                surface_hover: "#edf2f1",
+                surface_active: "#e4eceb",
+                surface_selected: "#d7eae6",
+                input_background: "#ffffff",
+                border: "#cbd5d9",
+                border_subtle: "rgba(32, 35, 38, 0.16)",
+                text_primary: "#172027",
+                text_secondary: "#38515b",
+                text_muted: "#53636d",
+                accent: "#26796d",
+                accent_hover: "#1f655c",
+                accent_foreground: "#ffffff",
+                success: "#26796d",
+                warning: "#936900",
+                danger: "#b4232d",
+                code_background: "#f8fafb",
+                code_foreground: "#26363e",
+                code_keyword: "#155a51",
+                code_string: "#7a4f00",
+                code_comment: "#65727a",
+                scrollbar: "#aebbc0",
+                light: true,
+            }
+        } else {
+            Self {
+                app_background: "#202327",
+                surface: "#252a2f",
+                surface_hover: "#2c353a",
+                surface_active: "#30363d",
+                surface_selected: "#38444f",
+                input_background: "#2a2e33",
+                border: "#3b434b",
+                border_subtle: "rgba(255, 255, 255, 0.12)",
+                text_primary: "#f3f5f7",
+                text_secondary: "#c8d3d4",
+                text_muted: "#9da8b0",
+                accent: "#82c7bb",
+                accent_hover: "#a6ded3",
+                accent_foreground: "#172027",
+                success: "#82c7bb",
+                warning: "#f2c879",
+                danger: "#ef6b73",
+                code_background: "#111315",
+                code_foreground: "#dce5e8",
+                code_keyword: "#d9b7ff",
+                code_string: "#f2c879",
+                code_comment: "#a7b6bf",
+                scrollbar: "#4b555d",
+                light: false,
+            }
+        }
+    }
+
+    fn css(self) -> String {
+        let css = format!(
+            r#"
+@define-color proton-app-background {app_background};
+@define-color proton-surface {surface};
+@define-color proton-surface-hover {surface_hover};
+@define-color proton-surface-active {surface_active};
+@define-color proton-surface-selected {surface_selected};
+@define-color proton-input-background {input_background};
+@define-color proton-border {border};
+@define-color proton-border-subtle {border_subtle};
+@define-color proton-text-primary {text_primary};
+@define-color proton-text-secondary {text_secondary};
+@define-color proton-text-muted {text_muted};
+@define-color proton-accent {accent};
+@define-color proton-accent-hover {accent_hover};
+@define-color proton-accent-foreground {accent_foreground};
+@define-color proton-success {success};
+@define-color proton-warning {warning};
+@define-color proton-danger {danger};
+@define-color proton-code-background {code_background};
+@define-color proton-code-foreground {code_foreground};
+@define-color proton-code-keyword {code_keyword};
+@define-color proton-code-string {code_string};
+@define-color proton-code-comment {code_comment};
+@define-color proton-scrollbar {scrollbar};
+
+/* Theme tokens are intentionally applied after the legacy layout CSS.  This
+ * keeps the layout stable while ensuring every large surface derives from
+ * one palette and can be swapped atomically at runtime. */
+window.proton-window,
+window.proton-window .launcher-root,
+window.proton-window .dashboard,
+window.proton-window .agent-root,
+window.proton-window .agent-content,
+window.proton-window .category-row,
+window.proton-window .footer-bar,
+window.proton-window list.result-list,
+window.proton-window scrolledwindow,
+window.proton-window scrolledwindow > viewport {{
+    background-color: @proton-app-background;
+    color: @proton-text-primary;
+}}
+
+window.proton-window entry.search-entry {{
+    background-color: @proton-input-background;
+    color: @proton-text-primary;
+    caret-color: @proton-accent;
+    border-color: @proton-border;
+}}
+window.proton-window entry.search-entry text,
+window.proton-window entry.search-entry placeholder,
+window.proton-window entry.search-entry text.placeholder,
+window.proton-window entry.search-entry > text > placeholder {{
+    color: @proton-text-primary;
+}}
+window.proton-window entry.search-entry placeholder,
+window.proton-window entry.search-entry text.placeholder,
+window.proton-window entry.search-entry > text > placeholder {{
+    color: @proton-text-muted;
+}}
+window.proton-window entry.search-entry:focus {{
+    border-color: @proton-accent;
+    box-shadow: inset 0 0 0 1px @proton-accent;
+}}
+window.proton-window entry.search-entry selection {{
+    color: @proton-accent-foreground;
+    background-color: @proton-accent;
+}}
+
+window.proton-window .dashboard-time,
+window.proton-window .dashboard-card-value,
+window.proton-window .result-title,
+window.proton-window .empty-state-title,
+window.proton-window .preview-title,
+window.proton-window .quick-side-preview-title {{ color: @proton-text-primary; }}
+window.proton-window .dashboard-date,
+window.proton-window .dashboard-card-title,
+window.proton-window .result-subtitle,
+window.proton-window .status-label,
+window.proton-window .footer-hint,
+window.proton-window .preview-hint,
+window.proton-window .empty-state-hint,
+window.proton-window .quick-side-preview-meta {{ color: @proton-text-muted; }}
+window.proton-window .dashboard-kicker,
+window.proton-window .dashboard-card-icon,
+window.proton-window .category-icon {{ color: @proton-accent; }}
+
+window.proton-window button.dashboard-card,
+window.proton-window button.dashboard-action {{
+    color: @proton-text-primary;
+    background-color: @proton-surface;
+    border-color: @proton-border;
+}}
+window.proton-window button.dashboard-card:hover,
+window.proton-window button.dashboard-card:focus,
+window.proton-window button.dashboard-action:hover,
+window.proton-window button.dashboard-action:focus {{
+    color: @proton-text-primary;
+    background-color: @proton-surface-hover;
+    border-color: @proton-accent;
+}}
+window.proton-window button.dashboard-card label,
+window.proton-window button.dashboard-action label {{
+    color: @proton-text-primary;
+}}
+window.proton-window button.dashboard-card:hover label,
+window.proton-window button.dashboard-card:focus label,
+window.proton-window button.dashboard-action:hover label,
+window.proton-window button.dashboard-action:focus label {{
+    color: @proton-text-primary;
+}}
+
+window.proton-window button.category-chip {{
+    color: @proton-text-muted;
+    background-color: transparent;
+}}
+window.proton-window button.category-chip:hover {{
+    color: @proton-text-primary;
+    background-color: @proton-surface-hover;
+}}
+window.proton-window button.category-chip.active,
+window.proton-window button.category-chip.active:hover {{
+    color: @proton-accent-foreground;
+    background-color: @proton-surface-selected;
+}}
+window.proton-window button.category-chip.active label,
+window.proton-window button.category-chip.active:hover label {{
+    color: @proton-accent-foreground;
+}}
+
+window.proton-window row.result-row,
+window.proton-window row.source-row {{
+    color: @proton-text-primary;
+    background-color: transparent;
+    border-color: transparent;
+}}
+window.proton-window row.result-row:hover,
+window.proton-window row.source-row:hover {{
+    background-color: @proton-surface-hover;
+    border-color: @proton-border;
+}}
+window.proton-window list.result-list > row.result-row:selected {{
+    background-color: @proton-surface-active;
+    border-color: @proton-border;
+}}
+window.proton-window list.result-list > row.result-row.cursor-row,
+window.proton-window list.result-list > row.result-row.cursor-row:selected,
+window.proton-window list.result-list > row.result-row.cursor-row:focus {{
+    color: @proton-text-primary;
+    background-color: @proton-surface-selected;
+    border-color: @proton-accent;
+    box-shadow: inset 3px 0 0 @proton-accent;
+}}
+window.proton-window list.result-list > row.result-row.multi-selected:selected:not(.cursor-row) {{
+    background-color: @proton-surface-active;
+    border-color: @proton-accent;
+}}
+window.proton-window list.result-list > row.result-row:selected label.result-title,
+window.proton-window list.result-list > row.result-row.cursor-row label.result-title {{
+    color: @proton-text-primary;
+}}
+window.proton-window list.result-list > row.result-row:selected label.result-subtitle,
+window.proton-window list.result-list > row.result-row.cursor-row label.result-subtitle {{
+    color: @proton-text-secondary;
+}}
+window.proton-window .source-badge,
+window.proton-window .badge-file,
+window.proton-window .badge-folder,
+window.proton-window .badge-image,
+window.proton-window .badge-code,
+window.proton-window .badge-command,
+window.proton-window .badge-setting,
+window.proton-window .badge-source,
+window.proton-window .badge-clipboard {{
+    color: @proton-text-secondary;
+    background-color: @proton-surface-active;
+}}
+
+window.proton-window .quick-side-preview {{
+    background-color: @proton-app-background;
+    border-left-color: @proton-border;
+}}
+window.proton-window .quick-side-preview-surface {{
+    background-color: @proton-surface;
+}}
+window.proton-window .quick-side-preview-detail {{ color: @proton-text-secondary; }}
+window.proton-window textview.quick-side-preview-text,
+window.proton-window textview.quick-side-preview-text text {{
+    color: @proton-code-foreground;
+    background-color: transparent;
+}}
+window.proton-window textview.agent-transcript,
+window.proton-window textview.agent-transcript text {{
+    color: @proton-text-primary;
+    background-color: @proton-surface;
+    border-color: @proton-border;
+}}
+
+window.proton-window .status-panel {{
+    color: @proton-text-primary;
+    background-color: @proton-surface;
+    border-color: @proton-border;
+}}
+window.proton-window .status-heading,
+window.proton-window .status-value,
+window.proton-window .status-property-value {{ color: @proton-text-primary; }}
+window.proton-window .status-subheading,
+window.proton-window .status-property-label,
+window.proton-window .status-summary {{ color: @proton-text-muted; }}
+window.proton-window .status-close {{ color: @proton-text-secondary; }}
+window.proton-window .status-close:hover {{
+    color: @proton-text-primary;
+    background-color: @proton-surface-hover;
+}}
+window.proton-window .status-progress trough {{ background-color: @proton-surface-active; }}
+window.proton-window .status-progress progress {{ background-color: @proton-accent; }}
+
+window.proton-window .agent-sidebar {{ background-color: @proton-surface; }}
+window.proton-window .agent-history-list row:hover,
+window.proton-window .agent-history-list row:selected {{
+    color: @proton-text-primary;
+    background-color: @proton-surface-hover;
+}}
+window.proton-window .agent-user {{
+    color: @proton-accent-foreground;
+    background-color: @proton-accent;
+}}
+window.proton-window .agent-assistant,
+window.proton-window .agent-input-row {{
+    color: @proton-text-primary;
+    background-color: @proton-surface;
+    border-color: @proton-border;
+}}
+window.proton-window .agent-empty,
+window.proton-window .agent-status {{ color: @proton-text-muted; }}
+
+window.settings-window,
+window.settings-window .settings-shell {{
+    color: @proton-text-primary;
+    background-color: @proton-app-background;
+}}
+window.settings-window .settings-sidebar {{ background-color: @proton-surface; }}
+window.settings-window .settings-sidebar-title,
+window.settings-window .settings-heading,
+window.settings-window .settings-label,
+window.settings-window .settings-section-title {{ color: @proton-text-primary; }}
+window.settings-window .settings-help,
+window.settings-window .result-subtitle {{ color: @proton-text-muted; }}
+window.settings-window stacksidebar row {{ color: @proton-text-muted; }}
+window.settings-window stacksidebar row label {{ color: @proton-text-muted; }}
+window.settings-window stacksidebar row:hover {{ background-color: @proton-surface-hover; }}
+window.settings-window stacksidebar row:selected {{
+    color: @proton-accent-foreground;
+    background-color: @proton-surface-selected;
+}}
+window.settings-window stacksidebar row:selected label {{ color: @proton-accent-foreground; }}
+window.settings-window entry,
+window.settings-window spinbutton,
+window.settings-window combobox button {{
+    color: @proton-text-primary;
+    background-color: @proton-input-background;
+    border-color: @proton-border;
+}}
+window.settings-window entry text,
+window.settings-window spinbutton text {{ color: @proton-text-primary; }}
+window.settings-window button,
+window.settings-window button label {{ color: @proton-text-primary; }}
+window.settings-window button:hover {{ background-color: @proton-surface-hover; }}
+
+window.proton-image-preview,
+window.proton-image-preview .preview-shell {{
+    color: @proton-text-primary;
+    background-color: @proton-app-background;
+    border-color: @proton-border;
+}}
+window.proton-image-preview .preview-surface {{
+    background-color: @proton-surface;
+    border-color: @proton-border;
+}}
+window.proton-image-preview .preview-window-title {{ color: @proton-text-primary; }}
+window.proton-image-preview .preview-close {{ color: @proton-text-secondary; }}
+window.proton-image-preview .preview-close:hover {{
+    color: @proton-text-primary;
+    background-color: @proton-surface-hover;
+}}
+window.proton-image-preview .preview-loading,
+window.proton-image-preview .preview-error {{ color: @proton-text-muted; }}
+
+scrollbar slider {{ background-color: @proton-scrollbar; }}
+"#,
+            app_background = self.app_background,
+            surface = self.surface,
+            surface_hover = self.surface_hover,
+            surface_active = self.surface_active,
+            surface_selected = self.surface_selected,
+            input_background = self.input_background,
+            border = self.border,
+            border_subtle = self.border_subtle,
+            text_primary = self.text_primary,
+            text_secondary = self.text_secondary,
+            text_muted = self.text_muted,
+            accent = self.accent,
+            accent_hover = self.accent_hover,
+            accent_foreground = self.accent_foreground,
+            success = self.success,
+            warning = self.warning,
+            danger = self.danger,
+            code_background = self.code_background,
+            code_foreground = self.code_foreground,
+            code_keyword = self.code_keyword,
+            code_string = self.code_string,
+            code_comment = self.code_comment,
+            scrollbar = self.scrollbar,
+        );
+        css.replace(
+            "window.proton-window",
+            "window.proton-window.proton-theme-active",
+        )
+        .replace(
+            "window.settings-window",
+            "window.settings-window.proton-theme-active",
+        )
+    }
+
+    fn syntax_rgb(self, color: Color) -> (u8, u8, u8) {
+        let (r, g, b) = (color.r, color.g, color.b);
+        let luminance = 0.2126 * f64::from(r) + 0.7152 * f64::from(g) + 0.0722 * f64::from(b);
+        if self.light {
+            if luminance > 180.0 {
+                (
+                    r.saturating_sub(80),
+                    g.saturating_sub(80),
+                    b.saturating_sub(80),
+                )
+            } else {
+                (r, g, b)
+            }
+        } else if luminance < 95.0 {
+            (
+                r.saturating_add(70),
+                g.saturating_add(70),
+                b.saturating_add(70),
+            )
+        } else {
+            (r, g, b)
+        }
+    }
+}
+
 pub fn run(paths: XdgPaths) -> Result<()> {
     let Some((socket_guard, commands)) = start_ipc(&paths, true) else {
         return Ok(());
@@ -1575,7 +2012,10 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             .default_height(700)
             .build();
         window.add_css_class("settings-window");
-        install_css();
+        window.add_css_class("proton-theme-active");
+        window.add_css_class(theme_class(&current.theme_mode));
+        window.add_css_class(&format!("settings-theme-{}", theme_class(&current.theme_mode)));
+        let css_provider = Rc::new(RefCell::new(install_css(&current.theme_mode)));
         let root = GtkBox::new(Orientation::Horizontal, 0);
         root.add_css_class("settings-shell");
 
@@ -2213,6 +2653,8 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         let paths_for_save = paths.clone();
         let home_filter_order_for_save = home_filter_order.clone();
         let home_filter_checks_for_save = home_filter_checks.clone();
+        let window_for_save = window.clone();
+        let css_provider_for_save = css_provider.clone();
         save.connect_clicked(move |_| {
             let mut next = current.clone();
             next.run_on_startup = startup.is_active();
@@ -2308,6 +2750,18 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
                 eprintln!("ProtonSearch: could not save settings: {error:#}");
                 return;
             }
+            window_for_save.remove_css_class("dark");
+            window_for_save.remove_css_class("light");
+            window_for_save.remove_css_class("system");
+            window_for_save.remove_css_class("settings-theme-dark");
+            window_for_save.remove_css_class("settings-theme-light");
+            window_for_save.remove_css_class("settings-theme-system");
+            window_for_save.add_css_class(theme_class(&next.theme_mode));
+            window_for_save.add_css_class(&format!(
+                "settings-theme-{}",
+                theme_class(&next.theme_mode)
+            ));
+            replace_css_provider(&css_provider_for_save, &next.theme_mode);
             let mut startup_update_failed = false;
             if next.run_on_startup != current.run_on_startup {
                 if let Err(error) = sync_startup_service(next.run_on_startup) {
@@ -3236,11 +3690,13 @@ struct SidePreviewHandle {
     text_scroll: ScrolledWindow,
     title: Label,
     status: Label,
+    light_theme: Rc<Cell<bool>>,
+    document: Rc<RefCell<Option<PreviewDocument>>>,
 }
 
 type SidePreviewState = Rc<RefCell<Option<SidePreviewHandle>>>;
 
-fn build_side_preview() -> SidePreviewHandle {
+fn build_side_preview(light_theme: bool) -> SidePreviewHandle {
     let panel = GtkBox::new(Orientation::Vertical, 10);
     panel.add_css_class("quick-side-preview");
     panel.set_width_request(320);
@@ -3316,6 +3772,8 @@ fn build_side_preview() -> SidePreviewHandle {
         text_scroll,
         title,
         status,
+        light_theme: Rc::new(Cell::new(light_theme)),
+        document: Rc::new(RefCell::new(None)),
     }
 }
 
@@ -3323,6 +3781,7 @@ fn preview_style_tag(
     buffer: &TextBuffer,
     cache: &mut HashMap<String, TextTag>,
     style: PreviewTextStyle,
+    palette: ThemePalette,
 ) -> Option<TextTag> {
     let key = format!("{style:?}");
     if let Some(tag) = cache.get(&key) {
@@ -3333,34 +3792,40 @@ fn preview_style_tag(
     match style {
         PreviewTextStyle::Normal => {}
         PreviewTextStyle::Heading => {
-            tag.set_foreground(Some("#82c7bb"));
+            tag.set_foreground(Some(palette.accent));
             tag.set_weight(700);
             tag.set_size_points(12.5);
         }
         PreviewTextStyle::Strong => {
-            tag.set_foreground(Some("#f3f5f7"));
+            tag.set_foreground(Some(palette.text_primary));
             tag.set_weight(700);
         }
         PreviewTextStyle::Emphasis => {
-            tag.set_foreground(Some("#d9b7ff"));
+            tag.set_foreground(Some(palette.code_keyword));
             tag.set_style(gtk4::pango::Style::Italic);
         }
         PreviewTextStyle::InlineCode => {
-            tag.set_foreground(Some("#f2c879"));
-            tag.set_background(Some("rgba(242, 200, 121, 0.10)"));
+            tag.set_foreground(Some(palette.code_string));
+            tag.set_background(Some(palette.surface_active));
         }
         PreviewTextStyle::Link => {
-            tag.set_foreground(Some("#8fc7ff"));
+            tag.set_foreground(Some(palette.accent_hover));
             tag.set_underline(gtk4::pango::Underline::Single);
         }
         PreviewTextStyle::Quote => {
-            tag.set_foreground(Some("#a7b6bf"));
+            tag.set_foreground(Some(palette.code_comment));
             tag.set_style(gtk4::pango::Style::Italic);
         }
         PreviewTextStyle::ListMarker => {
-            tag.set_foreground(Some("#82c7bb"));
+            tag.set_foreground(Some(palette.accent));
         }
         PreviewTextStyle::Syntax { red, green, blue } => {
+            let (red, green, blue) = palette.syntax_rgb(Color {
+                r: red,
+                g: green,
+                b: blue,
+                a: 255,
+            });
             tag.set_foreground(Some(&format!("#{red:02x}{green:02x}{blue:02x}")));
         }
     }
@@ -3375,9 +3840,14 @@ fn preview_style_tag(
 fn apply_preview_document(preview: &SidePreviewHandle, document: &PreviewDocument) {
     let buffer = TextBuffer::new(None);
     let mut tags = HashMap::<String, TextTag>::new();
+    let palette = ThemePalette::for_mode(if preview.light_theme.get() {
+        "light"
+    } else {
+        "dark"
+    });
     let mut iter = buffer.end_iter();
     for span in &document.spans {
-        if let Some(tag) = preview_style_tag(&buffer, &mut tags, span.style) {
+        if let Some(tag) = preview_style_tag(&buffer, &mut tags, span.style, palette) {
             buffer.insert_with_tags(&mut iter, &span.text, &[&tag]);
         } else {
             buffer.insert(&mut iter, &span.text);
@@ -3393,6 +3863,17 @@ fn apply_preview_document(preview: &SidePreviewHandle, document: &PreviewDocumen
     vertical.set_value(vertical.lower());
     let horizontal = preview.text_scroll.hadjustment();
     horizontal.set_value(horizontal.lower());
+}
+
+fn set_side_preview_theme(side: &SidePreviewState, light: bool) {
+    let Some(preview) = side.borrow().as_ref().cloned() else {
+        return;
+    };
+    preview.light_theme.set(light);
+    let document = preview.document.borrow().as_ref().cloned();
+    if let Some(document) = document {
+        apply_preview_document(&preview, &document);
+    }
 }
 
 fn preview_source_for_item(paths: &XdgPaths, item: &Item) -> Option<PreviewSource> {
@@ -4171,6 +4652,7 @@ fn open_side_preview(
     preview.status.set_text("Loading preview…");
     preview.status.remove_css_class("preview-error");
     preview.status.add_css_class("preview-loading");
+    *preview.document.borrow_mut() = None;
     preview.image.set_paintable(None::<&gdk::Paintable>);
     preview.image.set_visible(true);
     preview.detail.set_visible(false);
@@ -4247,6 +4729,7 @@ fn open_file_side_preview(
     preview.status.set_text("Reading a bounded preview…");
     preview.status.remove_css_class("preview-error");
     preview.status.add_css_class("preview-loading");
+    *preview.document.borrow_mut() = None;
     preview.image.set_paintable(None::<&gdk::Paintable>);
     preview.image.set_visible(false);
     preview.detail.set_visible(false);
@@ -4277,6 +4760,7 @@ fn open_file_side_preview(
         };
         match result {
             Ok(document) if document.kind == PreviewKind::Metadata => {
+                *preview.document.borrow_mut() = Some(document.clone());
                 preview
                     .meta
                     .set_text(&format!("{} • {}", document.label, document.metadata));
@@ -4292,6 +4776,7 @@ fn open_file_side_preview(
                 preview.status.remove_css_class("preview-error");
             }
             Ok(document) => {
+                *preview.document.borrow_mut() = Some(document.clone());
                 preview
                     .meta
                     .set_text(&format!("{} • {}", document.label, document.metadata));
@@ -4670,8 +5155,9 @@ fn build_window(
     window.set_decorated(false);
     window.set_resizable(false);
     window.add_css_class("proton-window");
+    window.add_css_class("proton-theme-active");
     window.add_css_class(theme_class(&linux_settings.theme_mode));
-    install_css();
+    let css_provider = Rc::new(RefCell::new(install_css(&linux_settings.theme_mode)));
 
     let root = GtkBox::new(Orientation::Vertical, 10);
     root.add_css_class("launcher-root");
@@ -4862,6 +5348,7 @@ fn build_window(
     status.set_max_width_chars(34);
     status.add_css_class("status-label");
     let footer_bar = GtkBox::new(Orientation::Horizontal, 8);
+    footer_bar.add_css_class("footer-bar");
     footer_bar.set_hexpand(true);
     footer_bar.append(&status);
     footer_bar.append(&footer);
@@ -4883,7 +5370,7 @@ fn build_window(
         entry_for_agent_back.grab_focus();
     });
     root.set_width_request(linux_settings.window_width.clamp(480, 1600) as i32);
-    let side_handle = build_side_preview();
+    let side_handle = build_side_preview(theme_class(&linux_settings.theme_mode) == "light");
     let side_panel = side_handle.panel.clone();
     let side_previews: SidePreviewState = Rc::new(RefCell::new(Some(side_handle)));
     let launcher_shell = GtkBox::new(Orientation::Horizontal, 0);
@@ -5122,6 +5609,8 @@ fn build_window(
     let paths_for_commands = paths.clone();
     let settings_for_commands = settings_state.clone();
     let previews_for_commands = previews.clone();
+    let side_previews_for_commands = side_previews.clone();
+    let css_provider_for_commands = css_provider.clone();
     let root_for_commands = root.clone();
     let base_width_for_commands = base_width.clone();
     let base_height_for_commands = base_height.clone();
@@ -5146,7 +5635,12 @@ fn build_window(
                     window_for_commands.remove_css_class("light");
                     window_for_commands.remove_css_class("system");
                     window_for_commands.add_css_class(theme_class(&next_settings.theme_mode));
+                    replace_css_provider(&css_provider_for_commands, &next_settings.theme_mode);
                     set_preview_theme(&previews_for_commands, &next_settings.theme_mode);
+                    set_side_preview_theme(
+                        &side_previews_for_commands,
+                        theme_class(&next_settings.theme_mode) == "light",
+                    );
                     window_for_commands.set_default_size(
                         next_settings.window_width.clamp(480, 1600) as i32,
                         next_settings.window_height.clamp(420, 1200) as i32,
@@ -6178,15 +6672,28 @@ fn result_asset_name(item: &Item) -> Option<&'static str> {
     }
 }
 
-fn install_css() {
+fn install_css(theme_mode: &str) -> gtk4::CssProvider {
     let provider = gtk4::CssProvider::new();
-    provider.load_from_data(LAUNCHER_CSS);
+    let palette = ThemePalette::for_mode(theme_mode);
+    // Keep the token definitions and selectors after the legacy layout rules
+    // so the active palette is the final cascade for every themed surface.
+    let css = format!("{}\n{}", LAUNCHER_CSS, palette.css());
+    provider.load_from_data(&css);
     if let Some(display) = gdk::Display::default() {
         gtk4::style_context_add_provider_for_display(
             &display,
             &provider,
             gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
+    }
+    provider
+}
+
+fn replace_css_provider(state: &Rc<RefCell<gtk4::CssProvider>>, theme_mode: &str) {
+    let next = install_css(theme_mode);
+    let previous = state.replace(next);
+    if let Some(display) = gdk::Display::default() {
+        gtk4::style_context_remove_provider_for_display(&display, &previous);
     }
 }
 
