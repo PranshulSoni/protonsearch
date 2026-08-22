@@ -21,23 +21,27 @@ use gtk4::{
     EventControllerScrollFlags, GestureClick, Grid, Image, Label, ListBox, ListBoxRow,
     MessageDialog, MessageType, Orientation, Picture, PolicyType, ProgressBar, PropagationPhase,
     ResponseType, Revealer, RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton,
-    Stack, StackSidebar, StackTransitionType,
+    Stack, StackSidebar, StackTransitionType, TextBuffer, TextTag, TextView, WrapMode,
 };
+use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
-use std::fs;
-use std::io::{BufRead, Cursor, Write};
+use std::fs::{self, File};
+use std::io::{BufRead, Cursor, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, OnceLock,
 };
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
+use syntect::easy::HighlightLines;
+use syntect::highlighting::{Color, ThemeSet};
+use syntect::parsing::{SyntaxReference, SyntaxSet};
 
 const APPLICATION_ID: &str = "com.protonsearch.Linux";
 const LAUNCHER_CSS: &str = r#"
@@ -973,6 +977,11 @@ entry.agent-prompt {
     font-weight: 700;
 }
 
+.quick-side-preview-meta {
+    color: #9da8b0;
+    font-size: 11px;
+}
+
 .quick-side-preview-surface {
     background-color: #111315;
     border-radius: 10px;
@@ -985,6 +994,22 @@ entry.agent-prompt {
     line-height: 1.35;
 }
 
+.quick-side-preview-viewport {
+    min-height: 180px;
+}
+
+textview.quick-side-preview-text,
+textview.quick-side-preview-text text {
+    background-color: transparent;
+    color: #dce5e8;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+textview.quick-side-preview-text {
+    padding: 8px;
+}
+
 window.proton-window.light .quick-side-preview {
     background-color: #f2f3f4;
     border-left-color: #d2d6da;
@@ -994,8 +1019,17 @@ window.proton-window.light .quick-side-preview-title {
     color: #202225;
 }
 
+window.proton-window.light .quick-side-preview-meta {
+    color: #65727a;
+}
+
 window.proton-window.light .quick-side-preview-detail {
     color: #4f5d65;
+}
+
+window.proton-window.light textview.quick-side-preview-text,
+window.proton-window.light textview.quick-side-preview-text text {
+    color: #26363e;
 }
 
 window.proton-window.light .quick-side-preview-surface {
@@ -3197,6 +3231,9 @@ struct SidePreviewHandle {
     panel: GtkBox,
     image: Picture,
     detail: Label,
+    meta: Label,
+    text_view: TextView,
+    text_scroll: ScrolledWindow,
     title: Label,
     status: Label,
 }
@@ -3209,11 +3246,18 @@ fn build_side_preview() -> SidePreviewHandle {
     panel.set_width_request(320);
     panel.set_hexpand(false);
     panel.set_vexpand(true);
-    let title = Label::new(Some("Image preview"));
+    let heading = GtkBox::new(Orientation::Vertical, 2);
+    let title = Label::new(Some("Preview"));
     title.set_halign(Align::Start);
     title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     title.add_css_class("quick-side-preview-title");
-    panel.append(&title);
+    heading.append(&title);
+    let meta = Label::new(Some("Select a result to inspect it here"));
+    meta.set_halign(Align::Start);
+    meta.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    meta.add_css_class("quick-side-preview-meta");
+    heading.append(&meta);
+    panel.append(&heading);
     let surface = GtkBox::new(Orientation::Vertical, 8);
     surface.add_css_class("quick-side-preview-surface");
     surface.set_hexpand(true);
@@ -3234,6 +3278,29 @@ fn build_side_preview() -> SidePreviewHandle {
     detail.add_css_class("quick-side-preview-detail");
     detail.set_visible(false);
     surface.append(&detail);
+    let text_view = TextView::new();
+    text_view.set_editable(false);
+    text_view.set_cursor_visible(false);
+    text_view.set_monospace(true);
+    text_view.set_wrap_mode(WrapMode::None);
+    text_view.set_left_margin(4);
+    text_view.set_right_margin(4);
+    text_view.set_top_margin(4);
+    text_view.set_bottom_margin(4);
+    text_view.add_css_class("quick-side-preview-text");
+    text_view.set_visible(false);
+    let text_scroll = ScrolledWindow::builder()
+        .child(&text_view)
+        .hexpand(true)
+        .vexpand(true)
+        .min_content_height(180)
+        .max_content_height(640)
+        .hscrollbar_policy(PolicyType::Automatic)
+        .vscrollbar_policy(PolicyType::Automatic)
+        .build();
+    text_scroll.add_css_class("quick-side-preview-viewport");
+    text_scroll.set_visible(false);
+    surface.append(&text_scroll);
     let status = Label::new(Some("Hold Alt to preview"));
     status.set_halign(Align::Center);
     status.add_css_class("preview-loading");
@@ -3244,9 +3311,88 @@ fn build_side_preview() -> SidePreviewHandle {
         panel,
         image,
         detail,
+        meta,
+        text_view,
+        text_scroll,
         title,
         status,
     }
+}
+
+fn preview_style_tag(
+    buffer: &TextBuffer,
+    cache: &mut HashMap<String, TextTag>,
+    style: PreviewTextStyle,
+) -> Option<TextTag> {
+    let key = format!("{style:?}");
+    if let Some(tag) = cache.get(&key) {
+        return Some(tag.clone());
+    }
+    let tag = TextTag::new(Some(&key));
+    tag.set_family(Some("monospace"));
+    match style {
+        PreviewTextStyle::Normal => {}
+        PreviewTextStyle::Heading => {
+            tag.set_foreground(Some("#82c7bb"));
+            tag.set_weight(700);
+            tag.set_size_points(12.5);
+        }
+        PreviewTextStyle::Strong => {
+            tag.set_foreground(Some("#f3f5f7"));
+            tag.set_weight(700);
+        }
+        PreviewTextStyle::Emphasis => {
+            tag.set_foreground(Some("#d9b7ff"));
+            tag.set_style(gtk4::pango::Style::Italic);
+        }
+        PreviewTextStyle::InlineCode => {
+            tag.set_foreground(Some("#f2c879"));
+            tag.set_background(Some("rgba(242, 200, 121, 0.10)"));
+        }
+        PreviewTextStyle::Link => {
+            tag.set_foreground(Some("#8fc7ff"));
+            tag.set_underline(gtk4::pango::Underline::Single);
+        }
+        PreviewTextStyle::Quote => {
+            tag.set_foreground(Some("#a7b6bf"));
+            tag.set_style(gtk4::pango::Style::Italic);
+        }
+        PreviewTextStyle::ListMarker => {
+            tag.set_foreground(Some("#82c7bb"));
+        }
+        PreviewTextStyle::Syntax { red, green, blue } => {
+            tag.set_foreground(Some(&format!("#{red:02x}{green:02x}{blue:02x}")));
+        }
+    }
+    if buffer.tag_table().add(&tag) {
+        cache.insert(key, tag.clone());
+        Some(tag)
+    } else {
+        None
+    }
+}
+
+fn apply_preview_document(preview: &SidePreviewHandle, document: &PreviewDocument) {
+    let buffer = TextBuffer::new(None);
+    let mut tags = HashMap::<String, TextTag>::new();
+    let mut iter = buffer.end_iter();
+    for span in &document.spans {
+        if let Some(tag) = preview_style_tag(&buffer, &mut tags, span.style) {
+            buffer.insert_with_tags(&mut iter, &span.text, &[&tag]);
+        } else {
+            buffer.insert(&mut iter, &span.text);
+        }
+    }
+    preview.text_view.set_buffer(Some(&buffer));
+    preview.text_view.set_wrap_mode(if document.wrap {
+        WrapMode::WordChar
+    } else {
+        WrapMode::None
+    });
+    let vertical = preview.text_scroll.vadjustment();
+    vertical.set_value(vertical.lower());
+    let horizontal = preview.text_scroll.hadjustment();
+    horizontal.set_value(horizontal.lower());
 }
 
 fn preview_source_for_item(paths: &XdgPaths, item: &Item) -> Option<PreviewSource> {
@@ -3260,6 +3406,567 @@ fn preview_source_for_item(paths: &XdgPaths, item: &Item) -> Option<PreviewSourc
         }),
         _ => None,
     }
+}
+
+const MAX_TEXT_PREVIEW_BYTES: usize = 512 * 1024;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PreviewKind {
+    Image,
+    Markdown,
+    Code,
+    Folder,
+    Metadata,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct LanguageSpec {
+    label: &'static str,
+    syntax_token: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PreviewTextStyle {
+    Normal,
+    Heading,
+    Strong,
+    Emphasis,
+    InlineCode,
+    Link,
+    Quote,
+    ListMarker,
+    Syntax { red: u8, green: u8, blue: u8 },
+}
+
+#[derive(Clone, Debug)]
+struct PreviewSpan {
+    text: String,
+    style: PreviewTextStyle,
+}
+
+#[derive(Clone, Debug)]
+struct PreviewDocument {
+    kind: PreviewKind,
+    label: String,
+    metadata: String,
+    path: String,
+    spans: Vec<PreviewSpan>,
+    wrap: bool,
+    truncated: bool,
+}
+
+fn language_for_path(path: &Path) -> Option<LanguageSpec> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if matches!(file_name.as_str(), "dockerfile" | "containerfile") {
+        return Some(LanguageSpec {
+            label: "Dockerfile",
+            syntax_token: "Dockerfile",
+        });
+    }
+    if file_name == "cmakelists.txt" {
+        return Some(LanguageSpec {
+            label: "CMake",
+            syntax_token: "CMake",
+        });
+    }
+    if matches!(file_name.as_str(), "makefile" | "gnumakefile") {
+        return Some(LanguageSpec {
+            label: "Makefile",
+            syntax_token: "Makefile",
+        });
+    }
+    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+    Some(match extension.as_str() {
+        "c" => LanguageSpec {
+            label: "C",
+            syntax_token: "C",
+        },
+        "h" => LanguageSpec {
+            label: "C header",
+            syntax_token: "C",
+        },
+        "cc" | "cpp" | "cxx" | "hpp" | "hh" | "hxx" => LanguageSpec {
+            label: "C++",
+            syntax_token: "C++",
+        },
+        "py" => LanguageSpec {
+            label: "Python",
+            syntax_token: "Python",
+        },
+        "rs" => LanguageSpec {
+            label: "Rust",
+            syntax_token: "Rust",
+        },
+        "go" => LanguageSpec {
+            label: "Go",
+            syntax_token: "Go",
+        },
+        "java" => LanguageSpec {
+            label: "Java",
+            syntax_token: "Java",
+        },
+        "js" | "mjs" | "cjs" | "jsx" => LanguageSpec {
+            label: "JavaScript",
+            syntax_token: "JavaScript",
+        },
+        "ts" | "tsx" => LanguageSpec {
+            label: "TypeScript",
+            syntax_token: "TypeScript",
+        },
+        "sh" | "bash" | "zsh" | "fish" => LanguageSpec {
+            label: "Shell",
+            syntax_token: "Bash",
+        },
+        "cs" => LanguageSpec {
+            label: "C#",
+            syntax_token: "C#",
+        },
+        "php" => LanguageSpec {
+            label: "PHP",
+            syntax_token: "PHP",
+        },
+        "rb" => LanguageSpec {
+            label: "Ruby",
+            syntax_token: "Ruby",
+        },
+        "swift" => LanguageSpec {
+            label: "Swift",
+            syntax_token: "Swift",
+        },
+        "kt" | "kts" => LanguageSpec {
+            label: "Kotlin",
+            syntax_token: "Kotlin",
+        },
+        "dart" => LanguageSpec {
+            label: "Dart",
+            syntax_token: "Dart",
+        },
+        "lua" => LanguageSpec {
+            label: "Lua",
+            syntax_token: "Lua",
+        },
+        "html" | "htm" => LanguageSpec {
+            label: "HTML",
+            syntax_token: "HTML",
+        },
+        "css" => LanguageSpec {
+            label: "CSS",
+            syntax_token: "CSS",
+        },
+        "scss" => LanguageSpec {
+            label: "SCSS",
+            syntax_token: "SCSS",
+        },
+        "sql" => LanguageSpec {
+            label: "SQL",
+            syntax_token: "SQL",
+        },
+        "json" | "jsonc" => LanguageSpec {
+            label: "JSON",
+            syntax_token: "JSON",
+        },
+        "yaml" | "yml" => LanguageSpec {
+            label: "YAML",
+            syntax_token: "YAML",
+        },
+        "toml" => LanguageSpec {
+            label: "TOML",
+            syntax_token: "TOML",
+        },
+        "xml" => LanguageSpec {
+            label: "XML",
+            syntax_token: "XML",
+        },
+        "ini" | "conf" | "cfg" => LanguageSpec {
+            label: "INI",
+            syntax_token: "INI",
+        },
+        _ => return None,
+    })
+}
+
+fn shebang_language(source: &str) -> Option<LanguageSpec> {
+    let first_line = source.lines().next()?.trim();
+    if !first_line.starts_with("#!") {
+        return None;
+    }
+    let interpreter = first_line
+        .trim_start_matches("#!")
+        .split_whitespace()
+        .last()
+        .unwrap_or_default();
+    Some(match interpreter {
+        "python" | "python3" => LanguageSpec {
+            label: "Python",
+            syntax_token: "Python",
+        },
+        "bash" | "sh" | "zsh" | "fish" => LanguageSpec {
+            label: "Shell",
+            syntax_token: "Bash",
+        },
+        "node" | "nodejs" => LanguageSpec {
+            label: "JavaScript",
+            syntax_token: "JavaScript",
+        },
+        "ruby" => LanguageSpec {
+            label: "Ruby",
+            syntax_token: "Ruby",
+        },
+        _ => return None,
+    })
+}
+
+fn preview_kind_for_path(path: &Path) -> PreviewKind {
+    if fs::metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
+        return PreviewKind::Folder;
+    }
+    if crate::search::is_image_path(path) {
+        return PreviewKind::Image;
+    }
+    if matches!(
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.to_ascii_lowercase())
+            .as_deref(),
+        Some("md" | "markdown" | "mdown" | "mkdn")
+    ) {
+        return PreviewKind::Markdown;
+    }
+    if language_for_path(path).is_some() {
+        PreviewKind::Code
+    } else {
+        PreviewKind::Metadata
+    }
+}
+
+fn should_probe_unknown_text(path: &Path) -> bool {
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    !matches!(
+        extension.as_str(),
+        "pdf"
+            | "png"
+            | "jpg"
+            | "jpeg"
+            | "webp"
+            | "gif"
+            | "bmp"
+            | "ico"
+            | "svg"
+            | "mp4"
+            | "mkv"
+            | "avi"
+            | "mov"
+            | "webm"
+            | "mp3"
+            | "wav"
+            | "flac"
+            | "ogg"
+            | "zip"
+            | "tar"
+            | "gz"
+            | "xz"
+            | "7z"
+            | "rar"
+            | "bin"
+            | "so"
+            | "dll"
+            | "exe"
+            | "wasm"
+    )
+}
+
+fn append_preview_span(spans: &mut Vec<PreviewSpan>, text: &str, style: PreviewTextStyle) {
+    if text.is_empty() {
+        return;
+    }
+    if let Some(previous) = spans.last_mut() {
+        if previous.style == style {
+            previous.text.push_str(text);
+            return;
+        }
+    }
+    spans.push(PreviewSpan {
+        text: text.to_string(),
+        style,
+    });
+}
+
+fn append_highlighted_code(
+    spans: &mut Vec<PreviewSpan>,
+    source: &str,
+    language: Option<LanguageSpec>,
+) {
+    let (syntax_set, theme_set) = syntax_assets();
+    let syntax: &SyntaxReference = language
+        .and_then(|language| syntax_set.find_syntax_by_token(language.syntax_token))
+        .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
+    let theme = theme_set
+        .themes
+        .get("base16-ocean.dark")
+        .or_else(|| theme_set.themes.values().next());
+    let Some(theme) = theme else {
+        append_preview_span(spans, source, PreviewTextStyle::Normal);
+        return;
+    };
+    let mut highlighter = HighlightLines::new(syntax, theme);
+    for line in syntect::util::LinesWithEndings::from(source) {
+        let Ok(ranges) = highlighter.highlight_line(line, &syntax_set) else {
+            append_preview_span(spans, line, PreviewTextStyle::Normal);
+            continue;
+        };
+        for (style, text) in ranges {
+            let Color { r, g, b, .. } = style.foreground;
+            append_preview_span(
+                spans,
+                text,
+                PreviewTextStyle::Syntax {
+                    red: r,
+                    green: g,
+                    blue: b,
+                },
+            );
+        }
+    }
+}
+
+fn syntax_assets() -> (&'static SyntaxSet, &'static ThemeSet) {
+    static ASSETS: OnceLock<(SyntaxSet, ThemeSet)> = OnceLock::new();
+    let assets = ASSETS.get_or_init(|| {
+        (
+            SyntaxSet::load_defaults_newlines(),
+            ThemeSet::load_defaults(),
+        )
+    });
+    (&assets.0, &assets.1)
+}
+
+fn render_markdown(source: &str) -> Vec<PreviewSpan> {
+    let mut spans = Vec::new();
+    let mut style_stack = vec![PreviewTextStyle::Normal];
+    let mut code_block = None::<(String, Option<String>)>;
+    let parser = Parser::new_ext(source, Options::all());
+    for event in parser {
+        if let Some((code, _)) = code_block.as_mut() {
+            match event {
+                Event::End(TagEnd::CodeBlock) => {
+                    let (code, language) = code_block.take().unwrap_or_default();
+                    let language = language
+                        .and_then(|value| language_for_path(Path::new(&format!("file.{value}"))));
+                    append_highlighted_code(&mut spans, &code, language);
+                    append_preview_span(&mut spans, "\n", PreviewTextStyle::Normal);
+                }
+                Event::Text(text) => code.push_str(&text),
+                Event::SoftBreak | Event::HardBreak => code.push('\n'),
+                _ => {}
+            }
+            continue;
+        }
+        match event {
+            Event::Start(Tag::Heading { .. }) => style_stack.push(PreviewTextStyle::Heading),
+            Event::End(TagEnd::Heading(_)) => {
+                style_stack.pop();
+                append_preview_span(&mut spans, "\n\n", PreviewTextStyle::Normal);
+            }
+            Event::Start(Tag::Strong) => style_stack.push(PreviewTextStyle::Strong),
+            Event::End(TagEnd::Strong) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::Emphasis) => style_stack.push(PreviewTextStyle::Emphasis),
+            Event::End(TagEnd::Emphasis) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::Link { .. }) => style_stack.push(PreviewTextStyle::Link),
+            Event::End(TagEnd::Link) => {
+                style_stack.pop();
+            }
+            Event::Start(Tag::BlockQuote(_)) => {
+                append_preview_span(&mut spans, "│ ", PreviewTextStyle::Quote);
+                style_stack.push(PreviewTextStyle::Quote);
+            }
+            Event::End(TagEnd::BlockQuote(_)) => {
+                style_stack.pop();
+                append_preview_span(&mut spans, "\n", PreviewTextStyle::Normal);
+            }
+            Event::Start(Tag::Item) => {
+                append_preview_span(&mut spans, "• ", PreviewTextStyle::ListMarker);
+            }
+            Event::Start(Tag::CodeBlock(kind)) => {
+                let language = match kind {
+                    CodeBlockKind::Fenced(value) if !value.is_empty() => Some(value.to_string()),
+                    _ => None,
+                };
+                code_block = Some((String::new(), language));
+            }
+            Event::End(TagEnd::Item) => {
+                append_preview_span(&mut spans, "\n", PreviewTextStyle::Normal);
+            }
+            Event::End(TagEnd::Paragraph) => {
+                append_preview_span(&mut spans, "\n\n", PreviewTextStyle::Normal);
+            }
+            Event::End(TagEnd::List(_)) => {
+                append_preview_span(&mut spans, "\n", PreviewTextStyle::Normal);
+            }
+            Event::Text(text) => {
+                let style = *style_stack.last().unwrap_or(&PreviewTextStyle::Normal);
+                append_preview_span(&mut spans, &text, style);
+            }
+            Event::Code(text) => {
+                append_preview_span(&mut spans, &text, PreviewTextStyle::InlineCode);
+            }
+            Event::SoftBreak | Event::HardBreak => {
+                append_preview_span(&mut spans, "\n", PreviewTextStyle::Normal);
+            }
+            Event::Rule => append_preview_span(
+                &mut spans,
+                "────────────────────────────────\n",
+                PreviewTextStyle::ListMarker,
+            ),
+            _ => {}
+        }
+    }
+    spans
+}
+
+fn file_metadata(path: &Path) -> (String, String) {
+    let size = fs::metadata(path)
+        .map(|metadata| format_dashboard_bytes(metadata.len()))
+        .unwrap_or_else(|_| "Size unavailable".to_string());
+    (size, path.display().to_string())
+}
+
+fn load_file_preview(path: PathBuf) -> anyhow::Result<PreviewDocument> {
+    let kind = preview_kind_for_path(&path);
+    let (size, display_path) = file_metadata(&path);
+    if kind == PreviewKind::Folder {
+        let children = fs::read_dir(&path)
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok())
+                    .take(12)
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let mut spans = Vec::new();
+        append_preview_span(
+            &mut spans,
+            if children.is_empty() {
+                "Folder is empty\n"
+            } else {
+                "Folder contents\n"
+            },
+            PreviewTextStyle::Heading,
+        );
+        for child in children {
+            append_preview_span(
+                &mut spans,
+                &format!("• {child}\n"),
+                PreviewTextStyle::Normal,
+            );
+        }
+        return Ok(PreviewDocument {
+            kind,
+            label: "Folder".to_string(),
+            metadata: format!("{size} • {} direct items", spans.len().saturating_sub(1)),
+            path: display_path,
+            spans,
+            wrap: true,
+            truncated: false,
+        });
+    }
+    if matches!(kind, PreviewKind::Image) {
+        return Ok(PreviewDocument {
+            kind,
+            label: "Image".to_string(),
+            metadata: size,
+            path: display_path,
+            spans: Vec::new(),
+            wrap: false,
+            truncated: false,
+        });
+    }
+    if kind == PreviewKind::Metadata && !should_probe_unknown_text(&path) {
+        return Ok(PreviewDocument {
+            kind,
+            label: "Metadata".to_string(),
+            metadata: size,
+            path: display_path,
+            spans: Vec::new(),
+            wrap: true,
+            truncated: false,
+        });
+    }
+
+    let file = File::open(&path)?;
+    let mut bytes = Vec::with_capacity(MAX_TEXT_PREVIEW_BYTES + 1);
+    file.take((MAX_TEXT_PREVIEW_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)?;
+    let truncated = bytes.len() > MAX_TEXT_PREVIEW_BYTES;
+    if truncated {
+        bytes.truncate(MAX_TEXT_PREVIEW_BYTES);
+    }
+    let source = std::str::from_utf8(&bytes)
+        .map_err(|_| anyhow::anyhow!("binary content"))?
+        .to_string();
+    let language = language_for_path(&path).or_else(|| shebang_language(&source));
+    let kind = if path.extension().is_some_and(|extension| {
+        matches!(
+            extension
+                .to_str()
+                .unwrap_or_default()
+                .to_ascii_lowercase()
+                .as_str(),
+            "md" | "markdown" | "mdown" | "mkdn"
+        )
+    }) {
+        PreviewKind::Markdown
+    } else if language.is_some() {
+        PreviewKind::Code
+    } else {
+        PreviewKind::Metadata
+    };
+    if kind == PreviewKind::Metadata {
+        return Ok(PreviewDocument {
+            kind,
+            label: "Metadata".to_string(),
+            metadata: size,
+            path: display_path,
+            spans: Vec::new(),
+            wrap: true,
+            truncated: false,
+        });
+    }
+    let label = if kind == PreviewKind::Markdown {
+        "Markdown".to_string()
+    } else {
+        language
+            .map(|language| language.label.to_string())
+            .unwrap_or_else(|| "Plain text".to_string())
+    };
+    let spans = if kind == PreviewKind::Markdown {
+        render_markdown(&source)
+    } else {
+        let mut spans = Vec::new();
+        append_highlighted_code(&mut spans, &source, language);
+        spans
+    };
+    Ok(PreviewDocument {
+        kind,
+        label,
+        metadata: format!("{size}{}", if truncated { " • first portion" } else { "" }),
+        path: display_path,
+        spans,
+        wrap: kind == PreviewKind::Markdown,
+        truncated,
+    })
 }
 
 fn preview_bounds(parent: &ApplicationWindow, quick: bool) -> (u32, u32) {
@@ -3460,12 +4167,15 @@ fn open_side_preview(
     load_generation.set(request_id);
     preview.panel.set_visible(true);
     preview.title.set_text(&item.title);
+    preview.meta.set_text("Image • loading");
     preview.status.set_text("Loading preview…");
     preview.status.remove_css_class("preview-error");
     preview.status.add_css_class("preview-loading");
     preview.image.set_paintable(None::<&gdk::Paintable>);
     preview.image.set_visible(true);
     preview.detail.set_visible(false);
+    preview.text_view.set_visible(false);
+    preview.text_scroll.set_visible(false);
 
     let (sender, receiver) = async_channel::bounded::<Result<LoadedPreview, String>>(1);
     thread::spawn(move || {
@@ -3498,6 +4208,10 @@ fn open_side_preview(
                     loaded.stride,
                 );
                 preview.image.set_paintable(Some(&texture));
+                preview.meta.set_text(&format!(
+                    "Image • {} × {}",
+                    loaded.original_width, loaded.original_height
+                ));
                 preview.status.set_text(&format!(
                     "{} × {}",
                     loaded.original_width, loaded.original_height
@@ -3505,6 +4219,104 @@ fn open_side_preview(
                 preview.status.remove_css_class("preview-loading");
             }
             Err(_) => {
+                preview.status.set_text("Preview unavailable");
+                preview.status.remove_css_class("preview-loading");
+                preview.status.add_css_class("preview-error");
+            }
+        }
+    });
+    true
+}
+
+fn open_file_side_preview(
+    side: &SidePreviewState,
+    load_generation: &Rc<Cell<u64>>,
+    item: &Item,
+    path: &Path,
+) -> bool {
+    let Some(preview) = side.borrow().as_ref().cloned() else {
+        return false;
+    };
+    let request_id = load_generation.get().saturating_add(1);
+    load_generation.set(request_id);
+    let item_kind = item.kind.clone();
+    let item_subtitle = item.subtitle.clone();
+    preview.panel.set_visible(true);
+    preview.title.set_text(&item.title);
+    preview.meta.set_text("Loading preview…");
+    preview.status.set_text("Reading a bounded preview…");
+    preview.status.remove_css_class("preview-error");
+    preview.status.add_css_class("preview-loading");
+    preview.image.set_paintable(None::<&gdk::Paintable>);
+    preview.image.set_visible(false);
+    preview.detail.set_visible(false);
+    preview.text_view.buffer().set_text("Loading preview…");
+    preview.text_view.set_visible(true);
+    preview.text_scroll.set_visible(true);
+
+    let path = path.to_path_buf();
+    let (sender, receiver) = async_channel::bounded::<Result<PreviewDocument, String>>(1);
+    thread::spawn(move || {
+        let result = load_file_preview(path).map_err(|error| error.to_string());
+        let _ = sender.send_blocking(result);
+    });
+    let weak_side = Rc::downgrade(side);
+    let generation_for_result = load_generation.clone();
+    glib::MainContext::default().spawn_local(async move {
+        let Ok(result) = receiver.recv().await else {
+            return;
+        };
+        if generation_for_result.get() != request_id {
+            return;
+        }
+        let Some(side) = weak_side.upgrade() else {
+            return;
+        };
+        let Some(preview) = side.borrow().as_ref().cloned() else {
+            return;
+        };
+        match result {
+            Ok(document) if document.kind == PreviewKind::Metadata => {
+                preview
+                    .meta
+                    .set_text(&format!("{} • {}", document.label, document.metadata));
+                preview.detail.set_text(&format!(
+                    "{}\n{}\n{}\n\nPreview unavailable for this file type.",
+                    document.label, document.metadata, document.path
+                ));
+                preview.detail.set_visible(true);
+                preview.text_view.set_visible(false);
+                preview.text_scroll.set_visible(false);
+                preview.status.set_text(&document.path);
+                preview.status.remove_css_class("preview-loading");
+                preview.status.remove_css_class("preview-error");
+            }
+            Ok(document) => {
+                preview
+                    .meta
+                    .set_text(&format!("{} • {}", document.label, document.metadata));
+                apply_preview_document(&preview, &document);
+                preview.detail.set_visible(false);
+                preview.text_view.set_visible(true);
+                preview.text_scroll.set_visible(true);
+                let status = if document.truncated {
+                    format!("{}\nLarge file — previewing first portion", document.path)
+                } else {
+                    document.path.clone()
+                };
+                preview.status.set_text(&status);
+                preview.status.remove_css_class("preview-loading");
+                preview.status.remove_css_class("preview-error");
+            }
+            Err(error) => {
+                preview.meta.set_text("Metadata only");
+                preview.detail.set_text(&format!(
+                    "{}\n{}\n\nPreview unavailable: {error}",
+                    item_kind, item_subtitle
+                ));
+                preview.detail.set_visible(true);
+                preview.text_view.set_visible(false);
+                preview.text_scroll.set_visible(false);
                 preview.status.set_text("Preview unavailable");
                 preview.status.remove_css_class("preview-loading");
                 preview.status.add_css_class("preview-error");
@@ -3759,27 +4571,12 @@ fn context_preview_detail(item: &Item) -> String {
                 );
             }
             let size = metadata.map(|value| format_dashboard_bytes(value.len()));
-            let mut detail = format!(
+            format!(
                 "{}\n{}\n{}",
                 item.kind,
                 size.unwrap_or_else(|| "Size unavailable".to_string()),
                 path.display()
-            );
-            if let Ok(bytes) = fs::read(path) {
-                if bytes.len() <= 32 * 1024 && !bytes.contains(&0) {
-                    let preview = String::from_utf8_lossy(&bytes);
-                    let preview = preview.trim();
-                    if !preview.is_empty() {
-                        let excerpt = preview.chars().take(900).collect::<String>();
-                        detail.push_str("\n\n");
-                        detail.push_str(&excerpt);
-                        if preview.chars().count() > 900 {
-                            detail.push_str("…");
-                        }
-                    }
-                }
-            }
-            detail
+            )
         }
         Target::Application(application) => format!(
             "Application\n{}\n{}\n{}",
@@ -3805,10 +4602,17 @@ fn update_context_preview(
     load_generation: &Rc<Cell<u64>>,
     item: &Item,
 ) {
-    if item.kind.eq_ignore_ascii_case("IMAGE")
+    if preview_source_for_item(paths, item).is_some()
         && open_side_preview(paths, side, load_generation, item)
     {
         return;
+    }
+    if let Target::Path(path) = &item.target {
+        if !crate::search::is_image_path(path)
+            && open_file_side_preview(side, load_generation, item, path)
+        {
+            return;
+        }
     }
     load_generation.set(load_generation.get().saturating_add(1));
     let Some(preview) = side.borrow().as_ref().cloned() else {
@@ -3816,13 +4620,32 @@ fn update_context_preview(
     };
     preview.panel.set_visible(true);
     preview.title.set_text(&item.title);
+    preview.meta.set_text("Details");
     preview.image.set_paintable(None::<&gdk::Paintable>);
     preview.image.set_visible(false);
+    preview.text_view.set_visible(false);
+    preview.text_scroll.set_visible(false);
     preview.detail.set_text(&context_preview_detail(item));
     preview.detail.set_visible(true);
     preview.status.set_text(&item.subtitle);
     preview.status.remove_css_class("preview-loading");
     preview.status.remove_css_class("preview-error");
+}
+
+fn screen_safe_launcher_height(requested: u32) -> u32 {
+    let fallback_max = 900_u32;
+    let Some(display) = gdk::Display::default() else {
+        return requested.clamp(420, fallback_max);
+    };
+    let monitors = display.monitors();
+    let Some(object) = monitors.item(0) else {
+        return requested.clamp(420, fallback_max);
+    };
+    let Ok(monitor) = object.downcast::<gdk::Monitor>() else {
+        return requested.clamp(420, fallback_max);
+    };
+    let max_height = (monitor.geometry().height() - 72).max(420) as u32;
+    requested.min(max_height).clamp(420, max_height)
 }
 
 fn build_window(
@@ -3836,7 +4659,9 @@ fn build_window(
         .application(application)
         .title("ProtonSearch")
         .default_width(linux_settings.window_width.clamp(480, 1600) as i32)
-        .default_height(linux_settings.window_height.clamp(420, 1200) as i32)
+        .default_height(
+            screen_safe_launcher_height(linux_settings.window_height.clamp(420, 1200)) as i32,
+        )
         .build();
     // Keep an explicit application-owned reference. This matters when the
     // launcher is started directly from a compositor keybind: the local
@@ -3930,7 +4755,8 @@ fn build_window(
                 previous.remove_css_class("active");
             }
             chip_for_callback.add_css_class("active");
-            entry_for_chip.set_text(prefix);
+            let next_query = query_for_filter(&entry_for_chip.text(), prefix);
+            entry_for_chip.set_text(&next_query);
             entry_for_chip.grab_focus();
             ensure_category_visible(&scroller_for_chip, &chip_for_callback);
         });
@@ -4046,7 +4872,9 @@ fn build_window(
     let alt_preview_active = Rc::new(Cell::new(false));
     let side_preview_active = Rc::new(Cell::new(false));
     let base_width = Rc::new(Cell::new(linux_settings.window_width.clamp(480, 1600)));
-    let base_height = Rc::new(Cell::new(linux_settings.window_height.clamp(420, 1200)));
+    let base_height = Rc::new(Cell::new(screen_safe_launcher_height(
+        linux_settings.window_height.clamp(420, 1200),
+    )));
     let (sender, receiver) = async_channel::unbounded::<(u64, String, Vec<Item>)>();
     let (action_sender, action_receiver) =
         async_channel::unbounded::<(Target, anyhow::Result<Option<StatusPanel>>)>();
@@ -4113,6 +4941,8 @@ fn build_window(
     let category_buttons_for_changed = category_buttons.clone();
     let dashboard_for_changed = dashboard.clone();
     let scroll_for_changed = scroll.clone();
+    let list_for_changed = list.clone();
+    let status_for_changed = status.clone();
     let side_panel_for_changed = side_panel.clone();
     let window_for_changed = window.clone();
     let root_for_changed = root.clone();
@@ -4138,6 +4968,23 @@ fn build_window(
             window_for_changed.set_default_size(
                 base_width_for_changed.get() as i32,
                 base_height_for_changed.get() as i32,
+            );
+        } else {
+            // Replace the hidden Home source cards synchronously with a
+            // loading state before exposing the result list. This keeps a
+            // filter transition atomic: Files never briefly displays the
+            // Browser Bookmarks/Home rows while its worker is running.
+            side_panel_for_changed.set_visible(false);
+            root_for_changed.set_width_request(base_width_for_changed.get() as i32);
+            window_for_changed.set_default_size(
+                base_width_for_changed.get() as i32,
+                base_height_for_changed.get() as i32,
+            );
+            show_loading_results(
+                &list_for_changed,
+                &scroll_for_changed,
+                &status_for_changed,
+                &query,
             );
         }
         if let Some(source) = debounce_source.borrow_mut().take() {
@@ -4863,6 +5710,41 @@ fn update_results(
     }
 }
 
+fn loading_scope_label(query: &str) -> &'static str {
+    let query = query.trim().to_ascii_lowercase();
+    if query.starts_with("file:") {
+        "Files"
+    } else if query.starts_with("app:") {
+        "Applications"
+    } else if query.starts_with("folder:") {
+        "Folders"
+    } else if query.starts_with("images:") || query.starts_with("image:") {
+        "Images"
+    } else if query.starts_with("commands:") || query.starts_with("command:") {
+        "Commands"
+    } else if query.starts_with("clip:") || query.starts_with("clipboard:") {
+        "Clipboard"
+    } else if query.starts_with("agents:") || query.starts_with("agent:") {
+        "Agents"
+    } else {
+        "Search"
+    }
+}
+
+fn show_loading_results(list: &ListBox, scroll: &ScrolledWindow, status: &Label, query: &str) {
+    while let Some(child) = list.first_child() {
+        list.remove(&child);
+    }
+    list.append(&empty_state_row(&format!(
+        "Loading {}…",
+        loading_scope_label(query)
+    )));
+    list.unselect_all();
+    set_cursor_row(list, -1);
+    status.set_text("Loading filtered results…");
+    scroll.vadjustment().set_value(scroll.vadjustment().lower());
+}
+
 fn set_cursor_row(list: &ListBox, index: i32) {
     let mut child = list.first_child();
     while let Some(widget) = child {
@@ -4989,6 +5871,36 @@ fn home_filter_spec(id: &str) -> Option<(&'static str, &'static str, &'static st
         "agents" => ("Agents", "agents:", "agents"),
         _ => return None,
     })
+}
+
+fn query_for_filter(current: &str, prefix: &str) -> String {
+    let current = current.trim();
+    let term = [
+        "file:",
+        "app:",
+        "folder:",
+        "content:",
+        "images:",
+        "image:",
+        "ocr:",
+        "code:",
+        "settings:",
+        "commands:",
+        "command:",
+        "clip:",
+        "clipboard:",
+        "agents:",
+        "agent:",
+    ]
+    .iter()
+    .find_map(|scope| current.strip_prefix(scope))
+    .unwrap_or(current)
+    .trim();
+    if prefix.is_empty() {
+        term.to_string()
+    } else {
+        format!("{prefix}{term}")
+    }
 }
 
 fn home_filter_label(id: &str) -> &'static str {
@@ -5371,5 +6283,71 @@ mod preview_tests {
             }, &item),
             Some(PreviewSource::File(candidate)) if candidate == path
         ));
+    }
+
+    #[test]
+    fn preview_language_resolver_covers_common_source_and_config_files() {
+        let cases = [
+            ("main.py", "Python"),
+            ("main.cpp", "C++"),
+            ("main.rs", "Rust"),
+            ("app.tsx", "TypeScript"),
+            ("script.sh", "Shell"),
+            ("package.json", "JSON"),
+            ("config.yaml", "YAML"),
+            ("CMakeLists.txt", "CMake"),
+            ("Dockerfile", "Dockerfile"),
+            ("Makefile", "Makefile"),
+        ];
+        for (name, expected) in cases {
+            assert_eq!(
+                language_for_path(Path::new(name)).map(|value| value.label),
+                Some(expected)
+            );
+        }
+        assert_eq!(
+            preview_kind_for_path(Path::new("README.md")),
+            PreviewKind::Markdown
+        );
+        assert_eq!(
+            preview_kind_for_path(Path::new("movie.mp4")),
+            PreviewKind::Metadata
+        );
+    }
+
+    #[test]
+    fn markdown_preview_is_rendered_into_structured_spans() {
+        let spans = render_markdown(
+            "# Title\n\nA **bold** item with `inline code`.\n\n```python\nimport json\n```",
+        );
+        assert!(spans
+            .iter()
+            .any(|span| span.style == PreviewTextStyle::Heading));
+        assert!(spans
+            .iter()
+            .any(|span| span.style == PreviewTextStyle::Strong));
+        assert!(spans
+            .iter()
+            .any(|span| span.style == PreviewTextStyle::InlineCode));
+        assert!(spans
+            .iter()
+            .any(|span| matches!(span.style, PreviewTextStyle::Syntax { .. })));
+    }
+
+    #[test]
+    fn text_preview_is_bounded_before_highlighting() {
+        assert_eq!(MAX_TEXT_PREVIEW_BYTES, 512 * 1024);
+        let source = "fn main() {\n".repeat(100_000);
+        assert!(source.len() > MAX_TEXT_PREVIEW_BYTES);
+        let bounded = &source.as_bytes()[..MAX_TEXT_PREVIEW_BYTES];
+        assert_eq!(bounded.len(), MAX_TEXT_PREVIEW_BYTES);
+    }
+
+    #[test]
+    fn filter_switch_preserves_the_search_term() {
+        assert_eq!(query_for_filter("fire", "file:"), "file:fire");
+        assert_eq!(query_for_filter("images:fire", "file:"), "file:fire");
+        assert_eq!(query_for_filter("file:fire", ""), "fire");
+        assert_eq!(query_for_filter("", "commands:"), "commands:");
     }
 }
