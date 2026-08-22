@@ -49,6 +49,23 @@ window.proton-window {
     border-radius: 16px;
 }
 
+.search-header {
+    min-height: 48px;
+}
+
+.brand-slot {
+    min-width: 44px;
+    min-height: 44px;
+    background-color: #252a2f;
+    border: 1px solid #3b434b;
+    border-radius: 12px;
+}
+
+.brand-logo {
+    min-width: 38px;
+    min-height: 38px;
+}
+
 .search-shell {
     background-color: #2a2e33;
     border: 1px solid #3b434b;
@@ -68,7 +85,7 @@ entry.search-entry {
     border: none;
     box-shadow: none;
     padding: 0 8px;
-    font-size: 16px;
+    font-size: 17px;
 }
 
 entry.search-entry:focus {
@@ -88,6 +105,16 @@ entry.search-entry selection {
     background-color: #82c7bb;
 }
 
+.shortcut-badge {
+    color: #a7b0b8;
+    background-color: #363c42;
+    border: 1px solid #4a535b;
+    border-radius: 7px;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
 entry.error {
     border: 1px solid #ef6b73;
 }
@@ -104,8 +131,18 @@ entry.error {
     box-shadow: none;
     font-size: 11px;
     font-weight: 600;
-    padding: 6px 9px;
+    padding: 5px 8px;
     border-radius: 999px;
+}
+
+.category-chip > box {
+    min-height: 18px;
+}
+
+.category-icon {
+    min-width: 16px;
+    min-height: 16px;
+    color: #a7b0b8;
 }
 
 .category-chip.active {
@@ -120,6 +157,12 @@ button.category-chip:hover {
 
 button.category-chip.active label,
 button.category-chip.active:hover label {
+    color: #e8f5f2;
+}
+
+button.category-chip.active .category-icon,
+button.category-chip.active:hover .category-icon,
+button.category-chip:hover .category-icon {
     color: #e8f5f2;
 }
 
@@ -139,19 +182,49 @@ row.result-row {
     margin: 2px 0;
 }
 
+row.compact-row {
+    border: 1px solid transparent;
+}
+
+row.source-row {
+    background-color: #252a2f;
+    border: 1px solid #30373d;
+    margin: 4px 0;
+}
+
+row.source-row:hover {
+    background-color: #2d353a;
+    border-color: #465159;
+}
+
+row.source-row .result-title {
+    font-size: 14px;
+}
+
+row.source-row .result-subtitle {
+    color: #b4bec4;
+}
+
+row.source-row .asset-icon {
+    min-width: 38px;
+    min-height: 38px;
+}
+
 row.result-row:hover {
     background-color: #2d3339;
 }
 
 list.result-list > row.result-row:selected {
     background-color: #30383e;
+    border: 1px solid #53616a;
 }
 
 list.result-list > row.result-row.cursor-row,
 list.result-list > row.result-row.cursor-row:selected,
 list.result-list > row.result-row.cursor-row:focus {
     background-color: #38444f;
-    box-shadow: inset 2px 0 0 #82c7bb;
+    border: 1px solid #82c7bb;
+    box-shadow: inset 3px 0 0 #82c7bb, 0 0 0 1px rgba(130, 199, 187, 0.16);
 }
 
 .result-icon {
@@ -206,7 +279,7 @@ list.result-list > row.result-row.cursor-row:focus {
     font-weight: 700;
 }
 
-.badge-file, .badge-folder, .badge-image, .badge-command,
+.badge-file, .badge-folder, .badge-image, .badge-code, .badge-command,
 .badge-setting, .badge-source, .badge-clipboard {
     background-color: #313941;
 }
@@ -322,6 +395,11 @@ window.proton-window.light .launcher-root {
     background-color: #ffffff;
 }
 
+window.proton-window.light .brand-slot {
+    background-color: #f8fafb;
+    border-color: #cbd5d9;
+}
+
 window.proton-window.light list.result-list {
     background-color: #ffffff;
 }
@@ -343,6 +421,12 @@ window.proton-window.light .empty-state-title {
 
 window.proton-window.light entry.search-entry {
     caret-color: #26796d;
+}
+
+window.proton-window.light .shortcut-badge {
+    color: #38515b;
+    background-color: #e4eceb;
+    border-color: #c1d5d1;
 }
 
 window.proton-window.light entry.search-entry placeholder,
@@ -386,6 +470,16 @@ window.proton-window.light button.category-chip.active:hover label {
     color: #155a51;
 }
 
+window.proton-window.light .category-icon {
+    color: #53636d;
+}
+
+window.proton-window.light button.category-chip:hover .category-icon,
+window.proton-window.light button.category-chip.active .category-icon,
+window.proton-window.light button.category-chip.active:hover .category-icon {
+    color: #155a51;
+}
+
 window.proton-window.light .result-subtitle,
 window.proton-window.light .status-label,
 window.proton-window.light .footer-hint,
@@ -398,19 +492,35 @@ window.proton-window.light row.result-row {
     background-color: transparent;
 }
 
+window.proton-window.light row.source-row {
+    background-color: #f7f9fa;
+    border-color: #e0e6e9;
+}
+
+window.proton-window.light row.source-row:hover {
+    background-color: #e9edf1;
+    border-color: #cbd5d9;
+}
+
+window.proton-window.light row.source-row .result-subtitle {
+    color: #53636d;
+}
+
 window.proton-window.light row.result-row:hover {
     background-color: #e9edf1;
 }
 
 window.proton-window.light list.result-list > row.result-row:selected {
     background-color: #e4ecef;
+    border-color: #b6c9cc;
 }
 
 window.proton-window.light list.result-list > row.result-row.cursor-row,
 window.proton-window.light list.result-list > row.result-row.cursor-row:selected,
 window.proton-window.light list.result-list > row.result-row.cursor-row:focus {
     background-color: #d7eae6;
-    box-shadow: inset 2px 0 0 #26796d;
+    border-color: #26796d;
+    box-shadow: inset 3px 0 0 #26796d, 0 0 0 1px rgba(38, 121, 109, 0.16);
 }
 
 window.proton-window.light list.result-list > row.result-row:selected label.result-title,
@@ -433,6 +543,7 @@ window.proton-window.light .source-badge,
 window.proton-window.light .badge-file,
 window.proton-window.light .badge-folder,
 window.proton-window.light .badge-image,
+window.proton-window.light .badge-code,
 window.proton-window.light .badge-command,
 window.proton-window.light .badge-setting,
 window.proton-window.light .badge-source,
@@ -2151,14 +2262,23 @@ fn build_window(
     root.set_margin_start(18);
     root.set_margin_end(18);
 
+    let search_header = GtkBox::new(Orientation::Horizontal, 10);
+    search_header.add_css_class("search-header");
+    search_header.set_hexpand(true);
+
+    let brand_slot = GtkBox::new(Orientation::Horizontal, 0);
+    brand_slot.add_css_class("brand-slot");
+    brand_slot.set_halign(Align::Center);
+    brand_slot.set_valign(Align::Center);
+    let brand_logo = crate::icons::protonsearch(38);
+    brand_logo.add_css_class("brand-logo");
+    brand_slot.append(&brand_logo);
+    search_header.append(&brand_slot);
+
     let search_shell = GtkBox::new(Orientation::Horizontal, 6);
     search_shell.add_css_class("search-shell");
     search_shell.set_hexpand(true);
     search_shell.set_height_request(linux_settings.search_bar_height.clamp(42, 100) as i32);
-
-    let search_icon = crate::icons::protonsearch(34);
-    search_icon.add_css_class("search-icon");
-    search_shell.append(&search_icon);
 
     let entry = Entry::builder().hexpand(true).build();
     if linux_settings.show_placeholder {
@@ -2169,7 +2289,15 @@ fn build_window(
         "Type to search; Enter opens the selected result; Escape closes",
     ));
     search_shell.append(&entry);
-    root.append(&search_shell);
+
+    let shortcut_badge = Label::new(Some("Ctrl+K"));
+    shortcut_badge.add_css_class("shortcut-badge");
+    shortcut_badge.set_halign(Align::Center);
+    shortcut_badge.set_valign(Align::Center);
+    shortcut_badge.set_tooltip_text(Some("Focus the search field"));
+    search_shell.append(&shortcut_badge);
+    search_header.append(&search_shell);
+    root.append(&search_header);
 
     let category_row = FlowBox::new();
     category_row.add_css_class("category-row");
@@ -2180,25 +2308,36 @@ fn build_window(
     category_row.set_min_children_per_line(1);
     category_row.set_max_children_per_line(9);
     let active_category = Rc::new(RefCell::new(None::<Button>));
-    for (label, prefix, active) in [
-        ("All", "", true),
-        ("Files", "file:", false),
-        ("Folders", "folder:", false),
-        ("Content", "content:", false),
-        ("Images", "images:", false),
-        ("OCR", "ocr:", false),
-        ("Code", "code:", false),
-        ("Settings", "settings:", false),
-        ("Commands", "commands:", false),
+    let category_buttons = Rc::new(RefCell::new(Vec::<(String, Button)>::new()));
+    for (label, prefix, icon_name, active) in [
+        ("All", "", "all", true),
+        ("Files", "file:", "files", false),
+        ("Folders", "folder:", "folders", false),
+        ("Content", "content:", "content", false),
+        ("Images", "images:", "images", false),
+        ("OCR", "ocr:", "ocr", false),
+        ("Code", "code:", "source-code", false),
+        ("Settings", "settings:", "settings", false),
+        ("Commands", "commands:", "commands", false),
     ] {
-        let chip = Button::with_label(label);
+        let chip = Button::new();
         chip.set_has_frame(false);
         chip.add_css_class("category-chip");
+        let chip_content = GtkBox::new(Orientation::Horizontal, 5);
+        chip_content.set_halign(Align::Center);
+        chip_content.append(&category_icon(icon_name));
+        let chip_label = Label::new(Some(label));
+        chip_label.set_single_line_mode(true);
+        chip_content.append(&chip_label);
+        chip.set_child(Some(&chip_content));
         if active {
             chip.add_css_class("active");
             *active_category.borrow_mut() = Some(chip.clone());
         }
         category_row.insert(&chip, -1);
+        category_buttons
+            .borrow_mut()
+            .push((prefix.to_string(), chip.clone()));
         let entry_for_chip = entry.clone();
         let active_category_for_chip = active_category.clone();
         let chip_for_callback = chip.clone();
@@ -2301,11 +2440,18 @@ fn build_window(
     let generation_for_changed = generation.clone();
     let request_sender_for_changed = request_sender.clone();
     let settings_for_changed = settings_state.clone();
+    let active_category_for_changed = active_category.clone();
+    let category_buttons_for_changed = category_buttons.clone();
     let debounce_source = Rc::new(RefCell::new(None::<glib::SourceId>));
     entry.connect_changed(move |entry| {
         let next_generation = generation_for_changed.get().saturating_add(1);
         generation_for_changed.set(next_generation);
         let query = entry.text().to_string();
+        sync_active_category(
+            &active_category_for_changed,
+            &category_buttons_for_changed.borrow(),
+            &query,
+        );
         if let Some(source) = debounce_source.borrow_mut().take() {
             source.remove();
         }
@@ -2463,6 +2609,7 @@ fn build_window(
         }
         if let Some(row) = list_for_enter
             .selected_row()
+            .or_else(|| list_for_enter.row_at_index(cursor_index_for_enter.get()))
             .or_else(|| list_for_enter.row_at_index(0))
         {
             cursor_index_for_enter.set(row.index());
@@ -2574,6 +2721,7 @@ fn build_window(
     });
 
     let key_controller = EventControllerKey::new();
+    let entry_for_shortcut = entry.clone();
     let window_for_escape = window.clone();
     let animation_for_escape = animation.clone();
     let list_for_navigation = list.clone();
@@ -2585,6 +2733,11 @@ fn build_window(
     let cursor_index_for_key = cursor_index.clone();
     let settings_state_for_key = settings_state.clone();
     key_controller.connect_key_pressed(move |_, key, _, state| {
+        if key == gdk::Key::k && state.contains(gdk::ModifierType::CONTROL_MASK) {
+            entry_for_shortcut.grab_focus();
+            entry_for_shortcut.select_region(0, -1);
+            return glib::Propagation::Stop;
+        }
         if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R) {
             let selected = list_for_navigation
                 .selected_row()
@@ -2805,6 +2958,11 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     row.set_height_request(row_height as i32);
     row.set_hexpand(true);
     row.add_css_class("result-row");
+    if item.kind.eq_ignore_ascii_case("SOURCE") {
+        row.add_css_class("source-row");
+    } else {
+        row.add_css_class("compact-row");
+    }
     let content = GtkBox::new(Orientation::Horizontal, 8);
     content.set_hexpand(true);
     content.set_margin_top(8);
@@ -2841,7 +2999,7 @@ fn result_row(item: &Item, row_height: u32, light_theme: bool, paths: &XdgPaths)
     text.append(&subtitle);
     content.append(&text);
 
-    let badge = Label::new(Some(&item.kind));
+    let badge = Label::new(Some(badge_label(&item.kind)));
     badge.set_halign(Align::End);
     badge.set_hexpand(false);
     badge.set_ellipsize(gtk4::pango::EllipsizeMode::End);
@@ -2868,12 +3026,81 @@ fn badge_class(kind: &str) -> &'static str {
         "FILE" => "badge-file",
         "FOLDER" => "badge-folder",
         "IMAGE" => "badge-image",
+        "CODE" => "badge-code",
         "COMMAND" => "badge-command",
         "SETTING" => "badge-setting",
-        "CLIPBOARD" => "badge-clipboard",
+        "CLIP" | "CLIPBOARD" => "badge-clipboard",
         "SOURCE" => "badge-source",
         _ => "badge-source",
     }
+}
+
+fn badge_label(kind: &str) -> &'static str {
+    match kind.to_ascii_uppercase().as_str() {
+        "FILE" => "File",
+        "FOLDER" => "Folder",
+        "IMAGE" => "Image",
+        "CODE" => "Code",
+        "COMMAND" => "Command",
+        "SETTING" => "Setting",
+        "CLIP" | "CLIPBOARD" => "Clipboard",
+        "CONTENT" => "Content",
+        "OCR" => "OCR",
+        "APP" => "App",
+        "AGENT" => "Agent",
+        "BOOKMARK" => "Bookmark",
+        "HISTORY" => "History",
+        "COMMIT" => "Commit",
+        "REPO" => "Repository",
+        "RECENT" => "Recent",
+        "NOTE" => "Note",
+        "CALC" | "CALCULATOR" => "Calculator",
+        "WINDOW" => "Window",
+        "INFO" => "Info",
+        "SOURCE" => "Source",
+        _ => "Source",
+    }
+}
+
+fn category_icon(name: &str) -> Image {
+    let icon_name = match name {
+        "all" => "view-grid-symbolic",
+        "files" => "document-open-symbolic",
+        "folders" => "folder-symbolic",
+        "content" => "text-x-generic-symbolic",
+        "images" => "image-x-generic-symbolic",
+        "ocr" => "edit-find-symbolic",
+        "source-code" => "text-x-script-symbolic",
+        "settings" => "emblem-system-symbolic",
+        "commands" => "system-run-symbolic",
+        _ => "view-grid-symbolic",
+    };
+    let image = Image::from_icon_name(icon_name);
+    image.set_pixel_size(16);
+    image.add_css_class("category-icon");
+    image
+}
+
+fn sync_active_category(
+    active_category: &Rc<RefCell<Option<Button>>>,
+    categories: &[(String, Button)],
+    query: &str,
+) {
+    let query = query.trim();
+    let Some((_, next)) = categories
+        .iter()
+        .find(|(prefix, _)| {
+            prefix.is_empty() && query.is_empty() || !prefix.is_empty() && query.starts_with(prefix)
+        })
+        .or_else(|| categories.iter().find(|(prefix, _)| prefix.is_empty()))
+    else {
+        return;
+    };
+
+    if let Some(previous) = active_category.borrow_mut().replace(next.clone()) {
+        previous.remove_css_class("active");
+    }
+    next.add_css_class("active");
 }
 
 fn empty_state_message(query: &str) -> String {
@@ -2925,7 +3152,12 @@ fn scaled_clipboard_bytes(bytes: &[u8], max_width: i32, max_height: i32) -> Opti
 
 fn result_icon(item: &Item, light_theme: bool, paths: &XdgPaths) -> Image {
     if let Some(name) = result_asset_name(item) {
-        if let Some(image) = crate::icons::source_for_theme(name, 32, light_theme) {
+        let size = if item.kind.eq_ignore_ascii_case("SOURCE") {
+            40
+        } else {
+            32
+        };
+        if let Some(image) = crate::icons::source_for_theme(name, size, light_theme) {
             return image;
         }
     }
