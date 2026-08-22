@@ -4767,6 +4767,45 @@ fn build_window(
             ensure_category_visible(&scroller_for_focus, &chip_for_focus);
         });
         chip.add_controller(focus_controller);
+
+        let category_buttons_for_key = category_buttons.clone();
+        let chip_for_key = chip.clone();
+        let scroller_for_key = category_scroller.clone();
+        let key_controller = EventControllerKey::new();
+        key_controller.connect_key_pressed(move |_, key, _, _| {
+            let direction = match key {
+                gdk::Key::Left => Some(-1_i32),
+                gdk::Key::Right => Some(1_i32),
+                gdk::Key::Home => Some(i32::MIN),
+                gdk::Key::End => Some(i32::MAX),
+                _ => None,
+            };
+            let Some(direction) = direction else {
+                return glib::Propagation::Proceed;
+            };
+            let buttons = category_buttons_for_key.borrow();
+            let Some(current) = buttons
+                .iter()
+                .position(|(_, button)| button.as_ptr() == chip_for_key.as_ptr())
+            else {
+                return glib::Propagation::Proceed;
+            };
+            let next = if direction == i32::MIN {
+                0
+            } else if direction == i32::MAX {
+                buttons.len().saturating_sub(1)
+            } else {
+                (current as i32 + direction).clamp(0, buttons.len().saturating_sub(1) as i32)
+                    as usize
+            };
+            let target = buttons[next].1.clone();
+            drop(buttons);
+            target.grab_focus();
+            ensure_category_visible(&scroller_for_key, &target);
+            target.emit_clicked();
+            glib::Propagation::Stop
+        });
+        chip.add_controller(key_controller);
     }
     let filter_scroll_controller = EventControllerScroll::new(
         EventControllerScrollFlags::VERTICAL | EventControllerScrollFlags::HORIZONTAL,
