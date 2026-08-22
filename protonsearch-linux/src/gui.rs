@@ -16,10 +16,10 @@ use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
-    ComboBoxText, Entry, EventControllerKey, Image, Label, ListBox, ListBoxRow, MessageDialog,
-    MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
-    RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
-    StackTransitionType,
+    ComboBoxText, Entry, EventControllerFocus, EventControllerKey, EventControllerScroll,
+    EventControllerScrollFlags, Image, Label, ListBox, ListBoxRow, MessageDialog, MessageType,
+    Orientation, PolicyType, PropagationPhase, ResponseType, Revealer, RevealerTransitionType,
+    ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar, StackTransitionType,
 };
 use std::cell::{Cell, RefCell};
 use std::fs;
@@ -2967,6 +2967,21 @@ fn build_window(
     let category_row = GtkBox::new(Orientation::Horizontal, 2);
     category_row.add_css_class("category-row");
     category_row.set_halign(Align::Start);
+    category_row.set_vexpand(false);
+    let category_scroller = ScrolledWindow::builder()
+        .child(&category_row)
+        .hexpand(true)
+        .vexpand(false)
+        .hscrollbar_policy(PolicyType::Never)
+        .vscrollbar_policy(PolicyType::Never)
+        .min_content_height(34)
+        .build();
+    category_scroller.set_hexpand(true);
+    category_scroller.set_vexpand(false);
+    let category_bar = GtkBox::new(Orientation::Horizontal, 0);
+    category_bar.set_hexpand(true);
+    category_bar.set_vexpand(false);
+    category_bar.append(&category_scroller);
     let active_category = Rc::new(RefCell::new(None::<Button>));
     let category_buttons = Rc::new(RefCell::new(Vec::<(String, Button)>::new()));
     for filter_id in &linux_settings.home_filters {
@@ -2994,6 +3009,7 @@ fn build_window(
         let entry_for_chip = entry.clone();
         let active_category_for_chip = active_category.clone();
         let chip_for_callback = chip.clone();
+        let scroller_for_chip = category_scroller.clone();
         chip.connect_clicked(move |_| {
             if let Some(previous) = active_category_for_chip
                 .borrow_mut()
@@ -3004,27 +3020,38 @@ fn build_window(
             chip_for_callback.add_css_class("active");
             entry_for_chip.set_text(prefix);
             entry_for_chip.grab_focus();
+            ensure_category_visible(&scroller_for_chip, &chip_for_callback);
         });
+        let focus_controller = EventControllerFocus::new();
+        let scroller_for_focus = category_scroller.clone();
+        let chip_for_focus = chip.clone();
+        focus_controller.connect_enter(move |_| {
+            ensure_category_visible(&scroller_for_focus, &chip_for_focus);
+        });
+        chip.add_controller(focus_controller);
     }
-    let category_scroller = ScrolledWindow::builder()
-        .child(&category_row)
-        .hexpand(true)
-        .vexpand(false)
-        .hscrollbar_policy(PolicyType::Automatic)
-        .vscrollbar_policy(PolicyType::Never)
-        .min_content_height(34)
-        .build();
-    let category_bar = GtkBox::new(Orientation::Horizontal, 4);
-    category_bar.set_hexpand(true);
-    category_bar.append(&category_scroller);
-
-    let status = Label::new(Some("Quick Search"));
-    status.set_halign(Align::End);
-    status.set_hexpand(false);
-    status.set_ellipsize(gtk4::pango::EllipsizeMode::End);
-    status.set_max_width_chars(18);
-    status.add_css_class("status-label");
-    category_bar.append(&status);
+    let filter_scroll_controller = EventControllerScroll::new(
+        EventControllerScrollFlags::VERTICAL | EventControllerScrollFlags::HORIZONTAL,
+    );
+    filter_scroll_controller.set_propagation_phase(PropagationPhase::Capture);
+    let category_scroller_for_scroll = category_scroller.clone();
+    filter_scroll_controller.connect_scroll(move |_, dx, dy| {
+        let delta = if dx.abs() > 0.01 { dx } else { dy };
+        if delta.abs() <= 0.01 {
+            return glib::Propagation::Proceed;
+        }
+        let adjustment = category_scroller_for_scroll.hadjustment();
+        let lower = adjustment.lower();
+        let upper = (adjustment.upper() - adjustment.page_size()).max(lower);
+        let next = (adjustment.value() + delta * 72.0).clamp(lower, upper);
+        if (next - adjustment.value()).abs() > 0.01 {
+            adjustment.set_value(next);
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    category_scroller.add_controller(filter_scroll_controller);
     root.append(&category_bar);
 
     let list = ListBox::new();
@@ -3047,7 +3074,17 @@ fn build_window(
     ));
     footer.set_halign(Align::End);
     footer.add_css_class("footer-hint");
-    root.append(&footer);
+    let status = Label::new(Some("Quick Search"));
+    status.set_halign(Align::Start);
+    status.set_hexpand(true);
+    status.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    status.set_max_width_chars(34);
+    status.add_css_class("status-label");
+    let footer_bar = GtkBox::new(Orientation::Horizontal, 8);
+    footer_bar.set_hexpand(true);
+    footer_bar.append(&status);
+    footer_bar.append(&footer);
+    root.append(&footer_bar);
     let (agent_root, agent_ui) = build_agent_view(&paths);
     connect_agent_actions(&agent_ui);
     let agent_stack = Stack::new();
@@ -3139,6 +3176,7 @@ fn build_window(
         sync_active_category(
             &active_category_for_changed,
             &category_buttons_for_changed.borrow(),
+            &category_scroller,
             &query,
         );
         if let Some(source) = debounce_source.borrow_mut().take() {
@@ -3751,12 +3789,7 @@ fn update_results(
         list.append(&empty_state_row(&message));
         status.set_text(&message);
     } else {
-        let source_count = items
-            .iter()
-            .map(|item| item.source.as_str())
-            .collect::<std::collections::HashSet<_>>()
-            .len();
-        status.set_text(&format!("{source_count} sources · {} results", items.len()));
+        status.set_text("Quick Search");
     }
     list.unselect_all();
     if let Some(row) = list.row_at_index(0) {
@@ -3913,6 +3946,7 @@ fn move_home_filter(order: &Rc<RefCell<Vec<String>>>, id: &str, delta: i32, orde
 fn sync_active_category(
     active_category: &Rc<RefCell<Option<Button>>>,
     categories: &[(String, Button)],
+    scroller: &ScrolledWindow,
     query: &str,
 ) {
     let query = query.trim();
@@ -3930,6 +3964,26 @@ fn sync_active_category(
         previous.remove_css_class("active");
     }
     next.add_css_class("active");
+    ensure_category_visible(scroller, next);
+}
+
+fn ensure_category_visible(scroller: &ScrolledWindow, button: &Button) {
+    let allocation = button.allocation();
+    let adjustment = scroller.hadjustment();
+    let current = adjustment.value();
+    let viewport = adjustment.page_size().max(scroller.width() as f64);
+    let left = allocation.x() as f64;
+    let right = left + allocation.width() as f64;
+    let margin = 8.0;
+    let target = if left < current + margin {
+        (left - margin).max(adjustment.lower())
+    } else if right > current + viewport - margin {
+        (right - viewport + margin)
+            .min((adjustment.upper() - adjustment.page_size()).max(adjustment.lower()))
+    } else {
+        return;
+    };
+    adjustment.set_value(target);
 }
 
 fn empty_state_message(query: &str) -> String {
