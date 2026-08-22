@@ -2674,13 +2674,22 @@ fn open_quick_preview(
     floating: &PreviewState,
     side: &SidePreviewState,
     load_generation: &Rc<Cell<u64>>,
+    alt_active: &Rc<Cell<bool>>,
     item: &Item,
     mode: &str,
 ) -> bool {
     if mode == "side" {
         open_side_preview(paths, side, load_generation, item)
     } else {
-        open_image_preview(parent, paths, floating, load_generation, item, true)
+        open_image_preview(
+            parent,
+            paths,
+            floating,
+            load_generation,
+            item,
+            true,
+            Some(alt_active.clone()),
+        )
     }
 }
 
@@ -2691,13 +2700,15 @@ fn open_image_preview(
     load_generation: &Rc<Cell<u64>>,
     item: &Item,
     quick: bool,
+    alt_active: Option<Rc<Cell<bool>>>,
 ) -> bool {
     let Some(source) = preview_source_for_item(paths, item) else {
         return false;
     };
 
-    let preview = if let Some(preview) = previews.borrow().as_ref() {
-        preview.clone()
+    let existing_preview = previews.borrow().as_ref().cloned();
+    let preview = if let Some(preview) = existing_preview {
+        preview
     } else {
         let Some(application) = parent.application() else {
             return false;
@@ -2785,6 +2796,19 @@ fn open_image_preview(
                 glib::Propagation::Proceed
             }
         });
+        if quick {
+            let previews_for_alt_release = previews.clone();
+            let generation_for_alt_release = load_generation.clone();
+            let alt_active_for_release = alt_active.clone();
+            key_controller.connect_key_released(move |_, key, _, _| {
+                if matches!(key, gdk::Key::Alt_L | gdk::Key::Alt_R) {
+                    if let Some(alt_active) = alt_active_for_release.as_ref() {
+                        alt_active.set(false);
+                    }
+                    close_image_preview(&previews_for_alt_release, &generation_for_alt_release);
+                }
+            });
+        }
         window.add_controller(key_controller);
 
         let preview = PreviewHandle {
@@ -3300,6 +3324,7 @@ fn build_window(
                     &preview_generation_for_enter,
                     &item,
                     false,
+                    None,
                 )
             {
                 return;
@@ -3385,6 +3410,7 @@ fn build_window(
                 &preview_generation_for_activation,
                 &item,
                 false,
+                None,
             ) {
                 return;
             }
@@ -3450,6 +3476,7 @@ fn build_window(
                         &previews_for_key,
                         &side_previews_for_key,
                         &preview_generation_for_key,
+                        &alt_preview_active_for_key,
                         item,
                         &mode,
                     )
@@ -3547,6 +3574,7 @@ fn build_window(
                                 &previews_for_key,
                                 &side_previews_for_key,
                                 &preview_generation_for_key,
+                                &alt_preview_active_for_key,
                                 &item,
                                 &mode,
                             );
@@ -3616,6 +3644,13 @@ fn build_window(
     let base_height_for_focus_loss = base_height.clone();
     window.connect_is_active_notify(move |window| {
         if window.is_active() {
+            return;
+        }
+        // The floating quick preview is an owned ProtonSearch window. GTK
+        // can mark the launcher inactive while that preview is presented;
+        // keep the preview alive until Alt is released instead of treating
+        // this internal focus transfer as an outside click.
+        if alt_for_focus_loss.get() && previews_for_focus_loss.borrow().is_some() {
             return;
         }
         alt_for_focus_loss.set(false);
