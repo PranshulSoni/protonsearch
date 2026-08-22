@@ -2400,6 +2400,9 @@ fn confirmation_target(target: &Target) -> Option<(Target, &'static str)> {
 struct StatusUi {
     stack: Stack,
     panel: GtkBox,
+    window: ApplicationWindow,
+    launcher_root: GtkBox,
+    previous_window_size: Rc<Cell<Option<(i32, i32)>>>,
     icon: Image,
     title: Label,
     value: Label,
@@ -2411,8 +2414,59 @@ struct StatusUi {
 }
 
 impl StatusUi {
+    fn remember_launcher_size(&self) {
+        if self.previous_window_size.get().is_some() {
+            return;
+        }
+        let (default_width, default_height) = self.window.default_size();
+        let width = self.window.width().max(default_width).max(1);
+        let height = self.window.height().max(default_height).max(1);
+        self.previous_window_size.set(Some((width, height)));
+    }
+
+    fn restore_launcher_size(&self) {
+        if let Some((width, height)) = self.previous_window_size.take() {
+            self.launcher_root.set_width_request(width);
+            self.window.set_default_size(width, height);
+        }
+    }
+
+    fn status_window_bounds(&self) -> (i32, i32) {
+        let fallback = (1600, 1000);
+        let Some(surface) = self.window.surface() else {
+            return fallback;
+        };
+        let Some(monitor) =
+            gtk4::prelude::WidgetExt::display(&self.window).monitor_at_surface(&surface)
+        else {
+            return fallback;
+        };
+        let geometry = monitor.geometry();
+        (
+            geometry.width().saturating_sub(32).max(480),
+            geometry.height().saturating_sub(64).max(320),
+        )
+    }
+
+    fn resize_to_status_content(&self) {
+        let (min_width, natural_width, _, _) = self.panel.measure(Orientation::Horizontal, -1);
+        let width = natural_width.max(min_width).max(520);
+        let (min_height, natural_height, _, _) = self.panel.measure(Orientation::Vertical, width);
+        let height = natural_height.max(min_height).max(340);
+        let (max_width, max_height) = self.status_window_bounds();
+        self.window
+            .set_default_size(width.min(max_width), height.min(max_height));
+    }
+
+    fn show_status(&self) {
+        self.remember_launcher_size();
+        self.stack.set_visible_child_name("status");
+        self.resize_to_status_content();
+    }
+
     fn show_launcher(&self) {
         self.stack.set_visible_child_name("launcher");
+        self.restore_launcher_size();
     }
 
     fn close(&self, entry: &Entry) {
@@ -2421,10 +2475,15 @@ impl StatusUi {
     }
 }
 
-fn build_status_ui(stack: &Stack, entry: &Entry) -> StatusUi {
+fn build_status_ui(
+    stack: &Stack,
+    entry: &Entry,
+    window: &ApplicationWindow,
+    launcher_root: &GtkBox,
+) -> StatusUi {
     let panel = GtkBox::new(Orientation::Vertical, 18);
-    panel.set_hexpand(true);
-    panel.set_vexpand(true);
+    panel.set_hexpand(false);
+    panel.set_vexpand(false);
     panel.set_valign(Align::Center);
     panel.set_margin_top(22);
     panel.set_margin_bottom(22);
@@ -2458,7 +2517,7 @@ fn build_status_ui(stack: &Stack, entry: &Entry) -> StatusUi {
     let center = GtkBox::new(Orientation::Vertical, 8);
     center.set_halign(Align::Center);
     center.set_valign(Align::Center);
-    center.set_vexpand(true);
+    center.set_vexpand(false);
     let value = Label::new(Some("—"));
     value.set_halign(Align::Center);
     value.add_css_class("status-value");
@@ -2491,6 +2550,9 @@ fn build_status_ui(stack: &Stack, entry: &Entry) -> StatusUi {
     let status_ui = StatusUi {
         stack: stack.clone(),
         panel: panel.clone(),
+        window: window.clone(),
+        launcher_root: launcher_root.clone(),
+        previous_window_size: Rc::new(Cell::new(None)),
         icon,
         title,
         value,
@@ -2556,7 +2618,7 @@ fn render_status_panel(status_ui: &StatusUi, panel: StatusPanel, target: Target)
         status_ui.properties.append(&row);
     }
     *status_ui.target.borrow_mut() = Some(target);
-    status_ui.stack.set_visible_child_name("status");
+    status_ui.show_status();
     status_ui.refresh.grab_focus();
 }
 
@@ -3429,7 +3491,7 @@ fn build_window(
     view_stack.set_transition_type(StackTransitionType::Crossfade);
     view_stack.set_transition_duration(120);
     view_stack.add_named(&launcher_shell, Some("launcher"));
-    let status_ui = build_status_ui(&view_stack, &entry);
+    let status_ui = build_status_ui(&view_stack, &entry, &window, &root);
     view_stack.add_named(&status_ui.panel, Some("status"));
     view_stack.set_visible_child_name("launcher");
     window.set_child(Some(&view_stack));
