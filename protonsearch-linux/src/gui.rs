@@ -1239,7 +1239,9 @@ fn connect_agent_actions(ui: &AgentUi) {
     let ui_for_history = ui.clone();
     ui.history.connect_row_selected(move |_, row| {
         if let Some(row) = row {
-            agent_new_conversation(&ui_for_history, Some(row.widget_name().to_string()));
+            *ui_for_history.active.borrow_mut() = Some(row.widget_name().to_string());
+            agent_render_chat(&ui_for_history);
+            ui_for_history.prompt.grab_focus();
         }
     });
 }
