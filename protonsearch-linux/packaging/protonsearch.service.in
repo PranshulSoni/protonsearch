@@ -2,11 +2,13 @@
 Description=ProtonSearch Linux launcher
 After=graphical-session.target
 PartOf=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
 ExecStart="@BINDIR@/protonsearch-linux" daemon
-Restart=always
+Restart=on-failure
 RestartSec=3
 Environment=RUST_BACKTRACE=1
 Environment="PATH=@BINDIR@:/usr/local/bin:/usr/bin:/bin"

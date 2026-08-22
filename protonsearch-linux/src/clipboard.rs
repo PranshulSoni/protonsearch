@@ -105,7 +105,9 @@ pub fn start(paths: XdgPaths) -> Result<ClipboardMonitor> {
         },
     )?;
 
-    let (sender, receiver) = mpsc::channel::<PendingClipboard>();
+    // Clipboard producers are event-driven. A bounded queue prevents a burst
+    // of large screenshots from retaining unbounded image buffers in memory.
+    let (sender, receiver) = mpsc::sync_channel::<PendingClipboard>(8);
     let worker_paths = paths.clone();
     let worker = thread::Builder::new()
         .name("protonsearch-clipboard-store".to_string())
@@ -190,27 +192,30 @@ fn start_wayland_watchers() -> Vec<NativeWatcher> {
     let Ok(executable) = std::env::current_exe() else {
         return Vec::new();
     };
-    [
-        ("text/plain", "clipboard-capture-text"),
-        ("image/png", "clipboard-capture-image"),
-    ]
-    .into_iter()
-    .filter_map(|(mime_type, mode)| {
-        Command::new("wl-paste")
-            .args(["--type", mime_type, "--watch"])
-            .arg(&executable)
-            .arg(mode)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map(|child| NativeWatcher { child })
-            .map_err(|error| {
-                eprintln!("ProtonSearch: could not start {mime_type} clipboard watcher: {error}");
-            })
-            .ok()
-    })
-    .collect()
+    // GDK already observes text changes on Wayland. Keep one native image
+    // watcher for screenshot tools whose image offer is not exposed through
+    // the text signal, avoiding two persistent subprocesses and duplicate
+    // text captures.
+    [("image/png", "clipboard-capture-image")]
+        .into_iter()
+        .filter_map(|(mime_type, mode)| {
+            Command::new("wl-paste")
+                .args(["--type", mime_type, "--watch"])
+                .arg(&executable)
+                .arg(mode)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .map(|child| NativeWatcher { child })
+                .map_err(|error| {
+                    eprintln!(
+                        "ProtonSearch: could not start {mime_type} clipboard watcher: {error}"
+                    );
+                })
+                .ok()
+        })
+        .collect()
 }
 
 pub fn status(paths: &XdgPaths) -> ClipboardStatus {
@@ -283,13 +288,13 @@ pub fn text(paths: &XdgPaths, id: u64) -> Result<String> {
 
 fn capture_current(
     clipboard: gdk::Clipboard,
-    sender: mpsc::Sender<PendingClipboard>,
+    sender: mpsc::SyncSender<PendingClipboard>,
     paths: XdgPaths,
 ) {
     let clipboard_for_texture = clipboard.clone();
     let paths_for_text = paths.clone();
     clipboard.read_text_async(None::<&gio::Cancellable>, move |result| {
-        let read_image = |sender: mpsc::Sender<PendingClipboard>, paths: XdgPaths| {
+        let read_image = |sender: mpsc::SyncSender<PendingClipboard>, paths: XdgPaths| {
             let _ = write_status(
                 &paths,
                 &ClipboardStatus {
@@ -303,7 +308,7 @@ fn capture_current(
                     Ok(Some(texture)) => {
                         let bytes = texture.save_to_png_bytes().to_vec();
                         if !bytes.is_empty() && bytes.len() <= MAX_IMAGE_BYTES {
-                            let _ = sender.send(PendingClipboard::Image(bytes));
+                            enqueue(&sender, PendingClipboard::Image(bytes));
                         }
                     }
                     Ok(None) => {}
@@ -313,7 +318,7 @@ fn capture_current(
         };
         match result {
             Ok(Some(text)) if !text.is_empty() && text.len() <= MAX_TEXT_BYTES => {
-                let _ = sender.send(PendingClipboard::Text(text.to_string()));
+                enqueue(&sender, PendingClipboard::Text(text.to_string()));
             }
             Ok(Some(_)) => {}
             Ok(None) => {
@@ -329,7 +334,7 @@ fn capture_current(
     });
 }
 
-fn fallback_text(sender: mpsc::Sender<PendingClipboard>, paths: XdgPaths) {
+fn fallback_text(sender: mpsc::SyncSender<PendingClipboard>, paths: XdgPaths) {
     thread::spawn(move || {
         let mut last_result = None;
         for attempt in 0..3 {
@@ -370,7 +375,7 @@ fn fallback_text(sender: mpsc::Sender<PendingClipboard>, paths: XdgPaths) {
                         message: "Clipboard text captured".to_string(),
                     },
                 );
-                let _ = sender.send(PendingClipboard::Text(result.stdout));
+                enqueue(&sender, PendingClipboard::Text(result.stdout));
                 return;
             }
             last_result = Some(result);
@@ -386,6 +391,13 @@ fn fallback_text(sender: mpsc::Sender<PendingClipboard>, paths: XdgPaths) {
             );
         }
     });
+}
+
+fn enqueue(sender: &mpsc::SyncSender<PendingClipboard>, pending: PendingClipboard) {
+    // Dropping the newest event under a sustained burst is preferable to
+    // growing resident memory without bound. The next clipboard change will
+    // be captured normally once the writer catches up.
+    let _ = sender.try_send(pending);
 }
 
 fn persist_pending(paths: &XdgPaths, pending: PendingClipboard) -> Result<()> {

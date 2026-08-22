@@ -922,8 +922,11 @@ fn run_application(
     let clipboard_monitor = Rc::new(RefCell::new(None::<crate::clipboard::ClipboardMonitor>));
     let clipboard_monitor_for_startup = clipboard_monitor.clone();
     let clipboard_paths = paths.clone();
-    application.connect_startup(
-        move |_| match crate::clipboard::start(clipboard_paths.clone()) {
+    application.connect_startup(move |_| {
+        if !settings::load(&clipboard_paths).enable_clipboard_history {
+            return;
+        }
+        match crate::clipboard::start(clipboard_paths.clone()) {
             Ok(monitor) => {
                 *clipboard_monitor_for_startup.borrow_mut() = Some(monitor);
             }
@@ -934,8 +937,8 @@ fn run_application(
                 );
                 eprintln!("ProtonSearch: clipboard monitoring unavailable: {error:#}");
             }
-        },
-    );
+        }
+    });
     let commands = Rc::new(RefCell::new(Some(commands)));
     let commands_for_activate = commands.clone();
     application.connect_activate(move |application| {
@@ -1034,23 +1037,10 @@ fn build_agent_view(paths: &XdgPaths) -> (GtkBox, AgentUi) {
     heading.set_hexpand(true);
     heading.add_css_class("settings-heading");
     header.append(&heading);
-    let hermes_readiness = crate::hermes::readiness();
-    let status_text = match hermes_readiness.command {
-        None => "Hermes Agent is not installed".to_string(),
-        Some(command) if hermes_readiness.ready => format!(
-            "{} · local gateway ready",
-            hermes_readiness
-                .version
-                .unwrap_or_else(|| command.program().to_string())
-        ),
-        Some(command) => format!(
-            "{} installed · local gateway not running",
-            hermes_readiness
-                .version
-                .unwrap_or_else(|| command.program().to_string())
-        ),
-    };
-    let status = Label::new(Some(&status_text));
+    // Hermes readiness probes execute an external CLI and a bounded network
+    // check. Do not make launcher construction wait for either; the agent
+    // action performs its own readiness/error handling when the tab is used.
+    let status = Label::new(Some("Hermes Agent · ready when opened"));
     status.set_halign(Align::End);
     status.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     status.set_max_width_chars(34);
@@ -1744,6 +1734,43 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
         indexing_note.add_css_class("settings-help");
         indexing_page.append(&indexing_note);
 
+        let performance_title = Label::new(Some("Adaptive resource use"));
+        performance_title.set_halign(Align::Start);
+        performance_title.add_css_class("settings-section-title");
+        indexing_page.append(&performance_title);
+        let performance_mode = ComboBoxText::new();
+        performance_mode.append(Some("adaptive"), "Adaptive (recommended)");
+        performance_mode.append(Some("low-resource"), "Low resource / battery");
+        performance_mode.append(Some("balanced"), "Balanced");
+        performance_mode.append(Some("high-performance"), "High performance");
+        let performance_id = match current.performance_mode.as_str() {
+            "low-resource" => "low-resource",
+            "balanced" => "balanced",
+            "high-performance" => "high-performance",
+            _ => "adaptive",
+        };
+        performance_mode.set_active_id(Some(performance_id));
+        performance_mode.set_tooltip_text(Some(
+            "Adjusts bounded search traversal and provider work for this machine",
+        ));
+        indexing_page.append(&performance_mode);
+        let pause_search_on_battery = CheckButton::with_label(
+            "Use the low-resource budget on battery power",
+        );
+        pause_search_on_battery.set_active(current.pause_search_on_battery);
+        indexing_page.append(&pause_search_on_battery);
+        let reduce_search_when_busy = CheckButton::with_label(
+            "Reduce search work while the system is busy",
+        );
+        reduce_search_when_busy.set_active(current.reduce_search_when_busy);
+        indexing_page.append(&reduce_search_when_busy);
+        let performance_summary = Label::new(Some(&crate::performance::summary(&paths, &current)));
+        performance_summary.set_wrap(true);
+        performance_summary.set_selectable(true);
+        performance_summary.set_halign(Align::Start);
+        performance_summary.add_css_class("settings-help");
+        indexing_page.append(&performance_summary);
+
         let roots_title = Label::new(Some("Authoritative search roots"));
         roots_title.set_halign(Align::Start);
         roots_title.add_css_class("settings-section-title");
@@ -2019,6 +2046,12 @@ pub fn run_settings(paths: XdgPaths) -> Result<()> {
             next.window_height = height.value_as_int().clamp(420, 1200) as u32;
             next.item_height = item_height.value_as_int().clamp(52, 120) as u32;
             next.search_bar_height = search_bar_height.value_as_int().clamp(42, 100) as u32;
+            next.performance_mode = performance_mode
+                .active_id()
+                .map(|id| id.to_string())
+                .unwrap_or_else(|| "adaptive".to_string());
+            next.pause_search_on_battery = pause_search_on_battery.is_active();
+            next.reduce_search_when_busy = reduce_search_when_busy.is_active();
             next.image_preview_mode = image_preview_mode
                 .active_id()
                 .map(|id| id.to_string())
@@ -2529,36 +2562,27 @@ fn set_launcher_status(status: &Label, message: &str) {
 
 fn activate_target(
     paths: &XdgPaths,
-    window: &ApplicationWindow,
+    _window: &ApplicationWindow,
     status: &Label,
-    animation: &Rc<RefCell<Option<glib::SourceId>>>,
+    _animation: &Rc<RefCell<Option<glib::SourceId>>>,
     action_sender: &async_channel::Sender<(Target, anyhow::Result<Option<StatusPanel>>)>,
     target: Target,
 ) {
-    if matches!(&target, Target::Action { .. }) {
-        let paths_for_worker = paths.clone();
-        let target_for_worker = target.clone();
-        let sender_for_worker = action_sender.clone();
-        set_launcher_status(status, "Running action…");
-        thread::spawn(move || {
-            let result = providers::activate(&paths_for_worker, &target_for_worker);
-            let _ = sender_for_worker.send_blocking((target_for_worker, result));
-        });
-        return;
-    }
-    match providers::activate(paths, &target) {
-        Ok(Some(_)) => {
-            set_launcher_status(status, "Quick Search");
-        }
-        Ok(None) => {
-            animate_hide(window, animation);
-        }
-        Err(error) => {
-            set_launcher_status(status, &format!("Action failed: {error}"));
-            status.set_tooltip_text(Some(&format!("{error:#}")));
-            eprintln!("ProtonSearch: {error:#}");
-        }
-    }
+    let paths_for_worker = paths.clone();
+    let target_for_worker = target.clone();
+    let sender_for_worker = action_sender.clone();
+    let status_message = if matches!(target, Target::Action { .. }) {
+        "Running action…"
+    } else {
+        "Opening…"
+    };
+    set_launcher_status(status, status_message);
+    // Desktop openers and clipboard writes can block on a slow portal or
+    // compositor. Keep every external activation off the GTK thread.
+    thread::spawn(move || {
+        let result = providers::activate(&paths_for_worker, &target_for_worker);
+        let _ = sender_for_worker.send_blocking((target_for_worker, result));
+    });
 }
 
 fn activate_item(
@@ -3490,6 +3514,8 @@ fn build_window(
 
     let action_status = status.clone();
     let status_ui_for_receiver = status_ui.clone();
+    let window_for_action_receiver = window.clone();
+    let animation_for_action_receiver = animation.clone();
     glib::MainContext::default().spawn_local(async move {
         while let Ok((target, result)) = action_receiver.recv().await {
             match result {
@@ -3499,7 +3525,19 @@ fn build_window(
                 }
                 Ok(None) => {
                     status_ui_for_receiver.refresh.set_sensitive(true);
-                    set_launcher_status(&action_status, "Quick Search");
+                    if matches!(
+                        target,
+                        Target::Application(_)
+                            | Target::Path(_)
+                            | Target::Url(_)
+                            | Target::Copy(_)
+                            | Target::Clipboard(_)
+                    ) {
+                        set_launcher_status(&action_status, "Quick Search");
+                        animate_hide(&window_for_action_receiver, &animation_for_action_receiver);
+                    } else {
+                        set_launcher_status(&action_status, "Quick Search");
+                    }
                 }
                 Err(error) => {
                     status_ui_for_receiver.refresh.set_sensitive(true);
@@ -4003,6 +4041,14 @@ fn build_window(
                 base_height_for_focus_loss.get() as i32,
             );
         }
+    });
+    // The resident daemon owns this window for the whole session. Closing it
+    // from a window manager must hide it, not destroy the GTK object that a
+    // later Alt+Space/IPC toggle will present.
+    window.set_hide_on_close(true);
+    window.connect_close_request(|window| {
+        window.hide();
+        glib::Propagation::Stop
     });
     // The resident service starts hidden. The compositor shortcut sends a
     // toggle over the IPC socket and reveals the launcher on demand.

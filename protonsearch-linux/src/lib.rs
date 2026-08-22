@@ -14,6 +14,7 @@ pub mod gui;
 pub mod hermes;
 pub mod hyprland;
 pub mod icons;
+pub mod performance;
 pub mod platform;
 pub mod providers;
 pub mod search;

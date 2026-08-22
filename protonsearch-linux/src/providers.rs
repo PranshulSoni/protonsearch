@@ -8,6 +8,7 @@ use crate::actions;
 use crate::calculator;
 use crate::clipboard;
 use crate::desktop::{self, DesktopEntry};
+use crate::performance::SearchBudget;
 use crate::search::{self, FileResult, SearchOptions};
 use crate::settings::{self, LinuxSettings};
 use crate::system;
@@ -22,9 +23,6 @@ use std::fs;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-
-const MAX_GIT_REPOSITORIES: usize = 12;
-const MAX_GIT_SCAN_ENTRIES: usize = 6_000;
 
 pub const MAX_RESULTS: usize = 100;
 
@@ -83,6 +81,7 @@ enum Scope {
 pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str) -> Vec<Item> {
     let (scope, query) = parse_scope(raw_query);
     let query_lower = query.to_ascii_lowercase();
+    let budget = crate::performance::budget(paths, linux_settings);
     let mut results = Vec::new();
 
     if scope == Scope::Ocr {
@@ -98,9 +97,11 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
             Scope::All => {
                 add_home_sources(linux_settings, &mut results);
             }
-            Scope::Folders => add_files(paths, linux_settings, "", scope, &mut results),
-            Scope::Files => add_files(paths, linux_settings, "", scope, &mut results),
-            Scope::Apps => add_applications(paths, linux_settings, "", scope, &mut results),
+            Scope::Folders => add_files(paths, linux_settings, &budget, "", scope, &mut results),
+            Scope::Files => add_files(paths, linux_settings, &budget, "", scope, &mut results),
+            Scope::Apps => {
+                add_applications(paths, linux_settings, &budget, "", scope, &mut results)
+            }
             Scope::Settings => add_settings(paths, "", &mut results),
             Scope::Commands => add_commands(paths, "", &mut results),
             Scope::Recent => add_recent(paths, "", &mut results),
@@ -117,13 +118,20 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
             Scope::AgentHistory => {
                 add_hermes_history("", linux_settings.enable_agent_history, &mut results)
             }
-            Scope::Images => add_content(paths, linux_settings, "", Scope::Images, &mut results),
+            Scope::Images => add_content(
+                paths,
+                linux_settings,
+                &budget,
+                "",
+                Scope::Images,
+                &mut results,
+            ),
             Scope::Clipboard => add_clipboard(paths, "", &mut results),
-            Scope::Git => add_git(paths, "", &mut results),
-            Scope::Ocr => add_content(paths, linux_settings, "", Scope::Ocr, &mut results),
+            Scope::Git => add_git(paths, &budget, "", &mut results),
+            Scope::Ocr => add_content(paths, linux_settings, &budget, "", Scope::Ocr, &mut results),
             Scope::Content | Scope::Windows => {}
         }
-        return trim(results);
+        return trim(results, budget.max_results);
     }
 
     if (scope == Scope::All || scope == Scope::Commands) && linux_settings.enable_system_actions {
@@ -149,13 +157,13 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
         );
     }
     if scope == Scope::All || scope == Scope::Apps {
-        add_applications(paths, linux_settings, &query, scope, &mut results);
+        add_applications(paths, linux_settings, &budget, &query, scope, &mut results);
     }
     if linux_settings.enable_hyprland && (scope == Scope::All || scope == Scope::Windows) {
         add_windows(&query_lower, &mut results);
     }
     if scope == Scope::All || scope == Scope::Files || scope == Scope::Folders {
-        add_files(paths, linux_settings, &query, scope, &mut results);
+        add_files(paths, linux_settings, &budget, &query, scope, &mut results);
     }
     if scope == Scope::All {
         add_recent(paths, &query_lower, &mut results);
@@ -185,16 +193,23 @@ pub fn collect(paths: &XdgPaths, linux_settings: &LinuxSettings, raw_query: &str
         );
     }
     if scope == Scope::Git {
-        add_git(paths, &query_lower, &mut results);
+        add_git(paths, &budget, &query_lower, &mut results);
     }
     if matches!(scope, Scope::Content | Scope::Images | Scope::Ocr) {
-        add_content(paths, linux_settings, &query_lower, scope, &mut results);
+        add_content(
+            paths,
+            linux_settings,
+            &budget,
+            &query_lower,
+            scope,
+            &mut results,
+        );
     }
     if scope == Scope::Clipboard {
         add_clipboard(paths, &query_lower, &mut results);
     }
 
-    trim(results)
+    trim(results, budget.max_results)
 }
 
 fn add_home_sources(linux_settings: &LinuxSettings, results: &mut Vec<Item>) {
@@ -411,16 +426,17 @@ fn ocr_coming_soon() -> Item {
     }
 }
 
-fn trim(mut results: Vec<Item>) -> Vec<Item> {
+fn trim(mut results: Vec<Item>, max_results: usize) -> Vec<Item> {
     let mut seen = HashSet::new();
     results.retain(|item| seen.insert(format!("{}\n{}", item.title, item.subtitle)));
-    results.truncate(MAX_RESULTS);
+    results.truncate(max_results);
     results
 }
 
 fn add_applications(
     paths: &XdgPaths,
     linux_settings: &LinuxSettings,
+    budget: &SearchBudget,
     query: &str,
     scope: Scope,
     results: &mut Vec<Item>,
@@ -433,33 +449,37 @@ fn add_applications(
     } else {
         desktop::matching_applications_filtered(paths, query, linux_settings.show_terminal_apps)
     };
-    results.extend(entries.into_iter().take(35).map(|entry| {
-        Item {
-            title: entry.name.clone(),
-            subtitle: entry
-                .generic_name
-                .clone()
-                .or_else(|| entry.comment.clone())
-                .unwrap_or_else(|| "Application".to_string()),
-            source: "Applications".to_string(),
-            kind: "APP".to_string(),
-            target: Target::Application(entry),
-        }
-    }));
+    results.extend(
+        entries
+            .into_iter()
+            .take(budget.application_results)
+            .map(|entry| Item {
+                title: entry.name.clone(),
+                subtitle: entry
+                    .generic_name
+                    .clone()
+                    .or_else(|| entry.comment.clone())
+                    .unwrap_or_else(|| "Application".to_string()),
+                source: "Applications".to_string(),
+                kind: "APP".to_string(),
+                target: Target::Application(entry),
+            }),
+    );
 }
 
 fn add_files(
     paths: &XdgPaths,
     linux_settings: &LinuxSettings,
+    budget: &SearchBudget,
     query: &str,
     scope: Scope,
     results: &mut Vec<Item>,
 ) {
     let options = SearchOptions {
         include_hidden: linux_settings.include_hidden,
-        max_results: 55,
-        max_entries: 50_000,
-        max_depth: 32,
+        max_results: budget.file_results,
+        max_entries: budget.file_entries,
+        max_depth: budget.file_depth,
         extra_roots: linux_settings
             .search_roots
             .iter()
@@ -1179,11 +1199,11 @@ fn add_firefox_bookmarks(path: &Path, query: &str, results: &mut Vec<Item>) {
     }
 }
 
-fn add_git(paths: &XdgPaths, query: &str, results: &mut Vec<Item>) {
+fn add_git(paths: &XdgPaths, budget: &SearchBudget, query: &str, results: &mut Vec<Item>) {
     if !system::command_available("git") {
         return;
     }
-    for repo in find_repositories(paths) {
+    for repo in find_repositories(paths, budget) {
         let name = repo
             .file_name()
             .and_then(|name| name.to_str())
@@ -1237,7 +1257,7 @@ fn add_git(paths: &XdgPaths, query: &str, results: &mut Vec<Item>) {
     }
 }
 
-fn find_repositories(paths: &XdgPaths) -> Vec<PathBuf> {
+fn find_repositories(paths: &XdgPaths, budget: &SearchBudget) -> Vec<PathBuf> {
     let mut found = Vec::new();
     let mut roots = Vec::new();
     for mount_root in [
@@ -1255,9 +1275,16 @@ fn find_repositories(paths: &XdgPaths) -> Vec<PathBuf> {
     let mut visited = 0;
     for root in roots {
         if seen_roots.insert(root.clone()) {
-            find_repositories_inner(&root, &mut found, 0, &mut visited);
+            find_repositories_inner(
+                &root,
+                &mut found,
+                0,
+                &mut visited,
+                budget.git_repositories,
+                budget.git_entries,
+            );
         }
-        if found.len() >= MAX_GIT_REPOSITORIES {
+        if found.len() >= budget.git_repositories {
             break;
         }
     }
@@ -1308,8 +1335,10 @@ fn find_repositories_inner(
     found: &mut Vec<PathBuf>,
     depth: usize,
     visited: &mut usize,
+    max_repositories: usize,
+    max_entries: usize,
 ) {
-    if depth > 8 || found.len() >= MAX_GIT_REPOSITORIES || *visited >= MAX_GIT_SCAN_ENTRIES {
+    if depth > 8 || found.len() >= max_repositories || *visited >= max_entries {
         return;
     }
     *visited += 1;
@@ -1349,13 +1378,21 @@ fn find_repositories_inner(
         ) {
             continue;
         }
-        find_repositories_inner(&child, found, depth + 1, visited);
+        find_repositories_inner(
+            &child,
+            found,
+            depth + 1,
+            visited,
+            max_repositories,
+            max_entries,
+        );
     }
 }
 
 fn add_content(
     paths: &XdgPaths,
     linux_settings: &LinuxSettings,
+    budget: &SearchBudget,
     query: &str,
     scope: Scope,
     results: &mut Vec<Item>,
@@ -1363,9 +1400,21 @@ fn add_content(
     let image_scope = matches!(scope, Scope::Images | Scope::Ocr);
     let options = SearchOptions {
         include_hidden: linux_settings.include_hidden,
-        max_results: if image_scope { 100 } else { 30 },
-        max_entries: 12_000,
-        max_depth: 20,
+        max_results: if image_scope {
+            budget.image_results
+        } else {
+            budget.content_results
+        },
+        max_entries: if image_scope {
+            budget.image_entries
+        } else {
+            budget.content_entries
+        },
+        max_depth: if image_scope {
+            budget.image_depth
+        } else {
+            budget.content_depth
+        },
         extra_roots: linux_settings
             .search_roots
             .iter()
@@ -1389,7 +1438,9 @@ fn add_content(
             });
         }
     }
-    if scope != Scope::Images || linux_settings.enable_ocr {
+    // Images are filename-search only until OCR is released. Avoid spawning
+    // tesseract for every image while the user is simply browsing Images.
+    if scope != Scope::Images && scope != Scope::Ocr {
         for file in search::search_content(paths, query, &options) {
             let is_image = matches!(file.kind.as_str(), "image" | "ocr");
             if is_image && !linux_settings.enable_ocr {

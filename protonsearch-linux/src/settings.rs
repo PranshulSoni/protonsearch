@@ -62,6 +62,11 @@ pub struct LinuxSettings {
     pub hotkey: String,
     pub search_roots: Vec<String>,
     pub ignored_names: Vec<String>,
+    /// `adaptive`, `low-resource`, `balanced`, or `high-performance`.
+    pub performance_mode: String,
+    /// Reduce on-demand traversal while the machine is on battery or busy.
+    pub pause_search_on_battery: bool,
+    pub reduce_search_when_busy: bool,
     /// Filter IDs visible in the launcher rail, in display order.
     pub home_filters: Vec<String>,
     /// All filter IDs in the user's preferred order.
@@ -99,6 +104,9 @@ impl Default for LinuxSettings {
             hotkey: "ALT,SPACE".to_string(),
             search_roots: Vec::new(),
             ignored_names: Vec::new(),
+            performance_mode: "adaptive".to_string(),
+            pause_search_on_battery: true,
+            reduce_search_when_busy: true,
             home_filters: DEFAULT_HOME_FILTERS
                 .iter()
                 .map(|id| (*id).to_string())
@@ -160,6 +168,16 @@ pub fn normalize_image_preview_mode(settings: &mut LinuxSettings) {
     }
 }
 
+pub fn normalize_performance_mode(settings: &mut LinuxSettings) {
+    let mode = settings.performance_mode.trim().to_ascii_lowercase();
+    settings.performance_mode = match mode.as_str() {
+        "low" | "low-resource" | "power-saver" => "low-resource".to_string(),
+        "balanced" | "normal" => "balanced".to_string(),
+        "high" | "high-performance" | "performance" => "high-performance".to_string(),
+        _ => "adaptive".to_string(),
+    };
+}
+
 pub fn load(paths: &XdgPaths) -> LinuxSettings {
     let path = paths.settings_file();
     let Ok(contents) = fs::read_to_string(&path) else {
@@ -170,6 +188,7 @@ pub fn load(paths: &XdgPaths) -> LinuxSettings {
         Ok(mut settings) => {
             normalize_home_filters(&mut settings);
             normalize_image_preview_mode(&mut settings);
+            normalize_performance_mode(&mut settings);
             settings
         }
         Err(_) => {

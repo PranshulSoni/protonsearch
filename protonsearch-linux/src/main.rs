@@ -46,11 +46,12 @@ fn main() -> Result<()> {
         }
         Some("search") => {
             let query = args.collect::<Vec<_>>().join(" ");
+            let budget = protonsearch_linux::performance::budget(&paths, &settings);
             let options = search::SearchOptions {
                 include_hidden: settings.include_hidden,
-                max_results: 100,
-                max_entries: 50_000,
-                max_depth: 32,
+                max_results: budget.file_results,
+                max_entries: budget.file_entries,
+                max_depth: budget.file_depth,
                 extra_roots: settings.search_roots.iter().map(PathBuf::from).collect(),
                 ignored_names: settings.ignored_names.clone(),
             };
@@ -111,6 +112,10 @@ fn print_doctor(paths: &xdg::XdgPaths) {
         "xdg_data": paths.data,
         "xdg_state": paths.state,
         "capabilities": capabilities::detect(),
+        "performance": {
+            "summary": protonsearch_linux::performance::summary(paths, &settings::load(paths)),
+            "hardware": protonsearch_linux::performance::hardware(paths),
+        },
         "hermes": hermes,
     });
     print_json(&report);
