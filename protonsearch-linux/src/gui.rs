@@ -17,11 +17,13 @@ use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
     ComboBoxText, Entry, EventControllerFocus, EventControllerKey, EventControllerScroll,
-    EventControllerScrollFlags, Image, Label, ListBox, ListBoxRow, MessageDialog, MessageType,
-    Orientation, PolicyType, PropagationPhase, ResponseType, Revealer, RevealerTransitionType,
-    ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar, StackTransitionType,
+    EventControllerScrollFlags, GestureClick, Image, Label, ListBox, ListBoxRow, MessageDialog,
+    MessageType, Orientation, PolicyType, PropagationPhase, ResponseType, Revealer,
+    RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
+    StackTransitionType,
 };
 use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, Cursor, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -197,6 +199,11 @@ list.result-list > row.result-row.cursor-row:focus {
     background-color: #38444f;
     border: 1px solid #82c7bb;
     box-shadow: inset 3px 0 0 #82c7bb, 0 0 0 1px rgba(130, 199, 187, 0.16);
+}
+
+list.result-list > row.result-row.multi-selected:selected:not(.cursor-row) {
+    background-color: #2a3538;
+    border: 1px solid #49635e;
 }
 
 .result-icon {
@@ -486,6 +493,12 @@ window.proton-window.light list.result-list > row.result-row.cursor-row:focus {
     background-color: #d7eae6;
     border-color: #26796d;
     box-shadow: inset 3px 0 0 #26796d, 0 0 0 1px rgba(38, 121, 109, 0.16);
+}
+
+window.proton-window.light
+    list.result-list > row.result-row.multi-selected:selected:not(.cursor-row) {
+    background-color: #edf5f3;
+    border: 1px solid #a8cbc4;
 }
 
 window.proton-window.light list.result-list > row.result-row:selected label.result-title,
@@ -3062,6 +3075,7 @@ fn build_window(
     window.set_child(Some(&launcher_shell));
 
     let items = Rc::new(RefCell::new(Vec::<Item>::new()));
+    let multi_selected = Rc::new(RefCell::new(HashSet::<i32>::new()));
     let animation = Rc::new(RefCell::new(None::<glib::SourceId>));
     let generation = Rc::new(Cell::new(0_u64));
     let previews: PreviewState = Rc::new(RefCell::new(None));
@@ -3104,6 +3118,7 @@ fn build_window(
     *items.borrow_mut() = initial_items.clone();
     update_results(
         &list,
+        &scroll,
         &status,
         &initial_items,
         "",
@@ -3144,18 +3159,22 @@ fn build_window(
     let generation_for_receiver = generation.clone();
     let items_for_receiver = items.clone();
     let list_for_receiver = list.clone();
+    let scroll_for_receiver = scroll.clone();
     let status_for_receiver = status.clone();
     let row_height_for_receiver = row_height.clone();
     let settings_for_receiver = settings_state.clone();
     let paths_for_receiver = paths.clone();
     let cursor_index_for_receiver = cursor_index.clone();
+    let multi_selected_for_receiver = multi_selected.clone();
     glib::MainContext::default().spawn_local(async move {
         while let Ok((result_generation, query, results)) = receiver.recv().await {
             if result_generation == generation_for_receiver.get() {
                 *items_for_receiver.borrow_mut() = results.clone();
                 cursor_index_for_receiver.set(0);
+                multi_selected_for_receiver.borrow_mut().clear();
                 update_results(
                     &list_for_receiver,
+                    &scroll_for_receiver,
                     &status_for_receiver,
                     &results,
                     &query,
@@ -3414,6 +3433,43 @@ fn build_window(
         );
     });
 
+    let cursor_index_for_mouse = cursor_index.clone();
+    let scroll_for_mouse = scroll.clone();
+    let list_for_mouse = list.clone();
+    list.connect_row_selected(move |_, row| {
+        let Some(row) = row else {
+            return;
+        };
+        cursor_index_for_mouse.set(row.index());
+        set_cursor_row(&list_for_mouse, row.index());
+        ensure_result_visible(&scroll_for_mouse, row);
+    });
+
+    let multi_selected_for_click = multi_selected.clone();
+    let list_for_click = list.clone();
+    let cursor_index_for_click = cursor_index.clone();
+    let click_controller = GestureClick::new();
+    click_controller.set_button(1);
+    click_controller.set_propagation_phase(PropagationPhase::Capture);
+    click_controller.connect_pressed(move |gesture, _, _, y| {
+        if gesture
+            .current_event_state()
+            .contains(gdk::ModifierType::CONTROL_MASK)
+        {
+            return;
+        }
+        multi_selected_for_click.borrow_mut().clear();
+        sync_multi_selected_classes(&list_for_click, &multi_selected_for_click.borrow());
+        let Some(row) = list_for_click.row_at_y(y as i32) else {
+            return;
+        };
+        cursor_index_for_click.set(row.index());
+        set_cursor_row(&list_for_click, row.index());
+        list_for_click.unselect_all();
+        list_for_click.select_row(Some(&row));
+    });
+    list.add_controller(click_controller);
+
     let key_controller = EventControllerKey::new();
     let entry_for_shortcut = entry.clone();
     let window_for_escape = window.clone();
@@ -3421,6 +3477,7 @@ fn build_window(
     let agent_stack_for_escape = agent_stack.clone();
     let entry_for_agent_escape = entry.clone();
     let list_for_navigation = list.clone();
+    let scroll_for_navigation = scroll.clone();
     let items_for_preview = items.clone();
     let paths_for_preview = paths.clone();
     let previews_for_key = previews.clone();
@@ -3433,6 +3490,7 @@ fn build_window(
     let root_for_key = root.clone();
     let cursor_index_for_key = cursor_index.clone();
     let settings_state_for_key = settings_state.clone();
+    let multi_selected_for_key = multi_selected.clone();
     key_controller.connect_key_pressed(move |_, key, _, state| {
         let agent_visible = agent_stack_for_escape.visible_child_name().as_deref() == Some("agent");
         if key == gdk::Key::k && state.contains(gdk::ModifierType::CONTROL_MASK) {
@@ -3496,15 +3554,14 @@ fn build_window(
                 return glib::Propagation::Proceed;
             }
             if let Some(row) = list_for_navigation.row_at_index(cursor_index_for_key.get()) {
-                let selected = list_for_navigation
-                    .selected_rows()
-                    .iter()
-                    .any(|selected| selected.index() == row.index());
-                if selected {
+                let mut multi_selected = multi_selected_for_key.borrow_mut();
+                if multi_selected.remove(&row.index()) {
                     list_for_navigation.unselect_row(&row);
-                } else if !selected {
+                } else {
+                    multi_selected.insert(row.index());
                     list_for_navigation.select_row(Some(&row));
                 }
+                sync_multi_selected_classes(&list_for_navigation, &multi_selected);
             }
             return glib::Propagation::Stop;
         }
@@ -3541,15 +3598,21 @@ fn build_window(
             };
             if let Some(row) = list_for_navigation.row_at_index(next) {
                 cursor_index_for_key.set(next);
-                // Multiple selection is available for clipboard workflows,
-                // but ordinary arrow navigation must behave like a single
-                // active cursor. Holding Ctrl intentionally preserves the
-                // existing selection set.
-                if !state.contains(gdk::ModifierType::CONTROL_MASK) {
-                    list_for_navigation.unselect_all();
+                // Keep only explicitly multi-selected rows plus the active
+                // cursor row. Ordinary navigation never accumulates stale
+                // selection state, even when the list uses GTK's Multiple
+                // mode for clipboard workflows.
+                let preserved = multi_selected_for_key.borrow().clone();
+                list_for_navigation.unselect_all();
+                for index in preserved {
+                    if let Some(selected_row) = list_for_navigation.row_at_index(index) {
+                        list_for_navigation.select_row(Some(&selected_row));
+                    }
                 }
                 list_for_navigation.select_row(Some(&row));
                 set_cursor_row(&list_for_navigation, next);
+                sync_multi_selected_classes(&list_for_navigation, &multi_selected_for_key.borrow());
+                ensure_result_visible(&scroll_for_navigation, &row);
                 if alt_preview_active_for_key.get() {
                     if let Some(item) = items_for_preview.borrow().get(next as usize).cloned() {
                         let mode = settings_state_for_key.borrow().image_preview_mode.clone();
@@ -3719,6 +3782,7 @@ fn animate_hide(window: &ApplicationWindow, animation: &Rc<RefCell<Option<glib::
 
 fn update_results(
     list: &ListBox,
+    scroll: &ScrolledWindow,
     status: &Label,
     items: &[Item],
     query: &str,
@@ -3739,10 +3803,12 @@ fn update_results(
     } else {
         status.set_text("Quick Search");
     }
+    scroll.vadjustment().set_value(scroll.vadjustment().lower());
     list.unselect_all();
     if let Some(row) = list.row_at_index(0) {
         list.select_row(Some(&row));
         set_cursor_row(list, 0);
+        ensure_result_visible(scroll, &row);
     } else {
         list.select_row(None::<&ListBoxRow>);
     }
@@ -3757,6 +3823,21 @@ fn set_cursor_row(list: &ListBox, index: i32) {
                 row.add_css_class("cursor-row");
             } else {
                 row.remove_css_class("cursor-row");
+            }
+        }
+        child = next;
+    }
+}
+
+fn sync_multi_selected_classes(list: &ListBox, selected: &HashSet<i32>) {
+    let mut child = list.first_child();
+    while let Some(widget) = child {
+        let next = widget.next_sibling();
+        if let Ok(row) = widget.downcast::<ListBoxRow>() {
+            if selected.contains(&row.index()) {
+                row.add_css_class("multi-selected");
+            } else {
+                row.remove_css_class("multi-selected");
             }
         }
         child = next;
@@ -3927,6 +4008,25 @@ fn ensure_category_visible(scroller: &ScrolledWindow, button: &Button) {
         (left - margin).max(adjustment.lower())
     } else if right > current + viewport - margin {
         (right - viewport + margin)
+            .min((adjustment.upper() - adjustment.page_size()).max(adjustment.lower()))
+    } else {
+        return;
+    };
+    adjustment.set_value(target);
+}
+
+fn ensure_result_visible(scroller: &ScrolledWindow, row: &ListBoxRow) {
+    let allocation = row.allocation();
+    let adjustment = scroller.vadjustment();
+    let current = adjustment.value();
+    let viewport = adjustment.page_size().max(scroller.height() as f64);
+    let top = allocation.y() as f64;
+    let bottom = top + allocation.height() as f64;
+    let margin = 4.0;
+    let target = if top < current + margin {
+        (top - margin).max(adjustment.lower())
+    } else if bottom > current + viewport - margin {
+        (bottom - viewport + margin)
             .min((adjustment.upper() - adjustment.page_size()).max(adjustment.lower()))
     } else {
         return;
