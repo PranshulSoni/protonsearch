@@ -1131,6 +1131,32 @@ fn connect_agent_actions(ui: &AgentUi) {
                     ui_for_receiver.status.set_text("Hermes is responding…");
                     agent_render_chat(&ui_for_receiver);
                 }
+                crate::hermes::HermesEvent::Delta(fragment) => {
+                    if let Some(conversation) = ui_for_receiver
+                        .conversations
+                        .borrow_mut()
+                        .iter_mut()
+                        .find(|conversation| conversation.id == id)
+                    {
+                        if let Some(last) = conversation.messages.last_mut() {
+                            if last.role == "assistant" {
+                                last.text.push_str(&fragment);
+                            } else {
+                                conversation.messages.push(crate::agent::Message {
+                                    role: "assistant".to_string(),
+                                    text: fragment,
+                                });
+                            }
+                        } else {
+                            conversation.messages.push(crate::agent::Message {
+                                role: "assistant".to_string(),
+                                text: fragment,
+                            });
+                        }
+                    }
+                    ui_for_receiver.status.set_text("Hermes is responding…");
+                    agent_render_chat(&ui_for_receiver);
+                }
                 crate::hermes::HermesEvent::Diagnostic(line) => {
                     if !line.trim().is_empty() {
                         ui_for_receiver.status.set_text(&format!("Hermes: {line}"));
@@ -3147,7 +3173,11 @@ fn build_window(
     let cursor_index_for_key = cursor_index.clone();
     let settings_state_for_key = settings_state.clone();
     key_controller.connect_key_pressed(move |_, key, _, state| {
+        let agent_visible = agent_stack_for_escape.visible_child_name().as_deref() == Some("agent");
         if key == gdk::Key::k && state.contains(gdk::ModifierType::CONTROL_MASK) {
+            if agent_visible {
+                return glib::Propagation::Proceed;
+            }
             entry_for_shortcut.grab_focus();
             entry_for_shortcut.select_region(0, -1);
             return glib::Propagation::Stop;
@@ -3185,6 +3215,9 @@ fn build_window(
             return glib::Propagation::Stop;
         }
         if key == gdk::Key::space && state.contains(gdk::ModifierType::CONTROL_MASK) {
+            if agent_visible {
+                return glib::Propagation::Proceed;
+            }
             if let Some(row) = list_for_navigation.row_at_index(cursor_index_for_key.get()) {
                 let selected = list_for_navigation
                     .selected_rows()
@@ -3207,6 +3240,9 @@ fn build_window(
                 | gdk::Key::Home
                 | gdk::Key::End
         ) {
+            if agent_visible {
+                return glib::Propagation::Proceed;
+            }
             let count = list_for_navigation.observe_children().n_items() as i32;
             if count == 0 {
                 return glib::Propagation::Stop;

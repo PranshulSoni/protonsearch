@@ -11,6 +11,10 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -19,6 +23,7 @@ const DEFAULT_GATEWAY_PORT: u16 = 8642;
 const DEFAULT_GATEWAY_BASE: &str = "http://127.0.0.1:8642";
 const GATEWAY_SERVICE: &str = "hermes-gateway.service";
 const PROBE_TIMEOUT: Duration = Duration::from_millis(350);
+const CLI_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// The executable used by the installed Hermes distribution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,7 +97,7 @@ pub fn readiness() -> HermesReadiness {
         .as_deref()
         .and_then(|path| read_version(path).ok())
         .and_then(|output| parse_version(&output));
-    let gateway = if gateway_reachable(DEFAULT_GATEWAY_HOST, DEFAULT_GATEWAY_PORT) {
+    let gateway = if gateway_healthy() {
         GatewayState::Running
     } else {
         GatewayState::Unavailable
@@ -155,6 +160,8 @@ pub fn ensure_gateway_started() -> io::Result<GatewayStart> {
 pub enum HermesEvent {
     /// A complete line from Hermes stdout.
     Output(String),
+    /// A gateway token/delta that should be appended without inserting a line break.
+    Delta(String),
     /// A complete diagnostic line from Hermes stderr.
     Diagnostic(String),
     /// A tool is waiting for user approval in the gateway.
@@ -221,6 +228,17 @@ where
     let stdout_tx = events_tx.clone();
     let stdout_reader = thread::spawn(move || read_lines(stdout, stdout_tx, false));
     let stderr_reader = thread::spawn(move || read_lines(stderr, events_tx, true));
+    let finished = Arc::new(AtomicBool::new(false));
+    let finished_for_watchdog = finished.clone();
+    let pid = child.id();
+    thread::spawn(move || {
+        thread::sleep(CLI_TIMEOUT);
+        if !finished_for_watchdog.load(Ordering::Acquire) {
+            unsafe {
+                libc::kill(pid as libc::pid_t, libc::SIGTERM);
+            }
+        }
+    });
 
     Ok(thread::spawn(move || {
         let mut callback = callback;
@@ -229,6 +247,7 @@ where
         }
         let _ = stdout_reader.join();
         let _ = stderr_reader.join();
+        finished.store(true, Ordering::Release);
         let status = child.wait().ok().and_then(|status| status.code());
         callback(HermesEvent::Finished(HermesExit {
             status,
@@ -323,8 +342,14 @@ fn run_gateway_prompt(
         .build()
         .call()
         .map_err(|error| io::Error::other(format!("Hermes event stream failed: {error}")))?;
+    let mut event_name = String::new();
     for line in BufReader::new(stream.into_body().into_reader()).lines() {
         let line = line?;
+        if let Some(name) = line.strip_prefix("event:").map(str::trim) {
+            event_name.clear();
+            event_name.push_str(name);
+            continue;
+        }
         let Some(data) = line.strip_prefix("data:").map(str::trim) else {
             continue;
         };
@@ -334,11 +359,15 @@ fn run_gateway_prompt(
         let Ok(event) = serde_json::from_str::<serde_json::Value>(data) else {
             continue;
         };
-        let kind = event
-            .get("type")
-            .or_else(|| event.get("event"))
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("");
+        let kind = if event_name.is_empty() {
+            event
+                .get("type")
+                .or_else(|| event.get("event"))
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+        } else {
+            event_name.as_str()
+        };
         if [
             "approval_required",
             "approval.requested",
@@ -377,7 +406,7 @@ fn run_gateway_prompt(
             .or_else(|| event.get("output"))
             .and_then(serde_json::Value::as_str);
         if let Some(fragment) = fragment.filter(|value| !value.is_empty()) {
-            callback(HermesEvent::Output(fragment.to_string()));
+            callback(HermesEvent::Delta(fragment.to_string()));
         }
     }
     Ok(())
@@ -473,6 +502,22 @@ fn gateway_reachable(host: &str, port: u16) -> bool {
             SocketAddr::V4(_) | SocketAddr::V6(_) => Some(address),
         })
         .any(|address| TcpStream::connect_timeout(&address, PROBE_TIMEOUT).is_ok())
+}
+
+fn gateway_healthy() -> bool {
+    if !gateway_reachable(DEFAULT_GATEWAY_HOST, DEFAULT_GATEWAY_PORT) {
+        return false;
+    }
+    let key = std::env::var("HERMES_API_KEY")
+        .or_else(|_| std::env::var("API_SERVER_KEY"))
+        .unwrap_or_else(|_| "hermes".to_string());
+    ureq::get(&format!("{DEFAULT_GATEWAY_BASE}/health"))
+        .header("Authorization", &format!("Bearer {key}"))
+        .config()
+        .timeout_global(Some(PROBE_TIMEOUT))
+        .build()
+        .call()
+        .is_ok()
 }
 
 #[cfg(test)]
