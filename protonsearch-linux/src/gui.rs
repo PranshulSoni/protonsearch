@@ -19,9 +19,9 @@ use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton,
     ComboBoxText, Entry, EventControllerFocus, EventControllerKey, EventControllerScroll,
     EventControllerScrollFlags, GestureClick, Image, Label, ListBox, ListBoxRow, MessageDialog,
-    MessageType, Orientation, PolicyType, ProgressBar, PropagationPhase, ResponseType, Revealer,
-    RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack, StackSidebar,
-    StackTransitionType,
+    MessageType, Orientation, Picture, PolicyType, ProgressBar, PropagationPhase, ResponseType,
+    Revealer, RevealerTransitionType, ScrolledWindow, SelectionMode, SpinButton, Stack,
+    StackSidebar, StackTransitionType,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
@@ -2672,13 +2672,15 @@ struct LoadedPreview {
     pixels: Vec<u8>,
     width: i32,
     height: i32,
+    original_width: i32,
+    original_height: i32,
     stride: usize,
 }
 
 #[derive(Clone)]
 struct PreviewHandle {
     window: ApplicationWindow,
-    image: Image,
+    image: Picture,
     title: Label,
     status: Label,
 }
@@ -2688,7 +2690,7 @@ type PreviewState = Rc<RefCell<Option<PreviewHandle>>>;
 #[derive(Clone)]
 struct SidePreviewHandle {
     panel: GtkBox,
-    image: Image,
+    image: Picture,
     title: Label,
     status: Label,
 }
@@ -2710,7 +2712,9 @@ fn build_side_preview() -> SidePreviewHandle {
     surface.add_css_class("quick-side-preview-surface");
     surface.set_hexpand(true);
     surface.set_vexpand(true);
-    let image = Image::from_icon_name("image-x-generic-symbolic");
+    let image = Picture::new();
+    image.set_keep_aspect_ratio(true);
+    image.set_can_shrink(true);
     image.set_halign(Align::Center);
     image.set_valign(Align::Center);
     image.set_hexpand(true);
@@ -2792,22 +2796,51 @@ fn load_preview_bytes(
     max_width: u32,
     max_height: u32,
 ) -> anyhow::Result<LoadedPreview> {
-    let pixbuf = match source {
+    let (pixbuf, original_width, original_height) = match source {
         PreviewSource::File(path) => {
-            gdk_pixbuf::Pixbuf::from_file_at_scale(path, max_width as i32, max_height as i32, true)?
+            let (original_width, original_height) = gdk_pixbuf::Pixbuf::file_info(&path)
+                .map(|(_, width, height)| (width, height))
+                .unwrap_or((0, 0));
+            let candidate = gdk_pixbuf::Pixbuf::from_file_at_scale(
+                &path,
+                max_width as i32,
+                max_height as i32,
+                true,
+            )?;
+            let (target_width, target_height) = fit_preview_dimensions(
+                if original_width > 0 {
+                    original_width
+                } else {
+                    candidate.width()
+                },
+                if original_height > 0 {
+                    original_height
+                } else {
+                    candidate.height()
+                },
+                max_width,
+                max_height,
+            );
+            let pixbuf = if target_width > candidate.width() || target_height > candidate.height() {
+                // The scaled loader intentionally avoids decoding a huge
+                // source at full resolution. Only small images that need
+                // enlargement take this second, full-source path.
+                let original = gdk_pixbuf::Pixbuf::from_file(&path)?;
+                scale_pixbuf(original, target_width, target_height)?
+            } else {
+                scale_pixbuf(candidate, target_width, target_height)?
+            };
+            (pixbuf, original_width.max(1), original_height.max(1))
         }
         PreviewSource::StoredClipboard { paths, id } => {
             let bytes = crate::clipboard::image_bytes(&paths, id)?;
-            let pixbuf = gdk_pixbuf::Pixbuf::from_read(Cursor::new(bytes))?;
-            let (width, height) =
-                fit_preview_dimensions(pixbuf.width(), pixbuf.height(), max_width, max_height);
-            if width != pixbuf.width() || height != pixbuf.height() {
-                pixbuf
-                    .scale_simple(width, height, gdk_pixbuf::InterpType::Bilinear)
-                    .ok_or_else(|| anyhow::anyhow!("could not scale clipboard image"))?
-            } else {
-                pixbuf
-            }
+            let original = gdk_pixbuf::Pixbuf::from_read(Cursor::new(bytes))?;
+            let original_width = original.width();
+            let original_height = original.height();
+            let (target_width, target_height) =
+                fit_preview_dimensions(original_width, original_height, max_width, max_height);
+            let pixbuf = scale_pixbuf(original, target_width, target_height)?;
+            (pixbuf, original_width, original_height)
         }
     };
     let width = pixbuf.width();
@@ -2842,6 +2875,8 @@ fn load_preview_bytes(
         pixels,
         width,
         height,
+        original_width,
+        original_height,
         stride,
     })
 }
@@ -2850,13 +2885,24 @@ fn fit_preview_dimensions(width: i32, height: i32, max_width: u32, max_height: u
     if width <= 0 || height <= 0 {
         return (1, 1);
     }
-    let scale = (max_width as f64 / width as f64)
-        .min(max_height as f64 / height as f64)
-        .min(1.0);
+    let scale = (max_width as f64 / width as f64).min(max_height as f64 / height as f64);
     (
         (width as f64 * scale).round().max(1.0) as i32,
         (height as f64 * scale).round().max(1.0) as i32,
     )
+}
+
+fn scale_pixbuf(
+    pixbuf: gdk_pixbuf::Pixbuf,
+    width: i32,
+    height: i32,
+) -> anyhow::Result<gdk_pixbuf::Pixbuf> {
+    if pixbuf.width() == width && pixbuf.height() == height {
+        return Ok(pixbuf);
+    }
+    pixbuf
+        .scale_simple(width, height, gdk_pixbuf::InterpType::Bilinear)
+        .ok_or_else(|| anyhow::anyhow!("could not scale image preview"))
 }
 
 fn set_preview_theme(previews: &PreviewState, theme_mode: &str) {
@@ -2902,9 +2948,7 @@ fn open_side_preview(
     preview.status.set_text("Loading preview…");
     preview.status.remove_css_class("preview-error");
     preview.status.add_css_class("preview-loading");
-    preview
-        .image
-        .set_icon_name(Some("image-x-generic-symbolic"));
+    preview.image.set_paintable(None::<&gdk::Paintable>);
 
     let (sender, receiver) = async_channel::bounded::<Result<LoadedPreview, String>>(1);
     thread::spawn(move || {
@@ -2937,9 +2981,10 @@ fn open_side_preview(
                     loaded.stride,
                 );
                 preview.image.set_paintable(Some(&texture));
-                preview
-                    .status
-                    .set_text(&format!("{} × {}", loaded.width, loaded.height));
+                preview.status.set_text(&format!(
+                    "{} × {}",
+                    loaded.original_width, loaded.original_height
+                ));
                 preview.status.remove_css_class("preview-loading");
             }
             Err(_) => {
@@ -3041,7 +3086,9 @@ fn open_image_preview(
         surface.set_halign(Align::Fill);
         surface.set_valign(Align::Fill);
 
-        let image = Image::from_icon_name("image-x-generic-symbolic");
+        let image = Picture::new();
+        image.set_keep_aspect_ratio(true);
+        image.set_can_shrink(true);
         image.set_halign(Align::Center);
         image.set_valign(Align::Center);
         image.set_hexpand(true);
@@ -3111,9 +3158,7 @@ fn open_image_preview(
     preview.status.set_text("Loading image…");
     preview.status.remove_css_class("preview-error");
     preview.status.add_css_class("preview-loading");
-    preview
-        .image
-        .set_icon_name(Some("image-x-generic-symbolic"));
+    preview.image.set_paintable(None::<&gdk::Paintable>);
     preview.window.present();
 
     let (sender, receiver) = async_channel::bounded::<Result<LoadedPreview, String>>(1);
@@ -3153,10 +3198,10 @@ fn open_image_preview(
                 preview.image.set_tooltip_text(Some("Image preview"));
                 preview.status.set_text(&format!(
                     "{} × {} · Escape closes",
-                    loaded.width, loaded.height
+                    loaded.original_width, loaded.original_height
                 ));
                 preview.status.remove_css_class("preview-error");
-                preview.status.add_css_class("preview-loading");
+                preview.status.remove_css_class("preview-loading");
                 if quick {
                     preview.window.set_default_size(
                         (loaded.width + 28).clamp(360, 480),
@@ -4630,8 +4675,11 @@ mod preview_tests {
     }
 
     #[test]
-    fn fit_preview_does_not_upscale_small_images() {
-        assert_eq!(fit_preview_dimensions(320, 180, 1200, 900), (320, 180));
+    fn fit_preview_upscales_small_images_to_use_the_viewport() {
+        assert_eq!(fit_preview_dimensions(320, 180, 1200, 900), (1200, 675));
+        assert_eq!(fit_preview_dimensions(312, 260, 360, 260), (312, 260));
+        assert_eq!(fit_preview_dimensions(312, 260, 900, 680), (816, 680));
+        assert_eq!(fit_preview_dimensions(16, 16, 360, 260), (260, 260));
     }
 
     #[test]
