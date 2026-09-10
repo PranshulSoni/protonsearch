@@ -1,0 +1,38 @@
+name: ProtonSearch Windows
+
+on:
+  push:
+    paths:
+      - "protonsearch/**"
+      - ".github/workflows/protonsearch-windows.yml"
+  pull_request:
+    paths:
+      - "protonsearch/**"
+      - ".github/workflows/protonsearch-windows.yml"
+
+jobs:
+  windows:
+    name: Windows check, tests, clippy
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            protonsearch/target
+          key: windows-cargo-${{ hashFiles('protonsearch/Cargo.lock') }}
+      - name: Check
+        working-directory: protonsearch
+        run: cargo check --all-targets
+      - name: Tests
+        working-directory: protonsearch
+        run: cargo test --all-targets
+      - name: Clippy (warnings are not errors yet)
+        working-directory: protonsearch
+        run: cargo clippy --all-targets

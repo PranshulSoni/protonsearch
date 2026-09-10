@@ -44,16 +44,60 @@ fn run_browser_indexer(db_path: &Path) -> anyhow::Result<()> {
         [],
     )?;
 
+    // Source-file mtimes from the previous run: a browser source that hasn't changed
+    // since the last 10-minute pass is copied + re-parsed for nothing. Chrome/Edge run
+    // many profiles; this turns an unchanged system's pass into a few stat calls.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS browser_source_mtimes (
+            source_key TEXT PRIMARY KEY,
+            mtime_secs INTEGER NOT NULL
+        );",
+        [],
+    )?;
+
+    let source_changed = |conn: &Connection, key: &str, path: &Path| -> Option<u64> {
+        let mtime = std::fs::metadata(path)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())?;
+        let prev: Option<i64> = conn
+            .query_row(
+                "SELECT mtime_secs FROM browser_source_mtimes WHERE source_key = ?1",
+                [key],
+                |row| row.get(0),
+            )
+            .ok();
+        if prev == Some(mtime as i64) {
+            return None; // unchanged since last successful parse
+        }
+        Some(mtime)
+    };
+    let remember_mtime = |conn: &Connection, key: &str, mtime: u64| {
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO browser_source_mtimes (source_key, mtime_secs) VALUES (?1, ?2)",
+            params![key, mtime as i64],
+        );
+    };
+
     let profiles = get_browser_profiles();
     for (browser, profile_path) in profiles {
         if browser == "firefox" {
             let places_path = profile_path.join("places.sqlite");
             if places_path.exists() {
-                if let Err(e) = parse_firefox(&places_path, &conn) {
-                    eprintln!(
-                        "Error parsing Firefox places for {:?}: {:?}",
-                        places_path, e
-                    );
+                let key = format!("{browser}:{}", profile_path.display());
+                match source_changed(&conn, &key, &places_path) {
+                    Some(mtime) => {
+                        if let Err(e) = parse_firefox(&places_path, &conn) {
+                            eprintln!(
+                                "Error parsing Firefox places for {:?}: {:?}",
+                                places_path, e
+                            );
+                        } else {
+                            remember_mtime(&conn, &key, mtime);
+                        }
+                    }
+                    None => {}
                 }
             }
         } else {
@@ -61,24 +105,34 @@ fn run_browser_indexer(db_path: &Path) -> anyhow::Result<()> {
             // 1. Bookmarks
             let bookmarks_path = profile_path.join("Bookmarks");
             if bookmarks_path.exists() {
-                let source_type = format!("{}_bookmark", browser);
-                if let Err(e) = parse_bookmarks(&bookmarks_path, &source_type, &conn) {
-                    eprintln!(
-                        "Error parsing bookmarks for {}/{:?}: {:?}",
-                        browser, bookmarks_path, e
-                    );
+                let key = format!("{browser}:bookmarks:{}", profile_path.display());
+                if let Some(mtime) = source_changed(&conn, &key, &bookmarks_path) {
+                    let source_type = format!("{}_bookmark", browser);
+                    if let Err(e) = parse_bookmarks(&bookmarks_path, &source_type, &conn) {
+                        eprintln!(
+                            "Error parsing bookmarks for {}/{:?}: {:?}",
+                            browser, bookmarks_path, e
+                        );
+                    } else {
+                        remember_mtime(&conn, &key, mtime);
+                    }
                 }
             }
 
             // 2. History
             let history_path = profile_path.join("History");
             if history_path.exists() {
-                let source_type = format!("{}_history", browser);
-                if let Err(e) = parse_history(&history_path, &source_type, &conn) {
-                    eprintln!(
-                        "Error parsing history for {}/{:?}: {:?}",
-                        browser, history_path, e
-                    );
+                let key = format!("{browser}:history:{}", profile_path.display());
+                if let Some(mtime) = source_changed(&conn, &key, &history_path) {
+                    let source_type = format!("{}_history", browser);
+                    if let Err(e) = parse_history(&history_path, &source_type, &conn) {
+                        eprintln!(
+                            "Error parsing history for {}/{:?}: {:?}",
+                            browser, history_path, e
+                        );
+                    } else {
+                        remember_mtime(&conn, &key, mtime);
+                    }
                 }
             }
         }

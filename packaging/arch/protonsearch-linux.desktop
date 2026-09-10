@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ProtonSearch
+GenericName=Application launcher
+Comment=Search and launch applications and files
+Exec=protonsearch-linux gui
+Terminal=false
+Categories=Utility;System;Launcher;
+Keywords=search;files;applications;launcher;hyprland;

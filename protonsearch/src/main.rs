@@ -1125,28 +1125,35 @@ unsafe fn run(first_settings_run: bool) {
         placeholder_override: None,
     });
 
-    // Spawn background Hermes gateway status checker and auto-starter
-    std::thread::spawn(|| {
-        // Quick initial check and start if not running
-        let running = std::net::TcpStream::connect_timeout(
-            &"127.0.0.1:8642".parse().unwrap(),
-            std::time::Duration::from_millis(500),
-        )
-        .is_ok();
-        if !running {
-            ai::start_hermes_gateway_daemon();
-        }
-
-        loop {
+    // Background Hermes gateway status checker + optional auto-starter.
+    // Auto-start is opt-in (Settings: auto_start_hermes_gateway, default off): the old
+    // unconditional startup path ran five `hermes` subprocesses and launched a gateway
+    // daemon on every boot even for users who never use Hermes agents (#idle-cpu).
+    if crate::settings::AppSettings::load().auto_start_hermes_gateway {
+        std::thread::spawn(|| {
+            // Quick initial check and start if not running
             let running = std::net::TcpStream::connect_timeout(
                 &"127.0.0.1:8642".parse().unwrap(),
                 std::time::Duration::from_millis(500),
             )
             .is_ok();
-            ai::HERMES_GATEWAY_RUNNING.store(running, std::sync::atomic::Ordering::SeqCst);
-            std::thread::sleep(std::time::Duration::from_secs(3));
-        }
-    });
+            if !running {
+                ai::start_hermes_gateway_daemon();
+            }
+
+            loop {
+                let running = std::net::TcpStream::connect_timeout(
+                    &"127.0.0.1:8642".parse().unwrap(),
+                    std::time::Duration::from_millis(500),
+                )
+                .is_ok();
+                ai::HERMES_GATEWAY_RUNNING.store(running, std::sync::atomic::Ordering::SeqCst);
+                // 30s is plenty for a status flag the UI only reads when opening the
+                // AI/agents panel; 3s kept a wakeup+TCP connect burning all day.
+                std::thread::sleep(std::time::Duration::from_secs(30));
+            }
+        });
+    }
 
     if let Ok(cfg) = ai::get_config() {
         configure_hermes_llm(&cfg.endpoint, &cfg.model, &cfg.api_key);
@@ -1218,6 +1225,8 @@ unsafe fn run(first_settings_run: bool) {
             // Rebind the whole wrapper: edition-2021 disjoint capture would otherwise
             // capture only the raw (non-Send) HWND field out of `hwnd.0` uses below.
             let hwnd = hwnd;
+            // Restart backoff for the panic-recovery loop below (see the catch_unwind arm).
+            let mut panic_backoff_ms: u64 = 100;
             loop {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     let hwnd_raw = SendHwnd(hwnd.0);
@@ -1229,6 +1238,9 @@ unsafe fn run(first_settings_run: bool) {
                         )
                     };
                     while let Ok(req) = icon_rx.recv() {
+                        // A successfully dispatched request proves the thread is healthy
+                        // again — restore the panic-restart delay to its fast path.
+                        panic_backoff_ms = 100;
                         unsafe {
                             let file_icon_path = icon_file_path(&req.source, &req.key);
                             let hicon = if let Some(path) = file_icon_path {
@@ -1275,7 +1287,12 @@ unsafe fn run(first_settings_run: bool) {
                         "icon thread panicked with unknown payload".to_string()
                     };
                     applog::log(&msg);
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    // Exponential backoff, capped at 5s: a shell extension that panics on
+                    // every request used to restart this loop 10x/sec, turning one bad
+                    // icon into a permanent busy-wait (#idle-cpu). Requests still drain
+                    // once a panic-free pass happens; backoff resets on success below.
+                    panic_backoff_ms = (panic_backoff_ms * 2).min(5000);
+                    std::thread::sleep(std::time::Duration::from_millis(panic_backoff_ms));
                     // Loop continues - thread restarts with same channel
                 } else {
                     // Channel closed (sender dropped) - normal shutdown
@@ -11956,8 +11973,15 @@ unsafe fn start_timeline_tracker(db_path: std::path::PathBuf, launcher_hwnd: Sen
         .unwrap_or_default()
         .as_secs() as i64;
 
+    // Foreground focus durations are second-granular (`duration.as_secs()`), so polling
+    // every 1s burned a wakeup + OpenProcess/QueryFullProcessImageNameW per second for no
+    // extra accuracy. 5s keeps the same event boundaries (#idle-cpu).
+    // Cache exe paths per PID so an unchanged foreground window costs no process handle.
+    let mut app_name_cache: std::collections::HashMap<u32, String> =
+        std::collections::HashMap::new();
+
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_secs(5));
 
         let fg = GetForegroundWindow();
         if fg.0.is_null() {
@@ -11978,28 +12002,42 @@ unsafe fn start_timeline_tracker(db_path: std::path::PathBuf, launcher_hwnd: Sen
             String::new()
         };
 
-        // Get app name (process filename)
+        // Get app name (process filename); cached per PID so an idle desktop with the
+        // same foreground app doesn't open a process handle every tick.
         let mut pid = 0u32;
         GetWindowThreadProcessId(fg, Some(&mut pid));
 
         let app = if pid != 0 {
-            if let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, BOOL(0), pid) {
-                let mut buffer = [0u16; 512];
-                let mut size = buffer.len() as u32;
-                let res = QueryFullProcessImageNameW(
-                    handle,
-                    PROCESS_NAME_WIN32,
-                    PWSTR(buffer.as_mut_ptr()),
-                    &mut size,
-                );
-                let _ = CloseHandle(handle);
-                if res.is_ok() && size > 0 {
-                    String::from_utf16_lossy(&buffer[..size as usize])
+            if let Some(cached) = app_name_cache.get(&pid) {
+                cached.clone()
+            } else {
+                let name = if let Ok(handle) =
+                    OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, BOOL(0), pid)
+                {
+                    let mut buffer = [0u16; 512];
+                    let mut size = buffer.len() as u32;
+                    let res = QueryFullProcessImageNameW(
+                        handle,
+                        PROCESS_NAME_WIN32,
+                        PWSTR(buffer.as_mut_ptr()),
+                        &mut size,
+                    );
+                    let _ = CloseHandle(handle);
+                    if res.is_ok() && size > 0 {
+                        String::from_utf16_lossy(&buffer[..size as usize])
+                    } else {
+                        "Unknown".to_string()
+                    }
                 } else {
                     "Unknown".to_string()
+                };
+                // Bound the cache: PIDs are recycled, so drop everything once it grows —
+                // a rare full rebuild beats an unbounded leak on long sessions.
+                if app_name_cache.len() > 256 {
+                    app_name_cache.clear();
                 }
-            } else {
-                "Unknown".to_string()
+                app_name_cache.insert(pid, name.clone());
+                name
             }
         } else {
             "Unknown".to_string()

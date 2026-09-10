@@ -682,13 +682,30 @@ fn fallback_config_from_key(key: &str) -> Option<AiConfig> {
 }
 
 fn get_agent_config() -> AiConfig {
-    if HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
+    if hermes_gateway_available() {
         get_hermes_config()
     } else if let Ok(cfg) = get_config() {
         fallback_config_from_key(&cfg.api_key).unwrap_or_else(get_hermes_config)
     } else {
         get_hermes_config()
     }
+}
+
+/// Cached-status fast path with a one-shot cheap probe on the "down" branch, so a gateway
+/// started outside this process is still detected without any background polling thread.
+fn hermes_gateway_available() -> bool {
+    if HERMES_GATEWAY_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
+        return true;
+    }
+    let running = std::net::TcpStream::connect_timeout(
+        &"127.0.0.1:8642".parse().unwrap(),
+        std::time::Duration::from_millis(300),
+    )
+    .is_ok();
+    if running {
+        HERMES_GATEWAY_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+    running
 }
 
 /// Human-readable label for errors, based on which backend the request hit.

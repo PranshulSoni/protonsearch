@@ -250,8 +250,7 @@ fn index_one_file(conn: &Connection, path: &Path) {
         }
     }
     let meta = match std::fs::metadata(path) {
-        Ok(m) if m.is_file() => m,
-        Ok(_) => return, // exists but isn't a file (e.g. a directory) — nothing to do here
+        Ok(m) => m,
         Err(_) => {
             // Raced with a delete: the create/modify event fired but the path is already
             // gone. Clean up any stale row instead of silently leaving it behind forever.
@@ -259,6 +258,13 @@ fn index_one_file(conn: &Connection, path: &Path) {
             return;
         }
     };
+    let is_dir = meta.is_dir();
+    // Directories ARE indexed — by name only. Skipping them left folders created while
+    // the app runs out of the index until the next full crawl, and contributed to the
+    // "Folders (0)" misclassification (#51).
+    if !is_dir && !meta.is_file() {
+        return; // neither file nor directory (socket, device, ...) — nothing to index
+    }
     let path_str = match path.to_str() {
         Some(s) => s.to_string(),
         None => return,
@@ -268,7 +274,7 @@ fn index_one_file(conn: &Connection, path: &Path) {
         .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_string();
-    if name.is_empty() || is_ignored_file(&name, &ext) {
+    if name.is_empty() || (!is_dir && is_ignored_file(&name, &ext)) {
         return;
     }
     let modified = meta
@@ -277,12 +283,15 @@ fn index_one_file(conn: &Connection, path: &Path) {
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
-    let size = meta.len() as i64;
+    let size = if is_dir { 0 } else { meta.len() };
 
     let _ = conn.execute(
-        "INSERT OR REPLACE INTO files (path, name, extension, modified, size, is_dir) VALUES (?,?,?,?,?,0)",
-        params![path_str, name, ext, modified, size],
+        "INSERT OR REPLACE INTO files (path, name, extension, modified, size, is_dir) VALUES (?,?,?,?,?,?)",
+        params![path_str, name, ext, modified, size, is_dir as i64],
     );
+    if is_dir {
+        return; // no content extraction for directories
+    }
     if is_indexable_content(&ext) {
         // Only (re)write the content index when extraction actually succeeds. On
         // failure (locked file, parser/OCR error) keep any existing FTS row rather
@@ -464,14 +473,22 @@ pub fn start_indexer(db_path: PathBuf) {
         }
 
         // ── Phase 2: Full crawl (entire user profile + other drives) ───────
-        // Runs 15s after launch to further reduce first-open contention.
-        thread::sleep(std::time::Duration::from_secs(15));
-        log_indexer("Starting Phase 2 full crawl...");
-        if let Err(e) = run_indexer_folders(&db_path_clone, get_scan_folders()) {
-            log_indexer(&format!("Indexer error: {:?}", e));
-            eprintln!("Indexer error: {:?}", e);
+        // Runs 15s after launch to further reduce first-open contention, but only when
+        // the last full crawl is stale (>24h). Walking the whole profile on EVERY launch
+        // dominated startup CPU for nothing: the filesystem watcher already covers
+        // day-to-day changes, and "Rebuild index" in Settings forces a full pass.
+        if full_crawl_is_stale(&db_path_clone) {
+            thread::sleep(std::time::Duration::from_secs(15));
+            log_indexer("Starting Phase 2 full crawl...");
+            if let Err(e) = run_indexer_folders(&db_path_clone, get_scan_folders()) {
+                log_indexer(&format!("Indexer error: {:?}", e));
+                eprintln!("Indexer error: {:?}", e);
+            }
+            mark_full_crawl_done(&db_path_clone);
+            log_indexer("Phase 2 crawl finished.");
+        } else {
+            log_indexer("Phase 2 full crawl skipped (completed within the last 24h).");
         }
-        log_indexer("Phase 2 crawl finished.");
         if com_initialized {
             unsafe {
                 windows::Win32::System::Com::CoUninitialize();
@@ -1114,6 +1131,38 @@ fn run_indexer_folders_inner(db_path: &Path, folders: Vec<PathBuf>) -> anyhow::R
 
     log_indexer("run_indexer_folders completed successfully");
     Ok(())
+}
+
+/// Full-crawl throttle: Phase 2 (whole user profile) only runs when the last run is >24h
+/// old. State lives in `indexer_state` so it survives restarts. Errors are non-fatal: a
+/// missing/failed row simply means "stale", i.e. the old every-launch behavior.
+fn full_crawl_is_stale(db_path: &Path) -> bool {
+    let Ok(conn) = Connection::open(db_path) else {
+        return true;
+    };
+    conn.query_row(
+        "SELECT value FROM indexer_state WHERE key = 'last_full_crawl'",
+        [],
+        |row| row.get::<_, String>(0),
+    )
+    .ok()
+    .and_then(|v| v.parse::<i64>().ok())
+    .map(|last| {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        now.saturating_sub(last) > 24 * 60 * 60
+    })
+    .unwrap_or(true)
+}
+
+fn mark_full_crawl_done(db_path: &Path) {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    save_indexer_state_to_db(db_path, "last_full_crawl", &now.to_string());
 }
 
 pub fn get_scan_folders() -> Vec<PathBuf> {

@@ -630,6 +630,11 @@ struct FileRow {
     name_lower: String,
     path: String,
     ext: String,
+    // Mirrors the `files.is_dir` column. Folder rows must be classified from this flag,
+    // not from a magic `extension == "folder"` string: the indexer stores directories
+    // with an empty extension (dirs have no file extension), so the old check never
+    // matched and every folder showed up under Files with "Folders (0)" (#51).
+    is_dir: bool,
     path_modifier: f32,
 }
 
@@ -648,6 +653,228 @@ pub struct SearchEngine {
     was_indexing: bool,
     _db_path: std::path::PathBuf,
     conn: Connection,
+}
+
+/// Opens the index DB and ensures every table/column/seed-row exists — the exact schema
+/// bootstrap `SearchEngine::new` used to run inline. Split out so it can be retried once
+/// against a freshly-created file if the existing one turns out to be corrupt (see
+/// `open_db_with_corruption_recovery`).
+fn open_and_prepare_db(db_path: &std::path::Path) -> Result<Connection> {
+    if let Some(parent) = db_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let conn = Connection::open(db_path)?;
+    let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);",
+        [],
+    );
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS clipboard_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT UNIQUE,
+            timestamp INTEGER NOT NULL,
+            source_app TEXT NOT NULL,
+            is_image INTEGER DEFAULT 0,
+            pinned INTEGER DEFAULT 0,
+            ocr_text TEXT
+        );",
+        [],
+    )?;
+    // Add columns for databases created by older versions. Run after CREATE TABLE so
+    // fresh installs get every column even when ALTER would otherwise target no table.
+    let _ = conn.execute(
+        "ALTER TABLE clipboard_history ADD COLUMN is_image INTEGER DEFAULT 0;",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE clipboard_history ADD COLUMN pinned INTEGER DEFAULT 0;",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE clipboard_history ADD COLUMN ocr_text TEXT;",
+        [],
+    );
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS timeline_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            duration INTEGER NOT NULL,
+            app_name TEXT NOT NULL,
+            window_title TEXT NOT NULL
+        );",
+        [],
+    )?;
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp);",
+        [],
+    );
+    ensure_memory_events_schema(&conn)?;
+
+    // Create quicklinks table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS quicklinks (
+            name TEXT PRIMARY KEY,
+            url TEXT NOT NULL,
+            keyword TEXT NOT NULL
+        );",
+        [],
+    )?;
+
+    // Pre-populate quicklinks if empty
+    let ql_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM quicklinks", [], |row| row.get(0))
+        .unwrap_or(0);
+    if ql_count == 0 {
+        let defaults = &[
+            ("Google", "https://google.com/search?q={query}", "g"),
+            (
+                "YouTube",
+                "https://youtube.com/results?search_query={query}",
+                "yt",
+            ),
+            ("GitHub", "https://github.com/search?q={query}", "gh"),
+            (
+                "Rust Docs",
+                "https://docs.rs/releases/search?query={query}",
+                "rs",
+            ),
+        ];
+        for &(name, url, keyword) in defaults {
+            let _ = conn.execute(
+                "INSERT INTO quicklinks (name, url, keyword) VALUES (?, ?, ?);",
+                rusqlite::params![name, url, keyword],
+            );
+        }
+    }
+
+    // Create snippets table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS snippets (
+            name TEXT PRIMARY KEY,
+            content TEXT NOT NULL,
+            keyword TEXT
+        );",
+        [],
+    )?;
+
+    // Create focus categories table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS focus_categories (
+            name TEXT PRIMARY KEY,
+            blocked_apps TEXT NOT NULL
+        );",
+        [],
+    )?;
+
+    let fc_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM focus_categories", [], |row| {
+            row.get(0)
+        })
+        .unwrap_or(0);
+    if fc_count == 0 {
+        let _ = conn.execute(
+            "INSERT INTO focus_categories (name, blocked_apps) VALUES (?, ?);",
+            rusqlite::params!["Deep Work", "Discord.exe, slack.exe"],
+        );
+    }
+
+    // Create AI settings table
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS ai_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );",
+        [],
+    )?;
+
+    // Pre-populate AI endpoint/model if empty. Do not seed an API key:
+    // users configure their own key via settings/env/AppData.
+    let ai_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM ai_settings", [], |row| row.get(0))
+        .unwrap_or(0);
+    if ai_count == 0 {
+        let _ = conn.execute(
+            "INSERT INTO ai_settings (key, value) VALUES ('endpoint', 'https://opencode.ai/zen/v1/chat/completions');",
+            [],
+        );
+        let _ = conn.execute(
+            "INSERT INTO ai_settings (key, value) VALUES ('model', 'deepseek-v4-flash-free');",
+            [],
+        );
+    }
+
+    // Pre-populate snippets if empty
+    let sn_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM snippets", [], |row| row.get(0))
+        .unwrap_or(0);
+    if sn_count == 0 {
+        let _ = conn.execute(
+            "INSERT INTO snippets (name, content, keyword) VALUES (?, ?, ?);",
+            rusqlite::params![
+                "Example Snippet",
+                "Hello, this is a reusable snippet! Type '!demo' to trigger it or search for it.",
+                "!demo"
+            ],
+        );
+    }
+    Ok(conn)
+}
+
+/// True for SQLite's "file exists but its contents are broken" class of error — as opposed to
+/// permissions/disk-full/locked-file errors, where backing up and starting over wouldn't help
+/// and could lose data for no reason. Checked by message text (not exhaustive, but matches
+/// every corruption message actually observed in the wild: "malformed database schema (...)"
+/// and "database disk image is malformed").
+fn is_corruption_error(e: &anyhow::Error) -> bool {
+    e.to_string().to_lowercase().contains("malformed")
+}
+
+/// Moves a corrupt db (+ -wal/-shm, if present) aside into a timestamped backup folder next to
+/// it, never deleting outright, so a user who wants to investigate or recover data later still
+/// can.
+fn backup_corrupt_db(db_path: &std::path::Path) {
+    let (Some(parent), Some(file_name)) = (db_path.parent(), db_path.file_name()) else {
+        return;
+    };
+    let Some(file_name) = file_name.to_str() else {
+        return;
+    };
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let backup_dir = parent.join(format!("corrupt_db_backup_{stamp}"));
+    if std::fs::create_dir_all(&backup_dir).is_err() {
+        return;
+    }
+    for suffix in ["", "-wal", "-shm"] {
+        let src = parent.join(format!("{file_name}{suffix}"));
+        if src.exists() {
+            let _ = std::fs::rename(&src, backup_dir.join(format!("{file_name}{suffix}")));
+        }
+    }
+}
+
+/// Opens/prepares the index DB, self-healing exactly once if it's genuinely corrupted: the
+/// bad file (whatever version wrote or corrupted it — corruption isn't version-specific) is
+/// backed up and a fresh one is created in its place, rather than surfacing a raw SQLite error
+/// and leaving the app unusable. Non-corruption errors (disk full, permissions) are returned
+/// as-is; retrying those wouldn't help and backing up would just be noise.
+fn open_db_with_corruption_recovery(db_path: &std::path::Path) -> Result<Connection> {
+    match open_and_prepare_db(db_path) {
+        Ok(conn) => Ok(conn),
+        Err(e) if is_corruption_error(&e) => {
+            crate::applog::log(&format!(
+                "file_index.db was corrupted ({e}) — backing it up and starting a fresh index"
+            ));
+            backup_corrupt_db(db_path);
+            open_and_prepare_db(db_path)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 impl SearchEngine {
@@ -721,166 +948,7 @@ impl SearchEngine {
             },
         ];
 
-        if let Some(parent) = db_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let conn = Connection::open(&db_path)?;
-        let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
-        conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_files_name ON files(name);",
-            [],
-        );
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS clipboard_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                content TEXT UNIQUE,
-                timestamp INTEGER NOT NULL,
-                source_app TEXT NOT NULL,
-                is_image INTEGER DEFAULT 0,
-                pinned INTEGER DEFAULT 0,
-                ocr_text TEXT
-            );",
-            [],
-        )?;
-        // Add columns for databases created by older versions. Run after CREATE TABLE so
-        // fresh installs get every column even when ALTER would otherwise target no table.
-        let _ = conn.execute(
-            "ALTER TABLE clipboard_history ADD COLUMN is_image INTEGER DEFAULT 0;",
-            [],
-        );
-        let _ = conn.execute(
-            "ALTER TABLE clipboard_history ADD COLUMN pinned INTEGER DEFAULT 0;",
-            [],
-        );
-        let _ = conn.execute(
-            "ALTER TABLE clipboard_history ADD COLUMN ocr_text TEXT;",
-            [],
-        );
-
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS timeline_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp INTEGER NOT NULL,
-                duration INTEGER NOT NULL,
-                app_name TEXT NOT NULL,
-                window_title TEXT NOT NULL
-            );",
-            [],
-        )?;
-        let _ = conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_timeline_timestamp ON timeline_events(timestamp);",
-            [],
-        );
-        ensure_memory_events_schema(&conn)?;
-
-        // Create quicklinks table
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS quicklinks (
-                name TEXT PRIMARY KEY,
-                url TEXT NOT NULL,
-                keyword TEXT NOT NULL
-            );",
-            [],
-        )?;
-
-        // Pre-populate quicklinks if empty
-        let ql_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM quicklinks", [], |row| row.get(0))
-            .unwrap_or(0);
-        if ql_count == 0 {
-            let defaults = &[
-                ("Google", "https://google.com/search?q={query}", "g"),
-                (
-                    "YouTube",
-                    "https://youtube.com/results?search_query={query}",
-                    "yt",
-                ),
-                ("GitHub", "https://github.com/search?q={query}", "gh"),
-                (
-                    "Rust Docs",
-                    "https://docs.rs/releases/search?query={query}",
-                    "rs",
-                ),
-            ];
-            for &(name, url, keyword) in defaults {
-                let _ = conn.execute(
-                    "INSERT INTO quicklinks (name, url, keyword) VALUES (?, ?, ?);",
-                    rusqlite::params![name, url, keyword],
-                );
-            }
-        }
-
-        // Create snippets table
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS snippets (
-                name TEXT PRIMARY KEY,
-                content TEXT NOT NULL,
-                keyword TEXT
-            );",
-            [],
-        )?;
-
-        // Create focus categories table
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS focus_categories (
-                name TEXT PRIMARY KEY,
-                blocked_apps TEXT NOT NULL
-            );",
-            [],
-        )?;
-
-        let fc_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM focus_categories", [], |row| {
-                row.get(0)
-            })
-            .unwrap_or(0);
-        if fc_count == 0 {
-            let _ = conn.execute(
-                "INSERT INTO focus_categories (name, blocked_apps) VALUES (?, ?);",
-                rusqlite::params!["Deep Work", "Discord.exe, slack.exe"],
-            );
-        }
-
-        // Create AI settings table
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS ai_settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );",
-            [],
-        )?;
-
-        // Pre-populate AI endpoint/model if empty. Do not seed an API key:
-        // users configure their own key via settings/env/AppData.
-        let ai_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM ai_settings", [], |row| row.get(0))
-            .unwrap_or(0);
-        if ai_count == 0 {
-            let _ = conn.execute(
-                "INSERT INTO ai_settings (key, value) VALUES ('endpoint', 'https://opencode.ai/zen/v1/chat/completions');",
-                [],
-            );
-            let _ = conn.execute(
-                "INSERT INTO ai_settings (key, value) VALUES ('model', 'deepseek-v4-flash-free');",
-                [],
-            );
-        }
-
-        // Pre-populate snippets if empty
-        let sn_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM snippets", [], |row| row.get(0))
-            .unwrap_or(0);
-        if sn_count == 0 {
-            let _ = conn.execute(
-                "INSERT INTO snippets (name, content, keyword) VALUES (?, ?, ?);",
-                rusqlite::params![
-                    "Example Snippet",
-                    "Hello, this is a reusable snippet! Type '!demo' to trigger it or search for it.",
-                    "!demo"
-                ],
-            );
-        }
+        let conn = open_db_with_corruption_recovery(&db_path)?;
         ensure_settings_catalog_fts(&conn, &meta)?;
 
         let meta_index = meta.iter().map(CatalogEntryIndex::from_entry).collect();
@@ -997,15 +1065,17 @@ impl SearchEngine {
     /// path score so each search is a pure in-memory scan.
     fn build_file_index(conn: &Connection) -> Vec<FileRow> {
         let mut rows = Vec::new();
-        if let Ok(mut stmt) = conn.prepare("SELECT path, name, extension FROM files") {
+        // is_dir is the authoritative folder flag; see FileRow::is_dir (#51).
+        if let Ok(mut stmt) = conn.prepare("SELECT path, name, extension, is_dir FROM files") {
             if let Ok(it) = stmt.query_map([], |r| {
                 Ok((
                     r.get::<_, String>(0)?,
                     r.get::<_, String>(1)?,
                     r.get::<_, String>(2)?,
+                    r.get::<_, i64>(3)?,
                 ))
             }) {
-                for (path, name, ext) in it.filter_map(|r| r.ok()) {
+                for (path, name, ext, is_dir) in it.filter_map(|r| r.ok()) {
                     let name_lower = name.to_lowercase();
                     let path_modifier = Self::get_path_score_modifier(&path);
                     rows.push(FileRow {
@@ -1013,6 +1083,7 @@ impl SearchEngine {
                         name_lower,
                         path,
                         ext,
+                        is_dir: is_dir != 0,
                         path_modifier,
                     });
                 }
@@ -1076,7 +1147,8 @@ impl SearchEngine {
                 continue;
             }
             score += row.path_modifier;
-            let source = if row.ext == "folder" {
+            // Folders are flagged by is_dir, not by an extension string (#51).
+            let source = if row.is_dir {
                 "FOLDER"
             } else if only_code || is_code {
                 "CODE"
@@ -1255,14 +1327,15 @@ impl SearchEngine {
         let mut results = Vec::new();
 
         let name_query = format!("%{}%", q_lower);
+        // is_dir rides along so folder rows can be labeled FOLDER instead of FILE (#51).
         let query_str = if only_code {
             let placeholders: Vec<String> = code_exts.iter().map(|_| "?".to_string()).collect();
             format!(
-                "SELECT path, name, extension FROM files WHERE name LIKE ? AND extension IN ({}) LIMIT ?",
+                "SELECT path, name, extension, is_dir FROM files WHERE name LIKE ? AND extension IN ({}) LIMIT ?",
                 placeholders.join(",")
             )
         } else {
-            "SELECT path, name, extension FROM files WHERE name LIKE ? LIMIT ?".to_string()
+            "SELECT path, name, extension, is_dir FROM files WHERE name LIKE ? LIMIT ?".to_string()
         };
         if let Ok(mut stmt) = conn.prepare(&query_str) {
             let mut params_vec: Vec<rusqlite::types::Value> =
@@ -1279,10 +1352,11 @@ impl SearchEngine {
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
                 ))
             }) {
                 for row in rows.filter_map(|r| r.ok()) {
-                    let (path, name, ext) = row;
+                    let (path, name, ext, is_dir) = row;
                     let path_modifier = Self::get_path_score_modifier(&path);
                     if path_modifier < -1.0 {
                         continue;
@@ -1292,7 +1366,8 @@ impl SearchEngine {
                         continue;
                     }
                     score += path_modifier;
-                    let source = if ext == "folder" {
+                    // Folders are flagged by is_dir, not by an extension string (#51).
+                    let source = if is_dir != 0 {
                         "FOLDER"
                     } else if only_code || code_exts.contains(&ext.as_str()) {
                         "CODE"
@@ -3449,6 +3524,9 @@ impl SearchEngine {
     ) -> Vec<SearchResult> {
         let mut results = self.search_raw_with_fts(query, top_k, with_fts);
         results.retain(lean_allowed);
+        // One settings read per search: search_raw_with_fts also consults the git plugin
+        // flag and AppSettings::load does disk I/O (file read + JSON parse) on the search
+        // worker, so per-keystroke searches used to hit settings.json twice.
         let plugin_settings = crate::settings::AppSettings::load();
         results.retain(|r| plugin_allowed(r, &plugin_settings));
         if results.is_empty() {
@@ -3476,6 +3554,10 @@ impl SearchEngine {
         }
         self.search_raw_with_fts_inner(query, top_k, with_fts)
     }
+    // NOTE: this second settings read stays — it gates an early return before any search
+    // work happens, so caching it into search_with_fts would not avoid the disk read on
+    // commits: queries and would complicate the signature. Two reads per search total,
+    // down from three, and both off the UI thread.
 
     fn search_raw_with_fts_inner(
         &mut self,
@@ -5963,6 +6045,61 @@ mod tests {
             columns.iter().any(|column| column == "ocr_text"),
             "fresh clipboard_history schema should include ocr_text, got {columns:?}"
         );
+    }
+
+    #[test]
+    fn folders_are_classified_as_folders_not_files() {
+        // Regression for #51: rows with is_dir=1 must surface as source FOLDER with the
+        // Folders filter counting them, instead of being labeled FILE (Folders (0)).
+        let db_path = unique_test_db("folder_classification");
+        let mut engine = SearchEngine::new(db_path.clone(), false).expect("engine");
+        engine
+            .conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS files (
+                    path TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    extension TEXT NOT NULL,
+                    modified INTEGER NOT NULL,
+                    size INTEGER NOT NULL DEFAULT 0,
+                    is_dir INTEGER NOT NULL DEFAULT 0
+                );",
+                [],
+            )
+            .expect("files table");
+        engine
+            .conn
+            .execute(
+                "INSERT INTO files (path, name, extension, modified, size, is_dir) VALUES (?1, ?2, '', 1, 0, 1)",
+                rusqlite::params!["C:\\Users\\tester\\Documents\\ProjectA", "ProjectA"],
+            )
+            .expect("insert folder row");
+        engine
+            .conn
+            .execute(
+                "INSERT INTO files (path, name, extension, modified, size, is_dir) VALUES (?1, ?2, 'txt', 1, 10, 0)",
+                rusqlite::params!["C:\\Users\\tester\\Documents\\notes.txt", "notes.txt"],
+            )
+            .expect("insert file row");
+
+        // Both the in-memory fast path (needs build_file_index) and the SQL LIKE path.
+        engine.file_index = SearchEngine::build_file_index(&engine.conn);
+        let _ = std::fs::remove_file(&db_path);
+
+        for (path_name, results) in [
+            ("in-memory", engine.search_files_in_memory("project", false, 50)),
+            ("sql", engine.search_files_generic("project", false, 50, false)),
+        ] {
+            let hit = results
+                .iter()
+                .find(|r| r.entry.control_name == "ProjectA")
+                .expect("folder row should match by name");
+            assert_eq!(
+                hit.entry.source, "FOLDER",
+                "{path_name} path: folder row must be source=FOLDER, got {:?}",
+                hit.entry.source
+            );
+        }
     }
 
     #[test]

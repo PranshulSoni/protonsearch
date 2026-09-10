@@ -93,6 +93,14 @@ pub struct AppSettings {
 
     #[serde(default = "default_true")]
     pub show_clipboard_image_text_action: bool,
+
+    /// Launch the Hermes gateway daemon (`hermes gateway run`) automatically at startup.
+    /// Defaults to OFF: for users without Hermes installed this used to spawn five
+    /// `hermes` config/tool subprocesses plus a gateway launch attempt on every start,
+    /// an easily-missed constant CPU cost. Users who enable Hermes agents explicitly
+    /// (launcher command or AI panel) still get the daemon on demand.
+    #[serde(default = "default_false")]
+    pub auto_start_hermes_gateway: bool,
 }
 
 impl Default for AppSettings {
@@ -126,6 +134,7 @@ impl Default for AppSettings {
             plugin_calculator: default_true(),
             plugin_git_commits: default_true(),
             show_clipboard_image_text_action: default_true(),
+            auto_start_hermes_gateway: default_false(),
         }
     }
 }
@@ -289,5 +298,12 @@ mod tests {
     #[test]
     fn clipboard_image_text_action_defaults_on() {
         assert!(AppSettings::default().show_clipboard_image_text_action);
+    }
+
+    #[test]
+    fn hermes_gateway_auto_start_defaults_off() {
+        // Spawning five `hermes` subprocesses + a gateway daemon on every boot must stay
+        // opt-in; see the field docs on auto_start_hermes_gateway.
+        assert!(!AppSettings::default().auto_start_hermes_gateway);
     }
 }
