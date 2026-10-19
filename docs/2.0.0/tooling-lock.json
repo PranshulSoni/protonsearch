@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-20",
+  "skills": [
+    {
+      "name": "rust-skills",
+      "path": ".agents/skills/rust-skills",
+      "upstream": "https://github.com/leonardomso/rust-skills",
+      "ref": "fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9",
+      "license": "MIT",
+      "installation": "skill-installer install-skill-from-github.py --repo leonardomso/rust-skills --path . --ref fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9 --dest .agents/skills --name rust-skills",
+      "scope": "repository",
+      "optional_checks_executed": false
+    }
+  ],
+  "mcp_servers_added": [],
+  "runtime_dependencies_added": [],
+  "baseline_commit": "98d52ce"
+}

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Proton 2.0 planning: a customizable widget dock for Windows."><title>Widgets & profiles — Proton 2.0</title><link rel="stylesheet" href="styles.css"><script src="concept.js" defer></script></head>
+<body><a class="skip" href="#main">Skip to content</a>
+<aside class="sidebar"><a class="brand" href="index.html">proton<span class="brand-dot">•</span></a><div class="version">2.0 / THE WORKSPACE EDITION</div><nav aria-label="Planning chapters"><a href="index.html"><span>00</span>Overview</a><a href="product.html"><span>01</span>Product & experience</a><a href="architecture.html"><span>02</span>System architecture</a><a href="stack.html"><span>03</span>Tech stack</a><a href="windows.html"><span>04</span>Windows integration</a><a href="widgets.html" aria-current="page"><span>05</span>Widgets & profiles</a><a href="agents.html"><span>06</span>Agent runtime</a><a href="roadmap.html"><span>07</span>Implementation roadmap</a><a href="migration.html"><span>08</span>Repository & migration</a><a href="sources.html"><span>09</span>Sources & tooling</a></nav><div class="side-bottom">PLANNING, NOT PRODUCTION<br>20 OCTOBER 2026<a href="README.md">Reading guide ↗</a><a href="implementation-plan.md">Written implementation plan ↗</a></div></aside>
+<main class="main" id="main"><div class="topline"><span>PROTON / PRODUCT & ENGINEERING</span><span class="pill">BRANCH 2.0.0 · PROPOSAL</span></div><header><div class="eyebrow">05 / WIDGET PLATFORM</div><h1>One contract. Many expressions.</h1><p class="intro">Make it easy to build useful widgets without letting a widget own the desktop.</p></header>
+<h2>Four distinct objects</h2><table><thead><tr><th>Object</th><th>Purpose</th></tr></thead><tbody><tr><td>Definition</td><td>Package identity, API version, supported sizes, configuration schema, permissions and view templates</td></tr><tr><td>Instance</td><td>A user's placement/configuration of a definition; multiple weather cities are separate instances</td></tr><tr><td>Provider</td><td>Host data service such as audio, battery, weather or agent state; shared among instances</td></tr><tr><td>View</td><td>Validated renderer-neutral tree for tile and panel; host owns layout, input, accessibility and rendering</td></tr></tbody></table>
+<h2>Illustrative manifest</h2><pre><code>{
+  "schema_version": 1,
+  "id": "proton.weather",
+  "version": "0.1.0",
+  "api": "^1",
+  "sizes": ["compact", "wide", "rich"],
+  "views": {"tile": "weather.tile.json", "panel": "weather.panel.json"},
+  "permissions": ["weather.read"],
+  "config_schema": {
+    "type": "object",
+    "required": ["location_ref"],
+    "properties": {"location_ref": {"type": "string", "maxLength": 128}},
+    "additionalProperties": false
+  }
+}</code></pre><p>This manifest is a proposed example, not an implemented SDK or formal schema. <code>weather.read</code> uses the host weather broker; the widget receives no generic network permission. Version matching, signature verification and configuration validation occur before activation.</p>
+<h2>Lifecycle</h2><pre><code>discover → validate → install → configure → mount → subscribe
+                                                 ↕
+                                            suspend/resume
+                                                 ↓
+                                unmount → release → uninstall</code></pre>
+<p>Separate definition version, instance revision and runtime session. Configuration saves are transactional. Resource leases close on unmount; no orphan timers. Every state has loading, stale, offline, unsupported, permission-denied and crashed representations. Timed-out providers cannot block layout. Visibility can pause presentation without deleting shared state or an agent job.</p>
+<h2>Rendering constraints</h2><ul><li>Initial DSL: Row, Column, Text, Icon, Badge, Progress, Sparkline, Button, Toggle and Slider. No HTML, arbitrary script, shader or raw Slint binding in dock packages.</li><li>Host validates depth, node count, text length, image dimensions and update rate. Candidate caps: 128 tile nodes, 512 panel nodes; tune with measurements.</li><li>Labels, roles, focus order and accessible values are mandatory. Host owns semantic accessibility mapping.</li><li>Actions reference typed host commands such as <code>panel.open</code>, <code>audio.set_volume</code> and <code>search.open</code>. No raw command strings or arbitrary URLs.</li><li>Width changes happen only through explicit size changes. Numbers truncate predictably, charts use bounded buffers, no layout jitter from polling.</li><li>One active transient panel per dock; detached persistent panels are a later feature. No panel can cover recovery controls.</li></ul>
+<h2>Trust tiers</h2><table><thead><tr><th>Tier</th><th>Execution</th><th>Policy</th></tr></thead><tbody><tr><td>Bundled first-party</td><td>Reviewed Rust provider + host-rendered view</td><td>Explicit provider permissions; audit OS actions</td></tr><tr><td>Declarative community</td><td>Data/view package with no executable logic</td><td>Validate all content, assets, actions and declared broker access</td></tr><tr><td>Curated logic · later</td><td>WASM in separate worker; no ambient WASI</td><td>Capability broker, CPU/memory/output limits, cancellation and revocation</td></tr><tr><td>Native external code</td><td>Full same-user execution unless genuinely restricted by OS sandbox</td><td>Not supported in early ecosystem; signing alone does not sandbox it</td></tr></tbody></table>
+<p>Wasmtime can bound guest execution using fuel/epoch interruption, but synchronous host calls need their own deadlines and resource limits. Broker network/filesystem requests explicitly; Wasm does not make authorized host functions safe by itself. <a href="sources.html#s11">[S11]</a></p>
+<h2>Profiles and layout</h2><pre><code>{
+  "schema_version": 1, "id": "work", "revision": 3,
+  "display_layouts": [{
+    "display_ref": "primary", "edge": "bottom", "scale": 1.0,
+    "items": [
+      {"instance_id": "start-work", "definition": "proton.start", "size": "compact"},
+      {"instance_id": "weather-work", "definition": "proton.weather", "size": "wide"}
+    ]
+  }],
+  "privacy": {"hide_sensitive_previews": false}
+}</code></pre>
+<p>A layout switch is an atomic change of visible instance references. Do not duplicate active agent runs or re-request authority. Keep dormant instance state and monitor mappings. If width is insufficient, first shrink only widgets that opt into automatic sizing, then move low-priority items into an overflow drawer. Critical host recovery remains accessible outside that list.</p>
+<h2>Initial catalog and effort classes</h2><table><thead><tr><th>Class</th><th>Widgets</th><th>Dependency</th></tr></thead><tbody><tr><td>Foundation</td><td>Start/app drawer, Search, app launcher/running apps, clock/calendar, files shortcut</td><td>App inventory, task model, search adapter</td></tr><tr><td>System</td><td>Audio, battery, network status/settings, native tray access</td><td>Reviewed Windows providers; hardware absence states</td></tr><tr><td>Network</td><td>Weather; later agenda/media integrations</td><td>Explicit location, provider terms, cache, offline UI</td></tr><tr><td>Execution</td><td>Agent launcher/status/approvals</td><td>Job scheduler and capability broker</td></tr><tr><td>Advanced</td><td>Tray host, notification mirroring, live previews, community logic</td><td>Separate feasibility/security gates</td></tr></tbody></table>
+<h2>Weather provider decision</h2><p>Start with manual city selection and brokered cached requests; precise geolocation is optional consent. Open-Meteo is a candidate, but its free API has non-commercial terms and attribution requirements. Choose a suitable paid/provider agreement if commercial distribution requires it; expose provider licensing and data provenance in settings. Never imply “free forever” for an eventual commercial app. <a href="sources.html#s12">[S12]</a></p>
+<h2>Ecosystem roadmap</h2><p>Ship excellent first-party widgets first. Next publish a versioned schema, validator, examples and compatibility tests. Then accept curated declarative packages with provenance, digests, review and rollback. Add sandboxed logic only after quota and adversarial tests. Marketplace accounts, payments and hundreds of packages follow demonstrated developer demand; no cloud backend is needed for the first release.</p><nav class="footer-nav" aria-label="Chapter navigation"><a href="windows.html">← Windows integration</a><a href="agents.html">Agent runtime →</a></nav><div class="footer-note">PROTON 2.0 · STRATEGY & SYSTEM DESIGN · 20 OCT 2026<br>Concepts use sample data. Proposed budgets require measurement.</div></main></body></html>
