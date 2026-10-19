@@ -22,6 +22,7 @@
  };
  function close(restore = false) {
   flyout.hidden = true;
+  status.textContent = "Preview closed.";
   tiles.forEach(t => t.setAttribute("aria-expanded", "false"));
   if (restore && trigger) trigger.focus();
   trigger = null;
