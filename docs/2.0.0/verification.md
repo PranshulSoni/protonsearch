@@ -11,7 +11,9 @@ panel-status correction at `9b7391f`.
 - Twenty-five source entries are present.
 - `node --check docs/2.0.0/concept.js` exits successfully.
 - `tooling-lock.json` parses successfully.
-- `git diff --check` reports no whitespace errors.
+- Planning files pass `git diff --check` against the application baseline.
+  Vendored upstream skill whitespace is preserved; checking that third-party bundle
+  may report upstream trailing-whitespace warnings.
 - Baseline-to-planning diff contains only `docs/2.0.0/` and
   `.agents/skills/rust-skills/`; no Proton production sources/configuration changed.
 
