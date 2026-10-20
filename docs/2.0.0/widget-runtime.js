@@ -27,10 +27,12 @@
     positionFrame=null;
     if(!anchor||detail.hidden)return;
     const rect=anchor.getBoundingClientRect(),width=Math.min(380,innerWidth-24);
-    detail.style.width=`${width}px`;detail.style.maxHeight=`${Math.max(120,Math.min(innerHeight-24,rect.top-26))}px`;
+    const profileTop=stage.querySelector('.mode-switch')?.getBoundingClientRect().top??rect.top;
+    const baseline=Math.min(rect.top,profileTop)-12;
+    detail.style.width=`${width}px`;detail.style.maxHeight=`${Math.max(1,Math.min(innerHeight-24,baseline-12))}px`;
     const height=detail.getBoundingClientRect().height;
     detail.style.left=`${clamp(rect.left+rect.width/2-width/2,12,Math.max(12,innerWidth-width-12))}px`;
-    detail.style.top=`${clamp(rect.top-height-14,12,Math.max(12,innerHeight-height-12))}px`;
+    detail.style.top=`${clamp(baseline-height,12,Math.max(12,innerHeight-height-12))}px`;
   }
   function queuePosition(){if(positionFrame===null)positionFrame=requestAnimationFrame(positionPanel);}
   function closePanel(restore=true){
