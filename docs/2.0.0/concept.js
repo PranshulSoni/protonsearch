@@ -84,6 +84,7 @@
   if (button && button.hasAttribute("aria-expanded")) button.setAttribute("aria-expanded","true");
   attach(id);
   position();
+  panel.scrollTop=0;
   (content.querySelector("input[type=search]") || document.getElementById("close-panel")).focus({preventScroll:true});
   announce(titles[id] + " preview opened.");
  }
