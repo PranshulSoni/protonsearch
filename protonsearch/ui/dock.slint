@@ -31,7 +31,6 @@ component GlassButton inherits Rectangle {
             return reject;
         }
     }
-    @children
     touch := TouchArea {
         mouse-cursor: pointer;
         clicked => { focus.focus(); root.activated(); }
@@ -41,6 +40,7 @@ component GlassButton inherits Rectangle {
             }
         }
     }
+    @children
 }
 
 component HorizontalFlickable inherits Flickable {
@@ -88,7 +88,7 @@ export component DockWindow inherits Window {
                     spacing: 5px;
                     for item[index] in root.items : tile := GlassButton {
                         label: item.title + (item.value == "" ? "" : ", " + item.value);
-                        selected: item.active;
+                        selected: item.active || (item.kind != "app" && item.width >= 85);
                         width: item.kind == "app" ? 64px : max(54px, item.width * 1px);
                         height: parent.height;
                         activated => { root.item-clicked(item.id); }
@@ -98,7 +98,7 @@ export component DockWindow inherits Window {
                             width: tile.hovered ? 60px : 50px;
                             height: self.width;
                             x: (parent.width - self.width) / 2;
-                            y: tile.hovered ? -5px : 0px;
+                            y: tile.hovered ? 0px : 5px;
                             image-fit: contain;
                             animate width { duration: 150ms; easing: ease-out; }
                             animate y { duration: 150ms; easing: ease-out; }
@@ -135,6 +135,11 @@ export component DockWindow inherits Window {
                                     overflow: elide; vertical-stretch: 0;
                                 }
                             }
+                        }
+                        if item.kind != "app" && item.progress > 0 : Rectangle {
+                            x: 12px; y: parent.height - 5px; width: parent.width - 24px; height: 2px;
+                            border-radius: 1px; background: #ffffff14;
+                            Rectangle { width: parent.width * clamp(item.progress, 0, 1); height: 2px; border-radius: 1px; background: #d0def4; }
                         }
                         if root.editing : HorizontalLayout {
                             y: parent.height - 19px; height: 18px;
