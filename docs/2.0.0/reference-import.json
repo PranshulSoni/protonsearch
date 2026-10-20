@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "sourceFile": "C:/Users/Pranshul/Downloads/customizable_macos_widget_dock_weather_gallery_lines_fixed.html",
+  "sourceSHA256": "27c8c162b9558b79eb4702f58033d5288451b7426fd3be29c5d034089d2ff114",
+  "sourceBytes": 298513,
+  "adaptedFiles": [
+    "glass-dock.html",
+    "unified-dock.css",
+    "concept.js"
+  ],
+  "notes": [
+    "Adapted the user-supplied reference structure, content, animations, adaptive service layouts, and embedded assets.",
+    "All profile widgets remain in one dock-shell. Daily and Founder each keep independent visibility, order, widths, dock height, and capsule/line appearance.",
+    "Replaced the embedded photographic wallpaper with assets/wallpaper-dawn.svg and neutralized olive glass surfaces to charcoal/silver.",
+    "Extracted CSS and JavaScript to local files; no network service integration or arbitrary custom HTML/JavaScript.",
+    "Added bounded plain-text custom metric definitions in protonUnifiedDockCustomWidgetsV1; profile geometry stored in protonUnifiedDockLayoutV1.",
+    "Validated persisted state, repaired Founder Gmail primary brand panel, fixed separator clipping, and kept reduced-motion active panels visible.",
+    "Added profile arrow-key navigation, keyboard reorder/width controls, editor focus handling, and discreet sample-only labeling."
+  ]
+}
