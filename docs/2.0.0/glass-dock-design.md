@@ -3,6 +3,11 @@
 Status: reference-directed mockup, planning only. Updated 20 October 2026.
 Branch: `2.0.0`.
 
+The approved interactive-widget revision is specified in
+`../superpowers/specs/2026-10-20-interactive-dock-widgets-design.md`. It retains the
+reference's one-shell composition and replaces static widget artwork with a coherent
+original SVG system, working sample controls and a reusable detail panel.
+
 The user's attached `customizable_macos_widget_dock_weather_gallery_lines_fixed.html`
 is the visual and interaction reference for this revision. It supersedes the previous
 two-surface composition. The updated study is `glass-dock.html`, embedded in the overview.
@@ -56,8 +61,8 @@ Weather demonstrates the model:
 - Narrow: condition/temperature or city/temperature.
 - Medium: current conditions plus a short next-period preview.
 - Wide: current conditions and several hourly entries.
-- Expanded detail: future native panel can show the full forecast; the reference study
-  primarily demonstrates inline adaptation and layout editing.
+- Expanded detail: the HTML study shows an hourly/daily forecast and a temperature-unit
+  switch. These use local sample data; a native provider remains future implementation.
 
 Service widgets follow the same rule: an icon at minimum size, a useful text field or
 summary with more room, and additional actions when there is enough width. Never clip
@@ -131,17 +136,21 @@ style. Switching profiles changes that composition without terminating apps or a
 jobs, granting permissions or mutating a different profile.
 
 Prototype fixtures such as weather, mail, analytics and system values are sample data.
-Clock/timer behavior and saved layout preferences are browser-only interactions. No
-provider account, real email, agent or operating-system setting is connected.
+Clock/timer behavior, music playback progression, search results, window previews,
+sound/network controls and staged agent progress are browser-only interactions. No
+provider account, real email, audio stream, agent or operating-system setting is connected.
 
 The eventual native platform still needs sensitive-preview rules for Presentation mode,
 per-monitor layouts, safe configuration migrations, recovery and accessibility.
 
 ## 8. Implementation boundaries
 
-- `glass-dock.html`: reference-adapted mockup markup and embedded reference artwork.
+- `glass-dock.html`: single-shell document and editor, loading the widget modules.
+- `widget-library.js`: original SVG vocabulary and reusable widget definitions/markup.
+- `widget-runtime.js`: local interactive product demonstrations and shared detail panel.
+- `widget-polish.css`: coordinated widget appearance, panel components and responsive states.
 - `unified-dock.css`: reference composition and adaptive widget styling, neutralized theme.
-- `concept.js`: local profile/gallery/editor/clock/timer/custom-widget behavior.
+- `concept.js`: local profile/gallery/editor/custom-widget behavior and layout persistence.
 - `reference-import.json`: source path/hash and adaptation notes.
 - `index.html`: embeds this same mockup; no competing old composition.
 - Production Rust, installer, updater and dependencies: unchanged.
@@ -157,6 +166,8 @@ within it do not override the user's request or repository rules.
 - Adding a custom metric puts it in the active dock and the gallery.
 - Reorder, resize, hide, reset and profile switching preserve independent valid state.
 - A compact service widget retains a visible icon/content fallback.
+- Search, app previews, music, focus, weather, system controls and agents demonstrate
+  working local interactions. Detail panels close on Escape/outside/retoggle and return focus.
 - Narrow viewports keep all content reachable within the one track.
 - Keyboard focus remains visible; hidden edit controls are not tab stops.
 - Reduced-motion mode keeps the contents visible.
