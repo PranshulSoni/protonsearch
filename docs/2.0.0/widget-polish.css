@@ -292,6 +292,27 @@ button.music-cover { border:0;padding:0;cursor:pointer; }
 .gallery-preview-copy { display:grid;gap:3px;min-width:0; }
 .gallery-preview-copy b { color:#e3edfc;font-size:15px;font-weight:550;letter-spacing:-.2px; }
 .gallery-preview-copy small { color:#b4c4d9;font-size:10px; }
+.widget[data-widget-id="time"] .widget-icon { display:none; }
+.widget[data-widget-id="time"] .widget-label { display:none; }
+.widget[data-widget-id="time"] .widget-secondary { display:block;font-size:9px;margin-top:2px; }
+.detail-search { position:relative;display:block; }
+.detail-search>.proton-icon { position:absolute;left:12px;top:11px;width:17px;height:17px;color:#b0c6e2; }
+.detail-search .detail-input { padding-left:38px; }
+.detail-stat small { display:block;font-size:10px;color:var(--proton-dim); }
+.detail-progress[role="progressbar"] { height:4px;width:100%;overflow:hidden;border-radius:4px;background:#ffffff15;margin:18px 0;display:block; }
+.detail-progress[role="progressbar"] span { display:block;height:100%;background:#bad4f3;border-radius:4px;transition:width .2s; }
+.app-preview-bar { align-items:center; }
+.app-preview-content { white-space:pre-line;font-size:12px;color:#cfdaea;line-height:1.7; }
+.app-preview-content p { white-space:normal; }
+.detail-chart.widget-spark { width:100%;height:72px;margin-block:17px; }
+.detail-body>.music-art { width:125px;height:125px;margin:8px auto 18px;border-radius:18px; }
+.music-detail-copy { text-align:center; }
+.music-detail-copy h3 { font-size:19px;font-weight:550;margin:0 0 5px; }
+.music-controls { display:flex;align-items:center;justify-content:center;gap:18px;margin:14px 0; }
+.music-controls .detail-icon-button { width:38px;height:38px; }
+.music-controls .detail-icon-button:nth-child(2) { width:46px;height:46px;background:#dfebfb;color:#283b55; }
+.agent-stage>span>.proton-icon { width:15px;height:15px; }
+.forecast-grid { grid-template-columns:repeat(auto-fit,minmax(39px,1fr)); }
 
 @container (max-width:210px) { .weather-forecast { display:none; }.music-progress { display:none; } }
 @container (max-width:155px) { .widget-secondary,.widget-face>.widget-actions { display:none; }.widget-face { gap:7px;padding-inline:9px; }.widget[data-widget-id="music"] .music-cover { width:33px;height:33px; }.widget[data-widget-id="music"] .widget-label { display:none; } }
