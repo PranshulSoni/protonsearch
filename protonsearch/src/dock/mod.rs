@@ -65,12 +65,29 @@ fn image(pixels: &platform::IconPixels) -> Image {
     ))
 }
 fn asset(name: &str) -> Image {
-    Image::load_from_path(
-        &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("ui/icons/dock")
-            .join(format!("{name}.svg")),
-    )
-    .unwrap_or_default()
+    thread_local! { static CACHE: std::cell::RefCell<HashMap<String,Image>> = std::cell::RefCell::new(HashMap::new()); }
+    if let Some(image) = CACHE.with(|cache| cache.borrow().get(name).cloned()) {
+        return image;
+    }
+    let bytes: &[u8] = match name {
+        "apps" => include_bytes!("../../ui/icons/dock/apps.svg"),
+        "agent" => include_bytes!("../../ui/icons/dock/agent.svg"),
+        "clock" => include_bytes!("../../ui/icons/dock/clock.svg"),
+        "volume" => include_bytes!("../../ui/icons/dock/volume.svg"),
+        "network" => include_bytes!("../../ui/icons/dock/network.svg"),
+        "power" => include_bytes!("../../ui/icons/dock/power.svg"),
+        "music" => include_bytes!("../../ui/icons/dock/music.svg"),
+        "weather" => include_bytes!("../../ui/icons/dock/weather.svg"),
+        "focus" => include_bytes!("../../ui/icons/dock/focus.svg"),
+        "settings" => include_bytes!("../../ui/icons/dock/settings.svg"),
+        "file" => include_bytes!("../../ui/icons/dock/file.svg"),
+        _ => include_bytes!("../../ui/icons/dock/search.svg"),
+    };
+    let image = Image::load_from_svg_data(bytes).unwrap_or_default();
+    CACHE.with(|cache| {
+        cache.borrow_mut().insert(name.to_owned(), image.clone());
+    });
+    image
 }
 fn native(window: &slint::Window) -> Option<HWND> {
     let provider = window.window_handle();
@@ -783,6 +800,9 @@ pub fn run() -> Result<()> {
         }
         if dirty {
             refresh(&state, &dock, &panel);
+        }
+        if !dirty {
+            return;
         }
         if let Some(hwnd) = native(dock.window()) {
             if !configured {
