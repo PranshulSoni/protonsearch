@@ -50,7 +50,7 @@ component HorizontalFlickable inherits Flickable {
 }
 
 export component DockWindow inherits Window {
-    title: "Proton dock";
+    title: "Proton Dock";
     background: transparent;
     no-frame: true;
     default-font-family: "Segoe UI Variable";
@@ -158,7 +158,7 @@ export component DockWindow inherits Window {
 }
 
 export component DockPanelWindow inherits Window {
-    title: root.title;
+    title: "Proton Widget";
     background: transparent;
     no-frame: true;
     default-font-family: "Segoe UI Variable";
@@ -166,7 +166,7 @@ export component DockPanelWindow inherits Window {
     width: 440px;
     height: 560px;
     in-out property <string> panel-kind;
-    in-out property <string> title;
+    in-out property <string> panel-title;
     in-out property <string> subtitle;
     in-out property <string> query;
     in-out property <string> body;
@@ -194,7 +194,7 @@ export component DockPanelWindow inherits Window {
             HorizontalLayout {
                 VerticalLayout {
                     spacing: 5px;
-                    Text { text: root.title; color: #f4f7ff; font-size: 23px; font-weight: 600; overflow: elide; }
+                    Text { text: root.panel-title; color: #f4f7ff; font-size: 23px; font-weight: 600; overflow: elide; }
                     Text { text: root.subtitle; color: #b1bdd0; font-size: 12px; overflow: elide; }
                 }
                 GlassButton {
@@ -205,7 +205,7 @@ export component DockPanelWindow inherits Window {
             }
             if root.panel-kind == "apps" || root.panel-kind == "agents" || root.panel-kind == "windows" || root.panel-kind == "weather" || root.panel-kind == "customize" : LineEdit {
                 text <=> root.query;
-                placeholder-text: root.panel-kind == "weather" ? "City or coordinates" : root.panel-kind == "customize" ? "Custom widget: name | value | detail" : "Search " + root.title;
+                placeholder-text: root.panel-kind == "weather" ? "City or coordinates" : root.panel-kind == "customize" ? "Custom widget: name | value | detail" : "Search " + root.panel-title;
                 edited(text) => { root.query-edited(text); }
                 accepted => { root.action("submit"); }
             }
@@ -258,6 +258,8 @@ export component DockPanelWindow inherits Window {
                                         Text { text: entry.title; color: #f4f7ff; font-size: 13px; font-weight: 600; overflow: elide; }
                                         Text { text: entry.subtitle; color: #aebbd0; font-size: 11px; overflow: elide; }
                                     }
+                                    if root.panel-kind == "apps" : Button { text: entry.selected ? "Unpin" : "Pin"; clicked => { root.action("pin:" + entry.id); } }
+                                    if root.panel-kind == "windows" : Button { text: "Close"; clicked => { root.action("close:" + entry.id); } }
                                     Text { text: entry.value; color: #d9e5fa; font-size: 12px; vertical-alignment: center; overflow: elide; horizontal-stretch: 0; }
                                 }
                             }
