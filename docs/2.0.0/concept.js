@@ -294,6 +294,8 @@ function renderManager(){
   const focusAttribute=['data-widget-toggle','data-service-toggle','data-gallery-toggle'].find(attribute=>popover.contains(focused)&&focused.hasAttribute(attribute));
   const focusValue=focusAttribute?focused.getAttribute(focusAttribute):null;
   const managerScroll=popover.scrollTop;
+  const optionsScroll=widgetOptions.scrollTop;
+  const galleryScroll=widgetGallery?.scrollTop||0;
   updateAppearanceControls();
   renderServiceWidgetOptions();
   managerProfile.textContent=`${activeMode[0].toUpperCase()+activeMode.slice(1)} profile`;
@@ -316,6 +318,8 @@ function renderManager(){
     replacement?.focus({preventScroll:true});
     popover.scrollTop=managerScroll;
   }
+  widgetOptions.scrollTop=optionsScroll;
+  if(widgetGallery)widgetGallery.scrollTop=galleryScroll;
 }
 
 function selectWidget(widget){
