@@ -1,6 +1,11 @@
 # Proton 2.0 product and system specification
 
 Status: proposed for review, planning only.
+
+Visual revision: [glass-dock-design.md](glass-dock-design.md) supersedes the original
+green palette, uniform tile treatment and default dock composition. It proposes neutral
+glass, an app/content dock plus a quiet status capsule, and different presentations
+within the shared widget system. Architecture and safety contracts remain unchanged.
 Date: 20 October 2026, Asia/Kolkata.
 Baseline: 98d52ce, original branch 1.1.1; planning branch 2.0.0.
 
