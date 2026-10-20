@@ -27,7 +27,7 @@ const selectedWidgetSize=document.querySelector('#selectedWidgetSize');
 const doneEditingButton=document.querySelector('#doneEditing');
 const manageWidgetsButton=document.querySelector('#manageWidgets');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-const STORAGE_KEY='protonUnifiedDockLayoutV1';
+const STORAGE_KEY='protonUnifiedDockLayoutV2';
 const CUSTOM_STORAGE_KEY='protonUnifiedDockCustomWidgetsV1';
 const MAX_CUSTOM_WIDGETS=12;
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -44,8 +44,6 @@ const modeSwitch=document.querySelector('.mode-switch');
 let activeMode='daily';
 let editing=false;
 let selectedWidget=null;
-let focusSeconds=25*60;
-let focusRunning=false;
 function panelGapFor(mode=activeMode){
   const state=profileState(mode);
   const h=Number(state.dockHeight)||DEFAULT_DOCK_HEIGHT;
@@ -54,7 +52,6 @@ function panelGapFor(mode=activeMode){
 }
 
 
-let focusInterval=null;
 let panSession=null;
 let dragSession=null;
 let resizeSession=null;
@@ -83,7 +80,7 @@ function registerCustomWidget(definition){
     const widget=document.createElement('div');
     widget.className='tile widget custom-metric';
     Object.assign(widget.dataset,{widgetId:definition.id,widgetName:definition.label,defaultW:'190',minW:'96',maxW:'520',startHidden:'true'});
-    widget.innerHTML='<button class="widget-drag" title="Drag to move; arrow keys to reorder" type="button">•••</button><div class="custom-metric-copy"><span class="custom-label"></span><b class="custom-value"></b><span class="custom-detail"></span></div><span class="widget-edit-label"></span><button class="widget-resize" title="Drag sideways; arrow keys to resize" type="button"></button>';
+    widget.innerHTML=`<button class="widget-drag" title="Drag to move; arrow keys to reorder" type="button">${window.ProtonWidgets.icon('grip')}</button><button type="button" class="widget-face" data-open-widget="${definition.id}" aria-haspopup="dialog" aria-expanded="false"><span class="widget-icon">${window.ProtonWidgets.icon('metric')}</span><span class="widget-copy custom-metric-copy"><span class="widget-label custom-label"></span><b class="widget-value custom-value"></b><span class="widget-secondary custom-detail"></span></span></button><span class="widget-edit-label"></span><button class="widget-resize" title="Drag sideways; arrow keys to resize" type="button"></button>`;
     widget.querySelector('.custom-label').textContent=definition.label;
     widget.querySelector('.custom-value').textContent=definition.value;
     widget.querySelector('.custom-detail').textContent=definition.detail;
@@ -230,62 +227,29 @@ function setDockHeight(value,{animate=true}={}){
 
 function renderGallery(){
   if(!widgetGallery)return;
-  widgetGallery.innerHTML='';
-  const ids=[];
-  widgetsFor(activeMode).forEach(widget=>{ if(!ids.includes(widget.dataset.widgetId)) ids.push(widget.dataset.widgetId); });
-  ids.forEach(id=>{
-    const widget=widgetsFor(activeMode).find(item=>item.dataset.widgetId===id);
-    if(!widget)return;
+  widgetGallery.replaceChildren();
+  widgetsFor(activeMode).forEach(widget=>{
+    const id=widget.dataset.widgetId;
+    const definition=window.ProtonWidgets.byId.get(id);
     const visible=!profileState().hidden.includes(id);
-    const card=document.createElement('article');
-    card.className='gallery-card';
+    const card=document.createElement('article');card.className='gallery-card';
+    const width=Math.round(profileState().sizes[id].w);
     const title=escapeHTML(widget.dataset.widgetName);
-    const size=profileState().sizes[id]||{w:Number(widget.dataset.defaultW)||120};
-    const openaiSrc=widgetsFor(activeMode).find(w=>w.dataset.widgetId==='chatgpt')?.querySelector('.brand-logo')?.src||'';
-    const gmailSrc=widgetsFor(activeMode).find(w=>w.dataset.widgetId==='gmail')?.querySelector('.gmail-primary-logo')?.src||'';
-    let preview='';
-    if(id==='chatgpt'){
-      preview=`<div class="gallery-size-row">
-        <div class="gallery-size-demo large"><img class="gallery-openai" alt="" src="${openaiSrc}"><span class="text">Ask Anything</span><div class="mini-actions"><span></span><span></span><span></span></div></div>
-      </div><div class="gallery-size-row"><div class="gallery-size-demo medium"><img class="gallery-openai" alt="" src="${openaiSrc}"><span class="text">Ask Anything</span><div class="mini-actions"><span></span><span></span></div></div><div class="gallery-size-demo small"><img class="gallery-openai" alt="" src="${openaiSrc}"><span class="text">Ask Anything</span></div><div class="gallery-size-demo icon"><img class="gallery-openai" alt="" src="${openaiSrc}"></div></div>`;
-    } else if(id==='gmail'){
-      preview=`<div class="gallery-size-row">
-        <div class="gallery-size-demo large"><img class="g-logo" alt="" src="${gmailSrc}"><span class="text">Starting some words of latest email</span><div class="mini-actions"><span></span><span></span><span></span></div></div>
-      </div><div class="gallery-size-row"><div class="gallery-size-demo medium"><img class="g-logo" alt="" src="${gmailSrc}"><span class="text">Search in Emails</span><div class="mini-actions"><span></span><span></span></div></div><div class="gallery-size-demo small"><img class="g-logo" alt="" src="${gmailSrc}"><span class="text">Search</span></div><div class="gallery-size-demo icon"><img class="g-logo" alt="" src="${gmailSrc}"></div></div>`;
-    } else if(id==='weather'){
-      preview=`<div class="gallery-size-row">
-        <div class="gallery-size-demo large weather-demo"><div class="weather-copy"><span class="city">Ahmedabad</span><span class="deg">38°</span></div><div class="mini-hours"><div class="mini-hour"><span>2pm</span><i class="mini-cloud"></i></div><div class="mini-hour"><span>3pm</span><i class="mini-cloud"></i></div><div class="mini-hour"><span>4pm</span><i class="mini-cloud"></i></div><div class="mini-hour"><span>5pm</span><i class="mini-cloud"></i></div></div></div>
-      </div><div class="gallery-size-row"><div class="gallery-size-demo medium weather-demo"><div class="weather-copy"><span class="city">Ahmedabad</span><span class="deg">38°</span></div><div class="mini-hours"><div class="mini-hour"><span>2pm</span><i class="mini-cloud"></i></div><div class="mini-hour"><span>3pm</span><i class="mini-cloud"></i></div></div></div><div class="gallery-size-demo small weather-demo"><div class="weather-copy"><span class="city">Ahmedabad</span><span class="deg">38°</span></div></div></div>`;
-    } else {
-      preview=`<div class="gallery-size-row"><div class="gallery-size-demo large"><span class="text">${title}</span></div><div class="gallery-size-demo icon"><span class="text">•</span></div></div>`;
-    }
-    card.innerHTML=`<div class="gallery-card-head"><div class="gallery-card-copy"><b>${title}</b><small>Current width ${Math.round(size.w)} px · adaptive preview</small></div></div>${preview}<button type="button" class="${visible?'added':''}" data-gallery-toggle="${id}">${visible?'Shown in profile':'Add to profile'}</button>`;
-    widgetGallery.appendChild(card);
+    const value=definition?.value||customWidgets.find(item=>item.id===id)?.value||'Your metric';
+    const detail=definition?.detail||customWidgets.find(item=>item.id===id)?.detail||'Personal text widget';
+    card.innerHTML=`<div class="gallery-card-head"><div class="gallery-card-copy"><b>${title}</b><small>Current width ${width} px · adapts to your dock</small></div></div><div class="gallery-widget-preview"><span class="widget-icon">${window.ProtonWidgets.icon(definition?.glyph||'metric')}</span><span class="gallery-preview-copy"><b>${escapeHTML(value)}</b><small>${escapeHTML(detail)}</small></span></div><button type="button" class="${visible?'added':''}" data-gallery-toggle="${id}">${visible?'Shown in profile':'Add to profile'}</button>`;
+    widgetGallery.append(card);
   });
 }
-
-
 function renderServiceWidgetOptions(){
   if(!serviceWidgetOptions)return;
-  const services=widgetsFor(activeMode).filter(widget=>['chatgpt','gmail','weather'].includes(widget.dataset.widgetId));
-  serviceWidgetOptions.innerHTML='';
-  services.forEach(widget=>{
-    const id=widget.dataset.widgetId;
-    const visible=!profileState().hidden.includes(id);
-    let logo='';
-    if(id==='chatgpt'){
-      const src=widget.querySelector('.brand-logo')?.src||'';
-      logo=`<img class="service-openai" alt="${escapeHTML(widget.dataset.widgetName)}" src="${src}">`;
-    } else if(id==='gmail'){
-      const src=widget.querySelector('.gmail-primary-logo')?.src||'';
-      logo=`<img alt="${escapeHTML(widget.dataset.widgetName)}" src="${src}">`;
-    } else {
-      logo=`<span class="cloud" style="transform:scale(1.15)"></span>`;
-    }
-    const label=document.createElement('label');
-    label.className='service-option';
-    label.innerHTML=`<input type="checkbox" ${visible?'checked':''} data-service-toggle="${id}"><span class="service-option-logo">${logo}</span><span class="service-option-copy"><b>${escapeHTML(widget.dataset.widgetName)}</b><small>${id==='weather'?'Adaptive forecast widget':'Adaptive service widget'}</small><span class="service-option-state">${visible?'Shown':'Hidden'}</span></span>`;
-    serviceWidgetOptions.appendChild(label);
+  serviceWidgetOptions.replaceChildren();
+  widgetsFor(activeMode).filter(widget=>['chatgpt','gmail','weather'].includes(widget.dataset.widgetId)).forEach(widget=>{
+    const id=widget.dataset.widgetId,visible=!profileState().hidden.includes(id);
+    const definition=window.ProtonWidgets.byId.get(id);
+    const label=document.createElement('label');label.className='service-option';
+    label.innerHTML=`<input type="checkbox" ${visible?'checked':''} data-service-toggle="${id}"><span class="service-option-logo">${window.ProtonWidgets.icon(definition.glyph)}</span><span class="service-option-copy"><b>${escapeHTML(widget.dataset.widgetName)}</b><small>${escapeHTML(definition.detail)}</small><span class="service-option-state">${visible?'Shown':'Hidden'}</span></span>`;
+    serviceWidgetOptions.append(label);
   });
 }
 
@@ -397,6 +361,7 @@ function setWidgetVisibility(id,visible){
 function setEditing(value){
   finishPointerInteraction();
   editing=value;
+  document.dispatchEvent(new CustomEvent('proton:editing-change',{detail:{editing}}));
   syncEditorAccess();
   stage.classList.toggle('editing',editing);
   layoutToolbar.classList.toggle('open',editing);
@@ -425,6 +390,7 @@ function switchMode(mode){
   motion(outgoing,[{opacity:1,transform:'translateY(0) scale(1)',filter:'blur(0)'},{opacity:0,transform:'translateY(8px) scale(.985)',filter:'blur(4px)'}],{duration:150,easing:'ease-in'});
   selectWidget(null);
   activeMode=mode;
+  document.dispatchEvent(new CustomEvent('proton:profile-change',{detail:{mode}}));
   dockState.activeMode=mode;
   saveState();
   panels.forEach(panel=>{const on=panel.dataset.panel===mode;panel.classList.toggle('active',on);panel.inert=!on;});
@@ -575,7 +541,7 @@ activePanel().addEventListener('click',()=>{});
 document.addEventListener('click',event=>{
   if(!editing)return;
   const widget=event.target.closest('.dock-panel.active .widget');
-  if(widget&&!event.target.closest('.widget-drag,.widget-resize,.app-button,.play'))selectWidget(widget);
+  if(widget&&!event.target.closest('.widget-drag,.widget-resize'))selectWidget(widget);
 });
 
 function pointerPoint(event){return {x:event.clientX,y:event.clientY};}
@@ -658,41 +624,6 @@ function finishPointerInteraction(){
 document.addEventListener('pointerup',finishPointerInteraction);
 document.addEventListener('pointercancel',finishPointerInteraction);
 
-function updateClock(){
-  const now=new Date();
-  document.querySelector('#timeMain').textContent=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});
-  document.querySelector('#timeDate').textContent=now.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
-  document.querySelector('#menuClock').textContent=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  const clock=document.querySelector('#analogClock');
-  const h=now.getHours()%12,m=now.getMinutes(),s=now.getSeconds();
-  clock.querySelector('.hour').style.transform=`rotate(${h*30+m*.5}deg)`;
-  clock.querySelector('.minute').style.transform=`rotate(${m*6}deg)`;
-  clock.querySelector('.second').style.transform=`rotate(${s*6}deg)`;
-}
-const analog=document.querySelector('#analogClock');
-for(let i=0;i<12;i++){const tick=document.createElement('span');tick.className='tick';tick.style.transform=`rotate(${i*30}deg)`;analog.appendChild(tick);}
-['hour','minute','second'].forEach(name=>{const hand=document.createElement('span');hand.className=`hand ${name}`;analog.appendChild(hand);});
-updateClock();setInterval(updateClock,1000);
-
-function updateEnergy(){
-  const total=30*60;
-  const left=total-Math.floor((Date.now()/1000)%total);
-  document.querySelector('#energyTimer').textContent=`${String(Math.floor(left/60)).padStart(2,'0')}:${String(left%60).padStart(2,'0')}`;
-}
-updateEnergy();setInterval(updateEnergy,1000);
-
-function renderFocus(){document.querySelector('#focusTimer').textContent=`${String(Math.floor(focusSeconds/60)).padStart(2,'0')}:${String(focusSeconds%60).padStart(2,'0')}`;}
-document.querySelector('#playFocus').addEventListener('click',()=>{
-  focusRunning=!focusRunning;
-  document.querySelector('#playFocus').textContent=focusRunning?'Ⅱ':'▶';
-  clearInterval(focusInterval);
-  if(focusRunning)focusInterval=setInterval(()=>{
-    focusSeconds=Math.max(0,focusSeconds-1);renderFocus();
-    if(!focusSeconds){focusRunning=false;clearInterval(focusInterval);document.querySelector('#playFocus').textContent='▶';}
-  },1000);
-});
-renderFocus();
-
 function resetMagnification(){
   document.querySelectorAll('.app-button').forEach(item=>{
     item.style.setProperty('--scale','1');item.style.setProperty('--lift','0px');item.style.zIndex=1;
@@ -715,7 +646,7 @@ track.addEventListener('wheel',event=>{
   if(track.scrollWidth>track.clientWidth){event.preventDefault();track.scrollLeft+=event.deltaY+event.deltaX;}
 },{passive:false});
 track.addEventListener('pointerdown',event=>{
-  if(editing||event.target.closest('button'))return;
+  if(editing||event.button!==0||event.target.closest('button,input,select,textarea,a,[role=button]'))return;
   panSession={pointerId:event.pointerId,startX:event.clientX,startScroll:track.scrollLeft};
   track.setPointerCapture?.(event.pointerId);
   track.classList.add('dragging');resetMagnification();
@@ -738,6 +669,7 @@ function syncEditorAccess(){
   panels.forEach(panel=>panel.querySelectorAll('.widget').forEach(widget=>{
     widget.tabIndex=editing?0:-1;
     widget.setAttribute('aria-label',widget.dataset.widgetName);
+    widget.querySelectorAll('[data-open-widget],[data-widget-action],[data-app]').forEach(button=>{button.disabled=editing;});
     widget.querySelectorAll('.widget-drag,.widget-resize').forEach(button=>{button.tabIndex=editing?0:-1;button.disabled=!editing;});
   }));
 }
@@ -785,6 +717,29 @@ document.querySelector('#customWidgetForm').addEventListener('submit',event=>{
   });
   syncEditorAccess();saveState();renderManager();fitDock();
   event.target.reset();status.textContent=`Added ${label} to this profile. It is also available in the other profile's gallery.`;
+});
+document.addEventListener('proton:metric-update',event=>{
+  const request=event.detail,definition=customWidgets.find(item=>item.id===request.id);
+  if(!definition)return;
+  const label=cleanText(request.label,40),value=cleanText(request.value,32),detail=cleanText(request.detail,80);
+  if(!label||!value)return;
+  const next=customWidgets.map(item=>item.id===request.id?{...item,label,value,detail}:item);
+  try{localStorage.setItem(CUSTOM_STORAGE_KEY,JSON.stringify({version:1,widgets:next}));}catch{return;}
+  Object.assign(definition,{label,value,detail});
+  panels.forEach(panel=>{
+    const widget=widgetsFor(panel.dataset.panel).find(item=>item.dataset.widgetId===request.id);
+    if(!widget)return;
+    widget.dataset.widgetName=label;
+    widget.querySelector('.custom-label').textContent=label;
+    widget.querySelector('.custom-value').textContent=value;
+    widget.querySelector('.custom-detail').textContent=detail;
+    widget.querySelector('.widget-edit-label').textContent=label;
+    widget.querySelector('[data-open-widget]').setAttribute('aria-label',`Open ${label}`);
+    widget.querySelector('.widget-drag').setAttribute('aria-label',`Move ${label}; arrow keys to reorder`);
+    widget.querySelector('.widget-resize').setAttribute('aria-label',`Resize ${label}; arrow keys change width`);
+    widget.setAttribute('aria-label',label);
+  });
+  request.saved=true;renderManager();refreshSelectedDetails();
 });
 syncEditorAccess();
 
