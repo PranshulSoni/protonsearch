@@ -6,7 +6,9 @@ Baseline application commit: `98d52ce` on `1.1.1`.
 **Revised visual direction:** read [Glass dock design plan](glass-dock-design.md).
 The [unified widget dock study](glass-dock.html) adapts the user's supplied HTML reference.
 All visible widgets share one outer dock. The gallery, width/height editor, profiles and
-safe local custom metric widgets demonstrate the intended composition. The previous
+safe local custom metric widgets demonstrate the intended composition. Original SVG
+icons and working sample search, music, focus, weather, sound/network controls, app
+previews and agent progress demonstrate the product experience. The previous
 separate status capsule is superseded. No application code is involved.
 
 Open [index.html](index.html) directly in a browser. All assets are local; no build,
@@ -18,7 +20,8 @@ python -m http.server 8765 --bind 127.0.0.1 --directory docs/2.0.0
 ```
 
 The browser site is a planning artifact with sample data. It does not call Windows
-APIs, index files, run agents, hide the taskbar or persist a dock configuration.
+APIs, index files, run real agents or hide the taskbar. Layouts and custom metrics are
+saved in this browser only; the site does not change the Windows dock configuration.
 
 ## Read in this order
 

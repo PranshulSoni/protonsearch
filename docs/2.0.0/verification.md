@@ -130,8 +130,59 @@ Independent code review found manager positioning, stacking, and focus/scroll de
 these were corrected and checked again. Custom text uses escaped HTML/textContent,
 saved dimensions and widget IDs are validated, and the study has no network API calls
 or arbitrary custom code execution. An older MutationObserver browser error remains
-in the tab's log from the prior overview navigation; no such code exists in this study.
+in the tab's log from the prior overview navigation; its source was not identified.
 
 This remains a visual planning prototype. Weather, services, apps and analytics are
 illustrative fixtures; custom widgets are plain-text metric examples. These checks do
 not establish native Windows taskbar replacement, real search or service integration.
+
+## Interactive widget revision
+
+Approved design: `../superpowers/specs/2026-10-20-interactive-dock-widgets-design.md`.
+Implementation and fixes reviewed through `919a618`, 20 October 2026. This section
+supersedes the earlier static-widget limitations; the data remains illustrative.
+
+Browser checks performed on the loopback preview:
+
+- One glass shell contains the composition; the library supplies 22 original SVG-based
+  widget types. The revised overview iframe loads the same interactive study.
+- Search `notes` yields two results; selecting Weekly notes opens its sample content
+  without closing the panel. Filtering the app drawer to `code` opens the Code preview
+  and marks it running. Search has an explicit accessible label.
+- Weather switches 31°C to 88°F and to a seven-day outlook. Widening its dock region
+  from 126 to 226 px reveals hourly information inside the dock.
+- Music play/next changes Weightless to A Walk and updates the dock. Keyboard seek
+  changes playback to 00:01; progression advances without streaming any audio.
+- Volume keyboard input changes 68 to 69; mute is selected, Headphones becomes the
+  chosen output, and Guest network becomes the simulated connected Wi-Fi network.
+- Focus Start changes the controls to Pause; Reset restores 25:00. Agent Run shows
+  staged progress and a sample result; an immediate second run can be cancelled.
+- Clock opens the current calendar with day 20 highlighted. Revenue opens its sample
+  trend and statistics in Founder. Switching profiles closes active details.
+- Gallery Add retains the manager and toggle focus. Reading goal edits from 12 / 20
+  to 13 / 20, persisting after reload. Profile compositions remain independent.
+- Escape, retoggle and background clicks close details. Background dismissal restores
+  widget focus. Clicking Customize keeps focus on Customize and opens only the manager.
+  Panel actions stay open; details leave the profile controls unobstructed.
+- At 375 x 812, document width is 375 px; forecast panel width is about 351 px at x=12
+  and its bottom stays above the profile bar.
+- At 320 x 740, document width is 320 px. Moving Search six places right scrolls its
+  selected tile into view (track scroll about 665 px; tile/track right edge about 302 px).
+  Widening Search to 162 px and its order survive reload.
+- Narrow Search detail is 296 px wide at x=12, y=12, bottom=591; the profile bar starts
+  at y=603. Tall content scrolls inside the panel.
+- Desktop checks at 1440 x 820 and 1440 x 900 confirm full clock/search values fit.
+  Temporary viewport overrides were reset. Screenshot: `scratch/interactive-widget-dock.jpg`.
+
+All three JavaScript syntax checks, 11 HTML-page ID/local-target checks, reference JSON
+parsing and documentation diff whitespace checks pass. No production sources or
+dependencies changed. Independent code review approved the final fixes.
+
+The browser log still reports an unattributed MutationObserver error during overview
+navigation, as it did before this revision; it supplies no source URL/stack. The study
+uses an observer with an existing manager node to synchronize its expanded attribute.
+The UI checks above succeed; an error-free browser log is not claimed. Earlier stale
+cached-script errors during development were resolved with versioned asset URLs.
+
+This is an interactive HTML product study. Services, sound, Wi-Fi, window previews,
+search and agents use local fixture state; native Windows integration is not implemented.
