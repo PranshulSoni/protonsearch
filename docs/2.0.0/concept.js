@@ -491,7 +491,8 @@ manageWidgetsButton.addEventListener('click',event=>{
   popover.classList.toggle('open');
 });
 document.addEventListener('click',event=>{
-  if(!event.target.closest('.settings-popover')&&!event.target.closest('#modeAdd')&&!event.target.closest('#manageWidgets'))popover.classList.remove('open');
+  const path=event.composedPath();
+  if(!path.includes(popover)&&!path.includes(addButton)&&!path.includes(manageWidgetsButton))popover.classList.remove('open');
 });
 
 
