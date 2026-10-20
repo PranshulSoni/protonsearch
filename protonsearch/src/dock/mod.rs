@@ -45,6 +45,10 @@ struct State {
 }
 impl State {
     fn save(&mut self) {
+        if let Err(error) = self.config.normalize() {
+            self.status = error;
+            return;
+        }
         if self.read_only {
             self.status = "Layout is read-only because its saved file could not be loaded.".into();
             return;
@@ -263,6 +267,16 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
             value: value.into(),
             icon: asset(kind_icon(widget.kind)),
             width: widget.width,
+            progress: match widget.kind {
+                WidgetKind::Audio => state.snapshot.audio.map_or(0., |a| a.volume as f32 / 100.),
+                WidgetKind::Focus => 1. - state.focus.seconds(Instant::now()) as f32 / 1500.,
+                WidgetKind::Power => state
+                    .snapshot
+                    .power
+                    .and_then(|p| p.percentage)
+                    .map_or(0., |p| p as f32 / 100.),
+                _ => 0.,
+            },
             ..Default::default()
         });
     }
@@ -275,6 +289,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     }
     dock.set_items(model(items));
     dock.set_profile(profile.name.clone().into());
+    dock.set_editing(state.panel == "customize");
     dock.set_dock_height(profile.height);
     dock.set_status(state.status.clone().into());
     panel.set_panel_kind(state.panel.clone().into());
@@ -329,6 +344,7 @@ fn launch(command: &str) {
 fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
     if command == "hide" || command == "back" {
         let _ = panel.hide();
+        state.panel.clear();
         return;
     }
     if let Some(query) = command.strip_prefix("query:") {
@@ -553,7 +569,10 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
                 }
             }
             state.panel = "windows".into();
-            state.query = identity.into();
+            state.query = wins
+                .first()
+                .map(|w| w.identity.clone())
+                .unwrap_or_else(|| identity.into());
         } else {
             let kind = state
                 .config
@@ -736,6 +755,15 @@ pub fn run() -> Result<()> {
         loop {
             let windows = platform::enumerate_windows();
             let mut icons = HashMap::new();
+            if let Some(folder_icon) = platform::icon_for_path(
+                &format!(
+                    "{}\\explorer.exe",
+                    std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".into())
+                ),
+                64,
+            ) {
+                icons.insert("files".into(), folder_icon);
+            }
             for app in apps.iter().filter(|a| a.icon.is_some()) {
                 if let Some(icon) = &app.icon {
                     icons.insert(app.id.clone(), icon.clone());
@@ -778,7 +806,36 @@ pub fn run() -> Result<()> {
     let mut configured = false;
     let mut panel_configured = None;
     let mut bar_geometry = None;
+    struct StopEvent(HANDLE);
+    impl Drop for StopEvent {
+        fn drop(&mut self) {
+            unsafe {
+                let _ = CloseHandle(self.0);
+            }
+        }
+    }
+    let stop_name: Vec<u16> = format!("Local\\ProtonDockStop-{pid}")
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+    // SAFETY: the controller owns the event; this process owns and closes its opened handle.
+    let stop = unsafe {
+        OpenEventW(
+            SYNCHRONIZATION_SYNCHRONIZE,
+            false,
+            windows::core::PCWSTR(stop_name.as_ptr()),
+        )
+        .ok()
+        .map(StopEvent)
+    };
     timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
+        if stop
+            .as_ref()
+            .is_some_and(|event| unsafe { WaitForSingleObject(event.0, 0) == WAIT_OBJECT_0 })
+        {
+            let _ = slint::quit_event_loop();
+            return;
+        }
         let (Some(dock), Some(panel)) = (weak.upgrade(), weak_panel.upgrade()) else {
             return;
         };
