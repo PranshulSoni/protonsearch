@@ -3831,21 +3831,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                         do_show(hwnd, s);
                     }
                 } else if selection.0 == 2 {
-                    // Kill every other instance of this exe (settings windows are separate processes).
-                    unsafe {
-                        use std::os::windows::process::CommandExt;
-                        use windows::Win32::System::Threading::GetCurrentProcessId;
-                        if let Some(exe) = std::env::current_exe()
-                            .ok()
-                            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-                        {
-                            let _ = std::process::Command::new("taskkill")
-                                .args(["/F", "/IM", &exe, "/FI",
-                                       &format!("PID ne {}", GetCurrentProcessId())])
-                                .creation_flags(0x0800_0000)
-                                .spawn();
-                        }
-                    }
+                    // Controller shutdown gracefully stops its dock child.
                     let _ = unsafe { PostMessageW(hwnd, windows::Win32::UI::WindowsAndMessaging::WM_CLOSE, WPARAM(0), LPARAM(0)) };
                 } else if selection.0 == 3 {
                     if let Ok(exe) = std::env::current_exe() {
@@ -3996,29 +3982,7 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                     do_show(hwnd, s);
                 }
             } else if cmd == 2 {
-                // Exit App — close every instance (this launcher + any open settings windows, which
-                // run as separate `--settings` processes of the same exe), not just this one.
-                unsafe {
-                    use std::os::windows::process::CommandExt;
-                    use windows::Win32::System::Threading::GetCurrentProcessId;
-                    if let Some(exe) = std::env::current_exe()
-                        .ok()
-                        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-                    {
-                        // Kill the other instances; this process then exits cleanly below so its
-                        // tray icon is removed properly.
-                        let _ = std::process::Command::new("taskkill")
-                            .args([
-                                "/F",
-                                "/IM",
-                                &exe,
-                                "/FI",
-                                &format!("PID ne {}", GetCurrentProcessId()),
-                            ])
-                            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
-                            .spawn();
-                    }
-                }
+                // Controller shutdown gracefully stops its dock child.
                 let _ = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) };
             }
             LRESULT(0)
