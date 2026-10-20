@@ -53,3 +53,39 @@ AppBar/taskbar behavior, native accessibility, indexing performance, data migrat
 agent containment or a production dock. No app build, unit suite, installer or imported
 skill validation fixture was run. All 2.0 runtime budgets remain proposed targets.
 The next implementation step is Stage 0 in implementation-plan.md.
+
+## Glass mockup rebuild
+
+The revised visual study replaces the overview's green illustration and is available
+standalone at `glass-dock.html`. Production application files remain untouched.
+Original SVG wallpaper and illustrative app artwork are documented in assets/README.md.
+
+Verified in the in-app browser against the loopback preview:
+
+- Overview iframe loads the study and Search filters `notes` to Widget ideas.
+- Weather opens from the dock and, on narrow canvases, through More apps and widgets.
+  The narrow panel stays inside its desktop canvas.
+- Start's profile selector changes Presentation mode and returns keyboard focus to Start.
+- Presentation Search excludes the sample private document/note records.
+- Layout Cancel restores weather size, joined state and app order. Save retains the
+  chosen rich weather size for the current preview.
+- Sample volume responds to keyboard input (64% to 65%) without touching Windows volume.
+- Panels reset scroll position when switching widgets and support Escape/retoggle close.
+- Light, dark and solid material controls and Dawn/Midnight/Studio backgrounds are present.
+- Rich compositions fit exact measured stage widths 820 and 920 CSS px, with both dock
+  groups inside bounds. Also checked viewport widths 1280, 1440, 1920 and 2560.
+- At viewport widths 320 and 375, dock/status remain inside the canvas and there is no
+  page-level horizontal overflow. The compact layout preserves access through overflow.
+- Temporary viewport override was reset after responsive checks.
+- JavaScript syntax, local HTML asset targets and five SVG XML files pass validation.
+- The browser reported one unattributed MutationObserver error on final navigation;
+  the mockup source does not use MutationObserver. The interactions above succeeded.
+
+Independent review initially identified responsive clipping, Presentation search privacy
+and profile focus issues. All were fixed. The follow-up review through `52b0558` found
+no remaining actionable issues. Universal group wrapping handles content-dependent fit;
+joined capsules separate when the canvas is too narrow.
+
+The visual study remains sample-only: no native taskbar control, file indexing, network
+requests, real agents or OS volume changes. Native glass performance/accessibility and
+the broader application acceptance matrix are not established by this mockup.
