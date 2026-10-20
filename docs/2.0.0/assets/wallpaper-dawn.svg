@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<defs>
+<linearGradient id="sky" x2=".85" y2="1"><stop stop-color="#bfcbdc"/><stop offset=".48" stop-color="#8296b4"/><stop offset="1" stop-color="#3d587b"/></linearGradient>
+<linearGradient id="ribbon" x1=".2" y1="0" x2=".8" y2="1"><stop stop-color="#f0e5e0"/><stop offset=".28" stop-color="#d6d9e4"/><stop offset=".58" stop-color="#a6b5d0"/><stop offset="1" stop-color="#4d6895"/></linearGradient>
+<linearGradient id="crest" x1="0" y1=".2" x2=".9" y2=".9"><stop stop-color="#f5e4db"/><stop offset=".43" stop-color="#c3cedf"/><stop offset=".65" stop-color="#9facc9"/><stop offset="1" stop-color="#455e83"/></linearGradient>
+<linearGradient id="front" x1=".2" y1="0" x2=".65" y2="1"><stop stop-color="#cad6e5"/><stop offset=".15" stop-color="#a6b9d2"/><stop offset=".47" stop-color="#5c7aa0"/><stop offset="1" stop-color="#223d60"/></linearGradient>
+<linearGradient id="rim"><stop stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="170%" height="180%"><feDropShadow dx="-15" dy="25" stdDeviation="40" flood-color="#1a3157" flood-opacity=".4"/></filter>
+<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+</defs>
+<path fill="url(#sky)" d="M0 0h1920v1080H0Z"/>
+<path fill="url(#ribbon)" filter="url(#shadow)" d="M-250 940C220 790 150 195 550 170S1050 800 1430 610 1740-190 2170-170V1300H-250Z"/>
+<path fill="url(#crest)" filter="url(#shadow)" d="M-150 1090C390 1020 270 540 650 470s570 370 940 110 160-520 580-600V1260H-150Z"/>
+<path d="M-150 1090C390 1020 270 540 650 470s570 370 940 110 160-520 580-600" stroke="url(#rim)" stroke-width="2" fill="none"/>
+<path fill="url(#front)" filter="url(#shadow)" d="M-100 1130C310 800 480 810 780 890s440 50 690-85 430-60 610 200V1230H-100Z"/>
+<path d="M-100 1130C310 800 480 810 780 890s440 50 690-85 430-60 610 200" stroke="#e7efff" stroke-opacity=".2" stroke-width="2" fill="none"/>
+<path fill="#fff" filter="url(#grain)" opacity=".035" d="M0 0h1920v1080H0Z"/>
+</svg>

@@ -6,7 +6,8 @@ Branch: `2.0.0`.
 This replaces the visual direction of the green HTML concept. It supersedes the old
 uniform tile treatment, persistent labels, palette and default composition. Existing
 search, recovery, permissions, profile and Windows compatibility requirements remain.
-The old HTML illustration has not yet been rebuilt to this specification.
+The user authorized the rebuild. The interactive HTML study is now in glass-dock.html
+and embedded in the overview. The study uses original illustrative app artwork.
 
 ## 1. Design intent
 
