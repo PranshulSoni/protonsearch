@@ -1,6 +1,5 @@
 //! Windows providers. Native handles never leave the calling thread.
 use anyhow::{bail, Result};
-use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::{Dwm::*, Gdi::*};
 use windows::Win32::Media::Audio::{Endpoints::*, *};

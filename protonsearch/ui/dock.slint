@@ -59,6 +59,7 @@ export component DockWindow inherits Window {
     in-out property <bool> editing: false;
     in-out property <string> status;
     in-out property <float> dock-height: 96;
+    in-out property <float> icon-size: 50;
     callback item-clicked(string);
     callback item-context(string);
     callback profile-selected(string);
@@ -95,7 +96,7 @@ export component DockWindow inherits Window {
                         context => { root.item-context(item.id); }
                         if item.kind == "app" : Image {
                             source: item.icon;
-                            width: tile.hovered ? 60px : 50px;
+                            width: (root.icon-size + (tile.hovered ? 10 : 0)) * 1px;
                             height: self.width;
                             x: (parent.width - self.width) / 2;
                             y: tile.hovered ? 0px : 5px;

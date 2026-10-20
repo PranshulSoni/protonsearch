@@ -169,7 +169,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                         .get(&pin.id)
                         .map(image)
                         .unwrap_or_else(|| asset("apps")),
-                    width: 64.,
+                    width: profile.icon_size + 14.,
                     running,
                     ..Default::default()
                 });
@@ -190,7 +190,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                         .get(&window.identity)
                         .map(image)
                         .unwrap_or_else(|| asset("apps")),
-                    width: 64.,
+                    width: profile.icon_size + 14.,
                     running: true,
                     ..Default::default()
                 });
@@ -291,6 +291,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     dock.set_profile(profile.name.clone().into());
     dock.set_editing(state.panel == "customize");
     dock.set_dock_height(profile.height);
+    dock.set_icon_size(profile.icon_size);
     dock.set_status(state.status.clone().into());
     panel.set_panel_kind(state.panel.clone().into());
     panel.set_panel_title(
