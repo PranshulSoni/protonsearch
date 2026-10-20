@@ -1,6 +1,9 @@
 "use strict";
 (() => {
   const paths = {
+    notes:'<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',
+    browser:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 6.5h14M5 17.5h14"/>',
+    code:'<path d="m8 6-6 6 6 6m8-12 6 6-6 6M14 3l-4 18"/>',
     search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
     apps:'<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
     weather:'<path d="M8 18H6a4 4 0 1 1 1-7.9 6 6 0 0 1 11.8 1.4A3.3 3.3 0 1 1 18 18H8Z"/><path d="M4 5 3 4m8 1V3m7 4 2-1"/>',
@@ -58,7 +61,7 @@
     if(item.id==='music') return `<div class="widget-face music-face"><button class="music-cover" type="button" data-open-widget="music" aria-label="Open music player" aria-haspopup="dialog" aria-expanded="false"><span></span></button><button class="widget-copy music-copy" type="button" data-open-widget="music" aria-label="Open music player" aria-haspopup="dialog" aria-expanded="false"><span class="widget-label">Now playing</span><strong class="widget-value" data-live="music">Weightless</strong><span class="widget-secondary" data-live="artist">Marconi Union</span></button>${action('music-play','Play music','play')}</div>`;
     if(item.id==='focus'||item.id==='energy') return `<div class="widget-face"><button type="button" class="widget-copy focus-copy" data-open-widget="${item.id}" aria-label="Open ${item.name}" aria-haspopup="dialog" aria-expanded="false"><span class="widget-label">${item.id==='energy'?'Recharge':'Focus'}</span><strong class="widget-value" data-live="${item.id}">${item.value}</strong></button>${action(`${item.id}-play`,`Start ${item.name}`,'play')}</div>`;
     if(item.id==='quick-controls') return `<div class="widget-face quick-buttons">${action('controls','Open sound controls','volume')}${action('network','Open Wi-Fi controls','wifi')}</div>`;
-    if(item.id==='apps') return `<div class="widget-face"><div class="app-grid">${['notes','browser','code'].map((app,i)=>`<button type="button" class="app-shortcut app-${app}" data-app="${app}" aria-haspopup="dialog" aria-expanded="false" aria-label="Open ${['Notes','Browser','Code'][i]} preview"><span class="app-monogram">${['N','B','C'][i]}</span><span class="running-dot" data-running="${app}" hidden></span></button>`).join('')}</div><button type="button" class="widget-action" data-open-widget="apps" aria-label="Open application drawer" aria-haspopup="dialog" aria-expanded="false">${icon('apps')}</button></div>`;
+    if(item.id==='apps') return `<div class="widget-face"><div class="app-grid">${['notes','browser','code'].map((app,i)=>`<button type="button" class="app-shortcut app-${app}" data-app="${app}" aria-haspopup="dialog" aria-expanded="false" aria-label="Open ${['Notes','Browser','Code'][i]} preview">${icon(app)}<span class="running-dot" data-running="${app}" hidden></span></button>`).join('')}</div><button type="button" class="widget-action" data-open-widget="apps" aria-label="Open application drawer" aria-haspopup="dialog" aria-expanded="false">${icon('apps')}</button></div>`;
     const extra=item.id==='weather'?`<span class="weather-forecast widget-secondary"><span class="weather-hour">Now${icon('sun')}31°</span><span class="weather-hour">17:00${icon('weather')}29°</span></span>`:'';
     return `${open}<span class="widget-icon">${icon(item.glyph)}</span>${copy(item)}${extra}</button>`;
   }

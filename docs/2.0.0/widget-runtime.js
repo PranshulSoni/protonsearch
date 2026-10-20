@@ -27,7 +27,7 @@
     positionFrame=null;
     if(!anchor||detail.hidden)return;
     const rect=anchor.getBoundingClientRect(),width=Math.min(380,innerWidth-24);
-    detail.style.width=`${width}px`;detail.style.maxHeight=`${innerHeight-24}px`;
+    detail.style.width=`${width}px`;detail.style.maxHeight=`${Math.max(120,Math.min(innerHeight-24,rect.top-26))}px`;
     const height=detail.getBoundingClientRect().height;
     detail.style.left=`${clamp(rect.left+rect.width/2-width/2,12,Math.max(12,innerWidth-width-12))}px`;
     detail.style.top=`${clamp(rect.top-height-14,12,Math.max(12,innerHeight-height-12))}px`;
@@ -67,12 +67,13 @@
     heading.textContent=title;body.innerHTML=html;body.scrollTop=scroll;
     if(focusId){const replacement=document.getElementById(focusId);replacement?.focus({preventScroll:true});if(selection&&replacement?.setSelectionRange)replacement.setSelectionRange(...selection);}
     else if(focusAction){const replacement=[...body.querySelectorAll('[data-detail-action]')].find(node=>node.dataset.detailAction===focusAction);(replacement||detail.querySelector('.detail-close')).focus({preventScroll:true});}
+    if(focus&&!detail.contains(document.activeElement)){const fallback=body.querySelector('button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled])')||detail.querySelector('.detail-close');fallback.focus({preventScroll:true});}
     positionPanel();
   }
   function renderSearch(){
     const query=state.search.toLowerCase(),results=files.filter(file=>`${file.name} ${file.type} ${file.detail}`.toLowerCase().includes(query));
     const result=state.result===null?null:files[state.result];
-    return `<label class="detail-search" for="widgetSearch">${icon('search')}<input id="widgetSearch" class="detail-input" data-detail-input="search" placeholder="Search sample files and apps" value="${esc(state.search)}" autocomplete="off"/></label><p class="detail-section-title">${query?`${results.length} results`:'Suggested for you'}</p><div class="detail-list">${results.length?results.map(file=>row(file.name,file.detail,file.icon,`result:${files.indexOf(file)}`,file.type)).join(''):notice('No matches. Try “notes”, “design” or “code”.')}</div>${result?`<section class="app-preview"><div class="app-preview-bar">${icon(result.icon)}<b>${esc(result.name)}</b></div><div class="app-preview-content">${esc(result.body)}</div>${result.app?button('Open app preview',`app:${result.app}`,{primary:true}):''}</section>`:''}`;
+    return `<label class="detail-search" for="widgetSearch">${icon('search')}<input id="widgetSearch" aria-label="Search sample files and apps" class="detail-input" data-detail-input="search" placeholder="Search sample files and apps" value="${esc(state.search)}" autocomplete="off"/></label><p class="detail-section-title">${query?`${results.length} results`:'Suggested for you'}</p><div class="detail-list">${results.length?results.map(file=>row(file.name,file.detail,file.icon,`result:${files.indexOf(file)}`,file.type)).join(''):notice('No matches. Try “notes”, “design” or “code”.')}</div>${result?`<section class="app-preview"><div class="app-preview-bar">${icon(result.icon)}<b>${esc(result.name)}</b></div><div class="app-preview-content">${esc(result.body)}</div>${result.app?button('Open app preview',`app:${result.app}`,{primary:true}):''}</section>`:''}`;
   }
   function renderApps(){
     const list=apps.filter(app=>app.name.toLowerCase().includes(state.appFilter.toLowerCase()));

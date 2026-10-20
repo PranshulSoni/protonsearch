@@ -44,6 +44,7 @@ const modeSwitch=document.querySelector('.mode-switch');
 let activeMode='daily';
 let editing=false;
 let selectedWidget=null;
+let selectedRevealFrame=null;
 function panelGapFor(mode=activeMode){
   const state=profileState(mode);
   const h=Number(state.dockHeight)||DEFAULT_DOCK_HEIGHT;
@@ -292,6 +293,25 @@ function selectWidget(widget){
   selectedWidget=widget&&widget.closest('.dock-panel.active')?widget:null;
   if(selectedWidget)selectedWidget.classList.add('widget-selected');
   refreshSelectedDetails();
+  revealSelectedWidget();
+}
+
+function revealSelectedWidget(){
+  if(selectedRevealFrame!==null)cancelAnimationFrame(selectedRevealFrame);
+  selectedRevealFrame=requestAnimationFrame(()=>{
+    selectedRevealFrame=null;
+    if(!selectedWidget||selectedWidget.hidden||dragSession)return;
+    const ids=visibleWidgetIds(),index=ids.indexOf(selectedWidget.dataset.widgetId);
+    if(index<0)return;
+    // Layout widths avoid animated transforms and scroll only the horizontal dock.
+    const left=ids.slice(0,index).reduce((total,id)=>total+profileState().sizes[id].w+panelGapFor(),0);
+    const right=left+profileState().sizes[ids[index]].w;
+    const viewport=track.getBoundingClientRect().width;
+    let next=track.scrollLeft;
+    if(left<next||right-left>viewport)next=left;
+    else if(right>next+viewport)next=right-viewport;
+    if(Math.abs(next-track.scrollLeft)>1)track.scrollTo({left:clamp(next,0,Math.max(0,track.scrollWidth-track.clientWidth)),behavior:reduced.matches?'auto':'smooth'});
+  });
 }
 
 function refreshSelectedDetails(){
@@ -428,6 +448,7 @@ function setWidgetSize(widget,width,{persist=true}={}){
   widget.style.setProperty('--widget-h',`${size.h}px`);
   refreshSelectedDetails();
   fitDock();
+  if(selectedWidget===widget)revealSelectedWidget();
   if(persist){renderManager();saveState();}
 }
 
@@ -446,6 +467,7 @@ function moveSelected(direction){
   animateWidgetReflow(before);
   animateDockPulse();
   renderManager();saveState();fitDock();
+  revealSelectedWidget();
 }
 
 function hideSelected(){
