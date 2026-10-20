@@ -494,7 +494,15 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
                 .snapshot
                 .windows
                 .iter()
-                .filter(|w| w.identity == identity)
+                .filter(|w| {
+                    w.identity == identity
+                        || state.config.active().pins.iter().any(|p| {
+                            p.id == identity
+                                && w.executable
+                                    .as_ref()
+                                    .is_some_and(|e| e.eq_ignore_ascii_case(&p.command))
+                        })
+                })
                 .cloned()
                 .collect();
             if wins.len() == 1 {
@@ -719,6 +727,8 @@ pub fn run() -> Result<()> {
     let timer = Timer::default();
     let mut last = Instant::now() - Duration::from_secs(2);
     let mut configured = false;
+    let mut panel_configured = None;
+    let mut bar_geometry = None;
     timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
         let (Some(dock), Some(panel)) = (weak.upgrade(), weak_panel.upgrade()) else {
             return;
@@ -784,16 +794,19 @@ pub fn run() -> Result<()> {
             if let Some(m) = platform::primary_monitor() {
                 let profile = state.config.active();
                 let height = (profile.height * m.dpi as f32 / 96.) as i32;
-                if profile.reserve_space {
-                    if let Some(b) = bar.as_mut() {
-                        if let Err(e) = b.update(m, height) {
-                            state.status = e.to_string();
+                if bar_geometry != Some((m, height, profile.reserve_space)) {
+                    if profile.reserve_space {
+                        if let Some(b) = bar.as_mut() {
+                            if let Err(e) = b.update(m, height) {
+                                state.status = e.to_string();
+                            }
+                        } else {
+                            bar = appbar::AppBar::new(m, height).ok();
                         }
                     } else {
-                        bar = appbar::AppBar::new(m, height).ok();
+                        bar = None;
                     }
-                } else {
-                    bar = None;
+                    bar_geometry = Some((m, height, profile.reserve_space));
                 }
                 let rect = bar.as_ref().map(|b| b.rect()).unwrap_or(RECT {
                     left: m.work_left,
@@ -816,7 +829,10 @@ pub fn run() -> Result<()> {
                     );
                 }
                 if let Some(ph) = native(panel.window()) {
-                    let _ = platform::configure_window(ph, false);
+                    if panel_configured != Some(ph.0 as isize) {
+                        let _ = platform::configure_window(ph, false);
+                        panel_configured = Some(ph.0 as isize);
+                    }
                     let size = panel.window().size();
                     unsafe {
                         let _ = SetWindowPos(
