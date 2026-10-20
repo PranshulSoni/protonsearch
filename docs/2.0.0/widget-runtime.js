@@ -222,7 +222,7 @@
   }
   // After native pointer focus settles, restore the trigger for a background click.
   // A click on another control keeps that control's focus instead.
-  document.addEventListener('click',outsideDetail);
+  document.addEventListener('click',outsideDetail,true);
   document.addEventListener('keydown',event=>{
     if(detail.hidden)return;
     if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closePanel();return;}
