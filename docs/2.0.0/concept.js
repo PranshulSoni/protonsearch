@@ -93,7 +93,7 @@
    const items=[{title:"Files",detail:"Application",app:"files"},{title:"Code editor",detail:"Application",app:"code"},{title:"Design brief.pdf",detail:"Document · Projects",app:"files"},{title:"Widget ideas",detail:"Notes · Proton 2.0",app:"files"}];
    function render() {
     list.replaceChildren();
-    const matches=items.filter(i=>(i.title+" "+i.detail).toLowerCase().includes(input.value.toLowerCase()));
+    const matches=items.filter(i=>state.profile!=="presentation" || i.detail==="Application").filter(i=>(i.title+" "+i.detail).toLowerCase().includes(input.value.toLowerCase()));
     if (!matches.length) { const p=document.createElement("p");p.className="condition";p.textContent="No sample matches.";list.appendChild(p); }
     matches.forEach(item=>{
      const row=document.createElement("button");row.className="result-row";row.dataset.open=item.app;
@@ -130,8 +130,9 @@
   }
  }
  function changeProfile(value) {
+  const returnFocus=panel.contains(document.activeElement) ? stage.querySelector('[data-panel="start"]') : null;
   close(false);state.profile=value;state.preset=value==="presentation"?"essential":"balanced";
-  state.weatherSize=value==="home"?"rich":"wide";apply();announce(value+" profile selected.");
+  state.weatherSize=value==="home"?"rich":"wide";apply();returnFocus?.focus({preventScroll:true});announce(value+" profile selected.");
  }
  stage.addEventListener("click",e=>{
   const nested=e.target.closest("[data-open]");
