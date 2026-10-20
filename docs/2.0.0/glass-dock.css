@@ -15,7 +15,7 @@ body{margin:0}button,input,select{font:inherit}button,a,input,select{-webkit-tap
 .desktop-folder{position:absolute;right:24px;top:65px;display:flex;flex-direction:column;align-items:center;gap:5px;color:#fff;background:transparent;border:0;border-radius:10px;padding:8px;text-shadow:0 1px 4px #293e62;font-size:11px}.desktop-folder:hover{background:#ffffff13}.desktop-folder img{filter:drop-shadow(0 3px 3px #20365133)}
 .mode-indicator{position:absolute;top:65px;left:24px;display:flex;align-items:center;gap:8px;font-size:11px;color:#fff;opacity:.9}.mode-indicator .icon{width:13px;height:13px}
 .glass{background:var(--glass-bg);border:1px solid var(--glass-edge);box-shadow:var(--glass-shadow);backdrop-filter:blur(28px) saturate(1.15);-webkit-backdrop-filter:blur(28px) saturate(1.15);color:var(--on-glass)}
-.dock-shelf{position:absolute;bottom:23px;left:14px;right:14px;display:flex;align-items:center;justify-content:center;gap:16px;z-index:3}
+.dock-shelf{position:absolute;bottom:23px;left:14px;right:14px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px;z-index:3}
 .dock-main{display:flex;align-items:center;padding:10px 12px;min-height:76px;border-radius:26px;gap:0;position:relative}
 .system-group,.app-group{display:flex;align-items:center;gap:5px}
 .dock-item{position:relative;width:44px;height:52px;display:flex;align-items:center;justify-content:center;border:0;padding:0;background:transparent;border-radius:13px;color:var(--on-glass);flex-shrink:0}
@@ -74,3 +74,5 @@ body{margin:0}button,input,select{font:inherit}button,a,input,select{-webkit-tap
 @container (max-width:700px){.dock-shelf{flex-wrap:wrap;gap:12px}.dock-shelf.joined{gap:12px}.dock-shelf.joined .dock-main{border-radius:26px;border-right:1px solid var(--glass-edge)}.dock-shelf.joined .status-capsule{height:58px;border-radius:25px;border-left:1px solid var(--glass-edge)}.widget-panel{max-height:calc(100% - 200px)}}
 @container (max-width:540px){.dock-main .dock-divider{display:none}.app-group{margin-left:8px}.app-item[data-panel=browser]{display:none}}
 .stage{color-scheme:light}.stage[data-material=dark]{color-scheme:dark}.widget-panel{scrollbar-width:thin;scrollbar-color:#8995a655 transparent}.widget-panel::-webkit-scrollbar{width:5px}.widget-panel::-webkit-scrollbar-thumb{background:#8995a655;border-radius:6px}.widget-panel::-webkit-scrollbar-track{background:transparent}
+
+@container (max-width:1050px){.dock-shelf.joined{gap:12px}.dock-shelf.joined .dock-main{border-radius:26px;border-right:1px solid var(--glass-edge)}.dock-shelf.joined .status-capsule{height:58px;border-radius:25px;border-left:1px solid var(--glass-edge)}}
