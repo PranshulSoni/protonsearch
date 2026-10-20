@@ -951,7 +951,8 @@ body { background-color:#333949; }
 .dock-stage { bottom:22px;max-width:calc(100vw - 22px); }
 .dock-shell { background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.025)),rgba(36,39,45,.57);backdrop-filter:blur(30px) saturate(110%);-webkit-backdrop-filter:blur(30px) saturate(110%); }
 .mode-switch { background:rgba(40,45,54,.70); }
-.settings-popover { width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - var(--dock-h) - 95px);background:rgba(34,39,49,.94);overscroll-behavior:contain; }
+.settings-popover { left:50%;right:auto;translate:-50% 0;z-index:100;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - var(--dock-h) - 95px);background:rgba(34,39,49,.94);overscroll-behavior:contain; }
+.service-option:focus-within,.widget-option:focus-within { outline:2px solid #b6dcff;outline-offset:2px;background:rgba(255,255,255,.09); }
 .layout-toolbar { position:absolute;bottom:calc(100% + 48px)!important; }
 .dock-stage.editing .dock-track { overflow-x:auto;overflow-y:hidden;padding-block:5px;height:calc(100% + 10px);transform:translateY(-5px); }
 .widget { min-height:var(--widget-h,var(--tile-h))!important;max-height:var(--widget-h,var(--tile-h))!important; }

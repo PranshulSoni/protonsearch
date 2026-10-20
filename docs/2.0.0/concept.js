@@ -290,6 +290,10 @@ function renderServiceWidgetOptions(){
 }
 
 function renderManager(){
+  const focused=document.activeElement;
+  const focusAttribute=['data-widget-toggle','data-service-toggle','data-gallery-toggle'].find(attribute=>popover.contains(focused)&&focused.hasAttribute(attribute));
+  const focusValue=focusAttribute?focused.getAttribute(focusAttribute):null;
+  const managerScroll=popover.scrollTop;
   updateAppearanceControls();
   renderServiceWidgetOptions();
   managerProfile.textContent=`${activeMode[0].toUpperCase()+activeMode.slice(1)} profile`;
@@ -307,6 +311,11 @@ function renderManager(){
     row.innerHTML=`<input type="checkbox" ${checked?'checked':''} data-widget-toggle="${id}"><span class="widget-toggle"></span><span class="widget-option-name">${escapeHTML(widget.dataset.widgetName)}</span><span class="widget-option-size">${Math.round(size.w)}×${tileHeightFor()}</span>`;
     widgetOptions.appendChild(row);
   });
+  if(focusAttribute){
+    const replacement=[...popover.querySelectorAll(`[${focusAttribute}]`)].find(element=>element.getAttribute(focusAttribute)===focusValue);
+    replacement?.focus({preventScroll:true});
+    popover.scrollTop=managerScroll;
+  }
 }
 
 function selectWidget(widget){
@@ -397,8 +406,10 @@ function setEditing(value){
     motion(layoutToolbar,[{opacity:0,transform:'translateX(-50%) translateY(12px) scale(.94)'},{opacity:1,transform:'translateX(-50%) translateY(0) scale(1)'}],{duration:340,easing:'cubic-bezier(.2,1.15,.35,1)'});
     const first=widgetsFor(activeMode).find(widget=>!widget.hidden);
     selectWidget(first||null);
+    (first||doneEditingButton).focus();
   }else{
     selectWidget(null);
+    addButton.focus();
   }
   fitDock();
 }
@@ -478,7 +489,7 @@ addButton.addEventListener('click',event=>{
   renderManager();
   popover.classList.toggle('open');
 });
-managerClose.addEventListener('click',()=>popover.classList.remove('open'));
+managerClose.addEventListener('click',()=>{popover.classList.remove('open');addButton.focus();});
 editLayoutButton.addEventListener('click',()=>setEditing(true));
 doneEditingButton.addEventListener('click',()=>setEditing(false));
 manageWidgetsButton.addEventListener('click',event=>{
