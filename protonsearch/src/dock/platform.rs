@@ -215,9 +215,11 @@ fn render_icon(icon: HICON, size: u32) -> Option<IconPixels> {
         let pixels = std::slice::from_raw_parts_mut(bits as *mut u8, len);
         pixels.fill(0);
         let first = DrawIconEx(dc, 0, 0, icon, size, size, 0, None, DI_NORMAL).is_ok();
+        let _ = GdiFlush();
         let black = pixels.to_vec();
         pixels.fill(255);
         let second = DrawIconEx(dc, 0, 0, icon, size, size, 0, None, DI_NORMAL).is_ok();
+        let _ = GdiFlush();
         let white = pixels.to_vec();
         let _ = SelectObject(dc, old);
         let _ = DeleteObject(bitmap);
