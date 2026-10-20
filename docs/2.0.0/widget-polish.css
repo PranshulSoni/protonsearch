@@ -299,6 +299,8 @@ button.music-cover { border:0;padding:0;cursor:pointer; }
 @container (max-width:75px) { .widget[data-widget-id="time"] .widget-value { font-size:18px; }.widget[data-widget-id="time"] .widget-label { display:none; }.widget[data-widget-id="music"] .widget-copy { display:none; }.widget[data-widget-id="music"] .music-cover { display:none; } }
 @container (max-width:140px) { .app-shortcut:nth-child(3) { display:none; }.widget[data-widget-id="weather"] .widget-secondary.weather-forecast { display:none; } }
 @container (max-width:110px) { .app-shortcut:nth-child(2) { display:none; } }
+@container (max-width:155px) { .widget[data-widget-id="music"] .widget-face { gap:7px;padding-inline:8px; } }
+@container (max-width:105px) { .widget-face>.focus-copy { display:flex!important; }.widget[data-widget-id="focus"] .widget-face,.widget[data-widget-id="energy"] .widget-face { gap:4px;padding-inline:7px; } }
 @media(max-width:600px) { .concept-caption { left:16px;right:16px;top:17px;gap:12px; }.concept-caption span:not(#menuClock) { font-size:9px;max-width:190px; }.dock-stage { bottom:16px; }.widget-detail { padding:17px;border-radius:20px; }.settings-popover { padding:14px; }.widget-gallery { grid-template-columns:1fr; } }
 @media(max-height:550px) { .widget-detail { max-height:calc(100dvh - 120px); }.concept-caption { top:12px; } }
 @keyframes detail-enter { from { opacity:0;transform:translateY(5px); } to { opacity:1;transform:none; } }
