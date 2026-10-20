@@ -28,8 +28,8 @@
   const icon = name => `<svg class="proton-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.metric}</svg>`;
   const definitions = [
     ['search','Search','search','Find anything','Files, apps & ideas',142,88],
-    ['apps','Applications','apps','Your workspace','3 apps ready',120,82],
-    ['weather','Weather','weather','31°','Ahmedabad',126,96],
+    ['apps','Applications','apps','Your workspace','3 apps ready',144,82],
+    ['weather','Weather','weather','31°','Mostly sunny',126,96],
     ['music','Music','music','Weightless','Marconi Union',180,128],
     ['focus','Focus timer','focus','25:00','Make room to think',116,100],
     ['quick-controls','Quick controls','volume','Sound & Wi-Fi','Connected',96,84],
@@ -58,7 +58,7 @@
     if(item.id==='music') return `<div class="widget-face music-face"><button class="music-cover" type="button" data-open-widget="music" aria-label="Open music player" aria-haspopup="dialog" aria-expanded="false"><span></span></button><button class="widget-copy music-copy" type="button" data-open-widget="music" aria-label="Open music player" aria-haspopup="dialog" aria-expanded="false"><span class="widget-label">Now playing</span><strong class="widget-value" data-live="music">Weightless</strong><span class="widget-secondary" data-live="artist">Marconi Union</span></button>${action('music-play','Play music','play')}</div>`;
     if(item.id==='focus'||item.id==='energy') return `<div class="widget-face"><button type="button" class="widget-copy focus-copy" data-open-widget="${item.id}" aria-label="Open ${item.name}" aria-haspopup="dialog" aria-expanded="false"><span class="widget-label">${item.id==='energy'?'Recharge':'Focus'}</span><strong class="widget-value" data-live="${item.id}">${item.value}</strong></button>${action(`${item.id}-play`,`Start ${item.name}`,'play')}</div>`;
     if(item.id==='quick-controls') return `<div class="widget-face quick-buttons">${action('controls','Open sound controls','volume')}${action('network','Open Wi-Fi controls','wifi')}</div>`;
-    if(item.id==='apps') return `<div class="widget-face"><div class="app-grid">${['notes','browser','code'].map((app,i)=>`<button type="button" class="app-shortcut app-${app}" data-app="${app}" aria-label="Open ${['Notes','Browser','Code'][i]} preview"><span class="app-monogram">${['N','B','C'][i]}</span><span class="running-dot" data-running="${app}" hidden></span></button>`).join('')}</div><button type="button" class="widget-action" data-open-widget="apps" aria-label="Open application drawer" aria-haspopup="dialog" aria-expanded="false">${icon('apps')}</button></div>`;
+    if(item.id==='apps') return `<div class="widget-face"><div class="app-grid">${['notes','browser','code'].map((app,i)=>`<button type="button" class="app-shortcut app-${app}" data-app="${app}" aria-haspopup="dialog" aria-expanded="false" aria-label="Open ${['Notes','Browser','Code'][i]} preview"><span class="app-monogram">${['N','B','C'][i]}</span><span class="running-dot" data-running="${app}" hidden></span></button>`).join('')}</div><button type="button" class="widget-action" data-open-widget="apps" aria-label="Open application drawer" aria-haspopup="dialog" aria-expanded="false">${icon('apps')}</button></div>`;
     const extra=item.id==='weather'?`<span class="weather-forecast widget-secondary"><span class="weather-hour">Now${icon('sun')}31°</span><span class="weather-hour">17:00${icon('weather')}29°</span></span>`:'';
     return `${open}<span class="widget-icon">${icon(item.glyph)}</span>${copy(item)}${extra}</button>`;
   }

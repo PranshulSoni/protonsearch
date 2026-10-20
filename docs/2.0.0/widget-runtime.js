@@ -35,22 +35,22 @@
   function queuePosition(){if(positionFrame===null)positionFrame=requestAnimationFrame(positionPanel);}
   function closePanel(restore=true){
     const prior=trigger;
-    detail.hidden=true;trigger?.setAttribute('aria-expanded','false');key=null;anchor=null;trigger=null;
+    detail.hidden=true;trigger?.setAttribute('aria-expanded','false');if(anchor)delete anchor.dataset.panelOpen;key=null;anchor=null;trigger=null;
     if(restore&&prior?.isConnected&&!prior.closest('[inert]')&&!prior.disabled)prior.focus({preventScroll:true});
   }
   function openPanel(next,source){
     if(stage.classList.contains('editing'))return;
     if(key===next&&trigger===source){closePanel();return;}
-    trigger?.setAttribute('aria-expanded','false');
+    trigger?.setAttribute('aria-expanded','false');if(anchor)delete anchor.dataset.panelOpen;
     key=next;trigger=source;anchor=source.closest('.widget')||source;
-    source.setAttribute('aria-expanded','true');detail.hidden=false;renderPanel();
+    source.setAttribute('aria-haspopup','dialog');source.setAttribute('aria-expanded','true');anchor.dataset.panelOpen='true';detail.hidden=false;renderPanel();
     const first=body.querySelector('input:not([type=range]),textarea')||detail.querySelector('.detail-close');
     first?.focus({preventScroll:true});
   }
-  function renderPanel(preserve=false){
+  function renderPanel(preserve=true){
     if(!key)return;
     const focus=preserve&&detail.contains(document.activeElement)?document.activeElement:null;
-    const focusId=focus?.id,selection=focus&&typeof focus.selectionStart==='number'?[focus.selectionStart,focus.selectionEnd]:null;
+    const focusId=focus?.id,focusAction=focus?.dataset.detailAction,selection=focus&&typeof focus.selectionStart==='number'?[focus.selectionStart,focus.selectionEnd]:null;
     const scroll=body.scrollTop;
     let title=library.byId.get(key)?.name||'Widget',html='';
     if(key==='search')html=renderSearch();
@@ -66,6 +66,7 @@
     else html=renderExtra(key);
     heading.textContent=title;body.innerHTML=html;body.scrollTop=scroll;
     if(focusId){const replacement=document.getElementById(focusId);replacement?.focus({preventScroll:true});if(selection&&replacement?.setSelectionRange)replacement.setSelectionRange(...selection);}
+    else if(focusAction){const replacement=[...body.querySelectorAll('[data-detail-action]')].find(node=>node.dataset.detailAction===focusAction);(replacement||detail.querySelector('.detail-close')).focus({preventScroll:true});}
     positionPanel();
   }
   function renderSearch(){
@@ -84,13 +85,13 @@
   function temperature(value){return `${state.weatherUnit==='C'?value:Math.round(value*9/5+32)}°`;}
   function renderWeather(){
     const hours=[['Now',31,'sun'],['17:00',29,'weather'],['18:00',28,'weather'],['19:00',27,'weather'],['20:00',26,'weather'],['21:00',26,'weather']];
-    const days=[['Today',31,'sun'],['Wed',32,'sun'],['Thu',30,'weather'],['Fri',29,'weather'],['Sat',30,'sun'],['Sun',31,'sun']];
+    const days=[['Today',31,'sun'],['Wed',32,'sun'],['Thu',30,'weather'],['Fri',29,'weather'],['Sat',30,'sun'],['Sun',31,'sun'],['Mon',32,'sun']];
     const forecast=state.weatherTab==='hours'?hours:days;
     return `<div class="detail-actions"><span class="detail-muted">Ahmedabad, India</span><div class="detail-tabs">${button('°C','weather-C',{pressed:state.weatherUnit==='C'})}${button('°F','weather-F',{pressed:state.weatherUnit==='F'})}</div></div>${hero(temperature(31),'Mostly sunny · feels like '+temperature(33))}<div class="detail-tabs">${button('Hourly','weather-hours',{pressed:state.weatherTab==='hours'})}${button('7-day outlook','weather-days',{pressed:state.weatherTab==='days'})}</div><div class="forecast-grid">${forecast.map(([label,temp,glyph])=>`<div class="forecast-item"><span>${label}</span>${icon(glyph)}<b>${temperature(temp)}</b></div>`).join('')}</div><div class="detail-grid"><div class="detail-stat"><small>Humidity</small><b>48%</b></div><div class="detail-stat"><small>Wind</small><b>12 km/h</b></div><div class="detail-stat"><small>UV index</small><b>4 · moderate</b></div></div>${notice('Illustrative forecast. Weather data is not live.')}`;
   }
   function renderMusic(){
     const track=tracks[state.music.index];
-    return `<div class="music-art music-cover"><span></span></div><div class="music-detail-copy"><h3>${esc(track.title)}</h3><p class="detail-muted">${esc(track.artist)} · ${esc(track.album)}</p></div><label class="detail-field" for="musicSeek">Playback position<input id="musicSeek" class="detail-range" type="range" min="0" max="${track.duration}" value="${Math.floor(state.music.position)}" data-detail-input="seek" aria-valuetext="${format(state.music.position)} of ${format(track.duration)}"/></label><div class="detail-actions"><span data-music-position>${format(state.music.position)}</span><span>${format(track.duration)}</span></div><div class="music-controls">${iconButton('Previous track','music-previous','previous')}${iconButton(state.music.playing?'Pause music':'Play music','music-play',state.music.playing?'pause':'play')}${iconButton('Next track','music-next','next')}</div>${notice('Playback is a visual simulation. No audio is streamed.')}`;
+    return `<div class="music-hero"><div class="music-art music-cover"><span></span></div><div class="music-detail-copy"><h3>${esc(track.title)}</h3><p class="detail-muted">${esc(track.artist)} · ${esc(track.album)}</p></div></div><label class="detail-field" for="musicSeek">Playback position<input id="musicSeek" class="detail-range" type="range" min="0" max="${track.duration}" value="${Math.floor(state.music.position)}" data-detail-input="seek" aria-valuetext="${format(state.music.position)} of ${format(track.duration)}"/></label><div class="detail-actions"><span data-music-position>${format(state.music.position)}</span><span>${format(track.duration)}</span></div><div class="music-controls playback-controls">${iconButton('Previous track','music-previous','previous')}${iconButton(state.music.playing?'Pause music':'Play music','music-play',state.music.playing?'pause':'play')}${iconButton('Next track','music-next','next')}</div>${notice('Playback is a visual simulation. No audio is streamed.')}`;
   }
   function renderControls(){
     return `<div class="detail-actions"><b>Volume</b>${button(state.muted?'Unmute':'Mute','mute',{pressed:state.muted})}</div><label class="detail-field" for="volumeRange">${state.muted?'Muted':`${state.volume}% volume`}<input class="detail-range" id="volumeRange" type="range" min="0" max="100" value="${state.volume}" data-detail-input="volume"/></label><label class="detail-field" for="audioOutput">Audio output<select id="audioOutput" class="detail-input" data-detail-input="output">${['Studio speakers','Headphones','Monitor audio'].map(name=>`<option${state.output===name?' selected':''}>${name}</option>`).join('')}</select></label><div class="detail-actions"><h3 class="detail-section-title">Wi-Fi</h3>${button(state.wifi?'On':'Off','wifi',{pressed:state.wifi})}</div><div class="detail-list">${['Proton Studio','Guest network','Mobile hotspot'].map(name=>row(name,state.wifi?(state.network===name?'Connected · secured':'Available · secured'):'Wi-Fi is off','wifi',`network:${name}`,state.wifi&&state.network===name?'Connected':'')).join('')}</div>${notice('These controls change the demo only; system settings stay on your device.')}`;
@@ -125,6 +126,7 @@
     const track=tracks[state.music.index];live('music',track.title);live('artist',track.artist);live('focus',format(state.focus.seconds));live('energy',format(state.energy.seconds));live('weather',temperature(31));
     live('agents',state.agent.status==='running'?'Working…':state.agent.status==='complete'?'Summary ready':'Ready to help');
     live('network',state.wifi?state.network:'Wi-Fi off');
+    document.querySelectorAll('.widget-weather .weather-hour').forEach((node,index)=>{node.lastChild.textContent=temperature(index?29:31);});
     document.querySelectorAll('[data-widget-action="music-play"],[data-widget-action="focus-play"],[data-widget-action="energy-play"]').forEach(node=>{
       const type=node.dataset.widgetAction.split('-')[0],running=type==='music'?state.music.playing:state[type].running;
       node.innerHTML=icon(running?'pause':'play');node.setAttribute('aria-label',`${running?'Pause':'Start'} ${type==='music'?'music':type+' timer'}`);node.setAttribute('aria-pressed',String(running));
@@ -136,6 +138,7 @@
     const now=new Date();live('time',now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false}));
     document.querySelectorAll('.widget-time .widget-secondary').forEach(node=>{node.textContent=now.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});});
     live('analog',now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
+    if(key==='time'||key==='analog'){const value=body.querySelector('.detail-hero-value');if(value)value.textContent=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
     const menu=document.querySelector('#menuClock');if(menu)menu.textContent=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }
   function refreshTimer(which){
@@ -205,8 +208,8 @@
     if(target.dataset.openWidget){if(target.dataset.openWidget==='search'){state.result=null;}openPanel(target.dataset.openWidget,target);return;}
     if(target.dataset.detailAction)act(target.dataset.detailAction);
   });
-  document.addEventListener('pointerdown',event=>{if(!detail.hidden&&!detail.contains(event.target)&&!event.target.closest('.widget'))closePanel(false);});
-  document.addEventListener('click',event=>{if(!detail.hidden&&!detail.contains(event.target)&&!event.target.closest('.widget'))closePanel(false);});
+  document.addEventListener('pointerdown',event=>{if(!detail.hidden&&!detail.contains(event.target)&&!event.target.closest('.widget'))closePanel();});
+  document.addEventListener('click',event=>{if(!detail.hidden&&!detail.contains(event.target)&&!event.target.closest('.widget'))closePanel();});
   document.addEventListener('keydown',event=>{
     if(detail.hidden)return;
     if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closePanel();return;}

@@ -81,6 +81,7 @@ function registerCustomWidget(definition){
     widget.className='tile widget custom-metric';
     Object.assign(widget.dataset,{widgetId:definition.id,widgetName:definition.label,defaultW:'190',minW:'96',maxW:'520',startHidden:'true'});
     widget.innerHTML=`<button class="widget-drag" title="Drag to move; arrow keys to reorder" type="button">${window.ProtonWidgets.icon('grip')}</button><button type="button" class="widget-face" data-open-widget="${definition.id}" aria-haspopup="dialog" aria-expanded="false"><span class="widget-icon">${window.ProtonWidgets.icon('metric')}</span><span class="widget-copy custom-metric-copy"><span class="widget-label custom-label"></span><b class="widget-value custom-value"></b><span class="widget-secondary custom-detail"></span></span></button><span class="widget-edit-label"></span><button class="widget-resize" title="Drag sideways; arrow keys to resize" type="button"></button>`;
+    widget.querySelector('[data-open-widget]').setAttribute('aria-label',`Open ${definition.label}`);
     widget.querySelector('.custom-label').textContent=definition.label;
     widget.querySelector('.custom-value').textContent=definition.value;
     widget.querySelector('.custom-detail').textContent=definition.detail;
