@@ -215,9 +215,13 @@
     if(detail.hidden)return;
     const path=event.composedPath();
     // Preserve the original event ancestry when an action replaces the panel contents.
-    if(!path.includes(detail)&&!path.some(node=>node instanceof Element&&node.classList.contains('widget')))closePanel();
+    if(!path.includes(detail)&&!path.some(node=>node instanceof Element&&node.classList.contains('widget'))){
+      const destination=path.some(node=>node instanceof Element&&node.matches('button,a[href],input,select,textarea,[tabindex]'));
+      closePanel(!destination);
+    }
   }
-  document.addEventListener('pointerdown',outsideDetail);
+  // After native pointer focus settles, restore the trigger for a background click.
+  // A click on another control keeps that control's focus instead.
   document.addEventListener('click',outsideDetail);
   document.addEventListener('keydown',event=>{
     if(detail.hidden)return;
