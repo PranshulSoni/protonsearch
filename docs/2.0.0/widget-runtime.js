@@ -208,8 +208,14 @@
     if(target.dataset.openWidget){if(target.dataset.openWidget==='search'){state.result=null;}openPanel(target.dataset.openWidget,target);return;}
     if(target.dataset.detailAction)act(target.dataset.detailAction);
   });
-  document.addEventListener('pointerdown',event=>{if(!detail.hidden&&!detail.contains(event.target)&&!event.target.closest('.widget'))closePanel();});
-  document.addEventListener('click',event=>{if(!detail.hidden&&!detail.contains(event.target)&&!event.target.closest('.widget'))closePanel();});
+  function outsideDetail(event){
+    if(detail.hidden)return;
+    const path=event.composedPath();
+    // Preserve the original event ancestry when an action replaces the panel contents.
+    if(!path.includes(detail)&&!path.some(node=>node instanceof Element&&node.classList.contains('widget')))closePanel();
+  }
+  document.addEventListener('pointerdown',outsideDetail);
+  document.addEventListener('click',outsideDetail);
   document.addEventListener('keydown',event=>{
     if(detail.hidden)return;
     if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closePanel();return;}
