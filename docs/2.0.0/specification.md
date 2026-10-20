@@ -3,9 +3,9 @@
 Status: proposed for review, planning only.
 
 Visual revision: [glass-dock-design.md](glass-dock-design.md) supersedes the original
-green palette, uniform tile treatment and default dock composition. It proposes neutral
-glass, an app/content dock plus a quiet status capsule, and different presentations
-within the shared widget system. Architecture and safety contracts remain unchanged.
+green palette, uniform tile treatment and default dock composition. It follows the user's supplied
+HTML reference: one continuous glass dock containing every visible widget. App groups,
+information and system controls are all placed inside the same outer container. Architecture and safety contracts remain unchanged.
 Date: 20 October 2026, Asia/Kolkata.
 Baseline: 98d52ce, original branch 1.1.1; planning branch 2.0.0.
 
@@ -74,7 +74,9 @@ chats/clipboard artifacts are not disposable indexes.
 ## Widget model
 
 Definition != instance != provider != rendered view.
-Supported sizes initially compact/wide/rich (1/2/3 units), optional per definition.
+Widgets declare minimum/preferred/maximum widths and adapt inline content to allocated
+space. Compact/wide/rich are optional width presets, not a fixed 1/2/3-cell restriction.
+A profile-level height aligns widgets in one continuous horizontal dock.
 View DSL is renderer-neutral and host validated. No raw Slint/HTML/script/native API
 exposure in early community packages. Built-ins use reviewed Rust providers.
 Shared subscriptions prevent one poller per instance.

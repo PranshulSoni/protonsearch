@@ -4,9 +4,10 @@ Prepared 20 October 2026 (Asia/Kolkata). Branch: `2.0.0`.
 Baseline application commit: `98d52ce` on `1.1.1`.
 
 **Revised visual direction:** read [Glass dock design plan](glass-dock-design.md).
-The rebuilt [interactive glass study](glass-dock.html) replaces the old green illustration
-in the overview. It includes material/wallpaper choices, composition presets, widget panels
-and draft layout customization. No application code is involved.
+The [unified widget dock study](glass-dock.html) adapts the user's supplied HTML reference.
+All visible widgets share one outer dock. The gallery, width/height editor, profiles and
+safe local custom metric widgets demonstrate the intended composition. The previous
+separate status capsule is superseded. No application code is involved.
 
 Open [index.html](index.html) directly in a browser. All assets are local; no build,
 CDN, account, package installation or application execution is required.
