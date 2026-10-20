@@ -314,6 +314,12 @@ button.music-cover { border:0;padding:0;cursor:pointer; }
 .music-controls .detail-icon-button:nth-child(2) { width:46px;height:46px;background:#dfebfb;color:#283b55; }
 .agent-stage>span>.proton-icon { width:15px;height:15px; }
 .forecast-grid { grid-template-columns:repeat(auto-fit,minmax(39px,1fr)); }
+.detail-actions>.detail-tabs { margin:0 0 0 auto; }
+.detail-grid:has(>.detail-stat:nth-child(3):last-child) { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.detail-stat { padding:11px; }
+.detail-stat b { font-size:17px;line-height:1.35;letter-spacing:-.3px;overflow-wrap:anywhere; }
+.widget[data-widget-id="agents"] .widget-value { font-size:13px;letter-spacing:0; }
+.widget[data-widget-id="agents"] .widget-label { font-size:9px; }
 
 @container (max-width:210px) { .weather-forecast { display:none; }.music-progress { display:none; } }
 @container (max-width:155px) { .widget-secondary,.widget-face>.widget-actions { display:none; }.widget-face { gap:7px;padding-inline:9px; }.widget[data-widget-id="music"] .music-cover { width:33px;height:33px; }.widget[data-widget-id="music"] .widget-label { display:none; } }
