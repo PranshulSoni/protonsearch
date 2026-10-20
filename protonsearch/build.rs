@@ -1,12 +1,15 @@
 fn main() {
     println!("cargo:rerun-if-changed=ui/settings.slint");
+    println!("cargo:rerun-if-changed=ui/app.slint");
+    println!("cargo:rerun-if-changed=ui/dock.slint");
+    println!("cargo:rerun-if-changed=ui/icons/dock");
     println!("cargo:rerun-if-changed=../icons/ProtonSearchTrans.ico");
     println!("cargo:rerun-if-changed=../icons/ProtonSearchTrans.png");
     println!("cargo:rerun-if-changed=../icons/ProtonSearchTrans_small.png");
     println!("cargo:rerun-if-changed=../icons/ProtonSearchTrans_16.png");
     println!("cargo:rerun-if-changed=../icons/ProtonSearchTrans_32.png");
 
-    slint_build::compile("ui/settings.slint").unwrap();
+    slint_build::compile("ui/app.slint").unwrap();
 
     if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "windows" {
         let mut res = winres::WindowsResource::new();

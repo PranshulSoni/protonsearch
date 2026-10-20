@@ -1,0 +1,285 @@
+import { Button, LineEdit, Slider, ScrollView, ComboBox } from "std-widgets.slint";
+
+export struct DockItem {
+    id: string, kind: string, title: string, subtitle: string, value: string,
+    icon: image, width: float, running: bool, active: bool, progress: float,
+}
+export struct PanelItem {
+    id: string, title: string, subtitle: string, value: string,
+    icon: image, selected: bool, progress: float,
+}
+
+// One keyboard and accessibility contract for custom glass controls.
+component GlassButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected;
+    out property <bool> hovered: touch.has-hover;
+    callback activated();
+    callback context();
+    border-radius: 13px;
+    background: touch.pressed ? #ffffff30 : touch.has-hover ? #ffffff21 : selected ? #ffffff18 : transparent;
+    border-width: focus.has-focus ? 2px : 0px;
+    border-color: #c1d8ff;
+    animate background { duration: 130ms; }
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.activated(); }
+    forward-focus: focus;
+    focus := FocusScope {
+        key-pressed(event) => {
+            if (event.text == " " || event.text == "\n") { root.activated(); return accept; }
+            return reject;
+        }
+    }
+    @children
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { focus.focus(); root.activated(); }
+        pointer-event(event) => {
+            if (event.button == PointerEventButton.right && event.kind == PointerEventKind.up) {
+                focus.focus(); root.context();
+            }
+        }
+    }
+}
+
+component HorizontalFlickable inherits Flickable {
+    viewport-height: self.height;
+    // The layout keeps its natural width; the host caps only the outer window.
+    @children
+}
+
+export component DockWindow inherits Window {
+    title: "Proton dock";
+    background: transparent;
+    no-frame: true;
+    default-font-family: "Segoe UI Variable";
+    in-out property <[DockItem]> items;
+    in-out property <string> profile: "Work";
+    in-out property <bool> editing: false;
+    in-out property <string> status;
+    in-out property <float> dock-height: 96;
+    callback item-clicked(string);
+    callback item-context(string);
+    callback profile-selected(string);
+    callback edit-toggled();
+    callback item-resized(string, float);
+    callback item-moved(string, int);
+    callback close-requested();
+    width: 1100px;
+    height: root.dock-height * 1px;
+    Rectangle {
+        x: 8px; y: 7px;
+        width: parent.width - 16px; height: parent.height - 14px;
+        background: @linear-gradient(180deg, #38414edb 0%, #202632e8 100%);
+        border-radius: 24px;
+        border-width: 1px;
+        border-color: #ffffff45;
+        drop-shadow-blur: 18px;
+        drop-shadow-offset-y: 5px;
+        drop-shadow-color: #00000045;
+        HorizontalLayout {
+            padding: 9px; spacing: 7px;
+            scroll := HorizontalFlickable {
+                viewport-width: track.width;
+                track := HorizontalLayout {
+                    width: self.preferred-width;
+                    height: scroll.height;
+                    spacing: 5px;
+                    for item[index] in root.items : tile := GlassButton {
+                        label: item.title + (item.value == "" ? "" : ", " + item.value);
+                        selected: item.active;
+                        width: item.kind == "app" ? 64px : max(54px, item.width * 1px);
+                        height: parent.height;
+                        activated => { root.item-clicked(item.id); }
+                        context => { root.item-context(item.id); }
+                        if item.kind == "app" : Image {
+                            source: item.icon;
+                            width: tile.hovered ? 60px : 50px;
+                            height: self.width;
+                            x: (parent.width - self.width) / 2;
+                            y: tile.hovered ? -5px : 0px;
+                            image-fit: contain;
+                            animate width { duration: 150ms; easing: ease-out; }
+                            animate y { duration: 150ms; easing: ease-out; }
+                        }
+                        if item.kind == "app" && item.running : Rectangle {
+                            width: item.active ? 12px : 5px;
+                            height: 4px;
+                            x: (parent.width - self.width) / 2;
+                            y: parent.height - 5px;
+                            border-radius: 2px;
+                            background: #eaf1ff;
+                        }
+                        if item.kind != "app" : HorizontalLayout {
+                            padding-left: 9px; padding-right: 9px; spacing: 8px;
+                            Image {
+                                source: item.icon;
+                                width: item.width < 85 ? 29px : 31px;
+                                height: 32px;
+                                image-fit: contain;
+                                vertical-stretch: 0;
+                            }
+                            if item.width >= 85 : VerticalLayout {
+                                alignment: center; spacing: 2px;
+                                Text {
+                                    text: item.value != "" ? item.value : item.title;
+                                    color: #f5f7fc; font-size: item.kind == "clock" ? 23px : 14px;
+                                    font-weight: 600;
+                                    overflow: elide;
+                                    vertical-stretch: 0;
+                                }
+                                Text {
+                                    text: item.subtitle != "" ? item.subtitle : item.title;
+                                    color: #b9c2d2; font-size: 10px;
+                                    overflow: elide; vertical-stretch: 0;
+                                }
+                            }
+                        }
+                        if root.editing : HorizontalLayout {
+                            y: parent.height - 19px; height: 18px;
+                            spacing: 1px;
+                            Button { text: "‹"; clicked => { root.item-moved(item.id, -1); } }
+                            Button { text: "−"; clicked => { root.item-resized(item.id, max(54, item.width - 20)); } }
+                            Button { text: "+"; clicked => { root.item-resized(item.id, item.width + 20); } }
+                            Button { text: "›"; clicked => { root.item-moved(item.id, 1); } }
+                        }
+                    }
+                }
+            }
+            Rectangle { width: 1px; background: #ffffff20; }
+            GlassButton {
+                width: 38px; label: "Customize dock"; selected: root.editing;
+                activated => { root.edit-toggled(); }
+                Image { source: @image-url("icons/dock/settings.svg"); width: 23px; height: 23px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+            }
+        }
+    }
+}
+
+export component DockPanelWindow inherits Window {
+    title: root.title;
+    background: transparent;
+    no-frame: true;
+    default-font-family: "Segoe UI Variable";
+    default-font-size: 13px;
+    width: 440px;
+    height: 560px;
+    in-out property <string> panel-kind;
+    in-out property <string> title;
+    in-out property <string> subtitle;
+    in-out property <string> query;
+    in-out property <string> body;
+    in-out property <string> status;
+    in-out property <[PanelItem]> entries;
+    in-out property <float> volume;
+    in-out property <bool> muted;
+    in-out property <string> timer-value;
+    in-out property <bool> timer-running;
+    in-out property <bool> busy;
+    in-out property <bool> edit-mode;
+    callback action(string);
+    callback query-edited(string);
+    callback volume-edited(float);
+    callback mute-toggled();
+    callback closed();
+    Rectangle {
+        x: 8px; y: 8px; width: parent.width - 16px; height: parent.height - 16px;
+        border-radius: 24px;
+        border-width: 1px; border-color: #ffffff40;
+        background: @linear-gradient(160deg, #35404ff5 0%, #202733fa 100%);
+        drop-shadow-blur: 20px; drop-shadow-color: #00000055;
+        VerticalLayout {
+            padding: 22px; spacing: 14px;
+            HorizontalLayout {
+                VerticalLayout {
+                    spacing: 5px;
+                    Text { text: root.title; color: #f4f7ff; font-size: 23px; font-weight: 600; overflow: elide; }
+                    Text { text: root.subtitle; color: #b1bdd0; font-size: 12px; overflow: elide; }
+                }
+                GlassButton {
+                    width: 32px; height: 32px; label: "Close panel";
+                    activated => { root.closed(); }
+                    Text { text: "×"; color: #cbd5e4; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
+                }
+            }
+            if root.panel-kind == "apps" || root.panel-kind == "agents" || root.panel-kind == "windows" || root.panel-kind == "weather" || root.panel-kind == "customize" : LineEdit {
+                text <=> root.query;
+                placeholder-text: root.panel-kind == "weather" ? "City or coordinates" : root.panel-kind == "customize" ? "Custom widget: name | value | detail" : "Search " + root.title;
+                edited(text) => { root.query-edited(text); }
+                accepted => { root.action("submit"); }
+            }
+            if root.body != "" : Text {
+                text: root.body; color: #d5deec; wrap: word-wrap;
+                vertical-stretch: 0; font-size: 13px;
+            }
+            if root.panel-kind == "focus" : VerticalLayout {
+                spacing: 18px; vertical-stretch: 0;
+                Text { text: root.timer-value; color: #f4f7ff; font-size: 68px; font-weight: 300; horizontal-alignment: center; }
+                HorizontalLayout {
+                    Button { text: root.timer-running ? "Pause" : "Start focus"; clicked => { root.action(root.timer-running ? "pause" : "start"); } }
+                    Button { text: "Reset"; clicked => { root.action("reset"); } }
+                }
+            }
+            if root.panel-kind == "audio" : VerticalLayout {
+                spacing: 18px; vertical-stretch: 0;
+                Text { text: root.muted ? "Muted" : round(root.volume) + "%"; color: #f4f7ff; font-size: 42px; horizontal-alignment: center; }
+                Slider { minimum: 0; maximum: 100; value: root.volume; changed(value) => { root.volume-edited(value); } }
+                Button { text: root.muted ? "Unmute" : "Mute"; clicked => { root.mute-toggled(); } }
+            }
+            if root.panel-kind == "music" : HorizontalLayout {
+                vertical-stretch: 0;
+                Button { text: "Previous"; clicked => { root.action("previous"); } }
+                Button { text: "Play / Pause"; clicked => { root.action("play"); } }
+                Button { text: "Next"; clicked => { root.action("next"); } }
+            }
+            if root.panel-kind == "customize" : HorizontalLayout {
+                vertical-stretch: 0;
+                ComboBox { model: ["Work", "Home", "Presentation"]; selected(value) => { root.action("profile:" + value); } }
+                Button { text: "Add widget"; clicked => { root.action("add-custom"); } }
+            }
+            ScrollView {
+                VerticalLayout {
+                    spacing: 7px;
+                    for entry in root.entries : Rectangle {
+                        height: root.panel-kind == "customize" ? 104px : 72px;
+                        background: #ffffff08; border-radius: 13px;
+                        border-width: 1px; border-color: entry.selected ? #afc9ff65 : #ffffff0a;
+                        VerticalLayout {
+                            padding: 6px; spacing: 3px;
+                            GlassButton {
+                                label: entry.title + ", " + entry.subtitle;
+                                activated => { root.action(entry.id); }
+                                HorizontalLayout {
+                                    padding: 5px; spacing: 11px;
+                                    Image { source: entry.icon; width: 42px; height: 42px; image-fit: contain; }
+                                    VerticalLayout {
+                                        spacing: 4px; alignment: center;
+                                        Text { text: entry.title; color: #f4f7ff; font-size: 13px; font-weight: 600; overflow: elide; }
+                                        Text { text: entry.subtitle; color: #aebbd0; font-size: 11px; overflow: elide; }
+                                    }
+                                    Text { text: entry.value; color: #d9e5fa; font-size: 12px; vertical-alignment: center; overflow: elide; horizontal-stretch: 0; }
+                                }
+                            }
+                            if root.panel-kind == "customize" : HorizontalLayout {
+                                height: 30px; spacing: 4px;
+                                Button { text: entry.selected ? "Hide" : "Show"; clicked => { root.action("customize:" + entry.id + ":toggle"); } }
+                                Button { text: "‹"; clicked => { root.action("customize:" + entry.id + ":left"); } }
+                                Button { text: "−"; clicked => { root.action("customize:" + entry.id + ":smaller"); } }
+                                Button { text: "+"; clicked => { root.action("customize:" + entry.id + ":larger"); } }
+                                Button { text: "›"; clicked => { root.action("customize:" + entry.id + ":right"); } }
+                            }
+                        }
+                    }
+                }
+            }
+            Text { text: root.busy ? "Updating…" : root.status; color: #aebbd0; font-size: 11px; wrap: word-wrap; vertical-stretch: 0; }
+            HorizontalLayout {
+                vertical-stretch: 0;
+                Button { text: "Back"; clicked => { root.action("back"); } }
+                Button { text: "Refresh"; enabled: !root.busy; clicked => { root.action("refresh"); } }
+                Button { text: root.panel-kind == "agents" ? "Open Agents" : "Settings"; clicked => { root.action("settings"); } }
+            }
+        }
+    }
+}

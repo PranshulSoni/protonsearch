@@ -1,4 +1,4 @@
-slint::include_modules!();
+use crate::ui::*;
 
 use crate::settings::AppSettings;
 use slint::{CloseRequestResponse, ComponentHandle, SharedString};
