@@ -17,6 +17,7 @@ mod settings;
 mod settings_startup;
 mod settings_ui;
 mod uninstall;
+mod ui;
 
 use search::{SearchEngine, SearchResult};
 use std::os::windows::process::CommandExt;
