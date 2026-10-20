@@ -649,6 +649,20 @@ pub fn run() -> Result<()> {
     panel.on_query_edited(send("query:"));
     {
         let t = tx.clone();
+        dock.window().on_close_requested(move || {
+            let _ = t.send("disable".into());
+            slint::CloseRequestResponse::KeepWindowShown
+        });
+    }
+    {
+        let t = tx.clone();
+        panel.window().on_close_requested(move || {
+            let _ = t.send("hide".into());
+            slint::CloseRequestResponse::KeepWindowShown
+        });
+    }
+    {
+        let t = tx.clone();
         dock.on_edit_toggled(move || {
             let _ = t.send("customize".into());
         });
