@@ -243,6 +243,13 @@ export component DockPanelWindow inherits Window {
                 ComboBox { model: ["Work", "Home", "Presentation"]; selected(value) => { root.action("profile:" + value); } }
                 Button { text: "Add widget"; clicked => { root.action("add-custom"); } }
             }
+            if root.panel-kind == "customize" : HorizontalLayout {
+                vertical-stretch: 0;
+                Button { text: "Height −"; clicked => { root.action("height-less"); } }
+                Button { text: "Height +"; clicked => { root.action("height-more"); } }
+                Button { text: "Work area"; clicked => { root.action("reserve"); } }
+                Button { text: "Disable"; clicked => { root.action("disable"); } }
+            }
             ScrollView {
                 VerticalLayout {
                     spacing: 7px;

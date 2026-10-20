@@ -308,7 +308,11 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     match state.panel.as_str() {
         "apps"=>for app in state.snapshot.apps.iter().filter(|a|a.name.to_lowercase().contains(&query)).take(150){entries.push(PanelItem{id:app.id.clone().into(),title:app.name.clone().into(),subtitle:app.command.clone().into(),icon:app.icon.as_ref().map(image).unwrap_or_else(||asset("apps")),selected:profile.pins.iter().any(|p|p.id==app.id),..Default::default()});},
         "windows"=>for w in state.snapshot.windows.iter().filter(|w|query.is_empty()||w.title.to_lowercase().contains(&query)||w.identity==query){entries.push(PanelItem{id:format!("window:{}",w.hwnd).into(),title:w.title.clone().into(),subtitle:w.executable.clone().unwrap_or_default().into(),icon:state.snapshot.icons.get(&w.identity).map(image).unwrap_or_else(||asset("apps")),..Default::default()});},
-        "customize"=>for kind in WidgetKind::ALL { let w=profile.widgets.iter().find(|w|w.kind==kind);entries.push(PanelItem{id:kind.key().into(),title:kind.title().into(),subtitle:w.map(|w|format!("{} px",w.width)).unwrap_or("Add to this profile".into()).into(),selected:w.is_some_and(|w|w.enabled),icon:asset(kind_icon(kind)),..Default::default()});},
+        "customize"=>{
+            let mut gallery=profile.widgets.clone();
+            for kind in WidgetKind::ALL {if !gallery.iter().any(|w|w.kind==kind){let mut widget=WidgetInstance::new(kind);widget.enabled=false;gallery.push(widget);}}
+            for widget in gallery {entries.push(PanelItem{id:widget.id.into(),title:if widget.label.is_empty(){widget.kind.title().into()}else{widget.label.into()},subtitle:format!("{} px",widget.width).into(),selected:widget.enabled,icon:asset(kind_icon(widget.kind)),..Default::default()});}
+        },
         "weather"=>body="Weather forecasts are not connected yet. Use Windows Weather from Settings, or add a location when a weather provider is available.".into(),
         "music"=>body="Controls the current Windows media session. Track information is not available from this provider.".into(),
         "agents"=>body="Open your existing ProtonSearch Agents page to manage and launch configured agents.".into(),
@@ -406,7 +410,9 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
             let p = state.config.active_mut();
             match op {
                 "toggle" => {
-                    if let Some(k) = WidgetKind::ALL.into_iter().find(|k| k.key() == id) {
+                    if p.widgets.iter().any(|w| w.id == id) {
+                        p.toggle(id);
+                    } else if let Some(k) = WidgetKind::ALL.into_iter().find(|k| k.key() == id) {
                         p.ensure_kind(k);
                     }
                 }
@@ -426,6 +432,18 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
             }
             state.save();
         }
+        return;
+    }
+    if command == "height-less" || command == "height-more" {
+        let p = state.config.active_mut();
+        p.height = (p.height + if command == "height-more" { 8. } else { -8. }).clamp(80., 144.);
+        state.save();
+        return;
+    }
+    if command == "reserve" {
+        let p = state.config.active_mut();
+        p.reserve_space = !p.reserve_space;
+        state.save();
         return;
     }
     if command == "add-custom" {
