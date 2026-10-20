@@ -12,6 +12,7 @@ dependencies = [
  "notify",
  "once_cell",
  "pdf-extract",
+ "raw-window-handle",
  "rusqlite",
  "serde",
  "serde_json",

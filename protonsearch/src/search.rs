@@ -6871,6 +6871,9 @@ pub fn resolve_lnk_path(lnk_path: &std::path::Path) -> Option<String> {
     }
 }
 
+/// Enumerate applications without constructing a search engine or touching its database.
+pub(crate) fn installed_apps() -> Vec<AppInfo> { scan_apps() }
+
 fn scan_apps() -> Vec<AppInfo> {
     let mut apps = Vec::new();
     unsafe {
@@ -6883,7 +6886,16 @@ fn scan_apps() -> Vec<AppInfo> {
             KF_FLAG_DEFAULT, SIGDN_DESKTOPABSOLUTEPARSING, SIGDN_NORMALDISPLAY,
         };
 
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+        struct ApartmentGuard(bool);
+        impl Drop for ApartmentGuard {
+            fn drop(&mut self) {
+                if self.0 {
+                    // SAFETY: balances successful initialization on this same calling thread.
+                    unsafe { windows::Win32::System::Com::CoUninitialize(); }
+                }
+            }
+        }
+        let _apartment = ApartmentGuard(CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).is_ok());
 
         let apps_folder: IShellItem =
             match SHGetKnownFolderItem(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, HANDLE::default()) {
