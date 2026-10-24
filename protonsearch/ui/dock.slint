@@ -230,7 +230,7 @@ export component DockPanelWindow inherits Window {
                 GlassButton {
                     width: 32px; height: 32px; label: "Close panel";
                     activated => { root.closed(); }
-                    Text { text: "Ã—"; color: #cbd5e4; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "×"; color: #cbd5e4; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
                 }
             }
             if root.panel-kind == "apps" || root.panel-kind == "agents" || root.panel-kind == "windows" || root.panel-kind == "weather" || root.panel-kind == "customize" : LineEdit {
@@ -270,7 +270,7 @@ export component DockPanelWindow inherits Window {
             }
             if root.panel-kind == "customize" : HorizontalLayout {
                 vertical-stretch: 0;
-                QuietButton { text: "Height âˆ’"; clicked => { root.action("height-less"); } }
+                QuietButton { text: "Height −"; clicked => { root.action("height-less"); } }
                 QuietButton { text: "Height +"; clicked => { root.action("height-more"); } }
                 QuietButton { text: "Work area"; clicked => { root.action("reserve"); } }
                 QuietButton { text: "Disable"; clicked => { root.action("disable"); } }
@@ -307,16 +307,16 @@ export component DockPanelWindow inherits Window {
                             if root.panel-kind == "customize" : HorizontalLayout {
                                 height: 30px; spacing: 4px;
                                 QuietButton { text: entry.selected ? "Hide" : "Show"; clicked => { root.action("customize:" + entry.id + ":toggle"); } }
-                                QuietButton { text: "â€¹"; clicked => { root.action("customize:" + entry.id + ":left"); } }
-                                QuietButton { text: "âˆ’"; clicked => { root.action("customize:" + entry.id + ":smaller"); } }
+                                QuietButton { text: "‹"; clicked => { root.action("customize:" + entry.id + ":left"); } }
+                                QuietButton { text: "−"; clicked => { root.action("customize:" + entry.id + ":smaller"); } }
                                 QuietButton { text: "+"; clicked => { root.action("customize:" + entry.id + ":larger"); } }
-                                QuietButton { text: "â€º"; clicked => { root.action("customize:" + entry.id + ":right"); } }
+                                QuietButton { text: "›"; clicked => { root.action("customize:" + entry.id + ":right"); } }
                             }
                         }
                     }
                 }
             }
-            Text { text: root.busy ? "Updatingâ€¦" : root.status; color: #b5b7bf; font-size: 11px; wrap: word-wrap; vertical-stretch: 0; }
+            Text { text: root.busy ? "Updating…" : root.status; color: #b5b7bf; font-size: 11px; wrap: word-wrap; vertical-stretch: 0; }
             HorizontalLayout {
                 vertical-stretch: 0;
                 QuietButton { text: "Back"; clicked => { root.action("back"); } }
