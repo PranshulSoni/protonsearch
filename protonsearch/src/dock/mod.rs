@@ -407,7 +407,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
         "agents"=>body="Open your existing ProtonSearch Agents page to manage and launch configured agents.".into(),
         "network"=>body=state.snapshot.network.as_ref().map(|n|format!("{}\n{} · {}",n.name,if n.wireless{"Wi-Fi"}else{"Network"},if n.internet{"Internet access"}else if n.connected{"Local connectivity"}else{"Disconnected"})).unwrap_or("Network information unavailable".into()),
         "clock"=>body=format!("{}\nLocal time", clock()),
-        "custom"=>body=profile.widgets.iter().find(|w|w.id==state.panel_anchor).map(|w|format!("{}\n{}\n{}",w.label,w.value,w.detail)).unwrap_or_default(),
+        "custom-metric"=>body=profile.widgets.iter().find(|w|w.id==state.panel_anchor).map(|w|format!("{}\n{}\n{}",w.label,w.value,w.detail)).unwrap_or_default(),
         "power"=>body=state.snapshot.power.map(|p|format!("{}\n{}",p.percentage.map(|v|format!("Battery: {v}%")).unwrap_or("No battery reported".into()),if p.charging{"Charging"}else if p.ac_power==Some(true){"Connected to AC power"}else{"On battery"})).unwrap_or("Power information unavailable".into()),
         _=>{}
     }
@@ -584,6 +584,7 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
                 "network" => "ms-settings:network-status",
                 "power" => "ms-settings:powersleep",
                 "weather" => "msnweather:",
+                "clock" => "ms-settings:dateandtime",
                 _ => "ms-settings:",
             });
         }
@@ -779,6 +780,7 @@ pub fn run() -> Result<()> {
     };
     let dock = DockWindow::new()?;
     let panel = DockPanelWindow::new()?;
+    panel.window().set_size(slint::LogicalSize::new(404., 460.));
     let (tx, rx) = mpsc::channel::<String>();
     let send = |prefix: &'static str| {
         let tx = tx.clone();
@@ -945,6 +947,7 @@ pub fn run() -> Result<()> {
     let mut visible_panel = String::new();
     let mut hide_panel_at: Option<Instant> = None;
     let mut focus_seen = false;
+    let mut taskbar_setting = None;
     struct StopEvent(HANDLE);
     impl Drop for StopEvent {
         fn drop(&mut self) {
@@ -1035,7 +1038,8 @@ pub fn run() -> Result<()> {
             refresh(&state, &dock, &panel);
         }
         if !state.panel.is_empty() && panel.window().is_visible() {
-            let focused = panel.window().is_active();
+            let focused =
+                native(panel.window()).is_some_and(|hwnd| unsafe { GetForegroundWindow() == hwnd });
             if focused {
                 focus_seen = true;
             }
@@ -1104,11 +1108,13 @@ pub fn run() -> Result<()> {
                         native_hidden = Some(hidden);
                     }
                 }
-                if heartbeat || native_hidden == Some(false) {
+                if heartbeat || taskbar_setting != Some(state.config.hide_windows_taskbar) {
                     if let Err(error) =
                         taskbar_visibility.set_hidden(state.config.hide_windows_taskbar)
                     {
                         state.status = format!("Taskbar setting: {error}");
+                    } else {
+                        taskbar_setting = Some(state.config.hide_windows_taskbar);
                     }
                 }
                 if state.panel != visible_panel {
@@ -1142,4 +1148,35 @@ pub fn run() -> Result<()> {
     slint::run_event_loop()?;
     drop(timer);
     Ok(())
+}
+
+#[cfg(test)]
+mod geometry_tests {
+    use super::*;
+    fn monitor() -> platform::MonitorBounds {
+        platform::MonitorBounds {
+            left: -1920,
+            top: 0,
+            right: 0,
+            bottom: 1080,
+            work_left: -1920,
+            work_top: 0,
+            work_right: 0,
+            work_bottom: 1040,
+            dpi: 144,
+        }
+    }
+    #[test]
+    fn panel_clamps_both_sides_on_negative_coordinate_monitor() {
+        assert_eq!(
+            popup_position(-1910, 950, 404, 460, monitor()),
+            (-1920, 480)
+        );
+        assert_eq!(popup_position(-10, 950, 404, 460, monitor()), (-404, 480));
+    }
+    #[test]
+    fn panel_anchors_above_origin_and_stays_below_work_area_top() {
+        assert_eq!(popup_position(-960, 950, 404, 460, monitor()), (-1162, 480));
+        assert_eq!(popup_position(-960, 300, 404, 460, monitor()), (-1162, 0));
+    }
 }
