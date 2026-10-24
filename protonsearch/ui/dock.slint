@@ -75,6 +75,7 @@ export component DockWindow inherits Window {
     in-out property <string> status;
     in-out property <float> dock-height: 82;
     in-out property <float> icon-size: 48;
+    out property <float> scroll-offset: -scroll.viewport-x / 1px;
     callback item-clicked(string);
     callback item-context(string);
     callback profile-selected(string);

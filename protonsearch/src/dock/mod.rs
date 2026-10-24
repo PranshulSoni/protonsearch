@@ -158,7 +158,7 @@ fn position_panel(
     rect: RECT,
 ) {
     let scale = monitor.dpi as f32 / 96.;
-    let mut offset = 14.;
+    let mut offset = 10. - dock.get_scroll_offset();
     let mut anchor = rect.left + (rect.right - rect.left) / 2;
     let dock_size = dock.window().size();
     let dock_left = rect.left + (rect.right - rect.left - dock_size.width as i32) / 2;
@@ -909,11 +909,10 @@ pub fn run() -> Result<()> {
         });
     }
     let (snapshot_tx, snapshot_rx) = mpsc::sync_channel(1);
+    let (request_tx, request_rx) = mpsc::sync_channel(1);
     std::thread::spawn(move || {
         let mut apps = platform::installed_apps();
-        for app in apps.iter_mut().take(150) {
-            app.icon = platform::icon_for_path(&app.command, 128);
-        }
+        let mut next_icon = 0;
         let mut cached_icons = HashMap::new();
         loop {
             let windows = platform::enumerate_windows();
@@ -957,7 +956,13 @@ pub fn run() -> Result<()> {
             if snapshot_tx.send(snapshot).is_err() {
                 break;
             }
-            std::thread::sleep(Duration::from_secs(2));
+            // Publish useful system/window data immediately; fill drawer artwork in bounded batches.
+            let end = (next_icon + 6).min(apps.len());
+            for app in &mut apps[next_icon..end] {
+                app.icon = platform::icon_for_path(&app.command, 128);
+            }
+            next_icon = end;
+            let _ = request_rx.recv_timeout(Duration::from_secs(2));
         }
     });
     refresh(&state, &dock, &panel);
@@ -1070,6 +1075,9 @@ pub fn run() -> Result<()> {
                     }
                 }
             } else {
+                if cmd == "refresh" {
+                    let _ = request_tx.try_send(());
+                }
                 action(&mut state, &cmd, &panel);
             }
             dirty = true;
@@ -1186,6 +1194,14 @@ pub fn run() -> Result<()> {
                             }
                         }
                         let _ = panel.show();
+                        // Some backends create the native handle only while mapping the window.
+                        if let Some(ph) = native(panel.window()) {
+                            if panel_configured != Some(ph.0 as isize) {
+                                let _ = platform::configure_window(ph, false);
+                                panel_configured = Some(ph.0 as isize);
+                            }
+                        }
+                        position_panel(&state, &dock, &panel, m, rect);
                         let weak_reveal = panel.as_weak();
                         Timer::single_shot(Duration::from_millis(16), move || {
                             if let Some(panel) = weak_reveal.upgrade() {
