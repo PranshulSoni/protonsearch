@@ -2,6 +2,7 @@
 pub mod appbar;
 pub mod platform;
 pub mod supervisor;
+pub mod taskbar;
 use crate::ui::{DockItem, DockPanelWindow, DockWindow, PanelItem};
 use anyhow::{bail, Result};
 use proton_core::dock_model::{
@@ -11,6 +12,7 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{ComponentHandle, Image, ModelRc, SharedPixelBuffer, Timer, TimerMode, VecModel};
 use std::{
     collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
     sync::mpsc,
     time::{Duration, Instant},
 };
@@ -42,6 +44,7 @@ struct State {
     query: String,
     status: String,
     controller: isize,
+    panel_anchor: String,
 }
 impl State {
     fn save(&mut self) {
@@ -62,11 +65,80 @@ fn model<T: Clone + 'static>(items: Vec<T>) -> ModelRc<T> {
     std::rc::Rc::new(VecModel::from(items)).into()
 }
 fn image(pixels: &platform::IconPixels) -> Image {
-    Image::from_rgba8(SharedPixelBuffer::clone_from_slice(
-        &pixels.rgba,
-        pixels.width,
-        pixels.height,
-    ))
+    // Slint images are reference counted; reuse decoded buffers across unchanged snapshots.
+    thread_local! { static ICONS: std::cell::RefCell<HashMap<u64, Image>> = std::cell::RefCell::new(HashMap::new()); }
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    pixels.width.hash(&mut hash);
+    pixels.height.hash(&mut hash);
+    pixels.rgba.hash(&mut hash);
+    let key = hash.finish();
+    ICONS.with(|icons| {
+        let mut icons = icons.borrow_mut();
+        if let Some(icon) = icons.get(&key) {
+            return icon.clone();
+        }
+        if icons.len() >= 256 {
+            icons.clear();
+        }
+        let icon = Image::from_rgba8(SharedPixelBuffer::clone_from_slice(
+            &pixels.rgba,
+            pixels.width,
+            pixels.height,
+        ));
+        icons.insert(key, icon.clone());
+        icon
+    })
+}
+/// Anchor a popup to its originating tile, with both edges inside the monitor work area.
+fn popup_position(
+    anchor: i32,
+    dock_top: i32,
+    width: i32,
+    height: i32,
+    monitor: platform::MonitorBounds,
+) -> (i32, i32) {
+    let left = monitor.work_left;
+    let top = monitor.work_top;
+    let right = monitor.work_right;
+    (
+        (anchor - width / 2).clamp(left, (right - width).max(left)),
+        (dock_top - height - 10).max(top),
+    )
+}
+fn position_panel(
+    state: &State,
+    dock: &DockWindow,
+    panel: &DockPanelWindow,
+    monitor: platform::MonitorBounds,
+    rect: RECT,
+) {
+    use slint::Model;
+    let scale = monitor.dpi as f32 / 96.;
+    let mut offset = 14.;
+    let mut anchor = rect.left + (rect.right - rect.left) / 2;
+    let dock_size = dock.window().size();
+    let dock_left = rect.left + (rect.right - rect.left - dock_size.width as i32) / 2;
+    let items = dock.get_items();
+    for i in 0..items.row_count() {
+        if let Some(item) = items.row_data(i) {
+            if item.id.as_str() == state.panel_anchor {
+                anchor = dock_left + ((offset + item.width / 2.) * scale) as i32;
+                break;
+            }
+            offset += item.width + 4.;
+        }
+    }
+    let size = panel.window().size();
+    let (x, y) = popup_position(
+        anchor,
+        rect.top,
+        size.width as i32,
+        size.height as i32,
+        monitor,
+    );
+    panel
+        .window()
+        .set_position(slint::PhysicalPosition::new(x, y));
 }
 fn asset(name: &str) -> Image {
     thread_local! { static CACHE: std::cell::RefCell<HashMap<String,Image>> = std::cell::RefCell::new(HashMap::new()); }
@@ -169,7 +241,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                         .get(&pin.id)
                         .map(image)
                         .unwrap_or_else(|| asset("apps")),
-                    width: profile.icon_size + 14.,
+                    width: 60.,
                     running,
                     ..Default::default()
                 });
@@ -190,7 +262,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                         .get(&window.identity)
                         .map(image)
                         .unwrap_or_else(|| asset("apps")),
-                    width: profile.icon_size + 14.,
+                    width: 60.,
                     running: true,
                     ..Default::default()
                 });
@@ -293,6 +365,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     dock.set_dock_height(profile.height);
     dock.set_icon_size(profile.icon_size);
     dock.set_status(state.status.clone().into());
+    panel.set_taskbar_hidden(state.config.hide_windows_taskbar);
     panel.set_panel_kind(state.panel.clone().into());
     panel.set_panel_title(
         match state.panel.as_str() {
@@ -333,6 +406,8 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
         "music"=>body="Controls the current Windows media session. Track information is not available from this provider.".into(),
         "agents"=>body="Open your existing ProtonSearch Agents page to manage and launch configured agents.".into(),
         "network"=>body=state.snapshot.network.as_ref().map(|n|format!("{}\n{} · {}",n.name,if n.wireless{"Wi-Fi"}else{"Network"},if n.internet{"Internet access"}else if n.connected{"Local connectivity"}else{"Disconnected"})).unwrap_or("Network information unavailable".into()),
+        "clock"=>body=format!("{}\nLocal time", clock()),
+        "custom"=>body=profile.widgets.iter().find(|w|w.id==state.panel_anchor).map(|w|format!("{}\n{}\n{}",w.label,w.value,w.detail)).unwrap_or_default(),
         "power"=>body=state.snapshot.power.map(|p|format!("{}\n{}",p.percentage.map(|v|format!("Battery: {v}%")).unwrap_or("No battery reported".into()),if p.charging{"Charging"}else if p.ac_power==Some(true){"Connected to AC power"}else{"On battery"})).unwrap_or("Power information unavailable".into()),
         _=>{}
     }
@@ -344,7 +419,6 @@ fn launch(command: &str) {
 }
 fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
     if command == "hide" || command == "back" {
-        let _ = panel.hide();
         state.panel.clear();
         return;
     }
@@ -410,7 +484,7 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
             .find(|w| w.hwnd.to_string() == id)
             .cloned()
         {
-            let _ = panel.hide();
+            state.panel.clear();
             if let Err(e) = platform::activate_window(&w) {
                 state.status = e.to_string();
             }
@@ -434,10 +508,10 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
                     }
                 }
                 "smaller" => {
-                    p.resize(id, -20.);
+                    p.resize(id, -64.);
                 }
                 "larger" => {
-                    p.resize(id, 20.);
+                    p.resize(id, 64.);
                 }
                 "left" => {
                     p.move_widget(id, -1);
@@ -453,7 +527,12 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
     }
     if command == "height-less" || command == "height-more" {
         let p = state.config.active_mut();
-        p.height = (p.height + if command == "height-more" { 8. } else { -8. }).clamp(80., 144.);
+        p.height = (p.height + if command == "height-more" { 8. } else { -8. }).clamp(82., 112.);
+        state.save();
+        return;
+    }
+    if command == "toggle-taskbar" {
+        state.config.hide_windows_taskbar = !state.config.hide_windows_taskbar;
         state.save();
         return;
     }
@@ -519,7 +598,23 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
         });
         return;
     }
-    if command == "refresh" || command == "submit" {
+    if command == "refresh" {
+        state.status = "System information refresh requested".into();
+        return;
+    }
+    if command == "submit" {
+        if state.panel == "apps" {
+            let query = state.query.to_lowercase();
+            if let Some(app) = state
+                .snapshot
+                .apps
+                .iter()
+                .find(|a| a.name.to_lowercase().contains(&query))
+            {
+                launch(&app.command);
+                state.panel.clear();
+            }
+        }
         return;
     }
     if let Some(id) = command.strip_prefix("context:") {
@@ -537,10 +632,14 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
             })
             .unwrap_or_default();
         panel.set_query(state.query.clone().into());
-        let _ = panel.show();
         return;
     }
     if let Some(id) = command.strip_prefix("dock:") {
+        if !state.panel.is_empty() && state.panel_anchor == id {
+            state.panel.clear();
+            return;
+        }
+        state.panel_anchor = id.to_owned();
         if let Some(identity) = id.strip_prefix("app:") {
             let wins: Vec<_> = state
                 .snapshot
@@ -584,10 +683,12 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
                 .map(|w| w.kind);
             match kind {
                 Some(WidgetKind::Search) => {
+                    state.panel.clear();
                     host(state, WM_APP + 100);
                     return;
                 }
                 Some(WidgetKind::Files) => {
+                    state.panel.clear();
                     launch("explorer.exe");
                     return;
                 }
@@ -603,19 +704,22 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
             state.query.clear();
         }
         panel.set_query(state.query.clone().into());
-        let _ = panel.show();
         return;
     }
     if command == "customize" {
+        if state.panel == "customize" {
+            state.panel.clear();
+            return;
+        }
+        state.panel_anchor.clear();
         state.panel = "customize".into();
         state.query.clear();
         panel.set_query("".into());
-        let _ = panel.show();
         return;
     }
     if let Some(app) = state.snapshot.apps.iter().find(|a| a.id == command) {
         launch(&app.command);
-        let _ = panel.hide();
+        state.panel.clear();
     }
 }
 
@@ -671,6 +775,7 @@ pub fn run() -> Result<()> {
         query: String::new(),
         status,
         controller,
+        panel_anchor: String::new(),
     };
     let dock = DockWindow::new()?;
     let panel = DockPanelWindow::new()?;
@@ -750,9 +855,10 @@ pub fn run() -> Result<()> {
     let (snapshot_tx, snapshot_rx) = mpsc::sync_channel(1);
     std::thread::spawn(move || {
         let mut apps = platform::installed_apps();
-        for app in apps.iter_mut().take(40) {
-            app.icon = platform::icon_for_path(&app.command, 64);
+        for app in apps.iter_mut().take(150) {
+            app.icon = platform::icon_for_path(&app.command, 128);
         }
+        let mut cached_icons = HashMap::new();
         loop {
             let windows = platform::enumerate_windows();
             let mut icons = HashMap::new();
@@ -771,9 +877,18 @@ pub fn run() -> Result<()> {
                 }
             }
             for w in windows.iter().take(24) {
-                if let Some(icon) = platform::icon_for_window(w.hwnd, 64) {
-                    icons.insert(w.identity.clone(), icon);
+                let icon = cached_icons.entry(w.identity.clone()).or_insert_with(|| {
+                    w.executable
+                        .as_ref()
+                        .and_then(|path| platform::icon_for_path(path, 128))
+                        .or_else(|| platform::icon_for_window(w.hwnd, 128))
+                });
+                if let Some(icon) = icon {
+                    icons.insert(w.identity.clone(), icon.clone());
                 }
+            }
+            if cached_icons.len() > 256 {
+                cached_icons.retain(|id, _| windows.iter().any(|w| &w.identity == id));
             }
             let snapshot = Snapshot {
                 windows,
@@ -790,7 +905,6 @@ pub fn run() -> Result<()> {
         }
     });
     refresh(&state, &dock, &panel);
-    dock.show()?;
     let monitor = platform::primary_monitor().ok_or_else(|| anyhow::anyhow!("no monitor"))?;
     let mut bar = if state.config.active().reserve_space {
         Some(appbar::AppBar::new(
@@ -800,6 +914,25 @@ pub fn run() -> Result<()> {
     } else {
         None
     };
+    // Set the initial location before mapping the window to avoid a visible jump from (0, 0).
+    let initial_height = (state.config.active().height * monitor.dpi as f32 / 96.) as i32;
+    let initial_rect = bar.as_ref().map(|b| b.rect()).unwrap_or(RECT {
+        left: monitor.work_left,
+        right: monitor.work_right,
+        top: monitor.work_bottom - initial_height,
+        bottom: monitor.work_bottom,
+    });
+    let initial_size = dock.window().size();
+    dock.window().set_position(slint::PhysicalPosition::new(
+        initial_rect.left
+            + (initial_rect.right - initial_rect.left - initial_size.width as i32) / 2,
+        initial_rect.top,
+    ));
+    if let Some(hwnd) = native(dock.window()) {
+        platform::configure_window(hwnd, true)?;
+    }
+    dock.show()?;
+    let mut taskbar_visibility = taskbar::TaskbarVisibility::new(supervisor::layout_path());
     let weak = dock.as_weak();
     let weak_panel = panel.as_weak();
     let timer = Timer::default();
@@ -807,6 +940,11 @@ pub fn run() -> Result<()> {
     let mut configured = false;
     let mut panel_configured = None;
     let mut bar_geometry = None;
+    let mut native_geometry = None;
+    let mut native_hidden = None;
+    let mut visible_panel = String::new();
+    let mut hide_panel_at: Option<Instant> = None;
+    let mut focus_seen = false;
     struct StopEvent(HANDLE);
     impl Drop for StopEvent {
         fn drop(&mut self) {
@@ -840,6 +978,10 @@ pub fn run() -> Result<()> {
         let (Some(dock), Some(panel)) = (weak.upgrade(), weak_panel.upgrade()) else {
             return;
         };
+        if hide_panel_at.is_some_and(|deadline| Instant::now() >= deadline) {
+            let _ = panel.hide();
+            hide_panel_at = None;
+        }
         let mut dirty = false;
         while let Ok(cmd) = rx.try_recv() {
             if cmd == "disable" {
@@ -879,7 +1021,8 @@ pub fn run() -> Result<()> {
             state.snapshot = snapshot;
             dirty = true;
         }
-        if last.elapsed() >= Duration::from_secs(1) {
+        let heartbeat = last.elapsed() >= Duration::from_secs(1);
+        if heartbeat {
             if !controller_live(controller, pid) {
                 let _ = slint::quit_event_loop();
                 return;
@@ -890,6 +1033,17 @@ pub fn run() -> Result<()> {
         }
         if dirty {
             refresh(&state, &dock, &panel);
+        }
+        if !state.panel.is_empty() && panel.window().is_visible() {
+            let focused = panel.window().is_active();
+            if focused {
+                focus_seen = true;
+            }
+            if focus_seen && !focused {
+                state.panel.clear();
+                dirty = true;
+                focus_seen = false;
+            }
         }
         if !dirty {
             return;
@@ -926,36 +1080,61 @@ pub fn run() -> Result<()> {
                 });
                 let size = dock.window().size();
                 let hidden = platform::fullscreen_on_monitor(m, &[hwnd.0 as isize, controller]);
+                let geometry = (
+                    rect.left + (rect.right - rect.left - size.width as i32) / 2,
+                    rect.top,
+                    size.width as i32,
+                    height,
+                );
                 unsafe {
-                    let _ = ShowWindow(hwnd, if hidden { SW_HIDE } else { SW_SHOWNOACTIVATE });
-                    let _ = SetWindowPos(
-                        hwnd,
-                        HWND_TOPMOST,
-                        rect.left + (rect.right - rect.left - size.width as i32) / 2,
-                        rect.top,
-                        size.width as i32,
-                        height,
-                        SWP_NOACTIVATE,
-                    );
-                }
-                if let Some(ph) = native(panel.window()) {
-                    if panel_configured != Some(ph.0 as isize) {
-                        let _ = platform::configure_window(ph, false);
-                        panel_configured = Some(ph.0 as isize);
-                    }
-                    let size = panel.window().size();
-                    unsafe {
+                    if native_geometry != Some(geometry) {
                         let _ = SetWindowPos(
-                            ph,
+                            hwnd,
                             HWND_TOPMOST,
-                            (rect.left + (rect.right - rect.left - size.width as i32) / 2)
-                                .max(m.left),
-                            rect.top - size.height as i32 - 8,
-                            size.width as i32,
-                            size.height as i32,
+                            geometry.0,
+                            geometry.1,
+                            geometry.2,
+                            geometry.3,
                             SWP_NOACTIVATE,
                         );
+                        native_geometry = Some(geometry);
                     }
+                    if native_hidden != Some(hidden) {
+                        let _ = ShowWindow(hwnd, if hidden { SW_HIDE } else { SW_SHOWNOACTIVATE });
+                        native_hidden = Some(hidden);
+                    }
+                }
+                if heartbeat || native_hidden == Some(false) {
+                    if let Err(error) =
+                        taskbar_visibility.set_hidden(state.config.hide_windows_taskbar)
+                    {
+                        state.status = format!("Taskbar setting: {error}");
+                    }
+                }
+                if state.panel != visible_panel {
+                    if state.panel.is_empty() {
+                        panel.set_revealed(false);
+                        hide_panel_at = Some(Instant::now() + Duration::from_millis(150));
+                    } else {
+                        hide_panel_at = None;
+                        panel.set_revealed(false);
+                        position_panel(&state, &dock, &panel, m, rect);
+                        if let Some(ph) = native(panel.window()) {
+                            if panel_configured != Some(ph.0 as isize) {
+                                let _ = platform::configure_window(ph, false);
+                                panel_configured = Some(ph.0 as isize);
+                            }
+                        }
+                        let _ = panel.show();
+                        let weak_reveal = panel.as_weak();
+                        Timer::single_shot(Duration::from_millis(16), move || {
+                            if let Some(panel) = weak_reveal.upgrade() {
+                                panel.set_revealed(true);
+                            }
+                        });
+                        focus_seen = false;
+                    }
+                    visible_panel = state.panel.clone();
                 }
             }
         }
