@@ -43,12 +43,10 @@ impl WidgetKind {
 
     pub fn width_bounds(self) -> (f32, f32, f32) {
         match self {
-            Self::Start | Self::Applications => (56.0, 64.0, 96.0),
-            Self::Audio | Self::Power | Self::Network | Self::SystemTray => (64.0, 88.0, 220.0),
-            Self::Weather | Self::Music => (96.0, 184.0, 380.0),
-            Self::Search => (72.0, 136.0, 260.0),
-            Self::Clock | Self::Focus => (96.0, 124.0, 260.0),
-            _ => (88.0, 152.0, 380.0),
+            Self::Start | Self::Applications | Self::Search | Self::Agents | Self::Files | Self::SystemTray => (60.0, 60.0, 60.0),
+            Self::Audio | Self::Power | Self::Network => (60.0, 124.0, 188.0),
+            Self::Weather | Self::Music | Self::Clock | Self::Focus => (60.0, 124.0, 188.0),
+            Self::CustomMetric => (60.0, 124.0, 252.0),
         }
     }
 }
@@ -116,7 +114,7 @@ impl Default for Profile {
             widgets: [WidgetKind::Start, WidgetKind::Search, WidgetKind::Applications,
                 WidgetKind::Weather, WidgetKind::Focus, WidgetKind::Audio, WidgetKind::Clock,
                 WidgetKind::Agents].into_iter().map(WidgetInstance::new).collect(),
-            pins: vec![AppPin::default()], height: 96.0, icon_size: 52.0,
+            pins: vec![AppPin::default()], height: 82.0, icon_size: 48.0,
             reserve_space: true, presentation: false }
     }
 }
@@ -125,8 +123,8 @@ impl Profile {
     pub fn normalize(&mut self) {
         self.id = clean_text(&self.id, 48);
         self.name = clean_text(&self.name, 40);
-        self.height = if self.height.is_finite() { self.height.clamp(80.0, 144.0) } else { 96.0 };
-        self.icon_size = if self.icon_size.is_finite() { self.icon_size.clamp(40.0, (self.height - 30.0).min(80.0)) } else { 52.0 };
+        self.height = if self.height.is_finite() { self.height.clamp(82.0, 112.0) } else { 82.0 };
+        self.icon_size = if self.icon_size.is_finite() { self.icon_size.clamp(32.0, 48.0) } else { 48.0 };
         self.widgets.truncate(MAX_WIDGETS);
         let mut ids = HashSet::new();
         self.widgets.retain_mut(|widget| {
@@ -192,6 +190,9 @@ pub struct DockConfig {
     pub active_profile: String,
     pub profiles: Vec<Profile>,
     pub weather: Option<WeatherLocation>,
+    pub hide_windows_taskbar: bool,
+    #[serde(default)]
+    pub appearance_revision: u32,
 }
 
 impl Default for DockConfig {
@@ -206,13 +207,24 @@ impl Default for DockConfig {
         presentation.widgets = [WidgetKind::Start, WidgetKind::Applications, WidgetKind::Audio,
             WidgetKind::Clock].into_iter().map(WidgetInstance::new).collect();
         Self { version: SCHEMA_VERSION, enabled: true, active_profile: "work".into(),
-            profiles: vec![work, home, presentation], weather: None }
+            profiles: vec![work, home, presentation], weather: None,
+            hide_windows_taskbar: false, appearance_revision: 1 }
     }
 }
 
 impl DockConfig {
     pub fn normalize(&mut self) -> Result<(), String> {
         if self.version != SCHEMA_VERSION { return Err(format!("unsupported dock layout version {}", self.version)); }
+        // The first native alpha saved oversized dashboard cards. Migrate appearance once,
+        // retaining profile order, pins, custom values and each widget's enabled state.
+        if self.appearance_revision == 0 {
+            for profile in &mut self.profiles {
+                profile.height = 82.0;
+                profile.icon_size = 48.0;
+                for widget in &mut profile.widgets { widget.width = widget.kind.width_bounds().1; }
+            }
+            self.appearance_revision = 1;
+        }
         self.profiles.truncate(12);
         let mut ids = HashSet::new();
         self.profiles.retain_mut(|profile| { profile.normalize(); !profile.id.is_empty() && ids.insert(profile.id.clone()) });
@@ -297,19 +309,19 @@ mod tests {
     use super::*;
     #[test] fn defaults_have_three_independent_profiles() {
         let mut config = DockConfig::default(); config.active_mut().widgets[0].width = 80.0;
-        assert_eq!(config.profiles.len(), 3); assert_eq!(config.profiles[1].widgets[0].width, 64.0);
+        assert_eq!(config.profiles.len(), 3); assert_eq!(config.profiles[1].widgets[0].width, 60.0);
         assert!(config.profiles[2].presentation);
     }
     #[test] fn invalid_and_duplicate_geometry_is_normalized() {
         let mut config = DockConfig::default(); let profile = config.active_mut();
         profile.height = f32::NAN; profile.icon_size = 800.0; profile.widgets[0].width = f32::INFINITY;
         profile.widgets.push(profile.widgets[0].clone()); profile.normalize();
-        assert_eq!(profile.height, 96.0); assert_eq!(profile.icon_size, 66.0);
-        assert_eq!(profile.widgets[0].width, 64.0); assert_eq!(profile.widgets.len(), 8);
+        assert_eq!(profile.height, 82.0); assert_eq!(profile.icon_size, 48.0);
+        assert_eq!(profile.widgets[0].width, 60.0); assert_eq!(profile.widgets.len(), 8);
     }
     #[test] fn resize_and_reorder_obey_widget_constraints() {
         let mut profile = Profile::default(); assert!(profile.resize("weather", 900.0));
-        assert_eq!(profile.widgets.iter().find(|w| w.id == "weather").unwrap().width, 380.0);
+        assert_eq!(profile.widgets.iter().find(|w| w.id == "weather").unwrap().width, 188.0);
         assert!(profile.move_widget("search", -99)); assert_eq!(profile.widgets[0].id, "search");
         assert!(!profile.resize("search", f32::NAN)); assert!(!profile.move_widget("absent", 1));
     }
