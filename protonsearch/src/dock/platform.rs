@@ -1,5 +1,6 @@
 //! Windows providers. Native handles never leave the calling thread.
 use anyhow::{bail, Result};
+use windows::core::{Interface, PCWSTR};
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::{Dwm::*, Gdi::*};
 use windows::Win32::Media::Audio::{Endpoints::*, *};
@@ -252,6 +253,19 @@ pub fn icon_for_window(hwnd: isize, size: u32) -> Option<IconPixels> {
         if !IsWindow(hwnd).as_bool() {
             return None;
         }
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if let Some(path) = crate::get_process_path(pid) {
+            // UWP frame hosts carry a generic Windows icon, not their hosted app's icon.
+            if !path
+                .to_ascii_lowercase()
+                .ends_with("applicationframehost.exe")
+            {
+                if let Some(icon) = icon_for_path(&path, size) {
+                    return Some(icon);
+                }
+            }
+        }
         let mut value = 0usize;
         for kind in [ICON_BIG, ICON_SMALL2, ICON_SMALL] {
             let _ = SendMessageTimeoutW(
@@ -284,6 +298,9 @@ pub fn icon_for_window(hwnd: isize, size: u32) -> Option<IconPixels> {
 }
 pub fn icon_for_path(path: &str, size: u32) -> Option<IconPixels> {
     let _apartment = Apartment::new().ok()?;
+    if let Some(icon) = shell_icon_pixels(path, size) {
+        return Some(icon);
+    }
     // SAFETY: shell helpers return caller-owned icons; each icon is destroyed exactly once.
     unsafe {
         let mut icon = crate::get_app_icon(path);
@@ -296,6 +313,111 @@ pub fn icon_for_path(path: &str, size: u32) -> Option<IconPixels> {
         let pixels = render_icon(icon, size);
         let _ = DestroyIcon(icon);
         pixels
+    }
+}
+
+/// Request an actual high-resolution Shell image, rather than stretching the
+/// legacy launcher's fixed 32px HICON to dock size. Call only on the icon worker.
+fn shell_icon_pixels(path: &str, size: u32) -> Option<IconPixels> {
+    use windows::Win32::UI::Shell::{
+        IShellItem, IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_BIGGERSIZEOK,
+        SIIGBF_ICONONLY,
+    };
+    let target = if path.to_ascii_lowercase().ends_with(".lnk") {
+        unsafe { crate::resolve_lnk(path) }.unwrap_or_else(|| path.to_owned())
+    } else {
+        path.to_owned()
+    };
+    let parsing = if target.starts_with("shell:") || std::path::Path::new(&target).is_absolute() {
+        target
+    } else {
+        format!("shell:AppsFolder\\{target}")
+    };
+    let wide: Vec<u16> = parsing.encode_utf16().chain(Some(0)).collect();
+    // SAFETY: COM is initialized by icon_for_path. All bitmap/DC handles are released locally.
+    unsafe {
+        let item: IShellItem = SHCreateItemFromParsingName(PCWSTR(wide.as_ptr()), None).ok()?;
+        let factory: IShellItemImageFactory = item.cast().ok()?;
+        let requested = size.clamp(64, 256) as i32;
+        let bitmap = factory
+            .GetImage(
+                SIZE {
+                    cx: requested,
+                    cy: requested,
+                },
+                SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK,
+            )
+            .ok()?;
+        let result = bitmap_icon_pixels(bitmap);
+        let _ = DeleteObject(bitmap);
+        result
+    }
+}
+
+fn bitmap_icon_pixels(bitmap: HBITMAP) -> Option<IconPixels> {
+    // SAFETY: bitmap remains owned by the caller; GetDIBits copies into a bounded Vec.
+    unsafe {
+        let mut dimensions = BITMAP::default();
+        if GetObjectW(
+            bitmap,
+            std::mem::size_of::<BITMAP>() as i32,
+            Some(&mut dimensions as *mut _ as _),
+        ) == 0
+        {
+            return None;
+        }
+        let width = dimensions.bmWidth;
+        let height = dimensions.bmHeight.abs();
+        if !(1..=512).contains(&width) || !(1..=512).contains(&height) {
+            return None;
+        }
+        let mut info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width,
+                biHeight: -height,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let dc = CreateCompatibleDC(None);
+        if dc.is_invalid() {
+            return None;
+        }
+        let mut rgba = vec![0u8; width as usize * height as usize * 4];
+        let copied = GetDIBits(
+            dc,
+            bitmap,
+            0,
+            height as u32,
+            Some(rgba.as_mut_ptr() as _),
+            &mut info,
+            DIB_RGB_COLORS,
+        );
+        let _ = DeleteDC(dc);
+        if copied != height || !rgba.chunks_exact(4).any(|pixel| pixel[3] != 0) {
+            return None;
+        }
+        // The Shell returns premultiplied BGRA; Slint SharedPixelBuffer expects straight RGBA.
+        for pixel in rgba.chunks_exact_mut(4) {
+            pixel.swap(0, 2);
+            let alpha = u32::from(pixel[3]);
+            for channel in &mut pixel[..3] {
+                *channel = if alpha == 0 {
+                    0
+                } else {
+                    ((u32::from(*channel) * 255 + alpha / 2) / alpha).min(255) as u8
+                };
+            }
+        }
+        Some(IconPixels {
+            width: width as u32,
+            height: height as u32,
+            rgba,
+        })
     }
 }
 pub fn installed_apps() -> Vec<InstalledApp> {
