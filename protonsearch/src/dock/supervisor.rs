@@ -34,6 +34,9 @@ pub struct DockSupervisor {
 
 impl DockSupervisor {
     pub fn new(controller: HWND, allowed: bool) -> Self {
+        if let Err(error) = super::taskbar::restore_after_exit(&layout_path(), None) {
+            crate::applog::log(&format!("cannot recover stale taskbar visibility: {error}"));
+        }
         let name: Vec<u16> = format!("Local\\ProtonDockStop-{}\0", std::process::id())
             .encode_utf16()
             .collect();
@@ -77,6 +80,13 @@ impl DockSupervisor {
                 }
                 Ok(Some(status)) => {
                     crate::applog::log(&format!("dock process exited: {status}"));
+                    if let Err(error) =
+                        super::taskbar::restore_after_exit(&layout_path(), Some(child.id()))
+                    {
+                        crate::applog::log(&format!(
+                            "cannot recover taskbar after dock exit: {error}"
+                        ));
+                    }
                 }
                 Err(error) => {
                     crate::applog::log(&format!("cannot inspect dock process: {error}"));
@@ -135,6 +145,10 @@ impl DockSupervisor {
                 let _ = child.kill();
             }
             let _ = child.wait();
+            if let Err(error) = super::taskbar::restore_after_exit(&layout_path(), Some(child.id()))
+            {
+                crate::applog::log(&format!("cannot recover taskbar after dock stop: {error}"));
+            }
         }
         self.started = None;
     }

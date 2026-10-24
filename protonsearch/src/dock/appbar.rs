@@ -244,8 +244,17 @@ mod tests {
     use super::*;
     #[test]
     fn work_area_changes_do_not_move_our_reservation() {
-        let a = MonitorBounds { left: -1920, top: 0, right: 0, bottom: 1080,
-            work_left: -1920, work_top: 0, work_right: 0, work_bottom: 1040, dpi: 96 };
+        let a = MonitorBounds {
+            left: -1920,
+            top: 0,
+            right: 0,
+            bottom: 1080,
+            work_left: -1920,
+            work_top: 0,
+            work_right: 0,
+            work_bottom: 1040,
+            dpi: 96,
+        };
         let mut b = a;
         b.work_bottom = 960;
         assert!(same_display(a, b));
