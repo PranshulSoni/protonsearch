@@ -1,7 +1,8 @@
 //! Opt-in Explorer taskbar visibility, with a durable recovery lease.
 //! We only restore windows which this dock actually hid; Explorer is never terminated.
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use std::{
     marker::PhantomData,
     path::{Path, PathBuf},
@@ -50,6 +51,11 @@ fn explorer_window(item: &TaskbarWindow) -> bool {
     }
 }
 fn owner_alive(pid: u32) -> bool {
+    if !crate::get_process_path(pid).is_some_and(|path| {
+        std::env::current_exe().is_ok_and(|exe| exe.to_string_lossy().eq_ignore_ascii_case(&path))
+    }) {
+        return false;
+    }
     // SAFETY: process handle is closed on all success paths.
     unsafe {
         let Ok(process) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) else {
@@ -65,12 +71,12 @@ fn owner_alive(pid: u32) -> bool {
 /// A live renderer's lease is never reclaimed by an unrelated controller.
 pub fn restore_after_exit(layout: &Path, exited_pid: Option<u32>) -> Result<()> {
     let path = lease_path(layout);
-    let bytes = match std::fs::read(&path) {
-        Ok(bytes) => bytes,
+    let file = match std::fs::File::open(&path) {
+        Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error.into()),
     };
-    let lease: Lease = serde_json::from_slice(&bytes).context("invalid taskbar recovery lease")?;
+    let lease = read_lease(file)?;
     if exited_pid.map_or_else(|| owner_alive(lease.owner), |pid| pid != lease.owner) {
         return Ok(());
     }
@@ -84,6 +90,18 @@ pub fn restore_after_exit(layout: &Path, exited_pid: Option<u32>) -> Result<()> 
     }
     std::fs::remove_file(path)?;
     Ok(())
+}
+
+fn read_lease(file: std::fs::File) -> Result<Lease> {
+    let mut bytes = Vec::new();
+    file.take(65_537).read_to_end(&mut bytes)?;
+    ensure!(bytes.len() <= 65_536, "taskbar recovery lease too large");
+    let lease: Lease = serde_json::from_slice(&bytes).context("invalid taskbar recovery lease")?;
+    ensure!(
+        lease.owner != 0 && lease.windows.len() <= 64,
+        "invalid taskbar recovery owner or window count"
+    );
+    Ok(lease)
 }
 
 pub struct TaskbarVisibility {
@@ -111,7 +129,7 @@ impl TaskbarVisibility {
         }
         let path = lease_path(&self.layout);
         let mut lease = if self.hidden {
-            serde_json::from_slice::<Lease>(&std::fs::read(&path)?)?
+            read_lease(std::fs::File::open(&path)?)?
         } else {
             Lease {
                 owner: std::process::id(),
