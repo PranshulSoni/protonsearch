@@ -366,7 +366,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                     )
                 })
                 .unwrap_or(("Unavailable".into(), "Network".into())),
-            WidgetKind::Weather => ("Weather".into(), "Set location".into()),
+            WidgetKind::Weather => ("—".into(), "No forecast".into()),
             WidgetKind::Music => ("Media controls".into(), "System playback".into()),
             WidgetKind::CustomMetric => (widget.value.clone(), widget.detail.clone()),
             _ => (widget.kind.title().into(), String::new()),

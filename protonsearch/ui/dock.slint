@@ -234,9 +234,9 @@ export component DockPanelWindow inherits Window {
                     Text { text: "×"; color: #cbd5e4; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
                 }
             }
-            if root.panel-kind == "apps" || root.panel-kind == "agents" || root.panel-kind == "windows" || root.panel-kind == "weather" || root.panel-kind == "customize" : LineEdit {
+            if root.panel-kind == "apps" || root.panel-kind == "agents" || root.panel-kind == "windows" || root.panel-kind == "customize" : LineEdit {
                 text <=> root.query;
-                placeholder-text: root.panel-kind == "weather" ? "City or coordinates" : root.panel-kind == "customize" ? "Custom widget: name | value | detail" : "Search " + root.panel-title;
+                placeholder-text: root.panel-kind == "customize" ? "Custom widget: name | value | detail" : "Search " + root.panel-title;
                 edited(text) => { root.query-edited(text); }
                 accepted => { root.action("submit"); }
             }
