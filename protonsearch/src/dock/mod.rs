@@ -9,7 +9,9 @@ use proton_core::dock_model::{
     AppPin, DockConfig, FocusTimer, LayoutStore, WidgetInstance, WidgetKind,
 };
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use slint::{ComponentHandle, Image, ModelRc, SharedPixelBuffer, Timer, TimerMode, VecModel};
+use slint::{
+    ComponentHandle, Image, Model, ModelRc, SharedPixelBuffer, Timer, TimerMode, VecModel,
+};
 use std::{
     collections::{HashMap, HashSet},
     hash::{Hash, Hasher},
@@ -64,6 +66,49 @@ impl State {
 fn model<T: Clone + 'static>(items: Vec<T>) -> ModelRc<T> {
     std::rc::Rc::new(VecModel::from(items)).into()
 }
+// Preserve delegates and keyboard focus when only a clock, volume, or timer value changes.
+fn update_rows<T: Clone + 'static>(
+    current: ModelRc<T>,
+    rows: Vec<T>,
+    id: impl Fn(&T) -> &slint::SharedString,
+    equal: impl Fn(&T, &T) -> bool,
+) -> Option<ModelRc<T>> {
+    if current.row_count() != rows.len()
+        || rows
+            .iter()
+            .enumerate()
+            .any(|(i, row)| current.row_data(i).is_none_or(|old| id(&old) != id(row)))
+    {
+        return Some(model(rows));
+    }
+    for (i, row) in rows.into_iter().enumerate() {
+        if current.row_data(i).is_some_and(|old| !equal(&old, &row)) {
+            current.set_row_data(i, row);
+        }
+    }
+    None
+}
+fn dock_equal(a: &DockItem, b: &DockItem) -> bool {
+    a.id == b.id
+        && a.kind == b.kind
+        && a.title == b.title
+        && a.subtitle == b.subtitle
+        && a.value == b.value
+        && a.icon == b.icon
+        && a.width == b.width
+        && a.running == b.running
+        && a.active == b.active
+        && a.progress == b.progress
+}
+fn panel_equal(a: &PanelItem, b: &PanelItem) -> bool {
+    a.id == b.id
+        && a.title == b.title
+        && a.subtitle == b.subtitle
+        && a.value == b.value
+        && a.icon == b.icon
+        && a.selected == b.selected
+        && a.progress == b.progress
+}
 fn image(pixels: &platform::IconPixels) -> Image {
     // Slint images are reference counted; reuse decoded buffers across unchanged snapshots.
     thread_local! { static ICONS: std::cell::RefCell<HashMap<u64, Image>> = std::cell::RefCell::new(HashMap::new()); }
@@ -112,7 +157,6 @@ fn position_panel(
     monitor: platform::MonitorBounds,
     rect: RECT,
 ) {
-    use slint::Model;
     let scale = monitor.dpi as f32 / 96.;
     let mut offset = 14.;
     let mut anchor = rect.left + (rect.right - rect.left) / 2;
@@ -354,12 +398,19 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     }
     let width = (items.iter().map(|i| i.width + 5.).sum::<f32>() + 90.).max(250.);
     if let Some(m) = platform::primary_monitor() {
-        dock.window().set_size(slint::LogicalSize::new(
-            width.min((m.right - m.left) as f32 * 96. / m.dpi as f32 - 24.),
-            profile.height,
-        ));
+        let target_width = width.min((m.right - m.left) as f32 * 96. / m.dpi as f32 - 24.);
+        let scale = dock.window().scale_factor();
+        let current = dock.window().size();
+        if (current.width as f32 - target_width * scale).abs() > 1.
+            || (current.height as f32 - profile.height * scale).abs() > 1.
+        {
+            dock.window()
+                .set_size(slint::LogicalSize::new(target_width, profile.height));
+        }
     }
-    dock.set_items(model(items));
+    if let Some(items) = update_rows(dock.get_items(), items, |item| &item.id, dock_equal) {
+        dock.set_items(items);
+    }
     dock.set_profile(profile.name.clone().into());
     dock.set_editing(state.panel == "customize");
     dock.set_dock_height(profile.height);
@@ -412,7 +463,10 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
         _=>{}
     }
     panel.set_body(body.into());
-    panel.set_entries(model(entries));
+    if let Some(entries) = update_rows(panel.get_entries(), entries, |entry| &entry.id, panel_equal)
+    {
+        panel.set_entries(entries);
+    }
 }
 fn launch(command: &str) {
     crate::launcher::launch(command);
