@@ -151,7 +151,7 @@ export component DockWindow inherits Window {
                                     font-weight: item.kind == "clock" || item.kind == "focus" ? 500 : 600;
                                     overflow: elide; vertical-stretch: 0;
                                 }
-                                if item.kind == "weather" || item.kind == "music" || item.kind == "custom" || item.kind == "custom_metric" : Text {
+                                if item.kind == "weather" || item.kind == "music" || item.kind == "custom-metric" : Text {
                                     text: item.subtitle;
                                     color: #c4c6cd; font-size: 10px;
                                     overflow: elide; vertical-stretch: 0;
