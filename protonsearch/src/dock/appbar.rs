@@ -65,6 +65,12 @@ impl State {
                 bail!("AppBar position negotiation failed");
             }
             data.rc.top = data.rc.bottom.saturating_sub(height).max(data.rc.top);
+            // ABM_SETPOS broadcasts ABN_POSCHANGED. Do not re-broadcast an unchanged
+            // reservation, otherwise other appbars can create a position feedback loop.
+            let previous = self.rect.get();
+            if same_rect(previous, data.rc) {
+                return Ok(());
+            }
             if SHAppBarMessage(ABM_SETPOS, &mut data) == 0 {
                 bail!("AppBar work-area reservation failed");
             }
@@ -153,10 +159,23 @@ impl AppBar {
         self.state.rect.get()
     }
     pub fn update(&mut self, monitor: MonitorBounds, height_px: i32) -> Result<()> {
+        // rcWork changes when this AppBar reserves space. It is output, not an
+        // input geometry change, so comparing the entire MonitorBounds oscillates.
+        let previous = self.state.monitor.get();
+        if same_display(previous, monitor) && self.state.height.get() == height_px {
+            self.state.monitor.set(monitor);
+            return Ok(());
+        }
         self.state.monitor.set(monitor);
         self.state.height.set(height_px);
         self.state.position()
     }
+}
+fn same_rect(a: RECT, b: RECT) -> bool {
+    (a.left, a.top, a.right, a.bottom) == (b.left, b.top, b.right, b.bottom)
+}
+fn same_display(a: MonitorBounds, b: MonitorBounds) -> bool {
+    (a.left, a.top, a.right, a.bottom, a.dpi) == (b.left, b.top, b.right, b.bottom, b.dpi)
 }
 impl Drop for AppBar {
     fn drop(&mut self) {
@@ -184,6 +203,7 @@ unsafe extern "system" fn window_proc(
             let state = &*state;
             if state.taskbar_created != 0 && message == state.taskbar_created {
                 state.registered.set(false);
+                state.rect.set(RECT::default());
                 state.refresh_monitor();
                 if state.register().is_ok() {
                     let _ = state.position();
@@ -216,5 +236,20 @@ unsafe extern "system" fn window_proc(
             }
         }
         DefWindowProcW(hwnd, message, wparam, lparam)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn work_area_changes_do_not_move_our_reservation() {
+        let a = MonitorBounds { left: -1920, top: 0, right: 0, bottom: 1080,
+            work_left: -1920, work_top: 0, work_right: 0, work_bottom: 1040, dpi: 96 };
+        let mut b = a;
+        b.work_bottom = 960;
+        assert!(same_display(a, b));
+        b.dpi = 144;
+        assert!(!same_display(a, b));
     }
 }
