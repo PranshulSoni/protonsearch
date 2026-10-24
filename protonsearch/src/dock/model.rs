@@ -307,6 +307,25 @@ impl FocusTimer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn alpha_appearance_migrates_once_without_losing_profile_contents() {
+        let mut value = serde_json::to_value(DockConfig::default()).unwrap();
+        value.as_object_mut().unwrap().remove("appearance_revision");
+        value.as_object_mut().unwrap().remove("hide_windows_taskbar");
+        value["profiles"][0]["height"] = serde_json::json!(144.0);
+        value["profiles"][0]["widgets"][0]["enabled"] = serde_json::json!(false);
+        let mut config: DockConfig = serde_json::from_value(value).unwrap();
+        assert_eq!(config.appearance_revision, 0);
+        config.normalize().unwrap();
+        assert_eq!(config.active().height, 82.0);
+        assert!(!config.active().widgets[0].enabled);
+        assert_eq!(config.active().pins.len(), 1);
+        assert!(!config.hide_windows_taskbar);
+        config.active_mut().height = 104.0;
+        config.active_mut().resize("weather", 64.0);
+        config.normalize().unwrap();
+        assert_eq!(config.active().height, 104.0);
+        assert_eq!(config.active().widgets.iter().find(|w| w.id == "weather").unwrap().width, 188.0);
+    }
     #[test] fn defaults_have_three_independent_profiles() {
         let mut config = DockConfig::default(); config.active_mut().widgets[0].width = 80.0;
         assert_eq!(config.profiles.len(), 3); assert_eq!(config.profiles[1].widgets[0].width, 60.0);
