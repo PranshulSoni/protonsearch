@@ -51,7 +51,8 @@ fn explorer_window(item: &TaskbarWindow) -> bool {
     }
 }
 fn owner_alive(pid: u32) -> bool {
-    if !crate::get_process_path(pid).is_some_and(|path| {
+    // SAFETY: the helper only queries the process identified by this PID.
+    if !unsafe { crate::get_process_path(pid) }.is_some_and(|path| {
         std::env::current_exe().is_ok_and(|exe| exe.to_string_lossy().eq_ignore_ascii_case(&path))
     }) {
         return false;
