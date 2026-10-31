@@ -41,8 +41,31 @@ properties; fixed 1100px dock and 404×460px panel bindings can disagree with na
 geometry and clip content. Widget artwork and compact control alignment are also being
 corrected.
 
-Status: UI integration, fresh build/tests and native recapture remain pending.
-No visual pass is claimed for this iteration yet.
+UI integration landed in `e91959a` and `3d6e2ac`. The parent agent captured the actual
+application in normal mode, without the debug inspection flag, through
+`get_app_state(app: 'ProtonSearch')`.
+
+Observed native results:
+
+- Dock: 1060×82, centered glyphs and no blue appearance.
+- Sound: 320×300, with close control, Mute and footer fully visible.
+- Focus: 320×320; Start changed the timer to 24:59 and exposed Pause, and Reset
+  restored 25:00.
+
+These observations establish those specific normal-mode layout and timer interactions,
+not full accessibility, frame-pacing or recovery acceptance. The earlier debug-only
+capture limitation is no longer a blocker for native inspection.
+
+## Iteration 3: issues found by native inspection
+
+The iteration 2 captures exposed two further defects: the volume fill was centered
+inside its track instead of left-anchored, and panel closing could briefly show generic
+Proton/system-settings content after runtime panel state was cleared. Corrections are
+in progress, alongside removal of the irrelevant System settings footer from Focus
+and a more compact Focus panel.
+
+Status: final source review, build/tests and native recapture remain pending. No pass
+is claimed for these corrections until their final build is checked.
 
 ## Acceptance still open
 
