@@ -196,6 +196,9 @@ fn position_panel(
     let height = height
         .min((monitor.work_bottom - monitor.work_top) as f32 / scale - 16.)
         .max(120.);
+    // Component bindings and native geometry must agree before the first visible frame.
+    panel.set_panel_width(width);
+    panel.set_panel_height(height);
     let current_size = panel.window().size();
     if current_size.width != (width * scale).round() as u32
         || current_size.height != (height * scale).round() as u32
@@ -218,12 +221,11 @@ fn position_panel(
             offset += item.width + 4.;
         }
     }
-    let size = panel.window().size();
     let (x, y) = popup_position(
         anchor,
         rect.top,
-        size.width as i32,
-        size.height as i32,
+        (width * scale).round() as i32,
+        (height * scale).round() as i32,
         monitor,
     );
     let target = slint::PhysicalPosition::new(x, y);
@@ -460,6 +462,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     let width = (items.iter().map(|i| i.width + 5.).sum::<f32>() + 90.).max(250.);
     if let Some(m) = platform::primary_monitor() {
         let target_width = width.min((m.right - m.left) as f32 * 96. / m.dpi as f32 - 24.);
+        dock.set_dock_width(target_width);
         let scale = dock.window().scale_factor();
         let current = dock.window().size();
         if (current.width as f32 - target_width * scale).abs() > 1.
