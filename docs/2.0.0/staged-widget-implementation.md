@@ -23,9 +23,9 @@ not a fresh verification of the referenced code.
 
 Luma Bar is a reference for a unified app/widget surface, compact live previews,
 configurable composition and expanded controls. Its official README documents
-multiple styles and sizes, drag placement and taskbar visibility controls. This
+multiple styles and sizes, drag placement and taskbar visibility controls. The current official homepage also documents a Search widget for folders, applications and files. This
 does not establish exact spacing, animation quality, performance, or absence of
-profiles/search. Keep those claims unknown until verified. See
+profiles, or indexed-content search efficiency. Profile support remains unknown; search quality needs a repeatable comparison. See
 [`luma-baseline-research.md`](luma-baseline-research.md) for the evidence record.
 
 Use the [requested Apple design skill](https://github.com/emilkowalski/skills/blob/main/skills/apple-design/SKILL.md)
@@ -84,7 +84,7 @@ Keep widget inventory, providers, profiles and search behavior unchanged.
 - Keep Windows system type and real high-resolution app artwork. Missing data uses an
   honest unavailable state, not placeholder values that resemble live telemetry.
 
-**User checklist:** compare dock at rest, hover and press; open/close each of three
+**User checklist:** compare dock at rest, hover and press; open/close audio and focus
 panels repeatedly; reverse a closing panel; use keyboard activation/Escape; try a
 busy wallpaper and reduced-motion/high-contrast modes. Verify no overlap, clipping,
 focus stealing or bottom-edge jump at 100%, 150% and 200% DPI where available.
