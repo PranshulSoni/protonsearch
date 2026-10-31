@@ -354,9 +354,9 @@ export component DockPanelWindow inherits Window {
                                         Text { text: entry.title; color: #f7f7f8; font-size: 13px; font-weight: 600; overflow: elide; }
                                         Text { text: entry.subtitle; color: #bdb7ac; font-size: 11px; overflow: elide; }
                                     }
-                                    if root.panel-kind == "apps" : QuietButton { text: entry.selected ? "Unpin" : "Pin"; clicked => { root.action("pin:" + entry.id); } }
-                                    if root.panel-kind == "windows" : QuietButton { text: "Close"; clicked => { root.action("close:" + entry.id); } }
-                                    Text { text: entry.value; color: #e8e2d7; font-size: 12px; vertical-alignment: center; overflow: elide; horizontal-stretch: 0; }
+                                    if root.panel-kind == "apps" : QuietButton { min-width: 48px; max-width: 48px; horizontal-stretch: 0; text: entry.selected ? "Unpin" : "Pin"; clicked => { root.action("pin:" + entry.id); } }
+                                    if root.panel-kind == "windows" : QuietButton { min-width: 56px; max-width: 56px; horizontal-stretch: 0; text: "Close"; clicked => { root.action("close:" + entry.id); } }
+                                    if entry.value != "" : Text { text: entry.value; color: #e8e2d7; font-size: 12px; vertical-alignment: center; overflow: elide; horizontal-stretch: 0; }
                                 }
                             }
                             if root.panel-kind == "customize" : HorizontalLayout {
