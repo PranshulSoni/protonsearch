@@ -152,7 +152,7 @@ fn popup_position(
 }
 fn panel_dimensions(kind: &str) -> (f32, f32) {
     match kind {
-        "audio" => (320., 260.),
+        "audio" => (320., 300.),
         "focus" => (320., 320.),
         "clock" => (300., 210.),
         "music" | "network" | "power" | "weather" | "agents" => (340., 280.),
@@ -160,6 +160,16 @@ fn panel_dimensions(kind: &str) -> (f32, f32) {
         "customize" => (440., 620.),
         _ => (340., 260.),
     }
+}
+fn coalesce_volume_commands(commands: Vec<String>) -> Vec<String> {
+    let latest = commands.iter().rposition(|cmd| cmd.starts_with("volume:"));
+    commands
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, command)| {
+            (!command.starts_with("volume:") || Some(index) == latest).then_some(command)
+        })
+        .collect()
 }
 fn panel_has_foreground(panel: HWND) -> bool {
     // SAFETY: these borrowed window handles are queried only, never dereferenced.
@@ -1100,7 +1110,8 @@ pub fn run() -> Result<()> {
             hide_panel_at = None;
         }
         let mut dirty = false;
-        while let Ok(cmd) = rx.try_recv() {
+        // Slider feedback is local; only its latest queued value needs a native audio call.
+        for cmd in coalesce_volume_commands(rx.try_iter().collect()) {
             if cmd == "disable" {
                 state.config.enabled = false;
                 state.save();
@@ -1162,6 +1173,9 @@ pub fn run() -> Result<()> {
         }
         if dirty {
             refresh(&state, &dock, &panel);
+        }
+        if (state.panel.clone(), state.panel_anchor.clone()) != visible_panel {
+            focus_seen = false;
         }
         if !state.panel.is_empty() && panel.window().is_visible() {
             let focused = native(panel.window()).is_some_and(panel_has_foreground);
@@ -1340,5 +1354,21 @@ mod geometry_tests {
         }
         assert!(panel_dimensions("apps").1 > panel_dimensions("audio").1);
         assert!(panel_dimensions("customize").1 > panel_dimensions("apps").1);
+    }
+    #[test]
+    fn volume_bursts_keep_latest_value_and_other_action_order() {
+        let commands = [
+            "volume:1",
+            "mute",
+            "volume:2",
+            "profile:home",
+            "volume:3",
+            "pause",
+        ];
+        assert_eq!(
+            coalesce_volume_commands(commands.into_iter().map(str::to_owned).collect()),
+            ["mute", "profile:home", "volume:3", "pause"]
+        );
+        assert!(coalesce_volume_commands(Vec::new()).is_empty());
     }
 }
