@@ -103,3 +103,32 @@ and recovery validation. Do not bundle those into Stage 1.
 
 Rollback is the Stage 1 source commit, not deletion of saved profiles. This increment changes
 no layout schema, saved data, taskbar ownership, provider contracts or search/indexing code.
+
+## Stage 1 build handoff — 31 October 2026
+
+Native code revision: `efbd722`. The app was not launched during automated verification.
+The main executable is `protonsearch/target/debug/ProtonSearch.exe` (64,668,160 bytes).
+SHA-256: `16D57494DD021FA8D016A688417225E2592EBBCC7CCD3DAF98760F0F66B3608A`.
+The previous passing executable is preserved at
+`protonsearch/target/stages/baseline-2026-10-31/ProtonSearch.exe`.
+
+Automated evidence:
+
+- `cargo check --locked --manifest-path protonsearch/Cargo.toml --bin ProtonSearch`
+  passed for the initial Stage 1 change before the final timer correction.
+- `cargo build --locked --manifest-path protonsearch/Cargo.toml --bin ProtonSearch`
+  passed after the final timer correction (56.30 seconds).
+- `cargo test --locked --manifest-path protonsearch/Cargo.toml --lib --bin ProtonSearch -- --skip tests::test_antigravity_icons`
+  passed: 10 library tests and 94 binary tests. One pre-existing, machine-specific
+  Antigravity icon test was filtered out.
+- Targeted `rustfmt --check` passed for the changed Rust module.
+- General and Rust reviews found no outstanding high-risk issue; the added reveal
+  delay was corrected with an owned, cancellable 16ms timer.
+- Clippy was not rerun for this increment. The prior baseline has two denied
+  colour-literal diagnostics in `main.rs`.
+
+Start the main executable manually from the repository workspace to test this build.
+Use the numbered native acceptance checklist above, especially audio/focus toggling,
+keyboard focus, display scaling, and Windows animation-effects changes.
+Do not run a dependent Stage 2 change until the user records this checkpoint's result.
+Build/test success does not establish native visual quality or accessibility acceptance.
