@@ -1321,13 +1321,24 @@ mod geometry_tests {
     fn panel_clamps_both_sides_on_negative_coordinate_monitor() {
         assert_eq!(
             popup_position(-1910, 950, 404, 460, monitor()),
-            (-1920, 480)
+            (-1920, 475)
         );
-        assert_eq!(popup_position(-10, 950, 404, 460, monitor()), (-404, 480));
+        assert_eq!(popup_position(-10, 950, 404, 460, monitor()), (-404, 475));
     }
     #[test]
     fn panel_anchors_above_origin_and_stays_below_work_area_top() {
-        assert_eq!(popup_position(-960, 950, 404, 460, monitor()), (-1162, 480));
+        assert_eq!(popup_position(-960, 950, 404, 460, monitor()), (-1162, 475));
         assert_eq!(popup_position(-960, 300, 404, 460, monitor()), (-1162, 0));
+    }
+    #[test]
+    fn simple_widgets_do_not_open_editor_sized_windows() {
+        for kind in [
+            "audio", "focus", "clock", "music", "network", "power", "weather",
+        ] {
+            let (width, height) = panel_dimensions(kind);
+            assert!(width <= 340. && height <= 320., "{kind}");
+        }
+        assert!(panel_dimensions("apps").1 > panel_dimensions("audio").1);
+        assert!(panel_dimensions("customize").1 > panel_dimensions("apps").1);
     }
 }
