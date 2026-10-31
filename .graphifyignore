@@ -1,0 +1,10 @@
+# Project architecture, excluding assistant reference libraries and binary artwork.
+.agents/
+.claude/
+.gemini/
+icons/
+assets/
+launcher_source_icons/
+docs/2.0.0/assets/
+protonsearch/ui/icons/
+graphify-out/
