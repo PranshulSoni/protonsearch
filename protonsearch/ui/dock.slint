@@ -332,6 +332,7 @@ export component DockPanelWindow inherits Window {
                 clicked => { root.action("toggle-taskbar"); }
             }
             if root.panel-kind == "apps" || root.panel-kind == "windows" || root.panel-kind == "customize" : ScrollView {
+                vertical-stretch: 1;
                 VerticalLayout {
                     spacing: 7px;
                     for entry in root.entries : Rectangle {
