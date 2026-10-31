@@ -87,7 +87,7 @@ component VolumeSlider inherits Rectangle {
     Rectangle {
         x: 8px; y: 12px; width: parent.width - 16px; height: 8px;
         border-radius: 4px; background: #ffffff1a;
-        Rectangle { width: parent.width * clamp(root.value / 100, 0, 1); height: parent.height; border-radius: 4px; background: #e8e2d7; }
+        Rectangle { x: 0px; y: 0px; width: parent.width * clamp(root.value / 100, 0, 1); height: parent.height; border-radius: 4px; background: #e8e2d7; }
     }
     Rectangle {
         x: 8px + (parent.width - 16px) * clamp(root.value / 100, 0, 1) - 7px;
@@ -369,10 +369,10 @@ export component DockPanelWindow inherits Window {
                 }
             }
             if root.busy || root.status != "" : Text { text: root.busy ? "Updating…" : root.status; color: #bdb7ac; font-size: 11px; wrap: word-wrap; vertical-stretch: 0; }
-            HorizontalLayout {
+            if root.panel-kind == "apps" || root.panel-kind == "windows" || root.panel-kind == "customize" || root.panel-kind == "audio" || root.panel-kind == "network" || root.panel-kind == "power" || root.panel-kind == "clock" || root.panel-kind == "weather" || root.panel-kind == "agents" : HorizontalLayout {
                 vertical-stretch: 0;
                 if root.panel-kind == "apps" || root.panel-kind == "windows" || root.panel-kind == "customize" : QuietButton { text: "Refresh"; enabled: !root.busy; clicked => { root.action("refresh"); } }
-                QuietButton { text: root.panel-kind == "agents" ? "Open Agents" : root.panel-kind == "audio" ? "Sound settings" : root.panel-kind == "network" ? "Network settings" : root.panel-kind == "clock" ? "Date and time settings" : "System settings"; clicked => { root.action("settings"); } }
+                if root.panel-kind == "audio" || root.panel-kind == "network" || root.panel-kind == "power" || root.panel-kind == "clock" || root.panel-kind == "weather" || root.panel-kind == "agents" : QuietButton { text: root.panel-kind == "agents" ? "Open Agents" : root.panel-kind == "audio" ? "Sound settings" : root.panel-kind == "network" ? "Network settings" : root.panel-kind == "clock" ? "Date and time settings" : root.panel-kind == "weather" ? "Open Weather" : "Power settings"; clicked => { root.action("settings"); } }
             }
         }
     }
