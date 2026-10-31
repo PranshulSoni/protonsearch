@@ -271,7 +271,8 @@ export component DockPanelWindow inherits Window {
         background: @linear-gradient(160deg, #35322ef5 0%, #201e1bf9 100%);
         drop-shadow-blur: 20px; drop-shadow-color: #00000055;
         VerticalLayout {
-            padding: 18px; spacing: 12px; alignment: start;
+            padding: 18px; spacing: 12px;
+            alignment: root.panel-kind == "apps" || root.panel-kind == "windows" || root.panel-kind == "customize" ? LayoutAlignment.stretch : LayoutAlignment.start;
             HorizontalLayout {
                 vertical-stretch: 0;
                 VerticalLayout {
@@ -286,6 +287,7 @@ export component DockPanelWindow inherits Window {
                 }
             }
             if root.panel-kind == "apps" || root.panel-kind == "agents" || root.panel-kind == "windows" || root.panel-kind == "customize" : LineEdit {
+                vertical-stretch: 0;
                 text <=> root.query;
                 placeholder-text: root.panel-kind == "customize" ? "Custom widget: name | value | detail" : "Search " + root.panel-title;
                 edited(text) => { root.query-edited(text); }
