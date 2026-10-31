@@ -68,7 +68,7 @@ AI coding agents must follow these rules without exception:
 
 ### Agent Behavior (CRITICAL)
 4. **Never run the launcher in the background**: **Do not** run `cargo run`, `cargo run --release`, or `protonsearch.exe` as background tasks within the agent's workspace. Running the daemon blocks the workspace environment and causes access denial (`os error 5`) during subsequent builds. Allow the user to launch and run the app manually.
-5. **Do NOT use graphify**: Do not use graphify or run any graphify-watch/rebuild commands. Graphify is completely disabled.
+5. **Use the knowledge graph first**: Query `graphify-out/graph.json` for project analysis and edit locations. Verify only the targeted source snippets before implementation. Update the graph after source or design changes. Do not enable watch mode, hooks or cloud services without an explicit request.
 6. **Commit and Push after every edit**: Perform a git commit and push after every single edit you make to the codebase.
 7. **Kill app before build or edit**: Before building the app or editing it, make sure you kill any running instance of the app (`taskkill /F /IM protonsearch.exe`).
 
