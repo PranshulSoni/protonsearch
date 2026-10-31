@@ -19,9 +19,8 @@ component GlassButton inherits Rectangle {
     callback context();
     border-radius: 12px;
     background: touch.pressed ? #ffffff24 : touch.has-hover ? #ffffff12 : selected ? #ffffff10 : transparent;
-    border-width: focus.has-focus ? 1px : 0px;
-    border-color: #ffffff90;
-    animate background { duration: 130ms; }
+    border-width: focus.has-focus ? 2px : 0px;
+    border-color: #dce8ff;
     accessible-role: button;
     accessible-label: label;
     accessible-action-default => { root.activated(); }
@@ -75,6 +74,7 @@ export component DockWindow inherits Window {
     in-out property <string> status;
     in-out property <float> dock-height: 82;
     in-out property <float> icon-size: 48;
+    in-out property <bool> reduced-motion: false;
     out property <float> scroll-offset: -scroll.viewport-x / 1px;
     callback item-clicked(string);
     callback item-context(string);
@@ -88,10 +88,10 @@ export component DockWindow inherits Window {
     Rectangle {
         x: 6px; y: 7px;
         width: parent.width - 12px; height: parent.height - 14px;
-        background: @linear-gradient(180deg, #414349d9 0%, #24262cde 100%);
+        background: @linear-gradient(180deg, #373a40e8 0%, #202329eb 100%);
         border-radius: 21px;
         border-width: 1px;
-        border-color: #ffffff38;
+        border-color: #ffffff2b;
         drop-shadow-blur: 12px;
         drop-shadow-offset-y: 3px;
         drop-shadow-color: #00000045;
@@ -113,13 +113,14 @@ export component DockWindow inherits Window {
                         context => { root.item-context(item.id); }
                         if item.kind == "app" : Image {
                             source: item.icon;
-                            width: min(parent.width - 8px, parent.height - 6px, (root.icon-size + (tile.hovered ? 5 : 0) - (tile.pressed ? 3 : 0)) * 1px);
+                            width: min(parent.width - 8px, parent.height - 6px, (root.icon-size + (!root.reduced-motion && tile.hovered ? 5 : 0) - (!root.reduced-motion && tile.pressed ? 3 : 0)) * 1px);
                             height: self.width;
                             x: (parent.width - self.width) / 2;
-                            y: (parent.height - self.height) / 2 - (tile.hovered ? 3px : 1px);
+                            y: (parent.height - self.height) / 2 - (!root.reduced-motion && tile.hovered ? 3px : 1px);
+                            opacity: tile.pressed ? 0.75 : 1;
                             image-fit: contain;
-                            animate width { duration: 140ms; easing: ease-out; }
-                            animate y { duration: 140ms; easing: ease-out; }
+                            animate width { duration: root.reduced-motion ? 0ms : 140ms; easing: ease-out; }
+                            animate y { duration: root.reduced-motion ? 0ms : 140ms; easing: ease-out; }
                         }
                         if item.kind == "app" && item.running : Rectangle {
                             width: item.active ? 9px : 4px; height: 3px;
@@ -127,15 +128,15 @@ export component DockWindow inherits Window {
                             y: parent.height - 3px;
                             border-radius: 2px;
                             background: #f5f5f5;
-                            animate width { duration: 130ms; }
+                            animate width { duration: root.reduced-motion ? 0ms : 130ms; }
                         }
                         if item.kind != "app" && tile.icon-only : Image {
                             source: item.icon; width: 25px; height: 25px;
                             image-fit: contain;
                             x: (parent.width - self.width) / 2;
-                            y: (parent.height - self.height) / 2 - (tile.hovered ? 2px : 0px);
+                            y: (parent.height - self.height) / 2 - (!root.reduced-motion && tile.hovered ? 2px : 0px);
                             opacity: tile.pressed ? 0.7 : 1;
-                            animate y { duration: 130ms; easing: ease-out; }
+                            animate y { duration: root.reduced-motion ? 0ms : 130ms; easing: ease-out; }
                         }
                         if item.kind != "app" && !tile.icon-only : HorizontalLayout {
                             padding-left: 10px; padding-right: 10px; spacing: 9px;
@@ -154,7 +155,7 @@ export component DockWindow inherits Window {
                                 }
                                 if item.kind == "weather" || item.kind == "music" || item.kind == "custom-metric" : Text {
                                     text: item.subtitle;
-                                    color: #c4c6cd; font-size: 10px;
+                                    color: #d3d5db; font-size: 11px;
                                     overflow: elide; vertical-stretch: 0;
                                 }
                             }
@@ -166,7 +167,7 @@ export component DockWindow inherits Window {
                             Rectangle {
                                 width: parent.width * clamp(item.progress, 0, 1); height: 2px;
                                 border-radius: 1px; background: #d9dbe1;
-                                animate width { duration: 100ms; }
+                                animate width { duration: root.reduced-motion ? 0ms : 100ms; }
                             }
                         }
                     }
@@ -205,17 +206,18 @@ export component DockPanelWindow inherits Window {
     in-out property <bool> edit-mode;
     in-out property <bool> taskbar-hidden: false;
     in-out property <bool> revealed: true;
+    in-out property <bool> reduced-motion: false;
     callback action(string);
     callback query-edited(string);
     callback volume-edited(float);
     callback mute-toggled();
     callback closed();
     Rectangle {
-        x: 8px; y: root.revealed ? 8px : 18px;
+        x: 8px; y: root.reduced-motion || root.revealed ? 8px : 18px;
         width: parent.width - 16px; height: parent.height - 16px;
         opacity: root.revealed ? 1 : 0;
-        animate y { duration: 140ms; easing: ease-out; }
-        animate opacity { duration: 120ms; easing: ease-out; }
+        animate y { duration: root.reduced-motion ? 0ms : 140ms; easing: ease-out; }
+        animate opacity { duration: root.reduced-motion ? 0ms : 120ms; easing: ease-out; }
         border-radius: 20px;
         border-width: 1px; border-color: #ffffff30;
         background: @linear-gradient(160deg, #3b3d43ed 0%, #23252bf5 100%);

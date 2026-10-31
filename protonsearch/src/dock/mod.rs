@@ -246,6 +246,18 @@ fn timer_text(state: &State) -> String {
     let s = state.focus.seconds(Instant::now());
     format!("{:02}:{:02}", s / 60, s % 60)
 }
+fn animations_enabled() -> bool {
+    let mut enabled = FALSE;
+    // Windows owns the preference; a failed query uses the less distracting static path.
+    unsafe {
+        SystemParametersInfoW(
+            SPI_GETCLIENTAREAANIMATION,
+            0,
+            Some(&mut enabled as *mut BOOL as _),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        ).is_ok() && enabled.as_bool()
+    }
+}
 fn kind_icon(kind: WidgetKind) -> &'static str {
     match kind {
         WidgetKind::Start | WidgetKind::Applications => "apps",
@@ -834,6 +846,9 @@ pub fn run() -> Result<()> {
     };
     let dock = DockWindow::new()?;
     let panel = DockPanelWindow::new()?;
+    let reduced_motion = !animations_enabled();
+    dock.set_reduced_motion(reduced_motion);
+    panel.set_reduced_motion(reduced_motion);
     panel.window().set_size(slint::LogicalSize::new(404., 460.));
     let (tx, rx) = mpsc::channel::<String>();
     let send = |prefix: &'static str| {
@@ -1005,6 +1020,7 @@ pub fn run() -> Result<()> {
     let mut native_hidden = None;
     let mut visible_panel = String::new();
     let mut hide_panel_at: Option<Instant> = None;
+    let mut reveal_panel = false;
     let mut focus_seen = false;
     let mut taskbar_setting = None;
     struct StopEvent(HANDLE);
@@ -1040,6 +1056,12 @@ pub fn run() -> Result<()> {
         let (Some(dock), Some(panel)) = (weak.upgrade(), weak_panel.upgrade()) else {
             return;
         };
+        if reveal_panel {
+            if !state.panel.is_empty() {
+                panel.set_revealed(true);
+            }
+            reveal_panel = false;
+        }
         if hide_panel_at.is_some_and(|deadline| Instant::now() >= deadline) {
             let _ = panel.hide();
             hide_panel_at = None;
@@ -1088,6 +1110,9 @@ pub fn run() -> Result<()> {
         }
         let heartbeat = last.elapsed() >= Duration::from_secs(1);
         if heartbeat {
+            let reduced_motion = !animations_enabled();
+            dock.set_reduced_motion(reduced_motion);
+            panel.set_reduced_motion(reduced_motion);
             if !controller_live(controller, pid) {
                 let _ = slint::quit_event_loop();
                 return;
@@ -1181,8 +1206,14 @@ pub fn run() -> Result<()> {
                 }
                 if state.panel != visible_panel {
                     if state.panel.is_empty() {
+                        reveal_panel = false;
                         panel.set_revealed(false);
-                        hide_panel_at = Some(Instant::now() + Duration::from_millis(150));
+                        if panel.get_reduced_motion() {
+                            let _ = panel.hide();
+                            hide_panel_at = None;
+                        } else {
+                            hide_panel_at = Some(Instant::now() + Duration::from_millis(150));
+                        }
                     } else {
                         hide_panel_at = None;
                         panel.set_revealed(false);
@@ -1202,12 +1233,11 @@ pub fn run() -> Result<()> {
                             }
                         }
                         position_panel(&state, &dock, &panel, m, rect);
-                        let weak_reveal = panel.as_weak();
-                        Timer::single_shot(Duration::from_millis(16), move || {
-                            if let Some(panel) = weak_reveal.upgrade() {
-                                panel.set_revealed(true);
-                            }
-                        });
+                        if panel.get_reduced_motion() {
+                            panel.set_revealed(true);
+                        } else {
+                            reveal_panel = true;
+                        }
                         focus_seen = false;
                     }
                     visible_panel = state.panel.clone();
