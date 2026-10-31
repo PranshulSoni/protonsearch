@@ -147,8 +147,29 @@ fn popup_position(
     let right = monitor.work_right;
     (
         (anchor - width / 2).clamp(left, (right - width).max(left)),
-        (dock_top - height - 10).max(top),
+        (dock_top - height - (10 * monitor.dpi as i32 / 96)).max(top),
     )
+}
+fn panel_dimensions(kind: &str) -> (f32, f32) {
+    match kind {
+        "audio" => (320., 260.),
+        "focus" => (320., 320.),
+        "clock" => (300., 210.),
+        "music" | "network" | "power" | "weather" | "agents" => (340., 280.),
+        "apps" | "windows" => (440., 500.),
+        "customize" => (440., 620.),
+        _ => (340., 260.),
+    }
+}
+fn panel_has_foreground(panel: HWND) -> bool {
+    // SAFETY: these borrowed window handles are queried only, never dereferenced.
+    unsafe {
+        let foreground = GetForegroundWindow();
+        foreground == panel
+            || IsChild(panel, foreground).as_bool()
+            || (!foreground.is_invalid()
+                && GetAncestor(foreground, GA_ROOTOWNER) == GetAncestor(panel, GA_ROOTOWNER))
+    }
 }
 fn position_panel(
     state: &State,
@@ -158,6 +179,21 @@ fn position_panel(
     rect: RECT,
 ) {
     let scale = monitor.dpi as f32 / 96.;
+    let (width, height) = panel_dimensions(&state.panel);
+    let width = width
+        .min((monitor.work_right - monitor.work_left) as f32 / scale - 16.)
+        .max(160.);
+    let height = height
+        .min((monitor.work_bottom - monitor.work_top) as f32 / scale - 16.)
+        .max(120.);
+    let current_size = panel.window().size();
+    if current_size.width != (width * scale).round() as u32
+        || current_size.height != (height * scale).round() as u32
+    {
+        panel
+            .window()
+            .set_size(slint::LogicalSize::new(width, height));
+    }
     let mut offset = 10. - dock.get_scroll_offset();
     let mut anchor = rect.left + (rect.right - rect.left) / 2;
     let dock_size = dock.window().size();
@@ -180,9 +216,10 @@ fn position_panel(
         size.height as i32,
         monitor,
     );
-    panel
-        .window()
-        .set_position(slint::PhysicalPosition::new(x, y));
+    let target = slint::PhysicalPosition::new(x, y);
+    if panel.window().position() != target {
+        panel.window().set_position(target);
+    }
 }
 fn asset(name: &str) -> Image {
     thread_local! { static CACHE: std::cell::RefCell<HashMap<String,Image>> = std::cell::RefCell::new(HashMap::new()); }
@@ -1020,7 +1057,7 @@ pub fn run() -> Result<()> {
     let mut bar_geometry = None;
     let mut native_geometry = None;
     let mut native_hidden = None;
-    let mut visible_panel = String::new();
+    let mut visible_panel = (String::new(), String::new());
     let mut hide_panel_at: Option<Instant> = None;
     let reveal_timer = Timer::default();
     let mut focus_seen = false;
@@ -1127,8 +1164,7 @@ pub fn run() -> Result<()> {
             refresh(&state, &dock, &panel);
         }
         if !state.panel.is_empty() && panel.window().is_visible() {
-            let focused =
-                native(panel.window()).is_some_and(|hwnd| unsafe { GetForegroundWindow() == hwnd });
+            let focused = native(panel.window()).is_some_and(panel_has_foreground);
             if focused {
                 focus_seen = true;
             }
@@ -1206,7 +1242,8 @@ pub fn run() -> Result<()> {
                         taskbar_setting = Some(state.config.hide_windows_taskbar);
                     }
                 }
-                if state.panel != visible_panel {
+                let panel_identity = (state.panel.clone(), state.panel_anchor.clone());
+                if panel_identity != visible_panel {
                     reveal_timer.stop();
                     if state.panel.is_empty() {
                         panel.set_revealed(false);
@@ -1251,7 +1288,10 @@ pub fn run() -> Result<()> {
                         }
                         focus_seen = false;
                     }
-                    visible_panel = state.panel.clone();
+                    visible_panel = panel_identity;
+                } else if !state.panel.is_empty() && panel.window().is_visible() {
+                    // Re-anchor after profile, layout, scroll or display changes without replaying motion.
+                    position_panel(&state, &dock, &panel, m, rect);
                 }
             }
         }
