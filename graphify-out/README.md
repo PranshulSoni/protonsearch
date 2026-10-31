@@ -1,32 +1,39 @@
 # Proton Search knowledge graph
 
-Generated on 31 October 2026 using [Graphify](https://github.com/Graphify-Labs/graphify) 0.9.99.
-Source snapshot: `88b5957c` on branch `2.0.0`. Later commits that only store these
-artifacts do not change the application snapshot.
+Generated with Graphify 0.9.99 on 1 November 2026. Application source: `eb866a9`.
+Graph and ledger snapshot: `29eeb93` on branch `2.0.0`.
 
-- Open `graph.html` for the interactive viewer. Its renderer loads vis-network from a CDN.
-- Read `GRAPH_REPORT.md` for communities, architectural hubs, confidence and coverage limits.
-- Use `graph.json` for queries and integrations: 1,473 nodes, 3,181 edges, 78 communities.
-- `semantic-design.json` and `semantic-native.json` preserve the assistant-authored
-  documentation and Slint fragments. Planned features are explicitly labelled.
+- `graph.html`: interactive viewer; the rendering library requires internet or a cached CDN copy.
+- `GRAPH_REPORT.md`: communities, evidence, confidence and current acceptance limits.
+- `graph.json`: 1,500 nodes, 3,213 relationships, 77 communities.
+- `semantic-*.json`: assistant-authored documentation, Slint, Luma, stage and overnight fragments.
 
-The application source and project documentation are included. `.graphifyignore`
-excludes bundled assistant guidelines, binary artwork and generated output.
-Slint contracts are extracted manually because Graphify does not parse that language.
-External/unresolved symbols can lack source locations. Relationships describe source
-evidence and inferences, not proof that a feature runs correctly.
+Application source and project documents are mapped. `.graphifyignore` excludes assistant
+reference libraries, binary artwork and generated outputs. Slint contracts are mapped
+manually because Graphify does not parse Slint. External or unresolved symbols can lack
+source locations. A build alone does not promote a planned feature to accepted behavior.
 
-## Query in PowerShell
+## Current checkpoint
 
-Run from the repository root. The isolated installation is outside the project:
+The build and 107 selected tests passed: 10 library and 97 binary tests, with the known
+Antigravity test excluded. The overnight ledger records specific normal-mode observations
+of Dock, Sound, Focus and Applications. The Customize screenshot was cropped; geometry
+checks are not a complete visual pass. Broad DPI, accessibility, recovery, performance
+and user acceptance remain pending. No Stage 2 delivery is claimed.
+
+The warm neutral material is styling, not refractive Liquid Glass. Live weather, media
+metadata and third-party tray hosting remain incomplete. Luma publicly documents search;
+profile support and comparative indexed-content efficiency remain unverified.
+
+## Query from the repository root in PowerShell
 
 ```powershell
-& "$env:USERPROFILE\.local\bin\graphify.exe" query "DockSupervisor taskbar recovery" --budget 2000
+& "$env:USERPROFILE\.local\bin\graphify.exe" query "native dock observed overnight acceptance" --budget 2000
 & "$env:USERPROFILE\.local\bin\graphify.exe" explain "DockSupervisor"
 & "$env:USERPROFILE\.local\bin\graphify.exe" path "DockSupervisor" "TaskbarVisibility" --undirected
 ```
 
-## Refresh
+## Refresh structural data
 
 ```powershell
 uv tool install --python 3.12 graphifyy==0.9.99
@@ -35,15 +42,11 @@ uv tool install --python 3.12 graphifyy==0.9.99
 & "$env:USERPROFILE\.local\bin\graphify.exe" export html
 ```
 
-This refreshes structural code relationships and retains existing semantic nodes.
-It does not re-read documentation or Slint semantics. After those files change, ask
-the assistant to refresh their semantic fragments and merge them into the graph.
-Keep the saved JSON when refreshing; deleting it also removes those semantic nodes.
+Keep the saved graph JSON while refreshing: existing semantic nodes are retained.
+Documentation and Slint semantics require assistant fragment refresh and merge after
+changes. Verify targeted current source before editing; graph provenance is a navigation
+aid, not a substitute for source checks.
 
-No watcher, Git hooks, cloud service or MCP server was enabled. No application source
-was changed and the app was not launched. Graph JSON, provenance, query/path traversal
-and the generated HTML were checked; application tests were unnecessary for this data-only task.
-
-## Stage 1 checkpoint
-
-Source `efbd722` adds native motion preference and immediate widget feedback. Build and 104 selected tests passed; user visual/accessibility acceptance is pending. Stage 2 is not implemented. Luma research, the staged plan and Stage 1 contract are graph inputs. Luma Search is documented; profile support and search-efficiency comparisons remain unknown.
+No watcher, Git hooks, cloud service or MCP server was enabled. Graph generation changed
+no application source and launched no app. Structural counters do not measure assistant
+semantic token usage. No measured speedup or zero-cost claim is made.

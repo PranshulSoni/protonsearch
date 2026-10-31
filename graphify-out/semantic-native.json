@@ -33,28 +33,28 @@
       "label": "run()",
       "file_type": "code",
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L795"
+      "source_location": "L866"
     },
     {
       "id": "protonsearch_src_dock_mod_refresh",
       "label": "refresh()",
       "file_type": "code",
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L279"
+      "source_location": "L333"
     },
     {
       "id": "protonsearch_src_dock_mod_action",
       "label": "action()",
       "file_type": "code",
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L488"
+      "source_location": "L559"
     },
     {
       "id": "protonsearch_src_dock_mod_position_panel",
       "label": "position_panel()",
       "file_type": "code",
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L153"
+      "source_location": "L189"
     },
     {
       "id": "protonsearch_src_dock_mod_update_rows",
@@ -124,15 +124,15 @@
       "label": "DockWindow",
       "file_type": "code",
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L66",
-      "description": "Implemented native dock window: transparent frameless shell, 82 logical-pixel height, 48-pixel application artwork."
+      "source_location": "L107",
+      "description": "Implemented native frameless dock with bound runtime geometry, warm neutral material,44px resting app artwork and48px hover maximum within fixed slots."
     },
     {
       "id": "dockpanelwindow",
       "label": "DockPanelWindow",
       "file_type": "code",
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L186",
+      "source_location": "L232",
       "description": "Implemented shared native widget detail panel, with per-kind content and reveal animation."
     },
     {
@@ -204,7 +204,7 @@
       "label": "Dock interaction callback contract",
       "file_type": "code",
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L79",
+      "source_location": "L121",
       "description": "Item click/context, profile selection, edit, resize, reorder and close callbacks feed the Rust command queue."
     },
     {
@@ -212,7 +212,7 @@
       "label": "Detail panel action contract",
       "file_type": "code",
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L210",
+      "source_location": "L258",
       "description": "Action, query edit, volume edit, mute and close callbacks feed Rust commands."
     },
     {
@@ -465,11 +465,11 @@
     },
     {
       "id": "concept:compact-layout",
-      "label": "82px shell / 60px content / 48px artwork",
+      "label": "Historical design:82px shell /60px content /48px artwork",
       "file_type": "document",
       "source_file": "docs/2.0.0/dock-redesign-2026-10-24.md",
       "source_location": "L29",
-      "description": "One fixed content band, icon-action slots and wider data widgets; hover must not resize native window."
+      "description": "Original compact geometry contract. Overnight native refinement caps resting artwork at44px with48px hover; this document node records the earlier contract."
     },
     {
       "id": "concept:quiet-glass",
@@ -557,7 +557,7 @@
       "file_type": "document",
       "source_file": "docs/2.0.0/dock-redesign-validation.md",
       "source_location": "L44",
-      "description": "Build/unit tests do not establish visual smoothness, DPI/fullscreen behavior or live taskbar crash recovery."
+      "description": "Broad acceptance remains pending. Later normal-mode captures establish specific dock/Sound/Focus layouts and Focus start/reset behavior; see overnight ledger for scope."
     },
     {
       "id": "concept:selected-tests",
@@ -678,7 +678,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L71",
+      "source_location": "L112",
       "weight": 1.0
     },
     {
@@ -688,7 +688,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L106",
+      "source_location": "L148",
       "weight": 1.0
     },
     {
@@ -698,7 +698,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L100",
+      "source_location": "L142",
       "weight": 1.0
     },
     {
@@ -708,7 +708,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L79",
+      "source_location": "L121",
       "weight": 1.0
     },
     {
@@ -718,7 +718,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L200",
+      "source_location": "L248",
       "weight": 1.0
     },
     {
@@ -728,7 +728,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L253",
+      "source_location": "L304",
       "weight": 1.0
     },
     {
@@ -738,7 +738,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L210",
+      "source_location": "L258",
       "weight": 1.0
     },
     {
@@ -828,7 +828,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L862",
+      "source_location": "L933",
       "weight": 1.0
     },
     {
@@ -838,7 +838,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L865",
+      "source_location": "L936",
       "weight": 1.0
     },
     {
@@ -848,7 +848,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L426",
+      "source_location": "L481",
       "weight": 1.0
     },
     {
@@ -858,7 +858,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L433",
+      "source_location": "L492",
       "weight": 1.0
     },
     {
@@ -868,7 +868,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L756",
+      "source_location": "L827",
       "weight": 1.0
     },
     {
@@ -878,7 +878,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L161",
+      "source_location": "L215",
       "weight": 1.0
     },
     {
@@ -1018,7 +1018,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L829",
+      "source_location": "L900",
       "weight": 1.0
     },
     {
@@ -1058,7 +1058,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L842",
+      "source_location": "L913",
       "weight": 1.0
     },
     {
@@ -1278,7 +1278,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/src/dock/mod.rs",
-      "source_location": "L1202",
+      "source_location": "L1276",
       "weight": 1.0
     },
     {
@@ -1318,7 +1318,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L283",
+      "source_location": "L334",
       "weight": 1.0
     },
     {
@@ -1358,7 +1358,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "protonsearch/ui/dock.slint",
-      "source_location": "L75",
+      "source_location": "L117",
       "weight": 1.0
     },
     {
