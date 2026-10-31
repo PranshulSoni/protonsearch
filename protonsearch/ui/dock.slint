@@ -97,7 +97,7 @@ component VolumeSlider inherits Rectangle {
     touch := TouchArea {
         mouse-cursor: pointer;
         pointer-event(event) => {
-            if event.kind == PointerEventKind.down { keyboard.focus(); root.value = clamp((self.mouse-x - 8px) / (self.width - 16px) * 100, 0, 100); root.changed(root.value); }
+            if event.button == PointerEventButton.left && event.kind == PointerEventKind.down { keyboard.focus(); root.value = clamp((self.mouse-x - 8px) / (self.width - 16px) * 100, 0, 100); root.changed(root.value); }
         }
         moved => { if self.pressed { root.value = clamp((self.mouse-x - 8px) / (self.width - 16px) * 100, 0, 100); root.changed(root.value); } }
     }
