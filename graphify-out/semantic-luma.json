@@ -1,0 +1,209 @@
+{
+  "nodes": [
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:reference",
+      "label": "Luma Bar commercial reference",
+      "source_location": "L7",
+      "source_url": "https://github.com/Acadbek/lumabar",
+      "description": "Verified public product reference; proprietary source is not a dependency."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:homepage",
+      "label": "Luma official homepage evidence",
+      "source_location": "L5",
+      "source_url": "https://lumabar.xyz/",
+      "description": "Retrieved directly and viewed in browser; marketing claims are not native measurements."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:search",
+      "label": "Verified: Luma has a Search widget",
+      "source_location": "L23",
+      "source_url": "https://lumabar.xyz/",
+      "description": "FAQ describes opening a typed folder path. Full indexed-content scope and efficiency unverified."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:profiles",
+      "label": "Unknown: Luma profile support",
+      "source_location": "L23",
+      "source_url": "https://lumabar.xyz/",
+      "description": "Inspected sources do not establish presence or absence of profiles."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:pricing",
+      "label": "Observed: Luma one-time pricing",
+      "source_location": "L19",
+      "source_url": "https://lumabar.xyz/",
+      "description": "Homepage advertises $5.99 lifetime, crossed-out $15.99 comparison, 14-day refund; checked 31 October 2026."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:count",
+      "label": "Observed: differing Luma widget counts",
+      "source_location": "L17",
+      "source_url": "https://lumabar.xyz/",
+      "description": "Current homepage says100+; developer README still says85. Preserve source/version uncertainty."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:visual",
+      "label": "Observed: continuous compact glass dock",
+      "source_location": "L27",
+      "source_url": "https://lumabar.xyz/",
+      "description": "Website preview aligns app slots and wider data previews on one baseline; native dimensions not measured."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:taskbar",
+      "label": "Claimed: reversible taskbar behavior",
+      "source_location": "L21",
+      "source_url": "https://github.com/Acadbek/lumabar",
+      "description": "Public docs describe taskbar hiding/restoration and fullscreen avoidance; native behavior not tested."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:stage",
+      "label": "Planned: small testable widget stages",
+      "source_location": "L43",
+      "source_url": "https://lumabar.xyz/",
+      "description": "Apply original design in small stages; test native screenshots, functionality and performance before expanding."
+    },
+    {
+      "file_type": "document",
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "captured_at": "2026-10-31",
+      "_origin": "semantic",
+      "id": "luma:access",
+      "label": "Firecrawl access blocked; primary fallback used",
+      "source_location": "L9",
+      "source_url": "https://lumabar.xyz/",
+      "description": "CLI unauthenticated; scrape rejected without API key. Direct HTTPS/browser fallback inspected."
+    }
+  ],
+  "edges": [
+    {
+      "source": "luma:reference",
+      "target": "luma:search",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "luma:reference",
+      "target": "luma:profiles",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "luma:reference",
+      "target": "luma:pricing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "luma:reference",
+      "target": "luma:count",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "luma:reference",
+      "target": "luma:visual",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "luma:reference",
+      "target": "luma:taskbar",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "luma:reference",
+      "target": "luma:access",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "luma:visual",
+      "target": "luma:stage",
+      "relation": "informs",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "luma:homepage",
+      "target": "luma:reference",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/luma-baseline-research.md",
+      "source_location": "L7",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
