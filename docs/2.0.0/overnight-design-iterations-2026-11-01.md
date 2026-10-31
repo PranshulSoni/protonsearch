@@ -78,3 +78,52 @@ is claimed for these corrections until their final build is checked.
 
 The application is stopped before edits/builds and opened only for explicitly
 authorized native inspection. Existing profile data and search behavior are retained.
+
+## Final overnight verification — 1 November 2026
+
+Final application source: `eb866a9` (including runtime `2e47e9c` and app-label change
+`9a11834`). The temporary debug inspection branch was removed. All observations below
+used the normal dock window behavior and the installed Computer Use plugin.
+
+### Native iteration results
+
+- Iteration 3: captured Dock at 1023×82 logical pixels, Sound at 320×300 with the
+  fill anchored to the rail's left edge, and Focus at 320×260 without its unrelated
+  System settings footer. Close-transition accessibility state retained the departing
+  Sound content rather than replacing it with generic Proton/system-settings content.
+- Iteration 4: native Applications capture disproved the first list fix. The outer
+  start-aligned layout still left a one-row viewport and a large empty area.
+- Iteration 5: conditional stretch alignment fixed the shared list layout. Captured
+  Applications at 440×500 with multiple visible rows, compact 48px Pin buttons,
+  readable titles and human-facing Application/Pinned labels instead of launch IDs.
+  Its Refresh action remains below the scrolling viewport.
+- Customize: accessibility inspection reports 440×620 with the profile control,
+  widget controls, multiple rows and Refresh inside the logical bounds. The screenshot
+  provider cropped this larger surface. A DPI-aware Win32 read confirmed the actual
+  770×1085 physical client at 168 DPI, consistent with 440×620 logical pixels.
+  Do not treat the cropped capture as a complete Customize visual pass.
+
+The reliable capture route is the Computer Use plugin's legacy friendly-name lookup,
+`get_app_state(app: 'ProtonSearch')`. Catalog/path-based lookup omitted the dock.
+Some accessibility click calls reported an error after performing the action; every
+such result was re-observed before further input. No guessed window handles were used
+for UI actions. Native captures were inspected in tool output; no screenshot files
+were persisted. The app was stopped after the inspection session.
+
+### Automated evidence
+
+- Final native build passed in 58.87 seconds.
+- Final selected tests passed: 10 library and 97 binary tests (107 total). The known
+  baseline `tests::test_antigravity_icons` test was filtered out.
+- Targeted Rust formatting passed for `dock/mod.rs` and `dock/platform.rs`.
+- General and Rust source reviews found no outstanding HIGH or MEDIUM issue in the
+  reviewed changes. Clippy was not rerun; the known main.rs literal diagnostics remain.
+- Executable: `protonsearch/target/debug/ProtonSearch.exe`.
+- SHA-256: `1ED10DA53D8FE01CA50F660599581A9184D3F9C388665EDBABAD570974EBFBE3`.
+
+This delivery changes the dock/panel presentation and the observed interaction defects.
+It preserves profiles, launch commands, search/indexing and existing provider behavior.
+The neutral translucent material does not implement Luma's refraction shader. Live
+weather, media metadata and a real third-party tray host remain outside this delivery.
+The broader DPI, accessibility, recovery and performance gates above are still open;
+no zero-lag or complete taskbar-replacement acceptance is claimed.
