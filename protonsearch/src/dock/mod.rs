@@ -519,7 +519,19 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     let mut entries = Vec::new();
     let mut body = String::new();
     match state.panel.as_str() {
-        "apps"=>for app in state.snapshot.apps.iter().filter(|a|a.name.to_lowercase().contains(&query)).take(150){entries.push(PanelItem{id:app.id.clone().into(),title:app.name.clone().into(),subtitle:app.command.clone().into(),icon:app.icon.as_ref().map(image).unwrap_or_else(||asset("apps")),selected:profile.pins.iter().any(|p|p.id==app.id),..Default::default()});},
+        "apps" => {
+            for app in state.snapshot.apps.iter().filter(|a| a.name.to_lowercase().contains(&query)).take(150) {
+                let pinned = profile.pins.iter().any(|pin| pin.id == app.id);
+                entries.push(PanelItem {
+                    id: app.id.clone().into(),
+                    title: app.name.clone().into(),
+                    subtitle: if pinned { "Pinned" } else { "Application" }.into(),
+                    icon: app.icon.as_ref().map(image).unwrap_or_else(|| asset("apps")),
+                    selected: pinned,
+                    ..Default::default()
+                });
+            }
+        },
         "windows"=>for w in state.snapshot.windows.iter().filter(|w|query.is_empty()||w.title.to_lowercase().contains(&query)||w.identity==query){entries.push(PanelItem{id:format!("window:{}",w.hwnd).into(),title:w.title.clone().into(),subtitle:w.executable.clone().unwrap_or_default().into(),icon:state.snapshot.icons.get(&w.identity).map(image).unwrap_or_else(||asset("apps")),..Default::default()});},
         "customize"=>{
             let mut gallery=profile.widgets.clone();
