@@ -1,0 +1,1707 @@
+{
+  "nodes": [
+    {
+      "id": "doc:docs/2.0.0/product.html",
+      "label": "product.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/architecture.html",
+      "label": "architecture.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/stack.html",
+      "label": "stack.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/windows.html",
+      "label": "windows.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/widgets.html",
+      "label": "widgets.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/agents.html",
+      "label": "agents.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/migration.html",
+      "label": "migration.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/roadmap.html",
+      "label": "roadmap.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/roadmap.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/sources.html",
+      "label": "sources.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/sources.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/specification.md",
+      "label": "specification.md",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/implementation-plan.md",
+      "label": "implementation-plan.md",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/implementation-plan.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/2.0.0/index.html",
+      "label": "index.html",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/index.html",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "label": "2026-10-20-interactive-dock-widgets-design.md",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "doc:docs/superpowers/plans/2026-10-20-interactive-dock-widgets.md",
+      "label": "2026-10-20-interactive-dock-widgets.md",
+      "description": "Design/proposal document; browser mockup plans describe sample interactions, not native feature completion.",
+      "file_type": "document",
+      "source_file": "docs/superpowers/plans/2026-10-20-interactive-dock-widgets.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "concept:proton-workspace-plan",
+      "label": "Planned: Proton workspace dock",
+      "description": "Target desktop hub retains search while composing live widgets in one dock.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:continuous-dock",
+      "label": "Design: one continuous glass dock",
+      "description": "App, information and system widgets share one outer shell rather than separate capsules.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:search-engine-reuse",
+      "label": "Design: reuse Proton Search engine",
+      "description": "Existing indexing, query, content extraction and Windows launching are retained.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L14"
+    },
+    {
+      "id": "concept:adaptive-widget-widths",
+      "label": "Design: adaptive widget information density",
+      "description": "Widgets share profile-level height and bounded adaptive widths; wider sizes expose richer content.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L76"
+    },
+    {
+      "id": "concept:profile-compositions",
+      "label": "Planned: Work Home Presentation compositions",
+      "description": "Profiles replace visible layout and privacy; switching does not grant execution authority.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L17"
+    },
+    {
+      "id": "concept:planned-domain",
+      "label": "Planned: proton-domain",
+      "description": "Typed IDs, actions, widget/profile models and errors, without native handles or rendering.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:planned-storage",
+      "label": "Planned: proton-storage",
+      "description": "Paths, schema ledger, transactions and backup/import boundaries.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:planned-search-service",
+      "label": "Planned: proton-search service",
+      "description": "Prefix routing and generation-aware fast/slow provider composition separate from dock state.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:planned-platform",
+      "label": "Planned: proton-platform-windows",
+      "description": "HWND/COM/WinRT adapters own AppBar, tasks, audio, power and hotkeys.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:planned-widget-registry",
+      "label": "Planned: proton-widgets registry",
+      "description": "Definitions, instances, constraints, declarative trees and shared subscriptions.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:planned-dock-ui",
+      "label": "Planned: proton-dock UI boundary",
+      "description": "Composition, input, panels, accessibility and monitor windows exclude blocking index/model/network work.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:planned-agent-runner",
+      "label": "Planned: proton-agent-runner",
+      "description": "Durable jobs, scoped approvals and provider execution state are independent of direct UI ownership.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:planned-recovery",
+      "label": "Planned: proton-recovery",
+      "description": "Heartbeat, restore journal and safe startup remain independent of plugins and main databases.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:generation-search",
+      "label": "Design: generation-tagged incremental search",
+      "description": "Fast metadata batch precedes bounded slower content/OCR batches; stale generations are discarded.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L9"
+    },
+    {
+      "id": "concept:shared-provider-snapshots",
+      "label": "Design: shared provider snapshots",
+      "description": "Coalesced state subscriptions avoid separate COM polling for every widget instance.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L10"
+    },
+    {
+      "id": "concept:planned-ipc",
+      "label": "Planned: authenticated named-pipe IPC",
+      "description": "Current-user/session DACL, caller checks and bounded versioned envelopes; JSON origin is not identity proof.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L11"
+    },
+    {
+      "id": "concept:storage-separation",
+      "label": "Planned: personal index credential separation",
+      "description": "Personal state is retained, indexes are rebuildable, secrets use Windows credential storage.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L20"
+    },
+    {
+      "id": "concept:ui-responsiveness-rationale",
+      "label": "Rationale: keep blocking work off UI thread",
+      "description": "Explicit owning threads/apartments and bounded background work prevent providers freezing dock input.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L21"
+    },
+    {
+      "id": "concept:rust-windows-core",
+      "label": "Baseline: Rust and windows-rs",
+      "description": "The proposed stack preserves the existing native Rust Windows integration.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9"
+    },
+    {
+      "id": "concept:sqlite-fts5",
+      "label": "Baseline: SQLite FTS5 search",
+      "description": "rusqlite bundled SQLite and FTS5 plus existing notify remain the proposed search/storage baseline.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9"
+    },
+    {
+      "id": "concept:slint-candidate",
+      "label": "Design: Slint renderer candidate",
+      "description": "Planning proposed Slint first, with native feasibility and resource measurements before renderer lock.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9"
+    },
+    {
+      "id": "concept:tauri-fallback",
+      "label": "Planned evaluation: Tauri fallback",
+      "description": "Identical Tauri prototype is a measured fallback, not a second permanent UI.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L10"
+    },
+    {
+      "id": "concept:renderer-license-gate",
+      "label": "Planned gate: renderer SDK licensing",
+      "description": "Slint licensing and public API exposure need clarification before renderer/SDK lock.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L11"
+    },
+    {
+      "id": "concept:planned-wasm-worker",
+      "label": "Planned: Wasmtime widget worker",
+      "description": "Later executable extensions require bounded resources and no ambient WASI network/filesystem access.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9"
+    },
+    {
+      "id": "concept:coexistence-mode",
+      "label": "Design: default Explorer coexistence",
+      "description": "Explorer remains running; dock negotiates work area cooperatively with other bars.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:replacement-mode-gate",
+      "label": "Planned gate: reversible taskbar hiding",
+      "description": "Explicit optional compatibility appearance requires recovery, tested builds and native tray access; not shell replacement.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:appbar-contract",
+      "label": "Design: AppBar work-area negotiation",
+      "description": "SHAppBarMessage NEW QUERYPOS SETPOS REMOVE defines cooperative work-area lifecycle.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:recovery-journal",
+      "label": "Planned: ownership-aware restore journal",
+      "description": "Persist changed OS before-state with owner/session/generation and expiry before mutation.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15"
+    },
+    {
+      "id": "concept:recovery-watchdog",
+      "label": "Planned: independent recovery watchdog",
+      "description": "Watchdog restores without plugins/main databases; standalone restore remains a required gate.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15"
+    },
+    {
+      "id": "concept:native-tray-gate",
+      "label": "Planned gate: native tray continuity",
+      "description": "Replacement claims require accessible tray, language/input, network and security workflows.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L17"
+    },
+    {
+      "id": "concept:widget-definition",
+      "label": "Planned: widget definition contract",
+      "description": "Package identity, API version, size constraints, configuration schema, permissions and templates.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:widget-instance",
+      "label": "Design: per-placement widget instance",
+      "description": "Multiple placements/configurations of a definition have independent instance identity.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:widget-provider",
+      "label": "Design: shared widget provider",
+      "description": "Shared host data services are distinct from widget instances and rendered views.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:declarative-view",
+      "label": "Planned: validated renderer-neutral view DSL",
+      "description": "Host renders bounded declarative trees and accessibility; community packages do not gain raw scripts or Slint APIs.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L28"
+    },
+    {
+      "id": "concept:typed-host-actions",
+      "label": "Planned: typed brokered widget actions",
+      "description": "Actions refer to approved host operations rather than raw command strings or arbitrary URLs.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L28"
+    },
+    {
+      "id": "concept:widget-trust-tiers",
+      "label": "Planned: widget trust tiers",
+      "description": "Reviewed built-ins, declarative packages, later WASM and same-user native execution are distinct trust levels.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L29"
+    },
+    {
+      "id": "concept:weather-provider-plan",
+      "label": "Planned: brokered live weather provider",
+      "description": "Manual location, provider licensing/attribution, caching and stale/offline state are planned, not proven native functionality.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L44"
+    },
+    {
+      "id": "concept:curated-marketplace-plan",
+      "label": "Planned: curated widget ecosystem",
+      "description": "Schemas, validator, provenance/digests and rollback precede executable logic or marketplace/cloud scope.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L45"
+    },
+    {
+      "id": "concept:explicit-agent-action",
+      "label": "Planned: deliberate Search to Run action",
+      "description": "Ordinary search does not grant execution authority; explicit Run with agent creates a job.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:durable-job-state",
+      "label": "Planned: durable agent job state",
+      "description": "Persist run IDs, grants and outputs; interrupted restart never automatically replays writes.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L12"
+    },
+    {
+      "id": "concept:scoped-grants",
+      "label": "Planned: execution-time scoped grants",
+      "description": "Authenticated run/tool/resource binding, expiry and revocation remain independent of profile appearance.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L15"
+    },
+    {
+      "id": "concept:desktop-input-lease",
+      "label": "Planned: single desktop-input lease",
+      "description": "Only one computer-use job drives the desktop; yields to user input and never drives secure desktop/UAC.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L13"
+    },
+    {
+      "id": "concept:hermes-adapter",
+      "label": "Baseline: Hermes agent adapter seam",
+      "description": "Existing ai.rs streaming callbacks/Hermes are reusable adapters, not a concurrent durable scheduler.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L16"
+    },
+    {
+      "id": "concept:agent-migration-debt",
+      "label": "Baseline debt: global approvals and credentials",
+      "description": "Fixed gateway fallback, CLI credential transfer and global approval inheritance need repair before concurrent/untrusted execution.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L16"
+    },
+    {
+      "id": "concept:personal-data-preservation",
+      "label": "Rationale: preserve personal data during migration",
+      "description": "Consistent backup and isolated imports retain personal artifacts instead of treating them as disposable indexes.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L10"
+    },
+    {
+      "id": "concept:preview-identity",
+      "label": "Planned: isolated preview identity",
+      "description": "Separate install/data/startup identity protects original production state during migration.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/implementation-plan.md",
+      "source_location": "L65"
+    },
+    {
+      "id": "concept:uninstall-data-debt",
+      "label": "Baseline debt: destructive uninstall",
+      "description": "Baseline installer removed current AppData directory; preserve-data behavior is a release prerequisite.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L8"
+    },
+    {
+      "id": "concept:baseline-win32-search",
+      "label": "Baseline: Win32 search controller",
+      "description": "Baseline search main.rs is Win32/GDI with fast/slow phases; separate Slint settings is not the search renderer.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:baseline-indexer",
+      "label": "Baseline: selected-folder FTS indexer",
+      "description": "Selected-folder crawling and bounded child document extraction are reused; no Everything/MFT parity claim.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L6"
+    },
+    {
+      "id": "concept:release-gates",
+      "label": "Planned: native release acceptance gates",
+      "description": "Search parity, restore behavior, data preservation and accessibility are release gates rather than HTML claims.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/roadmap.html",
+      "source_location": "L12"
+    },
+    {
+      "id": "concept:performance-targets",
+      "label": "Planned targets: frame input resource budgets",
+      "description": "Roadmap metrics are proposed goals needing hardware/corpus measurement, not achieved results.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/roadmap.html",
+      "source_location": "L10"
+    },
+    {
+      "id": "concept:demo-widget-library",
+      "label": "Demo: browser widget library",
+      "description": "widget-library.js provides original SVG symbols and semantic markup for HTML mockup.",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L44"
+    },
+    {
+      "id": "concept:demo-layout-state",
+      "label": "Demo: browser profile layout controller",
+      "description": "concept.js owns browser composition, profiles, gallery and local persistence.",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L45"
+    },
+    {
+      "id": "concept:demo-widget-runtime",
+      "label": "Demo: sample interactive runtime",
+      "description": "widget-runtime.js implements sample interactions without model/native filesystem effects.",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L46"
+    },
+    {
+      "id": "concept:demo-glass-style",
+      "label": "Demo: widget polish stylesheet",
+      "description": "widget-polish.css styles coordinated neutral glass mockup appearance.",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L47"
+    },
+    {
+      "id": "concept:demo-panel-contract",
+      "label": "Demo design: anchored reusable panel",
+      "description": "One anchored panel toggles/dismisses and restores focus, separate from persisted layout.",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L35"
+    },
+    {
+      "id": "concept:primary-api-sources",
+      "label": "Design evidence: Microsoft and upstream references",
+      "description": "Source inventory distinguishes documented API facts, recommendations and baseline observations.",
+      "file_type": "document",
+      "source_file": "docs/2.0.0/sources.html",
+      "source_location": "L6"
+    }
+  ],
+  "edges": [
+    {
+      "source": "doc:docs/2.0.0/product.html",
+      "target": "concept:proton-workspace-plan",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/product.html",
+      "target": "concept:continuous-dock",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/specification.md",
+      "target": "concept:search-engine-reuse",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/specification.md",
+      "target": "concept:adaptive-widget-widths",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L76",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/product.html",
+      "target": "concept:profile-compositions",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-domain",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-storage",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-search-service",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-platform",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-widget-registry",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-dock-ui",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-agent-runner",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-recovery",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:generation-search",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:shared-provider-snapshots",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:planned-ipc",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:storage-separation",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/architecture.html",
+      "target": "concept:ui-responsiveness-rationale",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/stack.html",
+      "target": "concept:rust-windows-core",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/stack.html",
+      "target": "concept:sqlite-fts5",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/stack.html",
+      "target": "concept:slint-candidate",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/stack.html",
+      "target": "concept:tauri-fallback",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/stack.html",
+      "target": "concept:renderer-license-gate",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/stack.html",
+      "target": "concept:planned-wasm-worker",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/windows.html",
+      "target": "concept:coexistence-mode",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/windows.html",
+      "target": "concept:replacement-mode-gate",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/windows.html",
+      "target": "concept:appbar-contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/windows.html",
+      "target": "concept:recovery-journal",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/windows.html",
+      "target": "concept:recovery-watchdog",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/windows.html",
+      "target": "concept:native-tray-gate",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/widgets.html",
+      "target": "concept:widget-definition",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/widgets.html",
+      "target": "concept:widget-instance",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/widgets.html",
+      "target": "concept:widget-provider",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/widgets.html",
+      "target": "concept:declarative-view",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/widgets.html",
+      "target": "concept:typed-host-actions",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/widgets.html",
+      "target": "concept:widget-trust-tiers",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/widgets.html",
+      "target": "concept:weather-provider-plan",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/widgets.html",
+      "target": "concept:curated-marketplace-plan",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/agents.html",
+      "target": "concept:explicit-agent-action",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/agents.html",
+      "target": "concept:durable-job-state",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/agents.html",
+      "target": "concept:scoped-grants",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/agents.html",
+      "target": "concept:desktop-input-lease",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/agents.html",
+      "target": "concept:hermes-adapter",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/agents.html",
+      "target": "concept:agent-migration-debt",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/migration.html",
+      "target": "concept:personal-data-preservation",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/implementation-plan.md",
+      "target": "concept:preview-identity",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/implementation-plan.md",
+      "source_location": "L65",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/migration.html",
+      "target": "concept:uninstall-data-debt",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/migration.html",
+      "target": "concept:baseline-win32-search",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/migration.html",
+      "target": "concept:baseline-indexer",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/roadmap.html",
+      "target": "concept:release-gates",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/roadmap.html",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/roadmap.html",
+      "target": "concept:performance-targets",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/roadmap.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "target": "concept:demo-widget-library",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "target": "concept:demo-layout-state",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "target": "concept:demo-widget-runtime",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "target": "concept:demo-glass-style",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "target": "concept:demo-panel-contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L35",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/sources.html",
+      "target": "concept:primary-api-sources",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/sources.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:proton-workspace-plan",
+      "target": "concept:continuous-dock",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:proton-workspace-plan",
+      "target": "concept:search-engine-reuse",
+      "relation": "preserves",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:continuous-dock",
+      "target": "concept:adaptive-widget-widths",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L76",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:proton-workspace-plan",
+      "target": "concept:profile-compositions",
+      "relation": "supports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/product.html",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-dock-ui",
+      "target": "concept:planned-search-service",
+      "relation": "consumes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-dock-ui",
+      "target": "concept:planned-widget-registry",
+      "relation": "composes",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-platform",
+      "target": "concept:shared-provider-snapshots",
+      "relation": "publishes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-dock-ui",
+      "target": "concept:shared-provider-snapshots",
+      "relation": "consumes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:ui-responsiveness-rationale",
+      "target": "concept:planned-dock-ui",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-storage",
+      "target": "concept:storage-separation",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-search-service",
+      "target": "concept:generation-search",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-ipc",
+      "target": "concept:scoped-grants",
+      "relation": "requires",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L67",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-platform",
+      "target": "concept:appbar-contract",
+      "relation": "owns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-recovery",
+      "target": "concept:recovery-journal",
+      "relation": "owns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-recovery",
+      "target": "concept:recovery-watchdog",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:coexistence-mode",
+      "target": "concept:appbar-contract",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:replacement-mode-gate",
+      "target": "concept:recovery-watchdog",
+      "relation": "requires",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:replacement-mode-gate",
+      "target": "concept:recovery-journal",
+      "relation": "requires",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:replacement-mode-gate",
+      "target": "concept:native-tray-gate",
+      "relation": "requires",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/windows.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:slint-candidate",
+      "target": "concept:renderer-license-gate",
+      "relation": "requires",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:slint-candidate",
+      "target": "concept:tauri-fallback",
+      "relation": "evaluated_against",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-search-service",
+      "target": "concept:sqlite-fts5",
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-platform",
+      "target": "concept:rust-windows-core",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/stack.html",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-widget-registry",
+      "target": "concept:widget-definition",
+      "relation": "manages",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-widget-registry",
+      "target": "concept:widget-instance",
+      "relation": "manages",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/architecture.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:widget-instance",
+      "target": "concept:widget-definition",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:widget-instance",
+      "target": "concept:widget-provider",
+      "relation": "subscribes_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:widget-definition",
+      "target": "concept:declarative-view",
+      "relation": "declares",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:declarative-view",
+      "target": "concept:typed-host-actions",
+      "relation": "invokes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:curated-marketplace-plan",
+      "target": "concept:declarative-view",
+      "relation": "requires",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:curated-marketplace-plan",
+      "target": "concept:planned-wasm-worker",
+      "relation": "defers_logic_until",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-wasm-worker",
+      "target": "concept:widget-trust-tiers",
+      "relation": "belongs_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:weather-provider-plan",
+      "target": "concept:widget-provider",
+      "relation": "is_a",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:profile-compositions",
+      "target": "concept:widget-instance",
+      "relation": "selects",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:profile-compositions",
+      "target": "concept:durable-job-state",
+      "relation": "does_not_duplicate",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/widgets.html",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:explicit-agent-action",
+      "target": "concept:durable-job-state",
+      "relation": "creates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-agent-runner",
+      "target": "concept:durable-job-state",
+      "relation": "persists",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-agent-runner",
+      "target": "concept:scoped-grants",
+      "relation": "enforces",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-agent-runner",
+      "target": "concept:desktop-input-lease",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-agent-runner",
+      "target": "concept:hermes-adapter",
+      "relation": "adapts",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:planned-agent-runner",
+      "target": "concept:agent-migration-debt",
+      "relation": "requires_repair_of",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/agents.html",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:personal-data-preservation",
+      "target": "concept:preview-identity",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:uninstall-data-debt",
+      "target": "concept:personal-data-preservation",
+      "relation": "threatens",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:search-engine-reuse",
+      "target": "concept:baseline-win32-search",
+      "relation": "preserves",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:search-engine-reuse",
+      "target": "concept:baseline-indexer",
+      "relation": "preserves",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/migration.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:release-gates",
+      "target": "concept:replacement-mode-gate",
+      "relation": "gates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/roadmap.html",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:performance-targets",
+      "target": "concept:release-gates",
+      "relation": "requires_measurement_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/roadmap.html",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:demo-widget-runtime",
+      "target": "concept:demo-widget-library",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:demo-widget-runtime",
+      "target": "concept:demo-panel-contract",
+      "relation": "implements_demo",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:demo-layout-state",
+      "target": "concept:profile-compositions",
+      "relation": "demonstrates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:demo-glass-style",
+      "target": "concept:continuous-dock",
+      "relation": "styles_demo",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "concept:primary-api-sources",
+      "target": "concept:appbar-contract",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/sources.html",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/index.html",
+      "target": "doc:docs/2.0.0/architecture.html",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/index.html",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/roadmap.html",
+      "target": "doc:docs/2.0.0/implementation-plan.md",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/roadmap.html",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/2.0.0/specification.md",
+      "target": "doc:docs/2.0.0/sources.html",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/2.0.0/specification.md",
+      "source_location": "L127",
+      "weight": 1.0
+    },
+    {
+      "source": "doc:docs/superpowers/plans/2026-10-20-interactive-dock-widgets.md",
+      "target": "doc:docs/superpowers/specs/2026-10-20-interactive-dock-widgets-design.md",
+      "relation": "implements_demo_plan",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/plans/2026-10-20-interactive-dock-widgets.md",
+      "source_location": "L27",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
