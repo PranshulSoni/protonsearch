@@ -586,9 +586,18 @@ pub fn configure_window(hwnd: HWND, nonactivating: bool) -> Result<()> {
         if !IsWindow(hwnd).as_bool() {
             bail!("invalid dock window");
         }
-        let mut style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW.0 as isize;
-        style &= !(WS_EX_APPWINDOW.0 as isize);
-        if nonactivating {
+        // Debug inspection exposes the actual rendered windows to desktop capture tools.
+        let inspect = cfg!(debug_assertions)
+            && std::env::var("PROTON_DOCK_INSPECT").as_deref() == Ok("1");
+        let mut style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        if inspect {
+            style &= !(WS_EX_TOOLWINDOW.0 as isize);
+            style |= WS_EX_APPWINDOW.0 as isize;
+        } else {
+            style |= WS_EX_TOOLWINDOW.0 as isize;
+            style &= !(WS_EX_APPWINDOW.0 as isize);
+        }
+        if nonactivating && !inspect {
             style |= WS_EX_NOACTIVATE.0 as isize;
         } else {
             style &= !(WS_EX_NOACTIVATE.0 as isize);
@@ -604,7 +613,8 @@ pub fn configure_window(hwnd: HWND, nonactivating: bool) -> Result<()> {
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED,
         )?;
         let rounded = 2u32;
-        let backdrop = 3u32;
+        // Bright Desktop Acrylic inherits system tint; Slint owns our neutral material.
+        let backdrop = 1u32;
         let _ = DwmSetWindowAttribute(
             hwnd,
             DWMWA_WINDOW_CORNER_PREFERENCE,
