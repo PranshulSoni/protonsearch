@@ -586,18 +586,9 @@ pub fn configure_window(hwnd: HWND, nonactivating: bool) -> Result<()> {
         if !IsWindow(hwnd).as_bool() {
             bail!("invalid dock window");
         }
-        // Debug inspection exposes the actual rendered windows to desktop capture tools.
-        let inspect = cfg!(debug_assertions)
-            && std::env::var("PROTON_DOCK_INSPECT").as_deref() == Ok("1");
-        let mut style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        if inspect {
-            style &= !(WS_EX_TOOLWINDOW.0 as isize);
-            style |= WS_EX_APPWINDOW.0 as isize;
-        } else {
-            style |= WS_EX_TOOLWINDOW.0 as isize;
-            style &= !(WS_EX_APPWINDOW.0 as isize);
-        }
-        if nonactivating && !inspect {
+        let mut style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW.0 as isize;
+        style &= !(WS_EX_APPWINDOW.0 as isize);
+        if nonactivating {
             style |= WS_EX_NOACTIVATE.0 as isize;
         } else {
             style &= !(WS_EX_NOACTIVATE.0 as isize);

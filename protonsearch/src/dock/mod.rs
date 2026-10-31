@@ -153,7 +153,7 @@ fn popup_position(
 fn panel_dimensions(kind: &str) -> (f32, f32) {
     match kind {
         "audio" => (320., 300.),
-        "focus" => (320., 320.),
+        "focus" => (320., 260.),
         "clock" => (300., 210.),
         "music" | "network" | "power" | "weather" | "agents" => (340., 280.),
         "apps" | "windows" => (440., 500.),
@@ -180,6 +180,11 @@ fn panel_has_foreground(panel: HWND) -> bool {
             || (!foreground.is_invalid()
                 && GetAncestor(foreground, GA_ROOTOWNER) == GetAncestor(panel, GA_ROOTOWNER))
     }
+}
+fn dock_content_width(items: &[DockItem]) -> f32 {
+    // Shell insets 12 + layout padding 8 + two gaps 8 + separator 1 + settings 38.
+    67. + items.iter().map(|item| item.width.max(60.)).sum::<f32>()
+        + items.len().saturating_sub(1) as f32 * 4.
 }
 fn position_panel(
     state: &State,
@@ -459,7 +464,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
             ..Default::default()
         });
     }
-    let width = (items.iter().map(|i| i.width + 5.).sum::<f32>() + 90.).max(250.);
+    let width = dock_content_width(&items);
     if let Some(m) = platform::primary_monitor() {
         let target_width = width.min((m.right - m.left) as f32 * 96. / m.dpi as f32 - 24.);
         dock.set_dock_width(target_width);
@@ -480,6 +485,10 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     dock.set_dock_height(profile.height);
     dock.set_icon_size(profile.icon_size);
     dock.set_status(state.status.clone().into());
+    // Keep the departing panel intact while its exit animation is still visible.
+    if state.panel.is_empty() {
+        return;
+    }
     panel.set_taskbar_hidden(state.config.hide_windows_taskbar);
     panel.set_panel_kind(state.panel.clone().into());
     panel.set_panel_title(
@@ -1373,5 +1382,20 @@ mod geometry_tests {
             ["mute", "profile:home", "volume:3", "pause"]
         );
         assert!(coalesce_volume_commands(Vec::new()).is_empty());
+    }
+    #[test]
+    fn dock_width_matches_tiles_gaps_and_customization_chrome() {
+        let items = vec![
+            DockItem {
+                width: 60.,
+                ..Default::default()
+            },
+            DockItem {
+                width: 124.,
+                ..Default::default()
+            },
+        ];
+        assert_eq!(dock_content_width(&items), 255.);
+        assert_eq!(dock_content_width(&[]), 67.);
     }
 }
