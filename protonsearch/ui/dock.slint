@@ -55,7 +55,10 @@ component QuietButton inherits GlassButton {
     in property <bool> enabled: true;
     callback clicked();
     label: root.text;
+    height: 32px;
     min-height: 32px;
+    max-height: 32px;
+    vertical-stretch: 0;
     min-width: 40px;
     background: !root.enabled ? #ffffff04 : root.pressed ? #ffffff24 : root.hovered ? #ffffff17 : #ffffff0b;
     opacity: root.enabled ? 1 : 0.4;
@@ -112,6 +115,7 @@ export component DockWindow inherits Window {
     in-out property <string> profile: "Work";
     in-out property <bool> editing: false;
     in-out property <string> status;
+    in-out property <float> dock-width: 1100;
     in-out property <float> dock-height: 82;
     in-out property <float> icon-size: 48;
     in-out property <bool> reduced-motion: false;
@@ -123,7 +127,7 @@ export component DockWindow inherits Window {
     callback item-resized(string, float);
     callback item-moved(string, int);
     callback close-requested();
-    width: 1100px;
+    width: root.dock-width * 1px;
     height: root.dock-height * 1px;
     Rectangle {
         x: 6px; y: 7px;
@@ -180,9 +184,13 @@ export component DockWindow inherits Window {
                         }
                         if item.kind != "app" && !tile.icon-only : HorizontalLayout {
                             padding-left: 10px; padding-right: 10px; spacing: 9px;
-                            if item.kind != "clock" : Image {
-                                source: item.icon; width: 24px; height: 24px;
-                                image-fit: contain; vertical-stretch: 0;
+                            if item.kind != "clock" : Rectangle {
+                                width: 24px;
+                                Image {
+                                    source: item.icon; width: 24px; height: 24px;
+                                    y: (parent.height - self.height) / 2;
+                                    image-fit: contain;
+                                }
                             }
                             VerticalLayout {
                                 alignment: center; spacing: 2px;
@@ -229,8 +237,10 @@ export component DockPanelWindow inherits Window {
     no-frame: true;
     default-font-family: "Segoe UI Variable";
     default-font-size: 13px;
-    width: 404px;
-    height: 460px;
+    in-out property <float> panel-width: 404;
+    in-out property <float> panel-height: 460;
+    width: root.panel-width * 1px;
+    height: root.panel-height * 1px;
     in-out property <string> panel-kind;
     in-out property <string> panel-title;
     in-out property <string> subtitle;
@@ -263,8 +273,9 @@ export component DockPanelWindow inherits Window {
         background: @linear-gradient(160deg, #35322ef5 0%, #201e1bf9 100%);
         drop-shadow-blur: 20px; drop-shadow-color: #00000055;
         VerticalLayout {
-            padding: 18px; spacing: 12px;
+            padding: 18px; spacing: 12px; alignment: start;
             HorizontalLayout {
+                vertical-stretch: 0;
                 VerticalLayout {
                     spacing: 5px;
                     Text { text: root.panel-title; color: #f7f7f8; font-size: 20px; font-weight: 600; overflow: elide; }
