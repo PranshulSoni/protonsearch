@@ -248,14 +248,16 @@ fn timer_text(state: &State) -> String {
 }
 fn animations_enabled() -> bool {
     let mut enabled = FALSE;
-    // Windows owns the preference; a failed query uses the less distracting static path.
+    // SAFETY: this read-only SPI query writes only to the live, writable native BOOL.
     unsafe {
         SystemParametersInfoW(
             SPI_GETCLIENTAREAANIMATION,
             0,
             Some(&mut enabled as *mut BOOL as _),
             SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-        ).is_ok() && enabled.as_bool()
+        )
+        .is_ok()
+            && enabled.as_bool()
     }
 }
 fn kind_icon(kind: WidgetKind) -> &'static str {
@@ -1020,7 +1022,7 @@ pub fn run() -> Result<()> {
     let mut native_hidden = None;
     let mut visible_panel = String::new();
     let mut hide_panel_at: Option<Instant> = None;
-    let mut reveal_panel = false;
+    let reveal_timer = Timer::default();
     let mut focus_seen = false;
     let mut taskbar_setting = None;
     struct StopEvent(HANDLE);
@@ -1056,12 +1058,6 @@ pub fn run() -> Result<()> {
         let (Some(dock), Some(panel)) = (weak.upgrade(), weak_panel.upgrade()) else {
             return;
         };
-        if reveal_panel {
-            if !state.panel.is_empty() {
-                panel.set_revealed(true);
-            }
-            reveal_panel = false;
-        }
         if hide_panel_at.is_some_and(|deadline| Instant::now() >= deadline) {
             let _ = panel.hide();
             hide_panel_at = None;
@@ -1113,6 +1109,12 @@ pub fn run() -> Result<()> {
             let reduced_motion = !animations_enabled();
             dock.set_reduced_motion(reduced_motion);
             panel.set_reduced_motion(reduced_motion);
+            if reduced_motion {
+                reveal_timer.stop();
+                if !state.panel.is_empty() {
+                    panel.set_revealed(true);
+                }
+            }
             if !controller_live(controller, pid) {
                 let _ = slint::quit_event_loop();
                 return;
@@ -1205,8 +1207,8 @@ pub fn run() -> Result<()> {
                     }
                 }
                 if state.panel != visible_panel {
+                    reveal_timer.stop();
                     if state.panel.is_empty() {
-                        reveal_panel = false;
                         panel.set_revealed(false);
                         if panel.get_reduced_motion() {
                             let _ = panel.hide();
@@ -1236,7 +1238,16 @@ pub fn run() -> Result<()> {
                         if panel.get_reduced_motion() {
                             panel.set_revealed(true);
                         } else {
-                            reveal_panel = true;
+                            let weak_reveal = panel.as_weak();
+                            reveal_timer.start(
+                                TimerMode::SingleShot,
+                                Duration::from_millis(16),
+                                move || {
+                                    if let Some(panel) = weak_reveal.upgrade() {
+                                        panel.set_revealed(true);
+                                    }
+                                },
+                            );
                         }
                         focus_seen = false;
                     }
