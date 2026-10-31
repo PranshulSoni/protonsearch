@@ -1,12 +1,12 @@
 # Proton Search knowledge graph
 
 Generated on 31 October 2026 using [Graphify](https://github.com/Graphify-Labs/graphify) 0.9.99.
-Source snapshot: `4c359532` on branch `2.0.0`. Later commits that only store these
+Source snapshot: `88b5957c` on branch `2.0.0`. Later commits that only store these
 artifacts do not change the application snapshot.
 
 - Open `graph.html` for the interactive viewer. Its renderer loads vis-network from a CDN.
 - Read `GRAPH_REPORT.md` for communities, architectural hubs, confidence and coverage limits.
-- Use `graph.json` for queries and integrations: 1,449 nodes, 3,148 edges, 68 communities.
+- Use `graph.json` for queries and integrations: 1,473 nodes, 3,181 edges, 78 communities.
 - `semantic-design.json` and `semantic-native.json` preserve the assistant-authored
   documentation and Slint fragments. Planned features are explicitly labelled.
 
@@ -43,3 +43,7 @@ Keep the saved JSON when refreshing; deleting it also removes those semantic nod
 No watcher, Git hooks, cloud service or MCP server was enabled. No application source
 was changed and the app was not launched. Graph JSON, provenance, query/path traversal
 and the generated HTML were checked; application tests were unnecessary for this data-only task.
+
+## Stage 1 checkpoint
+
+Source `efbd722` adds native motion preference and immediate widget feedback. Build and 104 selected tests passed; user visual/accessibility acceptance is pending. Stage 2 is not implemented. Luma research, the staged plan and Stage 1 contract are graph inputs. Luma Search is documented; profile support and search-efficiency comparisons remain unknown.
