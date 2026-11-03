@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 pub const SCHEMA_VERSION: u32 = 1;
+pub const MIN_DOCK_HEIGHT: f32 = 54.0;
 pub const MAX_WIDGETS: usize = 32;
 pub const MAX_PINS: usize = 32;
 pub const MAX_CONFIG_BYTES: u64 = 512 * 1024;
@@ -214,7 +215,7 @@ impl Profile {
         self.id = clean_text(&self.id, 48);
         self.name = clean_text(&self.name, 40);
         self.height = if self.height.is_finite() {
-            self.height.clamp(82.0, 112.0)
+            self.height.clamp(MIN_DOCK_HEIGHT, 112.0)
         } else {
             82.0
         };
@@ -667,6 +668,19 @@ mod tests {
         assert_eq!(config.profiles.len(), 3);
         assert_eq!(config.profiles[1].widgets[0].width, 60.0);
         assert!(config.profiles[2].presentation);
+    }
+    #[test]
+    fn compact_height_survives_normalization_and_serialization() {
+        let mut config = DockConfig::default();
+        config.active_mut().height = MIN_DOCK_HEIGHT;
+        config.normalize().unwrap();
+        let json = serde_json::to_vec(&config).unwrap();
+        let mut loaded: DockConfig = serde_json::from_slice(&json).unwrap();
+        loaded.normalize().unwrap();
+        assert_eq!(loaded.active().height, MIN_DOCK_HEIGHT);
+        loaded.active_mut().height = 1.0;
+        loaded.normalize().unwrap();
+        assert_eq!(loaded.active().height, MIN_DOCK_HEIGHT);
     }
     #[test]
     fn invalid_and_duplicate_geometry_is_normalized() {

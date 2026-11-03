@@ -34,12 +34,13 @@ export struct PanelItem {
 component GlassButton inherits Rectangle {
     in property <string> label;
     in property <bool> selected;
+    in property <bool> housing-hover: false;
     out property <bool> hovered: touch.has-hover;
     out property <bool> pressed: touch.pressed;
     callback activated();
     callback context();
     border-radius: 12px;
-    background: touch.pressed ? DockStyle.pressed : touch.has-hover || selected ? DockStyle.hover : transparent;
+    background: touch.pressed ? DockStyle.pressed : selected ? DockStyle.hover : !housing-hover && touch.has-hover ? DockStyle.hover : transparent;
     border-width: focus.has-focus ? 2px : 0px;
     border-color: DockStyle.foreground;
     accessible-role: button;
@@ -126,8 +127,9 @@ component VolumeSlider inherits Rectangle {
 }
 
 component WidgetHousing inherits Rectangle {
-    background: DockStyle.surface;
-    border-radius: 18px;
+    in property <bool> hovered: false;
+    background: root.hovered ? (DockStyle.appearance == 1 ? #3a3c40 : #ffffff) : DockStyle.surface;
+    border-radius: min(16px, self.height / 3);
     border-width: 1px;
     border-color: DockStyle.rim;
     drop-shadow-blur: 8px;
@@ -150,6 +152,7 @@ export component DockWindow inherits Window {
     in-out property <float> dock-height: 82;
     in-out property <float> icon-size: 48;
     in-out property <bool> reduced-motion: false;
+    private property <string> hovered-group;
     out property <float> scroll-offset: -scroll.viewport-x / 1px;
     callback item-clicked(string);
     callback item-context(string);
@@ -179,15 +182,21 @@ export component DockWindow inherits Window {
                         x: item.gap-before * 1px;
                         width: item.surface-width * 1px;
                         height: parent.height;
+                        hovered: root.hovered-group == item.group-id;
                     }
                     tile := GlassButton {
                         property <bool> icon-only: item.kind != "status" && item.kind != "calendar" && (item.kind == "app" || item.kind == "start" || item.kind == "agents" || item.width < 100);
                         label: item.kind == "status" ? root.system-status.network-text + ", " + root.system-status.sound-text + ", " + root.system-status.battery-text : item.title + (item.value == "" ? "" : ", " + item.value);
                         selected: item.active;
-                        x: item.gap-before * 1px + 3px;
-                        y: 3px;
-                        width: item.width * 1px - 6px;
-                        height: parent.height - 6px;
+                        housing-hover: true;
+                        changed hovered => {
+                            if self.hovered { root.hovered-group = item.group-id; }
+                            else if root.hovered-group == item.group-id { root.hovered-group = ""; }
+                        }
+                        x: item.gap-before * 1px;
+                        y: 0px;
+                        width: item.width * 1px;
+                        height: parent.height;
                         border-radius: 15px;
                         activated => { root.item-clicked(item.id); }
                         context => { root.item-context(item.id); }
@@ -210,7 +219,7 @@ export component DockWindow inherits Window {
                             background: DockStyle.foreground;
                             animate width { duration: root.reduced-motion ? 0ms : 130ms; }
                         }
-                        if item.kind == "status" : VerticalLayout {
+                        if item.kind == "status" && tile.height >= 52px : VerticalLayout {
                             padding: 8px; spacing: 5px; alignment: center;
                             HorizontalLayout {
                                 spacing: 16px; alignment: center;
@@ -223,13 +232,20 @@ export component DockWindow inherits Window {
                                 Text { text: root.system-status.battery-text; color: DockStyle.foreground; font-size: 13px; font-weight: 500; overflow: elide; horizontal-stretch: 0; }
                             }
                         }
+                        if item.kind == "status" && tile.height < 52px : HorizontalLayout {
+                            padding: 5px; spacing: 4px; alignment: center;
+                            Image { source: root.system-status.network-icon; width: 17px; height: 17px; image-fit: contain; colorize: DockStyle.foreground; }
+                            Image { source: root.system-status.sound-icon; width: 17px; height: 17px; image-fit: contain; colorize: DockStyle.foreground; }
+                            Image { source: root.system-status.battery-icon; width: 19px; height: 17px; image-fit: contain; colorize: DockStyle.foreground; }
+                            Text { text: root.system-status.battery-text; color: DockStyle.foreground; font-size: 11px; overflow: elide; }
+                        }
                         if item.kind == "calendar" : VerticalLayout {
                             spacing: 1px; alignment: center;
-                            Text { text: item.subtitle; color: DockStyle.calendar-accent; font-size: 11px; font-weight: 600; horizontal-alignment: center; overflow: elide; vertical-stretch: 0; }
-                            Text { text: item.value; color: DockStyle.foreground; font-size: 27px; font-weight: 500; horizontal-alignment: center; vertical-stretch: 0; }
+                            if tile.height >= 38px : Text { text: item.subtitle; color: DockStyle.calendar-accent; font-size: 10px; font-weight: 600; horizontal-alignment: center; overflow: elide; vertical-stretch: 0; }
+                            Text { text: item.value; color: DockStyle.foreground; font-size: min(27px, max(15px, tile.height * 0.48)); font-weight: 500; horizontal-alignment: center; vertical-stretch: 0; }
                         }
                         if item.kind != "app" && tile.icon-only : Image {
-                            source: item.icon; width: 25px; height: 25px;
+                            source: item.icon; width: min(25px, parent.height - 4px); height: self.width;
                             image-fit: contain; colorize: DockStyle.foreground;
                             x: (parent.width - self.width) / 2;
                             y: (parent.height - self.height) / 2 - (!root.reduced-motion && tile.hovered ? 2px : 0px);
@@ -252,7 +268,7 @@ export component DockWindow inherits Window {
                                     horizontal-alignment: item.kind == "clock" ? center : left;
                                     overflow: elide; vertical-stretch: 0;
                                 }
-                                if item.kind == "weather" || item.kind == "music" || item.kind == "custom-metric" : Text {
+                                if (item.kind == "weather" || item.kind == "music" || item.kind == "custom-metric") && tile.height >= 48px : Text {
                                     text: item.subtitle; color: DockStyle.secondary; font-size: 11px;
                                     overflow: elide; vertical-stretch: 0;
                                 }
@@ -274,9 +290,11 @@ export component DockWindow inherits Window {
         }
         WidgetHousing {
             width: 44px; horizontal-stretch: 0;
-            GlassButton {
-                x: 3px; y: 3px; width: parent.width - 6px; height: parent.height - 6px;
+            hovered: settings-button.hovered;
+            settings-button := GlassButton {
+                x: 0px; y: 0px; width: parent.width; height: parent.height;
                 label: "Customize dock"; selected: root.editing;
+                housing-hover: true;
                 activated => { root.edit-toggled(); }
                 Image { source: @image-url("icons/dock/settings.svg"); width: 22px; height: 22px; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; colorize: DockStyle.foreground; }
             }

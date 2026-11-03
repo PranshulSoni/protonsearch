@@ -7,6 +7,7 @@ use crate::ui::{DockItem, DockPanelWindow, DockStyle, DockWindow, PanelItem, Sys
 use anyhow::{bail, Result};
 use proton_core::dock_model::{
     AppPin, DockAppearance, DockConfig, FocusTimer, LayoutStore, WidgetInstance, WidgetKind,
+    MIN_DOCK_HEIGHT,
 };
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{
@@ -112,7 +113,14 @@ fn panel_equal(a: &PanelItem, b: &PanelItem) -> bool {
         && a.selected == b.selected
         && a.progress == b.progress
 }
+thread_local! { static SNAPSHOT_ICONS: std::cell::RefCell<HashMap<usize, Image>> = std::cell::RefCell::new(HashMap::new()); }
+
 fn image(pixels: &platform::IconPixels) -> Image {
+    // Snapshot buffers remain immutable until the cache is cleared on replacement.
+    let address = pixels.rgba.as_ptr() as usize;
+    if let Some(icon) = SNAPSHOT_ICONS.with(|icons| icons.borrow().get(&address).cloned()) {
+        return icon;
+    }
     // Slint images are reference counted; reuse decoded buffers across unchanged snapshots.
     thread_local! { static ICONS: std::cell::RefCell<HashMap<u64, Image>> = std::cell::RefCell::new(HashMap::new()); }
     let mut hash = std::collections::hash_map::DefaultHasher::new();
@@ -120,7 +128,7 @@ fn image(pixels: &platform::IconPixels) -> Image {
     pixels.height.hash(&mut hash);
     pixels.rgba.hash(&mut hash);
     let key = hash.finish();
-    ICONS.with(|icons| {
+    let icon = ICONS.with(|icons| {
         let mut icons = icons.borrow_mut();
         if let Some(icon) = icons.get(&key) {
             return icon.clone();
@@ -135,7 +143,9 @@ fn image(pixels: &platform::IconPixels) -> Image {
         ));
         icons.insert(key, icon.clone());
         icon
-    })
+    });
+    SNAPSHOT_ICONS.with(|icons| { icons.borrow_mut().insert(address, icon.clone()); });
+    icon
 }
 /// Anchor a popup to its originating tile, with both edges inside the monitor work area.
 fn popup_position(
@@ -810,7 +820,8 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
     }
     if command == "height-less" || command == "height-more" {
         let p = state.config.active_mut();
-        p.height = (p.height + if command == "height-more" { 8. } else { -8. }).clamp(82., 112.);
+        p.height = (p.height + if command == "height-more" { 4. } else { -4. })
+            .clamp(MIN_DOCK_HEIGHT, 112.);
         state.save();
         return;
     }
@@ -1318,6 +1329,7 @@ pub fn run() -> Result<()> {
             dirty = true;
         }
         if let Ok(snapshot) = snapshot_rx.try_recv() {
+            SNAPSHOT_ICONS.with(|icons| icons.borrow_mut().clear());
             state.snapshot = snapshot;
             dirty = true;
         }
@@ -1487,6 +1499,17 @@ pub fn run() -> Result<()> {
 #[cfg(test)]
 mod geometry_tests {
     use super::*;
+    #[test]
+    fn snapshot_icon_cache_is_invalidated_before_buffers_are_reused() {
+        SNAPSHOT_ICONS.with(|icons| icons.borrow_mut().clear());
+        let mut pixels = platform::IconPixels { width: 1, height: 1, rgba: vec![255, 0, 0, 255] };
+        let red = image(&pixels);
+        pixels.rgba[0] = 0;
+        pixels.rgba[1] = 255;
+        assert_eq!(image(&pixels), red);
+        SNAPSHOT_ICONS.with(|icons| icons.borrow_mut().clear());
+        assert_ne!(image(&pixels), red);
+    }
     fn monitor() -> platform::MonitorBounds {
         platform::MonitorBounds {
             left: -1920,
