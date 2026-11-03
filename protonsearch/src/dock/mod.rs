@@ -298,6 +298,7 @@ fn asset(name: &str) -> Image {
     }
     let bytes: &[u8] = match name {
         "apps" | "apps-dark" => include_bytes!("../../ui/icons/dock/apps.svg"),
+        "start" => include_bytes!("../../ui/icons/dock/start.svg"),
         "agent" => include_bytes!("../../ui/icons/dock/agent.svg"),
         "clock" => include_bytes!("../../ui/icons/dock/clock.svg"),
         "volume" => include_bytes!("../../ui/icons/dock/volume.svg"),
@@ -390,7 +391,8 @@ fn animations_enabled() -> bool {
 }
 fn kind_icon(kind: WidgetKind) -> &'static str {
     match kind {
-        WidgetKind::Start | WidgetKind::Applications => "apps",
+        WidgetKind::Start => "start",
+        WidgetKind::Applications => "apps",
         WidgetKind::Agents => "agent",
         WidgetKind::Clock | WidgetKind::Calendar => "clock",
         WidgetKind::Weather => "weather",
@@ -463,7 +465,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     for widget in profile.widgets.iter().filter(|w| w.enabled) {
         if widget.kind == WidgetKind::Applications {
             for pin in &profile.pins {
-                let running = state.snapshot.windows.iter().any(|w| {
+                let running_window = state.snapshot.windows.iter().find(|w| {
                     w.identity == pin.id
                         || w.executable
                             .as_ref()
@@ -473,19 +475,21 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                     id: format!("app:{}", pin.id).into(),
                     kind: "app".into(),
                     title: pin.title.clone().into(),
-                    icon: state
-                        .snapshot
-                        .icons
-                        .get(&pin.id)
+                    icon: running_window
+                        .and_then(|w| state.snapshot.icons.get(&w.identity))
+                        .or_else(|| state.snapshot.icons.get(&pin.id))
                         .map(image)
                         .unwrap_or_else(|| app_fallback.clone()),
                     width: 60.,
                     group_id: widget.id.clone().into(),
-                    running,
+                    running: running_window.is_some(),
                     ..Default::default()
                 });
                 seen.insert(pin.id.clone());
                 seen.insert(pin.command.replace('/', "\\").to_lowercase());
+                if let Some(window) = running_window {
+                    seen.insert(window.identity.clone());
+                }
             }
             for window in &state.snapshot.windows {
                 if !seen.insert(window.identity.clone()) {
@@ -1177,10 +1181,11 @@ pub fn run() -> Result<()> {
             }
             for w in windows.iter().take(24) {
                 let icon = cached_icons.entry(w.identity.clone()).or_insert_with(|| {
-                    w.executable
-                        .as_ref()
-                        .and_then(|path| platform::icon_for_path(path, 128))
-                        .or_else(|| platform::icon_for_window(w.hwnd, 128))
+                    platform::icon_for_window(w.hwnd, 128).or_else(|| {
+                        w.executable
+                            .as_ref()
+                            .and_then(|path| platform::icon_for_path(path, 128))
+                    })
                 });
                 if let Some(icon) = icon {
                     icons.insert(w.identity.clone(), icon.clone());

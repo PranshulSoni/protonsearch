@@ -253,19 +253,6 @@ pub fn icon_for_window(hwnd: isize, size: u32) -> Option<IconPixels> {
         if !IsWindow(hwnd).as_bool() {
             return None;
         }
-        let mut pid = 0;
-        GetWindowThreadProcessId(hwnd, Some(&mut pid));
-        if let Some(path) = crate::get_process_path(pid) {
-            // UWP frame hosts carry a generic Windows icon, not their hosted app's icon.
-            if !path
-                .to_ascii_lowercase()
-                .ends_with("applicationframehost.exe")
-            {
-                if let Some(icon) = icon_for_path(&path, size) {
-                    return Some(icon);
-                }
-            }
-        }
         let mut value = 0usize;
         for kind in [ICON_BIG, ICON_SMALL2, ICON_SMALL] {
             let _ = SendMessageTimeoutW(
@@ -287,13 +274,24 @@ pub fn icon_for_window(hwnd: isize, size: u32) -> Option<IconPixels> {
         if value == 0 {
             value = GetClassLongPtrW(hwnd, GCLP_HICONSM);
         }
-        if value == 0 {
-            return None;
+        if value != 0 {
+            if let Ok(owned) = CopyIcon(HICON(value as _)) {
+                let pixels = render_icon(owned, size);
+                let _ = DestroyIcon(owned);
+                if pixels.is_some() {
+                    return pixels;
+                }
+            }
         }
-        let owned = CopyIcon(HICON(value as _)).ok()?;
-        let pixels = render_icon(owned, size);
-        let _ = DestroyIcon(owned);
-        pixels
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        crate::get_process_path(pid)
+            .filter(|path| {
+                !path
+                    .to_ascii_lowercase()
+                    .ends_with("applicationframehost.exe")
+            })
+            .and_then(|path| icon_for_path(&path, size))
     }
 }
 pub fn icon_for_path(path: &str, size: u32) -> Option<IconPixels> {
@@ -603,15 +601,17 @@ pub fn configure_window(hwnd: HWND, nonactivating: bool) -> Result<()> {
             0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED,
         )?;
-        let rounded = 2u32;
+        let corners = 1u32;
+        let no_border = 0xffff_fffeu32;
         // Bright Desktop Acrylic inherits system tint; Slint owns our neutral material.
         let backdrop = 1u32;
         let _ = DwmSetWindowAttribute(
             hwnd,
             DWMWA_WINDOW_CORNER_PREFERENCE,
-            &rounded as *const _ as _,
+            &corners as *const _ as _,
             4,
         );
+        let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(34), &no_border as *const _ as _, 4);
         let _ = DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(38), &backdrop as *const _ as _, 4);
     }
     Ok(())
