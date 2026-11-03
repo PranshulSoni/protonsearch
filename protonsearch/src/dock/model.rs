@@ -22,6 +22,8 @@ pub enum WidgetKind {
     Audio,
     Power,
     Network,
+    Status,
+    Calendar,
     Clock,
     Files,
     SystemTray,
@@ -29,7 +31,7 @@ pub enum WidgetKind {
 }
 
 impl WidgetKind {
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 16] = [
         Self::Start,
         Self::Search,
         Self::Applications,
@@ -40,6 +42,8 @@ impl WidgetKind {
         Self::Audio,
         Self::Power,
         Self::Network,
+        Self::Status,
+        Self::Calendar,
         Self::Clock,
         Self::Files,
         Self::SystemTray,
@@ -58,6 +62,8 @@ impl WidgetKind {
             Self::Audio => "audio",
             Self::Power => "power",
             Self::Network => "network",
+            Self::Status => "status",
+            Self::Calendar => "calendar",
             Self::Clock => "clock",
             Self::Files => "files",
             Self::SystemTray => "system-tray",
@@ -77,6 +83,8 @@ impl WidgetKind {
             Self::Audio => "Sound",
             Self::Power => "Battery",
             Self::Network => "Network",
+            Self::Status => "System status",
+            Self::Calendar => "Calendar",
             Self::Clock => "Clock",
             Self::Files => "Files",
             Self::SystemTray => "Windows tray",
@@ -86,15 +94,15 @@ impl WidgetKind {
 
     pub fn width_bounds(self) -> (f32, f32, f32) {
         match self {
-            Self::Start
-            | Self::Applications
-            | Self::Search
-            | Self::Agents
-            | Self::Files
-            | Self::SystemTray => (60.0, 60.0, 60.0),
+            Self::Start | Self::Applications | Self::Agents | Self::Files | Self::SystemTray => {
+                (60.0, 60.0, 60.0)
+            }
             Self::Audio | Self::Power | Self::Network => (60.0, 124.0, 188.0),
             Self::Weather | Self::Music | Self::Clock | Self::Focus => (60.0, 124.0, 188.0),
             Self::CustomMetric => (60.0, 124.0, 252.0),
+            Self::Search => (60.0, 112.0, 188.0),
+            Self::Status => (124.0, 124.0, 188.0),
+            Self::Calendar => (60.0, 60.0, 124.0),
         }
     }
 }
@@ -181,14 +189,13 @@ impl Default for Profile {
             id: "work".into(),
             name: "Work".into(),
             widgets: [
-                WidgetKind::Start,
-                WidgetKind::Search,
                 WidgetKind::Applications,
                 WidgetKind::Weather,
-                WidgetKind::Focus,
-                WidgetKind::Audio,
+                WidgetKind::Status,
+                WidgetKind::Calendar,
                 WidgetKind::Clock,
-                WidgetKind::Agents,
+                WidgetKind::Search,
+                WidgetKind::SystemTray,
             ]
             .into_iter()
             .map(WidgetInstance::new)
@@ -306,46 +313,34 @@ pub struct DockConfig {
     pub profiles: Vec<Profile>,
     pub weather: Option<WeatherLocation>,
     pub hide_windows_taskbar: bool,
+    pub appearance: DockAppearance,
     #[serde(default)]
     pub appearance_revision: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DockAppearance {
+    #[default]
+    Light,
+    Dark,
+    LiquidGlass,
 }
 
 impl Default for DockConfig {
     fn default() -> Self {
         let work = Profile::default();
-        let mut home = Profile {
+        let home = Profile {
             id: "home".into(),
             name: "Home".into(),
             ..work.clone()
         };
-        home.widgets = [
-            WidgetKind::Start,
-            WidgetKind::Search,
-            WidgetKind::Applications,
-            WidgetKind::Weather,
-            WidgetKind::Music,
-            WidgetKind::Audio,
-            WidgetKind::Power,
-            WidgetKind::Clock,
-        ]
-        .into_iter()
-        .map(WidgetInstance::new)
-        .collect();
-        let mut presentation = Profile {
+        let presentation = Profile {
             id: "presentation".into(),
             name: "Presentation".into(),
             presentation: true,
             ..work.clone()
         };
-        presentation.widgets = [
-            WidgetKind::Start,
-            WidgetKind::Applications,
-            WidgetKind::Audio,
-            WidgetKind::Clock,
-        ]
-        .into_iter()
-        .map(WidgetInstance::new)
-        .collect();
         Self {
             version: SCHEMA_VERSION,
             enabled: true,
@@ -353,6 +348,7 @@ impl Default for DockConfig {
             profiles: vec![work, home, presentation],
             weather: None,
             hide_windows_taskbar: false,
+            appearance: DockAppearance::Light,
             appearance_revision: 1,
         }
     }
@@ -564,6 +560,75 @@ impl FocusTimer {
 mod tests {
     use super::*;
     #[test]
+    fn appearance_defaults_for_saved_layouts_and_round_trips() {
+        let mut value = serde_json::to_value(DockConfig::default()).unwrap();
+        value.as_object_mut().unwrap().remove("appearance");
+        let legacy_widgets: Vec<_> = [WidgetKind::Start, WidgetKind::Audio, WidgetKind::Focus]
+            .into_iter()
+            .map(WidgetInstance::new)
+            .collect();
+        value["profiles"][0]["widgets"] = serde_json::to_value(&legacy_widgets).unwrap();
+        value["profiles"][0]["widgets"][1]["enabled"] = serde_json::json!(false);
+        let mut config: DockConfig = serde_json::from_value(value).unwrap();
+        config.normalize().unwrap();
+        assert_eq!(config.appearance, DockAppearance::Light);
+        assert_eq!(
+            config
+                .active()
+                .widgets
+                .iter()
+                .map(|w| w.kind)
+                .collect::<Vec<_>>(),
+            [WidgetKind::Start, WidgetKind::Audio, WidgetKind::Focus]
+        );
+        assert!(!config.active().widgets[1].enabled);
+        assert_eq!(config.active().pins[0].command, "explorer.exe");
+        for appearance in [
+            DockAppearance::Light,
+            DockAppearance::Dark,
+            DockAppearance::LiquidGlass,
+        ] {
+            config.appearance = appearance;
+            let saved = serde_json::to_vec(&config).unwrap();
+            let restored: DockConfig = serde_json::from_slice(&saved).unwrap();
+            assert_eq!(restored.appearance, appearance);
+        }
+    }
+
+    #[test]
+    fn new_profiles_have_the_seven_separate_widgets() {
+        let config = DockConfig::default();
+        for profile in &config.profiles {
+            assert_eq!(
+                profile.widgets.iter().map(|w| w.kind).collect::<Vec<_>>(),
+                [
+                    WidgetKind::Applications,
+                    WidgetKind::Weather,
+                    WidgetKind::Status,
+                    WidgetKind::Calendar,
+                    WidgetKind::Clock,
+                    WidgetKind::Search,
+                    WidgetKind::SystemTray,
+                ]
+            );
+        }
+        for kind in [WidgetKind::Status, WidgetKind::Calendar] {
+            assert!(WidgetKind::ALL.contains(&kind));
+            let widget = WidgetInstance::new(kind);
+            assert_eq!(widget.id, kind.key());
+            let (min, preferred, max) = kind.width_bounds();
+            assert_eq!(widget.width, preferred);
+            assert!(min <= preferred && preferred <= max);
+        }
+        assert_eq!(WidgetInstance::new(WidgetKind::Search).width, 112.);
+        assert_eq!(WidgetInstance::new(WidgetKind::Status).width, 124.);
+        let mut saved_search = WidgetInstance::new(WidgetKind::Search);
+        saved_search.width = 60.;
+        saved_search.normalize();
+        assert_eq!(saved_search.width, 60.);
+    }
+
+    #[test]
     fn alpha_appearance_migrates_once_without_losing_profile_contents() {
         let mut value = serde_json::to_value(DockConfig::default()).unwrap();
         value.as_object_mut().unwrap().remove("appearance_revision");
@@ -615,7 +680,7 @@ mod tests {
         assert_eq!(profile.height, 82.0);
         assert_eq!(profile.icon_size, 48.0);
         assert_eq!(profile.widgets[0].width, 60.0);
-        assert_eq!(profile.widgets.len(), 8);
+        assert_eq!(profile.widgets.len(), 7);
     }
     #[test]
     fn resize_and_reorder_obey_widget_constraints() {

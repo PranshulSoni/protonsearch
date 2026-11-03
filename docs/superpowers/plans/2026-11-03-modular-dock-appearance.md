@@ -42,33 +42,34 @@ The critique found two priorities: independent widget boundaries; consistent com
 
 **Files:** protonsearch/ui/dock.slint; protonsearch/src/dock/mod.rs.
 
-- [ ] Add transient DockItem group_id, surface_width and gap_before fields.
-- [ ] Group expanded app rows by their source Applications instance, preserving individual buttons.
-- [ ] Replace shared painted shell with independent housings; keep transparent gaps.
-- [ ] Share the contract: window edges 6 logical px, housing y 7 px, gap 10 px, settings housing 44 px.
-- [ ] Update content width and popup offsets using the same group geometry.
-- [ ] Test empty, single, app-group and boundary widths plus scroll-aware popup anchors.
+- [x] Add transient DockItem group_id, surface_width and gap_before fields.
+- [x] Group expanded app rows by their source Applications instance, preserving individual buttons.
+- [x] Replace shared painted shell with independent housings; keep transparent gaps.
+- [x] Share the contract: window edges 6 logical px, housing y 7 px, gap 10 px, settings housing 44 px.
+- [x] Update content width and popup offsets using the same group geometry.
+- [x] Test empty, single, app-group and boundary widths plus scroll-aware popup anchors.
 
 ## Step 3 — Apply appearances and complete first-party presentation
 
 **Files:** protonsearch/src/dock/model.rs; protonsearch/src/dock/mod.rs; protonsearch/ui/dock.slint; protonsearch/ui/app.slint.
 
-- [ ] Add serde-defaulted DockAppearance (Light/Dark/LiquidGlass), retaining old JSON compatibility.
-- [ ] Export and bind DockStyle and SystemStatus to dock and panel instances.
-- [ ] Theme text, system glyphs, focus/hover treatments, controls and popovers consistently.
-- [ ] Add appearance controls to existing Customize panel and persist changes.
-- [ ] Add independent Status and Calendar widget kinds using existing live system providers and local date.
-- [ ] Use the seven-widget arrangement for new layouts only; preserve existing saved profiles.
-- [ ] Reuse volume/mute and system settings actions in the Status panel.
-- [ ] Test appearance roundtrip, old-config loading, defaults and additive widget support.
+- [x] Add serde-defaulted DockAppearance (Light/Dark/LiquidGlass), retaining old JSON compatibility.
+- [x] Export and bind DockStyle and SystemStatus to dock and panel instances.
+- [x] Theme text, system glyphs, focus/hover treatments, controls and popovers consistently.
+- [x] Add appearance controls to existing Customize panel and persist changes.
+- [x] Add independent Status and Calendar widget kinds using existing live system providers and local date.
+- [x] Use the seven-widget arrangement for new layouts only; preserve existing saved profiles.
+- [x] Reuse volume/mute and system settings actions in the Status panel.
+- [x] Test appearance roundtrip, old-config loading, defaults and additive widget support.
 
 ## Step 4 — Build, independent review and native acceptance
 
-- [ ] Run cargo test --locked --manifest-path protonsearch/Cargo.toml --lib.
-- [ ] Run targeted dock geometry tests in the ProtonSearch binary.
-- [ ] Build ProtonSearch with its existing locked dependencies.
-- [ ] Obtain independent code and Rust review; resolve actionable findings.
-- [ ] Update graph and this checklist; commit and push only task-owned tracked files.
+- [x] Run cargo test --locked --manifest-path protonsearch/Cargo.toml --lib. Result: 12 passed.
+- [x] Run targeted dock geometry tests in the ProtonSearch binary. Result: 7 passed.
+- [x] Build ProtonSearch with its existing locked dependencies. Cargo check and scoped formatting also passed.
+- [x] Obtain independent code review; resolve actionable findings. Both findings fixed and re-review approved.
+- [ ] Complete Rust-specialist approval: attempted, but its global gate stopped at pre-existing unrelated formatting. No blanket Rust approval claimed.
+- [x] Update graph and this checklist; commit and push only task-owned tracked files.
 - [ ] Inspect native Light, Dark and Glass layouts and anchored Status/Calendar panels after the user opens the new build.
 - [ ] Verify customization, overflow and target DPI on the real desktop.
 

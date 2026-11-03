@@ -3,10 +3,10 @@ pub mod appbar;
 pub mod platform;
 pub mod supervisor;
 pub mod taskbar;
-use crate::ui::{DockItem, DockPanelWindow, DockWindow, PanelItem};
+use crate::ui::{DockItem, DockPanelWindow, DockStyle, DockWindow, PanelItem, SystemStatus};
 use anyhow::{bail, Result};
 use proton_core::dock_model::{
-    AppPin, DockConfig, FocusTimer, LayoutStore, WidgetInstance, WidgetKind,
+    AppPin, DockAppearance, DockConfig, FocusTimer, LayoutStore, WidgetInstance, WidgetKind,
 };
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{
@@ -96,6 +96,9 @@ fn dock_equal(a: &DockItem, b: &DockItem) -> bool {
         && a.value == b.value
         && a.icon == b.icon
         && a.width == b.width
+        && a.group_id == b.group_id
+        && a.surface_width == b.surface_width
+        && a.gap_before == b.gap_before
         && a.running == b.running
         && a.active == b.active
         && a.progress == b.progress
@@ -153,8 +156,9 @@ fn popup_position(
 fn panel_dimensions(kind: &str) -> (f32, f32) {
     match kind {
         "audio" => (320., 300.),
+        "status" => (340., 370.),
         "focus" => (320., 260.),
-        "clock" => (300., 210.),
+        "clock" | "calendar" => (300., 210.),
         "music" | "network" | "power" | "weather" | "agents" => (340., 280.),
         "apps" | "windows" => (440., 500.),
         "customize" => (440., 620.),
@@ -181,10 +185,50 @@ fn panel_has_foreground(panel: HWND) -> bool {
                 && GetAncestor(foreground, GA_ROOTOWNER) == GetAncestor(panel, GA_ROOTOWNER))
     }
 }
+const DOCK_EDGE: f32 = 6.;
+const SURFACE_GAP: f32 = 10.;
+const SETTINGS_WIDTH: f32 = 44.;
+
+fn layout_surfaces(items: &mut [DockItem]) {
+    let mut start = 0;
+    while start < items.len() {
+        let mut end = start + 1;
+        while end < items.len() && items[end].group_id == items[start].group_id {
+            end += 1;
+        }
+        let mut width = 0.;
+        for item in &mut items[start..end] {
+            item.width = item.width.max(60.);
+            item.gap_before = 0.;
+            item.surface_width = 0.;
+            width += item.width;
+        }
+        items[start].gap_before = if start == 0 { 0. } else { SURFACE_GAP };
+        items[start].surface_width = width;
+        start = end;
+    }
+}
+
 fn dock_content_width(items: &[DockItem]) -> f32 {
-    // Shell insets 12 + layout padding 8 + two gaps 8 + separator 1 + settings 38.
-    67. + items.iter().map(|item| item.width.max(60.)).sum::<f32>()
-        + items.len().saturating_sub(1) as f32 * 4.
+    DOCK_EDGE * 2.
+        + SETTINGS_WIDTH
+        + if items.is_empty() { 0. } else { SURFACE_GAP }
+        + items
+            .iter()
+            .map(|item| item.width + item.gap_before)
+            .sum::<f32>()
+}
+
+fn item_center(items: impl IntoIterator<Item = DockItem>, id: &str) -> Option<f32> {
+    let mut offset = DOCK_EDGE;
+    for item in items {
+        offset += item.gap_before;
+        if item.id.as_str() == id {
+            return Some(offset + item.width / 2.);
+        }
+        offset += item.width;
+    }
+    None
 }
 fn position_panel(
     state: &State,
@@ -212,20 +256,13 @@ fn position_panel(
             .window()
             .set_size(slint::LogicalSize::new(width, height));
     }
-    let mut offset = 10. - dock.get_scroll_offset();
-    let mut anchor = rect.left + (rect.right - rect.left) / 2;
     let dock_size = dock.window().size();
     let dock_left = rect.left + (rect.right - rect.left - dock_size.width as i32) / 2;
     let items = dock.get_items();
-    for i in 0..items.row_count() {
-        if let Some(item) = items.row_data(i) {
-            if item.id.as_str() == state.panel_anchor {
-                anchor = dock_left + ((offset + item.width / 2.) * scale) as i32;
-                break;
-            }
-            offset += item.width + 4.;
-        }
-    }
+    let center = item_center(items.iter(), &state.panel_anchor)
+        .map(|center| center - dock.get_scroll_offset())
+        .unwrap_or(dock.get_dock_width() - DOCK_EDGE - SETTINGS_WIDTH / 2.);
+    let anchor = dock_left + (center * scale) as i32;
     let (x, y) = popup_position(
         anchor,
         rect.top,
@@ -238,13 +275,19 @@ fn position_panel(
         panel.window().set_position(target);
     }
 }
+fn app_placeholder_name(appearance: DockAppearance) -> &'static str {
+    match appearance {
+        DockAppearance::Dark => "apps",
+        DockAppearance::Light | DockAppearance::LiquidGlass => "apps-dark",
+    }
+}
 fn asset(name: &str) -> Image {
     thread_local! { static CACHE: std::cell::RefCell<HashMap<String,Image>> = std::cell::RefCell::new(HashMap::new()); }
     if let Some(image) = CACHE.with(|cache| cache.borrow().get(name).cloned()) {
         return image;
     }
     let bytes: &[u8] = match name {
-        "apps" => include_bytes!("../../ui/icons/dock/apps.svg"),
+        "apps" | "apps-dark" => include_bytes!("../../ui/icons/dock/apps.svg"),
         "agent" => include_bytes!("../../ui/icons/dock/agent.svg"),
         "clock" => include_bytes!("../../ui/icons/dock/clock.svg"),
         "volume" => include_bytes!("../../ui/icons/dock/volume.svg"),
@@ -256,6 +299,13 @@ fn asset(name: &str) -> Image {
         "settings" => include_bytes!("../../ui/icons/dock/settings.svg"),
         "file" => include_bytes!("../../ui/icons/dock/file.svg"),
         _ => include_bytes!("../../ui/icons/dock/search.svg"),
+    };
+    let tinted;
+    let bytes = if name == "apps-dark" {
+        tinted = String::from_utf8_lossy(bytes).replace("#f3eee4", "#191b20");
+        tinted.as_bytes()
+    } else {
+        bytes
     };
     let image = Image::load_from_svg_data(bytes).unwrap_or_default();
     CACHE.with(|cache| {
@@ -296,6 +346,20 @@ fn clock() -> String {
         format!("{:02}:{:02}", t.wHour, t.wMinute)
     }
 }
+fn calendar() -> (String, String) {
+    // SAFETY: GetLocalTime returns the current local calendar fields by value.
+    let time = unsafe { GetLocalTime() };
+    let weekday = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+    ][usize::from(time.wDayOfWeek).min(6)];
+    (time.wDay.to_string(), weekday.into())
+}
 fn timer_text(state: &State) -> String {
     let s = state.focus.seconds(Instant::now());
     format!("{:02}:{:02}", s / 60, s % 60)
@@ -318,11 +382,11 @@ fn kind_icon(kind: WidgetKind) -> &'static str {
     match kind {
         WidgetKind::Start | WidgetKind::Applications => "apps",
         WidgetKind::Agents => "agent",
-        WidgetKind::Clock => "clock",
+        WidgetKind::Clock | WidgetKind::Calendar => "clock",
         WidgetKind::Weather => "weather",
         WidgetKind::Music => "music",
         WidgetKind::Focus => "focus",
-        WidgetKind::Audio => "volume",
+        WidgetKind::Audio | WidgetKind::Status => "volume",
         WidgetKind::Power => "power",
         WidgetKind::Network => "network",
         WidgetKind::Files => "file",
@@ -332,6 +396,58 @@ fn kind_icon(kind: WidgetKind) -> &'static str {
 }
 fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
     let profile = state.config.active();
+    let appearance = match state.config.appearance {
+        DockAppearance::Light => 0,
+        DockAppearance::Dark => 1,
+        DockAppearance::LiquidGlass => 2,
+    };
+    dock.global::<DockStyle>().set_appearance(appearance);
+    panel.global::<DockStyle>().set_appearance(appearance);
+    let system_status = SystemStatus {
+        network_icon: asset("network"),
+        sound_icon: asset("volume"),
+        battery_icon: asset("power"),
+        network_text: state
+            .snapshot
+            .network
+            .as_ref()
+            .map(|n| {
+                if n.internet {
+                    n.name.clone()
+                } else if n.connected {
+                    "No internet".into()
+                } else {
+                    "Disconnected".into()
+                }
+            })
+            .unwrap_or_else(|| "Unavailable".into())
+            .into(),
+        sound_text: state
+            .snapshot
+            .audio
+            .map(|a| {
+                if a.muted {
+                    "Muted".into()
+                } else {
+                    format!("{}%", a.volume)
+                }
+            })
+            .unwrap_or_else(|| "Unavailable".into())
+            .into(),
+        battery_text: state
+            .snapshot
+            .power
+            .map(|p| {
+                p.percentage
+                    .map(|v| format!("{v}%"))
+                    .unwrap_or_else(|| "AC power".into())
+            })
+            .unwrap_or_else(|| "Unavailable".into())
+            .into(),
+    };
+    dock.set_system_status(system_status.clone());
+    panel.set_system_status(system_status);
+    let app_fallback = asset(app_placeholder_name(state.config.appearance));
     let mut items = Vec::new();
     let mut seen = HashSet::new();
     for widget in profile.widgets.iter().filter(|w| w.enabled) {
@@ -352,8 +468,9 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                         .icons
                         .get(&pin.id)
                         .map(image)
-                        .unwrap_or_else(|| asset("apps")),
+                        .unwrap_or_else(|| app_fallback.clone()),
                     width: 60.,
+                    group_id: widget.id.clone().into(),
                     running,
                     ..Default::default()
                 });
@@ -373,8 +490,9 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                         .icons
                         .get(&window.identity)
                         .map(image)
-                        .unwrap_or_else(|| asset("apps")),
+                        .unwrap_or_else(|| app_fallback.clone()),
                     width: 60.,
+                    group_id: widget.id.clone().into(),
                     running: true,
                     ..Default::default()
                 });
@@ -383,6 +501,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
         }
         let (value, subtitle) = match widget.kind {
             WidgetKind::Clock => (clock(), "Local time".into()),
+            WidgetKind::Calendar => calendar(),
             WidgetKind::Focus => (
                 timer_text(state),
                 if state.focus.running() {
@@ -451,6 +570,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
             value: value.into(),
             icon: asset(kind_icon(widget.kind)),
             width: widget.width,
+            group_id: widget.id.clone().into(),
             progress: match widget.kind {
                 WidgetKind::Audio => state.snapshot.audio.map_or(0., |a| a.volume as f32 / 100.),
                 WidgetKind::Focus => 1. - state.focus.seconds(Instant::now()) as f32 / 1500.,
@@ -464,6 +584,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
             ..Default::default()
         });
     }
+    layout_surfaces(&mut items);
     let width = dock_content_width(&items);
     if let Some(m) = platform::primary_monitor() {
         let target_width = width.min((m.right - m.left) as f32 * 96. / m.dpi as f32 - 24.);
@@ -498,6 +619,8 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
             "customize" => "Customize dock",
             "focus" => "Focus",
             "audio" => "Sound",
+            "status" => "System status",
+            "calendar" => "Calendar",
             "agents" => "Agents",
             "music" => "Media controls",
             "weather" => "Weather",
@@ -526,13 +649,13 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
                     id: app.id.clone().into(),
                     title: app.name.clone().into(),
                     subtitle: if pinned { "Pinned" } else { "Application" }.into(),
-                    icon: app.icon.as_ref().map(image).unwrap_or_else(|| asset("apps")),
+                    icon: app.icon.as_ref().map(image).unwrap_or_else(|| app_fallback.clone()),
                     selected: pinned,
                     ..Default::default()
                 });
             }
         },
-        "windows"=>for w in state.snapshot.windows.iter().filter(|w|query.is_empty()||w.title.to_lowercase().contains(&query)||w.identity==query){entries.push(PanelItem{id:format!("window:{}",w.hwnd).into(),title:w.title.clone().into(),subtitle:w.executable.clone().unwrap_or_default().into(),icon:state.snapshot.icons.get(&w.identity).map(image).unwrap_or_else(||asset("apps")),..Default::default()});},
+        "windows"=>for w in state.snapshot.windows.iter().filter(|w|query.is_empty()||w.title.to_lowercase().contains(&query)||w.identity==query){entries.push(PanelItem{id:format!("window:{}",w.hwnd).into(),title:w.title.clone().into(),subtitle:w.executable.clone().unwrap_or_default().into(),icon:state.snapshot.icons.get(&w.identity).map(image).unwrap_or_else(||app_fallback.clone()),..Default::default()});},
         "customize"=>{
             let mut gallery=profile.widgets.clone();
             for kind in WidgetKind::ALL {if !gallery.iter().any(|w|w.kind==kind){let mut widget=WidgetInstance::new(kind);widget.enabled=false;gallery.push(widget);}}
@@ -543,6 +666,7 @@ fn refresh(state: &State, dock: &DockWindow, panel: &DockPanelWindow) {
         "agents"=>body="Open your existing ProtonSearch Agents page to manage and launch configured agents.".into(),
         "network"=>body=state.snapshot.network.as_ref().map(|n|format!("{}\n{} · {}",n.name,if n.wireless{"Wi-Fi"}else{"Network"},if n.internet{"Internet access"}else if n.connected{"Local connectivity"}else{"Disconnected"})).unwrap_or("Network information unavailable".into()),
         "clock"=>body=format!("{}\nLocal time", clock()),
+        "calendar"=>{let (day,weekday)=calendar();body=format!("{weekday}\n{day}");},
         "custom-metric"=>body=profile.widgets.iter().find(|w|w.id==state.panel_anchor).map(|w|format!("{}\n{}\n{}",w.label,w.value,w.detail)).unwrap_or_default(),
         "power"=>body=state.snapshot.power.map(|p|format!("{}\n{}",p.percentage.map(|v|format!("Battery: {v}%")).unwrap_or("No battery reported".into()),if p.charging{"Charging"}else if p.ac_power==Some(true){"Connected to AC power"}else{"On battery"})).unwrap_or("Power information unavailable".into()),
         _=>{}
@@ -563,6 +687,26 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
     }
     if let Some(query) = command.strip_prefix("query:") {
         state.query = query.into();
+        return;
+    }
+    if let Some(appearance) = command.strip_prefix("appearance:") {
+        state.config.appearance = match appearance {
+            "light" => DockAppearance::Light,
+            "dark" => DockAppearance::Dark,
+            "glass" => DockAppearance::LiquidGlass,
+            _ => return,
+        };
+        state.save();
+        return;
+    }
+    if let Some(kind) = command.strip_prefix("settings:") {
+        let target = match kind {
+            "audio" => "ms-settings:sound",
+            "network" => "ms-settings:network-status",
+            "power" => "ms-settings:powersleep",
+            _ => return,
+        };
+        launch(target);
         return;
     }
     if let Some(v) = command.strip_prefix("volume:") {
@@ -723,7 +867,7 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
                 "network" => "ms-settings:network-status",
                 "power" => "ms-settings:powersleep",
                 "weather" => "msnweather:",
-                "clock" => "ms-settings:dateandtime",
+                "clock" | "calendar" => "ms-settings:dateandtime",
                 _ => "ms-settings:",
             });
         }
@@ -758,6 +902,7 @@ fn action(state: &mut State, command: &str, panel: &DockPanelWindow) {
         return;
     }
     if let Some(id) = command.strip_prefix("context:") {
+        state.panel_anchor = id.to_owned();
         state.panel = "apps".into();
         state.query = id
             .strip_prefix("app:")
@@ -1378,6 +1523,16 @@ mod geometry_tests {
         }
         assert!(panel_dimensions("apps").1 > panel_dimensions("audio").1);
         assert!(panel_dimensions("customize").1 > panel_dimensions("apps").1);
+        assert_eq!(panel_dimensions("status"), (340., 370.));
+    }
+    #[test]
+    fn missing_app_artwork_contrasts_with_each_material() {
+        assert_eq!(app_placeholder_name(DockAppearance::Light), "apps-dark");
+        assert_eq!(
+            app_placeholder_name(DockAppearance::LiquidGlass),
+            "apps-dark"
+        );
+        assert_eq!(app_placeholder_name(DockAppearance::Dark), "apps");
     }
     #[test]
     fn volume_bursts_keep_latest_value_and_other_action_order() {
@@ -1397,17 +1552,66 @@ mod geometry_tests {
     }
     #[test]
     fn dock_width_matches_tiles_gaps_and_customization_chrome() {
-        let items = vec![
+        let mut items = vec![
             DockItem {
                 width: 60.,
+                group_id: "apps".into(),
                 ..Default::default()
             },
             DockItem {
                 width: 124.,
+                group_id: "weather".into(),
                 ..Default::default()
             },
         ];
-        assert_eq!(dock_content_width(&items), 255.);
-        assert_eq!(dock_content_width(&[]), 67.);
+        layout_surfaces(&mut items);
+        assert_eq!(dock_content_width(&items), 260.);
+        assert_eq!(dock_content_width(&[]), 56.);
+    }
+    #[test]
+    fn grouped_app_surfaces_preserve_individual_anchors_and_scroll_offsets() {
+        let mut items = vec![
+            DockItem {
+                id: "app:a".into(),
+                group_id: "applications".into(),
+                width: 60.,
+                ..Default::default()
+            },
+            DockItem {
+                id: "app:b".into(),
+                group_id: "applications".into(),
+                width: 60.,
+                ..Default::default()
+            },
+            DockItem {
+                id: "weather".into(),
+                group_id: "weather".into(),
+                width: 124.,
+                ..Default::default()
+            },
+        ];
+        layout_surfaces(&mut items);
+        assert_eq!(
+            items
+                .iter()
+                .map(|item| item.surface_width)
+                .collect::<Vec<_>>(),
+            [120., 0., 124.]
+        );
+        assert_eq!(
+            items.iter().map(|item| item.gap_before).collect::<Vec<_>>(),
+            [0., 0., 10.]
+        );
+        assert_eq!(dock_content_width(&items), 320.);
+        assert_eq!(item_center(items.iter().cloned(), "app:a"), Some(36.));
+        assert_eq!(item_center(items.iter().cloned(), "app:b"), Some(96.));
+        let weather_center = item_center(items.iter().cloned(), "weather").unwrap();
+        assert_eq!(weather_center, 198.);
+        assert_eq!(item_center(items.iter().cloned(), "missing"), None);
+        let scrolled_anchor = -1500 + ((weather_center - 40.) * 1.5) as i32;
+        assert_eq!(
+            popup_position(scrolled_anchor, 950, 340, 280, monitor()),
+            (-1433, 655)
+        );
     }
 }
