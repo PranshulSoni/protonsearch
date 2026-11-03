@@ -1,13 +1,8 @@
-//! Opt-in Explorer taskbar visibility, with a durable recovery lease.
-//! We only restore windows which this dock actually hid; Explorer is never terminated.
+//! Restore Explorer windows recorded in a legacy dock recovery lease.
 use anyhow::{ensure, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
-use std::{
-    marker::PhantomData,
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::path::{Path, PathBuf};
 use windows::Win32::{Foundation::*, System::Threading::*, UI::WindowsAndMessaging::*};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -105,98 +100,23 @@ fn read_lease(file: std::fs::File) -> Result<Lease> {
     Ok(lease)
 }
 
-pub struct TaskbarVisibility {
-    layout: PathBuf,
-    hidden: bool,
-    _thread: PhantomData<Rc<()>>,
-}
-impl TaskbarVisibility {
-    pub fn new(layout: PathBuf) -> Self {
-        Self {
-            layout,
-            hidden: false,
-            _thread: PhantomData,
-        }
-    }
-    /// Call after the dock has a configured, visible native window, then once per heartbeat.
-    /// Re-enumeration handles Explorer restart and newly connected monitors.
-    pub fn set_hidden(&mut self, hidden: bool) -> Result<()> {
-        if !hidden {
-            if self.hidden {
-                restore_after_exit(&self.layout, Some(std::process::id()))?;
-                self.hidden = false;
-            }
-            return Ok(());
-        }
-        let path = lease_path(&self.layout);
-        let mut lease = if self.hidden {
-            read_lease(std::fs::File::open(&path)?)?
-        } else {
-            Lease {
-                owner: std::process::id(),
-                windows: Vec::new(),
-            }
-        };
-        unsafe extern "system" fn collect(hwnd: HWND, param: LPARAM) -> BOOL {
-            // SAFETY: EnumWindows is synchronous; param points at our live Vec.
-            unsafe {
-                if taskbar_class(hwnd) && IsWindowVisible(hwnd).as_bool() {
-                    let mut pid = 0;
-                    GetWindowThreadProcessId(hwnd, Some(&mut pid));
-                    let item = TaskbarWindow {
-                        hwnd: hwnd.0 as isize,
-                        pid,
-                    };
-                    if explorer_window(&item) {
-                        (*(param.0 as *mut Vec<TaskbarWindow>)).push(item);
-                    }
-                }
-            }
-            TRUE
-        }
-        let mut visible = Vec::<TaskbarWindow>::new();
-        // SAFETY: callback borrows the Vec only for the duration of enumeration.
-        unsafe {
-            EnumWindows(Some(collect), LPARAM(&mut visible as *mut _ as isize))?;
-        }
-        if visible.is_empty() {
-            return Ok(());
-        }
-        for item in &visible {
-            if !lease
-                .windows
-                .iter()
-                .any(|old| old.hwnd == item.hwnd && old.pid == item.pid)
-            {
-                lease.windows.push(item.clone());
-            }
-        }
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        // Save before hiding so controller crash recovery always has the original window set.
-        let temporary = path.with_extension("json.tmp");
-        let file = std::fs::File::create(&temporary)?;
-        serde_json::to_writer(&file, &lease)?;
-        file.sync_all()?;
-        std::fs::rename(temporary, &path)?;
-        self.hidden = true;
-        for item in visible {
-            if explorer_window(&item) {
-                unsafe {
-                    let _ = ShowWindow(HWND(item.hwnd as *mut _), SW_HIDE);
-                }
-            }
-        }
-        Ok(())
-    }
-}
-impl Drop for TaskbarVisibility {
-    fn drop(&mut self) {
-        if self.hidden {
-            if let Err(error) = restore_after_exit(&self.layout, Some(std::process::id())) {
-                crate::applog::log(&format!("cannot restore Windows taskbar: {error}"));
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_or_invalid_lease_cannot_restore_or_delete_windows() {
+        let dir =
+            std::env::temp_dir().join(format!("protonsearch-recovery-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let layout = dir.join("dock-layout.json");
+        let lease = lease_path(&layout);
+        let _ = std::fs::remove_file(&lease);
+        assert!(restore_after_exit(&layout, None).is_ok());
+        std::fs::write(&lease, b"{\"owner\":0,\"windows\":[]}").unwrap();
+        assert!(restore_after_exit(&layout, None).is_err());
+        assert!(lease.exists());
+        std::fs::remove_file(&lease).unwrap();
+        std::fs::remove_dir(&dir).unwrap();
     }
 }

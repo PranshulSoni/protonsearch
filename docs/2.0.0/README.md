@@ -1,5 +1,7 @@
 # Proton 2.0 planning pack
 
+> Historical note: the native dock described in this planning pack has been removed from ProtonSearch. These pages are retained as design history.
+
 Prepared 20 October 2026 (Asia/Kolkata). Branch: `2.0.0`.
 Baseline application commit: `98d52ce` on `1.1.1`.
 

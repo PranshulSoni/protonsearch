@@ -18,7 +18,7 @@ mod settings_startup;
 mod settings_ui;
 mod uninstall;
 mod ui;
-mod dock;
+mod taskbar_recovery;
 
 use search::{SearchEngine, SearchResult};
 use std::os::windows::process::CommandExt;
@@ -116,10 +116,6 @@ const WM_OCR_RESULT: u32 = WM_USER + 13;
 // which would derive its own &mut State from the same GWLP_USERDATA pointer.
 const WM_ANIM_FOREGROUND: u32 = WM_USER + 14;
 const WM_ANIM_HIDE_WINDOW: u32 = WM_USER + 15;
-pub(crate) const WM_DOCK_SEARCH: u32 = WM_APP + 100;
-pub(crate) const WM_DOCK_AGENTS: u32 = WM_APP + 101;
-pub(crate) const WM_DOCK_START: u32 = WM_APP + 102;
-const TIMER_DOCK_SUPERVISOR: usize = 41;
 
 fn clipboard_ocr_empty_message() -> &'static str {
     "No readable text found in the clipboard image"
@@ -672,11 +668,6 @@ fn enforce_single_instance() -> Option<MutexHandle> {
 // ── Entry point ───────────────────────────────────────────────────────────────
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|arg| arg == "--dock") {
-        install_panic_logger();
-        if let Err(error) = dock::run() { applog::log(&format!("native dock: {error:#}")); }
-        return;
-    }
     migrate_legacy_appdata();
     install_panic_logger();
 
@@ -715,6 +706,15 @@ fn main() {
         None => return,
     };
 
+    let layout = std::env::var_os("APPDATA")
+        .or_else(|| std::env::var_os("LOCALAPPDATA"))
+        .map(std::path::PathBuf::from)
+        .map(|path| path.join("protonsearch").join("dock-layout.json"))
+        .unwrap_or_else(|| settings::AppSettings::get_settings_path().with_file_name("dock-layout.json"));
+    if let Err(error) = taskbar_recovery::restore_after_exit(&layout, None) {
+        applog::log(&format!("cannot recover Windows taskbar: {error}"));
+    }
+
     let first_settings_run = !crate::settings::AppSettings::get_settings_path().exists();
     let startup_settings = crate::settings::AppSettings::load();
     crate::settings_startup::sync_run_on_startup(startup_settings.run_on_startup);
@@ -728,7 +728,7 @@ fn main() {
     }
 
     unsafe {
-        run(first_settings_run, !args.iter().any(|arg| arg == "--search-only"));
+        run(first_settings_run);
     }
 }
 
@@ -816,7 +816,7 @@ unsafe fn create_gdi_font(family: &str, size_px: i32, weight_str: &str) -> HFONT
     )
 }
 
-unsafe fn run(first_settings_run: bool, enable_dock: bool) {
+unsafe fn run(first_settings_run: bool) {
     let hinst = GetModuleHandleW(PCWSTR::null()).unwrap();
     let face: Vec<u16> = "Segoe UI Variable\0".encode_utf16().collect();
     let fp = PCWSTR(face.as_ptr());
@@ -1465,19 +1465,11 @@ unsafe fn run(first_settings_run: bool, enable_dock: bool) {
         ));
     }
 
-    let mut dock_supervisor = dock::supervisor::DockSupervisor::new(hwnd, enable_dock);
-    let _ = SetTimer(hwnd, TIMER_DOCK_SUPERVISOR, 2000, None);
     let mut msg = MSG::default();
     while GetMessageW(&mut msg, HWND(null_mut()), 0, 0).as_bool() {
-        if msg.hwnd == hwnd && msg.message == WM_TIMER && msg.wParam.0 == TIMER_DOCK_SUPERVISOR {
-            dock_supervisor.tick();
-            continue;
-        }
         let _ = TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
-    let _ = KillTimer(hwnd, TIMER_DOCK_SUPERVISOR);
-    drop(dock_supervisor);
     let _ = UnregisterHotKey(hwnd, HOTKEY_ID);
 }
 
@@ -1847,19 +1839,6 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
             DefWindowProcW(hwnd, msg, wp, lp)
         }
 
-        WM_DOCK_SEARCH | WM_DOCK_AGENTS | WM_DOCK_START => {
-            if !sp.is_null() {
-                let s = &mut *sp;
-                if msg == WM_DOCK_AGENTS {
-                    s.query = "agents:".to_owned();
-                    s.cursor_pos = s.query.len();
-                    s.reset_results();
-                    trigger_search(hwnd, s);
-                }
-                do_show(hwnd, s);
-            }
-            LRESULT(0)
-        }
         WM_HOTKEY if wp.0 as i32 == HOTKEY_ID => {
             let s = &mut *sp;
             match s.anim {
@@ -3831,7 +3810,6 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                         do_show(hwnd, s);
                     }
                 } else if selection.0 == 2 {
-                    // Controller shutdown gracefully stops its dock child.
                     let _ = unsafe { PostMessageW(hwnd, windows::Win32::UI::WindowsAndMessaging::WM_CLOSE, WPARAM(0), LPARAM(0)) };
                 } else if selection.0 == 3 {
                     if let Ok(exe) = std::env::current_exe() {
@@ -3982,7 +3960,6 @@ unsafe extern "system" fn wnd_proc_inner(hwnd: HWND, msg: u32, wp: WPARAM, lp: L
                     do_show(hwnd, s);
                 }
             } else if cmd == 2 {
-                // Controller shutdown gracefully stops its dock child.
                 let _ = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) };
             }
             LRESULT(0)

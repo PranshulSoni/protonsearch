@@ -1,8 +1,6 @@
 fn main() {
     println!("cargo:rerun-if-changed=ui/settings.slint");
     println!("cargo:rerun-if-changed=ui/app.slint");
-    println!("cargo:rerun-if-changed=ui/dock.slint");
-    println!("cargo:rerun-if-changed=ui/icons/dock");
     println!("cargo:rerun-if-changed=../icons/ProtonSearchTrans.ico");
     println!("cargo:rerun-if-changed=../icons/ProtonSearchTrans.png");
     println!("cargo:rerun-if-changed=../icons/ProtonSearchTrans_small.png");

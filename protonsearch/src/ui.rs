@@ -1,2 +1,2 @@
-//! Shared generated Slint components for settings and the desktop dock.
+//! Generated Slint components for settings.
 slint::include_modules!();
