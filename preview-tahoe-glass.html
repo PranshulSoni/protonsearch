@@ -1771,6 +1771,7 @@
       pointer-events: none;
       z-index: 4;
     }
+    .customizer-backdrop.is-detail .cust-fade { display: none; }
 
     .cust-dock-preview {
       border-radius: 12px;
@@ -1871,7 +1872,7 @@
     .style-pill-btn:hover { color: var(--w-text); }
     .style-pill-btn.active { background: rgba(143, 226, 204, 0.13); color: #a9efd9; }
 
-    .wm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .wm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .wm-card {
       display: grid;
       grid-template-columns: 212px minmax(0, 1fr);
@@ -1880,7 +1881,7 @@
       border-radius: 13px;
       border: 1px solid rgba(255, 255, 255, 0.07);
       background: rgba(255, 255, 255, 0.022);
-      min-height: 172px;
+      min-height: 158px;
       transition: border-color 150ms ease-out, background 150ms ease-out;
       position: relative;
     }
@@ -1890,7 +1891,7 @@
     .wm-card.store-card.disabled { opacity: 0.94; }
     .wm-card.store-card.disabled:hover { opacity: 1; }
     .wm-preview {
-      height: 150px;
+      height: 136px;
       padding: 8px;
       border-radius: 9px;
       border: 1px solid rgba(255, 255, 255, 0.055);
@@ -1902,7 +1903,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 5px;
+      gap: 4px;
       overflow: hidden;
       cursor: pointer;
       position: relative;
@@ -1936,11 +1937,11 @@
       position: relative;
       z-index: 1;
       align-self: flex-start;
-      font-size: 7.5px;
-      font-weight: 600;
-      letter-spacing: 0.045em;
+      font-size: 8px;
+      font-weight: 650;
+      letter-spacing: 0.055em;
       text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.28);
+      color: rgba(255, 255, 255, 0.38);
       font-variant-numeric: tabular-nums;
       padding-left: 2px;
     }
@@ -1966,29 +1967,30 @@
     }
     .wm-drag:hover { color: var(--w-muted); background: rgba(255, 255, 255, 0.05); }
     .wm-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 7px; }
-    .wm-sizes { display: flex; gap: 2px; padding: 2px; border-radius: 6px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.045); width: max-content; }
+    .wm-sizes { display: flex; gap: 2px; padding: 3px; border-radius: 7px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.06); width: max-content; }
     .size-opt-btn {
-      appearance: none; border: 0; background: transparent; color: var(--w-dim);
-      font: 600 8.5px/1 var(--font-stack); padding: 4px 7px; border-radius: 4px; cursor: pointer;
-      transition: background 140ms ease-out, color 140ms ease-out;
+      appearance: none; border: 0; background: transparent; color: rgba(255, 255, 255, 0.48);
+      font: 650 9.5px/1 var(--font-stack); min-height: 28px; padding: 0 10px; border-radius: 5px; cursor: pointer;
+      transition: background 140ms ease-out, color 140ms ease-out, box-shadow 140ms ease-out;
     }
-    .size-opt-btn:hover { color: var(--w-text); }
-    .size-opt-btn.active { background: rgba(255, 255, 255, 0.1); color: #eef2f4; }
-    .wm-actions { display: flex; align-items: center; gap: 7px; }
+    .size-opt-btn:hover { color: var(--w-text); background: rgba(255, 255, 255, 0.06); }
+    .size-opt-btn.active { background: rgba(143, 226, 204, 0.15); color: #c9f8ea; box-shadow: inset 0 0 0 1px rgba(143, 226, 204, 0.28); }
+    .wm-actions { display: flex; align-items: center; gap: 8px; }
     .wm-customize {
-      appearance: none; border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.055); color: #dbe0e4;
-      font: 600 9px/1 var(--font-stack); padding: 6px 9px; border-radius: 6px; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 5px;
+      appearance: none; border: 1px solid rgba(255, 255, 255, 0.13);
+      background: rgba(255, 255, 255, 0.085); color: #f0f3f5;
+      font: 650 10.5px/1 var(--font-stack); min-height: 34px; padding: 0 13px; border-radius: 7px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
       transition: background 140ms ease-out, border-color 140ms ease-out;
     }
-    .wm-customize:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.14); }
-    .wm-enable { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-    .wm-enable-label { font-size: 8px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; color: var(--w-dim); }
+    .wm-customize:hover { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.2); }
+    .wm-enable { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+    .wm-enable-label { font-size: 8.5px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255, 255, 255, 0.42); }
     .wm-install {
-      appearance: none; border: 0; height: 26px; padding: 0 11px; border-radius: 6px;
+      appearance: none; border: 0; height: 32px; padding: 0 13px; border-radius: 7px;
       background: rgba(143, 226, 204, 0.13); border: 1px solid rgba(143, 226, 204, 0.25);
-      color: #a9efd9; font: 650 9px/1 var(--font-stack); cursor: pointer;
+      color: #a9efd9; font: 650 10px/1 var(--font-stack); cursor: pointer;
       display: inline-flex; align-items: center; gap: 5px; margin-left: auto;
       transition: background 140ms ease-out;
     }
@@ -1997,7 +1999,7 @@
     .wm-install.installed:hover { background: rgba(255, 255, 255, 0.08); }
     .wm-empty-store { font-size: 10px; color: var(--w-dim); padding: 12px; text-align: center; }
     .store-note {
-      min-height: 172px;
+      min-height: 158px;
       border-radius: 13px;
       border: 1px dashed rgba(255, 255, 255, 0.09);
       background: rgba(255, 255, 255, 0.012);
@@ -2019,7 +2021,8 @@
     .store-note span { font-size: 8.5px; color: rgba(255, 255, 255, 0.3); }
 
     /* Toggle */
-    .w-switch { position: relative; display: inline-flex; width: 28px; height: 16px; flex: 0 0 auto; cursor: pointer; }
+    .w-switch { position: relative; display: inline-flex; width: 32px; height: 18px; flex: 0 0 auto; cursor: pointer; }
+    .w-switch::before { content: ""; position: absolute; inset: -7px -6px; border-radius: 8px; }
     .w-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
     .w-switch .ws-track {
       position: absolute; inset: 0; border-radius: 999px;
@@ -2029,12 +2032,29 @@
     }
     .w-switch .ws-track::after {
       content: ""; position: absolute; top: 2px; left: 2px;
-      width: 10px; height: 10px; border-radius: 50%;
+      width: 12px; height: 12px; border-radius: 50%;
       background: #9aa0a7;
       transition: transform 150ms ease-out, background 150ms ease-out;
     }
     .w-switch input:checked + .ws-track { background: rgba(143, 226, 204, 0.28); border-color: rgba(143, 226, 204, 0.38); }
-    .w-switch input:checked + .ws-track::after { transform: translateX(12px); background: #c7f7e9; }
+    .w-switch input:checked + .ws-track::after { transform: translateX(14px); background: #c7f7e9; }
+    .w-switch input:focus-visible + .ws-track { box-shadow: 0 0 0 2px rgba(143, 226, 204, 0.8); }
+
+    /* Keyboard focus */
+    .customizer-window button:focus-visible,
+    .customizer-window select:focus-visible,
+    .customizer-window input:not([type="checkbox"]):focus-visible,
+    .customizer-window .wm-preview:focus-visible {
+      outline: 2px solid rgba(143, 226, 204, 0.8);
+      outline-offset: 2px;
+    }
+    .customizer-window .wm-preview:focus-visible { outline-offset: -2px; }
+
+    @media (pointer: coarse) {
+      .customizer-window .size-opt-btn,
+      .customizer-window .wm-customize,
+      .customizer-window .wm-install { min-height: 44px; }
+    }
 
     /* Detail view */
     .cust-detail { display: flex; flex-direction: column; gap: 12px; }
@@ -2092,7 +2112,7 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      max-height: 408px;
+      max-height: 448px;
       overflow-y: auto;
       scrollbar-width: none;
       -ms-overflow-style: none;
@@ -2443,7 +2463,7 @@
 
     const SAMPLE = {
       spotify: {
-        track: 'Tunnel Vision', artist: 'Aurora B.Poreal', album: 'Afterglow — Single',
+        track: 'Tunnel Vision', artist: 'Aurora B.Poreal', album: 'Afterglow · Single',
         elapsed: '2:14', duration: '3:48', pct: 59, device: 'Windows · Speakers',
         volume: 62
       },
@@ -3096,7 +3116,7 @@
           const def = WIDGET_BY_ID[state.id];
           const variant = state.size === 'compact' ? 'pill' : state.size === 'medium' ? 'tile' : 'rail';
           const width = RAIL_WIDTHS[state.id][state.size];
-          return '<div class="dock-widget tint-' + def.tint + '" data-widget="' + state.id + '" data-size="' + state.size + '" style="width:' + width + 'px" draggable="true" role="button" tabindex="0" aria-label="' + wEsc(def.name) + '" title="' + wEsc(def.name) + ' — hover for card, click for details" onclick="handleDockWidgetClick(event,\'' + state.id + '\')" onkeydown="handleDockWidgetKey(event,\'' + state.id + '\')">' + renderWidgetContent(def, state, variant) + '</div>';
+          return '<div class="dock-widget tint-' + def.tint + '" data-widget="' + state.id + '" data-size="' + state.size + '" style="width:' + width + 'px" draggable="true" role="button" tabindex="0" aria-label="' + wEsc(def.name) + '" title="' + wEsc(def.name) + ' · hover for card, click for details" onclick="handleDockWidgetClick(event,\'' + state.id + '\')" onkeydown="handleDockWidgetKey(event,\'' + state.id + '\')">' + renderWidgetContent(def, state, variant) + '</div>';
         }).join('');
       }
       updateManagerMeta();
@@ -3142,7 +3162,7 @@
         const [label, value] = miniPreview(state);
         const width = Math.max(state.size === 'compact' ? 60 : 54, Math.round(RAIL_WIDTHS[state.id][state.size] * 0.56)) + (state.id === 'agent' ? 12 : 0);
         const liveClock = state.id === 'clock' ? ' data-clock-inline' : '';
-        return '<button class="cdp-slot tint-' + def.tint + '" data-size="' + state.size + '" style="width:' + width + 'px" onclick="openWidgetDetail(\'' + state.id + '\')" title="' + wEsc(def.name) + ' — ' + SIZE_LABELS[state.size] + '">' +
+        return '<button class="cdp-slot tint-' + def.tint + '" data-size="' + state.size + '" style="width:' + width + 'px" onclick="openWidgetDetail(\'' + state.id + '\')" title="' + wEsc(def.name) + ' · ' + SIZE_LABELS[state.size] + '">' +
           '<span class="w-ico">' + wIcon(def.icon, 11) + '</span>' +
           '<span class="cdp-text">' +
             '<b' + liveClock + '>' + wEsc(label) + '</b>' +
@@ -3434,6 +3454,7 @@
       installed.style.display = !isDetail && activeTab === 'installed' ? 'flex' : 'none';
       store.style.display = !isDetail && activeTab === 'store' ? 'flex' : 'none';
       detail.style.display = isDetail ? 'flex' : 'none';
+      customizerModal.classList.toggle('is-detail', isDetail);
       if (dockPreview) dockPreview.style.display = 'block';
 
       updateManagerMeta();
@@ -3447,18 +3468,11 @@
 
     function previewMarkup(state) {
       const def = WIDGET_BY_ID[state.id];
-      if (state.size === 'expanded') {
-        return '<div class="wm-preview-scaler" data-fit-card>' + renderWidgetContent(def, state, 'card') + '</div>';
-      }
-      const variant = state.size === 'compact' ? 'pill' : 'tile';
-      const width = RAIL_WIDTHS[state.id][state.size];
-      return '<div class="dock-widget tint-' + def.tint + '" style="width:' + width + 'px;pointer-events:none" data-preview-size="' + state.size + '">' + renderWidgetContent(def, state, variant) + '</div>';
+      return '<div class="wm-preview-scaler" data-fit-card>' + renderWidgetContent(def, state, 'card') + '</div>';
     }
 
     function previewCaption(state) {
-      const def = WIDGET_BY_ID[state.id];
-      if (state.size === 'expanded') return 'Card · ' + def.cardWidth + ' px wide';
-      return SIZE_LABELS[state.size] + ' · ' + RAIL_WIDTHS[state.id][state.size] + ' × 66';
+      return 'Card preview · ' + SIZE_LABELS[state.size] + ' trigger';
     }
 
     function previewFrame(state) {
@@ -3471,15 +3485,7 @@
         const stage = scaler.closest('.wm-preview-stage');
         if (!card || !stage) return;
         const scale = Math.min((stage.clientWidth - 4) / card.offsetWidth, (stage.clientHeight - 4) / card.offsetHeight, 1);
-        scaler.style.transform = 'scale(' + Math.max(0.3, scale) + ')';
-      });
-      document.querySelectorAll('.wm-preview-stage [data-preview-size]').forEach(slot => {
-        const stage = slot.closest('.wm-preview-stage');
-        if (!stage) return;
-        const max = slot.getAttribute('data-preview-size') === 'compact' ? 1.55 : 1.05;
-        const scale = Math.min(max, (stage.clientWidth - 8) / slot.offsetWidth, (stage.clientHeight - 4) / slot.offsetHeight);
-        slot.style.transform = 'scale(' + Math.max(0.7, scale) + ')';
-        slot.style.transformOrigin = 'center center';
+        scaler.style.transform = 'scale(' + Math.max(0.24, scale) + ')';
       });
     }
 
@@ -3493,7 +3499,7 @@
       grid.innerHTML = widgetState.map(state => {
         const def = WIDGET_BY_ID[state.id];
         return '<div class="wm-card ' + (state.enabled ? '' : 'disabled') + '" data-manage-card="' + state.id + '" style="--tint-rgb:' + def.tintRgb + '">' +
-          '<div class="wm-preview" onclick="openWidgetDetail(\'' + state.id + '\')" title="Open ' + wEsc(def.name) + ' settings">' + previewFrame(state) + '</div>' +
+          '<div class="wm-preview" role="button" tabindex="0" onclick="openWidgetDetail(\'' + state.id + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openWidgetDetail(\'' + state.id + '\')}" title="Open ' + wEsc(def.name) + ' settings">' + previewFrame(state) + '</div>' +
           '<div class="wm-body">' +
             '<div class="wm-top"><div class="wm-icon">' + wIcon(def.icon, 14) + '</div><div class="wm-name"><b>' + wEsc(def.name) + '</b><p>' + wEsc(def.desc) + '</p></div><div class="wm-drag" draggable="true" data-drag-widget="' + state.id + '" title="Drag to reorder">' + wIcon('drag', 13) + '</div></div>' +
             '<div class="wm-bottom">' +
@@ -3515,7 +3521,7 @@
       grid.innerHTML = optional.map(def => {
         const state = getWidgetState(def.id);
         return '<div class="wm-card store-card ' + (state.enabled ? '' : 'disabled') + '" data-manage-card="' + state.id + '" style="--tint-rgb:' + def.tintRgb + '">' +
-          '<div class="wm-preview" onclick="openWidgetDetail(\'' + state.id + '\')" title="Preview ' + wEsc(def.name) + '">' + previewFrame(state) + '</div>' +
+          '<div class="wm-preview" role="button" tabindex="0" onclick="openWidgetDetail(\'' + state.id + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openWidgetDetail(\'' + state.id + '\')}" title="Preview ' + wEsc(def.name) + '">' + previewFrame(state) + '</div>' +
           '<div class="wm-body">' +
             '<div class="wm-top"><div class="wm-icon">' + wIcon(def.icon, 14) + '</div><div class="wm-name"><b>' + wEsc(def.name) + '</b><p>' + wEsc(def.desc) + '</p></div><span class="w-tag' + (state.enabled ? ' live' : '') + '">' + (state.enabled ? 'Installed' : 'Not installed') + '</span></div>' +
             '<div class="wm-bottom">' +

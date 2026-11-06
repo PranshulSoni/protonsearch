@@ -37,6 +37,15 @@ its detail preview; `node --check` and `git diff --check` pass. Evidence:
 `widget-system-card.png`, `widgets-store.png`, `widgets-popover.png`,
 `widgets-dock-1280.png`.
 
+Follow-up polish (2026-11-07): installed and store thumbnails now render the
+complete card layout fit-scaled into each preview stage, with captions naming the
+selected Pill/Tile/Card dock trigger; the trigger control no longer changes the
+thumbnail. Customize and the selected size segment were enlarged, a 2px
+focus-visible ring and 44px coarse-pointer targets were added, and the detail
+fade was removed so all eight System settings remain visible at 1600x1000. The
+visible copy audit found zero em/en dashes and no mojibake or replacement
+characters. Recaptured manager, store, Spotify, and System evidence above.
+
 Open gates: all provider values in the preview are marked SAMPLE; live native
 providers, real account usage, settings persistence across reloads, packaged-app
 rendering, and physical 125%/DPI visual checks remain unverified. The preview
