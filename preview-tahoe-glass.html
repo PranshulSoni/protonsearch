@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ProtonDock & ProtonSearch: Complete System & Widget Ecosystem</title>
+  <title>ProtonDock & ProtonSearch: Refined Tahoe Launcher & Dock</title>
   <style>
     /* ==========================================================================
        DESIGN TOKENS & SYSTEM VARIABLES (Modern Sleek Glass UI)
@@ -191,18 +191,18 @@
     }
 
     /* ==========================================================================
-       PROTONSEARCH PALETTE MODAL (Tahoe Glass Spotlight Window)
+       REFINED ADAPTIVE LAUNCHER PALETTE (Raycast & Tahoe Inspired)
        ========================================================================== */
     .ps-spotlight-backdrop {
       position: absolute;
       inset: 0;
-      background: rgba(0, 0, 0, 0.45);
-      backdrop-filter: blur(10px);
+      background: rgba(0, 0, 0, 0.50);
+      backdrop-filter: blur(14px);
       z-index: 150;
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding-top: clamp(55px, 11vh, 120px);
+      padding-top: clamp(65px, 13vh, 140px);
       opacity: 0;
       pointer-events: none;
       transition: opacity 220ms ease;
@@ -212,12 +212,13 @@
       pointer-events: auto;
     }
 
+    /* Adaptive Width Card: Single-column (620px) by default, widens to 820px when preview active */
     .ps-spotlight-card {
-      width: min(720px, calc(100vw - 32px));
+      width: min(620px, calc(100vw - 32px));
       background: var(--glass-modal);
       backdrop-filter: blur(48px) saturate(190%) contrast(104%);
       border: 1px solid var(--glass-border);
-      border-radius: 20px;
+      border-radius: 18px;
       box-shadow: 
         0 36px 90px rgba(0, 0, 0, 0.70),
         0 10px 24px rgba(0, 0, 0, 0.45),
@@ -226,12 +227,17 @@
       flex-direction: column;
       overflow: hidden;
       transform: translateY(-12px) scale(0.98);
-      transition: transform 240ms var(--spring-ease), opacity 200ms ease;
+      transition: width var(--trans-resize), transform 240ms var(--spring-ease), opacity 200ms ease;
+      position: relative;
+    }
+    .ps-spotlight-card.with-preview {
+      width: min(820px, calc(100vw - 32px));
     }
     .ps-spotlight-backdrop.is-open .ps-spotlight-card {
       transform: translateY(0) scale(1);
     }
 
+    /* Minimalist Integrated Search Header */
     .ps-search-top {
       display: flex;
       align-items: center;
@@ -240,21 +246,33 @@
       border-bottom: 1px solid var(--glass-border-subtle);
       background: rgba(255, 255, 255, 0.02);
     }
-    .ps-brand-badge {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      background: linear-gradient(135deg, #007aff, #5856d6);
+    .ps-search-ic {
+      color: var(--accent);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
       flex-shrink: 0;
-      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.35);
+    }
+    .ps-scope-pill {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(0, 122, 255, 0.22);
+      border: 1px solid rgba(0, 122, 255, 0.35);
+      color: #60a5fa;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .ps-scope-pill.is-active {
+      display: flex;
     }
     .ps-search-input {
       flex: 1;
-      height: 36px;
+      height: 34px;
       background: transparent;
       border: none;
       outline: none;
@@ -267,116 +285,94 @@
     .ps-search-input::placeholder {
       color: var(--text-tertiary);
     }
-    .ps-esc-btn {
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      cursor: pointer;
-    }
-    .ps-esc-btn:hover {
-      background: var(--glass-surface-hover);
-      color: var(--text-primary);
-    }
-
-    .ps-category-bar {
+    .ps-header-actions {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 18px;
-      border-bottom: 1px solid var(--glass-border-subtle);
-      background: rgba(0, 0, 0, 0.15);
-      overflow-x: auto;
     }
-    .ps-chip {
-      padding: 3px 10px;
-      border-radius: 999px;
+    .ps-key-hint {
+      padding: 3px 7px;
+      border-radius: 6px;
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
-      color: var(--text-secondary);
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 600;
+      color: var(--text-secondary);
       cursor: pointer;
-      white-space: nowrap;
-      transition: all var(--trans-hover);
+      transition: all 120ms ease;
     }
-    .ps-chip:hover {
+    .ps-key-hint:hover {
       background: var(--glass-surface-hover);
       color: var(--text-primary);
     }
-    .ps-chip.active {
-      background: rgba(0, 122, 255, 0.28);
-      border-color: var(--accent);
-      color: #fff;
-    }
 
+    /* Dynamic Results Body (Adaptive 1 or 2 Columns) */
     .ps-search-body {
-      display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(210px, 0.85fr);
-      min-height: 290px;
-      max-height: 380px;
+      display: flex;
+      min-height: 260px;
+      max-height: 400px;
       overflow: hidden;
     }
     .ps-results-column {
-      padding: 10px;
+      flex: 1;
+      min-width: 0;
+      padding: 8px 10px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
     }
-    .ps-results-heading {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 10px 4px 10px;
+
+    /* Section Sticky Header */
+    .ps-section-header {
       font-size: 9.5px;
       font-weight: 700;
-      letter-spacing: 0.06em;
-      color: var(--text-tertiary);
+      letter-spacing: 0.08em;
       text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 8px 10px 4px 10px;
+      display: flex;
+      justify-content: space-between;
     }
-    .ps-result-item {
+
+    /* Individual Result Row */
+    .ps-result-row {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 12px;
+      padding: 7px 11px;
       border-radius: 10px;
       background: transparent;
       border: 1px solid transparent;
       cursor: pointer;
       transition: all 120ms ease;
     }
-    .ps-result-item:hover,
-    .ps-result-item.is-selected {
+    .ps-result-row:hover,
+    .ps-result-row.is-selected {
       background: var(--glass-surface-active);
       border-color: var(--glass-border-subtle);
     }
-    .ps-result-item.is-selected {
-      border-color: rgba(0, 122, 255, 0.4);
+    .ps-result-row.is-selected {
       background: rgba(0, 122, 255, 0.16);
+      border-color: rgba(0, 122, 255, 0.40);
     }
-    .ps-result-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
+    .ps-item-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      color: var(--accent);
     }
-    .ps-result-copy {
+    .ps-item-copy {
       display: flex;
       flex-direction: column;
       min-width: 0;
       flex: 1;
       line-height: 1.25;
     }
-    .ps-result-copy b {
+    .ps-item-copy b {
       font-size: 12.5px;
       font-weight: 600;
       color: var(--text-primary);
@@ -384,14 +380,14 @@
       text-overflow: ellipsis;
       overflow: hidden;
     }
-    .ps-result-copy small {
+    .ps-item-copy small {
       font-size: 10px;
       color: var(--text-secondary);
       white-space: nowrap;
       text-overflow: ellipsis;
       overflow: hidden;
     }
-    .ps-result-badge {
+    .ps-item-badge {
       font-size: 9px;
       font-weight: 700;
       padding: 2px 6px;
@@ -401,98 +397,180 @@
       letter-spacing: 0.03em;
     }
 
-    .ps-preview-column {
-      border-left: 1px solid var(--glass-border-subtle);
-      background: rgba(0, 0, 0, 0.12);
-      padding: 18px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .ps-preview-header {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 8px;
-    }
-    .ps-preview-big-icon {
-      width: 54px;
-      height: 54px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, rgba(0, 122, 255, 0.2), rgba(0, 122, 255, 0.05));
-      border: 1px solid rgba(0, 122, 255, 0.3);
+    /* Zero-Click Hero Calculator Card */
+    .ps-calculator-hero {
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(94, 241, 194, 0.14), rgba(0, 122, 255, 0.08));
+      border: 1px solid rgba(94, 241, 194, 0.35);
       display: flex;
       align-items: center;
-      justify-content: center;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      justify-content: space-between;
+      margin: 4px 0 8px 0;
+      cursor: pointer;
     }
-    .ps-preview-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--text-primary);
-      word-break: break-all;
-    }
-    .ps-preview-path {
-      font-size: 10px;
-      color: var(--text-secondary);
-      font-family: monospace;
-      background: rgba(0, 0, 0, 0.25);
-      padding: 4px 8px;
-      border-radius: 6px;
-      max-width: 100%;
-      word-break: break-all;
-    }
-    .ps-preview-details {
+    .ps-calc-main {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 2px;
+    }
+    .ps-calc-expr {
       font-size: 11px;
       color: var(--text-secondary);
     }
-    .ps-preview-row {
+    .ps-calc-result {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--accent-emerald);
+      letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
+    }
+    .ps-calc-action {
       display: flex;
-      justify-content: space-between;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      padding-bottom: 4px;
-    }
-    .ps-preview-row span:last-child {
-      color: var(--text-primary);
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
       font-weight: 600;
+      color: var(--text-primary);
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
-    .ps-preview-actions {
+
+    /* Rich Actionable Preview Pane (Sliding in smoothly on width expansion) */
+    .ps-preview-pane {
+      width: 290px;
+      border-left: 1px solid var(--glass-border-subtle);
+      background: rgba(0, 0, 0, 0.16);
+      padding: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+    .ps-spotlight-card.with-preview .ps-preview-pane {
+      display: flex;
+    }
+
+    .prev-head-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .prev-head-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--glass-surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .prev-head-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .prev-breadcrumbs {
+      font-size: 9.5px;
+      color: var(--text-secondary);
+      font-family: monospace;
+      margin-top: 2px;
+    }
+
+    /* Code Snippet Mockup */
+    .prev-code-box {
+      border-radius: 9px;
+      background: rgba(10, 14, 22, 0.85);
+      border: 1px solid var(--glass-border-subtle);
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 9.5px;
+      line-height: 1.5;
+      color: #9cdcfe;
+      overflow: hidden;
+    }
+    .code-comment { color: #6a9955; }
+    .code-keyword { color: #c586c0; }
+    .code-func { color: #dcdcaa; }
+
+    /* Action Buttons in Preview Pane */
+    .prev-actions-stack {
       margin-top: auto;
       display: flex;
       flex-direction: column;
       gap: 5px;
     }
-    .ps-action-btn {
-      padding: 6px 10px;
-      border-radius: 7px;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
-      font-size: 10.5px;
-      font-weight: 600;
-      color: var(--text-primary);
+    .prev-action-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding: 6px 9px;
+      border-radius: 7px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-primary);
       cursor: pointer;
       transition: all 120ms ease;
     }
-    .ps-action-btn:hover {
+    .prev-action-row:hover {
       background: var(--accent);
       border-color: var(--accent);
       color: #fff;
     }
 
+    /* Action Palette Overlay (<kbd>Ctrl+K</kbd>) */
+    .ps-action-palette-menu {
+      position: absolute;
+      bottom: 44px;
+      right: 18px;
+      width: 230px;
+      background: var(--glass-modal);
+      backdrop-filter: blur(40px);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+      display: none;
+      flex-direction: column;
+      gap: 3px;
+      z-index: 200;
+    }
+    .ps-action-palette-menu.is-open {
+      display: flex;
+    }
+    .palette-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-radius: 7px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 100ms ease;
+    }
+    .palette-item:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* Refined Footer Bar */
     .ps-search-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 18px;
+      padding: 9px 18px;
       border-top: 1px solid var(--glass-border-subtle);
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.22);
       font-size: 10px;
       color: var(--text-secondary);
     }
@@ -512,11 +590,27 @@
     .ps-footer-keys {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+    }
+    .footer-key-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .footer-key-pill kbd {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-family: inherit;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--text-primary);
     }
 
     /* ==========================================================================
-       DEDICATED WIDGETS MANAGER & STORE MODAL (Requirement 1 & 5)
+       DEDICATED WIDGETS MANAGER & STORE MODAL
        ========================================================================== */
     .customizer-backdrop {
       position: absolute;
@@ -629,7 +723,6 @@
       gap: 16px;
     }
 
-    /* Global Preferences Strip (Capsules vs Lines) */
     .cust-pref-strip {
       display: flex;
       align-items: center;
@@ -774,7 +867,6 @@
       color: var(--text-primary);
     }
 
-    /* Store Grid */
     .store-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -865,7 +957,7 @@
     }
 
     /* ==========================================================================
-       THE PROTONDOCK RAIL & RELOCATABLE WIDGETS (Requirements 2, 3, 5, 6)
+       THE PROTONDOCK RAIL & RELOCATABLE WIDGETS
        ========================================================================== */
     .dock-stage {
       position: absolute;
@@ -1022,7 +1114,7 @@
       outline-offset: 2px;
     }
 
-    /* DISPLAY STYLES: CAPSULES VS LINES (Requirement 5) */
+    /* DISPLAY STYLES: CAPSULES VS LINES */
     body[data-display-style="capsule"] .dock-widget {
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
@@ -1057,124 +1149,34 @@
       display: none;
     }
 
-    /* EXACT WIDGET SIZING TIERS (Requirement 2 & 3) */
-    /* 1. Windows Start Menu Widget */
-    .widget-windows[data-size="compact"] {
-      width: 36px;
-      padding: 0;
-      justify-content: center;
-    }
-    .widget-windows[data-size="medium"] {
-      width: 78px;
-      padding: 0 9px;
-      gap: 6px;
-    }
-    .widget-windows[data-size="expanded"] {
-      width: 104px;
-      padding: 0 11px;
-      gap: 7px;
-    }
+    /* EXACT WIDGET SIZING TIERS */
+    .widget-windows[data-size="compact"] { width: 36px; padding: 0; justify-content: center; }
+    .widget-windows[data-size="medium"] { width: 78px; padding: 0 9px; gap: 6px; }
+    .widget-windows[data-size="expanded"] { width: 104px; padding: 0 11px; gap: 7px; }
 
-    /* 2. ProtonSearch Widget */
-    .widget-search[data-size="compact"] {
-      width: 36px;
-      padding: 0;
-      justify-content: center;
-    }
-    .widget-search[data-size="medium"] {
-      width: 114px;
-      padding: 0 9px;
-      gap: 6px;
-    }
-    .widget-search[data-size="expanded"] {
-      width: 175px;
-      padding: 0 11px;
-      gap: 8px;
-    }
+    .widget-search[data-size="compact"] { width: 36px; padding: 0; justify-content: center; }
+    .widget-search[data-size="medium"] { width: 114px; padding: 0 9px; gap: 6px; }
+    .widget-search[data-size="expanded"] { width: 175px; padding: 0 11px; gap: 8px; }
 
-    /* 3. Weather Widget */
-    .widget-weather[data-size="compact"] {
-      width: 54px;
-      padding: 0 8px;
-      gap: 5px;
-    }
-    .widget-weather[data-size="medium"] {
-      width: 98px;
-      padding: 0 9px;
-      gap: 6px;
-    }
-    .widget-weather[data-size="expanded"] {
-      width: 165px;
-      padding: 0 11px;
-      gap: 8px;
-    }
+    .widget-weather[data-size="compact"] { width: 54px; padding: 0 8px; gap: 5px; }
+    .widget-weather[data-size="medium"] { width: 98px; padding: 0 9px; gap: 6px; }
+    .widget-weather[data-size="expanded"] { width: 165px; padding: 0 11px; gap: 8px; }
 
-    /* 4. Hardware System Stats Widget */
-    .widget-system[data-size="compact"] {
-      width: 78px;
-      padding: 0 8px;
-      gap: 5px;
-      font-size: 10px;
-    }
-    .widget-system[data-size="medium"] {
-      width: 124px;
-      padding: 0 9px;
-      gap: 6px;
-      font-size: 10px;
-    }
-    .widget-system[data-size="expanded"] {
-      width: 172px;
-      padding: 0 11px;
-      gap: 7px;
-      font-size: 10px;
-    }
+    .widget-system[data-size="compact"] { width: 78px; padding: 0 8px; gap: 5px; font-size: 10px; }
+    .widget-system[data-size="medium"] { width: 124px; padding: 0 9px; gap: 6px; font-size: 10px; }
+    .widget-system[data-size="expanded"] { width: 172px; padding: 0 11px; gap: 7px; font-size: 10px; }
 
-    /* 5. Spotify Media Player Widget */
-    .widget-spotify[data-size="compact"] {
-      width: 78px;
-      padding: 0 8px;
-      gap: 6px;
-    }
-    .widget-spotify[data-size="medium"] {
-      width: 158px;
-      padding: 0 9px;
-      gap: 7px;
-    }
-    .widget-spotify[data-size="expanded"] {
-      width: 220px;
-      padding: 0 11px;
-      gap: 8px;
-    }
+    .widget-spotify[data-size="compact"] { width: 78px; padding: 0 8px; gap: 6px; }
+    .widget-spotify[data-size="medium"] { width: 158px; padding: 0 9px; gap: 7px; }
+    .widget-spotify[data-size="expanded"] { width: 220px; padding: 0 11px; gap: 8px; }
 
-    /* 6. Clock & Date Widget */
-    .widget-clock[data-size="compact"] {
-      width: 58px;
-      padding: 0 6px;
-      justify-content: center;
-    }
-    .widget-clock[data-size="medium"] {
-      width: 82px;
-      padding: 0 8px;
-      justify-content: center;
-    }
-    .widget-clock[data-size="expanded"] {
-      width: 110px;
-      padding: 0 10px;
-      justify-content: center;
-    }
+    .widget-clock[data-size="compact"] { width: 58px; padding: 0 6px; justify-content: center; }
+    .widget-clock[data-size="medium"] { width: 82px; padding: 0 8px; justify-content: center; }
+    .widget-clock[data-size="expanded"] { width: 110px; padding: 0 10px; justify-content: center; }
 
-    /* 7. Utility Widgets */
-    .widget-util[data-size="compact"] {
-      width: 34px;
-      padding: 0;
-      justify-content: center;
-    }
+    .widget-util[data-size="compact"] { width: 34px; padding: 0; justify-content: center; }
     .widget-util[data-size="medium"],
-    .widget-util[data-size="expanded"] {
-      width: 62px;
-      padding: 0 8px;
-      gap: 5px;
-    }
+    .widget-util[data-size="expanded"] { width: 62px; padding: 0 8px; gap: 5px; }
 
     .widget-inner {
       display: flex;
@@ -1294,8 +1296,8 @@
 
   <!-- Ambient Header -->
   <div class="desktop-hint">
-    <h1>ProtonDock & ProtonSearch: Complete System & Widgets</h1>
-    <p>Modular widgets with individual sizing, capsule vs line display styles, drag and drop relocation, dedicated widget manager and store, and full interactive ProtonSearch palette.</p>
+    <h1>ProtonDock & ProtonSearch: Refined Tahoe Launcher</h1>
+    <p>Adaptive Raycast-inspired command palette, high-fidelity native icons, real-time hero calculator, rich code preview pane, and modular relocatable dock rail.</p>
   </div>
 
   <!-- Top Demo Controls Toolbar -->
@@ -1321,174 +1323,268 @@
     <div class="demo-divider"></div>
     <button class="demo-pill-btn" style="background: rgba(0, 122, 255, 0.28); border-color: var(--accent); color: #fff;" onclick="toggleProtonSearch()">
       <svg class="icon" style="width:12px; height:12px; color:#5ef1c2;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      ProtonSearch (Alt+Space)
+      Try Launcher (Alt+Space)
     </button>
     <button class="demo-pill-btn" style="background: rgba(255, 255, 255, 0.08); border-color: var(--glass-border); color: #fff;" onclick="openCustomizerModal()">
       <svg class="icon" style="width:12px; height:12px;" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      Widget Manager & Store
+      Widget Manager
     </button>
   </div>
 
   <!-- ==========================================================================
-       PROTONSEARCH PALETTE MODAL (Interactive Spotlight Window)
+       REFINED ADAPTIVE LAUNCHER MODAL (Raycast & Tahoe Model)
        ========================================================================== -->
-  <div class="ps-spotlight-backdrop" id="searchModal" onclick="handleSearchBackdrop(event)">
-    <section class="ps-spotlight-card" role="dialog" aria-label="ProtonSearch Spotlight">
+  <div class="ps-spotlight-backdrop is-open" id="searchModal" onclick="handleSearchBackdrop(event)">
+    <section class="ps-spotlight-card with-preview" id="launcherCard" role="dialog" aria-label="ProtonSearch Spotlight">
+      
+      <!-- Minimalist Search Header with Quick Key Hints -->
       <div class="ps-search-top">
-        <div class="ps-brand-badge" title="ProtonSearch FTS5 Engine">
-          <svg class="icon" style="width:18px; height:18px; stroke:#fff;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <div class="ps-search-ic">
+          <svg class="icon" style="width:19px; height:19px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </div>
+        <div class="ps-scope-pill" id="activeScopePill">ALL</div>
         <input 
           id="spotlightInput"
           class="ps-search-input" 
           type="text" 
+          value="Sidebar"
           placeholder="Search apps, files, git commits, code, math formulas..." 
           autocomplete="off"
           oninput="handleSearchInput(this.value)"
         />
-        <button class="ps-esc-btn" onclick="toggleProtonSearch(false)">esc</button>
+        <div class="ps-header-actions">
+          <span class="ps-key-hint" onclick="togglePreviewPane()" title="Toggle Preview Column (Tab)">Tab Preview</span>
+          <span class="ps-key-hint" onclick="toggleActionPalette()" title="Action Palette (Ctrl+K)">Ctrl+K</span>
+          <span class="ps-key-hint" onclick="toggleProtonSearch(false)">esc</span>
+        </div>
       </div>
 
-      <div class="ps-category-bar">
-        <button class="ps-chip active" onclick="setFilterCategory('all', this)">All Results</button>
-        <button class="ps-chip" onclick="setFilterCategory('apps', this)">Apps</button>
-        <button class="ps-chip" onclick="setFilterCategory('files', this)">Local Files (FTS5)</button>
-        <button class="ps-chip" onclick="setFilterCategory('git', this)">Git Commits & TODOs</button>
-        <button class="ps-chip" onclick="setFilterCategory('actions', this)">Actions & Math</button>
-      </div>
-
+      <!-- Search Results Body (Adaptive 1 or 2 Columns) -->
       <div class="ps-search-body">
+        
+        <!-- Results Column (Left) -->
         <div class="ps-results-column" id="resultsList">
-          <div class="ps-results-heading">
-            <span>Results</span>
-            <span id="resultsCount">6 matches</span>
+          
+          <!-- Section 1: In-Process Tool Hero (Appears when math or quick tool matched) -->
+          <div id="calculatorHeroContainer" style="display:none;">
+            <div class="ps-calculator-hero" onclick="copyCalculatorResult()">
+              <div class="ps-calc-main">
+                <span class="ps-calc-expr" id="calcHeroExpr">24 * 1.15</span>
+                <span class="ps-calc-result" id="calcHeroVal">= 27.60</span>
+              </div>
+              <div class="ps-calc-action">
+                <span>Copy</span>
+                <kbd style="font-size:9px; background:rgba(255,255,255,0.15); padding:1px 4px; border-radius:3px;">↵</kbd>
+              </div>
+            </div>
           </div>
 
-          <!-- Result 1 -->
-          <div class="ps-result-item is-selected" data-idx="0" onclick="selectResult(0)">
-            <div class="ps-result-icon">
-              <svg style="width:18px; height:18px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/></svg>
+          <!-- Section 2: Applications -->
+          <div class="ps-section-header">
+            <span>Applications</span>
+            <span>2 Matches</span>
+          </div>
+
+          <!-- VS Code (Genuine Vector Icon) -->
+          <div class="ps-result-row" data-id="vscode" onclick="selectResult('vscode')">
+            <div class="ps-item-icon" style="background:rgba(0,122,204,0.15);">
+              <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+                <path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/>
+                <path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/>
+              </svg>
             </div>
-            <div class="ps-result-copy">
+            <div class="ps-item-copy">
               <b>Visual Studio Code</b>
               <small>Applications · C:\Program Files\Microsoft VS Code\Code.exe</small>
             </div>
-            <span class="ps-result-badge">APP</span>
+            <span class="ps-item-badge">APP</span>
           </div>
 
-          <!-- Result 2 -->
-          <div class="ps-result-item" data-idx="1" onclick="selectResult(1)">
-            <div class="ps-result-icon">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <!-- Spotify -->
+          <div class="ps-result-row" data-id="spotify" onclick="selectResult('spotify')">
+            <div class="ps-item-icon" style="background:rgba(29,185,84,0.15);">
+              <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="11" fill="#1db954"/>
+                <path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
+              </svg>
             </div>
-            <div class="ps-result-copy">
+            <div class="ps-item-copy">
+              <b>Spotify</b>
+              <small>Audio Player · %APPDATA%\Spotify\Spotify.exe</small>
+            </div>
+            <span class="ps-item-badge">APP</span>
+          </div>
+
+          <!-- Section 3: Files & Source Code (FTS5) -->
+          <div class="ps-section-header" style="margin-top:6px;">
+            <span>Local Files & Code (FTS5)</span>
+            <span>2 Matches</span>
+          </div>
+
+          <!-- Sidebar-Bridge.tsx (Selected by default) -->
+          <div class="ps-result-row is-selected" data-id="sidebar" onclick="selectResult('sidebar')">
+            <div class="ps-item-icon" style="background:rgba(49,120,198,0.18);">
+              <svg style="width:19px; height:19px;" viewBox="0 0 24 24">
+                <rect width="18" height="20" x="3" y="2" rx="3" fill="#3178c6"/>
+                <text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">TS</text>
+              </svg>
+            </div>
+            <div class="ps-item-copy">
               <b>Sidebar-Bridge.tsx</b>
-              <small>ProtonDock · src/components/dock/Sidebar-Bridge.tsx</small>
+              <small>src &gt; components &gt; dock &gt; Sidebar-Bridge.tsx</small>
             </div>
-            <span class="ps-result-badge">CODE</span>
+            <span class="ps-item-badge" style="color:#60a5fa; background:rgba(49,120,198,0.2);">TSX</span>
           </div>
 
-          <!-- Result 3 -->
-          <div class="ps-result-item" data-idx="2" onclick="selectResult(2)">
-            <div class="ps-result-icon">
-              <svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg>
+          <!-- weather.rs (Rust Source) -->
+          <div class="ps-result-row" data-id="weatherrs" onclick="selectResult('weatherrs')">
+            <div class="ps-item-icon" style="background:rgba(234,88,12,0.18);">
+              <svg style="width:19px; height:19px;" viewBox="0 0 24 24">
+                <rect width="18" height="20" x="3" y="2" rx="3" fill="#ea580c"/>
+                <text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">RS</text>
+              </svg>
             </div>
-            <div class="ps-result-copy">
-              <b>TODO: Cache FTS5 token indexes</b>
-              <small>Git Code Tasks · src-tauri/src/indexer.rs:142</small>
-            </div>
-            <span class="ps-result-badge">TODO</span>
-          </div>
-
-          <!-- Result 4 -->
-          <div class="ps-result-item" data-idx="3" onclick="selectResult(3)">
-            <div class="ps-result-icon">
-              <svg class="icon" style="color:#5ef1c2;" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/></svg>
-            </div>
-            <div class="ps-result-copy">
-              <b>24 * 1.15 = 27.60</b>
-              <small>Calculator · Recursive descent math parser</small>
-            </div>
-            <span class="ps-result-badge">MATH</span>
-          </div>
-
-          <!-- Result 5 -->
-          <div class="ps-result-item" data-idx="4" onclick="selectResult(4)">
-            <div class="ps-result-icon">
-              <svg class="icon" style="color:#ffd166;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7z"/></svg>
-            </div>
-            <div class="ps-result-copy">
+            <div class="ps-item-copy">
               <b>weather.rs</b>
-              <small>Native Rust Engine · protonsearch/src/weather.rs</small>
+              <small>protonsearch &gt; src &gt; weather.rs</small>
             </div>
-            <span class="ps-result-badge">FILE</span>
+            <span class="ps-item-badge" style="color:#fb923c; background:rgba(234,88,12,0.2);">RUST</span>
           </div>
 
-          <!-- Result 6 -->
-          <div class="ps-result-item" data-idx="5" onclick="selectResult(5)">
-            <div class="ps-result-icon">
-              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/></svg>
+          <!-- Section 4: Git Repository Tasks & Commits -->
+          <div class="ps-section-header" style="margin-top:6px;">
+            <span>Git Repository</span>
+            <span>2 Matches</span>
+          </div>
+
+          <!-- TODO Item -->
+          <div class="ps-result-row" data-id="todofts" onclick="selectResult('todofts')">
+            <div class="ps-item-icon" style="background:rgba(245,158,11,0.15);">
+              <svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="9 12 11 14 15 10"/></svg>
             </div>
-            <div class="ps-result-copy">
+            <div class="ps-item-copy">
+              <b>TODO: Cache FTS5 token indexes</b>
+              <small>src-tauri &gt; src &gt; indexer.rs:142</small>
+            </div>
+            <span class="ps-item-badge" style="color:#fbbf24; background:rgba(245,158,11,0.2);">TODO</span>
+          </div>
+
+          <!-- Git Commit -->
+          <div class="ps-result-row" data-id="gitcommit" onclick="selectResult('gitcommit')">
+            <div class="ps-item-icon" style="background:rgba(168,85,247,0.15);">
+              <svg class="icon" style="color:#c084fc;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+            </div>
+            <div class="ps-item-copy">
               <b>feat(ui): Ganella slender glass rail</b>
-              <small>Git Commit · dock branch (HEAD)</small>
+              <small>Commit 142f73e · branch dock (HEAD)</small>
             </div>
-            <span class="ps-result-badge">COMMIT</span>
+            <span class="ps-item-badge" style="color:#c084fc; background:rgba(168,85,247,0.2);">GIT</span>
+          </div>
+
+        </div>
+
+        <!-- Rich Actionable Preview Pane (Glides in when file selected or Tab pressed) -->
+        <div class="ps-preview-pane" id="previewPane">
+          <div class="prev-head-card">
+            <div class="prev-head-icon" id="prevIcon">
+              <svg style="width:24px; height:24px;" viewBox="0 0 24 24">
+                <rect width="18" height="20" x="3" y="2" rx="3" fill="#3178c6"/>
+                <text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">TS</text>
+              </svg>
+            </div>
+            <div style="min-width:0; flex:1;">
+              <div class="prev-head-title" id="prevTitle">Sidebar-Bridge.tsx</div>
+              <div class="prev-breadcrumbs" id="prevPath">src &gt; components &gt; dock</div>
+            </div>
+          </div>
+
+          <!-- Live Code Snippet Preview -->
+          <div class="prev-code-box" id="prevCodeBox">
+            <div><span class="code-comment">// Bridge between Tauri backend &amp; React dock</span></div>
+            <div><span class="code-keyword">export interface</span> <span class="code-func">DockGeometry</span> {</div>
+            <div>&nbsp;&nbsp;x: <span class="code-keyword">number</span>; y: <span class="code-keyword">number</span>;</div>
+            <div>&nbsp;&nbsp;width: <span class="code-keyword">number</span>; height: <span class="code-keyword">number</span>;</div>
+            <div>&nbsp;&nbsp;radius: <span class="code-keyword">number</span>;</div>
+            <div>}</div>
+            <div><span class="code-keyword">export function</span> <span class="code-func">syncDockGeometry</span>() {</div>
+            <div>&nbsp;&nbsp;<span class="code-comment">// Sets Win32 click-through region</span></div>
+            <div>}</div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:4px; font-size:10px; color:var(--text-secondary);">
+            <div style="display:flex; justify-content:space-between;">
+              <span>File Size</span>
+              <b style="color:var(--text-primary);" id="prevSize">8.4 KB (248 lines)</b>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span>Last Modified</span>
+              <b style="color:var(--text-primary);" id="prevMod">12 minutes ago</b>
+            </div>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="prev-actions-stack">
+            <div class="prev-action-row" onclick="executePreviewAction('Open with Code')">
+              <span>Open in VS Code</span>
+              <kbd style="font-size:9.5px; opacity:0.8;">↵</kbd>
+            </div>
+            <div class="prev-action-row" onclick="executePreviewAction('Reveal in Explorer')">
+              <span>Reveal in File Explorer</span>
+              <kbd style="font-size:9.5px; opacity:0.8;">Ctrl+↵</kbd>
+            </div>
+            <div class="prev-action-row" onclick="executePreviewAction('Copy Path')">
+              <span>Copy Relative Path</span>
+              <kbd style="font-size:9.5px; opacity:0.8;">Ctrl+C</kbd>
+            </div>
           </div>
         </div>
 
-        <div class="ps-preview-column" id="previewPane">
-          <div class="ps-preview-header">
-            <div class="ps-preview-big-icon" id="prevIcon">
-              <svg style="width:28px; height:28px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/></svg>
-            </div>
-            <div class="ps-preview-title" id="prevTitle">Visual Studio Code</div>
-            <div class="ps-preview-path" id="prevPath">C:\Program Files\Microsoft VS Code\Code.exe</div>
-          </div>
-          <div class="ps-preview-details">
-            <div class="ps-preview-row">
-              <span>Category</span>
-              <span id="prevCategory">Application</span>
-            </div>
-            <div class="ps-preview-row">
-              <span>Status</span>
-              <span id="prevStatus" style="color:var(--accent-emerald);">Running (Active)</span>
-            </div>
-            <div class="ps-preview-row">
-              <span>Indexed Via</span>
-              <span>Windows IShellItem</span>
-            </div>
-          </div>
-          <div class="ps-preview-actions">
-            <button class="ps-action-btn" onclick="executePreviewAction()">
-              <span>Open Application</span>
-              <span>↵</span>
-            </button>
-            <button class="ps-action-btn" onclick="executePreviewAction()">
-              <span>Show in Explorer</span>
-              <span>⌥↵</span>
-            </button>
-          </div>
+      </div>
+
+      <!-- Action Palette Floating Menu (<kbd>Ctrl+K</kbd>) -->
+      <div class="ps-action-palette-menu" id="actionPaletteMenu">
+        <div style="font-size:9px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; padding:4px 6px;">Available Actions</div>
+        <div class="palette-item" onclick="executePreviewAction('Primary Open')">
+          <span>Open File / Run</span>
+          <span style="opacity:0.6;">↵</span>
+        </div>
+        <div class="palette-item" onclick="executePreviewAction('Reveal in Explorer')">
+          <span>Reveal in File Explorer</span>
+          <span style="opacity:0.6;">Ctrl+↵</span>
+        </div>
+        <div class="palette-item" onclick="executePreviewAction('Open Terminal')">
+          <span>Open in Windows Terminal</span>
+          <span style="opacity:0.6;">Ctrl+T</span>
+        </div>
+        <div class="palette-item" onclick="executePreviewAction('Copy Path')">
+          <span>Copy Full Path</span>
+          <span style="opacity:0.6;">Ctrl+C</span>
+        </div>
+        <div class="palette-item" onclick="executePreviewAction('Pin to Dock')">
+          <span>Pin Item to Dock</span>
+          <span style="opacity:0.6;">Ctrl+P</span>
         </div>
       </div>
 
+      <!-- Refined Minimalist Footer Bar -->
       <footer class="ps-search-footer">
         <div class="ps-engine-badge">
           <span class="ps-engine-dot"></span>
-          <span>ProtonSearch · SQLite FTS5 Indexed (12,418 items) · 0.4 ms</span>
+          <span>ProtonSearch · 12,418 items indexed (0.4 ms)</span>
         </div>
         <div class="ps-footer-keys">
-          <span>↑↓ Navigate</span>
-          <span>↵ Open</span>
-          <span>Tab Filter</span>
-          <span>Esc Dismiss</span>
+          <div class="footer-key-pill" onclick="executePreviewAction('Open')"><kbd>↵</kbd> <span>Open</span></div>
+          <div class="footer-key-pill" onclick="togglePreviewPane()"><kbd>Tab</kbd> <span>Preview</span></div>
+          <div class="footer-key-pill" onclick="toggleActionPalette()"><kbd>Ctrl+K</kbd> <span>Actions</span></div>
+          <div class="footer-key-pill" onclick="toggleProtonSearch(false)"><kbd>esc</kbd> <span>Close</span></div>
         </div>
       </footer>
+
     </section>
   </div>
 
   <!-- ==========================================================================
-       DEDICATED WIDGETS PAGE & STORE MODAL (Requirement 1 & 5)
+       DEDICATED WIDGETS PAGE & STORE MODAL
        ========================================================================== -->
   <div class="customizer-backdrop" id="customizerModal" onclick="handleCustBackdrop(event)">
     <div class="customizer-window" role="dialog" aria-label="Widget Manager and Store">
@@ -1599,7 +1695,7 @@
   </div>
 
   <!-- ==========================================================================
-       THE DOCK RAIL WITH REORDERABLE WIDGETS (Requirements 2, 3, 5, 6)
+       THE DOCK RAIL WITH REORDERABLE WIDGETS
        ========================================================================== -->
   <div class="dock-stage" id="dockStage">
 
@@ -1622,7 +1718,7 @@
     <!-- MAIN DOCK RAIL (Drag and Drop Relocatable Container) -->
     <nav class="dock-rail" id="dockRail" aria-label="ProtonDock">
 
-      <!-- WIDGET 1: Windows Start Menu Button (Requirement 3) -->
+      <!-- WIDGET 1: Windows Start Menu Button -->
       <div class="dock-widget widget-windows" id="w-windows" data-widget="windows" data-size="compact" draggable="true" title="Windows Start Menu (Drag to relocate)">
         <div class="widget-inner" style="justify-content:center;">
           <svg style="width:18px; height:18px; flex-shrink:0;" viewBox="0 0 24 24" fill="#0078d4">
@@ -1636,7 +1732,7 @@
         </div>
       </div>
 
-      <!-- WIDGET 2: ProtonSearch Trigger (Requirement 3) -->
+      <!-- WIDGET 2: ProtonSearch Trigger -->
       <div class="dock-widget widget-search" id="w-search" data-widget="search" data-size="compact" draggable="true" title="ProtonSearch (Alt+Space)" onclick="toggleProtonSearch()">
         <div class="widget-inner" style="justify-content:center;">
           <svg class="icon" style="color:var(--accent); flex-shrink:0;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -1648,27 +1744,23 @@
         </div>
       </div>
 
-      <!-- WIDGET 3: Running Apps Group (Relocatable) -->
+      <!-- WIDGET 3: Running Apps Group -->
       <div class="dock-widget widget-apps" id="w-apps" data-widget="apps" data-size="compact" draggable="true" title="Running Applications Group">
         <div class="widget-inner" style="gap:4px;">
-          <!-- App 1: Sublime Text -->
           <div class="app-icon-btn" title="Sublime Text (2 windows)">
             <svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M4 6.5 12 2l8 4.5v11L12 22 4 17.5V6.5Z" fill="#ff9800"/><path d="M12 2v20" stroke="#fff" stroke-width="1.5"/></svg>
             <span class="app-badge" style="background:rgba(0,0,0,0.65);">2</span>
             <span class="app-dot"></span>
           </div>
-          <!-- App 2: Active VS Code Pill -->
           <div class="active-window-pill" title="Active Window: Sidebar-Bridge.tsx">
             <svg style="width:18px; height:18px; flex-shrink:0;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/></svg>
             <span>Sidebar-Bri...</span>
           </div>
-          <!-- App 3: Finder with badge 17 -->
           <div class="app-icon-btn" title="Finder (17 notifications)">
             <svg style="width:21px; height:21px;" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="5" fill="#38bdf8"/><path d="M12 2v20" stroke="#fff" stroke-width="1.5"/><circle cx="7" cy="9" r="1.5" fill="#fff"/><circle cx="17" cy="9" r="1.5" fill="#fff"/><path d="M8 15c2 2 6 2 8 0" stroke="#fff" stroke-width="1.5" fill="none"/></svg>
             <span class="app-badge">17</span>
             <span class="app-dot"></span>
           </div>
-          <!-- App 4: Browser -->
           <div class="app-icon-btn" title="Browser">
             <svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ea580c"/><circle cx="12" cy="12" r="6" fill="#fff"/></svg>
             <span class="app-dot"></span>
@@ -1676,7 +1768,7 @@
         </div>
       </div>
 
-      <!-- WIDGET 4: Spotify Media Player (Requirement 2 & 6) -->
+      <!-- WIDGET 4: Spotify Media Player -->
       <div class="dock-widget widget-spotify" id="w-spotify" data-widget="spotify" data-size="compact" draggable="true" title="Spotify Media Controller">
         <div class="widget-inner" style="gap:6px;">
           <svg style="width:17px; height:17px; flex-shrink:0;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
@@ -1695,7 +1787,7 @@
         </div>
       </div>
 
-      <!-- WIDGET 5: Real-time Weather Widget (Requirement 2 & 6) -->
+      <!-- WIDGET 5: Real-time Weather Widget -->
       <div class="dock-widget widget-weather" id="w-weather" data-widget="weather" data-size="compact" draggable="true" title="Weather: Click in manager to resize">
         <div class="widget-inner" style="gap:5px;">
           <svg class="icon" style="width:16px; height:16px; color:#ffd166; flex-shrink:0;" viewBox="0 0 24 24">
@@ -1711,7 +1803,7 @@
         </div>
       </div>
 
-      <!-- WIDGET 6: System Hardware Monitor (Requirement 2 & 6) -->
+      <!-- WIDGET 6: System Hardware Monitor -->
       <div class="dock-widget widget-system" id="w-system" data-widget="system" data-size="compact" draggable="true" title="Hardware Monitor">
         <div class="widget-inner" style="gap:5px; justify-content:center; font-variant-numeric:tabular-nums;">
           <span style="color:var(--text-secondary); font-size:8.5px; font-weight:700;">CPU</span>
@@ -1731,7 +1823,7 @@
         </div>
       </div>
 
-      <!-- WIDGET 7: Recycle Bin Utility (Requirement 2 & 6) -->
+      <!-- WIDGET 7: Recycle Bin Utility -->
       <div class="dock-widget widget-util" id="w-trash" data-widget="trash" data-size="compact" draggable="true" title="Recycle Bin">
         <div class="widget-inner" style="justify-content:center;">
           <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
@@ -1740,7 +1832,7 @@
         </div>
       </div>
 
-      <!-- WIDGET 8: Audio Volume Utility (Requirement 2 & 6) -->
+      <!-- WIDGET 8: Audio Volume Utility -->
       <div class="dock-widget widget-util" id="w-volume" data-widget="volume" data-size="compact" draggable="true" title="Volume Control">
         <div class="widget-inner" style="justify-content:center;">
           <svg class="icon" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
@@ -1749,7 +1841,7 @@
         </div>
       </div>
 
-      <!-- WIDGET 9: Stacked Clock & Date Widget (Requirement 2 & 6) -->
+      <!-- WIDGET 9: Stacked Clock & Date Widget -->
       <div class="dock-widget widget-clock" id="w-clock" data-widget="clock" data-size="compact" draggable="true" title="Clock & Calendar">
         <div class="widget-inner" style="justify-content:center; flex-direction:column; line-height:1.1; font-variant-numeric:tabular-nums; text-align:right;">
           <span style="font-size:11px; font-weight:700; letter-spacing:-0.01em;" id="liveTime">20:36</span>
@@ -1762,7 +1854,7 @@
 
   <script>
     // ==========================================================================
-    // 1. WIDGET CATALOG DATA MODEL (Requirement 1, 2, 3, 5, 6)
+    // 1. WIDGET CATALOG DATA MODEL
     // ==========================================================================
     let widgetState = [
       { id: "windows", name: "Windows Start Menu", desc: "Launch Windows Start menu flyout", enabled: true, size: "compact", icon: "⊞" },
@@ -1776,7 +1868,6 @@
       { id: "clock", name: "Stacked Clock & Date", desc: "2-line precision clock and calendar date", enabled: true, size: "compact", icon: "🕒" }
     ];
 
-    // Live Clock & Date matching exact reference format: HH:mm and DD.MM.YYYY
     function updateClock() {
       const now = new Date();
       const hours = String(now.getHours()).padStart(2, '0');
@@ -1806,9 +1897,6 @@
       btn.classList.add('active');
     }
 
-    // ==========================================================================
-    // 2. DISPLAY STYLES: CAPSULES VS LINES (Requirement 5)
-    // ==========================================================================
     function setDisplayStyle(style, btn) {
       document.body.setAttribute('data-display-style', style);
       
@@ -1831,25 +1919,78 @@
     }
 
     // ==========================================================================
-    // 3. PROTONSEARCH SPOTLIGHT MODAL LOGIC (Alt + Space)
+    // 2. REFINED LAUNCHER LOGIC & DATA (Raycast & Tahoe Model)
     // ==========================================================================
     const searchModal = document.getElementById('searchModal');
+    const launcherCard = document.getElementById('launcherCard');
     const spotlightInput = document.getElementById('spotlightInput');
-    const resultsList = document.getElementById('resultsList');
-    const resultsCount = document.getElementById('resultsCount');
+    const actionPaletteMenu = document.getElementById('actionPaletteMenu');
+    const calcHeroContainer = document.getElementById('calculatorHeroContainer');
+    const calcHeroExpr = document.getElementById('calcHeroExpr');
+    const calcHeroVal = document.getElementById('calcHeroVal');
 
-    const mockDb = [
-      { id: 0, title: "Visual Studio Code", detail: "Applications · C:\\Program Files\\Microsoft VS Code\\Code.exe", type: "APP", cat: "apps" },
-      { id: 1, title: "Sidebar-Bridge.tsx", detail: "ProtonDock · src/components/dock/Sidebar-Bridge.tsx", type: "CODE", cat: "files" },
-      { id: 2, title: "TODO: Cache FTS5 token indexes", detail: "Git Code Tasks · src-tauri/src/indexer.rs:142", type: "TODO", cat: "git" },
-      { id: 3, title: "24 * 1.15 = 27.60", detail: "Calculator · Recursive descent math parser", type: "MATH", cat: "actions" },
-      { id: 4, title: "weather.rs", detail: "Native Rust Engine · protonsearch/src/weather.rs", type: "FILE", cat: "files" },
-      { id: 5, title: "feat(ui): Ganella slender glass rail", detail: "Git Commit · dock branch (HEAD)", type: "COMMIT", cat: "git" },
-      { id: 6, title: "Spotify.exe", detail: "Applications · %APPDATA%\\Spotify\\Spotify.exe", type: "APP", cat: "apps" },
-      { id: 7, title: "Empty Recycle Bin", detail: "System Command · Purge deleted files", type: "ACTION", cat: "actions" }
-    ];
-
-    let currentFilter = 'all';
+    const resultDatabase = {
+      sidebar: {
+        title: "Sidebar-Bridge.tsx",
+        path: "src > components > dock",
+        type: "TSX",
+        size: "8.4 KB (248 lines)",
+        mod: "12 minutes ago",
+        hasCode: true,
+        code: `// Bridge between Tauri backend & React dock\nexport interface DockGeometry {\n  x: number; y: number;\n  width: number; height: number;\n  radius: number;\n}\nexport function syncDockGeometry() {\n  // Sets Win32 click-through region\n}`,
+        iconSvg: `<rect width="18" height="20" x="3" y="2" rx="3" fill="#3178c6"/><text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">TS</text>`
+      },
+      vscode: {
+        title: "Visual Studio Code",
+        path: "C:\\...\\Microsoft VS Code\\Code.exe",
+        type: "APP",
+        size: "Executable · v1.95.2",
+        mod: "Running (Process ID: 14820)",
+        hasCode: false,
+        code: `Application Manifest:\nExecutable: Code.exe\nRenderer: Chromium Embedded (v128)\nStatus: Active Window\nShortcuts: [↵ Open] [Ctrl+↵ Run as Admin]`,
+        iconSvg: `<path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/>`
+      },
+      weatherrs: {
+        title: "weather.rs",
+        path: "protonsearch > src > weather.rs",
+        type: "RUST",
+        size: "4.2 KB (134 lines)",
+        mod: "1 hour ago",
+        hasCode: true,
+        code: `// Native Open-Meteo cache & parser\npub struct WeatherSnapshot {\n    pub temperature_c: f32,\n    pub condition_code: u8,\n    pub cached_at_utc: u64,\n}`,
+        iconSvg: `<rect width="18" height="20" x="3" y="2" rx="3" fill="#ea580c"/><text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">RS</text>`
+      },
+      spotify: {
+        title: "Spotify",
+        path: "%APPDATA%\\Spotify\\Spotify.exe",
+        type: "APP",
+        size: "Audio Player · v1.2.49",
+        mod: "Playing · Tunnel Vision",
+        hasCode: false,
+        code: `Now Playing Session:\nTrack: Tunnel Vision\nArtist: Aurora B.Poreal\nPlayback: Active (68% Volume)\nActions: [Space: Play/Pause] [N: Next Track]`,
+        iconSvg: `<circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>`
+      },
+      todofts: {
+        title: "TODO: Cache FTS5 token indexes",
+        path: "src-tauri > src > indexer.rs:142",
+        type: "TODO",
+        size: "Code Task · Line 142",
+        mod: "Commit 4b921a",
+        hasCode: true,
+        code: `// TODO: Cache FTS5 token indexes\n// Truncate document text at 50KB\nlet text_snippet = extract_doc_text(&file_path)?;\nindex_sqlite_fts5(&db, &text_snippet)?;`,
+        iconSvg: `<circle cx="12" cy="12" r="9" fill="#f59e0b"/><polyline points="9 12 11 14 15 10" stroke="#fff" stroke-width="2" fill="none"/>`
+      },
+      gitcommit: {
+        title: "feat(ui): Ganella slender glass rail",
+        path: "Commit 142f73e · branch dock (HEAD)",
+        type: "GIT",
+        size: "Git Commit · +1042 / -1199",
+        mod: "Just now",
+        hasCode: true,
+        code: `commit 142f73e72c8b4\nAuthor: Pranshul Soni <git@pranshul>\nDate:   Fri Nov 7 01:01:00 2026\n\nfeat(preview): dedicated widget manager, store catalog, capsules vs lines`,
+        iconSvg: `<circle cx="12" cy="12" r="9" fill="#c084fc"/><circle cx="12" cy="12" r="3" fill="#fff"/>`
+      }
+    };
 
     function toggleProtonSearch(force) {
       const isOpen = force !== undefined ? force : !searchModal.classList.contains('is-open');
@@ -1858,6 +1999,7 @@
         setTimeout(() => spotlightInput?.focus(), 80);
       } else {
         searchModal.classList.remove('is-open');
+        actionPaletteMenu.classList.remove('is-open');
       }
     }
 
@@ -1867,94 +2009,149 @@
       }
     }
 
+    function togglePreviewPane() {
+      launcherCard.classList.toggle('with-preview');
+    }
+
+    function toggleActionPalette() {
+      actionPaletteMenu.classList.toggle('is-open');
+    }
+
+    function selectResult(id) {
+      const item = resultDatabase[id];
+      if (!item) return;
+
+      document.querySelectorAll('.ps-result-row').forEach(row => {
+        row.classList.toggle('is-selected', row.getAttribute('data-id') === id);
+      });
+
+      // Update Preview Pane with rich content
+      document.getElementById('prevTitle').textContent = item.title;
+      document.getElementById('prevPath').textContent = item.path;
+      document.getElementById('prevSize').textContent = item.size;
+      document.getElementById('prevMod').textContent = item.mod;
+      document.getElementById('prevIcon').innerHTML = item.iconSvg;
+      
+      const codeBox = document.getElementById('prevCodeBox');
+      if (codeBox) {
+        codeBox.style.display = 'block';
+        codeBox.innerHTML = escapeHtml(item.code).replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
+      }
+
+      // If app is selected, keep launcher wide or adapt gracefully
+      launcherCard.classList.add('with-preview');
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Live search input handler
+    function handleSearchInput(val) {
+      const q = val.trim();
+      const scopePill = document.getElementById('activeScopePill');
+
+      // Math parser detection (e.g. 24 * 1.15, 15% of 340, sqrt(16))
+      const isMath = /[0-9\+\-\*\/\%]/i.test(q) && !/[a-z]{4,}/i.test(q);
+      if (isMath && q.length > 2) {
+        try {
+          let sanitized = q.replace(/%/g, "*0.01");
+          let evaluated = Function(`'use strict'; return (${sanitized})`)();
+          if (evaluated !== undefined && !isNaN(evaluated)) {
+            calcHeroContainer.style.display = 'block';
+            calcHeroExpr.textContent = q;
+            calcHeroVal.textContent = "= " + (Math.round(evaluated * 100) / 100);
+          } else {
+            calcHeroContainer.style.display = 'none';
+          }
+        } catch(e) {
+          calcHeroContainer.style.display = 'none';
+        }
+      } else {
+        calcHeroContainer.style.display = 'none';
+      }
+
+      // Prefix detection
+      if (q.startsWith('app:')) {
+        scopePill.textContent = 'APPS';
+        scopePill.classList.add('is-active');
+      } else if (q.startsWith('file:')) {
+        scopePill.textContent = 'FILES';
+        scopePill.classList.add('is-active');
+      } else if (q.startsWith('git:')) {
+        scopePill.textContent = 'GIT';
+        scopePill.classList.add('is-active');
+      } else {
+        scopePill.classList.remove('is-active');
+      }
+
+      // Filter rows
+      const lowerQ = q.toLowerCase();
+      document.querySelectorAll('.ps-result-row').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = (!lowerQ || text.includes(lowerQ)) ? 'flex' : 'none';
+      });
+    }
+
+    function copyCalculatorResult() {
+      const val = calcHeroVal.textContent.replace('= ', '');
+      alert(`Copied "${val}" to clipboard!`);
+    }
+
+    function executePreviewAction(actionName) {
+      alert(`${actionName}: ${document.getElementById('prevTitle').textContent}`);
+      actionPaletteMenu.classList.remove('is-open');
+    }
+
+    // Keyboard navigation
     window.addEventListener('keydown', (e) => {
       if (e.altKey && (e.code === 'Space' || e.key === ' ')) {
         e.preventDefault();
         toggleProtonSearch();
-      } else if (e.key === 'Escape' && searchModal.classList.contains('is-open')) {
-        toggleProtonSearch(false);
-      } else if (e.key === 'Escape' && customizerModal.classList.contains('is-open')) {
-        closeCustomizerModal();
+      } else if (e.key === 'Escape') {
+        if (actionPaletteMenu.classList.contains('is-open')) {
+          actionPaletteMenu.classList.remove('is-open');
+        } else if (searchModal.classList.contains('is-open')) {
+          toggleProtonSearch(false);
+        } else if (customizerModal.classList.contains('is-open')) {
+          closeCustomizerModal();
+        }
+      } else if (e.ctrlKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (searchModal.classList.contains('is-open')) {
+          toggleActionPalette();
+        }
+      } else if (e.key === 'Tab' && searchModal.classList.contains('is-open')) {
+        e.preventDefault();
+        togglePreviewPane();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (searchModal.classList.contains('is-open')) {
+          const visibleRows = Array.from(document.querySelectorAll('.ps-result-row')).filter(r => r.style.display !== 'none');
+          const currentIdx = visibleRows.findIndex(r => r.classList.contains('is-selected'));
+          if (visibleRows.length > 0) {
+            e.preventDefault();
+            let nextIdx = currentIdx;
+            if (e.key === 'ArrowDown') {
+              nextIdx = (currentIdx + 1) % visibleRows.length;
+            } else {
+              nextIdx = (currentIdx - 1 + visibleRows.length) % visibleRows.length;
+            }
+            const targetId = visibleRows[nextIdx].getAttribute('data-id');
+            selectResult(targetId);
+            visibleRows[nextIdx].scrollIntoView({ block: 'nearest' });
+          }
+        }
+      } else if (e.key === 'Enter' && searchModal.classList.contains('is-open')) {
+        if (calcHeroContainer.style.display !== 'none') {
+          copyCalculatorResult();
+        } else {
+          executePreviewAction('Open');
+        }
       }
     });
 
-    function setFilterCategory(cat, btn) {
-      currentFilter = cat;
-      document.querySelectorAll('.ps-category-bar .ps-chip').forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      filterAndRenderResults(spotlightInput?.value || '');
-    }
-
-    function handleSearchInput(query) {
-      filterAndRenderResults(query);
-    }
-
-    function filterAndRenderResults(query) {
-      const q = (query || '').toLowerCase().trim();
-      const filtered = mockDb.filter(item => {
-        const matchesCategory = currentFilter === 'all' || item.cat === currentFilter;
-        const matchesQuery = !q || item.title.toLowerCase().includes(q) || item.detail.toLowerCase().includes(q);
-        return matchesCategory && matchesQuery;
-      });
-
-      if (resultsCount) resultsCount.textContent = `${filtered.length} matches`;
-
-      const existingItems = resultsList?.querySelectorAll('.ps-result-item');
-      existingItems?.forEach(el => el.remove());
-
-      if (filtered.length === 0) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'ps-result-item';
-        emptyDiv.style.color = 'var(--text-secondary)';
-        emptyDiv.textContent = 'No matching items in local index.';
-        resultsList?.appendChild(emptyDiv);
-        return;
-      }
-
-      filtered.forEach((item, i) => {
-        const div = document.createElement('div');
-        div.className = `ps-result-item ${i === 0 ? 'is-selected' : ''}`;
-        div.setAttribute('data-idx', item.id);
-        div.onclick = () => selectResult(item.id);
-        div.innerHTML = `
-          <div class="ps-result-icon">
-            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>
-          </div>
-          <div class="ps-result-copy">
-            <b>${item.title}</b>
-            <small>${item.detail}</small>
-          </div>
-          <span class="ps-result-badge">${item.type}</span>
-        `;
-        resultsList?.appendChild(div);
-      });
-
-      if (filtered[0]) selectResult(filtered[0].id);
-    }
-
-    function selectResult(id) {
-      const item = mockDb.find(m => m.id === id);
-      if (!item) return;
-
-      document.querySelectorAll('.ps-result-item').forEach(el => {
-        el.classList.toggle('is-selected', el.getAttribute('data-idx') == id);
-      });
-
-      const pTitle = document.getElementById('prevTitle');
-      const pPath = document.getElementById('prevPath');
-      const pCat = document.getElementById('prevCategory');
-      if (pTitle) pTitle.textContent = item.title;
-      if (pPath) pPath.textContent = item.detail;
-      if (pCat) pCat.textContent = item.type;
-    }
-
-    function executePreviewAction() {
-      alert("Opening: " + document.getElementById('prevTitle').textContent);
-      toggleProtonSearch(false);
-    }
-
     // ==========================================================================
-    // 4. CUSTOMIZER MODAL & STORE TABS (Requirement 1)
+    // 3. WIDGET MANAGER & STORE LOGIC
     // ==========================================================================
     const customizerModal = document.getElementById('customizerModal');
 
@@ -2030,9 +2227,6 @@
       });
     }
 
-    // ==========================================================================
-    // 5. WIDGET SIZING & RELOCATION LOGIC (Requirement 2, 6)
-    // ==========================================================================
     function setWidgetSize(widgetId, size) {
       const item = widgetState.find(w => w.id === widgetId);
       if (item) {
@@ -2121,7 +2315,6 @@
       });
     });
 
-    // Profile Switching
     const profilePresets = {
       daily: { sizes: { windows: "compact", search: "compact", weather: "compact", system: "compact", spotify: "compact", clock: "compact" } },
       work: { sizes: { windows: "compact", search: "medium", weather: "compact", system: "medium", spotify: "compact", clock: "compact" } },
@@ -2147,7 +2340,9 @@
       alert(`Profile "${name}" created and configured.`);
     }
 
+    // Initialize customizer on startup
     renderWidgetManageList();
+    selectResult('sidebar');
   </script>
 </body>
 </html>
