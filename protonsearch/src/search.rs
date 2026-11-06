@@ -4257,9 +4257,25 @@ impl SearchEngine {
             return self.search_files_only(sub_query);
         }
 
-        if q_lower_trimmed.starts_with("folder:") {
-            let sub_query = q_lower_trimmed.strip_prefix("folder:").unwrap().trim();
+        if q_lower_trimmed.starts_with("folders:") || q_lower_trimmed.starts_with("folder:") {
+            let sub_query = q_lower_trimmed
+                .strip_prefix("folders:")
+                .or_else(|| q_lower_trimmed.strip_prefix("folder:"))
+                .unwrap()
+                .trim();
             return self.search_folders_only(sub_query);
+        }
+
+        if q_lower_trimmed.starts_with("apps:") || q_lower_trimmed.starts_with("app:") {
+            let sub_query = q_lower_trimmed
+                .strip_prefix("apps:")
+                .or_else(|| q_lower_trimmed.strip_prefix("app:"))
+                .unwrap()
+                .trim();
+            let mut results = self.search_raw_with_fts(sub_query, top_k, with_fts);
+            results.retain(|result| result.entry.source == "app");
+            results.truncate(top_k);
+            return results;
         }
 
         if q_lower_trimmed.starts_with("code:") {

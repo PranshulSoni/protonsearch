@@ -2,6 +2,25 @@
 
 This is a working evidence ledger, not a release certification.
 
+## Single-column launcher port - 2026-11-07
+
+The React search window now uses the finalized single-column launcher: one
+638px obsidian glass card, a borderless query row, All/Apps/Files/Folders/OCR
+scope pills, a Rust-backed calculator hero, and a results-only list with inline
+SVG type icons. Scope routing sends Rust prefixes (`app:`, `file:`, `folder:`,
+`ocr:`) and leaves already-prefixed queries untouched. `app:`/`apps:` and
+`folders:` are accepted by the Rust search dispatcher; result selection,
+keyboard execution, and the existing request-id stale-response guard are
+covered by frontend tests.
+
+Frontend verification: 23 launcher tests and 158 total tests passed; production
+`npm run build` passed; `cargo check --manifest-path src-tauri/Cargo.toml`
+passed with pre-existing dead-code warnings. Native gaps: the actual Tauri
+window, transparent rounded corners, 125%/150% DPI rendering, real WebView2
+search results, calculator copy behavior, and pixel comparison against
+`launcher-final.png` were not run in this environment. The CSS surface was
+reviewed statically; no native screenshot is claimed.
+
 ## Preview dock and widget manager - 2026-11-07
 
 HTML preview only (`preview-tahoe-glass.html`); the React/native port was not

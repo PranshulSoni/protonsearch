@@ -1,0 +1,481 @@
+body {
+  margin: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .native-size-menu, .native-gallery {
+    animation: dock-surface-enter 160ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+  .native-gallery button, .native-size-menu button, .native-editor button {
+    transition: background-color 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
+  }
+  @keyframes dock-surface-enter {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+button,
+input,
+select {
+  font-family: inherit;
+}
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+.ps-spotlight.native-spotlight {
+  opacity: 1;
+  height: 100dvh;
+  max-height: 100dvh !important;
+  position: relative !important;
+  top: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  background: rgba(13,17,23,.94) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 18px 60px rgba(0,0,0,.55), inset 0 1px rgba(255,255,255,.06) !important;
+  backdrop-filter: blur(32px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(120%) !important;
+  transition: none !important;
+  animation: none !important;
+  overflow: hidden !important;
+  color-scheme: dark;
+}
+.native-spotlight .ps-results {
+  max-height: none;
+  min-height: 0;
+}
+.native-spotlight .ps-results-column {
+  max-height: none !important;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+.native-spotlight .ps-search-body {
+  display: flex !important;
+  flex: 1;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+.native-spotlight .ps-search-top,
+.native-spotlight .ps-scope-bar {
+  flex-shrink: 0;
+}
+.dock-stage {
+  position: absolute;
+  left: 8px;
+  top: 42px;
+  bottom: auto;
+  transform: none;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+}
+.dock-stage .dock-shell {
+  width: max-content !important;
+  min-width: min(280px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  transition: none !important;
+}
+.dock-stage .dock-track {
+  width: max-content;
+  max-width: 100%;
+}
+.dock-stage .dock-panel.active {
+  width: max-content;
+  animation: none !important;
+  transform: none;
+}
+.mode-switch {
+  position: relative !important;
+  right: auto !important;
+  bottom: auto !important;
+}
+.native-dock-controls {
+  position: absolute;
+  right: 10px;
+  bottom: calc(100% + 8px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 31px;
+}
+.native-gallery .native-dock-controls {
+  position: static;
+  margin-bottom: 20px;
+}
+.native-icon-button {
+  width: 28px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.native-icon-button:hover {
+  background: #ffffff0e;
+}
+.native-icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+.widget-slot {
+  flex: 0 0 auto;
+  position: relative;
+  height: 66px;
+  container-type: inline-size;
+}
+.widget-slot > .widget {
+  width: 100% !important;
+  height: 66px !important;
+}
+.native-gallery {
+  padding: 24px;
+  background: rgba(22, 24, 28, 0.98);
+  height: 100vh;
+  overflow: auto;
+}
+.native-gallery header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.native-gallery h1 {
+  font-size: 20px;
+}
+.native-gallery p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.native-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+.native-gallery-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--tile);
+}
+.native-gallery-card h2 {
+  font-size: 14px;
+}
+.native-gallery-card button,
+.native-gallery select,
+.native-gallery header button {
+  background: #ffffff0b;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+.native-editor {
+  display: flex;
+  gap: 3px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: #202428;
+  border-radius: 6px;
+  z-index: 30;
+}
+.native-editor button {
+  border: 0;
+  background: none;
+  color: white;
+  cursor: pointer;
+}
+.native-error {
+  position: fixed;
+  top: 3px;
+  bottom: auto;
+  left: 12px;
+  max-width: calc(100vw - 24px);
+  max-height: 36px;
+  overflow: auto;
+  background: #25282d;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.widget-slot[draggable="true"] {
+  cursor: grab;
+}
+.widget-slot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--tile-radius);
+}
+.native-size-menu {
+  position: fixed;
+  top: 4px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  max-width: calc(100vw - 24px);
+  background: #202429;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 11px;
+  z-index: 80;
+}
+.native-size-menu button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.native-size-menu button[aria-checked="true"] {
+  background: #285045;
+}
+.compact-provider-state {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 10px;
+  white-space: nowrap;
+}
+.widget[data-widget-size="compact"] .fresh-weather-forecast,
+.widget:not([data-widget-size="wide"]) .fresh-weather-divider,
+.widget[data-widget-size="standard"] .fresh-weather-forecast,
+.widget[data-widget-size="compact"] .fresh-media-info,
+.widget:not([data-widget-size="wide"]) .fresh-media-info small:not([role="status"]),
+.widget[data-widget-size="compact"] .fresh-calendar-copy,
+.widget:not([data-widget-size="wide"]) .fresh-calendar-copy small.calendar-secondary,
+.widget[data-widget-size="compact"] .ps-dock-copy,
+.widget[data-widget-size="compact"] .ps-dock-shortcut {
+  display: none !important;
+}
+.widget[data-widget-size="compact"] .fresh-stats {
+  grid-template-columns: 1fr;
+}
+.widget[data-widget-size="standard"] .fresh-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* Keep appearance overrides after the canonical theme rules. Separators stay inside clipped tiles. */
+.dock-stage .dock-shell .widget-slot > .widget::before {
+  display: none !important;
+}
+.dock-stage.lines-style .dock-shell .widget-slot > .widget {
+  background: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+.dock-stage.lines-style .dock-shell .widget-slot > .widget::after {
+  display: none !important;
+}
+.dock-stage.lines-style .dock-shell .widget-slot[data-first-visible="false"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 16%;
+  bottom: 16%;
+  width: 1px;
+  background: var(--line-ui, var(--line));
+  opacity: .94;
+  pointer-events: none;
+  z-index: 2;
+}
+.dock-stage.lines-style .dock-shell .widget .fresh-status,
+.dock-stage.lines-style .dock-shell .widget .fresh-widget,
+.dock-stage.lines-style .dock-shell .widget .fresh-ai-logo,
+.dock-stage.lines-style .dock-shell .widget .fresh-action > .fresh-icon,
+.dock-stage.lines-style .dock-shell .widget .fresh-media-art,
+.dock-stage.lines-style .dock-shell .widget .metric-icon,
+.dock-stage.lines-style .dock-shell .widget .fresh-calendar-date,
+.dock-stage.lines-style .dock-shell .widget .fresh-calendar-date span {
+  background: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.dock-stage .dock-shell .widget[data-widget-id="windows"] .ps-windows-logo {
+  width: 48px !important;
+  height: 48px !important;
+  flex: 0 0 48px !important;
+}
+.dock-stage.lines-style .dock-shell .widget .fresh-calendar-date {
+  color: var(--text) !important;
+  border-radius: 0 !important;
+}
+.dock-stage.lines-style .dock-shell .widget .fresh-calendar-date span {
+  color: var(--muted) !important;
+}
+.dock-stage .dock-shell .widget[data-widget-id="windows"] .ps-windows-logo svg {
+  width: 34px !important;
+  height: 34px !important;
+}
+.dock-stage .dock-shell .widget[data-widget-id="protonsearch"] .ps-dock-logo svg {
+  width: 29px !important;
+  height: 29px !important;
+}
+.dock-stage .dock-shell .app-button .app-icon-shell {
+  transform: scale(.94) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Material/color tokens from the supplied Lines_Fixed HTML; legacy layouts stay dark. */
+:root {
+  --sage: #a1c4a4; --sage-soft: #304236; --ink: #eff1ec; --sub: #a7afa9;
+  --surface: rgba(30,35,35,.97); --surface2: #292e2d; --line-ui: rgba(234,238,232,.12);
+  --soft-shadow: 0 18px 48px rgba(0,0,0,.35), 0 2px 7px rgba(0,0,0,.2);
+  --dock-bg: rgba(34,39,39,.94); --dock-border: rgba(242,248,243,.16);
+  --spot-bg: rgba(31,36,36,.98); --spot-solid: #1f2424; --spot-line: #414946; --spot-hover: #35433a;
+  --text: var(--ink); --muted: var(--sub); --glass: var(--dock-bg);
+  --tile: rgba(255,255,255,.035); --tile-strong: rgba(255,255,255,.05);
+  --line: var(--line-ui); --accent: var(--sage);
+}
+body[data-theme="light"] {
+  --sage: #557d61; --sage-soft: #e3ebe0; --ink: #252927; --sub: #646b67;
+  --surface: rgba(250,249,246,.965); --surface2: #f5f3ef; --line-ui: rgba(50,48,43,.12);
+  --soft-shadow: 0 13px 36px rgba(42,38,32,.11), 0 2px 6px rgba(42,38,32,.065);
+  --dock-bg: rgba(251,250,247,.91); --dock-border: rgba(255,255,255,.9);
+  --spot-bg: rgba(250,249,246,.975); --spot-solid: #faf9f6; --spot-line: #deded8; --spot-hover: #e8eee7;
+  --tile: rgba(0,0,0,.025); --tile-strong: rgba(0,0,0,.035);
+}
+body[data-theme="glass"] {
+  --sage: #456b53; --sage-soft: rgba(223,241,227,.6); --ink: #182927; --sub: #4e6360;
+  --surface: rgba(233,241,239,.52); --surface2: rgba(237,244,242,.42); --line-ui: rgba(255,255,255,.73);
+  --soft-shadow: 0 16px 44px rgba(43,65,67,.22), inset 0 1px rgba(255,255,255,.85);
+  --dock-bg: rgba(226,239,239,.53); --dock-border: rgba(255,255,255,.92);
+  --spot-bg: rgba(231,242,241,.86); --spot-solid: #e7f2f1; --spot-line: rgba(255,255,255,.72); --spot-hover: rgba(255,255,255,.58);
+  --tile: rgba(255,255,255,.18); --tile-strong: rgba(255,255,255,.26);
+}
+body[data-theme] {
+  --text: var(--ink); --muted: var(--sub); --glass: var(--dock-bg);
+  --line: var(--line-ui); --accent: var(--sage);
+}
+.dock-stage .dock-shell {
+  background: var(--dock-bg) !important;
+  border-color: var(--dock-border) !important;
+  box-shadow: var(--soft-shadow) !important;
+}
+body[data-theme="glass"] .dock-stage .dock-shell {
+  box-shadow: 0 14px 35px rgba(34,55,59,.23), inset 0 1px rgba(255,255,255,.94), inset 0 -1px rgba(255,255,255,.25) !important;
+  backdrop-filter: blur(30px) saturate(112%) !important;
+}
+.dock-stage:not(.lines-style) .dock-shell .tile {
+  background: var(--tile) !important;
+  border-color: var(--line-ui) !important;
+  box-shadow: none !important;
+}
+.dock-stage .dock-shell .tile { color: var(--ink) !important; }
+.dock-stage .dock-shell .tile :is(.time-main,.temp,b,strong,.fresh-title,.fresh-main,.metric-copy b) { color: var(--ink) !important; }
+.dock-stage .dock-shell .tile :is(small,.time-date,.fresh-sub,.metric-copy span,.fresh-kicker,.fresh-caption,.fresh-status-label,.fresh-stats em,.fresh-stats span) { color: var(--sub) !important; }
+.dock-stage .dock-shell :is(.ps-dock-logo,.ps-windows-logo) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--sage) !important;
+}
+.dock-stage .dock-shell :is(.fresh-control,.fresh-media-art,.fresh-calendar-date) {
+  background: var(--surface2);
+  border-color: var(--line-ui);
+  color: var(--ink);
+}
+.dock-stage .dock-shell .fresh-calendar-date span { background: var(--sage-soft); color: var(--ink); }
+.dock-stage .mode-switch,.native-gallery .mode-switch {
+  background: var(--dock-bg) !important;
+  border-color: var(--dock-border) !important;
+}
+.dock-stage .mode-btn,.native-gallery .mode-btn { color: var(--sub) !important; }
+.dock-stage .mode-btn.active,.native-gallery .mode-btn.active {
+  background: var(--sage-soft) !important;
+  color: var(--ink) !important;
+}
+.native-gallery { background: var(--spot-solid); color: var(--ink); }
+.native-gallery :is(.appearance-control,.native-gallery-card,.native-gallery-card button,.appearance-toggle button,select,header button),
+.native-size-menu,.native-editor,.native-error {
+  background: var(--surface2) !important;
+  color: var(--ink) !important;
+  border-color: var(--line-ui) !important;
+}
+.native-gallery .appearance-toggle button.active,.native-size-menu button[aria-checked="true"] {
+  background: var(--sage-soft) !important;
+  color: var(--ink) !important;
+  box-shadow: inset 0 0 0 1px var(--sage) !important;
+}
+.native-editor button { color: var(--ink); }
+.native-size-menu,.native-error { background: var(--spot-solid) !important; }
+.theme-toggle { grid-template-columns: repeat(3, 1fr); }
+
+/* Shared widget language: one surface, hierarchy and control treatment in every theme. */
+.dock-stage .widget-slot > .widget {
+  border-radius: 12px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.dock-stage:not(.lines-style) .widget-slot > .widget {
+  background: var(--tile) !important;
+  border: 1px solid var(--line-ui) !important;
+}
+.dock-stage .widget :is(.fresh-action, .fresh-media, .fresh-calendar, .network-widget, .focus-widget, .weather-live) {
+  gap: 8px;
+  min-width: 0;
+}
+.dock-stage .widget :is(.fresh-kicker, .fresh-status-label) {
+  color: var(--sub) !important;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .035em;
+  line-height: 1.15;
+}
+.dock-stage .widget :is(.fresh-action b, .fresh-media-info b, .fresh-calendar-copy strong, .network-values b) {
+  color: var(--ink) !important;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.dock-stage .widget :is(.fresh-action small, .fresh-media-info small, .fresh-calendar-copy small, .network-values small, .weather-live small) {
+  color: var(--sub) !important;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.dock-stage .widget :is(.fresh-action > .fresh-icon, .fresh-media-art, .fresh-calendar-date) {
+  background: var(--tile-strong);
+  border: 1px solid var(--line-ui);
+  color: var(--sage);
+  border-radius: 9px;
+}
+.dock-stage .widget .fresh-action > .fresh-inline-arrow {
+  background: transparent;
+  border: 0;
+  color: var(--sub);
+}
+.dock-stage .widget :is(.fresh-control, .system-controls .fresh-control) {
+  background: var(--tile-strong);
+  border: 1px solid var(--line-ui);
+  color: var(--ink);
+  border-radius: 8px;
+}
+.dock-stage .widget .fresh-control:disabled { opacity: .5; }
+.dock-stage .widget :is(.fresh-action, .fresh-control):focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: -2px;
+}
+.dock-stage.lines-style .widget :is(.fresh-action > .fresh-icon, .fresh-media-art, .fresh-calendar-date) {
+  background: transparent;
+  border-color: transparent;
+}
+
