@@ -3,69 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ProtonDock — macOS Tahoe Dynamic Resizable Glass Widgets</title>
+  <title>ProtonDock: macOS Tahoe Adaptive Glass Widgets</title>
   <style>
     /* ==========================================================================
-       DESIGN TOKENS & SYSTEM VARIABLES (macOS Tahoe Glassmorphism)
+       DESIGN TOKENS & CRAFTSMANSHIP STANDARDS (macOS Tahoe Glass, Anti-Slop)
        ========================================================================== */
     :root {
       /* Dock Dimensions */
       --dock-height: 84px;
       --dock-padding: 8px 12px;
-      --dock-radius: 30px;
+      --dock-radius: 28px;
       --tile-height: 64px;
       --tile-radius: 20px;
-      --gap: 9px;
+      --gap: 8px;
 
       /* Responsive Size Classes */
-      --size-compact: 64px;       /* Squircle 1:1 */
-      --size-standard: 138px;     /* Medium Rectangle */
-      --size-wide: 242px;         /* Rich Dashboard Card */
+      --size-compact: 64px;       /* 1:1 Squircle */
+      --size-standard: 136px;     /* Comfortable Card */
+      --size-wide: 240px;         /* Rich Dashboard Module */
 
-      /* Tahoe Dark Glass (Default) */
+      /* Tahoe Dark Glass (Purposeful Translucency) */
       --glass-base: rgba(18, 22, 28, 0.65);
-      --glass-surface: rgba(255, 255, 255, 0.06);
-      --glass-surface-hover: rgba(255, 255, 255, 0.12);
-      --glass-surface-active: rgba(255, 255, 255, 0.18);
-      --glass-border: rgba(255, 255, 255, 0.15);
+      --glass-surface: rgba(255, 255, 255, 0.055);
+      --glass-surface-hover: rgba(255, 255, 255, 0.11);
+      --glass-surface-active: rgba(255, 255, 255, 0.16);
+      --glass-border: rgba(255, 255, 255, 0.14);
       --glass-border-subtle: rgba(255, 255, 255, 0.08);
-      --glass-top-highlight: rgba(255, 255, 255, 0.35);
+      --glass-top-highlight: rgba(255, 255, 255, 0.32);
       --glass-blur: blur(48px) saturate(210%) contrast(104%);
       --glass-shadow: 
-        0 28px 70px -10px rgba(0, 0, 0, 0.58),
-        0 10px 28px -4px rgba(0, 0, 0, 0.38),
+        0 28px 70px -10px rgba(0, 0, 0, 0.55),
+        0 10px 28px -4px rgba(0, 0, 0, 0.35),
         inset 0 1.5px 0 0 var(--glass-top-highlight),
         inset 0 0 0 1px var(--glass-border);
 
       /* Typography & Accents */
-      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", sans-serif;
       --text-primary: rgba(255, 255, 255, 0.96);
-      --text-secondary: rgba(255, 255, 255, 0.62);
-      --text-tertiary: rgba(255, 255, 255, 0.40);
+      --text-secondary: rgba(255, 255, 255, 0.65);
+      --text-tertiary: rgba(255, 255, 255, 0.42);
       --accent: #5ef1c2; /* Tahoe Mint */
-      --accent-glow: rgba(94, 241, 194, 0.45);
-      --accent-bg: rgba(94, 241, 194, 0.16);
+      --accent-glow: rgba(94, 241, 194, 0.40);
+      --accent-bg: rgba(94, 241, 194, 0.15);
       --indicator-color: #5ef1c2;
       --indicator-glow: 0 0 8px #5ef1c2;
 
-      /* Apple-like Fluid Spring Easing */
-      --apple-spring: cubic-bezier(0.16, 1, 0.3, 1);
-      --anim-resize: width 0.42s var(--apple-spring), padding 0.42s var(--apple-spring), transform 0.2s var(--apple-spring);
-      --trans-hover: 180ms var(--apple-spring);
+      /* Motion: Apple-like Fluid Spring Physics */
+      --spring-physics: cubic-bezier(0.16, 1, 0.3, 1);
+      --anim-resize: width 0.38s var(--spring-physics), padding 0.38s var(--spring-physics), transform 0.2s var(--spring-physics);
+      --trans-hover: 180ms var(--spring-physics);
     }
 
-    /* Light Glacier Theme */
+    /* Light Theme */
     body[data-theme="light"] {
-      --glass-base: rgba(246, 248, 252, 0.70);
-      --glass-surface: rgba(0, 0, 0, 0.045);
-      --glass-surface-hover: rgba(0, 0, 0, 0.085);
-      --glass-surface-active: rgba(0, 0, 0, 0.13);
+      --glass-base: rgba(246, 248, 252, 0.72);
+      --glass-surface: rgba(0, 0, 0, 0.04);
+      --glass-surface-hover: rgba(0, 0, 0, 0.08);
+      --glass-surface-active: rgba(0, 0, 0, 0.12);
       --glass-border: rgba(255, 255, 255, 0.90);
-      --glass-border-subtle: rgba(0, 0, 0, 0.09);
+      --glass-border-subtle: rgba(0, 0, 0, 0.08);
       --glass-top-highlight: rgba(255, 255, 255, 0.98);
       --glass-shadow: 
-        0 26px 60px -10px rgba(24, 38, 62, 0.18),
-        0 10px 24px -4px rgba(24, 38, 62, 0.10),
+        0 24px 56px -10px rgba(24, 38, 62, 0.16),
+        0 8px 20px -4px rgba(24, 38, 62, 0.09),
         inset 0 1.5px 0 0 var(--glass-top-highlight),
         inset 0 0 0 1px var(--glass-border);
       --text-primary: rgba(14, 20, 28, 0.94);
@@ -80,11 +80,11 @@
 
     /* Aurora Theme */
     body[data-theme="aurora"] {
-      --glass-base: rgba(20, 15, 36, 0.65);
-      --glass-surface: rgba(186, 155, 255, 0.08);
-      --glass-surface-hover: rgba(186, 155, 255, 0.15);
-      --glass-border: rgba(210, 190, 255, 0.24);
-      --glass-top-highlight: rgba(240, 230, 255, 0.50);
+      --glass-base: rgba(19, 15, 34, 0.65);
+      --glass-surface: rgba(186, 155, 255, 0.07);
+      --glass-surface-hover: rgba(186, 155, 255, 0.14);
+      --glass-border: rgba(210, 190, 255, 0.22);
+      --glass-top-highlight: rgba(240, 230, 255, 0.45);
       --accent: #bf7af0;
       --accent-glow: rgba(191, 122, 240, 0.45);
       --accent-bg: rgba(191, 122, 240, 0.18);
@@ -92,9 +92,7 @@
       --indicator-glow: 0 0 8px #d18bf7;
     }
 
-    /* ==========================================================================
-       RESET & BASE LAYOUT
-       ========================================================================== */
+    /* Reset */
     * {
       box-sizing: border-box;
       margin: 0;
@@ -137,7 +135,7 @@
       background: radial-gradient(circle at 50% 0%, #e2ecf7 0%, #cadcf0 45%, #9cbcdb 100%);
     }
 
-    /* Ambient Desktop Header */
+    /* Desktop Header */
     .desktop-hint {
       position: absolute;
       top: 80px;
@@ -162,9 +160,7 @@
       line-height: 1.5;
     }
 
-    /* ==========================================================================
-       DEMO CONTROLS TOOLBAR
-       ========================================================================== */
+    /* Demo Controls Toolbar */
     .demo-toolbar {
       position: absolute;
       top: 14px;
@@ -224,7 +220,7 @@
     }
 
     /* ==========================================================================
-       THE PROTONDOCK STAGE (Fluid Auto-reflowing Glass Rail)
+       THE PROTONDOCK RAIL
        ========================================================================== */
     .dock-stage {
       position: absolute;
@@ -249,11 +245,9 @@
       backdrop-filter: var(--glass-blur);
       border-radius: var(--dock-radius);
       box-shadow: var(--glass-shadow);
-      /* Smooth Apple-style dock rail resize */
-      transition: width 0.42s var(--apple-spring), padding 0.42s var(--apple-spring);
+      transition: width 0.38s var(--spring-physics), padding 0.38s var(--spring-physics);
     }
 
-    /* Specular Refractive Top Rim */
     .dock-rail::before {
       content: "";
       position: absolute;
@@ -268,14 +262,14 @@
 
     .dock-divider {
       width: 1px;
-      height: 40px;
+      height: 38px;
       background: var(--glass-border-subtle);
       margin: 0 1px;
       flex-shrink: 0;
     }
 
     /* ==========================================================================
-       SMOOTH RESPONSIVE WIDGET TILES
+       RESPONSIVE WIDGET SYSTEM (ANTI-SLOP OPTIMIZED)
        ========================================================================== */
     .dock-slot {
       position: relative;
@@ -285,7 +279,6 @@
       flex-shrink: 0;
     }
 
-    /* Base Widget Tile with Animated Width */
     .widget-tile {
       height: var(--tile-height);
       background: var(--glass-surface);
@@ -297,43 +290,42 @@
       overflow: hidden;
       box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
       cursor: pointer;
-      /* Crucial: Smooth Apple-like Width Animation */
       transition: var(--anim-resize), background var(--trans-hover), border-color var(--trans-hover), box-shadow var(--trans-hover);
     }
 
     .widget-tile:hover {
       background: var(--glass-surface-hover);
       border-color: var(--glass-border);
-      transform: translateY(-3px);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28), inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
     }
     .widget-tile:active {
       transform: translateY(0) scale(0.98);
       background: var(--glass-surface-active);
     }
 
-    /* Tactile Drag Handle on Widget Edge */
+    /* Drag Handle on Widget Edge */
     .widget-resize-grip {
       position: absolute;
       right: 0;
       top: 0;
       bottom: 0;
-      width: 14px;
+      width: 12px;
       cursor: col-resize;
       display: flex;
       align-items: center;
       justify-content: center;
       opacity: 0;
-      transition: opacity 160ms ease;
+      transition: opacity 140ms ease;
       z-index: 10;
     }
     .widget-resize-grip::after {
       content: "";
       width: 3px;
-      height: 20px;
+      height: 18px;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.35);
-      transition: all 140ms ease;
+      transition: all 120ms ease;
     }
     .widget-tile:hover .widget-resize-grip {
       opacity: 1;
@@ -344,10 +336,10 @@
       box-shadow: 0 0 8px var(--accent-glow);
     }
 
-    /* Size Switcher Pills on Hover */
+    /* Size Switcher Capsule on Hover */
     .widget-size-switcher {
       position: absolute;
-      top: -26px;
+      top: -24px;
       left: 50%;
       transform: translateX(-50%) translateY(4px);
       background: var(--glass-base);
@@ -360,7 +352,7 @@
       gap: 3px;
       opacity: 0;
       pointer-events: none;
-      transition: all 160ms var(--apple-spring);
+      transition: all 140ms var(--spring-physics);
       z-index: 30;
       box-shadow: var(--glass-shadow);
     }
@@ -390,21 +382,25 @@
     }
 
     /* ==========================================================================
-       1. WEATHER WIDGET (Dynamic Content per Size)
+       1. WEATHER WIDGET: PURPOSE-DRIVEN PROGRESSIVE CONTENT
        ========================================================================== */
     .widget-weather {
-      width: var(--size-compact);
       padding: 0 10px;
-      justify-content: center;
     }
+    /* Compact: ONLY icon and degrees, perfectly centered with breathing room */
     .widget-weather[data-size="compact"] {
       width: var(--size-compact);
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 3px;
+      padding: 0;
     }
     .widget-weather[data-size="standard"] {
       width: var(--size-standard);
-      padding: 0 12px;
+      padding: 0 14px;
       justify-content: flex-start;
-      gap: 10px;
+      gap: 12px;
     }
     .widget-weather[data-size="wide"] {
       width: var(--size-wide);
@@ -412,41 +408,53 @@
       justify-content: space-between;
     }
 
-    /* Weather Content Layers */
-    .weather-main-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
     .weather-icon-box {
-      width: 32px;
-      height: 32px;
+      width: 26px;
+      height: 26px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #ffd166;
       flex-shrink: 0;
     }
+    .widget-weather[data-size="standard"] .weather-icon-box,
+    .widget-weather[data-size="wide"] .weather-icon-box {
+      width: 32px;
+      height: 32px;
+    }
+
     .weather-temp-block {
       display: flex;
       flex-direction: column;
       gap: 1px;
     }
     .weather-temp-val {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       line-height: 1;
       font-variant-numeric: tabular-nums;
+      text-align: center;
     }
+    .widget-weather[data-size="standard"] .weather-temp-val,
+    .widget-weather[data-size="wide"] .weather-temp-val {
+      font-size: 18px;
+      text-align: left;
+    }
+
+    /* Condition text hidden in compact mode to eliminate clipping completely */
     .weather-condition-text {
-      font-size: 10px;
+      display: none;
+      font-size: 10.5px;
       color: var(--text-secondary);
       font-weight: 500;
       white-space: nowrap;
     }
+    .widget-weather[data-size="standard"] .weather-condition-text,
+    .widget-weather[data-size="wide"] .weather-condition-text {
+      display: block;
+    }
 
-    /* Forecast Pills (Revealed only in Wide mode) */
+    /* 3-hour forecast deck in Wide mode */
     .weather-forecast-deck {
       display: none;
       align-items: center;
@@ -476,17 +484,19 @@
     }
 
     /* ==========================================================================
-       2. DIGITAL CLOCK & CALENDAR WIDGET
+       2. DIGITAL CLOCK WIDGET: CLEAN TABULAR TYPOGRAPHY
        ========================================================================== */
     .widget-clock {
-      width: var(--size-compact);
       padding: 0 8px;
       justify-content: center;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
     }
+    /* Compact: Time + Day pill only */
     .widget-clock[data-size="compact"] {
       width: var(--size-compact);
+      align-items: center;
+      padding: 0;
     }
     .widget-clock[data-size="standard"] {
       width: var(--size-standard);
@@ -508,23 +518,24 @@
       line-height: 1;
       letter-spacing: -0.02em;
       font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
     }
     .widget-clock[data-size="standard"] .clock-digits,
     .widget-clock[data-size="wide"] .clock-digits {
-      font-size: 19px;
+      font-size: 18px;
     }
-    .clock-sub-pill {
+
+    .clock-date-tag {
       font-size: 9.5px;
-      font-weight: 600;
+      font-weight: 650;
       color: var(--accent);
-      padding: 2px 6px;
+      padding: 1px 5px;
       border-radius: 999px;
       background: var(--glass-surface-active);
       border: 1px solid var(--glass-border-subtle);
       white-space: nowrap;
     }
 
-    /* Event Chip (Wide mode) */
     .clock-event-chip {
       display: none;
       flex-direction: column;
@@ -558,21 +569,74 @@
     }
 
     /* ==========================================================================
-       3. HARDWARE & SYSTEM STATUS WIDGET
+       3. HARDWARE & SYSTEM STATUS WIDGET (DUAL METER SYSTEM)
        ========================================================================== */
     .widget-system {
-      width: var(--size-compact);
-      padding: 6px 10px;
-      justify-content: space-between;
-      flex-direction: column;
+      padding: 8px;
     }
+    /* Compact: Clean Dual Vertical Pill Meters */
     .widget-system[data-size="compact"] {
       width: var(--size-compact);
+      justify-content: center;
+      align-items: center;
+      padding: 6px 12px;
+    }
+    .system-compact-meters {
+      display: none;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+      justify-content: space-around;
+      gap: 8px;
+    }
+    .widget-system[data-size="compact"] .system-compact-meters {
+      display: flex;
+    }
+    .meter-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      height: 100%;
+      justify-content: center;
+    }
+    .meter-bar-v {
+      width: 5px;
+      height: 32px;
+      border-radius: 999px;
+      background: var(--glass-surface-active);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+    }
+    .meter-fill-v {
+      width: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+    .meter-label-v {
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    /* Standard & Wide: Horizontal Progress Bars */
+    .system-bars-group {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      gap: 5px;
+      flex: 1;
+    }
+    .widget-system[data-size="standard"] .system-bars-group,
+    .widget-system[data-size="wide"] .system-bars-group {
+      display: flex;
     }
     .widget-system[data-size="standard"] {
       width: var(--size-standard);
       padding: 8px 14px;
-      gap: 6px;
     }
     .widget-system[data-size="wide"] {
       width: var(--size-wide);
@@ -582,13 +646,6 @@
       gap: 12px;
     }
 
-    .system-bars-group {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      flex: 1;
-    }
     .stat-row {
       display: flex;
       align-items: center;
@@ -618,7 +675,6 @@
       box-shadow: 0 0 6px var(--accent-glow);
     }
 
-    /* Sparkline & Detail (Wide mode) */
     .system-wide-details {
       display: none;
       flex-direction: column;
@@ -634,7 +690,7 @@
     }
     .system-sparkline {
       width: 58px;
-      height: 22px;
+      height: 20px;
     }
     .system-sparkline path {
       stroke: var(--accent);
@@ -650,17 +706,18 @@
     }
 
     /* ==========================================================================
-       4. MEDIA / NOW PLAYING WIDGET
+       4. MEDIA PLAYER WIDGET: ALBUM ART SURFACE
        ========================================================================== */
     .widget-media {
-      width: var(--size-compact);
       padding: 0;
-      justify-content: center;
-      background: linear-gradient(135deg, rgba(235, 77, 75, 0.22), rgba(106, 17, 203, 0.22)), var(--glass-surface);
-      border-color: rgba(235, 77, 75, 0.35);
+      background: var(--glass-surface);
     }
+    /* Compact: Pure Album Art Squircle with subtle live EQ overlay */
     .widget-media[data-size="compact"] {
       width: var(--size-compact);
+      justify-content: center;
+      align-items: center;
+      position: relative;
     }
     .widget-media[data-size="standard"] {
       width: var(--size-standard);
@@ -674,19 +731,25 @@
       justify-content: space-between;
     }
 
-    .media-cover {
-      width: 38px;
-      height: 38px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #ff416c, #8a2387);
+    .media-cover-art {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #3a1c71, #d76d77);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       color: #fff;
       flex-shrink: 0;
       position: relative;
     }
+    .widget-media[data-size="compact"] .media-cover-art {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+    }
+
     .media-info-block {
       display: none;
       flex-direction: column;
@@ -712,7 +775,6 @@
       overflow: hidden;
     }
 
-    /* Scrubber & Controls (Wide mode) */
     .media-wide-controls {
       display: none;
       align-items: center;
@@ -742,50 +804,57 @@
       transform: scale(1.1);
     }
 
-    /* Compact EQ Bars */
-    .media-eq-bars {
+    /* Animated Soundwave EQ */
+    .media-compact-eq {
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
       display: flex;
       align-items: flex-end;
-      gap: 2px;
-      height: 10px;
+      gap: 1.5px;
+      height: 9px;
+      background: rgba(0, 0, 0, 0.45);
+      padding: 2px 4px;
+      border-radius: 4px;
+      backdrop-filter: blur(4px);
     }
-    .widget-media:not([data-size="compact"]) .media-eq-bars {
+    .widget-media:not([data-size="compact"]) .media-compact-eq {
       display: none;
     }
     .eq-bar {
-      width: 2.5px;
+      width: 2px;
       background: var(--accent);
       border-radius: 1px;
       animation: eqBounce 1s ease-in-out infinite alternate;
     }
-    .eq-bar:nth-child(1) { height: 4px; animation-delay: 0.1s; }
-    .eq-bar:nth-child(2) { height: 9px; animation-delay: 0.3s; }
-    .eq-bar:nth-child(3) { height: 6px; animation-delay: 0.2s; }
+    .eq-bar:nth-child(1) { height: 3px; animation-delay: 0.1s; }
+    .eq-bar:nth-child(2) { height: 8px; animation-delay: 0.3s; }
+    .eq-bar:nth-child(3) { height: 5px; animation-delay: 0.2s; }
     @keyframes eqBounce {
-      0% { height: 3px; }
-      100% { height: 10px; }
+      0% { height: 2px; }
+      100% { height: 8px; }
     }
 
     /* ==========================================================================
        5. PROTONSEARCH TRIGGER WIDGET
        ========================================================================== */
     .widget-search {
-      width: var(--size-compact);
       padding: 0 10px;
-      justify-content: center;
     }
+    /* Compact: Clean Squircle Icon Tile */
     .widget-search[data-size="compact"] {
       width: var(--size-compact);
-      flex-direction: column;
-      gap: 2px;
+      justify-content: center;
+      align-items: center;
+      padding: 0;
     }
     .widget-search[data-size="standard"] {
-      width: 165px;
+      width: 155px;
       justify-content: space-between;
       padding: 0 14px;
     }
     .widget-search[data-size="wide"] {
-      width: 235px;
+      width: 230px;
       justify-content: space-between;
       padding: 0 14px;
     }
@@ -814,11 +883,14 @@
       font-size: 10px;
       font-weight: 700;
       color: var(--text-secondary);
-      padding: 3px 6px;
+      padding: 2px 6px;
       border-radius: 6px;
       background: var(--glass-surface-active);
       border: 1px solid var(--glass-border-subtle);
       white-space: nowrap;
+    }
+    .widget-search[data-size="compact"] .search-shortcut-tag {
+      display: none;
     }
 
     /* ==========================================================================
@@ -857,10 +929,10 @@
       transition: all var(--trans-hover);
     }
     .app-icon-slot:hover .app-icon-wrapper {
-      transform: translateY(-5px) scale(1.08);
+      transform: translateY(-4px) scale(1.06);
       background: var(--glass-surface-hover);
       border-color: var(--glass-border);
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35), 0 0 16px var(--accent-glow);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35), 0 0 14px var(--accent-glow);
     }
     .app-icon-slot:active .app-icon-wrapper {
       transform: translateY(-1px) scale(0.96);
@@ -890,7 +962,6 @@
       box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
     }
 
-    /* Floating Tooltip */
     .app-tooltip {
       position: absolute;
       bottom: calc(100% + 12px);
@@ -909,35 +980,37 @@
       opacity: 0;
       transition: all 140ms ease-out;
     }
-    .app-icon-slot:hover .app-tooltip {
+    .app-icon-slot:hover .app-tooltip,
+    .widget-tile:hover .app-tooltip {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
 
-    /* Mode Switcher */
+    /* Profile Switcher: Clean Horizontal Segment */
     .tile-profile-switch {
       display: flex;
-      flex-direction: column;
-      gap: 3px;
-      padding: 4px;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
       background: var(--glass-surface);
       border-radius: 16px;
       border: 1px solid var(--glass-border-subtle);
-      width: 54px;
-      height: var(--tile-height);
-      justify-content: center;
+      height: 34px;
     }
     .profile-pill-btn {
       border: none;
       background: transparent;
       color: var(--text-secondary);
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: 700;
-      padding: 4px 0;
-      border-radius: 10px;
+      padding: 4px 9px;
+      border-radius: 12px;
       cursor: pointer;
       text-align: center;
       transition: all var(--trans-hover);
+    }
+    .profile-pill-btn:hover {
+      color: var(--text-primary);
     }
     .profile-pill-btn.active {
       background: var(--glass-surface-active);
@@ -980,7 +1053,7 @@
         inset 0 0 0 1px var(--glass-border);
       overflow: hidden;
       transform: translateY(-12px) scale(0.98);
-      transition: transform 220ms var(--apple-spring);
+      transition: transform 220ms var(--spring-physics);
     }
     .spotlight-backdrop.open .spotlight-palette {
       transform: translateY(0) scale(1);
@@ -1149,17 +1222,17 @@
   <!-- Desktop Wallpaper Canvas -->
   <div class="desktop-wallpaper wallpaper-tahoe-dark" id="wallpaperEl"></div>
 
-  <!-- Ambient Desktop Intro -->
+  <!-- Ambient Desktop Header -->
   <div class="desktop-hint">
-    <h1>ProtonDock — Fluid Apple-Smooth Dynamic Sizing</h1>
-    <p>Hover over any widget to see its <b>[S] [M] [L]</b> size pills or <b>drag its right edge</b> to smoothly expand the content. The entire dock rail reflows with butter-smooth spring physics.</p>
+    <h1>ProtonDock: Adaptive Content per Size</h1>
+    <p>Every widget displays only the essential glanceable content in <b>Squircle (S)</b>, expanding gracefully into <b>Standard (M)</b> and <b>Wide (L)</b> with zero text clipping.</p>
   </div>
 
-  <!-- Interactive Demo Controls Header -->
+  <!-- Demo Controls Toolbar -->
   <div class="demo-toolbar">
     <div class="demo-toolbar-group">
-      <span>Batch Layout Presets:</span>
-      <button class="demo-pill-btn active" onclick="setAllSizes('compact', this)">All Squarish (S)</button>
+      <span>Dock Sizing:</span>
+      <button class="demo-pill-btn active" onclick="setAllSizes('compact', this)">All Squircle (S)</button>
       <button class="demo-pill-btn" onclick="setAllSizes('standard', this)">All Standard (M)</button>
       <button class="demo-pill-btn" onclick="setAllSizes('wide', this)">All Wide (L)</button>
     </div>
@@ -1185,13 +1258,14 @@
     </button>
   </div>
 
-  <!-- The ProtonDock UI (Fluid Spring Resizing Rail) -->
+  <!-- The ProtonDock UI -->
   <div class="dock-stage">
     <nav class="dock-rail" id="dockRail" aria-label="ProtonDock">
       
       <!-- 1. Start Button -->
       <div class="dock-slot">
         <div class="widget-tile tile-start" title="Windows Start Menu" onclick="triggerEffect(this)">
+          <div class="app-tooltip">Windows Start</div>
           <svg style="width:24px; height:24px;" viewBox="0 0 24 24" fill="#0078d4">
             <rect x="3" y="3" width="8" height="8" rx="1.5"/>
             <rect x="13" y="3" width="8" height="8" rx="1.5"/>
@@ -1209,6 +1283,7 @@
           <button class="size-btn" onclick="setWidgetSize('searchWidget', 'wide', event)">L</button>
         </div>
         <div class="widget-tile widget-search" id="searchWidget" data-size="compact" onclick="toggleSpotlight()" title="Search Everything">
+          <div class="app-tooltip">ProtonSearch (Alt + Space)</div>
           <div class="search-lens-box">
             <svg class="icon" style="width:22px; height:22px;" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="7"/>
@@ -1216,7 +1291,7 @@
             </svg>
           </div>
           <span class="search-prompt-text">Search Everything...</span>
-          <span class="search-shortcut-tag">Alt ␣</span>
+          <span class="search-shortcut-tag">Alt Space</span>
           <div class="widget-resize-grip" onmousedown="initDragResize('searchWidget', event)" title="Drag to resize width"></div>
         </div>
       </div>
@@ -1291,7 +1366,7 @@
 
       <div class="dock-divider"></div>
 
-      <!-- 4. Dynamic Resizable Clock Widget -->
+      <!-- 4. Optimized Clock Widget -->
       <div class="dock-slot">
         <div class="widget-size-switcher">
           <button class="size-btn active" onclick="setWidgetSize('clockWidget', 'compact', event)">S</button>
@@ -1299,23 +1374,23 @@
           <button class="size-btn" onclick="setWidgetSize('clockWidget', 'wide', event)">L</button>
         </div>
         <div class="widget-tile widget-clock" id="clockWidget" data-size="compact" onclick="cycleWidgetSize('clockWidget')">
+          <div class="app-tooltip">Clock and Calendar</div>
           <div style="display:flex; flex-direction:column; gap:2px; flex-shrink:0;">
-            <div class="clock-digits" id="clockDigits">13:30</div>
-            <div class="clock-sub-pill" id="clockDate">Fri 6 Nov</div>
+            <div class="clock-digits" id="clockDigits">13:40</div>
+            <div class="clock-date-tag" id="clockDate">FRI</div>
           </div>
-          <!-- Revealed only in Wide mode -->
           <div class="clock-event-chip">
             <div class="event-title">Design Review Sync</div>
             <div class="event-time-tag">
               <span class="event-dot"></span>
-              <span>In 30 mins · Google Meet</span>
+              <span>In 30 mins (Google Meet)</span>
             </div>
           </div>
           <div class="widget-resize-grip" onmousedown="initDragResize('clockWidget', event)" title="Drag to resize width"></div>
         </div>
       </div>
 
-      <!-- 5. Dynamic Resizable Weather Widget -->
+      <!-- 5. Optimized Weather Widget: Icon + Degrees in S, Full details in M/L -->
       <div class="dock-slot">
         <div class="widget-size-switcher">
           <button class="size-btn active" onclick="setWidgetSize('weatherWidget', 'compact', event)">S</button>
@@ -1323,20 +1398,18 @@
           <button class="size-btn" onclick="setWidgetSize('weatherWidget', 'wide', event)">L</button>
         </div>
         <div class="widget-tile widget-weather" id="weatherWidget" data-size="compact" onclick="cycleWidgetSize('weatherWidget')">
-          <div class="weather-main-group">
-            <div class="weather-icon-box">
-              <svg class="icon" style="width:28px; height:28px;" viewBox="0 0 24 24">
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="#f59e0b"/>
-                <circle cx="12" cy="12" r="4" fill="#f59e0b" stroke="none"/>
-                <path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7a3.5 3.5 0 0 0 0-7z" fill="var(--text-primary)" stroke="none" opacity="0.9"/>
-              </svg>
-            </div>
-            <div class="weather-temp-block">
-              <div class="weather-temp-val">24°</div>
-              <div class="weather-condition-text">Sunny Clear</div>
-            </div>
+          <div class="app-tooltip">Weather: 24° Sunny Clear</div>
+          <div class="weather-icon-box">
+            <svg class="icon" style="width:26px; height:26px;" viewBox="0 0 24 24">
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="#f59e0b"/>
+              <circle cx="12" cy="12" r="4" fill="#f59e0b" stroke="none"/>
+              <path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7a3.5 3.5 0 0 0 0-7z" fill="var(--text-primary)" stroke="none" opacity="0.9"/>
+            </svg>
           </div>
-          <!-- Revealed only in Wide mode -->
+          <div class="weather-temp-block">
+            <div class="weather-temp-val">24°</div>
+            <div class="weather-condition-text">Sunny Clear</div>
+          </div>
           <div class="weather-forecast-deck">
             <div class="forecast-pill">
               <span>2 PM</span>
@@ -1358,7 +1431,7 @@
         </div>
       </div>
 
-      <!-- 6. Dynamic Resizable System Hardware Widget -->
+      <!-- 6. Optimized System Hardware Widget: Dual vertical pill meters in S, Horizontal bars in M/L -->
       <div class="dock-slot">
         <div class="widget-size-switcher">
           <button class="size-btn active" onclick="setWidgetSize('systemWidget', 'compact', event)">S</button>
@@ -1366,6 +1439,19 @@
           <button class="size-btn" onclick="setWidgetSize('systemWidget', 'wide', event)">L</button>
         </div>
         <div class="widget-tile widget-system" id="systemWidget" data-size="compact" onclick="cycleWidgetSize('systemWidget')">
+          <div class="app-tooltip">System: CPU 24%, RAM 58%</div>
+          <!-- Clean vertical meters in Compact mode -->
+          <div class="system-compact-meters">
+            <div class="meter-col">
+              <div class="meter-bar-v"><div class="meter-fill-v" style="height: 24%;"></div></div>
+              <span class="meter-label-v">CPU</span>
+            </div>
+            <div class="meter-col">
+              <div class="meter-bar-v"><div class="meter-fill-v" style="height: 58%; background: #60a5fa; box-shadow: 0 0 6px rgba(96,165,250,0.5);"></div></div>
+              <span class="meter-label-v">RAM</span>
+            </div>
+          </div>
+          <!-- Horizontal bars in Standard & Wide mode -->
           <div class="system-bars-group">
             <div class="stat-row">
               <span>CPU</span>
@@ -1378,18 +1464,17 @@
               <b>58%</b>
             </div>
           </div>
-          <!-- Revealed only in Wide mode -->
           <div class="system-wide-details">
-            <svg class="system-sparkline" viewBox="0 0 58 22">
-              <path d="M2 18 L12 12 L22 16 L32 6 L42 14 L56 4" />
+            <svg class="system-sparkline" viewBox="0 0 58 20">
+              <path d="M2 16 L12 10 L22 14 L32 5 L42 12 L56 3" />
             </svg>
-            <span class="system-detail-tag">9.2 / 16 GB · 4.2 GHz</span>
+            <span class="system-detail-tag">9.2 of 16 GB, 4.2 GHz</span>
           </div>
           <div class="widget-resize-grip" onmousedown="initDragResize('systemWidget', event)" title="Drag to resize width"></div>
         </div>
       </div>
 
-      <!-- 7. Dynamic Resizable Media Player Widget -->
+      <!-- 7. Optimized Media Widget: Album art cover with EQ in S, Details in M/L -->
       <div class="dock-slot">
         <div class="widget-size-switcher">
           <button class="size-btn active" onclick="setWidgetSize('mediaWidget', 'compact', event)">S</button>
@@ -1397,23 +1482,23 @@
           <button class="size-btn" onclick="setWidgetSize('mediaWidget', 'wide', event)">L</button>
         </div>
         <div class="widget-tile widget-media" id="mediaWidget" data-size="compact" onclick="cycleWidgetSize('mediaWidget')">
-          <div class="media-cover">
-            <svg class="icon" style="width:18px; height:18px;" viewBox="0 0 24 24" fill="currentColor">
+          <div class="app-tooltip">Now Playing: Midnight City (M83)</div>
+          <div class="media-cover-art">
+            <svg class="icon" style="width:20px; height:20px;" viewBox="0 0 24 24" fill="currentColor">
               <path d="M9 18V5l12-2v13"/>
               <circle cx="6" cy="18" r="3"/>
               <circle cx="18" cy="16" r="3"/>
             </svg>
+            <div class="media-compact-eq">
+              <span class="eq-bar"></span>
+              <span class="eq-bar"></span>
+              <span class="eq-bar"></span>
+            </div>
           </div>
           <div class="media-info-block">
             <div class="media-song-title">Midnight City</div>
-            <div class="media-song-artist">M83 · Hurry Up, We're Dreaming</div>
+            <div class="media-song-artist">M83, Hurry Up</div>
           </div>
-          <div class="media-eq-bars">
-            <span class="eq-bar"></span>
-            <span class="eq-bar"></span>
-            <span class="eq-bar"></span>
-          </div>
-          <!-- Controls in Wide mode -->
           <div class="media-wide-controls" onclick="event.stopPropagation()">
             <button class="media-ctrl-btn" title="Previous">
               <svg class="icon" style="width:12px; height:12px;" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/></svg>
@@ -1431,11 +1516,11 @@
 
       <div class="dock-divider"></div>
 
-      <!-- 8. Mode Switcher Capsule -->
+      <!-- 8. Mode Switcher (Clean Horizontal Segment) -->
       <div class="dock-slot">
         <div class="tile-profile-switch">
           <button class="profile-pill-btn active" onclick="switchProfile('daily', this)">Daily</button>
-          <button class="profile-pill-btn" onclick="switchProfile('founder', this)">Fndr</button>
+          <button class="profile-pill-btn" onclick="switchProfile('founder', this)">Founder</button>
         </div>
       </div>
 
@@ -1482,7 +1567,7 @@
             </div>
             <div class="result-text">
               <div class="result-title">protonsearch / src / main.rs</div>
-              <div class="result-subtitle">Rust Core Search Engine & Window Placement Logic</div>
+              <div class="result-subtitle">Rust Core Search Engine and Window Placement Logic</div>
             </div>
           </div>
           <span class="result-badge">Source Code</span>
@@ -1490,14 +1575,13 @@
       </div>
 
       <div class="spotlight-footer">
-        <div>Navigate with <kbd>↑</kbd> <kbd>↓</kbd> · Press <kbd>Enter</kbd> to launch</div>
-        <div>ProtonSearch FTS5 · <b>0.4ms</b></div>
+        <div>Navigate with <kbd>↑</kbd> <kbd>↓</kbd>, Press <kbd>Enter</kbd> to launch</div>
+        <div>ProtonSearch FTS5: <b>0.4ms</b></div>
       </div>
     </div>
   </div>
 
   <script>
-    // Live Clock
     function updateClock() {
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -1507,14 +1591,12 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Set individual widget size smoothly
     function setWidgetSize(widgetId, size, e) {
       if (e) e.stopPropagation();
       const widget = document.getElementById(widgetId);
       if (!widget) return;
       widget.setAttribute('data-size', size);
 
-      // Update switcher active state
       const slot = widget.closest('.dock-slot');
       if (slot) {
         slot.querySelectorAll('.size-btn').forEach(btn => {
@@ -1523,7 +1605,6 @@
       }
     }
 
-    // Click to cycle size: Compact -> Standard -> Wide -> Compact
     function cycleWidgetSize(widgetId) {
       const widget = document.getElementById(widgetId);
       if (!widget) return;
@@ -1533,7 +1614,6 @@
       setWidgetSize(widgetId, next);
     }
 
-    // Batch Set All Widget Sizes
     function setAllSizes(size, btn) {
       const widgets = ['searchWidget', 'clockWidget', 'weatherWidget', 'systemWidget', 'mediaWidget'];
       widgets.forEach(id => setWidgetSize(id, size));
@@ -1541,7 +1621,6 @@
       btn.classList.add('active');
     }
 
-    // Interactive Drag-to-Resize with Fluid Spring Snapping
     let activeDragWidget = null;
     let startX = 0;
     let startWidth = 0;
@@ -1552,7 +1631,7 @@
       activeDragWidget = document.getElementById(widgetId);
       startX = e.clientX;
       startWidth = activeDragWidget.getBoundingClientRect().width;
-      activeDragWidget.style.transition = 'none'; // Instant responsive feedback while dragging
+      activeDragWidget.style.transition = 'none';
 
       document.addEventListener('mousemove', handleDragResize);
       document.addEventListener('mouseup', endDragResize);
@@ -1564,26 +1643,24 @@
       const newWidth = Math.max(64, Math.min(270, startWidth + delta));
       activeDragWidget.style.width = newWidth + 'px';
 
-      // Live adapt content as threshold is crossed
-      if (newWidth > 190) {
+      if (newWidth > 185) {
         activeDragWidget.setAttribute('data-size', 'wide');
-      } else if (newWidth > 110) {
+      } else if (newWidth > 105) {
         activeDragWidget.setAttribute('data-size', 'standard');
       } else {
         activeDragWidget.setAttribute('data-size', 'compact');
       }
     }
 
-    function endDragResize(e) {
+    function endDragResize() {
       if (!activeDragWidget) return;
-      // Re-enable smooth spring transition and snap cleanly to closest size
       activeDragWidget.style.transition = '';
       const w = activeDragWidget.getBoundingClientRect().width;
       let snapSize = 'compact';
       if (w > 185) snapSize = 'wide';
       else if (w > 105) snapSize = 'standard';
 
-      activeDragWidget.style.width = ''; // Let CSS data-size govern width
+      activeDragWidget.style.width = '';
       setWidgetSize(activeDragWidget.id, snapSize);
 
       activeDragWidget = null;
@@ -1591,7 +1668,6 @@
       document.removeEventListener('mouseup', endDragResize);
     }
 
-    // Theme & Wallpaper Switchers
     function setTheme(theme, btn) {
       document.body.setAttribute('data-theme', theme);
       document.querySelectorAll('.demo-toolbar-group:nth-child(3) .demo-pill-btn').forEach(b => b.classList.remove('active'));
@@ -1618,7 +1694,6 @@
       }
     }
 
-    // Spotlight Overlay Controls
     function toggleSpotlight() {
       const overlay = document.getElementById('spotlightOverlay');
       const input = document.getElementById('spotlightInput');
@@ -1664,7 +1739,7 @@
                 </div>
                 <div class="result-text">
                   <div class="result-title" style="font-size: 18px; color: var(--accent); font-weight: 700;">= ${evalResult}</div>
-                  <div class="result-subtitle">Calculation result · Press Enter to copy to clipboard</div>
+                  <div class="result-subtitle">Calculation result, Press Enter to copy to clipboard</div>
                 </div>
               </div>
               <span class="result-badge" style="background: var(--accent-bg); color: var(--accent);">Calculator</span>
