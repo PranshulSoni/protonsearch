@@ -98,76 +98,70 @@
     .wallpaper-cobalt-wave {
       background: 
         radial-gradient(circle at 50% 10%, #4a34b8 0%, transparent 60%),
-        radial-gradient(circle at 80% 40%, #1e45b8 0%, #0d1e52 50%, #060b1c 100%),
-        radial-gradient(circle at 20% 70%, #18337a 0%, #060a17 65%);
+        radial-gradient(circle at 80% 30%, #1e40af 0%, transparent 55%),
+        radial-gradient(circle at 20% 70%, #0c4a6e 0%, transparent 50%),
+        linear-gradient(135deg, #090d16 0%, #101c36 50%, #050b14 100%);
     }
     .wallpaper-sunset {
-      background: radial-gradient(circle at 80% 10%, #e0684f 0%, #a23a54 30%, #3e1b46 65%, #0f0a1d 100%);
-    }
-    .wallpaper-minimal {
-      background: radial-gradient(circle at 50% 50%, #181d24 0%, #0e1115 100%);
+      background: 
+        radial-gradient(circle at 20% 20%, #ff5e62 0%, transparent 55%),
+        radial-gradient(circle at 80% 80%, #ff9966 0%, transparent 60%),
+        linear-gradient(135deg, #180b22 0%, #2b1055 50%, #0b0726 100%);
     }
 
-    /* Ambient Header */
     .desktop-hint {
       position: absolute;
-      top: 66px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 2;
-      text-align: center;
+      top: 18px;
+      left: 24px;
+      z-index: 10;
       pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
     }
     .desktop-hint h1 {
-      font-size: 22px;
+      font-size: 14.5px;
       font-weight: 700;
-      letter-spacing: -0.02em;
-      text-shadow: 0 4px 18px rgba(0,0,0,0.5);
-      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+      opacity: 0.9;
     }
     .desktop-hint p {
-      font-size: 12.5px;
+      font-size: 11px;
       color: var(--text-secondary);
-      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
-      max-width: 720px;
-      line-height: 1.45;
+      max-width: 480px;
+      line-height: 1.4;
     }
 
-    /* Top Demo Toolbar */
+    /* Top Controls Toolbar */
     .demo-toolbar {
       position: absolute;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 80;
+      top: 18px;
+      right: 24px;
+      z-index: 20;
       display: flex;
       align-items: center;
       gap: 8px;
       background: var(--glass-base);
       backdrop-filter: var(--glass-blur);
-      padding: 5px 14px;
+      border: 1px solid var(--glass-border);
       border-radius: 999px;
-      box-shadow: var(--glass-shadow);
-      font-size: 11px;
+      padding: 4px 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
     }
     .demo-toolbar-group {
       display: flex;
       align-items: center;
       gap: 4px;
-    }
-    .demo-toolbar span {
+      font-size: 10.5px;
       color: var(--text-secondary);
       font-weight: 600;
-      font-size: 9.5px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
     }
     .demo-pill-btn {
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border);
-      color: var(--text-primary);
-      padding: 4px 9px;
+      padding: 3px 9px;
       border-radius: 999px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-primary);
       font-size: 10.5px;
       font-weight: 600;
       cursor: pointer;
@@ -192,40 +186,40 @@
     }
 
     /* ==========================================================================
-       HIGH-PERFORMANCE NAVIGATION LAUNCHER PALETTE
+       HIGH-PERFORMANCE NAVIGATION LAUNCHER PALETTE (Minimalist Tahoe Glass)
        ========================================================================== */
     .ps-spotlight-backdrop {
       position: absolute;
       inset: 0;
       background: rgba(0, 0, 0, 0.50);
-      backdrop-filter: blur(14px);
-      z-index: 150;
+      backdrop-filter: blur(16px);
+      z-index: 100;
       display: flex;
       justify-content: center;
-      align-items: flex-start;
-      padding-top: clamp(65px, 13vh, 140px);
       opacity: 0;
       pointer-events: none;
-      transition: opacity 220ms ease;
+      transition: opacity 180ms ease;
     }
     .ps-spotlight-backdrop.is-open {
       opacity: 1;
       pointer-events: auto;
     }
 
-    /* Dock-Anchored Position Option */
+    body[data-launcher-pos="centered"] .ps-spotlight-backdrop {
+      align-items: center;
+    }
     body[data-launcher-pos="dock"] .ps-spotlight-backdrop {
       align-items: flex-end;
-      padding-top: 0;
       padding-bottom: 74px;
     }
 
     .ps-spotlight-card {
-      width: min(640px, calc(100vw - 32px));
+      width: 740px;
+      max-width: calc(100vw - 32px);
       background: var(--glass-modal);
       backdrop-filter: blur(48px) saturate(190%) contrast(104%);
       border: 1px solid var(--glass-border);
-      border-radius: 18px;
+      border-radius: 20px;
       box-shadow: 
         0 36px 90px rgba(0, 0, 0, 0.70),
         0 10px 24px rgba(0, 0, 0, 0.45),
@@ -233,31 +227,56 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      transform: translateY(-12px) scale(0.98);
-      transition: width var(--trans-resize), transform 240ms var(--spring-ease), opacity 200ms ease;
+      transform: scale(0.97) translateY(8px);
+      transition: transform 220ms var(--spring-ease), opacity 180ms ease;
       position: relative;
     }
-    .ps-spotlight-card.with-preview {
-      width: min(840px, calc(100vw - 32px));
-    }
     .ps-spotlight-backdrop.is-open .ps-spotlight-card {
-      transform: translateY(0) scale(1);
-    }
-    body[data-launcher-pos="dock"] .ps-spotlight-card {
-      transform: translateY(12px) scale(0.98);
-    }
-    body[data-launcher-pos="dock"] .ps-spotlight-backdrop.is-open .ps-spotlight-card {
-      transform: translateY(0) scale(1);
+      transform: scale(1) translateY(0);
     }
 
-    /* Search Input Top Bar */
+    /* Toast Notification HUD */
+    .ps-toast {
+      position: absolute;
+      top: 14px;
+      right: 18px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-top-highlight);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 160ms ease, transform 160ms ease;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .ps-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .ps-toast-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 6px var(--accent-emerald);
+    }
+
+    /* Minimalist Search Header */
     .ps-search-top {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 12px 18px;
+      padding: 13px 18px;
       border-bottom: 1px solid var(--glass-border-subtle);
-      background: rgba(255, 255, 255, 0.02);
       position: relative;
     }
     .ps-search-ic {
@@ -265,20 +284,21 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      width: 22px;
+      height: 22px;
       flex-shrink: 0;
     }
-    /* Inline Active Scope Tag in Search Bar */
     .ps-input-scope-tag {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 5px;
       padding: 2.5px 8px;
       border-radius: 6px;
-      background: rgba(0, 122, 255, 0.26);
-      border: 1px solid rgba(0, 122, 255, 0.45);
-      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #f8fafc;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: -0.01em;
       white-space: nowrap;
       user-select: none;
@@ -286,12 +306,12 @@
       transition: all 140ms ease;
     }
     .ps-input-scope-tag:hover {
-      background: rgba(0, 122, 255, 0.40);
-      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.24);
     }
     .ps-scope-close {
       font-size: 9px;
-      opacity: 0.7;
+      opacity: 0.6;
       margin-left: 1px;
     }
     .ps-scope-close:hover {
@@ -299,100 +319,59 @@
     }
     .ps-search-input {
       flex: 1;
-      height: 34px;
       background: transparent;
       border: none;
       outline: none;
       font-family: inherit;
       font-size: 15.5px;
       font-weight: 500;
+      letter-spacing: -0.015em;
       color: var(--text-primary);
-      letter-spacing: -0.01em;
+      min-width: 0;
     }
     .ps-search-input::placeholder {
       color: var(--text-tertiary);
-      font-size: 13.5px;
+      font-weight: 400;
     }
     .ps-top-actions {
       display: flex;
       align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
+      gap: 5px;
     }
     .ps-top-hint-badge {
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 3px 8px;
+      padding: 2px 7px;
       border-radius: 6px;
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
       font-size: 10px;
-      font-weight: 600;
-      color: var(--text-secondary);
+      color: var(--text-tertiary);
+      font-weight: 500;
       cursor: pointer;
-      user-select: none;
       transition: all 120ms ease;
     }
     .ps-top-hint-badge:hover {
       background: var(--glass-surface-hover);
-      color: var(--text-primary);
-      border-color: rgba(255, 255, 255, 0.22);
+      color: var(--text-secondary);
+      border-color: var(--glass-border);
     }
     .ps-top-hint-badge kbd {
-      padding: 1px 4px;
-      border-radius: 3px;
-      background: rgba(255, 255, 255, 0.12);
-      font-size: 9px;
+      font-family: inherit;
+      font-size: 9.5px;
       font-weight: 700;
-      color: var(--text-primary);
+      color: var(--text-secondary);
     }
 
-    /* Floating Toast Notification HUD */
-    .ps-toast {
-      position: absolute;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-22px) scale(0.96);
-      background: rgba(14, 20, 32, 0.94);
-      backdrop-filter: blur(24px) saturate(190%);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      border-radius: 999px;
-      padding: 6px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11.5px;
-      font-weight: 600;
-      color: #fff;
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 122, 255, 0.25);
-      opacity: 0;
-      pointer-events: none;
-      transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
-      z-index: 250;
-      white-space: nowrap;
-    }
-    .ps-toast.is-visible {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0) scale(1);
-    }
-    .ps-toast-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--accent-emerald);
-      box-shadow: 0 0 8px var(--accent-emerald);
-      flex-shrink: 0;
-    }
-
-    /* Fast Category Jump Navigation Bar (Tab & Shift+Tab or Click) */
+    /* Scope Bar */
     .ps-nav-scope-bar {
       display: flex;
       align-items: center;
-      gap: 5px;
-      padding: 7px 16px;
+      gap: 6px;
+      padding: 7px 18px;
+      background: rgba(0, 0, 0, 0.18);
       border-bottom: 1px solid var(--glass-border-subtle);
-      background: rgba(0, 0, 0, 0.16);
       overflow-x: auto;
     }
     .nav-scope-pill {
@@ -401,124 +380,153 @@
       gap: 5px;
       padding: 3px 9px;
       border-radius: 999px;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
+      background: transparent;
+      border: 1px solid transparent;
       color: var(--text-secondary);
       font-size: 10px;
-      font-weight: 600;
+      font-weight: 500;
       cursor: pointer;
       white-space: nowrap;
       transition: all var(--trans-hover);
       user-select: none;
     }
     .nav-scope-pill:hover {
-      background: var(--glass-surface-hover);
+      background: rgba(255, 255, 255, 0.05);
       color: var(--text-primary);
     }
     .nav-scope-pill.active {
-      background: rgba(0, 122, 255, 0.28);
-      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.10);
+      border-color: rgba(255, 255, 255, 0.20);
       color: #fff;
     }
     .nav-scope-count {
       font-size: 8.5px;
       padding: 1px 4.5px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.12);
-      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
     }
     .nav-scope-shortcut {
       font-size: 8.5px;
-      color: var(--text-tertiary);
+      opacity: 0.55;
       margin-left: 2px;
-      font-family: monospace;
     }
 
-    /* Substring Match Highlighter */
     .ps-match-hl {
-      color: #5ef1c2;
+      color: #93c5fd;
       font-weight: 700;
-      background: rgba(94, 241, 194, 0.14);
+      background: rgba(59, 130, 246, 0.15);
       border-radius: 2px;
       padding: 0 1.5px;
     }
 
-    /* Quick Jump Trigger Pulse */
-    @keyframes psJumpPulse {
-      0% { transform: scale(1); background: rgba(0, 122, 255, 0.5); }
-      50% { transform: scale(1.015); background: rgba(94, 241, 194, 0.38); }
-      100% { transform: scale(1); background: rgba(0, 122, 255, 0.16); }
-    }
-    .ps-result-row.pulse-jump {
-      animation: psJumpPulse 320ms ease;
-    }
-
-    /* Search Results Body with Sliding Action Drill-Down */
+    /* Body Layout */
     .ps-search-body {
       display: flex;
-      min-height: 270px;
-      max-height: 410px;
-      overflow: hidden;
+      min-height: 380px;
+      max-height: 440px;
       position: relative;
+      overflow: hidden;
     }
 
-    /* Deck 1: Main Results List */
     .ps-results-column {
       flex: 1;
-      min-width: 0;
-      padding: 8px 10px;
+      padding: 8px 12px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 2px;
-      transition: transform var(--trans-slide), opacity 180ms ease;
+      position: relative;
+      transition: transform var(--trans-slide), opacity var(--trans-slide);
     }
-    .ps-spotlight-card.in-action-mode .ps-results-column {
+    .ps-results-column.slide-out {
       transform: translateX(-40px);
-      opacity: 0;
+      opacity: 0.3;
       pointer-events: none;
     }
 
-    /* Section Sticky Header */
-    .ps-section-header {
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-tertiary);
-      padding: 8px 10px 4px 10px;
+    /* Calculator Hero Card */
+    .ps-calculator-hero {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      transition: background 120ms ease, border-color 120ms ease;
     }
-    .ps-jump-hint {
-      font-size: 8.5px;
-      color: var(--text-tertiary);
+    .ps-calculator-hero:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+    .ps-calc-main {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+    .ps-calc-tag {
+      font-size: 9.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #94a3b8;
+    }
+    .ps-calc-expr {
+      font-size: 13.5px;
+      color: #cbd5e1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ps-calc-result {
+      font-size: 19px;
+      font-weight: 700;
+      color: #f8fafc;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .ps-calc-action {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      font-size: 10.5px;
       font-weight: 500;
-      letter-spacing: normal;
+    }
+    .ps-calc-action kbd {
+      font-size: 10px;
+      font-weight: 700;
+      color: #f8fafc;
     }
 
-    /* Result Row */
+    /* Result Rows */
     .ps-result-row {
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 7px 11px;
-      border-radius: 10px;
+      border-radius: 8px;
       background: transparent;
       border: 1px solid transparent;
       cursor: pointer;
-      transition: all 120ms ease;
+      transition: background 100ms ease, border-color 100ms ease;
       position: relative;
     }
-    .ps-result-row:hover,
-    .ps-result-row.is-selected {
-      background: var(--glass-surface-active);
-      border-color: var(--glass-border-subtle);
+    .ps-result-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.06);
     }
     .ps-result-row.is-selected {
-      background: rgba(0, 122, 255, 0.16);
-      border-color: rgba(0, 122, 255, 0.40);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.16);
     }
     .ps-item-icon {
       width: 28px;
@@ -528,25 +536,27 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
     .ps-item-copy {
+      flex: 1;
       display: flex;
       flex-direction: column;
       min-width: 0;
-      flex: 1;
-      line-height: 1.25;
+      gap: 1px;
     }
     .ps-item-copy b {
       font-size: 12.5px;
       font-weight: 600;
-      color: var(--text-primary);
+      color: #f8fafc;
       white-space: nowrap;
       text-overflow: ellipsis;
       overflow: hidden;
     }
     .ps-item-copy small {
       font-size: 10px;
-      color: var(--text-secondary);
+      color: #94a3b8;
       white-space: nowrap;
       text-overflow: ellipsis;
       overflow: hidden;
@@ -554,79 +564,52 @@
     .ps-row-right {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
     }
     .ps-item-badge {
-      font-size: 8.5px;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 5px;
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-secondary);
-      letter-spacing: 0.03em;
+      font-size: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 1.5px 5.5px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      color: #94a3b8;
     }
-
-    /* Number Quick-Jump Key Badge (Alt + 1..6) */
-    .ps-num-badge {
+    .ps-item-jump-badge {
       font-size: 9px;
       font-weight: 700;
-      padding: 2px 5px;
+      color: var(--text-tertiary);
+      padding: 1px 4.5px;
       border-radius: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: var(--text-tertiary);
-      font-family: inherit;
-      transition: all 120ms ease;
-    }
-    .ps-result-row.is-selected .ps-num-badge {
-      color: var(--accent);
-      border-color: rgba(0, 122, 255, 0.4);
-      background: rgba(0, 122, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border-subtle);
     }
 
-    /* Drill-down Arrow Hint */
-    .ps-drill-arrow {
-      color: var(--text-tertiary);
-      opacity: 0;
-      transition: opacity 120ms ease, transform 120ms ease;
-    }
-    .ps-result-row.is-selected .ps-drill-arrow {
-      opacity: 0.8;
-      transform: translateX(2px);
-    }
-
-    /* Deck 2: Sliding Action Palette (Drill-Down via Right Arrow or Ctrl+K) */
+    /* Action Deck */
     .ps-action-deck {
       position: absolute;
       inset: 0;
-      right: 290px;
-      padding: 12px 16px;
       background: var(--glass-modal);
+      backdrop-filter: blur(40px);
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      padding: 12px 16px;
+      gap: 8px;
       transform: translateX(100%);
-      opacity: 0;
-      pointer-events: none;
-      transition: transform var(--trans-slide), opacity 180ms ease;
-      z-index: 10;
+      transition: transform var(--trans-slide);
+      z-index: 5;
     }
-    .ps-spotlight-card:not(.with-preview) .ps-action-deck {
-      right: 0;
-    }
-    .ps-spotlight-card.in-action-mode .ps-action-deck {
+    .ps-action-deck.is-open {
       transform: translateX(0);
-      opacity: 1;
-      pointer-events: auto;
     }
-
     .action-deck-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding-bottom: 8px;
       border-bottom: 1px solid var(--glass-border-subtle);
-      margin-bottom: 4px;
     }
     .action-deck-back {
       display: flex;
@@ -634,106 +617,54 @@
       gap: 6px;
       font-size: 11px;
       font-weight: 600;
-      color: var(--text-secondary);
+      color: var(--accent);
       cursor: pointer;
-      padding: 3px 7px;
-      border-radius: 6px;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
-    }
-    .action-deck-back:hover {
-      background: var(--glass-surface-hover);
-      color: var(--text-primary);
-    }
-    .action-category-header {
-      font-size: 8.5px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-tertiary);
-      padding: 6px 4px 2px 4px;
     }
     .action-deck-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 7px 11px;
+      padding: 8px 12px;
       border-radius: 8px;
       background: transparent;
       border: 1px solid transparent;
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--text-primary);
       cursor: pointer;
-      transition: all 100ms ease;
+      font-size: 11px;
+      color: var(--text-primary);
+      transition: all 120ms ease;
     }
     .action-deck-row:hover,
     .action-deck-row.is-selected {
-      background: var(--accent);
-      color: #fff;
+      background: var(--glass-surface-active);
+      border-color: var(--glass-border-subtle);
     }
     .action-deck-row kbd {
-      font-size: 9px;
+      font-size: 9.5px;
       padding: 1.5px 5px;
       border-radius: 4px;
-      background: rgba(255, 255, 255, 0.14);
-      color: inherit;
-    }
-
-    /* Zero-Click Hero Calculator Card */
-    .ps-calculator-hero {
-      padding: 12px 14px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, rgba(94, 241, 194, 0.14), rgba(0, 122, 255, 0.08));
-      border: 1px solid rgba(94, 241, 194, 0.35);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin: 4px 0 8px 0;
-      cursor: pointer;
-    }
-    .ps-calc-main {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .ps-calc-expr {
-      font-size: 11px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--glass-border-subtle);
       color: var(--text-secondary);
     }
-    .ps-calc-result {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--accent-emerald);
-      letter-spacing: -0.01em;
-      font-variant-numeric: tabular-nums;
-    }
-    .ps-calc-action {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--text-primary);
-      padding: 4px 8px;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
 
-    /* Rich Actionable Preview Pane */
+    /* Preview Pane */
     .ps-preview-pane {
-      width: 290px;
+      width: 280px;
       border-left: 1px solid var(--glass-border-subtle);
-      background: rgba(0, 0, 0, 0.16);
-      padding: 16px;
-      display: none;
+      background: rgba(0, 0, 0, 0.18);
+      padding: 14px 16px;
+      display: flex;
       flex-direction: column;
       gap: 12px;
       overflow-y: auto;
+      transition: width var(--trans-resize), padding var(--trans-resize), opacity 180ms ease;
     }
-    .ps-spotlight-card.with-preview .ps-preview-pane {
-      display: flex;
+    .ps-spotlight-card:not(.with-preview) .ps-preview-pane {
+      width: 0;
+      padding: 0;
+      border-left: none;
+      opacity: 0;
+      pointer-events: none;
     }
     .prev-head-card {
       display: flex;
@@ -741,10 +672,11 @@
       gap: 10px;
     }
     .prev-head-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
+      width: 38px;
+      height: 38px;
+      border-radius: 9px;
       background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -754,52 +686,51 @@
       font-size: 13.5px;
       font-weight: 700;
       color: var(--text-primary);
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
     }
     .prev-breadcrumbs {
       font-size: 9.5px;
       color: var(--text-secondary);
-      font-family: monospace;
-      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .prev-code-box {
-      border-radius: 9px;
-      background: rgba(10, 14, 22, 0.85);
-      border: 1px solid var(--glass-border-subtle);
-      padding: 10px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 9.5px;
-      line-height: 1.5;
-      color: #9cdcfe;
-      overflow: hidden;
+      line-height: 1.45;
+      color: var(--text-secondary);
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: 8px;
+      padding: 8px 10px;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
     }
-    .code-comment { color: #6a9955; }
-    .code-keyword { color: #c586c0; }
-    .code-func { color: #dcdcaa; }
 
-    /* Refined Footer Navigation Bar */
+    /* Footer */
     .ps-search-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 16px;
+      padding: 7px 18px;
       border-top: 1px solid var(--glass-border-subtle);
-      background: rgba(0, 0, 0, 0.28);
-      font-size: 9.5px;
+      background: rgba(0, 0, 0, 0.22);
+      font-size: 10px;
       color: var(--text-secondary);
-      user-select: none;
     }
     .ps-engine-badge {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-weight: 600;
     }
     .ps-engine-dot {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
       background: var(--accent-emerald);
       box-shadow: 0 0 6px var(--accent-emerald);
@@ -807,39 +738,375 @@
     .ps-nav-keys {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 8px;
       flex-wrap: wrap;
     }
     .key-cap {
       display: flex;
       align-items: center;
       gap: 3.5px;
-      cursor: pointer;
-      padding: 3px 6px;
-      border-radius: 5px;
-      transition: all 120ms ease;
-      background: transparent;
-    }
-    .key-cap:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-primary);
-    }
-    .key-cap:active {
-      transform: scale(0.96);
+      font-size: 9.5px;
+      color: var(--text-tertiary);
     }
     .key-cap kbd {
-      padding: 1px 4px;
-      border-radius: 3px;
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.16);
+      padding: 1.5px 4.5px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--glass-border-subtle);
       font-family: inherit;
-      font-size: 8.5px;
       font-weight: 700;
-      color: var(--text-primary);
+      color: var(--text-secondary);
     }
 
     /* ==========================================================================
-       THE DOCK RAIL WITH REORDERABLE WIDGETS
+       DEDICATED WIDGETS MANAGER & STORE MODAL
+       ========================================================================== */
+    .customizer-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(12px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms ease;
+    }
+    .customizer-backdrop.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .customizer-window {
+      width: min(780px, calc(100vw - 36px));
+      max-height: min(620px, calc(100vh - 80px));
+      background: var(--glass-modal);
+      backdrop-filter: blur(48px) saturate(190%) contrast(104%);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      box-shadow: 
+        0 36px 90px rgba(0, 0, 0, 0.70),
+        0 10px 24px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 var(--glass-top-highlight);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: scale(0.96) translateY(12px);
+      transition: transform 240ms var(--spring-ease), opacity 200ms ease;
+    }
+    .customizer-backdrop.is-open .customizer-window {
+      transform: scale(1) translateY(0);
+    }
+
+    .cust-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .cust-header-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .cust-tabs {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 3px;
+      border-radius: 999px;
+      border: 1px solid var(--glass-border-subtle);
+    }
+    .cust-tab-btn {
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: transparent;
+      border: none;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--trans-hover);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .cust-tab-btn.active {
+      background: var(--glass-surface-active);
+      color: var(--text-primary);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .cust-close-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 120ms ease;
+    }
+    .cust-close-btn:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+    }
+
+    .cust-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .cust-pref-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border-subtle);
+    }
+    .cust-pref-title b {
+      font-size: 12.5px;
+      color: var(--text-primary);
+      display: block;
+      margin-bottom: 2px;
+    }
+    .cust-pref-title small {
+      font-size: 10.5px;
+      color: var(--text-secondary);
+    }
+    .style-pill-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 3px;
+      border-radius: 999px;
+      border: 1px solid var(--glass-border-subtle);
+    }
+    .style-pill-btn {
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: transparent;
+      border: none;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--trans-hover);
+    }
+    .style-pill-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .widget-manage-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .widget-manage-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid var(--glass-border-subtle);
+      transition: all var(--trans-hover);
+    }
+    .widget-manage-row:hover {
+      background: rgba(255, 255, 255, 0.065);
+      border-color: var(--glass-border);
+    }
+    .widget-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 190px;
+    }
+    .widget-ic-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .widget-name b {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: block;
+    }
+    .widget-name small {
+      font-size: 9.5px;
+      color: var(--text-secondary);
+    }
+    .widget-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .reorder-btns {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .reorder-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      transition: all 120ms ease;
+    }
+    .reorder-btn:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+    }
+    .size-select-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 2px;
+      border-radius: 7px;
+      border: 1px solid var(--glass-border-subtle);
+    }
+    .size-opt-btn {
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: transparent;
+      border: none;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .size-opt-btn.active {
+      background: var(--glass-surface-active);
+      color: var(--text-primary);
+    }
+
+    .store-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .store-card {
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+    .store-card-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(0, 122, 255, 0.22);
+      border: 1px solid rgba(0, 122, 255, 0.4);
+      color: #60a5fa;
+      font-size: 8.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .store-card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: var(--glass-surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+    .store-card-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .store-card-desc {
+      font-size: 10px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 32px;
+      height: 18px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      transition: 0.2s;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    input:checked + .slider {
+      background-color: var(--accent);
+    }
+    input:checked + .slider:before {
+      transform: translateX(14px);
+    }
+
+    /* ==========================================================================
+       THE PROTONDOCK RAIL & RELOCATABLE WIDGETS
        ========================================================================== */
     .dock-stage {
       position: absolute;
@@ -898,6 +1165,47 @@
       color: #fff;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     }
+    .profile-add-btn {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 120ms ease;
+    }
+    .profile-add-btn:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+      transform: scale(1.1);
+    }
+
+    .customize-dock-trigger {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      padding: 4px 11px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 var(--glass-top-highlight);
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all var(--trans-hover);
+    }
+    .customize-dock-trigger:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-top-highlight);
+      transform: translateY(-1px);
+    }
 
     .dock-rail {
       position: relative;
@@ -911,6 +1219,7 @@
       border-radius: var(--dock-radius);
       box-shadow: var(--glass-shadow);
       transition: width var(--trans-resize), padding var(--trans-resize);
+      overflow: visible;
     }
     .dock-rail::before {
       content: "";
@@ -924,6 +1233,7 @@
       pointer-events: none;
     }
 
+    /* Common Dock Widget Container */
     .dock-widget {
       position: relative;
       display: flex;
@@ -936,10 +1246,25 @@
         width var(--trans-resize),
         padding var(--trans-resize),
         background var(--trans-hover),
-        border-color var(--trans-hover);
+        border-color var(--trans-hover),
+        box-shadow var(--trans-hover);
       flex-shrink: 0;
-      overflow: hidden;
+      overflow: visible;
     }
+    .dock-widget:active {
+      cursor: grabbing;
+    }
+    .dock-widget.dragging {
+      opacity: 0.35;
+      transform: scale(0.92);
+    }
+    .dock-widget.drag-over {
+      transform: scale(1.05);
+      outline: 2px dashed var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* DISPLAY STYLES: CAPSULES VS LINES */
     body[data-display-style="capsule"] .dock-widget {
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
@@ -950,10 +1275,16 @@
       border-color: var(--glass-border);
       transform: translateY(-2px);
     }
+
     body[data-display-style="line"] .dock-widget {
       background: transparent;
       border: 1px solid transparent;
       box-shadow: none;
+    }
+    body[data-display-style="line"] .dock-widget:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-border-subtle);
+      transform: translateY(-2px);
     }
     body[data-display-style="line"] .dock-widget::after {
       content: "";
@@ -964,47 +1295,364 @@
       width: 1px;
       background: var(--glass-border-subtle);
     }
+    body[data-display-style="line"] .dock-widget:last-child::after {
+      display: none;
+    }
 
-    .widget-windows { width: 36px; justify-content: center; }
-    .widget-search { width: 36px; justify-content: center; }
-    .widget-weather { width: 54px; padding: 0 8px; gap: 5px; }
-    .widget-system { width: 78px; padding: 0 8px; gap: 5px; font-size: 10px; }
-    .widget-spotify { width: 78px; padding: 0 8px; gap: 6px; }
-    .widget-clock { width: 58px; padding: 0 6px; justify-content: center; }
-    .widget-util { width: 34px; justify-content: center; }
-    .widget-apps { display: flex; align-items: center; gap: 4px; height: 38px; }
+    /* EXACT WIDGET SIZING TIERS */
+    .widget-windows[data-size="compact"] { width: 36px; padding: 0; justify-content: center; }
+    .widget-windows[data-size="medium"] { width: 78px; padding: 0 9px; gap: 6px; }
+    .widget-windows[data-size="expanded"] { width: 104px; padding: 0 11px; gap: 7px; }
 
-    .app-icon-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
+    .widget-search[data-size="compact"] { width: 36px; padding: 0; justify-content: center; }
+    .widget-search[data-size="medium"] { width: 114px; padding: 0 9px; gap: 6px; }
+    .widget-search[data-size="expanded"] { width: 175px; padding: 0 11px; gap: 8px; }
+
+    .widget-weather[data-size="compact"] { width: 54px; padding: 0 8px; gap: 5px; }
+    .widget-weather[data-size="medium"] { width: 98px; padding: 0 9px; gap: 6px; }
+    .widget-weather[data-size="expanded"] { width: 165px; padding: 0 11px; gap: 8px; }
+
+    .widget-system[data-size="compact"] { width: 78px; padding: 0 8px; gap: 5px; font-size: 10px; }
+    .widget-system[data-size="medium"] { width: 124px; padding: 0 9px; gap: 6px; font-size: 10px; }
+    .widget-system[data-size="expanded"] { width: 172px; padding: 0 11px; gap: 7px; font-size: 10px; }
+
+    .widget-spotify[data-size="compact"] { width: 78px; padding: 0 8px; gap: 6px; }
+    .widget-spotify[data-size="medium"] { width: 158px; padding: 0 9px; gap: 7px; }
+    .widget-spotify[data-size="expanded"] { width: 220px; padding: 0 11px; gap: 8px; }
+
+    .widget-clock[data-size="compact"] { width: 58px; padding: 0 6px; justify-content: center; }
+    .widget-clock[data-size="medium"] { width: 82px; padding: 0 8px; justify-content: center; }
+    .widget-clock[data-size="expanded"] { width: 110px; padding: 0 10px; justify-content: center; }
+
+    .widget-util[data-size="compact"] { width: 34px; padding: 0; justify-content: center; }
+    .widget-util[data-size="medium"],
+    .widget-util[data-size="expanded"] { width: 62px; padding: 0 8px; gap: 5px; }
+
+    .widget-inner {
       display: flex;
       align-items: center;
+      width: 100%;
+      height: 100%;
+      white-space: nowrap;
+      pointer-events: auto;
+      gap: 4px;
+    }
+    .widget-label-compact,
+    .widget-label-medium,
+    .widget-label-expanded {
+      display: none;
+      align-items: center;
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+    [data-size="compact"] .widget-label-compact { display: flex; }
+    [data-size="medium"] .widget-label-medium { display: flex; }
+    [data-size="expanded"] .widget-label-expanded { display: flex; }
+
+    /* Running Apps Group: Clean Horizontal Row without Vertical Clipping */
+    .widget-apps {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      overflow: visible;
+      flex-shrink: 0;
+    }
+    .widget-apps .widget-inner {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 4px;
+      height: 100%;
+    }
+    .app-icon-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      display: inline-flex;
+      align-items: center;
       justify-content: center;
-      cursor: pointer;
+      background: transparent;
+      border: 1px solid transparent;
       position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all var(--trans-hover);
+    }
+    .app-icon-btn:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-border-subtle);
+      transform: translateY(-2px);
     }
     .app-dot {
       position: absolute;
-      bottom: 1.5px;
+      bottom: 2px;
       left: 50%;
       transform: translateX(-50%);
       width: 3px;
       height: 3px;
       border-radius: 50%;
       background: var(--text-primary);
+      box-shadow: 0 0 3px rgba(255, 255, 255, 0.7);
+    }
+    .app-badge {
+      position: absolute;
+      top: 0px;
+      right: 0px;
+      min-width: 13px;
+      height: 13px;
+      padding: 0 3px;
+      border-radius: 999px;
+      background: rgba(255, 59, 48, 0.95);
+      color: #fff;
+      font-size: 8px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .active-window-pill {
-      height: 36px;
+      height: 30px;
       padding: 0 9px 0 6px;
-      border-radius: 10px;
+      border-radius: 8px;
       background: var(--glass-surface-active);
       border: 1px solid var(--glass-border);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      transition: all var(--trans-hover);
+    }
+    .active-window-pill:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-top-highlight);
+      transform: translateY(-2px);
+    }
+    .active-window-pill span {
+      font-size: 11px;
+      font-weight: 600;
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Popovers CSS */
+    .window-preview-popover {
+      position: absolute;
+      bottom: calc(100% + 12px);
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 10px 12px 12px 12px;
+      box-shadow: 
+        0 24px 60px rgba(0,0,0,0.65),
+        0 8px 20px rgba(0,0,0,0.40),
+        inset 0 1px 0 var(--glass-top-highlight);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms var(--spring-ease), transform 180ms var(--spring-ease);
+      z-index: 100;
+    }
+    .app-icon-btn:hover .window-preview-popover,
+    .window-preview-popover.force-show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0);
+    }
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 9px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .preview-header-left {
       display: flex;
       align-items: center;
       gap: 7px;
-      font-size: 11px;
+    }
+    .preview-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+    }
+    .preview-header-actions svg {
+      width: 13px;
+      height: 13px;
+      cursor: pointer;
+      transition: color 120ms ease;
+    }
+    .preview-header-actions svg:hover {
+      color: var(--text-primary);
+    }
+    .preview-thumbnails-deck {
+      display: flex;
+      gap: 10px;
+    }
+    .window-card {
+      width: 145px;
+      height: 98px;
+      border-radius: 9px;
+      background: rgba(12, 16, 24, 0.94);
+      border: 1px solid var(--glass-border-subtle);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      transition: all 150ms ease;
+    }
+    .window-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    }
+    .window-card.active-window {
+      border: 1.5px solid var(--accent);
+      box-shadow: 0 0 14px var(--accent-glow);
+    }
+    .window-card-bar {
+      height: 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      gap: 4px;
+    }
+    .window-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+    }
+    .window-mock-list {
+      flex: 1;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .mock-row {
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .mock-row.subtle {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .window-card-footer {
+      padding: 4px 8px 6px 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .window-card-title {
+      font-size: 10px;
       font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Spotify Media Popover Card */
+    .media-popover-card {
+      position: absolute;
+      bottom: calc(100% + 12px);
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      width: 195px;
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 
+        0 24px 60px rgba(0,0,0,0.65),
+        0 8px 20px rgba(0,0,0,0.40),
+        inset 0 1px 0 var(--glass-top-highlight);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms var(--spring-ease), transform 180ms var(--spring-ease);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dock-widget.widget-spotify:hover .media-popover-card,
+    .media-popover-card.force-show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0);
+    }
+    .media-popover-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .media-popover-art {
+      width: 100%;
+      height: 120px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1b263b, #0d1b2a);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .media-popover-art::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 60%, rgba(0, 122, 255, 0.35), transparent 70%);
+    }
+    .media-popover-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .media-popover-artist {
+      font-size: 10px;
+      color: var(--text-secondary);
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .media-popover-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 2px;
+    }
+    .popover-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--glass-surface-active);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .popover-btn:hover {
+      background: var(--accent);
+      color: #fff;
+      transform: scale(1.1);
     }
 
     .icon {
@@ -1026,7 +1674,7 @@
   <!-- Ambient Header -->
   <div class="desktop-hint">
     <h1>ProtonDock & ProtonSearch: High-Performance Navigation</h1>
-    <p>Spatial 2D navigation (<kbd>↑↓</kbd> items, <kbd>Tab</kbd> scopes, <kbd>→</kbd> drill-down actions, <kbd>Alt+1..6</kbd> direct jump) and position options (Centered vs Dock-Anchored).</p>
+    <p>Spatial 2D navigation (items, scopes, actions, math evaluation) and modular relocatable dock with dedicated widget manager and store.</p>
   </div>
 
   <!-- Top Demo Controls Toolbar -->
@@ -1044,19 +1692,29 @@
     </div>
     <div class="demo-divider"></div>
     <div class="demo-toolbar-group">
-      <span>Wallpaper:</span>
-      <button class="demo-pill-btn active" onclick="setWallpaper('cobalt-wave', this)">Cobalt</button>
-      <button class="demo-pill-btn" onclick="setWallpaper('sunset', this)">Sunset</button>
+      <span>Style:</span>
+      <button class="demo-pill-btn active" id="btnStyleCapsule" onclick="setDisplayStyle('capsule', this)">Capsules</button>
+      <button class="demo-pill-btn" id="btnStyleLine" onclick="setDisplayStyle('line', this)">Lines</button>
+    </div>
+    <div class="demo-divider"></div>
+    <div class="demo-toolbar-group">
+      <span>Popovers:</span>
+      <button class="demo-pill-btn" id="pinFinderBtn" onclick="togglePinPopover('finderPopover', this)">Pin Finder</button>
+      <button class="demo-pill-btn" id="pinSpotifyBtn" onclick="togglePinPopover('spotifyPopover', this)">Pin Spotify</button>
     </div>
     <div class="demo-divider"></div>
     <button class="demo-pill-btn" style="background: rgba(0, 122, 255, 0.28); border-color: var(--accent); color: #fff;" onclick="toggleProtonSearch()">
       <svg class="icon" style="width:12px; height:12px; color:#5ef1c2;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       Toggle Search (Alt+Space)
     </button>
+    <button class="demo-pill-btn" style="background: rgba(255, 255, 255, 0.08); border-color: var(--glass-border); color: #fff;" onclick="openCustomizerModal()">
+      <svg class="icon" style="width:12px; height:12px;" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Widget Manager & Store
+    </button>
   </div>
 
   <!-- ==========================================================================
-       HIGH-PERFORMANCE NAVIGATION LAUNCHER PALETTE
+       HIGH-PERFORMANCE NAVIGATION LAUNCHER PALETTE (Tahoe Glass Spotlight Window)
        ========================================================================== -->
   <div class="ps-spotlight-backdrop is-open" id="searchModal" onclick="handleSearchBackdrop(event)">
     <section class="ps-spotlight-card with-preview" id="launcherCard" role="dialog" aria-label="ProtonSearch Spotlight">
@@ -1098,7 +1756,7 @@
         </div>
       </div>
 
-      <!-- Category Filter Navigation Bar (Press Tab or Click to filter instantly) -->
+      <!-- Category Filter Navigation Bar -->
       <div class="ps-nav-scope-bar">
         <div class="nav-scope-pill active" data-scope="all" onclick="selectNavScope('all', this)">
           <span>All</span>
@@ -1133,16 +1791,17 @@
         <!-- Results Column (Left Deck) -->
         <div class="ps-results-column" id="resultsList">
           
-          <!-- Hero Calculator Card (When math entered) -->
-          <div id="calculatorHeroContainer" style="display:none;">
-            <div class="ps-calculator-hero" onclick="copyCalculatorResult()">
+          <!-- In-Process Calculator Card (When math entered) -->
+          <div id="calculatorHeroContainer" style="display:none; margin-bottom: 6px;">
+            <div class="ps-calculator-hero" onclick="copyCalculatorResult()" title="Click or press Enter to copy result">
               <div class="ps-calc-main">
-                <span class="ps-calc-expr" id="calcHeroExpr">24 * 1.15</span>
-                <span class="ps-calc-result" id="calcHeroVal">= 27.60</span>
+                <span class="ps-calc-tag">Calculation</span>
+                <span class="ps-calc-expr" id="calcHeroExpr">sqrt(144) + 15% of 200</span>
+                <span class="ps-calc-result" id="calcHeroVal">= 42</span>
               </div>
               <div class="ps-calc-action">
+                <kbd>↵</kbd>
                 <span>Copy</span>
-                <kbd style="font-size:9px; background:rgba(255,255,255,0.15); padding:1px 4px; border-radius:3px;">↵</kbd>
               </div>
             </div>
           </div>
@@ -1152,7 +1811,7 @@
 
         </div>
 
-        <!-- Sliding Action Drill-Down Deck (Slides in on Right Arrow or Ctrl+K) -->
+        <!-- Sliding Action Drill-Down Deck -->
         <div class="ps-action-deck" id="actionDeck">
           <div class="action-deck-header">
             <div class="action-deck-back" onclick="exitActionMode()">
@@ -1234,64 +1893,651 @@
   </div>
 
   <!-- ==========================================================================
-       THE DOCK RAIL
+       DEDICATED WIDGETS PAGE & STORE MODAL
        ========================================================================== -->
-  <div class="dock-stage" id="dockStage">
-    <div class="dock-floating-shelf">
-      <div class="profile-switcher-pill">
-        <button class="profile-tab-btn active">Daily</button>
-        <button class="profile-tab-btn">Work</button>
-        <button class="profile-tab-btn">Founder</button>
+  <div class="customizer-backdrop" id="customizerModal" onclick="handleCustBackdrop(event)">
+    <div class="customizer-window" role="dialog" aria-label="Widget Manager and Store">
+      <div class="cust-header">
+        <div class="cust-header-title">
+          <svg class="icon" style="color:var(--accent);" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <span>Dock &amp; Widgets Center</span>
+        </div>
+        <div class="cust-tabs">
+          <button class="cust-tab-btn active" id="tabBtnInstalled" onclick="switchCustTab('installed')">
+            <span>Installed Widgets</span>
+          </button>
+          <button class="cust-tab-btn" id="tabBtnStore" onclick="switchCustTab('store')">
+            <span>Widget Store</span>
+            <span style="font-size:8px; padding:1px 5px; border-radius:999px; background:rgba(0,122,255,0.3); color:#60a5fa;">NEW</span>
+          </button>
+        </div>
+        <button class="cust-close-btn" onclick="closeCustomizerModal()">✕</button>
+      </div>
+
+      <div class="cust-body">
+        <!-- TAB 1: INSTALLED WIDGETS -->
+        <div id="tabContentInstalled" style="display:flex; flex-direction:column; gap:14px;">
+          <div class="cust-pref-strip">
+            <div class="cust-pref-title">
+              <b>Dock Visual Representation</b>
+              <small>Choose between individual squircle capsules or minimalist horizontal line dividers.</small>
+            </div>
+            <div class="style-pill-group">
+              <button class="style-pill-btn active" id="modalStyleCapsule" onclick="setDisplayStyle('capsule')">Capsules</button>
+              <button class="style-pill-btn" id="modalStyleLine" onclick="setDisplayStyle('line')">Lines</button>
+            </div>
+          </div>
+
+          <div class="widget-manage-grid" id="widgetManageList">
+            <!-- Populated via JavaScript dynamically -->
+          </div>
+        </div>
+
+        <!-- TAB 2: WIDGET STORE (COMING SOON) -->
+        <div id="tabContentStore" style="display:none; flex-direction:column; gap:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <b style="font-size:14px;">Community &amp; Native Widget Store</b>
+              <p style="font-size:11px; color:var(--text-secondary); margin-top:2px;">Discover and install verified high-performance extensions for ProtonDock.</p>
+            </div>
+            <span style="font-size:10px; font-weight:700; color:var(--accent-emerald); background:rgba(94,241,194,0.15); border:1px solid rgba(94,241,194,0.3); padding:3px 9px; border-radius:999px;">Store Coming Soon</span>
+          </div>
+
+          <div class="store-grid">
+            <div class="store-card">
+              <span class="store-card-badge">Coming Soon</span>
+              <div class="store-card-icon">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+              </div>
+              <div class="store-card-title">GitHub Pulse</div>
+              <div class="store-card-desc">Real-time commit streaks, pending PR reviews, and CI workflow status pills.</div>
+            </div>
+
+            <div class="store-card">
+              <span class="store-card-badge">Coming Soon</span>
+              <div class="store-card-icon">
+                <svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div class="store-card-title">Crypto &amp; Stocks Ticker</div>
+              <div class="store-card-desc">Live mini sparklines for BTC, ETH, and S&amp;P 500 index tracking right in your rail.</div>
+            </div>
+
+            <div class="store-card">
+              <span class="store-card-badge">Coming Soon</span>
+              <div class="store-card-icon">
+                <svg class="icon" style="color:#ef4444;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="store-card-title">Pomodoro Focus Timer</div>
+              <div class="store-card-desc">Sleek 25-minute focus intervals with subtle audio cues and break alerts.</div>
+            </div>
+
+            <div class="store-card">
+              <span class="store-card-badge">Coming Soon</span>
+              <div class="store-card-icon">
+                <svg class="icon" style="color:#38bdf8;" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div class="store-card-title">Network Speedometer</div>
+              <div class="store-card-desc">Sub-second download and upload bandwidth meters powered by native Rust sockets.</div>
+            </div>
+
+            <div class="store-card">
+              <span class="store-card-badge">Coming Soon</span>
+              <div class="store-card-icon">
+                <svg class="icon" style="color:#a855f7;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div class="store-card-title">Quick Scratchpad</div>
+              <div class="store-card-desc">Instant clipboard snippets, fast Markdown notes, and auto-synced checklists.</div>
+            </div>
+
+            <div class="store-card">
+              <span class="store-card-badge">Coming Soon</span>
+              <div class="store-card-icon">
+                <svg class="icon" style="color:#10b981;" viewBox="0 0 24 24"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="11" x2="23" y2="13"/></svg>
+              </div>
+              <div class="store-card-title">Battery &amp; Power Engine</div>
+              <div class="store-card-desc">Live battery health, watt discharge rates, and one-click power profiles.</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+  </div>
 
-    <nav class="dock-rail" id="dockRail">
-      <div class="dock-widget widget-windows" title="Windows Start Menu">
+  <!-- ==========================================================================
+       THE DOCK RAIL WITH REORDERABLE WIDGETS
+       ========================================================================== -->
+  <div class="dock-stage" id="dockStage">
+
+    <!-- Floating Shelf Above Dock -->
+    <div class="dock-floating-shelf" id="dockShelf">
+      <div class="profile-switcher-pill" aria-label="Profiles">
+        <button class="profile-tab-btn active" onclick="switchProfile('daily', this)">Daily</button>
+        <button class="profile-tab-btn" onclick="switchProfile('work', this)">Work</button>
+        <button class="profile-tab-btn" onclick="switchProfile('founder', this)">Founder</button>
+        <button class="profile-tab-btn" onclick="switchProfile('focus', this)">Focus</button>
+        <button class="profile-add-btn" title="Add New Profile" onclick="addNewProfile()">+</button>
+      </div>
+
+      <button class="customize-dock-trigger" onclick="openCustomizerModal()">
+        <svg class="icon" style="width:12px; height:12px;" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Customize Widgets</span>
+      </button>
+    </div>
+
+    <!-- MAIN DOCK RAIL -->
+    <nav class="dock-rail" id="dockRail" aria-label="ProtonDock">
+
+      <!-- WIDGET 1: Windows Start Menu Button -->
+      <div class="dock-widget widget-windows" id="w-windows" data-widget="windows" data-size="compact" draggable="true" title="Windows Start Menu (Drag to relocate)">
         <div class="widget-inner" style="justify-content:center;">
-          <svg style="width:18px; height:18px;" viewBox="0 0 24 24" fill="#0078d4"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+          <svg style="width:18px; height:18px; flex-shrink:0;" viewBox="0 0 24 24" fill="#0078d4">
+            <rect x="3" y="3" width="8" height="8" rx="1.5"/>
+            <rect x="13" y="3" width="8" height="8" rx="1.5"/>
+            <rect x="3" y="13" width="8" height="8" rx="1.5"/>
+            <rect x="13" y="13" width="8" height="8" rx="1.5"/>
+          </svg>
+          <div class="widget-label-medium" style="font-size:11px; font-weight:600; margin-left:6px;">Start</div>
+          <div class="widget-label-expanded" style="font-size:11px; font-weight:600; margin-left:7px;">Windows Start</div>
         </div>
       </div>
-      <div class="dock-widget widget-search" title="ProtonSearch (Alt+Space)" onclick="toggleProtonSearch()">
+
+      <!-- WIDGET 2: ProtonSearch Trigger -->
+      <div class="dock-widget widget-search" id="w-search" data-widget="search" data-size="compact" draggable="true" title="ProtonSearch (Alt+Space)" onclick="toggleProtonSearch()">
         <div class="widget-inner" style="justify-content:center;">
-          <svg class="icon" style="color:var(--accent);" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <svg class="icon" style="color:var(--accent); flex-shrink:0;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <div class="widget-label-medium" style="font-size:11px; font-weight:600; margin-left:6px;">Search...</div>
+          <div class="widget-label-expanded" style="font-size:11px; font-weight:600; margin-left:7px; width:100%; justify-content:space-between;">
+            <span>Search apps, files...</span>
+            <span style="font-size:8.5px; opacity:0.6; padding:1px 4px; border-radius:4px; background:rgba(255,255,255,0.1);">Alt Space</span>
+          </div>
         </div>
       </div>
-      <div class="dock-widget widget-apps">
-        <div class="widget-inner" style="gap:4px;">
-          <div class="app-icon-btn"><svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M4 6.5 12 2l8 4.5v11L12 22 4 17.5V6.5Z" fill="#ff9800"/><path d="M12 2v20" stroke="#fff" stroke-width="1.5"/></svg><span class="app-dot"></span></div>
-          <div class="active-window-pill"><svg style="width:18px; height:18px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/></svg><span>Sidebar-Bri...</span></div>
+
+      <!-- WIDGET 3: Running Apps Group (Relocatable) -->
+      <div class="dock-widget widget-apps" id="w-apps" data-widget="apps" data-size="compact" draggable="true" title="Running Applications Group">
+        <div class="widget-inner">
+          <!-- App 1: Sublime Text -->
+          <div class="app-icon-btn" title="Sublime Text (2 windows)">
+            <svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M4 6.5 12 2l8 4.5v11L12 22 4 17.5V6.5Z" fill="#ff9800"/><path d="M12 2v20" stroke="#fff" stroke-width="1.5"/></svg>
+            <span class="app-badge" style="background:rgba(0,0,0,0.65);">2</span>
+            <span class="app-dot"></span>
+          </div>
+
+          <!-- App 2: Active VS Code Pill -->
+          <div class="active-window-pill" title="Active Window: Sidebar-Bridge.tsx">
+            <svg style="width:18px; height:18px; flex-shrink:0;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/></svg>
+            <span>Sidebar-Bri...</span>
+          </div>
+
+          <!-- App 3: Finder with Popover Card -->
+          <div class="app-icon-btn" id="finderAppBtn" title="Finder (Click/Hover for preview)">
+            <svg style="width:21px; height:21px;" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="5" fill="#38bdf8"/><path d="M12 2v20" stroke="#fff" stroke-width="1.5"/><circle cx="7" cy="9" r="1.5" fill="#fff"/><circle cx="17" cy="9" r="1.5" fill="#fff"/><path d="M8 15c2 2 6 2 8 0" stroke="#fff" stroke-width="1.5" fill="none"/></svg>
+            <span class="app-badge">17</span>
+            <span class="app-dot"></span>
+
+            <!-- Live Window Thumbnails Popover Card -->
+            <div class="window-preview-popover" id="finderPopover">
+              <div class="preview-header">
+                <div class="preview-header-left">
+                  <svg style="width:15px; height:15px;" viewBox="0 0 24 24" fill="#38bdf8"><rect width="20" height="20" x="2" y="2" rx="4"/></svg>
+                  <span>Finder</span>
+                </div>
+                <div class="preview-header-actions">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </div>
+              </div>
+              <div class="preview-thumbnails-deck">
+                <!-- Window 1: Desktop -->
+                <div class="window-card">
+                  <div class="window-card-bar">
+                    <span class="window-dot" style="background:#ff5f56;"></span>
+                    <span class="window-dot" style="background:#ffbd2e;"></span>
+                    <span class="window-dot" style="background:#27c93f;"></span>
+                  </div>
+                  <div class="window-mock-list">
+                    <div class="mock-row" style="width: 75%;"></div>
+                    <div class="mock-row subtle" style="width: 50%;"></div>
+                    <div class="mock-row" style="width: 85%;"></div>
+                    <div class="mock-row subtle" style="width: 60%;"></div>
+                    <div class="mock-row" style="width: 40%;"></div>
+                  </div>
+                  <div class="window-card-footer">
+                    <div class="window-card-title">Desktop</div>
+                  </div>
+                </div>
+
+                <!-- Window 2: Downloads (Active Highlight) -->
+                <div class="window-card active-window">
+                  <div class="window-card-bar">
+                    <span class="window-dot" style="background:#ff5f56;"></span>
+                    <span class="window-dot" style="background:#ffbd2e;"></span>
+                    <span class="window-dot" style="background:#27c93f;"></span>
+                  </div>
+                  <div class="window-mock-list">
+                    <div class="mock-row" style="width: 90%; background: #007aff;"></div>
+                    <div class="mock-row subtle" style="width: 65%;"></div>
+                    <div class="mock-row" style="width: 80%;"></div>
+                    <div class="mock-row subtle" style="width: 55%;"></div>
+                    <div class="mock-row" style="width: 70%;"></div>
+                  </div>
+                  <div class="window-card-footer">
+                    <div class="window-card-title">Downloads</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- App 4: Browser -->
+          <div class="app-icon-btn" title="Browser">
+            <svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ea580c"/><circle cx="12" cy="12" r="6" fill="#fff"/></svg>
+            <span class="app-dot"></span>
+          </div>
         </div>
       </div>
-      <div class="dock-widget widget-spotify">
+
+      <!-- WIDGET 4: Spotify Media Player with Popover Card -->
+      <div class="dock-widget widget-spotify" id="w-spotify" data-widget="spotify" data-size="compact" draggable="true" title="Spotify Media Controller">
         <div class="widget-inner" style="gap:6px;">
-          <svg style="width:17px; height:17px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" fill="none"/></svg>
-          <span style="font-size:10.5px; font-weight:700;">Play</span>
+          <svg style="width:17px; height:17px; flex-shrink:0;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+          <div class="widget-label-compact" style="font-size:10.5px; font-weight:700;">Play</div>
+          <div class="widget-label-medium" style="display:none; flex-direction:column; max-width:85px; overflow:hidden;">
+            <b style="font-size:10px; font-weight:700; text-overflow:ellipsis; overflow:hidden;">Tunnel Vision</b>
+            <small style="font-size:8.5px; color:var(--text-secondary);">Aurora B.</small>
+          </div>
+          <div class="widget-label-expanded" style="display:none; flex-direction:column; max-width:115px; overflow:hidden;">
+            <b style="font-size:10.5px; font-weight:700; text-overflow:ellipsis; overflow:hidden;">Tunnel Vision - Remaster</b>
+            <small style="font-size:9px; color:var(--text-secondary);">Aurora B.Poreal</small>
+          </div>
+          <div style="display:flex; align-items:center; gap:5px; margin-left:auto;">
+            <svg style="width:13px; height:13px; color:var(--text-primary); cursor:pointer;" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+
+          <!-- Floating Popover Now Playing Card -->
+          <div class="media-popover-card" id="spotifyPopover">
+            <div class="media-popover-header">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <svg style="width:13px; height:13px;" viewBox="0 0 24 24" fill="#1db954"><circle cx="12" cy="12" r="10"/></svg>
+                <span>Spotify</span>
+              </div>
+              <svg style="width:12px; height:12px; color:var(--text-secondary); cursor:pointer;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </div>
+            <div class="media-popover-art">
+              <svg style="width:50px; height:50px; color:rgba(255,255,255,0.85); z-index:2;" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+              </svg>
+            </div>
+            <div>
+              <div class="media-popover-title">Tunnel Vision - Remastered</div>
+              <div class="media-popover-artist">Aurora B.Poreal</div>
+            </div>
+            <div class="media-popover-buttons">
+              <div class="popover-btn">
+                <svg style="width:11px; height:11px;" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/></svg>
+              </div>
+              <div class="popover-btn" style="width:30px; height:30px; background:var(--accent); color:#fff;">
+                <svg style="width:13px; height:13px;" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              </div>
+              <div class="popover-btn">
+                <svg style="width:11px; height:11px;" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/></svg>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="dock-widget widget-weather">
+
+      <!-- WIDGET 5: Real-time Weather Widget -->
+      <div class="dock-widget widget-weather" id="w-weather" data-widget="weather" data-size="compact" draggable="true" title="Weather: Click in manager to resize">
         <div class="widget-inner" style="gap:5px;">
-          <svg class="icon" style="width:16px; height:16px; color:#ffd166;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="#ffd166"/><path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7z" fill="var(--text-primary)" opacity="0.9"/></svg>
-          <span style="font-size:11.5px; font-weight:700;">24°</span>
+          <svg class="icon" style="width:16px; height:16px; color:#ffd166; flex-shrink:0;" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4" fill="#ffd166" stroke="none"/>
+            <path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7a3.5 3.5 0 0 0 0-7z" fill="var(--text-primary)" stroke="none" opacity="0.9"/>
+          </svg>
+          <span style="font-size:11.5px; font-weight:700; font-variant-numeric:tabular-nums;">24°</span>
+          <div class="widget-label-medium" style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-left:2px;">Sunny</div>
+          <div class="widget-label-expanded" style="flex-direction:column; line-height:1.1; margin-left:3px;">
+            <span style="font-size:9.5px; font-weight:600;">Sunny Clear</span>
+            <span style="font-size:8px; color:var(--text-secondary);">H:26° L:18°</span>
+          </div>
         </div>
       </div>
-      <div class="dock-widget widget-system">
-        <div class="widget-inner" style="gap:5px; justify-content:center;">
+
+      <!-- WIDGET 6: System Hardware Monitor -->
+      <div class="dock-widget widget-system" id="w-system" data-widget="system" data-size="compact" draggable="true" title="Hardware Monitor">
+        <div class="widget-inner" style="gap:5px; justify-content:center; font-variant-numeric:tabular-nums;">
           <span style="color:var(--text-secondary); font-size:8.5px; font-weight:700;">CPU</span>
           <b style="font-size:10px;">24%</b>
+          <div class="widget-label-medium" style="align-items:center; gap:4px; margin-left:2px;">
+            <span style="color:var(--text-tertiary);">·</span>
+            <span style="color:var(--text-secondary); font-size:8.5px; font-weight:700;">RAM</span>
+            <b style="font-size:10px;">58%</b>
+          </div>
+          <div class="widget-label-expanded" style="align-items:center; gap:5px; margin-left:3px;">
+            <span style="color:var(--text-tertiary);">·</span>
+            <span style="color:var(--text-secondary); font-size:8.5px; font-weight:700;">RAM</span>
+            <b style="font-size:10px;">58%</b>
+            <span style="color:var(--text-tertiary);">·</span>
+            <b style="font-size:9.5px; color:var(--accent-emerald);">42°C</b>
+          </div>
         </div>
       </div>
-      <div class="dock-widget widget-clock">
+
+      <!-- WIDGET 7: Recycle Bin Utility -->
+      <div class="dock-widget widget-util" id="w-trash" data-widget="trash" data-size="compact" draggable="true" title="Recycle Bin">
+        <div class="widget-inner" style="justify-content:center;">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+          <div class="widget-label-medium" style="font-size:10px; font-weight:600; margin-left:5px;">Trash</div>
+          <div class="widget-label-expanded" style="font-size:10px; font-weight:600; margin-left:5px;">Empty Bin</div>
+        </div>
+      </div>
+
+      <!-- WIDGET 8: Audio Volume Utility -->
+      <div class="dock-widget widget-util" id="w-volume" data-widget="volume" data-size="compact" draggable="true" title="Volume Control">
+        <div class="widget-inner" style="justify-content:center;">
+          <svg class="icon" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          <div class="widget-label-medium" style="font-size:10px; font-weight:600; margin-left:5px;">68%</div>
+          <div class="widget-label-expanded" style="font-size:10px; font-weight:600; margin-left:5px;">Vol 68%</div>
+        </div>
+      </div>
+
+      <!-- WIDGET 9: Stacked Clock & Date Widget -->
+      <div class="dock-widget widget-clock" id="w-clock" data-widget="clock" data-size="compact" draggable="true" title="Clock & Calendar">
         <div class="widget-inner" style="justify-content:center; flex-direction:column; line-height:1.1; font-variant-numeric:tabular-nums; text-align:right;">
-          <span style="font-size:11px; font-weight:700;">20:36</span>
-          <span style="font-size:8.5px; font-weight:500; color:var(--text-secondary);">07.11</span>
+          <span style="font-size:11px; font-weight:700; letter-spacing:-0.01em;" id="liveTime">20:36</span>
+          <span style="font-size:8.5px; font-weight:500; color:var(--text-secondary);" id="liveDate">07.11</span>
         </div>
       </div>
+
     </nav>
   </div>
 
   <script>
     // ==========================================================================
-    // HIGH-PERFORMANCE NAVIGATION STATE & DATABASE
+    // 1. WIDGET CATALOG DATA MODEL
+    // ==========================================================================
+    let widgetState = [
+      { id: "windows", name: "Windows Start Menu", desc: "Launch Windows Start menu flyout", enabled: true, size: "compact", icon: "⊞" },
+      { id: "search", name: "ProtonSearch Spotlight", desc: "Sub-millisecond local SQLite FTS5 search", enabled: true, size: "compact", icon: "🔍" },
+      { id: "apps", name: "Running Apps Group", desc: "Taskbar apps with active window title pill", enabled: true, size: "compact", icon: "🗂️" },
+      { id: "spotify", name: "Spotify Media Player", desc: "Now playing title, artist & media playback", enabled: true, size: "compact", icon: "🎵" },
+      { id: "weather", name: "Real-time Weather", desc: "Current temperature, sky condition & forecasts", enabled: true, size: "compact", icon: "☀️" },
+      { id: "system", name: "Hardware System Stats", desc: "CPU, memory load and temperature metrics", enabled: true, size: "compact", icon: "⚡" },
+      { id: "trash", name: "Recycle Bin", desc: "One-click trash status & purge tool", enabled: true, size: "compact", icon: "🗑️" },
+      { id: "volume", name: "Audio Volume Control", desc: "Direct system audio output master levels", enabled: true, size: "compact", icon: "🔊" },
+      { id: "clock", name: "Stacked Clock & Date", desc: "2-line precision clock and calendar date", enabled: true, size: "compact", icon: "🕒" }
+    ];
+
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+
+      const timeEl = document.getElementById('liveTime');
+      const dateEl = document.getElementById('liveDate');
+      if (timeEl) timeEl.textContent = `${hours}:${minutes}`;
+      if (dateEl) dateEl.textContent = `${day}.${month}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function setTheme(theme, btn) {
+      document.body.setAttribute('data-theme', theme);
+      document.querySelectorAll('.demo-toolbar-group:nth-child(3) .demo-pill-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+    }
+
+    function setWallpaper(type, btn) {
+      const el = document.getElementById('wallpaperEl');
+      el.className = 'desktop-wallpaper wallpaper-' + type;
+      if (btn) {
+        btn.parentElement.querySelectorAll('.demo-pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    }
+
+    function setLauncherPosition(pos, btn) {
+      document.body.setAttribute('data-launcher-pos', pos);
+      document.getElementById('btnPosCentered').classList.toggle('active', pos === 'centered');
+      document.getElementById('btnPosDock').classList.toggle('active', pos === 'dock');
+      showToast('Position set to: ' + (pos === 'centered' ? 'Screen Center' : 'Dock-Anchored'));
+    }
+
+    // ==========================================================================
+    // 2. DISPLAY STYLES: CAPSULES VS LINES
+    // ==========================================================================
+    function setDisplayStyle(style, btn) {
+      document.body.setAttribute('data-display-style', style);
+      
+      const btnCapsule = document.getElementById('btnStyleCapsule');
+      const btnLine = document.getElementById('btnStyleLine');
+      const modCapsule = document.getElementById('modalStyleCapsule');
+      const modLine = document.getElementById('modalStyleLine');
+
+      if (style === 'capsule') {
+        btnCapsule?.classList.add('active');
+        btnLine?.classList.remove('active');
+        modCapsule?.classList.add('active');
+        modLine?.classList.remove('active');
+      } else {
+        btnLine?.classList.add('active');
+        btnCapsule?.classList.remove('active');
+        modLine?.classList.add('active');
+        modCapsule?.classList.remove('active');
+      }
+      showToast('Display style: ' + (style === 'capsule' ? 'Capsules' : 'Lines'));
+    }
+
+    // ==========================================================================
+    // 3. CUSTOMIZER MODAL & STORE TABS
+    // ==========================================================================
+    const customizerModal = document.getElementById('customizerModal');
+
+    function openCustomizerModal() {
+      renderWidgetManageList();
+      customizerModal.classList.add('is-open');
+    }
+
+    function closeCustomizerModal() {
+      customizerModal.classList.remove('is-open');
+    }
+
+    function handleCustBackdrop(e) {
+      if (e.target === customizerModal) {
+        closeCustomizerModal();
+      }
+    }
+
+    function switchCustTab(tab) {
+      const tabBtnInstalled = document.getElementById('tabBtnInstalled');
+      const tabBtnStore = document.getElementById('tabBtnStore');
+      const contentInstalled = document.getElementById('tabContentInstalled');
+      const contentStore = document.getElementById('tabContentStore');
+
+      if (tab === 'installed') {
+        tabBtnInstalled?.classList.add('active');
+        tabBtnStore?.classList.remove('active');
+        if (contentInstalled) contentInstalled.style.display = 'flex';
+        if (contentStore) contentStore.style.display = 'none';
+      } else {
+        tabBtnStore?.classList.add('active');
+        tabBtnInstalled?.classList.remove('active');
+        if (contentStore) contentStore.style.display = 'flex';
+        if (contentInstalled) contentInstalled.style.display = 'none';
+      }
+    }
+
+    function renderWidgetManageList() {
+      const listEl = document.getElementById('widgetManageList');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+
+      widgetState.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'widget-manage-row';
+        row.innerHTML = `
+          <div class="widget-info">
+            <div class="widget-ic-box">${item.icon}</div>
+            <div class="widget-name">
+              <b>${item.name}</b>
+              <small>${item.desc}</small>
+            </div>
+          </div>
+          <div class="widget-controls">
+            <div class="reorder-btns">
+              <button class="reorder-btn" title="Move Left / Earlier" onclick="moveWidget(${index}, -1)" ${index === 0 ? 'disabled style="opacity:0.3;"' : ''}>←</button>
+              <button class="reorder-btn" title="Move Right / Later" onclick="moveWidget(${index}, 1)" ${index === widgetState.length - 1 ? 'disabled style="opacity:0.3;"' : ''}>→</button>
+            </div>
+
+            <div class="size-select-group">
+              <button class="size-opt-btn ${item.size === 'compact' ? 'active' : ''}" onclick="setWidgetSize('${item.id}', 'compact')">Pill</button>
+              <button class="size-opt-btn ${item.size === 'medium' ? 'active' : ''}" onclick="setWidgetSize('${item.id}', 'medium')">Tile</button>
+              <button class="size-opt-btn ${item.size === 'expanded' ? 'active' : ''}" onclick="setWidgetSize('${item.id}', 'expanded')">Card</button>
+            </div>
+
+            <label class="switch" title="Toggle visible on dock">
+              <input type="checkbox" ${item.enabled ? 'checked' : ''} onchange="toggleWidgetEnabled('${item.id}', this.checked)">
+              <span class="slider"></span>
+            </label>
+          </div>
+        `;
+        listEl.appendChild(row);
+      });
+    }
+
+    function setWidgetSize(widgetId, size) {
+      const item = widgetState.find(w => w.id === widgetId);
+      if (item) {
+        item.size = size;
+        const domEl = document.getElementById('w-' + widgetId);
+        if (domEl) {
+          domEl.setAttribute('data-size', size);
+        }
+        renderWidgetManageList();
+        showToast(item.name + ' resized to: ' + size);
+      }
+    }
+
+    function toggleWidgetEnabled(widgetId, isEnabled) {
+      const item = widgetState.find(w => w.id === widgetId);
+      if (item) {
+        item.enabled = isEnabled;
+        const domEl = document.getElementById('w-' + widgetId);
+        if (domEl) {
+          domEl.style.display = isEnabled ? 'flex' : 'none';
+        }
+        showToast(item.name + (isEnabled ? ' enabled' : ' hidden'));
+      }
+    }
+
+    function moveWidget(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= widgetState.length) return;
+
+      const item = widgetState.splice(index, 1)[0];
+      widgetState.splice(targetIndex, 0, item);
+
+      syncDockDomOrder();
+      renderWidgetManageList();
+    }
+
+    function syncDockDomOrder() {
+      const rail = document.getElementById('dockRail');
+      if (!rail) return;
+
+      widgetState.forEach(item => {
+        const domEl = document.getElementById('w-' + item.id);
+        if (domEl) {
+          rail.appendChild(domEl);
+        }
+      });
+    }
+
+    // Direct Drag and Drop on Dock Rail
+    let draggedWidgetId = null;
+
+    function initDragAndDrop() {
+      document.querySelectorAll('.dock-widget').forEach(widget => {
+        widget.addEventListener('dragstart', (e) => {
+          draggedWidgetId = widget.getAttribute('data-widget');
+          widget.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+
+        widget.addEventListener('dragend', () => {
+          widget.classList.remove('dragging');
+          document.querySelectorAll('.dock-widget').forEach(w => w.classList.remove('drag-over'));
+        });
+
+        widget.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          widget.classList.add('drag-over');
+        });
+
+        widget.addEventListener('dragleave', () => {
+          widget.classList.remove('drag-over');
+        });
+
+        widget.addEventListener('drop', (e) => {
+          e.preventDefault();
+          widget.classList.remove('drag-over');
+          const targetWidgetId = widget.getAttribute('data-widget');
+          if (draggedWidgetId && targetWidgetId && draggedWidgetId !== targetWidgetId) {
+            const fromIdx = widgetState.findIndex(w => w.id === draggedWidgetId);
+            const toIdx = widgetState.findIndex(w => w.id === targetWidgetId);
+            if (fromIdx !== -1 && toIdx !== -1) {
+              const [movedItem] = widgetState.splice(fromIdx, 1);
+              widgetState.splice(toIdx, 0, movedItem);
+              syncDockDomOrder();
+              renderWidgetManageList();
+              showToast('Relocated ' + movedItem.name);
+            }
+          }
+        });
+      });
+    }
+    initDragAndDrop();
+
+    // Profile Switching
+    const profilePresets = {
+      daily: { sizes: { windows: "compact", search: "compact", weather: "compact", system: "compact", spotify: "compact", clock: "compact", trash: "compact", volume: "compact" } },
+      work: { sizes: { windows: "compact", search: "medium", weather: "compact", system: "medium", spotify: "compact", clock: "compact", trash: "compact", volume: "compact" } },
+      founder: { sizes: { windows: "medium", search: "medium", weather: "medium", system: "compact", spotify: "medium", clock: "compact", trash: "compact", volume: "compact" } },
+      focus: { sizes: { windows: "compact", search: "compact", weather: "compact", system: "compact", spotify: "compact", clock: "compact", trash: "compact", volume: "compact" } }
+    };
+
+    function switchProfile(profileKey, btn) {
+      document.querySelectorAll('.profile-tab-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      const preset = profilePresets[profileKey];
+      if (preset && preset.sizes) {
+        Object.entries(preset.sizes).forEach(([wId, sz]) => {
+          setWidgetSize(wId, sz);
+        });
+      }
+      showToast('Switched to ' + profileKey.toUpperCase() + ' profile');
+    }
+
+    function addNewProfile() {
+      const name = prompt("Enter new profile name (e.g. Gaming, Design):");
+      if (!name) return;
+      showToast('Profile "' + name + '" created and configured');
+    }
+
+    function togglePinPopover(popoverId, btn) {
+      const popover = document.getElementById(popoverId);
+      if (!popover) return;
+      const isForce = popover.classList.toggle('force-show');
+      if (btn) btn.classList.toggle('active', isForce);
+      showToast((isForce ? 'Pinned ' : 'Unpinned ') + (popoverId === 'finderPopover' ? 'Finder' : 'Spotify'));
+    }
+
+    // ==========================================================================
+    // 4. PROTONSEARCH LAUNCHER: DATABASE & IN-PROCESS MATH CALCULATOR
     // ==========================================================================
     const resultDatabase = {
       vscode: {
@@ -1300,12 +2546,10 @@
         path: "Applications · C:\\Program Files\\Microsoft VS Code\\Code.exe",
         cat: "apps",
         type: "APP",
-        badgeColor: "#60a5fa",
-        badgeBg: "rgba(0,122,204,0.18)",
         size: "v1.95.2 · x64",
         mod: "Active Window (PID 14820)",
-        code: `// Active Process Session\nProcess: Code.exe (PID 14820)\nStatus: Live Window foreground\nMemory: 248 MB · GPU Acceleration: Enabled`,
-        iconSvg: `<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/></svg>`,
+        code: "// Active Process Session\nProcess: Code.exe (PID 14820)\nStatus: Live Window foreground\nMemory: 248 MB · GPU Acceleration: Enabled",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/></svg>',
         actions: [
           { name: "Launch Application", kbd: "↵", fn: () => triggerPrimaryAction("vscode") },
           { name: "Reveal in File Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("vscode") },
@@ -1321,208 +2565,363 @@
         path: "Audio Player · %APPDATA%\\Spotify\\Spotify.exe",
         cat: "apps",
         type: "APP",
-        badgeColor: "#4ade80",
-        badgeBg: "rgba(29,185,84,0.18)",
         size: "v1.2.49 · Desktop Client",
         mod: "Playing · Tunnel Vision",
-        code: `// Media Player State\nTrack: Tunnel Vision\nArtist: Aurora B.Poreal\nPlayback: Active (Volume 68%)\nCodec: Ogg Vorbis 320kbps`,
-        iconSvg: `<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
+        code: "// Media Player State\nTrack: Tunnel Vision\nArtist: Aurora B.Poreal\nPlayback: Active (Volume 68%)\nCodec: Ogg Vorbis 320kbps",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>',
         actions: [
           { name: "Open Spotify Client", kbd: "↵", fn: () => triggerPrimaryAction("spotify") },
-          { name: "Toggle Play / Pause", kbd: "Space", fn: () => showToast("⏯ Playback Toggled") },
-          { name: "Next Track", kbd: "Ctrl+→", fn: () => showToast("⏭ Skipped to next track") },
-          { name: "Copy Track Info", kbd: "Ctrl+C", fn: () => copyCurrentName() },
-          { name: "Pin to ProtonDock Rail", kbd: "Ctrl+P", fn: () => pinToDock() }
+          { name: "Play / Pause Toggle", kbd: "Space", fn: () => showToast("Media playback toggled") },
+          { name: "Next Track", kbd: "Ctrl+Right", fn: () => showToast("Skipped to next track") }
         ]
       },
       terminal: {
         id: "terminal",
         title: "Windows Terminal",
-        path: "System Utilities · %LOCALAPPDATA%\\Microsoft\\WindowsApps\\wt.exe",
+        path: "System Shell · wt.exe (PowerShell 7.4.5)",
         cat: "apps",
         type: "APP",
-        badgeColor: "#93c5fd",
-        badgeBg: "rgba(59,130,246,0.18)",
-        size: "v1.21.3231.0 · PowerShell 7",
-        mod: "Default Profile: pwsh",
-        code: `// Terminal Configuration\nProfile: PowerShell 7 (x64)\nStarting Directory: ~\\Documents\\Projects\nColor Scheme: Campbell Powershell`,
-        iconSvg: `<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect width="20" height="18" x="2" y="3" rx="3" fill="#0c1117"/><path d="m6 8 4 4-4 4M12 16h6" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+        size: "MSIX Package · 42 MB",
+        mod: "Session active (2 tabs open)",
+        code: "// Terminal Multiplexer\nTab 1: PowerShell 7 (C:\\Projects\\protonsearch)\nTab 2: Ubuntu 24.04 (WSL2 Linux Kernel 6.6)",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="4" fill="#0c1017"/><path d="m6 8 4 4-4 4M12 16h6" stroke="#4ade80" stroke-width="2" fill="none"/></svg>',
         actions: [
-          { name: "Launch Terminal", kbd: "↵", fn: () => triggerPrimaryAction("terminal") },
-          { name: "Open as Administrator", kbd: "Ctrl+↵", fn: () => showToast("⚡ Admin Terminal Launched") },
-          { name: "Copy Executable Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
-          { name: "Pin to ProtonDock Rail", kbd: "Ctrl+P", fn: () => pinToDock() }
+          { name: "Open Terminal", kbd: "↵", fn: () => triggerPrimaryAction("terminal") },
+          { name: "Open as Administrator", kbd: "Ctrl+Shift+↵", fn: () => showToast("Terminal opened as Admin") }
         ]
       },
-      sidebar: {
-        id: "sidebar",
+      sidebarBridge: {
+        id: "sidebarBridge",
         title: "Sidebar-Bridge.tsx",
-        path: "src > components > dock > Sidebar-Bridge.tsx",
+        path: "ProtonDock · src/components/dock/Sidebar-Bridge.tsx",
         cat: "files",
-        type: "TSX",
-        badgeColor: "#60a5fa",
-        badgeBg: "rgba(49,120,198,0.2)",
-        size: "8.4 KB (248 lines)",
-        mod: "Modified 12m ago",
-        code: `// Bridge between Tauri backend & React dock\nexport interface DockGeometry {\n  x: number; y: number;\n  width: number; height: number;\n  radius: number;\n}\nexport function syncDockGeometry() {\n  // Sets Win32 click-through region\n}`,
-        iconSvg: `<svg style="width:19px; height:19px;" viewBox="0 0 24 24"><rect width="18" height="20" x="3" y="2" rx="3" fill="#3178c6"/><text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">TS</text></svg>`,
+        type: "CODE",
+        size: "3.4 KB · 112 lines",
+        mod: "Modified 8 mins ago",
+        code: "import React, { useState } from 'react';\nimport { emit } from '@tauri-apps/api/event';\n\nexport const SidebarBridge: React.FC = () => {\n  const [active, setActive] = useState(true);\n  return <div className='bridge-rail' />;\n};",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4m8.5-12-5 16" stroke="#38bdf8" stroke-width="2" fill="none"/></svg>',
         actions: [
-          { name: "Open in VS Code", kbd: "↵", fn: () => triggerPrimaryAction("sidebar") },
-          { name: "Reveal in File Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("sidebar") },
-          { name: "Copy Relative Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
-          { name: "Copy Absolute Path", kbd: "Ctrl+Shift+C", fn: () => copyCurrentName() },
-          { name: "Quick Look Preview", kbd: "Space", fn: () => togglePreviewPane() }
+          { name: "Open in VS Code", kbd: "↵", fn: () => triggerPrimaryAction("sidebarBridge") },
+          { name: "Reveal in Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("sidebarBridge") },
+          { name: "Copy Relative Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() }
         ]
       },
-      weatherrs: {
-        id: "weatherrs",
+      weatherEngine: {
+        id: "weatherEngine",
         title: "weather.rs",
-        path: "protonsearch > src > weather.rs",
+        path: "Native Rust Engine · protonsearch/src/weather.rs",
         cat: "files",
-        type: "RUST",
-        badgeColor: "#fb923c",
-        badgeBg: "rgba(234,88,12,0.2)",
-        size: "4.2 KB (134 lines)",
-        mod: "Modified 1h ago",
-        code: `// Native Open-Meteo cache & parser\npub struct WeatherSnapshot {\n    pub temperature_c: f32,\n    pub condition_code: u8,\n    pub cached_at_utc: u64,\n}`,
-        iconSvg: `<svg style="width:19px; height:19px;" viewBox="0 0 24 24"><rect width="18" height="20" x="3" y="2" rx="3" fill="#ea580c"/><text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">RS</text></svg>`,
+        type: "FILE",
+        size: "6.8 KB · Rust Module",
+        mod: "Modified 2 hours ago",
+        code: "use anyhow::Result;\npub struct WeatherEngine {\n    pub temp: f32,\n    pub status: String,\n}\n\nimpl WeatherEngine {\n    pub fn fetch() -> Result<Self> {\n        Ok(Self { temp: 24.0, status: \"Sunny\".into() })\n    }\n}",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#f97316"/><path d="M14 2v6h6" fill="#ea580c"/></svg>',
         actions: [
-          { name: "Open in VS Code", kbd: "↵", fn: () => triggerPrimaryAction("weatherrs") },
-          { name: "Reveal in File Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("weatherrs") },
-          { name: "Copy Relative Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
-          { name: "Quick Look Preview", kbd: "Space", fn: () => togglePreviewPane() }
+          { name: "Open in Editor", kbd: "↵", fn: () => triggerPrimaryAction("weatherEngine") },
+          { name: "Copy File Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() }
         ]
       },
-      todofts: {
-        id: "todofts",
+      todoCache: {
+        id: "todoCache",
         title: "TODO: Cache FTS5 token indexes",
-        path: "src-tauri > src > indexer.rs:142",
+        path: "Git Code Tasks · src-tauri/src/indexer.rs:142",
         cat: "git",
         type: "TODO",
-        badgeColor: "#fbbf24",
-        badgeBg: "rgba(245,158,11,0.2)",
-        size: "Code Task · Line 142",
-        mod: "Found in indexer.rs",
-        code: `// TODO: Cache FTS5 token indexes\n// Truncate document text at 50KB\nlet text_snippet = extract_doc_text(&file_path)?;\nindex_sqlite_fts5(&db, &text_snippet)?;`,
-        iconSvg: `<svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="9 12 11 14 15 10"/></svg>`,
+        size: "Line 142 · Priority: High",
+        mod: "Committed yesterday",
+        code: "// TODO: Cache FTS5 token indexes\n// We can preload the vocabulary tree on startup\n// to achieve sub-0.1ms fuzzy score evaluations.\nlet mut cache = TokenCache::new();",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#f59e0b" stroke-width="2" fill="none"/><path d="m9 12 2 2 4-4" stroke="#f59e0b" stroke-width="2" fill="none"/></svg>',
         actions: [
-          { name: "Jump to Line in VS Code", kbd: "↵", fn: () => triggerPrimaryAction("todofts") },
-          { name: "Open indexer.rs in Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("todofts") },
-          { name: "Copy Code Snippet", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
-          { name: "Mark Task Complete", kbd: "Ctrl+D", fn: () => showToast("✓ Task Marked Done") }
+          { name: "Jump to Code Line (code -g)", kbd: "↵", fn: () => triggerPrimaryAction("todoCache") },
+          { name: "Mark as Done in Git", kbd: "Ctrl+D", fn: () => showToast("TODO task acknowledged") }
         ]
       },
-      gitcommit: {
-        id: "gitcommit",
+      commitGanella: {
+        id: "commitGanella",
         title: "feat(ui): Ganella slender glass rail",
-        path: "Commit 6a94835 · branch dock (HEAD)",
+        path: "Git Commit · dock branch (HEAD -> origin/dock)",
         cat: "git",
-        type: "GIT",
-        badgeColor: "#c084fc",
-        badgeBg: "rgba(168,85,247,0.2)",
-        size: "Git Commit · +646 / -451",
-        mod: "Committed 22m ago",
-        code: `commit 6a94835\nAuthor: Pranshul Soni <git@pranshul>\nDate:   Fri Nov 7 01:11:00 2026\n\nfeat(launcher): refined adaptive Raycast/Tahoe launcher`,
-        iconSvg: `<svg class="icon" style="color:#c084fc;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>`,
+        type: "COMMIT",
+        size: "Commit 7d5bbac · 4 files",
+        mod: "Pushed 3 hours ago",
+        code: "commit 7d5bbac0c8e21\nAuthor: Pranshul Soni <pranshul@protonsearch.dev>\nDate:   Fri Nov 7 01:22:15 2026 +0530\n\n    feat(ui): Ganella and Docktor faithful styling\n    with pinned popovers and adaptive spring widgets",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" stroke="#a855f7" stroke-width="2" fill="none"/><line x1="1.05" y1="12" x2="7" y2="12" stroke="#a855f7" stroke-width="2"/><line x1="17.01" y1="12" x2="22.96" y2="12" stroke="#a855f7" stroke-width="2"/></svg>',
         actions: [
-          { name: "View Commit in Git Log", kbd: "↵", fn: () => triggerPrimaryAction("gitcommit") },
-          { name: "Copy Commit Hash (6a94835)", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
-          { name: "Open Git Terminal", kbd: "Ctrl+T", fn: () => showToast("🌿 Opening Git Terminal...") },
-          { name: "Checkout Branch dock", kbd: "Ctrl+B", fn: () => showToast("✓ Already on branch dock") }
+          { name: "View Commit in GitHub", kbd: "↵", fn: () => triggerPrimaryAction("commitGanella") },
+          { name: "Copy Commit Hash (7d5bbac)", kbd: "Ctrl+C", fn: () => showToast("Commit hash 7d5bbac copied") }
         ]
       },
-      lock: {
-        id: "lock",
-        title: "Lock Workstation",
-        path: "System Quick Action · rundll32.exe user32.dll,LockWorkStation",
-        cat: "tools",
-        type: "SYS",
-        badgeColor: "#f87171",
-        badgeBg: "rgba(239,68,68,0.2)",
-        size: "Instant Execution",
-        mod: "Ready to run",
-        code: `// Quick System Action\nAction: Lock Workstation (Win+L equivalent)\nPrivilege: Standard User\nTarget: Desktop Session`,
-        iconSvg: `<svg class="icon" style="color:#ef4444;" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
-        actions: [
-          { name: "Lock Screen Now", kbd: "↵", fn: () => triggerPrimaryAction("lock") }
-        ]
-      },
-      trash: {
-        id: "trash",
+      emptyTrash: {
+        id: "emptyTrash",
         title: "Empty Recycle Bin",
-        path: "System Maintenance · SHEmptyRecycleBinW",
+        path: "Quick Action · System Maintenance Tool",
         cat: "tools",
         type: "SYS",
-        badgeColor: "#38bdf8",
-        badgeBg: "rgba(56,189,248,0.2)",
-        size: "Reclaim Storage",
-        mod: "32 items · ~140 MB",
-        code: `// System Maintenance Action\nTarget: %SYSTEMDRIVE%\\$Recycle.Bin\nStatus: 32 unpurged items\nConfirmation: Silent with toast`,
-        iconSvg: `<svg class="icon" style="color:#38bdf8;" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`,
+        size: "3 items · 14.2 MB",
+        mod: "Ready to purge",
+        code: "// Windows Shell API\nSHEmptyRecycleBinW(NULL, NULL, SHERB_NOCONFIRMATION);\nPurge status: Ready to recover 14.2 MB storage space.",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" stroke="#ef4444" stroke-width="2" fill="none"/></svg>',
         actions: [
-          { name: "Empty Recycle Bin", kbd: "↵", fn: () => triggerPrimaryAction("trash") }
+          { name: "Execute Recycle Bin Purge", kbd: "↵", fn: () => showToast("Recycle bin emptied successfully") }
         ]
       },
-      sleep: {
-        id: "sleep",
-        title: "Sleep PC",
-        path: "Power Management · SetSuspendState",
+      calcSample: {
+        id: "calcSample",
+        title: "24 * 1.15 = 27.60",
+        path: "Calculator · Recursive descent math parser",
+        cat: "tools",
+        type: "MATH",
+        size: "In-process FPU evaluation",
+        mod: "Evaluated in 0.02 ms",
+        code: "// In-Process Calculator\nExpression: 24 * 1.15\nResult: 27.60\nIEEE 754 float: 27.600000000000001",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" stroke="#10b981" stroke-width="2" fill="none"/><line x1="8" y1="12" x2="16" y2="12" stroke="#10b981" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="16" stroke="#10b981" stroke-width="2"/></svg>',
+        actions: [
+          { name: "Copy Answer (27.60)", kbd: "↵", fn: () => copyCalculatorResult() },
+          { name: "Insert Expression in Search", kbd: "Tab", fn: () => { spotlightInput.value = "24 * 1.15"; handleSearchInput("24 * 1.15"); } }
+        ]
+      },
+      lockStation: {
+        id: "lockStation",
+        title: "Lock Workstation",
+        path: "Quick Action · rundll32.exe user32.dll,LockWorkStation",
         cat: "tools",
         type: "SYS",
-        badgeColor: "#fbbf24",
-        badgeBg: "rgba(251,191,36,0.2)",
-        size: "Low Power State",
-        mod: "ACPI S3 Suspend",
-        code: `// Power Management Action\nTarget: System Standby (S3)\nWake Timers: Preserved\nNetwork: Connected Standby`,
-        iconSvg: `<svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
+        size: "Instant execution",
+        mod: "Win32 API Native",
+        code: "// Win32 Lock API\nLockWorkStation();\nImmediate session lock triggered.",
+        iconSvg: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" stroke="#f59e0b" stroke-width="2" fill="none"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#f59e0b" stroke-width="2" fill="none"/></svg>',
         actions: [
-          { name: "Sleep Computer", kbd: "↵", fn: () => triggerPrimaryAction("sleep") }
+          { name: "Lock System Now", kbd: "↵", fn: () => showToast("Workstation lock triggered") }
         ]
       }
     };
 
-    let activeScope = 'all';
-    let currentSelectedId = 'vscode';
-    let currentSearchQuery = '';
-    let isActionMode = false;
-    let selectedActionIdx = 0;
-    let toastTimer = null;
+    // Full In-Process Math Evaluator mirroring native Rust engine
+    function tryCalculate(raw) {
+      if (!raw || typeof raw !== 'string') return null;
+      let text = raw.trim();
+      if (!text) return null;
 
-    const searchModal = document.getElementById('searchModal');
-    const launcherCard = document.getElementById('launcherCard');
-    const spotlightInput = document.getElementById('spotlightInput');
-    const inputScopeTag = document.getElementById('inputScopeTag');
-    const inputScopeLabel = document.getElementById('inputScopeLabel');
-    const actionDeck = document.getElementById('actionDeck');
-    const actionDeckList = document.getElementById('actionDeckList');
-    const resultsRowsContainer = document.getElementById('resultsRowsContainer');
-    const calcHeroContainer = document.getElementById('calculatorHeroContainer');
-    const calcHeroExpr = document.getElementById('calcHeroExpr');
-    const calcHeroVal = document.getElementById('calcHeroVal');
+      if (!/^[-0-9a-zA-Z_\s\.\+\*\/\^\(\)\%÷×πe]+$/.test(text)) {
+        return null;
+      }
 
-    // ==========================================================================
-    // TOAST NOTIFICATION HUD
-    // ==========================================================================
-    function showToast(msg) {
-      const toast = document.getElementById('psToast');
-      const toastMsg = document.getElementById('psToastMsg');
-      if (!toast || !toastMsg) return;
-      toastMsg.textContent = msg;
-      toast.classList.add('is-visible');
-      if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => {
-        toast.classList.remove('is-visible');
-      }, 1900);
+      if (!/[-0-9+*/^()%÷×]/.test(text)) {
+        return null;
+      }
+
+      let i = 0;
+      const tokens = [];
+      const len = text.length;
+
+      while (i < len) {
+        const ch = text[i];
+
+        if (/\s/.test(ch)) {
+          i++;
+          continue;
+        }
+
+        if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '^' || ch === '(' || ch === ')' || ch === '%' || ch === '×' || ch === '÷') {
+          let type = '';
+          switch (ch) {
+            case '+': type = 'PLUS'; break;
+            case '-': type = 'MINUS'; break;
+            case '*':
+            case '×': type = 'STAR'; break;
+            case '/':
+            case '÷': type = 'SLASH'; break;
+            case '^': type = 'CARET'; break;
+            case '%': type = 'PERCENT'; break;
+            case '(': type = 'LPAREN'; break;
+            case ')': type = 'RPAREN'; break;
+          }
+          tokens.push({ type });
+          i++;
+          continue;
+        }
+
+        if (/[0-9]/.test(ch) || (ch === '.' && i + 1 < len && /[0-9]/.test(text[i + 1]))) {
+          let numStr = '';
+          while (i < len && (/[0-9]/.test(text[i]) || text[i] === '.')) {
+            numStr += text[i];
+            i++;
+          }
+          const num = parseFloat(numStr);
+          if (isNaN(num)) return null;
+          tokens.push({ type: 'NUM', val: num });
+          continue;
+        }
+
+        if (/[a-zA-Zπ_]/.test(ch)) {
+          let ident = '';
+          while (i < len && /[a-zA-Z0-9π_]/.test(text[i])) {
+            ident += text[i];
+            i++;
+          }
+          tokens.push({ type: 'IDENT', val: ident.toLowerCase() });
+          continue;
+        }
+
+        return null;
+      }
+
+      tokens.push({ type: 'EOF' });
+
+      let pos = 0;
+
+      function parseExpr() {
+        let left = parseTerm();
+        if (left === null) return null;
+        while (tokens[pos] && (tokens[pos].type === 'PLUS' || tokens[pos].type === 'MINUS')) {
+          const op = tokens[pos].type;
+          pos++;
+          const right = parseTerm();
+          if (right === null) return null;
+          if (op === 'PLUS') left += right;
+          else left -= right;
+        }
+        return left;
+      }
+
+      function parseTerm() {
+        let left = parsePower();
+        if (left === null) return null;
+        while (tokens[pos] && (tokens[pos].type === 'STAR' || tokens[pos].type === 'SLASH' || tokens[pos].type === 'PERCENT')) {
+          const op = tokens[pos].type;
+          pos++;
+          if (op === 'PERCENT') {
+            if (tokens[pos] && tokens[pos].type === 'IDENT' && tokens[pos].val === 'of') {
+              pos++;
+              const base = parsePower();
+              if (base === null) return null;
+              left = (left / 100) * base;
+            } else {
+              left = left / 100;
+            }
+          } else {
+            const right = parsePower();
+            if (right === null) return null;
+            if (op === 'STAR') left *= right;
+            else {
+              if (right === 0) return null;
+              left /= right;
+            }
+          }
+        }
+        return left;
+      }
+
+      function parsePower() {
+        const base = parseUnary();
+        if (base === null) return null;
+        if (tokens[pos] && tokens[pos].type === 'CARET') {
+          pos++;
+          const exp = parsePower();
+          if (exp === null) return null;
+          return Math.pow(base, exp);
+        }
+        return base;
+      }
+
+      function parseUnary() {
+        if (tokens[pos] && tokens[pos].type === 'MINUS') {
+          pos++;
+          const val = parseUnary();
+          return val === null ? null : -val;
+        }
+        if (tokens[pos] && tokens[pos].type === 'PLUS') {
+          pos++;
+          return parseUnary();
+        }
+        return parsePrimary();
+      }
+
+      function parsePrimary() {
+        const tok = tokens[pos];
+        if (!tok) return null;
+
+        if (tok.type === 'NUM') {
+          pos++;
+          return tok.val;
+        }
+
+        if (tok.type === 'LPAREN') {
+          pos++;
+          const val = parseExpr();
+          if (val === null) return null;
+          if (tokens[pos] && tokens[pos].type === 'RPAREN') {
+            pos++;
+          }
+          return val;
+        }
+
+        if (tok.type === 'IDENT') {
+          const name = tok.val;
+          pos++;
+          if (tokens[pos] && tokens[pos].type === 'LPAREN') {
+            pos++;
+            const arg = parseExpr();
+            if (arg === null) return null;
+            if (tokens[pos] && tokens[pos].type === 'RPAREN') {
+              pos++;
+            }
+            switch (name) {
+              case 'sqrt': return arg < 0 ? null : Math.sqrt(arg);
+              case 'abs': return Math.abs(arg);
+              case 'round': return Math.round(arg);
+              case 'floor': return Math.floor(arg);
+              case 'ceil': return Math.ceil(arg);
+              case 'sin': return Math.sin((arg * Math.PI) / 180);
+              case 'cos': return Math.cos((arg * Math.PI) / 180);
+              case 'tan': return Math.tan((arg * Math.PI) / 180);
+              case 'log': return arg <= 0 ? null : Math.log10(arg);
+              case 'ln': return arg <= 0 ? null : Math.log(arg);
+              default: return null;
+            }
+          } else {
+            if (name === 'pi' || name === 'π') return Math.PI;
+            if (name === 'e') return Math.E;
+            return null;
+          }
+        }
+
+        return null;
+      }
+
+      const res = parseExpr();
+      if (res === null || !isFinite(res)) return null;
+      return res;
     }
 
-    // ==========================================================================
-    // WINDOW & THEME TOGGLES
-    // ==========================================================================
-    function toggleProtonSearch(force) {
-      const isOpen = force !== undefined ? force : !searchModal.classList.contains('is-open');
-      if (isOpen) {
+    // Navigation State
+    let currentScope = 'all';
+    let currentSearchQuery = '';
+    let selectedResultIndex = 0;
+    let filteredResults = [];
+    let isActionMode = false;
+    let selectedActionIndex = 0;
+    let isPreviewVisible = true;
+
+    const spotlightInput = document.getElementById('spotlightInput');
+    const searchModal = document.getElementById('searchModal');
+    const launcherCard = document.getElementById('launcherCard');
+    const resultsRowsContainer = document.getElementById('resultsRowsContainer');
+    const calculatorHeroContainer = document.getElementById('calculatorHeroContainer');
+    const calcHeroExpr = document.getElementById('calcHeroExpr');
+    const calcHeroVal = document.getElementById('calcHeroVal');
+    const actionDeck = document.getElementById('actionDeck');
+    const actionDeckList = document.getElementById('actionDeckList');
+    const inputScopeTag = document.getElementById('inputScopeTag');
+    const inputScopeLabel = document.getElementById('inputScopeLabel');
+
+    function toggleProtonSearch(forcedState) {
+      const willOpen = forcedState !== undefined ? forcedState : !searchModal.classList.contains('is-open');
+      if (willOpen) {
         searchModal.classList.add('is-open');
-        setTimeout(() => spotlightInput?.focus(), 80);
+        spotlightInput.focus();
+        spotlightInput.select();
+        renderResults();
       } else {
         searchModal.classList.remove('is-open');
         exitActionMode();
@@ -1530,143 +2929,70 @@
     }
 
     function handleSearchBackdrop(e) {
-      if (e.target === searchModal) toggleProtonSearch(false);
-    }
-
-    function setLauncherPosition(pos, btn) {
-      document.body.setAttribute('data-launcher-pos', pos);
-      document.querySelectorAll('.demo-toolbar-group:nth-child(1) .demo-pill-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    }
-
-    function setTheme(theme, btn) {
-      document.body.setAttribute('data-theme', theme);
-      document.querySelectorAll('.demo-toolbar-group:nth-child(3) .demo-pill-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    }
-
-    function setWallpaper(wp, btn) {
-      const el = document.getElementById('wallpaperEl');
-      el.className = 'desktop-wallpaper wallpaper-' + wp;
-      document.querySelectorAll('.demo-toolbar-group:nth-child(5) .demo-pill-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    }
-
-    function togglePreviewPane() {
-      launcherCard.classList.toggle('with-preview');
-    }
-
-    function escapeHtml(text) {
-      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-
-    function highlightMatch(text, query) {
-      if (!query) return escapeHtml(text);
-      const safeQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`(${safeQ})`, 'gi');
-      return escapeHtml(text).replace(regex, '<span class="ps-match-hl">$1</span>');
-    }
-
-    // ==========================================================================
-    // SCOPE & PREFIX FILTERING
-    // ==========================================================================
-    const scopeList = ['all', 'apps', 'files', 'git', 'tools'];
-    const scopeLabels = {
-      all: 'All',
-      apps: 'Apps',
-      files: 'Files & Code',
-      git: 'Git Tasks',
-      tools: 'System & Math'
-    };
-
-    function selectNavScope(scope, btn) {
-      activeScope = scope;
-      document.querySelectorAll('.nav-scope-pill').forEach(p => p.classList.remove('active'));
-      if (btn) {
-        btn.classList.add('active');
-      } else {
-        const foundBtn = document.querySelector(`.nav-scope-pill[data-scope="${scope}"]`);
-        if (foundBtn) foundBtn.classList.add('active');
+      if (e.target === searchModal) {
+        toggleProtonSearch(false);
       }
+    }
+
+    function selectNavScope(scope, pillEl) {
+      currentScope = scope;
+      document.querySelectorAll('.nav-scope-pill').forEach(p => p.classList.remove('active'));
+      if (pillEl) pillEl.classList.add('active');
 
       if (scope !== 'all') {
-        inputScopeTag.style.display = 'inline-flex';
-        inputScopeLabel.textContent = scopeLabels[scope] || scope;
+        inputScopeTag.style.display = 'flex';
+        inputScopeLabel.textContent = pillEl ? pillEl.querySelector('span:first-child').textContent : scope;
       } else {
         inputScopeTag.style.display = 'none';
       }
 
+      selectedResultIndex = 0;
       renderResults();
     }
 
     function clearActiveScope() {
-      selectNavScope('all');
+      selectNavScope('all', document.querySelector('.nav-scope-pill[data-scope="all"]'));
       spotlightInput.focus();
     }
 
-    function cycleNavScope(backward = false) {
-      const curIdx = scopeList.indexOf(activeScope);
-      const step = backward ? -1 : 1;
-      const nextIdx = (curIdx + step + scopeList.length) % scopeList.length;
-      const nextScope = scopeList[nextIdx];
-      selectNavScope(nextScope);
+    function cycleNavScope() {
+      const scopes = ['all', 'apps', 'files', 'git', 'tools'];
+      const curIdx = scopes.indexOf(currentScope);
+      const nextScope = scopes[(curIdx + 1) % scopes.length];
+      const pill = document.querySelector(`.nav-scope-pill[data-scope="${nextScope}"]`);
+      selectNavScope(nextScope, pill);
     }
 
-    // ==========================================================================
-    // SEARCH & RENDERING ENGINE
-    // ==========================================================================
-    function handleSearchInput(rawVal) {
-      let val = rawVal.trim();
+    function handleSearchInput(val) {
+      currentSearchQuery = val.trim();
+      const lower = currentSearchQuery.toLowerCase();
 
-      // Native Prefix detection
-      const prefixMap = {
+      const prefixes = {
         'app:': 'apps',
         'apps:': 'apps',
         'file:': 'files',
         'files:': 'files',
-        'code:': 'files',
         'git:': 'git',
-        'commits:': 'git',
         'todo:': 'git',
         'todos:': 'git',
-        'sys:': 'tools',
+        'commit:': 'git',
         'tool:': 'tools',
         'tools:': 'tools',
-        'calc:': 'tools',
         'math:': 'tools'
       };
 
-      for (const [prefix, scope] of Object.entries(prefixMap)) {
-        if (val.toLowerCase().startsWith(prefix)) {
-          val = val.substring(prefix.length).trim();
-          spotlightInput.value = val;
-          selectNavScope(scope);
+      for (const [pfx, scope] of Object.entries(prefixes)) {
+        if (lower.startsWith(pfx)) {
+          const remainder = val.slice(pfx.length).trim();
+          spotlightInput.value = remainder;
+          currentSearchQuery = remainder;
+          const pill = document.querySelector(`.nav-scope-pill[data-scope="${scope}"]`);
+          selectNavScope(scope, pill);
           return;
         }
       }
 
-      currentSearchQuery = val;
-
-      // Zero-Click Hero Calculator
-      const isMath = /[0-9\+\-\*\/\%]/.test(val) && !/[a-z]{3,}/i.test(val);
-      if (isMath && val.length >= 2) {
-        try {
-          let sanitized = val.replace(/%/g, "*0.01");
-          let evaluated = Function(`'use strict'; return (${sanitized})`)();
-          if (evaluated !== undefined && !isNaN(evaluated)) {
-            calcHeroContainer.style.display = 'block';
-            calcHeroExpr.textContent = val;
-            calcHeroVal.textContent = "= " + (Math.round(evaluated * 1000) / 1000);
-          } else {
-            calcHeroContainer.style.display = 'none';
-          }
-        } catch(e) {
-          calcHeroContainer.style.display = 'none';
-        }
-      } else {
-        calcHeroContainer.style.display = 'none';
-      }
-
+      selectedResultIndex = 0;
       renderResults();
     }
 
@@ -1674,410 +3000,335 @@
       const query = currentSearchQuery.toLowerCase();
       const allItems = Object.values(resultDatabase);
 
-      // Filter
-      const matchedItems = allItems.filter(item => {
-        const matchesScope = (activeScope === 'all' || item.cat === activeScope);
-        if (!matchesScope) return false;
+      let calcResult = null;
+      if (query.length > 0) {
+        calcResult = tryCalculate(query);
+      }
+
+      if (calcResult !== null) {
+        calculatorHeroContainer.style.display = 'block';
+        calcHeroExpr.textContent = currentSearchQuery;
+        calcHeroVal.textContent = '= ' + calcResult;
+      } else {
+        calculatorHeroContainer.style.display = 'none';
+      }
+
+      filteredResults = allItems.filter(item => {
+        if (currentScope !== 'all' && item.cat !== currentScope) return false;
         if (!query) return true;
-        return (
-          item.title.toLowerCase().includes(query) ||
-          item.path.toLowerCase().includes(query) ||
-          item.type.toLowerCase().includes(query)
-        );
+        return item.title.toLowerCase().includes(query) || 
+               item.path.toLowerCase().includes(query) ||
+               item.type.toLowerCase().includes(query);
       });
 
-      // Update Counts
-      const totalAll = allItems.filter(i => !query || i.title.toLowerCase().includes(query) || i.path.toLowerCase().includes(query)).length;
-      document.getElementById('count-all').textContent = totalAll;
-      ['apps', 'files', 'git', 'tools'].forEach(cat => {
-        const count = allItems.filter(i => i.cat === cat && (!query || i.title.toLowerCase().includes(query) || i.path.toLowerCase().includes(query))).length;
-        const el = document.getElementById(`count-${cat}`);
-        if (el) el.textContent = count;
-      });
-
-      // Update footer match count
-      document.getElementById('footerMatchCount').textContent = `ProtonSearch · ${matchedItems.length} matches · 0.4 ms`;
-
-      // If selected item is not in matched list, select first matched
-      if (!matchedItems.some(i => i.id === currentSelectedId) && matchedItems.length > 0) {
-        currentSelectedId = matchedItems[0].id;
+      if (selectedResultIndex >= filteredResults.length) {
+        selectedResultIndex = Math.max(0, filteredResults.length - 1);
       }
 
-      // Group by category sections
-      const sections = [
-        { key: 'apps', name: 'Applications' },
-        { key: 'files', name: 'Files & Code (FTS5)' },
-        { key: 'git', name: 'Git Tasks & Commits' },
-        { key: 'tools', name: 'System & Math Actions' }
-      ];
+      resultsRowsContainer.innerHTML = '';
 
-      let html = '';
-      let visibleIndex = 1;
-
-      sections.forEach(sec => {
-        const secItems = matchedItems.filter(i => i.cat === sec.key);
-        if (secItems.length === 0) return;
-
-        html += `
-          <div class="ps-section-header" data-section="${sec.key}">
-            <span>${sec.name}</span>
-            <span class="ps-jump-hint">Ctrl+↓ Jump</span>
+      if (filteredResults.length === 0 && calcResult === null) {
+        resultsRowsContainer.innerHTML = `
+          <div style="padding:40px 20px; text-align:center; color:var(--text-tertiary);">
+            <svg class="icon" style="width:32px; height:32px; margin-bottom:8px; opacity:0.4;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <div style="font-size:13px; font-weight:600; color:var(--text-secondary);">No results found</div>
+            <div style="font-size:11px; margin-top:2px;">Try broadening your query or switching categories</div>
           </div>
         `;
-
-        secItems.forEach(item => {
-          const isSelected = item.id === currentSelectedId;
-          const numBadgeHtml = (visibleIndex <= 6)
-            ? `<kbd class="ps-num-badge" onclick="event.stopPropagation(); openByNumber(${visibleIndex})">Alt ${visibleIndex}</kbd>`
-            : '';
-
-          html += `
-            <div class="ps-result-row ${isSelected ? 'is-selected' : ''}" 
-                 data-id="${item.id}" 
-                 data-cat="${item.cat}" 
-                 data-num="${visibleIndex}"
-                 onclick="selectResult('${item.id}')"
-                 ondblclick="triggerPrimaryAction('${item.id}')">
-              <div class="ps-item-icon" style="background:${item.badgeBg};">
-                ${item.iconSvg}
-              </div>
-              <div class="ps-item-copy">
-                <b>${highlightMatch(item.title, query)}</b>
-                <small>${highlightMatch(item.path, query)}</small>
-              </div>
-              <div class="ps-row-right">
-                <span class="ps-item-badge" style="color:${item.badgeColor}; background:${item.badgeBg};" onclick="event.stopPropagation(); selectNavScope('${item.cat}')">${item.type}</span>
-                ${numBadgeHtml}
-                <span class="ps-drill-arrow" onclick="event.stopPropagation(); enterActionMode()">→</span>
-              </div>
-            </div>
-          `;
-          visibleIndex++;
-        });
-      });
-
-      if (matchedItems.length === 0) {
-        html = `
-          <div style="padding: 32px 16px; text-align: center; color: var(--text-tertiary);">
-            <div style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">No matching results</div>
-            <div style="font-size: 11px;">Try typing a different keyword or press <kbd style="padding:1px 4px; background:rgba(255,255,255,0.1); border-radius:3px;">Esc</kbd> to clear filter</div>
-          </div>
-        `;
+        document.getElementById('footerMatchCount').textContent = 'ProtonSearch · 0 matches';
+        return;
       }
 
-      resultsRowsContainer.innerHTML = html;
+      document.getElementById('footerMatchCount').textContent = `ProtonSearch · ${filteredResults.length} matches · 0.4 ms`;
 
-      // Update details
-      const selectedItem = resultDatabase[currentSelectedId] || matchedItems[0];
-      if (selectedItem) {
-        updatePreviewAndActions(selectedItem);
+      filteredResults.forEach((item, index) => {
+        const isSelected = index === selectedResultIndex;
+        const row = document.createElement('div');
+        row.className = 'ps-result-row' + (isSelected ? ' is-selected' : '');
+        row.id = 'ps-row-' + index;
+        row.onclick = () => { selectResult(index); triggerPrimaryAction(); };
+        row.onmousemove = () => { if (selectedResultIndex !== index) selectResult(index, false); };
+
+        let displayTitle = item.title;
+        let displayPath = item.path;
+        if (query) {
+          const regex = new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
+          displayTitle = displayTitle.replace(regex, '<span class="ps-match-hl">$1</span>');
+          displayPath = displayPath.replace(regex, '<span class="ps-match-hl">$1</span>');
+        }
+
+        row.innerHTML = `
+          <div class="ps-item-icon">${item.iconSvg}</div>
+          <div class="ps-item-copy">
+            <b>${displayTitle}</b>
+            <small>${displayPath}</small>
+          </div>
+          <div class="ps-row-right">
+            <span class="ps-item-badge">${item.type}</span>
+            <span class="ps-item-jump-badge">Alt+${index + 1}</span>
+          </div>
+        `;
+        resultsRowsContainer.appendChild(row);
+      });
+
+      updatePreviewPane();
+    }
+
+    function selectResult(index, scrollIntoView = true) {
+      if (index < 0 || index >= filteredResults.length) return;
+      selectedResultIndex = index;
+      document.querySelectorAll('.ps-result-row').forEach((r, idx) => {
+        r.classList.toggle('is-selected', idx === selectedResultIndex);
+      });
+
+      if (scrollIntoView) {
+        const selectedEl = document.getElementById('ps-row-' + selectedResultIndex);
+        if (selectedEl) {
+          selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
+      updatePreviewPane();
+    }
+
+    function navigateResults(delta) {
+      if (isActionMode) {
+        navigateActionDeck(delta);
+        return;
+      }
+      if (filteredResults.length === 0) return;
+      const newIdx = (selectedResultIndex + delta + filteredResults.length) % filteredResults.length;
+      selectResult(newIdx);
+    }
+
+    function openByNumber(num) {
+      const targetIdx = num - 1;
+      if (targetIdx >= 0 && targetIdx < filteredResults.length) {
+        selectResult(targetIdx);
+        const row = document.getElementById('ps-row-' + targetIdx);
+        if (row) {
+          row.classList.add('pulse-jump');
+          setTimeout(() => {
+            row.classList.remove('pulse-jump');
+            triggerPrimaryAction();
+          }, 180);
+        } else {
+          triggerPrimaryAction();
+        }
       }
     }
 
-    function selectResult(id) {
-      const item = resultDatabase[id];
+    function updatePreviewPane() {
+      const item = filteredResults[selectedResultIndex];
       if (!item) return;
 
-      currentSelectedId = id;
-
-      document.querySelectorAll('.ps-result-row').forEach(row => {
-        row.classList.toggle('is-selected', row.getAttribute('data-id') === id);
-      });
-
-      updatePreviewAndActions(item);
-    }
-
-    function updatePreviewAndActions(item) {
+      document.getElementById('prevIcon').innerHTML = item.iconSvg;
       document.getElementById('prevTitle').textContent = item.title;
       document.getElementById('prevPath').textContent = item.path;
-      document.getElementById('prevSize').textContent = item.size;
-      document.getElementById('prevMod').textContent = item.mod;
-      document.getElementById('prevIcon').innerHTML = item.iconSvg;
-      document.getElementById('actionDeckItemName').textContent = item.title;
-
-      const codeBox = document.getElementById('prevCodeBox');
-      if (codeBox) {
-        codeBox.innerHTML = escapeHtml(item.code).replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
-      }
-
-      // Populate Action Deck
-      let actionHtml = '';
-      if (item.actions && item.actions.length > 0) {
-        item.actions.forEach((act, idx) => {
-          actionHtml += `
-            <div class="action-deck-row ${idx === selectedActionIdx ? 'is-selected' : ''}" 
-                 data-idx="${idx}"
-                 onclick="triggerActionByIndex(${idx})">
-              <span>${escapeHtml(act.name)}</span>
-              <kbd>${act.kbd}</kbd>
-            </div>
-          `;
-        });
-      }
-      actionDeckList.innerHTML = actionHtml;
+      document.getElementById('prevCodeBox').textContent = item.code || item.path;
+      document.getElementById('prevSize').textContent = item.size || 'Regular';
+      document.getElementById('prevMod').textContent = item.mod || 'Indexed';
     }
 
-    // ==========================================================================
-    // ACTION EXECUTION DISPATCHERS
-    // ==========================================================================
-    function triggerPrimaryAction(targetId) {
-      const id = targetId || currentSelectedId;
-      const item = resultDatabase[id];
-      if (!item) return;
-
-      if (item.cat === 'apps') {
-        showToast(`⚡ Launching ${item.title}...`);
-      } else if (item.cat === 'files') {
-        showToast(`📄 Opening ${item.title} in editor...`);
-      } else if (item.cat === 'git') {
-        showToast(`🌿 Navigating to ${item.title}...`);
-      } else {
-        showToast(`⚙️ Executed: ${item.title}`);
-      }
-      exitActionMode();
+    function togglePreviewPane() {
+      isPreviewVisible = !isPreviewVisible;
+      launcherCard.classList.toggle('with-preview', isPreviewVisible);
+      showToast(isPreviewVisible ? 'Preview pane enabled' : 'Preview pane minimized');
     }
 
-    function triggerSecondaryAction(targetId) {
-      const id = targetId || currentSelectedId;
-      const item = resultDatabase[id];
-      if (!item) return;
-
-      showToast(`📂 Revealed in File Explorer: ${item.path}`);
-      exitActionMode();
-    }
-
-    function copyCurrentPath() {
-      const item = resultDatabase[currentSelectedId];
-      if (!item) return;
-      showToast(`✓ Copied path: ${item.path}`);
-    }
-
-    function copyCurrentName() {
-      const item = resultDatabase[currentSelectedId];
-      if (!item) return;
-      showToast(`✓ Copied name: ${item.title}`);
-    }
-
-    function pinToDock() {
-      const item = resultDatabase[currentSelectedId];
-      if (!item) return;
-      showToast(`📌 Pinned "${item.title}" to ProtonDock Rail`);
-      exitActionMode();
-    }
-
-    function copyCalculatorResult() {
-      const val = calcHeroVal.textContent.replace('= ', '');
-      showToast(`✓ Copied "${val}" to clipboard`);
-    }
-
-    // 1. Direct Number Key Access (Alt + 1..6)
-    function openByNumber(num) {
-      const visibleRows = Array.from(document.querySelectorAll('.ps-result-row'));
-      const targetRow = visibleRows.find(r => r.getAttribute('data-num') === String(num));
-      if (targetRow) {
-        const id = targetRow.getAttribute('data-id');
-        selectResult(id);
-        targetRow.classList.add('pulse-jump');
-        setTimeout(() => targetRow.classList.remove('pulse-jump'), 350);
-        triggerPrimaryAction(id);
-      }
-    }
-
-    // 2. Action Drill-Down Navigation (Right Arrow or Ctrl+K)
     function enterActionMode() {
+      const item = filteredResults[selectedResultIndex];
+      if (!item) return;
+
       isActionMode = true;
-      selectedActionIdx = 0;
-      launcherCard.classList.add('in-action-mode');
-      const item = resultDatabase[currentSelectedId];
-      if (item) updatePreviewAndActions(item);
+      selectedActionIndex = 0;
+      document.getElementById('actionDeckItemName').textContent = item.title + ' - Actions';
+      actionDeck.classList.add('is-open');
+      renderActionDeck(item);
     }
 
     function exitActionMode() {
       isActionMode = false;
-      launcherCard.classList.remove('in-action-mode');
+      actionDeck.classList.remove('is-open');
+      spotlightInput.focus();
     }
 
-    function triggerActionByIndex(idx) {
-      const item = resultDatabase[currentSelectedId];
-      if (item && item.actions && item.actions[idx]) {
-        item.actions[idx].fn();
+    function renderActionDeck(item) {
+      actionDeckList.innerHTML = '';
+      item.actions.forEach((act, idx) => {
+        const isSel = idx === selectedActionIndex;
+        const row = document.createElement('div');
+        row.className = 'action-deck-row' + (isSel ? ' is-selected' : '');
+        row.innerHTML = `
+          <span>${act.name}</span>
+          <kbd>${act.kbd}</kbd>
+        `;
+        row.onclick = () => {
+          act.fn();
+          exitActionMode();
+        };
+        actionDeckList.appendChild(row);
+      });
+    }
+
+    function navigateActionDeck(delta) {
+      const item = filteredResults[selectedResultIndex];
+      if (!item || !item.actions) return;
+      selectedActionIndex = (selectedActionIndex + delta + item.actions.length) % item.actions.length;
+      document.querySelectorAll('.action-deck-row').forEach((r, idx) => {
+        r.classList.toggle('is-selected', idx === selectedActionIndex);
+      });
+    }
+
+    function triggerPrimaryAction(targetId) {
+      const item = targetId ? resultDatabase[targetId] : filteredResults[selectedResultIndex];
+      if (!item) return;
+      if (item.actions && item.actions[0]) {
+        item.actions[0].fn();
+      } else {
+        showToast('Launched: ' + item.title);
       }
-      exitActionMode();
     }
 
-    // 3. Section Jumping (Ctrl+Down / Ctrl+Up)
-    function jumpSection(direction) {
-      const visibleHeaders = Array.from(document.querySelectorAll('.ps-section-header'));
-      if (!visibleHeaders.length) return;
-
-      const currentRow = document.querySelector('.ps-result-row.is-selected');
-      const curCat = currentRow?.getAttribute('data-cat') || 'apps';
-      const curIdx = visibleHeaders.findIndex(s => s.getAttribute('data-section') === curCat);
-
-      let targetIdx = (curIdx + direction + visibleHeaders.length) % visibleHeaders.length;
-      const targetSec = visibleHeaders[targetIdx].getAttribute('data-section');
-
-      const targetRow = Array.from(document.querySelectorAll('.ps-result-row')).find(r => r.getAttribute('data-cat') === targetSec);
-      if (targetRow) {
-        selectResult(targetRow.getAttribute('data-id'));
-        targetRow.scrollIntoView({ block: 'nearest' });
-      }
+    function triggerSecondaryAction(targetId) {
+      const item = targetId ? resultDatabase[targetId] : filteredResults[selectedResultIndex];
+      if (!item) return;
+      showToast('Revealed in Explorer: ' + item.title);
     }
 
-    // Helper for navigation
-    function navigateResults(direction) {
-      const visibleRows = Array.from(document.querySelectorAll('.ps-result-row'));
-      if (!visibleRows.length) return;
-      const curIdx = visibleRows.findIndex(r => r.classList.contains('is-selected'));
-      let nextIdx = (curIdx + direction + visibleRows.length) % visibleRows.length;
-      selectResult(visibleRows[nextIdx].getAttribute('data-id'));
-      visibleRows[nextIdx].scrollIntoView({ block: 'nearest' });
+    function copyCurrentPath() {
+      const item = filteredResults[selectedResultIndex];
+      if (!item) return;
+      navigator.clipboard?.writeText(item.path).catch(() => {});
+      showToast('Copied path to clipboard');
     }
 
-    // ==========================================================================
-    // GLOBAL KEYBOARD NAVIGATION DISPATCHER
-    // ==========================================================================
+    function copyCurrentName() {
+      const item = filteredResults[selectedResultIndex];
+      if (!item) return;
+      navigator.clipboard?.writeText(item.title).catch(() => {});
+      showToast('Copied name: ' + item.title);
+    }
+
+    function pinToDock() {
+      const item = filteredResults[selectedResultIndex];
+      if (!item) return;
+      showToast('Pinned to ProtonDock: ' + item.title);
+    }
+
+    function copyCalculatorResult() {
+      const val = calcHeroVal.textContent.replace('= ', '').trim();
+      navigator.clipboard?.writeText(val).catch(() => {});
+      showToast('Copied "' + val + '" to clipboard');
+      spotlightInput.value = val;
+      currentSearchQuery = val;
+      spotlightInput.focus();
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('psToast');
+      const toastMsg = document.getElementById('psToastMsg');
+      if (!toast || !toastMsg) return;
+      toastMsg.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2200);
+    }
+
+    // Global Keyboard Listeners
     window.addEventListener('keydown', (e) => {
-      // Global toggle
-      if (e.altKey && (e.code === 'Space' || e.key === ' ')) {
+      // Toggle Launcher (Alt + Space)
+      if (e.altKey && e.code === 'Space') {
         e.preventDefault();
         toggleProtonSearch();
         return;
       }
 
-      if (!searchModal.classList.contains('is-open')) return;
-
-      // 1. Direct Number Key Access: Alt + 1..6
-      if (e.altKey && e.key >= '1' && e.key <= '6') {
+      // Quick number jumps (Alt + 1..6)
+      if (e.altKey && e.key >= '1' && e.key <= '6' && searchModal.classList.contains('is-open')) {
         e.preventDefault();
         openByNumber(parseInt(e.key, 10));
         return;
       }
 
-      // 2. Escape Priority: Action Mode -> Clear Query -> Close Launcher
       if (e.key === 'Escape') {
-        e.preventDefault();
+        if (customizerModal.classList.contains('is-open')) {
+          closeCustomizerModal();
+          return;
+        }
         if (isActionMode) {
           exitActionMode();
-        } else if (spotlightInput.value.length > 0) {
-          spotlightInput.value = '';
-          handleSearchInput('');
-        } else if (activeScope !== 'all') {
-          clearActiveScope();
-        } else {
-          toggleProtonSearch(false);
+          return;
         }
+        if (searchModal.classList.contains('is-open')) {
+          toggleProtonSearch(false);
+          return;
+        }
+      }
+
+      if (!searchModal.classList.contains('is-open')) return;
+
+      if (e.ctrlKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (isActionMode) exitActionMode();
+        else enterActionMode();
         return;
       }
 
-      // 3. Right Arrow: Drill down into Action Deck
-      if (e.key === 'ArrowRight' && !isActionMode) {
-        e.preventDefault();
+      if (e.key === 'ArrowRight' && !isActionMode && spotlightInput.selectionStart === spotlightInput.value.length) {
         enterActionMode();
         return;
       }
 
-      // 4. Left Arrow: Return from Action Deck
       if (e.key === 'ArrowLeft' && isActionMode) {
-        e.preventDefault();
         exitActionMode();
         return;
       }
 
-      // 5. Ctrl + K: Toggle Action Deck
-      if (e.ctrlKey && (e.key === 'k' || e.key === 'K')) {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (isActionMode) exitActionMode(); else enterActionMode();
+        navigateResults(1);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        navigateResults(-1);
         return;
       }
 
-      // 6. Secondary Action: Ctrl + Enter
-      if (e.ctrlKey && e.key === 'Enter') {
-        e.preventDefault();
-        triggerSecondaryAction();
-        return;
-      }
-
-      // 7. Clipboard Shortcuts: Ctrl + C / Ctrl + Shift + C
-      if (e.ctrlKey && (e.key === 'c' || e.key === 'C') && !window.getSelection().toString()) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          copyCurrentName();
-        } else {
-          copyCurrentPath();
-        }
-        return;
-      }
-
-      // 8. Section Jumping: Ctrl + Down / Ctrl + Up
-      if (e.ctrlKey && e.key === 'ArrowDown') {
-        e.preventDefault();
-        jumpSection(1);
-        return;
-      }
-      if (e.ctrlKey && e.key === 'ArrowUp') {
-        e.preventDefault();
-        jumpSection(-1);
-        return;
-      }
-
-      // 9. Tab / Shift + Tab: Cycle Scopes
       if (e.key === 'Tab') {
         e.preventDefault();
-        cycleNavScope(e.shiftKey);
+        cycleNavScope();
         return;
       }
 
-      // 10. Space: Quick Look Preview
-      if (e.code === 'Space' && (e.ctrlKey || spotlightInput.value === '')) {
+      if (e.code === 'Space' && (e.ctrlKey || document.activeElement !== spotlightInput)) {
         e.preventDefault();
         togglePreviewPane();
         return;
       }
 
-      // 11. Backspace: Dissolve Active Scope if input empty
-      if (e.key === 'Backspace' && spotlightInput.value === '' && activeScope !== 'all') {
-        e.preventDefault();
-        clearActiveScope();
-        return;
-      }
-
-      // 12. Arrow & Home-row Navigation: Down (↓, Ctrl+N, Ctrl+J) & Up (↑, Ctrl+P)
-      const isDownKey = e.key === 'ArrowDown' || (e.ctrlKey && (e.key === 'n' || e.key === 'j'));
-      const isUpKey = e.key === 'ArrowUp' || (e.ctrlKey && e.key === 'p');
-
-      if (isDownKey || isUpKey) {
-        e.preventDefault();
-        if (isActionMode) {
-          const actionRows = Array.from(document.querySelectorAll('.action-deck-row'));
-          if (actionRows.length) {
-            selectedActionIdx = isDownKey 
-              ? (selectedActionIdx + 1) % actionRows.length 
-              : (selectedActionIdx - 1 + actionRows.length) % actionRows.length;
-            actionRows.forEach((r, idx) => r.classList.toggle('is-selected', idx === selectedActionIdx));
-          }
-        } else {
-          navigateResults(isDownKey ? 1 : -1);
-        }
-        return;
-      }
-
-      // 13. Enter Key: Open or execute
       if (e.key === 'Enter') {
         e.preventDefault();
         if (isActionMode) {
-          triggerActionByIndex(selectedActionIdx);
-        } else if (calcHeroContainer.style.display !== 'none') {
+          const item = filteredResults[selectedResultIndex];
+          if (item && item.actions[selectedActionIndex]) {
+            item.actions[selectedActionIndex].fn();
+            exitActionMode();
+          }
+        } else if (calculatorHeroContainer.style.display !== 'none' && currentSearchQuery.length > 0) {
           copyCalculatorResult();
+        } else if (e.ctrlKey) {
+          triggerSecondaryAction();
         } else {
           triggerPrimaryAction();
         }
       }
     });
 
-    // Default Initialization
     renderResults();
-    selectResult('vscode');
   </script>
 </body>
 </html>

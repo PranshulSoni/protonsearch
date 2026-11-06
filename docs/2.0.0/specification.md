@@ -49,6 +49,7 @@ localization are release requirements.
 R15. Hundreds of widgets are an ecosystem goal. Launch inventory is a focused set of
 first-party widgets; public executable extensions come later.
 R16. Offline/error/stale/permission/hardware-absent states are designed for each provider.
+R17. In-process mathematical evaluation is an authoritative first-class capability of the launcher search bar. It evaluates arithmetic, percentage shorthand, trigonometric/logarithmic functions, and constants with zero latency and direct clipboard copying.
 
 ## Architecture
 
