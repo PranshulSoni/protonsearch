@@ -3,44 +3,45 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ProtonDock — macOS Tahoe / Glassmorphic Design Preview</title>
+  <title>ProtonDock — macOS Tahoe Squircle Glass Preview</title>
   <style>
     /* ==========================================================================
-       DESIGN TOKENS & SYSTEM VARIABLES (macOS Tahoe / Next-Gen Glassmorphism)
+       DESIGN TOKENS & SYSTEM VARIABLES (macOS Tahoe / Squircle Glass)
        ========================================================================== */
     :root {
-      /* Dimensions */
-      --dock-height: 82px;
+      /* Dimensions: Squary & Roundy Proportions */
+      --dock-height: 84px;
       --dock-padding: 8px 12px;
-      --dock-radius: 28px;
-      --tile-height: 64px;
-      --tile-radius: 16px;
-      --icon-size: 42px;
-      --gap: 8px;
+      --dock-radius: 30px;
+      
+      /* Standard Squircle Widget Tile */
+      --tile-size: 64px;       /* Uniform 1:1 squircle aspect ratio */
+      --tile-radius: 20px;     /* Deep smooth continuous squircle radius */
+      --gap: 9px;
 
       /* Tahoe Dark Glass (Default) */
-      --glass-base: rgba(18, 22, 28, 0.62);
-      --glass-surface: rgba(255, 255, 255, 0.05);
-      --glass-surface-hover: rgba(255, 255, 255, 0.10);
-      --glass-surface-active: rgba(255, 255, 255, 0.16);
-      --glass-border: rgba(255, 255, 255, 0.14);
+      --glass-base: rgba(18, 22, 28, 0.65);
+      --glass-surface: rgba(255, 255, 255, 0.06);
+      --glass-surface-hover: rgba(255, 255, 255, 0.12);
+      --glass-surface-active: rgba(255, 255, 255, 0.18);
+      --glass-border: rgba(255, 255, 255, 0.15);
       --glass-border-subtle: rgba(255, 255, 255, 0.08);
-      --glass-top-highlight: rgba(255, 255, 255, 0.32);
-      --glass-blur: blur(44px) saturate(210%) contrast(104%);
+      --glass-top-highlight: rgba(255, 255, 255, 0.35);
+      --glass-blur: blur(48px) saturate(210%) contrast(104%);
       --glass-shadow: 
-        0 26px 64px -12px rgba(0, 0, 0, 0.55),
-        0 8px 24px -4px rgba(0, 0, 0, 0.35),
+        0 28px 70px -10px rgba(0, 0, 0, 0.58),
+        0 10px 28px -4px rgba(0, 0, 0, 0.38),
         inset 0 1.5px 0 0 var(--glass-top-highlight),
         inset 0 0 0 1px var(--glass-border);
 
       /* Typography & Accents */
-      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
       --text-primary: rgba(255, 255, 255, 0.96);
       --text-secondary: rgba(255, 255, 255, 0.62);
       --text-tertiary: rgba(255, 255, 255, 0.40);
       --accent: #5ef1c2; /* Tahoe Mint / Sage */
       --accent-glow: rgba(94, 241, 194, 0.45);
-      --accent-bg: rgba(94, 241, 194, 0.15);
+      --accent-bg: rgba(94, 241, 194, 0.16);
       --indicator-color: #5ef1c2;
       --indicator-glow: 0 0 8px #5ef1c2;
 
@@ -50,18 +51,18 @@
       --trans-layout: 280ms var(--spring-ease);
     }
 
-    /* Theme Variations */
+    /* Light Glacier Theme */
     body[data-theme="light"] {
-      --glass-base: rgba(246, 248, 252, 0.68);
-      --glass-surface: rgba(0, 0, 0, 0.04);
-      --glass-surface-hover: rgba(0, 0, 0, 0.08);
-      --glass-surface-active: rgba(0, 0, 0, 0.12);
-      --glass-border: rgba(255, 255, 255, 0.85);
-      --glass-border-subtle: rgba(0, 0, 0, 0.08);
-      --glass-top-highlight: rgba(255, 255, 255, 0.95);
+      --glass-base: rgba(246, 248, 252, 0.70);
+      --glass-surface: rgba(0, 0, 0, 0.045);
+      --glass-surface-hover: rgba(0, 0, 0, 0.085);
+      --glass-surface-active: rgba(0, 0, 0, 0.13);
+      --glass-border: rgba(255, 255, 255, 0.90);
+      --glass-border-subtle: rgba(0, 0, 0, 0.09);
+      --glass-top-highlight: rgba(255, 255, 255, 0.98);
       --glass-shadow: 
-        0 24px 56px -10px rgba(24, 38, 62, 0.18),
-        0 8px 20px -4px rgba(24, 38, 62, 0.10),
+        0 26px 60px -10px rgba(24, 38, 62, 0.18),
+        0 10px 24px -4px rgba(24, 38, 62, 0.10),
         inset 0 1.5px 0 0 var(--glass-top-highlight),
         inset 0 0 0 1px var(--glass-border);
       --text-primary: rgba(14, 20, 28, 0.94);
@@ -74,12 +75,13 @@
       --indicator-glow: 0 0 6px rgba(0, 122, 255, 0.5);
     }
 
+    /* Aurora Theme */
     body[data-theme="aurora"] {
-      --glass-base: rgba(18, 14, 34, 0.62);
-      --glass-surface: rgba(186, 155, 255, 0.07);
-      --glass-surface-hover: rgba(186, 155, 255, 0.14);
-      --glass-border: rgba(210, 190, 255, 0.22);
-      --glass-top-highlight: rgba(240, 230, 255, 0.45);
+      --glass-base: rgba(20, 15, 36, 0.65);
+      --glass-surface: rgba(186, 155, 255, 0.08);
+      --glass-surface-hover: rgba(186, 155, 255, 0.15);
+      --glass-border: rgba(210, 190, 255, 0.24);
+      --glass-top-highlight: rgba(240, 230, 255, 0.50);
       --accent: #bf7af0;
       --accent-glow: rgba(191, 122, 240, 0.45);
       --accent-bg: rgba(191, 122, 240, 0.18);
@@ -87,16 +89,13 @@
       --indicator-glow: 0 0 8px #d18bf7;
     }
 
-    /* Style Mode: Lines vs Capsules */
-    body[data-mode="lines"] .widget-tile {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-    }
-    body[data-mode="lines"] .widget-tile:not(:first-child) {
-      border-left: 1px solid var(--glass-border-subtle) !important;
-      border-radius: 0 !important;
-    }
+    /* Comparison Toggle: Rectangles vs Squary */
+    body[data-shape="rect"] .widget-tile.tile-search { width: 175px !important; }
+    body[data-shape="rect"] .widget-tile.tile-clock { width: 110px !important; }
+    body[data-shape="rect"] .widget-tile.tile-weather { width: 120px !important; }
+    body[data-shape="rect"] .widget-tile.tile-system { width: 115px !important; }
+    body[data-shape="rect"] .widget-tile.tile-media { width: 165px !important; }
+    body[data-shape="rect"] .widget-tile { border-radius: 14px !important; }
 
     /* ==========================================================================
        RESET & BASE LAYOUT
@@ -118,7 +117,7 @@
       position: relative;
     }
 
-    /* Wallpaper Canvas with Real Dynamic Textures */
+    /* Dynamic Wallpaper Canvas */
     .desktop-wallpaper {
       position: absolute;
       inset: 0;
@@ -143,7 +142,7 @@
       background: radial-gradient(circle at 50% 0%, #e2ecf7 0%, #cadcf0 45%, #9cbcdb 100%);
     }
 
-    /* Ambient Desktop Details */
+    /* Ambient Desktop Header */
     .desktop-hint {
       position: absolute;
       top: 80px;
@@ -164,12 +163,12 @@
       font-size: 13px;
       color: var(--text-secondary);
       text-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      max-width: 580px;
+      max-width: 600px;
       line-height: 1.5;
     }
 
     /* ==========================================================================
-       CONTROL BAR (DEMO CONTROLS AT TOP)
+       DEMO CONTROLS TOOLBAR
        ========================================================================== */
     .demo-toolbar {
       position: absolute;
@@ -230,7 +229,7 @@
     }
 
     /* ==========================================================================
-       THE PROTONDOCK STAGE (macOS Tahoe Glass Container)
+       THE PROTONDOCK STAGE (macOS Tahoe Squircle Glass Rail)
        ========================================================================== */
     .dock-stage {
       position: absolute;
@@ -241,11 +240,9 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
       max-width: calc(100vw - 32px);
     }
 
-    /* Dock Outer Shell */
     .dock-rail {
       position: relative;
       height: var(--dock-height);
@@ -260,50 +257,49 @@
       transition: width var(--trans-layout), padding var(--trans-layout);
     }
 
-    /* Refractive Specular Gradient Sheen along top rim */
+    /* Specular Refractive Top Rim */
     .dock-rail::before {
       content: "";
       position: absolute;
       top: 0;
-      left: 20px;
-      right: 20px;
+      left: 24px;
+      right: 24px;
       height: 1.5px;
-      background: linear-gradient(90deg, transparent, var(--glass-top-highlight) 30%, var(--glass-top-highlight) 70%, transparent);
+      background: linear-gradient(90deg, transparent, var(--glass-top-highlight) 25%, var(--glass-top-highlight) 75%, transparent);
       border-radius: 999px;
       pointer-events: none;
     }
 
-    /* Segment Dividers inside Dock */
+    /* Vertical Divider */
     .dock-divider {
       width: 1px;
-      height: 44px;
+      height: 40px;
       background: var(--glass-border-subtle);
-      margin: 0 2px;
+      margin: 0 1px;
       flex-shrink: 0;
     }
 
     /* ==========================================================================
-       DOCK TILES & SLOTS (Interactive Components)
+       SQUARISH & ROUNDY WIDGET TILES (macOS Tahoe Pebble Style)
        ========================================================================== */
     .dock-slot {
       position: relative;
       display: flex;
       align-items: center;
-      height: var(--tile-height);
-      border-radius: var(--tile-radius);
-      transition: transform var(--trans-hover), background var(--trans-hover);
+      height: var(--tile-size);
     }
 
-    /* General Widget Tile in Tahoe Style */
+    /* Base Squircle Tile */
     .widget-tile {
-      height: var(--tile-height);
+      width: var(--tile-size);
+      height: var(--tile-size);
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
       border-radius: var(--tile-radius);
       display: flex;
+      flex-direction: column;
       align-items: center;
-      padding: 0 12px;
-      gap: 10px;
+      justify-content: center;
       cursor: pointer;
       position: relative;
       overflow: hidden;
@@ -313,19 +309,215 @@
     .widget-tile:hover {
       background: var(--glass-surface-hover);
       border-color: var(--glass-border);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+      transform: translateY(-4px) scale(1.04);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28), inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
     }
     .widget-tile:active {
-      transform: translateY(0) scale(0.98);
+      transform: translateY(0) scale(0.96);
       background: var(--glass-surface-active);
     }
 
-    /* App Launcher Icons (Windows Start & Taskbar Apps) */
+    /* 1. Windows Start Menu Squircle */
+    .tile-start {
+      background: linear-gradient(135deg, rgba(0, 120, 212, 0.24), var(--glass-surface));
+      border-color: rgba(0, 120, 212, 0.35);
+    }
+    .tile-start:hover {
+      box-shadow: 0 0 20px rgba(0, 120, 212, 0.45);
+    }
+
+    /* 2. ProtonSearch Squircle Tile */
+    .tile-search {
+      gap: 3px;
+    }
+    .search-lens-box {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+    }
+    .search-sub-tag {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: 0.03em;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: var(--glass-surface-active);
+    }
+
+    /* 3. Squarish Clock Widget */
+    .tile-clock {
+      padding: 6px;
+      gap: 3px;
+    }
+    .clock-main-digits {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+    .clock-pill-date {
+      font-size: 9.5px;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--glass-surface-active);
+      color: var(--accent);
+      border: 1px solid var(--glass-border-subtle);
+    }
+
+    /* 4. Squarish Weather Widget */
+    .tile-weather {
+      padding: 6px;
+      gap: 3px;
+    }
+    .weather-squircle-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffd166;
+    }
+    .weather-squircle-temp {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--text-primary);
+    }
+
+    /* 5. Squarish Hardware System Widget (CPU / RAM Dual Mini-Gauges) */
+    .tile-system {
+      padding: 8px 10px;
+      justify-content: space-between;
+    }
+    .stat-micro-item {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .stat-micro-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-micro-header span {
+      color: var(--text-secondary);
+    }
+    .stat-micro-header b {
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+    .stat-micro-track {
+      width: 100%;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--glass-surface-active);
+      overflow: hidden;
+    }
+    .stat-micro-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+
+    /* 6. Squarish Calendar Tear-off Widget */
+    .tile-calendar {
+      padding: 0;
+      overflow: hidden;
+      justify-content: flex-start;
+    }
+    .cal-header-bar {
+      width: 100%;
+      height: 20px;
+      background: linear-gradient(135deg, #ff4d6d, #e63946);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #fff;
+      text-transform: uppercase;
+    }
+    .cal-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 1px;
+    }
+    .cal-day-num {
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: var(--text-primary);
+    }
+    .cal-weekday {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    /* 7. Squarish Now Playing Media Widget with Animated EQ */
+    .tile-media {
+      padding: 0;
+      background: linear-gradient(135deg, rgba(235, 77, 75, 0.25), rgba(106, 17, 203, 0.25)), var(--glass-surface);
+      border-color: rgba(235, 77, 75, 0.35);
+      position: relative;
+    }
+    .media-cover-art {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #ff416c, #8a2387);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      color: #fff;
+      margin-bottom: 3px;
+    }
+    .media-eq-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 10px;
+    }
+    .eq-bar {
+      width: 2.5px;
+      background: var(--accent);
+      border-radius: 1px;
+      animation: eqBounce 1s ease-in-out infinite alternate;
+    }
+    .eq-bar:nth-child(1) { height: 4px; animation-delay: 0.1s; }
+    .eq-bar:nth-child(2) { height: 9px; animation-delay: 0.3s; }
+    .eq-bar:nth-child(3) { height: 6px; animation-delay: 0.2s; }
+    @keyframes eqBounce {
+      0% { height: 3px; }
+      100% { height: 10px; }
+    }
+
+    /* App Launcher Icons (Windows Taskbar Apps) */
     .app-icon-slot {
       position: relative;
-      width: 52px;
-      height: var(--tile-height);
+      width: var(--tile-size);
+      height: var(--tile-size);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -333,9 +525,9 @@
       cursor: pointer;
     }
     .app-icon-wrapper {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -348,16 +540,16 @@
       transform: translateY(-5px) scale(1.08);
       background: var(--glass-surface-hover);
       border-color: var(--glass-border);
-      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35), 0 0 16px var(--accent-glow);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35), 0 0 16px var(--accent-glow);
     }
     .app-icon-slot:active .app-icon-wrapper {
       transform: translateY(-1px) scale(0.96);
     }
 
-    /* Running App Indicator Dots (macOS / Windows Taskbar Replacement) */
+    /* Active Taskbar Indicator Dots */
     .app-indicator {
       position: absolute;
-      bottom: 2px;
+      bottom: 1px;
       left: 50%;
       transform: translateX(-50%);
       width: 4px;
@@ -373,8 +565,8 @@
       box-shadow: var(--indicator-glow);
     }
     .app-indicator.running {
-      width: 4px;
-      height: 4px;
+      width: 4.5px;
+      height: 4.5px;
       background: var(--text-primary);
       box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
     }
@@ -382,7 +574,7 @@
     /* Floating Tooltip */
     .app-tooltip {
       position: absolute;
-      bottom: calc(100% + 10px);
+      bottom: calc(100% + 12px);
       left: 50%;
       transform: translateX(-50%) translateY(4px);
       background: var(--glass-base);
@@ -398,199 +590,35 @@
       opacity: 0;
       transition: all 140ms ease-out;
     }
-    .app-icon-slot:hover .app-tooltip {
+    .app-icon-slot:hover .app-tooltip,
+    .widget-tile:hover .app-tooltip {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
 
-    /* ==========================================================================
-       SPECIFIC WIDGET IMPLEMENTATIONS
-       ========================================================================== */
-
-    /* 1. Start Button Tile */
-    .tile-start {
-      width: 48px;
-      padding: 0;
-      justify-content: center;
-      background: linear-gradient(135deg, rgba(0, 120, 212, 0.22), var(--glass-surface));
-      border-color: rgba(0, 120, 212, 0.35);
-    }
-    .tile-start:hover {
-      box-shadow: 0 0 18px rgba(0, 120, 212, 0.45);
-    }
-
-    /* 2. ProtonSearch Pill Tile */
-    .tile-search {
-      width: 180px;
-      justify-content: space-between;
-    }
-    .search-pill-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .search-pill-shortcut {
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 6px;
-      border-radius: 6px;
-      background: var(--glass-surface-active);
-      color: var(--text-secondary);
-      border: 1px solid var(--glass-border-subtle);
-    }
-
-    /* 3. Clock Widget */
-    .tile-clock {
-      width: 105px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: flex-start;
-      gap: 2px;
-    }
-    .clock-time {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1;
-      font-variant-numeric: tabular-nums;
-    }
-    .clock-date {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    /* 4. Weather Widget */
-    .tile-weather {
-      width: 125px;
-      gap: 8px;
-    }
-    .weather-icon-box {
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ffd166;
-    }
-    .weather-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .weather-temp {
-      font-size: 16px;
-      font-weight: 700;
-      line-height: 1;
-    }
-    .weather-cond {
-      font-size: 10px;
-      color: var(--text-secondary);
-      font-weight: 500;
-      white-space: nowrap;
-    }
-
-    /* 5. System Stats (CPU / RAM) */
-    .tile-system {
-      width: 115px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 6px;
-    }
-    .stat-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      font-size: 10px;
-      font-weight: 600;
-    }
-    .stat-row span {
-      color: var(--text-secondary);
-      width: 26px;
-    }
-    .stat-row b {
-      font-variant-numeric: tabular-nums;
-    }
-    .stat-bar {
-      flex: 1;
-      height: 4px;
-      margin: 0 6px;
-      border-radius: 999px;
-      background: var(--glass-surface-active);
-      overflow: hidden;
-      position: relative;
-    }
-    .stat-bar-fill {
-      height: 100%;
-      border-radius: 999px;
-      background: var(--accent);
-      box-shadow: 0 0 6px var(--accent-glow);
-      transition: width 0.4s ease;
-    }
-
-    /* 6. Media / Now Playing Widget */
-    .tile-media {
-      width: 165px;
-      gap: 8px;
-    }
-    .media-art {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #ff416c, #8a2387);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-    }
-    .media-details {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      gap: 2px;
-    }
-    .media-title {
-      font-size: 11px;
-      font-weight: 700;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .media-artist {
-      font-size: 10px;
-      color: var(--text-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* 7. Mode Switcher (Integrated inside dock right edge) */
+    /* Profile Switcher Capsule */
     .tile-profile-switch {
       display: flex;
-      align-items: center;
-      padding: 3px;
+      flex-direction: column;
+      gap: 3px;
+      padding: 4px;
       background: var(--glass-surface);
-      border-radius: 999px;
+      border-radius: 16px;
       border: 1px solid var(--glass-border-subtle);
+      width: 58px;
+      height: var(--tile-size);
+      justify-content: center;
     }
     .profile-pill-btn {
       border: none;
       background: transparent;
       color: var(--text-secondary);
-      font-size: 11px;
-      font-weight: 600;
-      padding: 5px 10px;
-      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 0;
+      border-radius: 10px;
       cursor: pointer;
+      text-align: center;
       transition: all var(--trans-hover);
     }
     .profile-pill-btn:hover {
@@ -599,17 +627,17 @@
     .profile-pill-btn.active {
       background: var(--glass-surface-active);
       color: var(--text-primary);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
 
     /* ==========================================================================
-       SPOTLIGHT MODAL OVERLAY (macOS Tahoe Glass Search Window)
+       SPOTLIGHT MODAL OVERLAY
        ========================================================================== */
     .spotlight-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.38);
-      backdrop-filter: blur(10px);
+      background: rgba(0, 0, 0, 0.40);
+      backdrop-filter: blur(12px);
       z-index: 100;
       display: flex;
       align-items: flex-start;
@@ -629,7 +657,7 @@
       max-width: 90vw;
       background: var(--glass-base);
       backdrop-filter: var(--glass-blur);
-      border-radius: 20px;
+      border-radius: 22px;
       box-shadow: 
         0 35px 80px -15px rgba(0, 0, 0, 0.7),
         0 12px 30px -5px rgba(0, 0, 0, 0.4),
@@ -677,7 +705,6 @@
       color: var(--text-secondary);
     }
 
-    /* Filter Chips */
     .spotlight-chips {
       display: flex;
       align-items: center;
@@ -708,7 +735,6 @@
       border-color: var(--accent);
     }
 
-    /* Results List */
     .spotlight-results {
       max-height: 380px;
       overflow-y: auto;
@@ -735,7 +761,7 @@
     .result-icon-box {
       width: 34px;
       height: 34px;
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
       display: flex;
@@ -787,7 +813,6 @@
       color: var(--text-primary);
     }
 
-    /* SVG Icon Helpers */
     .icon {
       width: 20px;
       height: 20px;
@@ -797,44 +822,40 @@
       stroke-linecap: round;
       stroke-linejoin: round;
     }
-    .icon-fill {
-      fill: currentColor;
-      stroke: none;
-    }
   </style>
 </head>
-<body data-theme="dark" data-mode="capsules">
+<body data-theme="dark" data-shape="squary">
 
-  <!-- Desktop Wallpaper Container -->
+  <!-- Desktop Wallpaper Canvas -->
   <div class="desktop-wallpaper wallpaper-tahoe-dark" id="wallpaperEl"></div>
 
-  <!-- Ambient Desktop Title / Intro -->
+  <!-- Ambient Desktop Intro -->
   <div class="desktop-hint">
-    <h1>ProtonDock — macOS Tahoe Glass Experience</h1>
-    <p>Interactive preview of the new glassmorphic visual language: deep frosted blur, specular highlights, active taskbar app indicators, and cohesive widget metrics.</p>
+    <h1>ProtonDock — Squircle Glass Experience</h1>
+    <p>Redesigned with uniform squary & roundy (squircle) widgets for maximum visual harmony, Apple-level polish, and taskbar parity.</p>
   </div>
 
-  <!-- Interactive Demo Controls Header -->
+  <!-- Interactive Controls Toolbar -->
   <div class="demo-toolbar">
+    <div class="demo-toolbar-group">
+      <span>Shape:</span>
+      <button class="demo-pill-btn active" onclick="setShape('squary', this)">Squary & Roundy (New)</button>
+      <button class="demo-pill-btn" onclick="setShape('rect', this)">Rectangles (Old)</button>
+    </div>
+    <div class="demo-divider"></div>
     <div class="demo-toolbar-group">
       <span>Theme:</span>
       <button class="demo-pill-btn active" onclick="setTheme('dark', this)">Tahoe Dark</button>
-      <button class="demo-pill-btn" onclick="setTheme('light', this)">Tahoe Glacier (Light)</button>
-      <button class="demo-pill-btn" onclick="setTheme('aurora', this)">Tahoe Aurora</button>
+      <button class="demo-pill-btn" onclick="setTheme('light', this)">Tahoe Glacier</button>
+      <button class="demo-pill-btn" onclick="setTheme('aurora', this)">Aurora</button>
     </div>
     <div class="demo-divider"></div>
     <div class="demo-toolbar-group">
       <span>Wallpaper:</span>
-      <button class="demo-pill-btn active" onclick="setWallpaper('tahoe-dark', this)">Deep Night</button>
+      <button class="demo-pill-btn active" onclick="setWallpaper('tahoe-dark', this)">Dark Night</button>
       <button class="demo-pill-btn" onclick="setWallpaper('tahoe-sunset', this)">Sunset Warm</button>
       <button class="demo-pill-btn" onclick="setWallpaper('tahoe-glacier', this)">Glacier Day</button>
       <button class="demo-pill-btn" onclick="setWallpaper('tahoe-minimal', this)">Minimal Dark</button>
-    </div>
-    <div class="demo-divider"></div>
-    <div class="demo-toolbar-group">
-      <span>Style:</span>
-      <button class="demo-pill-btn active" onclick="setMode('capsules', this)">Capsules</button>
-      <button class="demo-pill-btn" onclick="setMode('lines', this)">Lines</button>
     </div>
     <div class="demo-divider"></div>
     <button class="demo-pill-btn" style="background: var(--accent-bg); border-color: var(--accent); color: var(--accent);" onclick="toggleSpotlight()">
@@ -843,45 +864,45 @@
     </button>
   </div>
 
-  <!-- The ProtonDock UI -->
+  <!-- The ProtonDock UI (Squircle Glass Rail) -->
   <div class="dock-stage">
     <nav class="dock-rail" aria-label="ProtonDock">
       
-      <!-- SECTION 1: System Anchor / Windows Start -->
+      <!-- 1. Start Menu Squircle -->
       <div class="dock-slot">
         <div class="widget-tile tile-start" title="Windows Start Menu" onclick="triggerEffect(this)">
+          <div class="app-tooltip">Windows Start</div>
           <svg style="width:24px; height:24px;" viewBox="0 0 24 24" fill="#0078d4">
-            <rect x="3" y="3" width="8" height="8" rx="1"/>
-            <rect x="13" y="3" width="8" height="8" rx="1"/>
-            <rect x="3" y="13" width="8" height="8" rx="1"/>
-            <rect x="13" y="13" width="8" height="8" rx="1"/>
+            <rect x="3" y="3" width="8" height="8" rx="1.5"/>
+            <rect x="13" y="3" width="8" height="8" rx="1.5"/>
+            <rect x="3" y="13" width="8" height="8" rx="1.5"/>
+            <rect x="13" y="13" width="8" height="8" rx="1.5"/>
           </svg>
         </div>
       </div>
 
-      <!-- ProtonSearch Trigger Pill -->
+      <!-- 2. ProtonSearch Squircle -->
       <div class="dock-slot">
         <div class="widget-tile tile-search" onclick="toggleSpotlight()" title="Press Alt + Space to open search">
-          <div class="search-pill-label">
-            <svg class="icon" style="width:17px; height:17px; color: var(--accent);" viewBox="0 0 24 24">
+          <div class="app-tooltip">ProtonSearch (Alt+Space)</div>
+          <div class="search-lens-box">
+            <svg class="icon" style="width:22px; height:22px;" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="7"/>
               <path d="m20 20-3.5-3.5"/>
             </svg>
-            <span>Search...</span>
           </div>
-          <span class="search-pill-shortcut">Alt Space</span>
+          <span class="search-sub-tag">Alt ␣</span>
         </div>
       </div>
 
       <div class="dock-divider"></div>
 
-      <!-- SECTION 2: Running Apps (Windows Taskbar Replacement Strip) -->
+      <!-- 3. Running Apps Strip (Taskbar Replacement) -->
       <div class="dock-slot">
         <div class="app-icon-slot" onclick="switchApp(this)">
           <div class="app-tooltip">File Explorer (Active)</div>
           <div class="app-icon-wrapper">
-            <!-- Explorer SVG -->
-            <svg style="width:26px; height:26px;" viewBox="0 0 24 24">
+            <svg style="width:28px; height:28px;" viewBox="0 0 24 24">
               <path d="M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="#f8d775"/>
               <path d="M2 10h20v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8z" fill="#f5ba42"/>
             </svg>
@@ -894,8 +915,7 @@
         <div class="app-icon-slot" onclick="switchApp(this)">
           <div class="app-tooltip">Visual Studio Code</div>
           <div class="app-icon-wrapper">
-            <!-- VS Code SVG -->
-            <svg style="width:26px; height:26px;" viewBox="0 0 24 24">
+            <svg style="width:28px; height:28px;" viewBox="0 0 24 24">
               <path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/>
               <path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/>
             </svg>
@@ -908,8 +928,7 @@
         <div class="app-icon-slot" onclick="switchApp(this)">
           <div class="app-tooltip">Microsoft Edge</div>
           <div class="app-icon-wrapper">
-            <!-- Edge / Browser SVG -->
-            <svg style="width:26px; height:26px;" viewBox="0 0 24 24">
+            <svg style="width:28px; height:28px;" viewBox="0 0 24 24">
               <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" fill="#0078d4"/>
               <circle cx="12" cy="12" r="5" fill="#50e6ff"/>
             </svg>
@@ -922,8 +941,7 @@
         <div class="app-icon-slot" onclick="switchApp(this)">
           <div class="app-tooltip">Windows Terminal</div>
           <div class="app-icon-wrapper">
-            <!-- Terminal SVG -->
-            <svg style="width:24px; height:24px;" viewBox="0 0 24 24" stroke="var(--text-primary)" fill="none" stroke-width="2">
+            <svg style="width:26px; height:26px;" viewBox="0 0 24 24" stroke="var(--text-primary)" fill="none" stroke-width="2">
               <path d="m4 17 6-5-6-5"/>
               <path d="M12 19h8"/>
             </svg>
@@ -936,8 +954,7 @@
         <div class="app-icon-slot" onclick="switchApp(this)">
           <div class="app-tooltip">Spotify</div>
           <div class="app-icon-wrapper">
-            <!-- Spotify SVG -->
-            <svg style="width:26px; height:26px;" viewBox="0 0 24 24">
+            <svg style="width:28px; height:28px;" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="11" fill="#1db954"/>
               <path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
             </svg>
@@ -948,82 +965,93 @@
 
       <div class="dock-divider"></div>
 
-      <!-- SECTION 3: Live Widgets -->
-
-      <!-- Clock Widget -->
+      <!-- 4. Squircle Clock Widget -->
       <div class="dock-slot">
         <div class="widget-tile tile-clock" title="Today is Friday, November 6">
-          <div class="clock-time" id="clockTime">13:14</div>
-          <div class="clock-date">
-            <svg class="icon" style="width:12px; height:12px;" viewBox="0 0 24 24">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            <span>Fri, Nov 6</span>
-          </div>
+          <div class="app-tooltip">Local Time & Date</div>
+          <div class="clock-main-digits" id="clockDigits">13:15</div>
+          <div class="clock-pill-date">Fri 6</div>
         </div>
       </div>
 
-      <!-- Weather Widget -->
+      <!-- 5. Squircle Weather Widget -->
       <div class="dock-slot">
-        <div class="widget-tile tile-weather" title="Weather: 24°C, Partly Cloudy">
-          <div class="weather-icon-box">
-            <!-- Sun & Cloud SVG -->
-            <svg class="icon" style="width:24px; height:24px;" viewBox="0 0 24 24">
+        <div class="widget-tile tile-weather" title="Weather: 24°C, Sunny Clear">
+          <div class="app-tooltip">Weather · Sunny Clear</div>
+          <div class="weather-squircle-icon">
+            <svg class="icon" style="width:26px; height:26px;" viewBox="0 0 24 24">
               <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="#f59e0b"/>
               <circle cx="12" cy="12" r="4" fill="#f59e0b" stroke="none"/>
               <path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7a3.5 3.5 0 0 0 0-7z" fill="var(--text-primary)" stroke="none" opacity="0.9"/>
             </svg>
           </div>
-          <div class="weather-info">
-            <div class="weather-temp">24°</div>
-            <div class="weather-cond">Sunny Clear</div>
-          </div>
+          <div class="weather-squircle-temp">24°</div>
         </div>
       </div>
 
-      <!-- Hardware System Status Widget -->
+      <!-- 6. Squircle Hardware System Widget -->
       <div class="dock-slot">
-        <div class="widget-tile tile-system" title="CPU: 18% · RAM: 58% · Battery: 94%">
-          <div class="stat-row">
-            <span>CPU</span>
-            <div class="stat-bar"><div class="stat-bar-fill" style="width: 24%;"></div></div>
-            <b>24%</b>
+        <div class="widget-tile tile-system" title="CPU: 24% · RAM: 58%">
+          <div class="app-tooltip">System: CPU 24% · RAM 58%</div>
+          <div class="stat-micro-item">
+            <div class="stat-micro-header">
+              <span>CPU</span>
+              <b>24%</b>
+            </div>
+            <div class="stat-micro-track">
+              <div class="stat-micro-fill" style="width: 24%;"></div>
+            </div>
           </div>
-          <div class="stat-row">
-            <span>RAM</span>
-            <div class="stat-bar"><div class="stat-bar-fill" style="width: 58%; background: #60a5fa;"></div></div>
-            <b>58%</b>
+          <div class="stat-micro-item">
+            <div class="stat-micro-header">
+              <span>RAM</span>
+              <b>58%</b>
+            </div>
+            <div class="stat-micro-track">
+              <div class="stat-micro-fill" style="width: 58%; background: #60a5fa;"></div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Now Playing Media Widget -->
+      <!-- 7. Squircle Tear-Off Calendar Widget -->
+      <div class="dock-slot">
+        <div class="widget-tile tile-calendar" title="Calendar · Nov 6">
+          <div class="app-tooltip">Calendar: Nov 6 (No events)</div>
+          <div class="cal-header-bar">NOV</div>
+          <div class="cal-body">
+            <span class="cal-day-num">06</span>
+            <span class="cal-weekday">Fri</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. Squircle Media Player Widget -->
       <div class="dock-slot">
         <div class="widget-tile tile-media" title="Now Playing: Midnight City — M83">
-          <div class="media-art">
-            <svg class="icon" style="width:18px; height:18px; color: #fff;" viewBox="0 0 24 24" fill="currentColor">
+          <div class="app-tooltip">Midnight City · M83</div>
+          <div class="media-cover-art">
+            <svg class="icon" style="width:16px; height:16px;" viewBox="0 0 24 24" fill="currentColor">
               <path d="M9 18V5l12-2v13"/>
               <circle cx="6" cy="18" r="3"/>
               <circle cx="18" cy="16" r="3"/>
             </svg>
           </div>
-          <div class="media-details">
-            <div class="media-title">Midnight City</div>
-            <div class="media-artist">M83 · Hurry Up</div>
+          <div class="media-eq-bars">
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
           </div>
         </div>
       </div>
 
       <div class="dock-divider"></div>
 
-      <!-- SECTION 4: Integrated Mode Switcher (Daily vs Founder) -->
+      <!-- 9. Mode Switcher (Daily vs Founder) -->
       <div class="dock-slot">
         <div class="tile-profile-switch">
           <button class="profile-pill-btn active" onclick="switchProfile('daily', this)">Daily</button>
-          <button class="profile-pill-btn" onclick="switchProfile('founder', this)">Founder</button>
+          <button class="profile-pill-btn" onclick="switchProfile('founder', this)">Fndr</button>
         </div>
       </div>
 
@@ -1135,47 +1163,40 @@
     </div>
   </div>
 
-  <!-- CLIENT-SIDE SCRIPT FOR INTERACTIVE PREVIEW -->
   <script>
-    // Live Clock Update
     function updateClock() {
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-      const el = document.getElementById('clockTime');
+      const el = document.getElementById('clockDigits');
       if (el) el.textContent = timeStr;
     }
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Theme Switcher
-    function setTheme(theme, btn) {
-      document.body.setAttribute('data-theme', theme);
+    function setShape(shape, btn) {
+      document.body.setAttribute('data-shape', shape);
       document.querySelectorAll('.demo-toolbar-group:nth-child(1) .demo-pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
 
-    // Wallpaper Switcher
-    function setWallpaper(wp, btn) {
-      const el = document.getElementById('wallpaperEl');
-      el.className = 'desktop-wallpaper wallpaper-' + wp;
+    function setTheme(theme, btn) {
+      document.body.setAttribute('data-theme', theme);
       document.querySelectorAll('.demo-toolbar-group:nth-child(3) .demo-pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
 
-    // Mode Switcher (Capsules vs Lines)
-    function setMode(mode, btn) {
-      document.body.setAttribute('data-mode', mode);
+    function setWallpaper(wp, btn) {
+      const el = document.getElementById('wallpaperEl');
+      el.className = 'desktop-wallpaper wallpaper-' + wp;
       document.querySelectorAll('.demo-toolbar-group:nth-child(5) .demo-pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
 
-    // Profile Switcher (Daily vs Founder)
     function switchProfile(profile, btn) {
       document.querySelectorAll('.profile-pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
 
-    // App Switcher Simulator
     function switchApp(appSlot) {
       document.querySelectorAll('.app-indicator').forEach(dot => dot.classList.remove('active'));
       const dot = appSlot.querySelector('.app-indicator');
@@ -1184,7 +1205,6 @@
       }
     }
 
-    // Spotlight Overlay Controls
     function toggleSpotlight() {
       const overlay = document.getElementById('spotlightOverlay');
       const input = document.getElementById('spotlightInput');
@@ -1203,7 +1223,6 @@
       }
     }
 
-    // Keyboard Shortcuts (Alt + Space or Esc)
     window.addEventListener('keydown', (e) => {
       if (e.altKey && e.code === 'Space') {
         e.preventDefault();
@@ -1216,12 +1235,10 @@
       }
     });
 
-    // Live Math / Instant Query Simulation in Spotlight
     function handleSearch(val) {
       const container = document.getElementById('resultsContainer');
       const clean = val.trim();
 
-      // Math expression evaluator simulation
       if (/^[\d\s\+\-\*\/\(\)\.\^\%]+$/.test(clean) && /[\+\-\*\/]/.test(clean)) {
         try {
           const evalResult = Function('"use strict";return (' + clean + ')')();
@@ -1243,7 +1260,6 @@
         } catch (_) {}
       }
 
-      // Default mock if input is empty
       if (!clean) {
         container.innerHTML = `
           <div class="result-item selected">
