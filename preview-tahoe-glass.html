@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProtonDock — macOS Tahoe / Glassmorphic Design Preview</title>
+  <style>
+    /* ==========================================================================
+       DESIGN TOKENS & SYSTEM VARIABLES (macOS Tahoe / Next-Gen Glassmorphism)
+       ========================================================================== */
+    :root {
+      /* Dimensions */
+      --dock-height: 82px;
+      --dock-padding: 8px 12px;
+      --dock-radius: 28px;
+      --tile-height: 64px;
+      --tile-radius: 16px;
+      --icon-size: 42px;
+      --gap: 8px;
+
+      /* Tahoe Dark Glass (Default) */
+      --glass-base: rgba(18, 22, 28, 0.62);
+      --glass-surface: rgba(255, 255, 255, 0.05);
+      --glass-surface-hover: rgba(255, 255, 255, 0.10);
+      --glass-surface-active: rgba(255, 255, 255, 0.16);
+      --glass-border: rgba(255, 255, 255, 0.14);
+      --glass-border-subtle: rgba(255, 255, 255, 0.08);
+      --glass-top-highlight: rgba(255, 255, 255, 0.32);
+      --glass-blur: blur(44px) saturate(210%) contrast(104%);
+      --glass-shadow: 
+        0 26px 64px -12px rgba(0, 0, 0, 0.55),
+        0 8px 24px -4px rgba(0, 0, 0, 0.35),
+        inset 0 1.5px 0 0 var(--glass-top-highlight),
+        inset 0 0 0 1px var(--glass-border);
+
+      /* Typography & Accents */
+      --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+      --text-primary: rgba(255, 255, 255, 0.96);
+      --text-secondary: rgba(255, 255, 255, 0.62);
+      --text-tertiary: rgba(255, 255, 255, 0.40);
+      --accent: #5ef1c2; /* Tahoe Mint / Sage */
+      --accent-glow: rgba(94, 241, 194, 0.45);
+      --accent-bg: rgba(94, 241, 194, 0.15);
+      --indicator-color: #5ef1c2;
+      --indicator-glow: 0 0 8px #5ef1c2;
+
+      /* Motion */
+      --spring-ease: cubic-bezier(0.16, 1, 0.3, 1);
+      --trans-hover: 180ms var(--spring-ease);
+      --trans-layout: 280ms var(--spring-ease);
+    }
+
+    /* Theme Variations */
+    body[data-theme="light"] {
+      --glass-base: rgba(246, 248, 252, 0.68);
+      --glass-surface: rgba(0, 0, 0, 0.04);
+      --glass-surface-hover: rgba(0, 0, 0, 0.08);
+      --glass-surface-active: rgba(0, 0, 0, 0.12);
+      --glass-border: rgba(255, 255, 255, 0.85);
+      --glass-border-subtle: rgba(0, 0, 0, 0.08);
+      --glass-top-highlight: rgba(255, 255, 255, 0.95);
+      --glass-shadow: 
+        0 24px 56px -10px rgba(24, 38, 62, 0.18),
+        0 8px 20px -4px rgba(24, 38, 62, 0.10),
+        inset 0 1.5px 0 0 var(--glass-top-highlight),
+        inset 0 0 0 1px var(--glass-border);
+      --text-primary: rgba(14, 20, 28, 0.94);
+      --text-secondary: rgba(24, 34, 48, 0.65);
+      --text-tertiary: rgba(24, 34, 48, 0.42);
+      --accent: #007aff;
+      --accent-glow: rgba(0, 122, 255, 0.35);
+      --accent-bg: rgba(0, 122, 255, 0.12);
+      --indicator-color: #007aff;
+      --indicator-glow: 0 0 6px rgba(0, 122, 255, 0.5);
+    }
+
+    body[data-theme="aurora"] {
+      --glass-base: rgba(18, 14, 34, 0.62);
+      --glass-surface: rgba(186, 155, 255, 0.07);
+      --glass-surface-hover: rgba(186, 155, 255, 0.14);
+      --glass-border: rgba(210, 190, 255, 0.22);
+      --glass-top-highlight: rgba(240, 230, 255, 0.45);
+      --accent: #bf7af0;
+      --accent-glow: rgba(191, 122, 240, 0.45);
+      --accent-bg: rgba(191, 122, 240, 0.18);
+      --indicator-color: #d18bf7;
+      --indicator-glow: 0 0 8px #d18bf7;
+    }
+
+    /* Style Mode: Lines vs Capsules */
+    body[data-mode="lines"] .widget-tile {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    body[data-mode="lines"] .widget-tile:not(:first-child) {
+      border-left: 1px solid var(--glass-border-subtle) !important;
+      border-radius: 0 !important;
+    }
+
+    /* ==========================================================================
+       RESET & BASE LAYOUT
+       ========================================================================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-stack);
+      color: var(--text-primary);
+      position: relative;
+    }
+
+    /* Wallpaper Canvas with Real Dynamic Textures */
+    .desktop-wallpaper {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      transition: background-image 0.5s ease-in-out, filter 0.5s ease;
+      z-index: 1;
+    }
+    .wallpaper-tahoe-dark {
+      background: radial-gradient(circle at 50% 120%, #173347 0%, #0c1a26 40%, #06090e 100%),
+                  radial-gradient(circle at 15% 10%, #1f274a 0%, transparent 50%),
+                  radial-gradient(circle at 85% 30%, #134440 0%, transparent 45%);
+    }
+    .wallpaper-tahoe-sunset {
+      background: radial-gradient(circle at 80% 10%, #e0684f 0%, #a23a54 30%, #3e1b46 65%, #0f0a1d 100%),
+                  radial-gradient(circle at 20% 80%, #1e3c72 0%, transparent 60%);
+    }
+    .wallpaper-tahoe-minimal {
+      background: radial-gradient(circle at 50% 50%, #181d24 0%, #0e1115 100%);
+    }
+    .wallpaper-tahoe-glacier {
+      background: radial-gradient(circle at 50% 0%, #e2ecf7 0%, #cadcf0 45%, #9cbcdb 100%);
+    }
+
+    /* Ambient Desktop Details */
+    .desktop-hint {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      text-align: center;
+      pointer-events: none;
+    }
+    .desktop-hint h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      text-shadow: 0 4px 18px rgba(0,0,0,0.4);
+      margin-bottom: 6px;
+    }
+    .desktop-hint p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      max-width: 580px;
+      line-height: 1.5;
+    }
+
+    /* ==========================================================================
+       CONTROL BAR (DEMO CONTROLS AT TOP)
+       ========================================================================== */
+    .demo-toolbar {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      padding: 6px 14px;
+      border-radius: 999px;
+      box-shadow: var(--glass-shadow);
+      font-size: 12px;
+    }
+    .demo-toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .demo-toolbar span {
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .demo-pill-btn {
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border);
+      color: var(--text-primary);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--trans-hover);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .demo-pill-btn:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-top-highlight);
+    }
+    .demo-pill-btn.active {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+    .demo-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--glass-border);
+    }
+
+    /* ==========================================================================
+       THE PROTONDOCK STAGE (macOS Tahoe Glass Container)
+       ========================================================================== */
+    .dock-stage {
+      position: absolute;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      max-width: calc(100vw - 32px);
+    }
+
+    /* Dock Outer Shell */
+    .dock-rail {
+      position: relative;
+      height: var(--dock-height);
+      padding: var(--dock-padding);
+      display: flex;
+      align-items: center;
+      gap: var(--gap);
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      border-radius: var(--dock-radius);
+      box-shadow: var(--glass-shadow);
+      transition: width var(--trans-layout), padding var(--trans-layout);
+    }
+
+    /* Refractive Specular Gradient Sheen along top rim */
+    .dock-rail::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 20px;
+      right: 20px;
+      height: 1.5px;
+      background: linear-gradient(90deg, transparent, var(--glass-top-highlight) 30%, var(--glass-top-highlight) 70%, transparent);
+      border-radius: 999px;
+      pointer-events: none;
+    }
+
+    /* Segment Dividers inside Dock */
+    .dock-divider {
+      width: 1px;
+      height: 44px;
+      background: var(--glass-border-subtle);
+      margin: 0 2px;
+      flex-shrink: 0;
+    }
+
+    /* ==========================================================================
+       DOCK TILES & SLOTS (Interactive Components)
+       ========================================================================== */
+    .dock-slot {
+      position: relative;
+      display: flex;
+      align-items: center;
+      height: var(--tile-height);
+      border-radius: var(--tile-radius);
+      transition: transform var(--trans-hover), background var(--trans-hover);
+    }
+
+    /* General Widget Tile in Tahoe Style */
+    .widget-tile {
+      height: var(--tile-height);
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: var(--tile-radius);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 10px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+      transition: all var(--trans-hover);
+    }
+    .widget-tile:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-border);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+    }
+    .widget-tile:active {
+      transform: translateY(0) scale(0.98);
+      background: var(--glass-surface-active);
+    }
+
+    /* App Launcher Icons (Windows Start & Taskbar Apps) */
+    .app-icon-slot {
+      position: relative;
+      width: 52px;
+      height: var(--tile-height);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .app-icon-wrapper {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      transition: all var(--trans-hover);
+    }
+    .app-icon-slot:hover .app-icon-wrapper {
+      transform: translateY(-5px) scale(1.08);
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-border);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35), 0 0 16px var(--accent-glow);
+    }
+    .app-icon-slot:active .app-icon-wrapper {
+      transform: translateY(-1px) scale(0.96);
+    }
+
+    /* Running App Indicator Dots (macOS / Windows Taskbar Replacement) */
+    .app-indicator {
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--text-tertiary);
+      transition: all var(--trans-hover);
+    }
+    .app-indicator.active {
+      width: 14px;
+      height: 3.5px;
+      background: var(--indicator-color);
+      box-shadow: var(--indicator-glow);
+    }
+    .app-indicator.running {
+      width: 4px;
+      height: 4px;
+      background: var(--text-primary);
+      box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+    }
+
+    /* Floating Tooltip */
+    .app-tooltip {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: all 140ms ease-out;
+    }
+    .app-icon-slot:hover .app-tooltip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ==========================================================================
+       SPECIFIC WIDGET IMPLEMENTATIONS
+       ========================================================================== */
+
+    /* 1. Start Button Tile */
+    .tile-start {
+      width: 48px;
+      padding: 0;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(0, 120, 212, 0.22), var(--glass-surface));
+      border-color: rgba(0, 120, 212, 0.35);
+    }
+    .tile-start:hover {
+      box-shadow: 0 0 18px rgba(0, 120, 212, 0.45);
+    }
+
+    /* 2. ProtonSearch Pill Tile */
+    .tile-search {
+      width: 180px;
+      justify-content: space-between;
+    }
+    .search-pill-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .search-pill-shortcut {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 6px;
+      border-radius: 6px;
+      background: var(--glass-surface-active);
+      color: var(--text-secondary);
+      border: 1px solid var(--glass-border-subtle);
+    }
+
+    /* 3. Clock Widget */
+    .tile-clock {
+      width: 105px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 2px;
+    }
+    .clock-time {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .clock-date {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* 4. Weather Widget */
+    .tile-weather {
+      width: 125px;
+      gap: 8px;
+    }
+    .weather-icon-box {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffd166;
+    }
+    .weather-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .weather-temp {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .weather-cond {
+      font-size: 10px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* 5. System Stats (CPU / RAM) */
+    .tile-system {
+      width: 115px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+    }
+    .stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .stat-row span {
+      color: var(--text-secondary);
+      width: 26px;
+    }
+    .stat-row b {
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-bar {
+      flex: 1;
+      height: 4px;
+      margin: 0 6px;
+      border-radius: 999px;
+      background: var(--glass-surface-active);
+      overflow: hidden;
+      position: relative;
+    }
+    .stat-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent-glow);
+      transition: width 0.4s ease;
+    }
+
+    /* 6. Media / Now Playing Widget */
+    .tile-media {
+      width: 165px;
+      gap: 8px;
+    }
+    .media-art {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #ff416c, #8a2387);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    }
+    .media-details {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      gap: 2px;
+    }
+    .media-title {
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .media-artist {
+      font-size: 10px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 7. Mode Switcher (Integrated inside dock right edge) */
+    .tile-profile-switch {
+      display: flex;
+      align-items: center;
+      padding: 3px;
+      background: var(--glass-surface);
+      border-radius: 999px;
+      border: 1px solid var(--glass-border-subtle);
+    }
+    .profile-pill-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all var(--trans-hover);
+    }
+    .profile-pill-btn:hover {
+      color: var(--text-primary);
+    }
+    .profile-pill-btn.active {
+      background: var(--glass-surface-active);
+      color: var(--text-primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    /* ==========================================================================
+       SPOTLIGHT MODAL OVERLAY (macOS Tahoe Glass Search Window)
+       ========================================================================== */
+    .spotlight-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 15vh;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms ease;
+    }
+    .spotlight-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .spotlight-palette {
+      width: 640px;
+      max-width: 90vw;
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      border-radius: 20px;
+      box-shadow: 
+        0 35px 80px -15px rgba(0, 0, 0, 0.7),
+        0 12px 30px -5px rgba(0, 0, 0, 0.4),
+        inset 0 1.5px 0 0 var(--glass-top-highlight),
+        inset 0 0 0 1px var(--glass-border);
+      overflow: hidden;
+      transform: translateY(-12px) scale(0.98);
+      transition: transform 220ms var(--spring-ease);
+    }
+    .spotlight-backdrop.open .spotlight-palette {
+      transform: translateY(0) scale(1);
+    }
+
+    .spotlight-input-row {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px;
+      gap: 14px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+    }
+    .spotlight-search-icon {
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .spotlight-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 19px;
+      font-weight: 500;
+      color: var(--text-primary);
+      font-family: inherit;
+    }
+    .spotlight-input::placeholder {
+      color: var(--text-tertiary);
+    }
+    .spotlight-esc-tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 7px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: 6px;
+      color: var(--text-secondary);
+    }
+
+    /* Filter Chips */
+    .spotlight-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      background: rgba(0, 0, 0, 0.12);
+      border-bottom: 1px solid var(--glass-border-subtle);
+    }
+    .chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--glass-surface);
+      color: var(--text-secondary);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all var(--trans-hover);
+    }
+    .chip:hover, .chip.active {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+      border-color: var(--glass-border);
+    }
+    .chip.active {
+      background: var(--accent-bg);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Results List */
+    .spotlight-results {
+      max-height: 380px;
+      overflow-y: auto;
+      padding: 8px 12px;
+    }
+    .result-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .result-item:hover, .result-item.selected {
+      background: var(--glass-surface-hover);
+      box-shadow: inset 0 0 0 1px var(--glass-border-subtle);
+    }
+    .result-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .result-icon-box {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-primary);
+    }
+    .result-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .result-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .result-subtitle {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .result-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .spotlight-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      border-top: 1px solid var(--glass-border-subtle);
+      font-size: 11px;
+      color: var(--text-secondary);
+      background: rgba(0, 0, 0, 0.08);
+    }
+    .spotlight-footer kbd {
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 10px;
+      color: var(--text-primary);
+    }
+
+    /* SVG Icon Helpers */
+    .icon {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .icon-fill {
+      fill: currentColor;
+      stroke: none;
+    }
+  </style>
+</head>
+<body data-theme="dark" data-mode="capsules">
+
+  <!-- Desktop Wallpaper Container -->
+  <div class="desktop-wallpaper wallpaper-tahoe-dark" id="wallpaperEl"></div>
+
+  <!-- Ambient Desktop Title / Intro -->
+  <div class="desktop-hint">
+    <h1>ProtonDock — macOS Tahoe Glass Experience</h1>
+    <p>Interactive preview of the new glassmorphic visual language: deep frosted blur, specular highlights, active taskbar app indicators, and cohesive widget metrics.</p>
+  </div>
+
+  <!-- Interactive Demo Controls Header -->
+  <div class="demo-toolbar">
+    <div class="demo-toolbar-group">
+      <span>Theme:</span>
+      <button class="demo-pill-btn active" onclick="setTheme('dark', this)">Tahoe Dark</button>
+      <button class="demo-pill-btn" onclick="setTheme('light', this)">Tahoe Glacier (Light)</button>
+      <button class="demo-pill-btn" onclick="setTheme('aurora', this)">Tahoe Aurora</button>
+    </div>
+    <div class="demo-divider"></div>
+    <div class="demo-toolbar-group">
+      <span>Wallpaper:</span>
+      <button class="demo-pill-btn active" onclick="setWallpaper('tahoe-dark', this)">Deep Night</button>
+      <button class="demo-pill-btn" onclick="setWallpaper('tahoe-sunset', this)">Sunset Warm</button>
+      <button class="demo-pill-btn" onclick="setWallpaper('tahoe-glacier', this)">Glacier Day</button>
+      <button class="demo-pill-btn" onclick="setWallpaper('tahoe-minimal', this)">Minimal Dark</button>
+    </div>
+    <div class="demo-divider"></div>
+    <div class="demo-toolbar-group">
+      <span>Style:</span>
+      <button class="demo-pill-btn active" onclick="setMode('capsules', this)">Capsules</button>
+      <button class="demo-pill-btn" onclick="setMode('lines', this)">Lines</button>
+    </div>
+    <div class="demo-divider"></div>
+    <button class="demo-pill-btn" style="background: var(--accent-bg); border-color: var(--accent); color: var(--accent);" onclick="toggleSpotlight()">
+      <svg class="icon" style="width:14px; height:14px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Spotlight (Alt+Space)
+    </button>
+  </div>
+
+  <!-- The ProtonDock UI -->
+  <div class="dock-stage">
+    <nav class="dock-rail" aria-label="ProtonDock">
+      
+      <!-- SECTION 1: System Anchor / Windows Start -->
+      <div class="dock-slot">
+        <div class="widget-tile tile-start" title="Windows Start Menu" onclick="triggerEffect(this)">
+          <svg style="width:24px; height:24px;" viewBox="0 0 24 24" fill="#0078d4">
+            <rect x="3" y="3" width="8" height="8" rx="1"/>
+            <rect x="13" y="3" width="8" height="8" rx="1"/>
+            <rect x="3" y="13" width="8" height="8" rx="1"/>
+            <rect x="13" y="13" width="8" height="8" rx="1"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- ProtonSearch Trigger Pill -->
+      <div class="dock-slot">
+        <div class="widget-tile tile-search" onclick="toggleSpotlight()" title="Press Alt + Space to open search">
+          <div class="search-pill-label">
+            <svg class="icon" style="width:17px; height:17px; color: var(--accent);" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="m20 20-3.5-3.5"/>
+            </svg>
+            <span>Search...</span>
+          </div>
+          <span class="search-pill-shortcut">Alt Space</span>
+        </div>
+      </div>
+
+      <div class="dock-divider"></div>
+
+      <!-- SECTION 2: Running Apps (Windows Taskbar Replacement Strip) -->
+      <div class="dock-slot">
+        <div class="app-icon-slot" onclick="switchApp(this)">
+          <div class="app-tooltip">File Explorer (Active)</div>
+          <div class="app-icon-wrapper">
+            <!-- Explorer SVG -->
+            <svg style="width:26px; height:26px;" viewBox="0 0 24 24">
+              <path d="M4 4h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="#f8d775"/>
+              <path d="M2 10h20v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8z" fill="#f5ba42"/>
+            </svg>
+          </div>
+          <span class="app-indicator active"></span>
+        </div>
+      </div>
+
+      <div class="dock-slot">
+        <div class="app-icon-slot" onclick="switchApp(this)">
+          <div class="app-tooltip">Visual Studio Code</div>
+          <div class="app-icon-wrapper">
+            <!-- VS Code SVG -->
+            <svg style="width:26px; height:26px;" viewBox="0 0 24 24">
+              <path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/>
+              <path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/>
+            </svg>
+          </div>
+          <span class="app-indicator running"></span>
+        </div>
+      </div>
+
+      <div class="dock-slot">
+        <div class="app-icon-slot" onclick="switchApp(this)">
+          <div class="app-tooltip">Microsoft Edge</div>
+          <div class="app-icon-wrapper">
+            <!-- Edge / Browser SVG -->
+            <svg style="width:26px; height:26px;" viewBox="0 0 24 24">
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" fill="#0078d4"/>
+              <circle cx="12" cy="12" r="5" fill="#50e6ff"/>
+            </svg>
+          </div>
+          <span class="app-indicator running"></span>
+        </div>
+      </div>
+
+      <div class="dock-slot">
+        <div class="app-icon-slot" onclick="switchApp(this)">
+          <div class="app-tooltip">Windows Terminal</div>
+          <div class="app-icon-wrapper">
+            <!-- Terminal SVG -->
+            <svg style="width:24px; height:24px;" viewBox="0 0 24 24" stroke="var(--text-primary)" fill="none" stroke-width="2">
+              <path d="m4 17 6-5-6-5"/>
+              <path d="M12 19h8"/>
+            </svg>
+          </div>
+          <span class="app-indicator running"></span>
+        </div>
+      </div>
+
+      <div class="dock-slot">
+        <div class="app-icon-slot" onclick="switchApp(this)">
+          <div class="app-tooltip">Spotify</div>
+          <div class="app-icon-wrapper">
+            <!-- Spotify SVG -->
+            <svg style="width:26px; height:26px;" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="11" fill="#1db954"/>
+              <path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
+            </svg>
+          </div>
+          <span class="app-indicator"></span>
+        </div>
+      </div>
+
+      <div class="dock-divider"></div>
+
+      <!-- SECTION 3: Live Widgets -->
+
+      <!-- Clock Widget -->
+      <div class="dock-slot">
+        <div class="widget-tile tile-clock" title="Today is Friday, November 6">
+          <div class="clock-time" id="clockTime">13:14</div>
+          <div class="clock-date">
+            <svg class="icon" style="width:12px; height:12px;" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <span>Fri, Nov 6</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weather Widget -->
+      <div class="dock-slot">
+        <div class="widget-tile tile-weather" title="Weather: 24°C, Partly Cloudy">
+          <div class="weather-icon-box">
+            <!-- Sun & Cloud SVG -->
+            <svg class="icon" style="width:24px; height:24px;" viewBox="0 0 24 24">
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="#f59e0b"/>
+              <circle cx="12" cy="12" r="4" fill="#f59e0b" stroke="none"/>
+              <path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7a3.5 3.5 0 0 0 0-7z" fill="var(--text-primary)" stroke="none" opacity="0.9"/>
+            </svg>
+          </div>
+          <div class="weather-info">
+            <div class="weather-temp">24°</div>
+            <div class="weather-cond">Sunny Clear</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hardware System Status Widget -->
+      <div class="dock-slot">
+        <div class="widget-tile tile-system" title="CPU: 18% · RAM: 58% · Battery: 94%">
+          <div class="stat-row">
+            <span>CPU</span>
+            <div class="stat-bar"><div class="stat-bar-fill" style="width: 24%;"></div></div>
+            <b>24%</b>
+          </div>
+          <div class="stat-row">
+            <span>RAM</span>
+            <div class="stat-bar"><div class="stat-bar-fill" style="width: 58%; background: #60a5fa;"></div></div>
+            <b>58%</b>
+          </div>
+        </div>
+      </div>
+
+      <!-- Now Playing Media Widget -->
+      <div class="dock-slot">
+        <div class="widget-tile tile-media" title="Now Playing: Midnight City — M83">
+          <div class="media-art">
+            <svg class="icon" style="width:18px; height:18px; color: #fff;" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+          </div>
+          <div class="media-details">
+            <div class="media-title">Midnight City</div>
+            <div class="media-artist">M83 · Hurry Up</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dock-divider"></div>
+
+      <!-- SECTION 4: Integrated Mode Switcher (Daily vs Founder) -->
+      <div class="dock-slot">
+        <div class="tile-profile-switch">
+          <button class="profile-pill-btn active" onclick="switchProfile('daily', this)">Daily</button>
+          <button class="profile-pill-btn" onclick="switchProfile('founder', this)">Founder</button>
+        </div>
+      </div>
+
+    </nav>
+  </div>
+
+  <!-- SPOTLIGHT SEARCH PALETTE (macOS Tahoe Glass Overlay) -->
+  <div class="spotlight-backdrop" id="spotlightOverlay" onclick="handleBackdropClick(event)">
+    <div class="spotlight-palette">
+      
+      <!-- Search Input Header -->
+      <div class="spotlight-input-row">
+        <svg class="icon spotlight-search-icon" style="width:24px; height:24px;" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="m20 20-3.5-3.5"/>
+        </svg>
+        <input type="text" id="spotlightInput" class="spotlight-input" placeholder="Search apps, files, commits, or calculate..." autofocus oninput="handleSearch(this.value)" onkeydown="handleKeyDown(event)" />
+        <span class="spotlight-esc-tag">ESC</span>
+      </div>
+
+      <!-- Filter Categories -->
+      <div class="spotlight-chips">
+        <div class="chip active">All Results</div>
+        <div class="chip">Apps</div>
+        <div class="chip">Local Files</div>
+        <div class="chip">Git Commits</div>
+        <div class="chip">Calculator</div>
+      </div>
+
+      <!-- Results Body -->
+      <div class="spotlight-results" id="resultsContainer">
+        <!-- Result 1 -->
+        <div class="result-item selected">
+          <div class="result-left">
+            <div class="result-icon-box" style="color: #007acc;">
+              <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+                <path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/>
+              </svg>
+            </div>
+            <div class="result-text">
+              <div class="result-title">Visual Studio Code</div>
+              <div class="result-subtitle">C:\Users\Pranshul\AppData\Local\Programs\Microsoft VS Code\Code.exe</div>
+            </div>
+          </div>
+          <span class="result-badge">Application</span>
+        </div>
+
+        <!-- Result 2 -->
+        <div class="result-item">
+          <div class="result-left">
+            <div class="result-icon-box" style="color: #5ef1c2;">
+              <svg class="icon" viewBox="0 0 24 24">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <div class="result-text">
+              <div class="result-title">protonsearch / src / main.rs</div>
+              <div class="result-subtitle">Rust Core Search Engine & Window Placement Logic</div>
+            </div>
+          </div>
+          <span class="result-badge">Source Code</span>
+        </div>
+
+        <!-- Result 3 -->
+        <div class="result-item">
+          <div class="result-left">
+            <div class="result-icon-box" style="color: #f59e0b;">
+              <svg class="icon" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <div class="result-text">
+              <div class="result-title">Q3 Financial Roadmap & Metrics.docx</div>
+              <div class="result-subtitle">Documents / Business / Q3 Strategy</div>
+            </div>
+          </div>
+          <span class="result-badge">Document</span>
+        </div>
+
+        <!-- Result 4 -->
+        <div class="result-item">
+          <div class="result-left">
+            <div class="result-icon-box" style="color: #bf7af0;">
+              <svg class="icon" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </div>
+            <div class="result-text">
+              <div class="result-title">System Settings · Sound & Audio</div>
+              <div class="result-subtitle">Windows Settings Quick Control</div>
+            </div>
+          </div>
+          <span class="result-badge">Quick Action</span>
+        </div>
+      </div>
+
+      <!-- Spotlight Footer -->
+      <div class="spotlight-footer">
+        <div>Navigate with <kbd>↑</kbd> <kbd>↓</kbd> · Press <kbd>Enter</kbd> to launch</div>
+        <div>ProtonSearch FTS5 · <b>0.4ms</b></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CLIENT-SIDE SCRIPT FOR INTERACTIVE PREVIEW -->
+  <script>
+    // Live Clock Update
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      const el = document.getElementById('clockTime');
+      if (el) el.textContent = timeStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Theme Switcher
+    function setTheme(theme, btn) {
+      document.body.setAttribute('data-theme', theme);
+      document.querySelectorAll('.demo-toolbar-group:nth-child(1) .demo-pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // Wallpaper Switcher
+    function setWallpaper(wp, btn) {
+      const el = document.getElementById('wallpaperEl');
+      el.className = 'desktop-wallpaper wallpaper-' + wp;
+      document.querySelectorAll('.demo-toolbar-group:nth-child(3) .demo-pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // Mode Switcher (Capsules vs Lines)
+    function setMode(mode, btn) {
+      document.body.setAttribute('data-mode', mode);
+      document.querySelectorAll('.demo-toolbar-group:nth-child(5) .demo-pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // Profile Switcher (Daily vs Founder)
+    function switchProfile(profile, btn) {
+      document.querySelectorAll('.profile-pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // App Switcher Simulator
+    function switchApp(appSlot) {
+      document.querySelectorAll('.app-indicator').forEach(dot => dot.classList.remove('active'));
+      const dot = appSlot.querySelector('.app-indicator');
+      if (dot) {
+        dot.className = 'app-indicator active';
+      }
+    }
+
+    // Spotlight Overlay Controls
+    function toggleSpotlight() {
+      const overlay = document.getElementById('spotlightOverlay');
+      const input = document.getElementById('spotlightInput');
+      const isOpen = overlay.classList.contains('open');
+      if (isOpen) {
+        overlay.classList.remove('open');
+      } else {
+        overlay.classList.add('open');
+        setTimeout(() => input.focus(), 100);
+      }
+    }
+
+    function handleBackdropClick(e) {
+      if (e.target.id === 'spotlightOverlay') {
+        toggleSpotlight();
+      }
+    }
+
+    // Keyboard Shortcuts (Alt + Space or Esc)
+    window.addEventListener('keydown', (e) => {
+      if (e.altKey && e.code === 'Space') {
+        e.preventDefault();
+        toggleSpotlight();
+      } else if (e.key === 'Escape') {
+        const overlay = document.getElementById('spotlightOverlay');
+        if (overlay.classList.contains('open')) {
+          overlay.classList.remove('open');
+        }
+      }
+    });
+
+    // Live Math / Instant Query Simulation in Spotlight
+    function handleSearch(val) {
+      const container = document.getElementById('resultsContainer');
+      const clean = val.trim();
+
+      // Math expression evaluator simulation
+      if (/^[\d\s\+\-\*\/\(\)\.\^\%]+$/.test(clean) && /[\+\-\*\/]/.test(clean)) {
+        try {
+          const evalResult = Function('"use strict";return (' + clean + ')')();
+          container.innerHTML = `
+            <div class="result-item selected">
+              <div class="result-left">
+                <div class="result-icon-box" style="color: var(--accent);">
+                  <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M8 18h.01M12 18h.01"/></svg>
+                </div>
+                <div class="result-text">
+                  <div class="result-title" style="font-size: 18px; color: var(--accent); font-weight: 700;">= ${evalResult}</div>
+                  <div class="result-subtitle">Calculation result · Press Enter to copy to clipboard</div>
+                </div>
+              </div>
+              <span class="result-badge" style="background: var(--accent-bg); color: var(--accent);">Calculator</span>
+            </div>
+          `;
+          return;
+        } catch (_) {}
+      }
+
+      // Default mock if input is empty
+      if (!clean) {
+        container.innerHTML = `
+          <div class="result-item selected">
+            <div class="result-left">
+              <div class="result-icon-box" style="color: #007acc;">
+                <svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/></svg>
+              </div>
+              <div class="result-text">
+                <div class="result-title">Visual Studio Code</div>
+                <div class="result-subtitle">C:\\Users\\Pranshul\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe</div>
+              </div>
+            </div>
+            <span class="result-badge">Application</span>
+          </div>
+          <div class="result-item">
+            <div class="result-left">
+              <div class="result-icon-box" style="color: #5ef1c2;">
+                <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </div>
+              <div class="result-text">
+                <div class="result-title">protonsearch / src / main.rs</div>
+                <div class="result-subtitle">Rust Core Search Engine & Window Placement Logic</div>
+              </div>
+            </div>
+            <span class="result-badge">Source Code</span>
+          </div>
+        `;
+      }
+    }
+
+    function triggerEffect(el) {
+      el.style.transform = 'scale(0.92)';
+      setTimeout(() => el.style.transform = '', 120);
+    }
+  </script>
+</body>
+</html>
