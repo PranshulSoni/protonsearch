@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ProtonDock & ProtonSearch: Refined Tahoe Launcher & Dock</title>
+  <title>ProtonDock & ProtonSearch: High-Performance Navigation System</title>
   <style>
     /* ==========================================================================
        DESIGN TOKENS & SYSTEM VARIABLES (Modern Sleek Glass UI)
@@ -45,6 +45,7 @@
       --trans-hover: 160ms var(--spring-ease);
       --trans-resize: 340ms var(--spring-ease);
       --trans-reorder: 280ms var(--spring-ease);
+      --trans-slide: 260ms var(--spring-ease);
     }
 
     body[data-theme="light"] {
@@ -85,7 +86,7 @@
       position: relative;
     }
 
-    /* Wallpaper: Matching User's Flowing Cobalt Silk Wave */
+    /* Wallpaper: Flowing Cobalt Silk Wave */
     .desktop-wallpaper {
       position: absolute;
       inset: 0;
@@ -191,7 +192,7 @@
     }
 
     /* ==========================================================================
-       REFINED ADAPTIVE LAUNCHER PALETTE (Raycast & Tahoe Inspired)
+       HIGH-PERFORMANCE NAVIGATION LAUNCHER PALETTE
        ========================================================================== */
     .ps-spotlight-backdrop {
       position: absolute;
@@ -212,9 +213,15 @@
       pointer-events: auto;
     }
 
-    /* Adaptive Width Card: Single-column (620px) by default, widens to 820px when preview active */
+    /* Dock-Anchored Position Option */
+    body[data-launcher-pos="dock"] .ps-spotlight-backdrop {
+      align-items: flex-end;
+      padding-top: 0;
+      padding-bottom: 74px;
+    }
+
     .ps-spotlight-card {
-      width: min(620px, calc(100vw - 32px));
+      width: min(640px, calc(100vw - 32px));
       background: var(--glass-modal);
       backdrop-filter: blur(48px) saturate(190%) contrast(104%);
       border: 1px solid var(--glass-border);
@@ -231,20 +238,27 @@
       position: relative;
     }
     .ps-spotlight-card.with-preview {
-      width: min(820px, calc(100vw - 32px));
+      width: min(840px, calc(100vw - 32px));
     }
     .ps-spotlight-backdrop.is-open .ps-spotlight-card {
       transform: translateY(0) scale(1);
     }
+    body[data-launcher-pos="dock"] .ps-spotlight-card {
+      transform: translateY(12px) scale(0.98);
+    }
+    body[data-launcher-pos="dock"] .ps-spotlight-backdrop.is-open .ps-spotlight-card {
+      transform: translateY(0) scale(1);
+    }
 
-    /* Minimalist Integrated Search Header */
+    /* Search Input Top Bar */
     .ps-search-top {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 14px 18px;
+      gap: 10px;
+      padding: 12px 18px;
       border-bottom: 1px solid var(--glass-border-subtle);
       background: rgba(255, 255, 255, 0.02);
+      position: relative;
     }
     .ps-search-ic {
       color: var(--accent);
@@ -253,22 +267,35 @@
       justify-content: center;
       flex-shrink: 0;
     }
-    .ps-scope-pill {
-      display: none;
+    /* Inline Active Scope Tag in Search Bar */
+    .ps-input-scope-tag {
+      display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 2px 7px;
+      gap: 5px;
+      padding: 2.5px 8px;
       border-radius: 6px;
-      background: rgba(0, 122, 255, 0.22);
-      border: 1px solid rgba(0, 122, 255, 0.35);
-      color: #60a5fa;
+      background: rgba(0, 122, 255, 0.26);
+      border: 1px solid rgba(0, 122, 255, 0.45);
+      color: #fff;
       font-size: 11px;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      user-select: none;
+      cursor: pointer;
+      transition: all 140ms ease;
     }
-    .ps-scope-pill.is-active {
-      display: flex;
+    .ps-input-scope-tag:hover {
+      background: rgba(0, 122, 255, 0.40);
+      border-color: var(--accent);
+    }
+    .ps-scope-close {
+      font-size: 9px;
+      opacity: 0.7;
+      margin-left: 1px;
+    }
+    .ps-scope-close:hover {
+      opacity: 1;
     }
     .ps-search-input {
       flex: 1;
@@ -277,21 +304,26 @@
       border: none;
       outline: none;
       font-family: inherit;
-      font-size: 17px;
+      font-size: 15.5px;
       font-weight: 500;
       color: var(--text-primary);
       letter-spacing: -0.01em;
     }
     .ps-search-input::placeholder {
       color: var(--text-tertiary);
+      font-size: 13.5px;
     }
-    .ps-header-actions {
+    .ps-top-actions {
       display: flex;
       align-items: center;
       gap: 6px;
+      flex-shrink: 0;
     }
-    .ps-key-hint {
-      padding: 3px 7px;
+    .ps-top-hint-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
       border-radius: 6px;
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
@@ -299,20 +331,138 @@
       font-weight: 600;
       color: var(--text-secondary);
       cursor: pointer;
+      user-select: none;
       transition: all 120ms ease;
     }
-    .ps-key-hint:hover {
+    .ps-top-hint-badge:hover {
       background: var(--glass-surface-hover);
+      color: var(--text-primary);
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+    .ps-top-hint-badge kbd {
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.12);
+      font-size: 9px;
+      font-weight: 700;
       color: var(--text-primary);
     }
 
-    /* Dynamic Results Body (Adaptive 1 or 2 Columns) */
+    /* Floating Toast Notification HUD */
+    .ps-toast {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-22px) scale(0.96);
+      background: rgba(14, 20, 32, 0.94);
+      backdrop-filter: blur(24px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 999px;
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #fff;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 122, 255, 0.25);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 250;
+      white-space: nowrap;
+    }
+    .ps-toast.is-visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+    .ps-toast-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+      flex-shrink: 0;
+    }
+
+    /* Fast Category Jump Navigation Bar (Tab & Shift+Tab or Click) */
+    .ps-nav-scope-bar {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 16px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+      background: rgba(0, 0, 0, 0.16);
+      overflow-x: auto;
+    }
+    .nav-scope-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-secondary);
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--trans-hover);
+      user-select: none;
+    }
+    .nav-scope-pill:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+    }
+    .nav-scope-pill.active {
+      background: rgba(0, 122, 255, 0.28);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .nav-scope-count {
+      font-size: 8.5px;
+      padding: 1px 4.5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text-primary);
+    }
+    .nav-scope-shortcut {
+      font-size: 8.5px;
+      color: var(--text-tertiary);
+      margin-left: 2px;
+      font-family: monospace;
+    }
+
+    /* Substring Match Highlighter */
+    .ps-match-hl {
+      color: #5ef1c2;
+      font-weight: 700;
+      background: rgba(94, 241, 194, 0.14);
+      border-radius: 2px;
+      padding: 0 1.5px;
+    }
+
+    /* Quick Jump Trigger Pulse */
+    @keyframes psJumpPulse {
+      0% { transform: scale(1); background: rgba(0, 122, 255, 0.5); }
+      50% { transform: scale(1.015); background: rgba(94, 241, 194, 0.38); }
+      100% { transform: scale(1); background: rgba(0, 122, 255, 0.16); }
+    }
+    .ps-result-row.pulse-jump {
+      animation: psJumpPulse 320ms ease;
+    }
+
+    /* Search Results Body with Sliding Action Drill-Down */
     .ps-search-body {
       display: flex;
-      min-height: 260px;
-      max-height: 400px;
+      min-height: 270px;
+      max-height: 410px;
       overflow: hidden;
+      position: relative;
     }
+
+    /* Deck 1: Main Results List */
     .ps-results-column {
       flex: 1;
       min-width: 0;
@@ -321,11 +471,17 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
+      transition: transform var(--trans-slide), opacity 180ms ease;
+    }
+    .ps-spotlight-card.in-action-mode .ps-results-column {
+      transform: translateX(-40px);
+      opacity: 0;
+      pointer-events: none;
     }
 
     /* Section Sticky Header */
     .ps-section-header {
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -333,9 +489,16 @@
       padding: 8px 10px 4px 10px;
       display: flex;
       justify-content: space-between;
+      align-items: center;
+    }
+    .ps-jump-hint {
+      font-size: 8.5px;
+      color: var(--text-tertiary);
+      font-weight: 500;
+      letter-spacing: normal;
     }
 
-    /* Individual Result Row */
+    /* Result Row */
     .ps-result-row {
       display: flex;
       align-items: center;
@@ -346,6 +509,7 @@
       border: 1px solid transparent;
       cursor: pointer;
       transition: all 120ms ease;
+      position: relative;
     }
     .ps-result-row:hover,
     .ps-result-row.is-selected {
@@ -387,14 +551,133 @@
       text-overflow: ellipsis;
       overflow: hidden;
     }
+    .ps-row-right {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
     .ps-item-badge {
-      font-size: 9px;
+      font-size: 8.5px;
       font-weight: 700;
       padding: 2px 6px;
       border-radius: 5px;
       background: rgba(255, 255, 255, 0.08);
       color: var(--text-secondary);
       letter-spacing: 0.03em;
+    }
+
+    /* Number Quick-Jump Key Badge (Alt + 1..6) */
+    .ps-num-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-tertiary);
+      font-family: inherit;
+      transition: all 120ms ease;
+    }
+    .ps-result-row.is-selected .ps-num-badge {
+      color: var(--accent);
+      border-color: rgba(0, 122, 255, 0.4);
+      background: rgba(0, 122, 255, 0.2);
+    }
+
+    /* Drill-down Arrow Hint */
+    .ps-drill-arrow {
+      color: var(--text-tertiary);
+      opacity: 0;
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+    .ps-result-row.is-selected .ps-drill-arrow {
+      opacity: 0.8;
+      transform: translateX(2px);
+    }
+
+    /* Deck 2: Sliding Action Palette (Drill-Down via Right Arrow or Ctrl+K) */
+    .ps-action-deck {
+      position: absolute;
+      inset: 0;
+      right: 290px;
+      padding: 12px 16px;
+      background: var(--glass-modal);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transform: translateX(100%);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform var(--trans-slide), opacity 180ms ease;
+      z-index: 10;
+    }
+    .ps-spotlight-card:not(.with-preview) .ps-action-deck {
+      right: 0;
+    }
+    .ps-spotlight-card.in-action-mode .ps-action-deck {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .action-deck-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+      margin-bottom: 4px;
+    }
+    .action-deck-back {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+    }
+    .action-deck-back:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+    }
+    .action-category-header {
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 6px 4px 2px 4px;
+    }
+    .action-deck-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 11px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1px solid transparent;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 100ms ease;
+    }
+    .action-deck-row:hover,
+    .action-deck-row.is-selected {
+      background: var(--accent);
+      color: #fff;
+    }
+    .action-deck-row kbd {
+      font-size: 9px;
+      padding: 1.5px 5px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.14);
+      color: inherit;
     }
 
     /* Zero-Click Hero Calculator Card */
@@ -438,7 +721,7 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* Rich Actionable Preview Pane (Sliding in smoothly on width expansion) */
+    /* Rich Actionable Preview Pane */
     .ps-preview-pane {
       width: 290px;
       border-left: 1px solid var(--glass-border-subtle);
@@ -452,7 +735,6 @@
     .ps-spotlight-card.with-preview .ps-preview-pane {
       display: flex;
     }
-
     .prev-head-card {
       display: flex;
       align-items: center;
@@ -482,8 +764,6 @@
       font-family: monospace;
       margin-top: 2px;
     }
-
-    /* Code Snippet Mockup */
     .prev-code-box {
       border-radius: 9px;
       background: rgba(10, 14, 22, 0.85);
@@ -499,80 +779,17 @@
     .code-keyword { color: #c586c0; }
     .code-func { color: #dcdcaa; }
 
-    /* Action Buttons in Preview Pane */
-    .prev-actions-stack {
-      margin-top: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    .prev-action-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 9px;
-      border-radius: 7px;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--text-primary);
-      cursor: pointer;
-      transition: all 120ms ease;
-    }
-    .prev-action-row:hover {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-
-    /* Action Palette Overlay (<kbd>Ctrl+K</kbd>) */
-    .ps-action-palette-menu {
-      position: absolute;
-      bottom: 44px;
-      right: 18px;
-      width: 230px;
-      background: var(--glass-modal);
-      backdrop-filter: blur(40px);
-      border: 1px solid var(--glass-border);
-      border-radius: 14px;
-      padding: 6px;
-      box-shadow: 0 16px 40px rgba(0,0,0,0.6);
-      display: none;
-      flex-direction: column;
-      gap: 3px;
-      z-index: 200;
-    }
-    .ps-action-palette-menu.is-open {
-      display: flex;
-    }
-    .palette-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 10px;
-      border-radius: 7px;
-      font-size: 10.5px;
-      font-weight: 600;
-      color: var(--text-primary);
-      cursor: pointer;
-      transition: all 100ms ease;
-    }
-    .palette-item:hover {
-      background: var(--accent);
-      color: #fff;
-    }
-
-    /* Refined Footer Bar */
+    /* Refined Footer Navigation Bar */
     .ps-search-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 9px 18px;
+      padding: 8px 16px;
       border-top: 1px solid var(--glass-border-subtle);
-      background: rgba(0, 0, 0, 0.22);
-      font-size: 10px;
+      background: rgba(0, 0, 0, 0.28);
+      font-size: 9.5px;
       color: var(--text-secondary);
+      user-select: none;
     }
     .ps-engine-badge {
       display: flex;
@@ -587,377 +804,42 @@
       background: var(--accent-emerald);
       box-shadow: 0 0 6px var(--accent-emerald);
     }
-    .ps-footer-keys {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .footer-key-pill {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-    }
-    .footer-key-pill kbd {
-      padding: 1px 5px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      font-family: inherit;
-      font-size: 9.5px;
-      font-weight: 700;
-      color: var(--text-primary);
-    }
-
-    /* ==========================================================================
-       DEDICATED WIDGETS MANAGER & STORE MODAL
-       ========================================================================== */
-    .customizer-backdrop {
-      position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.45);
-      backdrop-filter: blur(12px);
-      z-index: 200;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 220ms ease;
-    }
-    .customizer-backdrop.is-open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .customizer-window {
-      width: min(780px, calc(100vw - 36px));
-      max-height: min(620px, calc(100vh - 80px));
-      background: var(--glass-modal);
-      backdrop-filter: blur(48px) saturate(190%) contrast(104%);
-      border: 1px solid var(--glass-border);
-      border-radius: 20px;
-      box-shadow: 
-        0 36px 90px rgba(0, 0, 0, 0.70),
-        0 10px 24px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 var(--glass-top-highlight);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      transform: scale(0.96) translateY(12px);
-      transition: transform 240ms var(--spring-ease), opacity 200ms ease;
-    }
-    .customizer-backdrop.is-open .customizer-window {
-      transform: scale(1) translateY(0);
-    }
-
-    .cust-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 22px;
-      border-bottom: 1px solid var(--glass-border-subtle);
-      background: rgba(255, 255, 255, 0.02);
-    }
-    .cust-header-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text-primary);
-      display: flex;
-      align-items: center;
-      gap: 9px;
-    }
-    .cust-tabs {
+    .ps-nav-keys {
       display: flex;
       align-items: center;
       gap: 5px;
-      background: rgba(0, 0, 0, 0.25);
-      padding: 3px;
-      border-radius: 999px;
-      border: 1px solid var(--glass-border-subtle);
+      flex-wrap: wrap;
     }
-    .cust-tab-btn {
-      padding: 5px 14px;
-      border-radius: 999px;
-      background: transparent;
-      border: none;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-secondary);
+    .key-cap {
+      display: flex;
+      align-items: center;
+      gap: 3.5px;
       cursor: pointer;
-      transition: all var(--trans-hover);
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .cust-tab-btn.active {
-      background: var(--glass-surface-active);
-      color: var(--text-primary);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .cust-close-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 13px;
-      transition: all 120ms ease;
-    }
-    .cust-close-btn:hover {
-      background: var(--glass-surface-hover);
-      color: var(--text-primary);
-    }
-
-    .cust-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 18px 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .cust-pref-strip {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--glass-border-subtle);
-    }
-    .cust-pref-title b {
-      font-size: 12.5px;
-      color: var(--text-primary);
-      display: block;
-      margin-bottom: 2px;
-    }
-    .cust-pref-title small {
-      font-size: 10.5px;
-      color: var(--text-secondary);
-    }
-    .style-pill-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 3px;
-      border-radius: 999px;
-      border: 1px solid var(--glass-border-subtle);
-    }
-    .style-pill-btn {
-      padding: 4px 12px;
-      border-radius: 999px;
-      background: transparent;
-      border: none;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: all var(--trans-hover);
-    }
-    .style-pill-btn.active {
-      background: var(--accent);
-      color: #fff;
-    }
-
-    .widget-manage-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .widget-manage-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.035);
-      border: 1px solid var(--glass-border-subtle);
-      transition: all var(--trans-hover);
-    }
-    .widget-manage-row:hover {
-      background: rgba(255, 255, 255, 0.065);
-      border-color: var(--glass-border);
-    }
-    .widget-info {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 190px;
-    }
-    .widget-ic-box {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent);
-      flex-shrink: 0;
-    }
-    .widget-name b {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-primary);
-      display: block;
-    }
-    .widget-name small {
-      font-size: 9.5px;
-      color: var(--text-secondary);
-    }
-    .widget-controls {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .reorder-btns {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .reorder-btn {
-      width: 24px;
-      height: 24px;
-      border-radius: 6px;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
-      color: var(--text-secondary);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      transition: all 120ms ease;
-    }
-    .reorder-btn:hover {
-      background: var(--glass-surface-hover);
-      color: var(--text-primary);
-    }
-    .size-select-group {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      background: rgba(0, 0, 0, 0.25);
-      padding: 2px;
-      border-radius: 7px;
-      border: 1px solid var(--glass-border-subtle);
-    }
-    .size-opt-btn {
-      padding: 3px 8px;
+      padding: 3px 6px;
       border-radius: 5px;
-      background: transparent;
-      border: none;
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      cursor: pointer;
       transition: all 120ms ease;
+      background: transparent;
     }
-    .size-opt-btn.active {
-      background: var(--glass-surface-active);
+    .key-cap:hover {
+      background: rgba(255, 255, 255, 0.08);
       color: var(--text-primary);
     }
-
-    .store-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-      gap: 12px;
+    .key-cap:active {
+      transform: scale(0.96);
     }
-    .store-card {
-      padding: 14px;
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--glass-border-subtle);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      position: relative;
-      overflow: hidden;
-    }
-    .store-card-badge {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 2px 7px;
-      border-radius: 999px;
-      background: rgba(0, 122, 255, 0.22);
-      border: 1px solid rgba(0, 122, 255, 0.4);
-      color: #60a5fa;
+    .key-cap kbd {
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-family: inherit;
       font-size: 8.5px;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .store-card-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 9px;
-      background: var(--glass-surface);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent);
-      margin-bottom: 2px;
-    }
-    .store-card-title {
-      font-size: 12.5px;
-      font-weight: 700;
       color: var(--text-primary);
-    }
-    .store-card-desc {
-      font-size: 10px;
-      color: var(--text-secondary);
-      line-height: 1.4;
-    }
-
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 32px;
-      height: 18px;
-    }
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      inset: 0;
-      background-color: rgba(255, 255, 255, 0.18);
-      border-radius: 999px;
-      transition: 0.2s;
-    }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 14px;
-      width: 14px;
-      left: 2px;
-      bottom: 2px;
-      background-color: white;
-      border-radius: 50%;
-      transition: 0.2s;
-    }
-    input:checked + .slider {
-      background-color: var(--accent);
-    }
-    input:checked + .slider:before {
-      transform: translateX(14px);
     }
 
     /* ==========================================================================
-       THE PROTONDOCK RAIL & RELOCATABLE WIDGETS
+       THE DOCK RAIL WITH REORDERABLE WIDGETS
        ========================================================================== */
     .dock-stage {
       position: absolute;
@@ -1016,47 +898,6 @@
       color: #fff;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     }
-    .profile-add-btn {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--glass-surface);
-      border: 1px solid var(--glass-border-subtle);
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 11px;
-      transition: all 120ms ease;
-    }
-    .profile-add-btn:hover {
-      background: var(--glass-surface-hover);
-      color: var(--text-primary);
-      transform: scale(1.1);
-    }
-
-    .customize-dock-trigger {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background: var(--glass-base);
-      backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--glass-border);
-      border-radius: 999px;
-      padding: 4px 11px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 var(--glass-top-highlight);
-      font-size: 10.5px;
-      font-weight: 600;
-      color: var(--text-primary);
-      cursor: pointer;
-      transition: all var(--trans-hover);
-    }
-    .customize-dock-trigger:hover {
-      background: var(--glass-surface-hover);
-      border-color: var(--glass-top-highlight);
-      transform: translateY(-1px);
-    }
 
     .dock-rail {
       position: relative;
@@ -1083,7 +924,6 @@
       pointer-events: none;
     }
 
-    /* Common Dock Widget Container (Supports Drag & Drop & Relocation) */
     .dock-widget {
       position: relative;
       display: flex;
@@ -1096,25 +936,10 @@
         width var(--trans-resize),
         padding var(--trans-resize),
         background var(--trans-hover),
-        border-color var(--trans-hover),
-        box-shadow var(--trans-hover);
+        border-color var(--trans-hover);
       flex-shrink: 0;
       overflow: hidden;
     }
-    .dock-widget:active {
-      cursor: grabbing;
-    }
-    .dock-widget.dragging {
-      opacity: 0.35;
-      transform: scale(0.92);
-    }
-    .dock-widget.drag-over {
-      transform: scale(1.05);
-      outline: 2px dashed var(--accent);
-      outline-offset: 2px;
-    }
-
-    /* DISPLAY STYLES: CAPSULES VS LINES */
     body[data-display-style="capsule"] .dock-widget {
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
@@ -1125,16 +950,10 @@
       border-color: var(--glass-border);
       transform: translateY(-2px);
     }
-
     body[data-display-style="line"] .dock-widget {
       background: transparent;
       border: 1px solid transparent;
       box-shadow: none;
-    }
-    body[data-display-style="line"] .dock-widget:hover {
-      background: var(--glass-surface-hover);
-      border-color: var(--glass-border-subtle);
-      transform: translateY(-2px);
     }
     body[data-display-style="line"] .dock-widget::after {
       content: "";
@@ -1145,66 +964,16 @@
       width: 1px;
       background: var(--glass-border-subtle);
     }
-    body[data-display-style="line"] .dock-widget:last-child::after {
-      display: none;
-    }
 
-    /* EXACT WIDGET SIZING TIERS */
-    .widget-windows[data-size="compact"] { width: 36px; padding: 0; justify-content: center; }
-    .widget-windows[data-size="medium"] { width: 78px; padding: 0 9px; gap: 6px; }
-    .widget-windows[data-size="expanded"] { width: 104px; padding: 0 11px; gap: 7px; }
+    .widget-windows { width: 36px; justify-content: center; }
+    .widget-search { width: 36px; justify-content: center; }
+    .widget-weather { width: 54px; padding: 0 8px; gap: 5px; }
+    .widget-system { width: 78px; padding: 0 8px; gap: 5px; font-size: 10px; }
+    .widget-spotify { width: 78px; padding: 0 8px; gap: 6px; }
+    .widget-clock { width: 58px; padding: 0 6px; justify-content: center; }
+    .widget-util { width: 34px; justify-content: center; }
+    .widget-apps { display: flex; align-items: center; gap: 4px; height: 38px; }
 
-    .widget-search[data-size="compact"] { width: 36px; padding: 0; justify-content: center; }
-    .widget-search[data-size="medium"] { width: 114px; padding: 0 9px; gap: 6px; }
-    .widget-search[data-size="expanded"] { width: 175px; padding: 0 11px; gap: 8px; }
-
-    .widget-weather[data-size="compact"] { width: 54px; padding: 0 8px; gap: 5px; }
-    .widget-weather[data-size="medium"] { width: 98px; padding: 0 9px; gap: 6px; }
-    .widget-weather[data-size="expanded"] { width: 165px; padding: 0 11px; gap: 8px; }
-
-    .widget-system[data-size="compact"] { width: 78px; padding: 0 8px; gap: 5px; font-size: 10px; }
-    .widget-system[data-size="medium"] { width: 124px; padding: 0 9px; gap: 6px; font-size: 10px; }
-    .widget-system[data-size="expanded"] { width: 172px; padding: 0 11px; gap: 7px; font-size: 10px; }
-
-    .widget-spotify[data-size="compact"] { width: 78px; padding: 0 8px; gap: 6px; }
-    .widget-spotify[data-size="medium"] { width: 158px; padding: 0 9px; gap: 7px; }
-    .widget-spotify[data-size="expanded"] { width: 220px; padding: 0 11px; gap: 8px; }
-
-    .widget-clock[data-size="compact"] { width: 58px; padding: 0 6px; justify-content: center; }
-    .widget-clock[data-size="medium"] { width: 82px; padding: 0 8px; justify-content: center; }
-    .widget-clock[data-size="expanded"] { width: 110px; padding: 0 10px; justify-content: center; }
-
-    .widget-util[data-size="compact"] { width: 34px; padding: 0; justify-content: center; }
-    .widget-util[data-size="medium"],
-    .widget-util[data-size="expanded"] { width: 62px; padding: 0 8px; gap: 5px; }
-
-    .widget-inner {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      height: 100%;
-      white-space: nowrap;
-      pointer-events: none;
-    }
-    .widget-label-compact,
-    .widget-label-medium,
-    .widget-label-expanded {
-      display: none;
-      align-items: center;
-      white-space: nowrap;
-      line-height: 1.2;
-    }
-    [data-size="compact"] .widget-label-compact { display: flex; }
-    [data-size="medium"] .widget-label-medium { display: flex; }
-    [data-size="expanded"] .widget-label-expanded { display: flex; }
-
-    /* Running Apps Group */
-    .widget-apps {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      height: 38px;
-    }
     .app-icon-btn {
       width: 36px;
       height: 36px;
@@ -1212,16 +981,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: transparent;
-      border: 1px solid transparent;
-      position: relative;
       cursor: pointer;
-      transition: all var(--trans-hover);
-    }
-    .app-icon-btn:hover {
-      background: var(--glass-surface-hover);
-      border-color: var(--glass-border-subtle);
-      transform: translateY(-2px);
+      position: relative;
     }
     .app-dot {
       position: absolute;
@@ -1232,25 +993,7 @@
       height: 3px;
       border-radius: 50%;
       background: var(--text-primary);
-      box-shadow: 0 0 3px rgba(255, 255, 255, 0.7);
     }
-    .app-badge {
-      position: absolute;
-      top: 0px;
-      right: 0px;
-      min-width: 14px;
-      height: 13px;
-      padding: 0 3.5px;
-      border-radius: 999px;
-      background: rgba(255, 59, 48, 0.95);
-      color: #fff;
-      font-size: 8px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
     .active-window-pill {
       height: 36px;
       padding: 0 9px 0 6px;
@@ -1260,22 +1003,8 @@
       display: flex;
       align-items: center;
       gap: 7px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      transition: all var(--trans-hover);
-    }
-    .active-window-pill:hover {
-      background: var(--glass-surface-hover);
-      border-color: var(--glass-top-highlight);
-      transform: translateY(-2px);
-    }
-    .active-window-pill span {
       font-size: 11px;
       font-weight: 600;
-      max-width: 100px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .icon {
@@ -1289,19 +1018,25 @@
     }
   </style>
 </head>
-<body data-theme="dark" data-display-style="capsule">
+<body data-theme="dark" data-display-style="capsule" data-launcher-pos="centered">
 
-  <!-- Cobalt Silk Wave Wallpaper -->
+  <!-- Flowing Cobalt Silk Wave Wallpaper -->
   <div class="desktop-wallpaper wallpaper-cobalt-wave" id="wallpaperEl"></div>
 
   <!-- Ambient Header -->
   <div class="desktop-hint">
-    <h1>ProtonDock & ProtonSearch: Refined Tahoe Launcher</h1>
-    <p>Adaptive Raycast-inspired command palette, high-fidelity native icons, real-time hero calculator, rich code preview pane, and modular relocatable dock rail.</p>
+    <h1>ProtonDock & ProtonSearch: High-Performance Navigation</h1>
+    <p>Spatial 2D navigation (<kbd>↑↓</kbd> items, <kbd>Tab</kbd> scopes, <kbd>→</kbd> drill-down actions, <kbd>Alt+1..6</kbd> direct jump) and position options (Centered vs Dock-Anchored).</p>
   </div>
 
   <!-- Top Demo Controls Toolbar -->
   <div class="demo-toolbar">
+    <div class="demo-toolbar-group">
+      <span>Position:</span>
+      <button class="demo-pill-btn active" id="btnPosCentered" onclick="setLauncherPosition('centered', this)">Centered</button>
+      <button class="demo-pill-btn" id="btnPosDock" onclick="setLauncherPosition('dock', this)">Dock-Anchored</button>
+    </div>
+    <div class="demo-divider"></div>
     <div class="demo-toolbar-group">
       <span>Theme:</span>
       <button class="demo-pill-btn active" onclick="setTheme('dark', this)">Dark Glass</button>
@@ -1309,63 +1044,96 @@
     </div>
     <div class="demo-divider"></div>
     <div class="demo-toolbar-group">
-      <span>Style:</span>
-      <button class="demo-pill-btn active" id="btnStyleCapsule" onclick="setDisplayStyle('capsule', this)">Capsules</button>
-      <button class="demo-pill-btn" id="btnStyleLine" onclick="setDisplayStyle('line', this)">Lines</button>
-    </div>
-    <div class="demo-divider"></div>
-    <div class="demo-toolbar-group">
       <span>Wallpaper:</span>
       <button class="demo-pill-btn active" onclick="setWallpaper('cobalt-wave', this)">Cobalt</button>
       <button class="demo-pill-btn" onclick="setWallpaper('sunset', this)">Sunset</button>
-      <button class="demo-pill-btn" onclick="setWallpaper('minimal', this)">Minimal</button>
     </div>
     <div class="demo-divider"></div>
     <button class="demo-pill-btn" style="background: rgba(0, 122, 255, 0.28); border-color: var(--accent); color: #fff;" onclick="toggleProtonSearch()">
       <svg class="icon" style="width:12px; height:12px; color:#5ef1c2;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      Try Launcher (Alt+Space)
-    </button>
-    <button class="demo-pill-btn" style="background: rgba(255, 255, 255, 0.08); border-color: var(--glass-border); color: #fff;" onclick="openCustomizerModal()">
-      <svg class="icon" style="width:12px; height:12px;" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      Widget Manager
+      Toggle Search (Alt+Space)
     </button>
   </div>
 
   <!-- ==========================================================================
-       REFINED ADAPTIVE LAUNCHER MODAL (Raycast & Tahoe Model)
+       HIGH-PERFORMANCE NAVIGATION LAUNCHER PALETTE
        ========================================================================== -->
   <div class="ps-spotlight-backdrop is-open" id="searchModal" onclick="handleSearchBackdrop(event)">
     <section class="ps-spotlight-card with-preview" id="launcherCard" role="dialog" aria-label="ProtonSearch Spotlight">
       
-      <!-- Minimalist Search Header with Quick Key Hints -->
+      <!-- Frosted Glass Toast Notification HUD -->
+      <div class="ps-toast" id="psToast">
+        <span class="ps-toast-dot"></span>
+        <span id="psToastMsg">Action executed</span>
+      </div>
+
+      <!-- Minimalist Search Header -->
       <div class="ps-search-top">
         <div class="ps-search-ic">
-          <svg class="icon" style="width:19px; height:19px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <svg class="icon" style="width:18px; height:18px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </div>
-        <div class="ps-scope-pill" id="activeScopePill">ALL</div>
+        <div class="ps-input-scope-tag" id="inputScopeTag" style="display:none;" onclick="clearActiveScope()">
+          <span id="inputScopeLabel">Apps</span>
+          <span class="ps-scope-close">✕</span>
+        </div>
         <input 
           id="spotlightInput"
           class="ps-search-input" 
           type="text" 
-          value="Sidebar"
-          placeholder="Search apps, files, git commits, code, math formulas..." 
+          value=""
+          placeholder="Search apps, files, git, math, or type 'app:', 'git:'... (Ctrl+K for actions)" 
           autocomplete="off"
           oninput="handleSearchInput(this.value)"
         />
-        <div class="ps-header-actions">
-          <span class="ps-key-hint" onclick="togglePreviewPane()" title="Toggle Preview Column (Tab)">Tab Preview</span>
-          <span class="ps-key-hint" onclick="toggleActionPalette()" title="Action Palette (Ctrl+K)">Ctrl+K</span>
-          <span class="ps-key-hint" onclick="toggleProtonSearch(false)">esc</span>
+        <div class="ps-top-actions">
+          <div class="ps-top-hint-badge" onclick="enterActionMode()" title="Actions Drawer (Ctrl+K)">
+            <kbd>Ctrl+K</kbd> <span>Actions</span>
+          </div>
+          <div class="ps-top-hint-badge" onclick="togglePreviewPane()" title="Toggle Preview (Space)">
+            <kbd>Space</kbd> <span>Preview</span>
+          </div>
+          <div class="ps-top-hint-badge" onclick="toggleProtonSearch(false)" title="Dismiss (Esc)">
+            <kbd>Esc</kbd>
+          </div>
         </div>
       </div>
 
-      <!-- Search Results Body (Adaptive 1 or 2 Columns) -->
+      <!-- Category Filter Navigation Bar (Press Tab or Click to filter instantly) -->
+      <div class="ps-nav-scope-bar">
+        <div class="nav-scope-pill active" data-scope="all" onclick="selectNavScope('all', this)">
+          <span>All</span>
+          <span class="nav-scope-count" id="count-all">10</span>
+          <span class="nav-scope-shortcut">Tab 1</span>
+        </div>
+        <div class="nav-scope-pill" data-scope="apps" onclick="selectNavScope('apps', this)">
+          <span>Apps</span>
+          <span class="nav-scope-count" id="count-apps">3</span>
+          <span class="nav-scope-shortcut">Tab 2</span>
+        </div>
+        <div class="nav-scope-pill" data-scope="files" onclick="selectNavScope('files', this)">
+          <span>Files &amp; Code</span>
+          <span class="nav-scope-count" id="count-files">2</span>
+          <span class="nav-scope-shortcut">Tab 3</span>
+        </div>
+        <div class="nav-scope-pill" data-scope="git" onclick="selectNavScope('git', this)">
+          <span>Git Tasks</span>
+          <span class="nav-scope-count" id="count-git">2</span>
+          <span class="nav-scope-shortcut">Tab 4</span>
+        </div>
+        <div class="nav-scope-pill" data-scope="tools" onclick="selectNavScope('tools', this)">
+          <span>System &amp; Math</span>
+          <span class="nav-scope-count" id="count-tools">3</span>
+          <span class="nav-scope-shortcut">Tab 5</span>
+        </div>
+      </div>
+
+      <!-- Search Results Body with Action Drill-Down Deck -->
       <div class="ps-search-body">
         
-        <!-- Results Column (Left) -->
+        <!-- Results Column (Left Deck) -->
         <div class="ps-results-column" id="resultsList">
           
-          <!-- Section 1: In-Process Tool Hero (Appears when math or quick tool matched) -->
+          <!-- Hero Calculator Card (When math entered) -->
           <div id="calculatorHeroContainer" style="display:none;">
             <div class="ps-calculator-hero" onclick="copyCalculatorResult()">
               <div class="ps-calc-main">
@@ -1379,204 +1147,86 @@
             </div>
           </div>
 
-          <!-- Section 2: Applications -->
-          <div class="ps-section-header">
-            <span>Applications</span>
-            <span>2 Matches</span>
-          </div>
-
-          <!-- VS Code (Genuine Vector Icon) -->
-          <div class="ps-result-row" data-id="vscode" onclick="selectResult('vscode')">
-            <div class="ps-item-icon" style="background:rgba(0,122,204,0.15);">
-              <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
-                <path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/>
-                <path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/>
-              </svg>
-            </div>
-            <div class="ps-item-copy">
-              <b>Visual Studio Code</b>
-              <small>Applications · C:\Program Files\Microsoft VS Code\Code.exe</small>
-            </div>
-            <span class="ps-item-badge">APP</span>
-          </div>
-
-          <!-- Spotify -->
-          <div class="ps-result-row" data-id="spotify" onclick="selectResult('spotify')">
-            <div class="ps-item-icon" style="background:rgba(29,185,84,0.15);">
-              <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="11" fill="#1db954"/>
-                <path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
-              </svg>
-            </div>
-            <div class="ps-item-copy">
-              <b>Spotify</b>
-              <small>Audio Player · %APPDATA%\Spotify\Spotify.exe</small>
-            </div>
-            <span class="ps-item-badge">APP</span>
-          </div>
-
-          <!-- Section 3: Files & Source Code (FTS5) -->
-          <div class="ps-section-header" style="margin-top:6px;">
-            <span>Local Files & Code (FTS5)</span>
-            <span>2 Matches</span>
-          </div>
-
-          <!-- Sidebar-Bridge.tsx (Selected by default) -->
-          <div class="ps-result-row is-selected" data-id="sidebar" onclick="selectResult('sidebar')">
-            <div class="ps-item-icon" style="background:rgba(49,120,198,0.18);">
-              <svg style="width:19px; height:19px;" viewBox="0 0 24 24">
-                <rect width="18" height="20" x="3" y="2" rx="3" fill="#3178c6"/>
-                <text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">TS</text>
-              </svg>
-            </div>
-            <div class="ps-item-copy">
-              <b>Sidebar-Bridge.tsx</b>
-              <small>src &gt; components &gt; dock &gt; Sidebar-Bridge.tsx</small>
-            </div>
-            <span class="ps-item-badge" style="color:#60a5fa; background:rgba(49,120,198,0.2);">TSX</span>
-          </div>
-
-          <!-- weather.rs (Rust Source) -->
-          <div class="ps-result-row" data-id="weatherrs" onclick="selectResult('weatherrs')">
-            <div class="ps-item-icon" style="background:rgba(234,88,12,0.18);">
-              <svg style="width:19px; height:19px;" viewBox="0 0 24 24">
-                <rect width="18" height="20" x="3" y="2" rx="3" fill="#ea580c"/>
-                <text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">RS</text>
-              </svg>
-            </div>
-            <div class="ps-item-copy">
-              <b>weather.rs</b>
-              <small>protonsearch &gt; src &gt; weather.rs</small>
-            </div>
-            <span class="ps-item-badge" style="color:#fb923c; background:rgba(234,88,12,0.2);">RUST</span>
-          </div>
-
-          <!-- Section 4: Git Repository Tasks & Commits -->
-          <div class="ps-section-header" style="margin-top:6px;">
-            <span>Git Repository</span>
-            <span>2 Matches</span>
-          </div>
-
-          <!-- TODO Item -->
-          <div class="ps-result-row" data-id="todofts" onclick="selectResult('todofts')">
-            <div class="ps-item-icon" style="background:rgba(245,158,11,0.15);">
-              <svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="9 12 11 14 15 10"/></svg>
-            </div>
-            <div class="ps-item-copy">
-              <b>TODO: Cache FTS5 token indexes</b>
-              <small>src-tauri &gt; src &gt; indexer.rs:142</small>
-            </div>
-            <span class="ps-item-badge" style="color:#fbbf24; background:rgba(245,158,11,0.2);">TODO</span>
-          </div>
-
-          <!-- Git Commit -->
-          <div class="ps-result-row" data-id="gitcommit" onclick="selectResult('gitcommit')">
-            <div class="ps-item-icon" style="background:rgba(168,85,247,0.15);">
-              <svg class="icon" style="color:#c084fc;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
-            </div>
-            <div class="ps-item-copy">
-              <b>feat(ui): Ganella slender glass rail</b>
-              <small>Commit 142f73e · branch dock (HEAD)</small>
-            </div>
-            <span class="ps-item-badge" style="color:#c084fc; background:rgba(168,85,247,0.2);">GIT</span>
-          </div>
+          <!-- Dynamic Results Container -->
+          <div id="resultsRowsContainer" style="display:flex; flex-direction:column; gap:2px;"></div>
 
         </div>
 
-        <!-- Rich Actionable Preview Pane (Glides in when file selected or Tab pressed) -->
+        <!-- Sliding Action Drill-Down Deck (Slides in on Right Arrow or Ctrl+K) -->
+        <div class="ps-action-deck" id="actionDeck">
+          <div class="action-deck-header">
+            <div class="action-deck-back" onclick="exitActionMode()">
+              <span>← Back to Results</span>
+              <kbd style="font-size:8.5px; opacity:0.6;">Esc</kbd>
+            </div>
+            <span style="font-size:10.5px; color:var(--text-tertiary); font-weight:700;" id="actionDeckItemName">Actions</span>
+          </div>
+
+          <!-- Contextual Actions List -->
+          <div id="actionDeckList" style="display:flex; flex-direction:column; gap:4px; overflow-y:auto;"></div>
+        </div>
+
+        <!-- Rich Actionable Preview Pane -->
         <div class="ps-preview-pane" id="previewPane">
           <div class="prev-head-card">
-            <div class="prev-head-icon" id="prevIcon">
-              <svg style="width:24px; height:24px;" viewBox="0 0 24 24">
-                <rect width="18" height="20" x="3" y="2" rx="3" fill="#3178c6"/>
-                <text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">TS</text>
-              </svg>
-            </div>
+            <div class="prev-head-icon" id="prevIcon"></div>
             <div style="min-width:0; flex:1;">
-              <div class="prev-head-title" id="prevTitle">Sidebar-Bridge.tsx</div>
-              <div class="prev-breadcrumbs" id="prevPath">src &gt; components &gt; dock</div>
+              <div class="prev-head-title" id="prevTitle">Visual Studio Code</div>
+              <div class="prev-breadcrumbs" id="prevPath">Applications · Code.exe</div>
             </div>
           </div>
 
-          <!-- Live Code Snippet Preview -->
-          <div class="prev-code-box" id="prevCodeBox">
-            <div><span class="code-comment">// Bridge between Tauri backend &amp; React dock</span></div>
-            <div><span class="code-keyword">export interface</span> <span class="code-func">DockGeometry</span> {</div>
-            <div>&nbsp;&nbsp;x: <span class="code-keyword">number</span>; y: <span class="code-keyword">number</span>;</div>
-            <div>&nbsp;&nbsp;width: <span class="code-keyword">number</span>; height: <span class="code-keyword">number</span>;</div>
-            <div>&nbsp;&nbsp;radius: <span class="code-keyword">number</span>;</div>
-            <div>}</div>
-            <div><span class="code-keyword">export function</span> <span class="code-func">syncDockGeometry</span>() {</div>
-            <div>&nbsp;&nbsp;<span class="code-comment">// Sets Win32 click-through region</span></div>
-            <div>}</div>
-          </div>
+          <div class="prev-code-box" id="prevCodeBox"></div>
 
           <div style="display:flex; flex-direction:column; gap:4px; font-size:10px; color:var(--text-secondary);">
             <div style="display:flex; justify-content:space-between;">
-              <span>File Size</span>
-              <b style="color:var(--text-primary);" id="prevSize">8.4 KB (248 lines)</b>
+              <span>Metrics</span>
+              <b style="color:var(--text-primary);" id="prevSize">v1.95.2 · x64</b>
             </div>
             <div style="display:flex; justify-content:space-between;">
-              <span>Last Modified</span>
-              <b style="color:var(--text-primary);" id="prevMod">12 minutes ago</b>
+              <span>Session / State</span>
+              <b style="color:var(--accent-emerald);" id="prevMod">Active Window</b>
             </div>
           </div>
 
-          <!-- Quick Action Buttons -->
-          <div class="prev-actions-stack">
-            <div class="prev-action-row" onclick="executePreviewAction('Open with Code')">
-              <span>Open in VS Code</span>
-              <kbd style="font-size:9.5px; opacity:0.8;">↵</kbd>
+          <div style="margin-top:auto; display:flex; flex-direction:column; gap:5px;">
+            <div class="action-deck-row" style="background:var(--glass-surface); border:1px solid var(--glass-border-subtle);" onclick="triggerPrimaryAction()">
+              <span>Launch / Open (↵)</span>
+              <span style="opacity:0.6; font-size:9.5px;">Primary</span>
             </div>
-            <div class="prev-action-row" onclick="executePreviewAction('Reveal in Explorer')">
-              <span>Reveal in File Explorer</span>
-              <kbd style="font-size:9.5px; opacity:0.8;">Ctrl+↵</kbd>
+            <div class="action-deck-row" style="background:var(--glass-surface); border:1px solid var(--glass-border-subtle);" onclick="triggerSecondaryAction()">
+              <span>Reveal in Explorer (Ctrl+↵)</span>
+              <span style="opacity:0.6; font-size:9.5px;">Secondary</span>
             </div>
-            <div class="prev-action-row" onclick="executePreviewAction('Copy Path')">
-              <span>Copy Relative Path</span>
-              <kbd style="font-size:9.5px; opacity:0.8;">Ctrl+C</kbd>
+            <div class="action-deck-row" style="background:var(--glass-surface); border:1px solid var(--glass-border-subtle);" onclick="copyCurrentPath()">
+              <span>Copy Full Path (Ctrl+C)</span>
+              <span style="opacity:0.6; font-size:9.5px;">Clipboard</span>
+            </div>
+            <div class="action-deck-row" style="background:rgba(0,122,255,0.2); border:1px solid rgba(0,122,255,0.4);" onclick="enterActionMode()">
+              <span>All Actions... (Ctrl+K)</span>
+              <span style="opacity:0.8; font-size:9.5px;">→</span>
             </div>
           </div>
         </div>
 
       </div>
 
-      <!-- Action Palette Floating Menu (<kbd>Ctrl+K</kbd>) -->
-      <div class="ps-action-palette-menu" id="actionPaletteMenu">
-        <div style="font-size:9px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; padding:4px 6px;">Available Actions</div>
-        <div class="palette-item" onclick="executePreviewAction('Primary Open')">
-          <span>Open File / Run</span>
-          <span style="opacity:0.6;">↵</span>
-        </div>
-        <div class="palette-item" onclick="executePreviewAction('Reveal in Explorer')">
-          <span>Reveal in File Explorer</span>
-          <span style="opacity:0.6;">Ctrl+↵</span>
-        </div>
-        <div class="palette-item" onclick="executePreviewAction('Open Terminal')">
-          <span>Open in Windows Terminal</span>
-          <span style="opacity:0.6;">Ctrl+T</span>
-        </div>
-        <div class="palette-item" onclick="executePreviewAction('Copy Path')">
-          <span>Copy Full Path</span>
-          <span style="opacity:0.6;">Ctrl+C</span>
-        </div>
-        <div class="palette-item" onclick="executePreviewAction('Pin to Dock')">
-          <span>Pin Item to Dock</span>
-          <span style="opacity:0.6;">Ctrl+P</span>
-        </div>
-      </div>
-
-      <!-- Refined Minimalist Footer Bar -->
+      <!-- Refined Navigation Footer -->
       <footer class="ps-search-footer">
         <div class="ps-engine-badge">
           <span class="ps-engine-dot"></span>
-          <span>ProtonSearch · 12,418 items indexed (0.4 ms)</span>
+          <span id="footerMatchCount">ProtonSearch · 10 matches · 0.4 ms</span>
         </div>
-        <div class="ps-footer-keys">
-          <div class="footer-key-pill" onclick="executePreviewAction('Open')"><kbd>↵</kbd> <span>Open</span></div>
-          <div class="footer-key-pill" onclick="togglePreviewPane()"><kbd>Tab</kbd> <span>Preview</span></div>
-          <div class="footer-key-pill" onclick="toggleActionPalette()"><kbd>Ctrl+K</kbd> <span>Actions</span></div>
-          <div class="footer-key-pill" onclick="toggleProtonSearch(false)"><kbd>esc</kbd> <span>Close</span></div>
+        <div class="ps-nav-keys">
+          <div class="key-cap" onclick="navigateResults(1)" title="Down arrow or Ctrl+N"><kbd>↑↓</kbd> <span>Select</span></div>
+          <div class="key-cap" onclick="triggerPrimaryAction()" title="Enter key"><kbd>↵</kbd> <span>Open</span></div>
+          <div class="key-cap" onclick="triggerSecondaryAction()" title="Ctrl+Enter"><kbd>Ctrl+↵</kbd> <span>Reveal</span></div>
+          <div class="key-cap" onclick="copyCurrentPath()" title="Ctrl+C"><kbd>Ctrl+C</kbd> <span>Path</span></div>
+          <div class="key-cap" onclick="openByNumber(1)" title="Alt+1 through Alt+6"><kbd>Alt+1..6</kbd> <span>Jump</span></div>
+          <div class="key-cap" onclick="enterActionMode()" title="Ctrl+K or Right Arrow"><kbd>Ctrl+K</kbd> <span>Actions</span></div>
+          <div class="key-cap" onclick="cycleNavScope()" title="Tab to cycle"><kbd>Tab</kbd> <span>Scopes</span></div>
+          <div class="key-cap" onclick="togglePreviewPane()" title="Space key"><kbd>Space</kbd> <span>Preview</span></div>
+          <div class="key-cap" onclick="toggleProtonSearch(false)" title="Escape key"><kbd>Esc</kbd> <span>Close</span></div>
         </div>
       </footer>
 
@@ -1584,309 +1234,314 @@
   </div>
 
   <!-- ==========================================================================
-       DEDICATED WIDGETS PAGE & STORE MODAL
-       ========================================================================== -->
-  <div class="customizer-backdrop" id="customizerModal" onclick="handleCustBackdrop(event)">
-    <div class="customizer-window" role="dialog" aria-label="Widget Manager and Store">
-      <div class="cust-header">
-        <div class="cust-header-title">
-          <svg class="icon" style="color:var(--accent);" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          <span>Dock & Widgets Center</span>
-        </div>
-        <div class="cust-tabs">
-          <button class="cust-tab-btn active" id="tabBtnInstalled" onclick="switchCustTab('installed')">
-            <span>Installed Widgets</span>
-          </button>
-          <button class="cust-tab-btn" id="tabBtnStore" onclick="switchCustTab('store')">
-            <span>Widget Store</span>
-            <span style="font-size:8px; padding:1px 5px; border-radius:999px; background:rgba(0,122,255,0.3); color:#60a5fa;">NEW</span>
-          </button>
-        </div>
-        <button class="cust-close-btn" onclick="closeCustomizerModal()">✕</button>
-      </div>
-
-      <div class="cust-body">
-        <!-- TAB 1: INSTALLED WIDGETS -->
-        <div id="tabContentInstalled" style="display:flex; flex-direction:column; gap:14px;">
-          <div class="cust-pref-strip">
-            <div class="cust-pref-title">
-              <b>Dock Visual Representation</b>
-              <small>Choose between individual squircle capsules or minimalist horizontal line dividers.</small>
-            </div>
-            <div class="style-pill-group">
-              <button class="style-pill-btn active" id="modalStyleCapsule" onclick="setDisplayStyle('capsule')">Capsules</button>
-              <button class="style-pill-btn" id="modalStyleLine" onclick="setDisplayStyle('line')">Lines</button>
-            </div>
-          </div>
-
-          <div class="widget-manage-grid" id="widgetManageList">
-            <!-- Populated via JavaScript dynamically -->
-          </div>
-        </div>
-
-        <!-- TAB 2: WIDGET STORE (COMING SOON) -->
-        <div id="tabContentStore" style="display:none; flex-direction:column; gap:14px;">
-          <div style="display:flex; align-items:center; justify-content:space-between;">
-            <div>
-              <b style="font-size:14px;">Community & Native Widget Store</b>
-              <p style="font-size:11px; color:var(--text-secondary); margin-top:2px;">Discover and install verified high-performance extensions for ProtonDock.</p>
-            </div>
-            <span style="font-size:10px; font-weight:700; color:var(--accent-emerald); background:rgba(94,241,194,0.15); border:1px solid rgba(94,241,194,0.3); padding:3px 9px; border-radius:999px;">Store Coming Soon</span>
-          </div>
-
-          <div class="store-grid">
-            <div class="store-card">
-              <span class="store-card-badge">Coming Soon</span>
-              <div class="store-card-icon">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-              </div>
-              <div class="store-card-title">GitHub Pulse</div>
-              <div class="store-card-desc">Real-time commit streaks, pending PR reviews, and CI workflow status pills.</div>
-            </div>
-
-            <div class="store-card">
-              <span class="store-card-badge">Coming Soon</span>
-              <div class="store-card-icon">
-                <svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              </div>
-              <div class="store-card-title">Crypto & Stocks Ticker</div>
-              <div class="store-card-desc">Live mini sparklines for BTC, ETH, and S&P 500 index tracking right in your rail.</div>
-            </div>
-
-            <div class="store-card">
-              <span class="store-card-badge">Coming Soon</span>
-              <div class="store-card-icon">
-                <svg class="icon" style="color:#ef4444;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              </div>
-              <div class="store-card-title">Pomodoro Focus Timer</div>
-              <div class="store-card-desc">Sleek 25-minute focus intervals with subtle audio cues and break alerts.</div>
-            </div>
-
-            <div class="store-card">
-              <span class="store-card-badge">Coming Soon</span>
-              <div class="store-card-icon">
-                <svg class="icon" style="color:#38bdf8;" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-              </div>
-              <div class="store-card-title">Network Speedometer</div>
-              <div class="store-card-desc">Sub-second download and upload bandwidth meters powered by native Rust sockets.</div>
-            </div>
-
-            <div class="store-card">
-              <span class="store-card-badge">Coming Soon</span>
-              <div class="store-card-icon">
-                <svg class="icon" style="color:#a855f7;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </div>
-              <div class="store-card-title">Quick Scratchpad</div>
-              <div class="store-card-desc">Instant clipboard snippets, fast Markdown notes, and auto-synced checklists.</div>
-            </div>
-
-            <div class="store-card">
-              <span class="store-card-badge">Coming Soon</span>
-              <div class="store-card-icon">
-                <svg class="icon" style="color:#10b981;" viewBox="0 0 24 24"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="11" x2="23" y2="13"/></svg>
-              </div>
-              <div class="store-card-title">Battery & Power Engine</div>
-              <div class="store-card-desc">Live battery health, watt discharge rates, and one-click power profiles.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==========================================================================
-       THE DOCK RAIL WITH REORDERABLE WIDGETS
+       THE DOCK RAIL
        ========================================================================== -->
   <div class="dock-stage" id="dockStage">
-
-    <!-- Floating Shelf Above Dock -->
-    <div class="dock-floating-shelf" id="dockShelf">
-      <div class="profile-switcher-pill" aria-label="Profiles">
-        <button class="profile-tab-btn active" onclick="switchProfile('daily', this)">Daily</button>
-        <button class="profile-tab-btn" onclick="switchProfile('work', this)">Work</button>
-        <button class="profile-tab-btn" onclick="switchProfile('founder', this)">Founder</button>
-        <button class="profile-tab-btn" onclick="switchProfile('focus', this)">Focus</button>
-        <button class="profile-add-btn" title="Add New Profile" onclick="addNewProfile()">+</button>
+    <div class="dock-floating-shelf">
+      <div class="profile-switcher-pill">
+        <button class="profile-tab-btn active">Daily</button>
+        <button class="profile-tab-btn">Work</button>
+        <button class="profile-tab-btn">Founder</button>
       </div>
-
-      <button class="customize-dock-trigger" onclick="openCustomizerModal()">
-        <svg class="icon" style="width:12px; height:12px;" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span>Customize Widgets</span>
-      </button>
     </div>
 
-    <!-- MAIN DOCK RAIL (Drag and Drop Relocatable Container) -->
-    <nav class="dock-rail" id="dockRail" aria-label="ProtonDock">
-
-      <!-- WIDGET 1: Windows Start Menu Button -->
-      <div class="dock-widget widget-windows" id="w-windows" data-widget="windows" data-size="compact" draggable="true" title="Windows Start Menu (Drag to relocate)">
+    <nav class="dock-rail" id="dockRail">
+      <div class="dock-widget widget-windows" title="Windows Start Menu">
         <div class="widget-inner" style="justify-content:center;">
-          <svg style="width:18px; height:18px; flex-shrink:0;" viewBox="0 0 24 24" fill="#0078d4">
-            <rect x="3" y="3" width="8" height="8" rx="1.5"/>
-            <rect x="13" y="3" width="8" height="8" rx="1.5"/>
-            <rect x="3" y="13" width="8" height="8" rx="1.5"/>
-            <rect x="13" y="13" width="8" height="8" rx="1.5"/>
-          </svg>
-          <div class="widget-label-medium" style="font-size:11px; font-weight:600; margin-left:6px;">Start</div>
-          <div class="widget-label-expanded" style="font-size:11px; font-weight:600; margin-left:7px;">Windows Start</div>
+          <svg style="width:18px; height:18px;" viewBox="0 0 24 24" fill="#0078d4"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
         </div>
       </div>
-
-      <!-- WIDGET 2: ProtonSearch Trigger -->
-      <div class="dock-widget widget-search" id="w-search" data-widget="search" data-size="compact" draggable="true" title="ProtonSearch (Alt+Space)" onclick="toggleProtonSearch()">
+      <div class="dock-widget widget-search" title="ProtonSearch (Alt+Space)" onclick="toggleProtonSearch()">
         <div class="widget-inner" style="justify-content:center;">
-          <svg class="icon" style="color:var(--accent); flex-shrink:0;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <div class="widget-label-medium" style="font-size:11px; font-weight:600; margin-left:6px;">Search...</div>
-          <div class="widget-label-expanded" style="font-size:11px; font-weight:600; margin-left:7px; width:100%; justify-content:space-between;">
-            <span>Search apps, files...</span>
-            <span style="font-size:8.5px; opacity:0.6; padding:1px 4px; border-radius:4px; background:rgba(255,255,255,0.1);">Alt Space</span>
-          </div>
+          <svg class="icon" style="color:var(--accent);" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </div>
       </div>
-
-      <!-- WIDGET 3: Running Apps Group -->
-      <div class="dock-widget widget-apps" id="w-apps" data-widget="apps" data-size="compact" draggable="true" title="Running Applications Group">
+      <div class="dock-widget widget-apps">
         <div class="widget-inner" style="gap:4px;">
-          <div class="app-icon-btn" title="Sublime Text (2 windows)">
-            <svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M4 6.5 12 2l8 4.5v11L12 22 4 17.5V6.5Z" fill="#ff9800"/><path d="M12 2v20" stroke="#fff" stroke-width="1.5"/></svg>
-            <span class="app-badge" style="background:rgba(0,0,0,0.65);">2</span>
-            <span class="app-dot"></span>
-          </div>
-          <div class="active-window-pill" title="Active Window: Sidebar-Bridge.tsx">
-            <svg style="width:18px; height:18px; flex-shrink:0;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/></svg>
-            <span>Sidebar-Bri...</span>
-          </div>
-          <div class="app-icon-btn" title="Finder (17 notifications)">
-            <svg style="width:21px; height:21px;" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="5" fill="#38bdf8"/><path d="M12 2v20" stroke="#fff" stroke-width="1.5"/><circle cx="7" cy="9" r="1.5" fill="#fff"/><circle cx="17" cy="9" r="1.5" fill="#fff"/><path d="M8 15c2 2 6 2 8 0" stroke="#fff" stroke-width="1.5" fill="none"/></svg>
-            <span class="app-badge">17</span>
-            <span class="app-dot"></span>
-          </div>
-          <div class="app-icon-btn" title="Browser">
-            <svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ea580c"/><circle cx="12" cy="12" r="6" fill="#fff"/></svg>
-            <span class="app-dot"></span>
-          </div>
+          <div class="app-icon-btn"><svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M4 6.5 12 2l8 4.5v11L12 22 4 17.5V6.5Z" fill="#ff9800"/><path d="M12 2v20" stroke="#fff" stroke-width="1.5"/></svg><span class="app-dot"></span></div>
+          <div class="active-window-pill"><svg style="width:18px; height:18px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/></svg><span>Sidebar-Bri...</span></div>
         </div>
       </div>
-
-      <!-- WIDGET 4: Spotify Media Player -->
-      <div class="dock-widget widget-spotify" id="w-spotify" data-widget="spotify" data-size="compact" draggable="true" title="Spotify Media Controller">
+      <div class="dock-widget widget-spotify">
         <div class="widget-inner" style="gap:6px;">
-          <svg style="width:17px; height:17px; flex-shrink:0;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-          <div class="widget-label-compact" style="font-size:10.5px; font-weight:700;">Play</div>
-          <div class="widget-label-medium" style="display:none; flex-direction:column; max-width:85px; overflow:hidden;">
-            <b style="font-size:10px; font-weight:700; text-overflow:ellipsis; overflow:hidden;">Tunnel Vision</b>
-            <small style="font-size:8.5px; color:var(--text-secondary);">Aurora B.</small>
-          </div>
-          <div class="widget-label-expanded" style="display:none; flex-direction:column; max-width:115px; overflow:hidden;">
-            <b style="font-size:10.5px; font-weight:700; text-overflow:ellipsis; overflow:hidden;">Tunnel Vision - Remaster</b>
-            <small style="font-size:9px; color:var(--text-secondary);">Aurora B.Poreal</small>
-          </div>
-          <div style="display:flex; align-items:center; gap:5px; margin-left:auto;">
-            <svg style="width:13px; height:13px; color:var(--text-primary); cursor:pointer;" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </div>
+          <svg style="width:17px; height:17px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" fill="none"/></svg>
+          <span style="font-size:10.5px; font-weight:700;">Play</span>
         </div>
       </div>
-
-      <!-- WIDGET 5: Real-time Weather Widget -->
-      <div class="dock-widget widget-weather" id="w-weather" data-widget="weather" data-size="compact" draggable="true" title="Weather: Click in manager to resize">
+      <div class="dock-widget widget-weather">
         <div class="widget-inner" style="gap:5px;">
-          <svg class="icon" style="width:16px; height:16px; color:#ffd166; flex-shrink:0;" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="4" fill="#ffd166" stroke="none"/>
-            <path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7a3.5 3.5 0 0 0 0-7z" fill="var(--text-primary)" stroke="none" opacity="0.9"/>
-          </svg>
-          <span style="font-size:11.5px; font-weight:700; font-variant-numeric:tabular-nums;">24°</span>
-          <div class="widget-label-medium" style="font-size:10px; font-weight:600; color:var(--text-secondary); margin-left:2px;">Sunny</div>
-          <div class="widget-label-expanded" style="flex-direction:column; line-height:1.1; margin-left:3px;">
-            <span style="font-size:9.5px; font-weight:600;">Sunny Clear</span>
-            <span style="font-size:8px; color:var(--text-secondary);">H:26° L:18°</span>
-          </div>
+          <svg class="icon" style="width:16px; height:16px; color:#ffd166;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="#ffd166"/><path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7z" fill="var(--text-primary)" opacity="0.9"/></svg>
+          <span style="font-size:11.5px; font-weight:700;">24°</span>
         </div>
       </div>
-
-      <!-- WIDGET 6: System Hardware Monitor -->
-      <div class="dock-widget widget-system" id="w-system" data-widget="system" data-size="compact" draggable="true" title="Hardware Monitor">
-        <div class="widget-inner" style="gap:5px; justify-content:center; font-variant-numeric:tabular-nums;">
+      <div class="dock-widget widget-system">
+        <div class="widget-inner" style="gap:5px; justify-content:center;">
           <span style="color:var(--text-secondary); font-size:8.5px; font-weight:700;">CPU</span>
           <b style="font-size:10px;">24%</b>
-          <div class="widget-label-medium" style="align-items:center; gap:4px; margin-left:2px;">
-            <span style="color:var(--text-tertiary);">·</span>
-            <span style="color:var(--text-secondary); font-size:8.5px; font-weight:700;">RAM</span>
-            <b style="font-size:10px;">58%</b>
-          </div>
-          <div class="widget-label-expanded" style="align-items:center; gap:5px; margin-left:3px;">
-            <span style="color:var(--text-tertiary);">·</span>
-            <span style="color:var(--text-secondary); font-size:8.5px; font-weight:700;">RAM</span>
-            <b style="font-size:10px;">58%</b>
-            <span style="color:var(--text-tertiary);">·</span>
-            <b style="font-size:9.5px; color:var(--accent-emerald);">42°C</b>
-          </div>
         </div>
       </div>
-
-      <!-- WIDGET 7: Recycle Bin Utility -->
-      <div class="dock-widget widget-util" id="w-trash" data-widget="trash" data-size="compact" draggable="true" title="Recycle Bin">
-        <div class="widget-inner" style="justify-content:center;">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-          <div class="widget-label-medium" style="font-size:10px; font-weight:600; margin-left:5px;">Trash</div>
-          <div class="widget-label-expanded" style="font-size:10px; font-weight:600; margin-left:5px;">Empty Bin</div>
-        </div>
-      </div>
-
-      <!-- WIDGET 8: Audio Volume Utility -->
-      <div class="dock-widget widget-util" id="w-volume" data-widget="volume" data-size="compact" draggable="true" title="Volume Control">
-        <div class="widget-inner" style="justify-content:center;">
-          <svg class="icon" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-          <div class="widget-label-medium" style="font-size:10px; font-weight:600; margin-left:5px;">68%</div>
-          <div class="widget-label-expanded" style="font-size:10px; font-weight:600; margin-left:5px;">Vol 68%</div>
-        </div>
-      </div>
-
-      <!-- WIDGET 9: Stacked Clock & Date Widget -->
-      <div class="dock-widget widget-clock" id="w-clock" data-widget="clock" data-size="compact" draggable="true" title="Clock & Calendar">
+      <div class="dock-widget widget-clock">
         <div class="widget-inner" style="justify-content:center; flex-direction:column; line-height:1.1; font-variant-numeric:tabular-nums; text-align:right;">
-          <span style="font-size:11px; font-weight:700; letter-spacing:-0.01em;" id="liveTime">20:36</span>
-          <span style="font-size:8.5px; font-weight:500; color:var(--text-secondary);" id="liveDate">07.11</span>
+          <span style="font-size:11px; font-weight:700;">20:36</span>
+          <span style="font-size:8.5px; font-weight:500; color:var(--text-secondary);">07.11</span>
         </div>
       </div>
-
     </nav>
   </div>
 
   <script>
     // ==========================================================================
-    // 1. WIDGET CATALOG DATA MODEL
+    // HIGH-PERFORMANCE NAVIGATION STATE & DATABASE
     // ==========================================================================
-    let widgetState = [
-      { id: "windows", name: "Windows Start Menu", desc: "Launch Windows Start menu flyout", enabled: true, size: "compact", icon: "⊞" },
-      { id: "search", name: "ProtonSearch Spotlight", desc: "Sub-millisecond local SQLite FTS5 search", enabled: true, size: "compact", icon: "🔍" },
-      { id: "apps", name: "Running Apps Group", desc: "Taskbar apps with active window title pill", enabled: true, size: "compact", icon: "🗂️" },
-      { id: "spotify", name: "Spotify Media Player", desc: "Now playing title, artist & media playback", enabled: true, size: "compact", icon: "🎵" },
-      { id: "weather", name: "Real-time Weather", desc: "Current temperature, sky condition & forecasts", enabled: true, size: "compact", icon: "☀️" },
-      { id: "system", name: "Hardware System Stats", desc: "CPU, memory load and temperature metrics", enabled: true, size: "compact", icon: "⚡" },
-      { id: "trash", name: "Recycle Bin", desc: "One-click trash status & purge tool", enabled: true, size: "compact", icon: "🗑️" },
-      { id: "volume", name: "Audio Volume Control", desc: "Direct system audio output master levels", enabled: true, size: "compact", icon: "🔊" },
-      { id: "clock", name: "Stacked Clock & Date", desc: "2-line precision clock and calendar date", enabled: true, size: "compact", icon: "🕒" }
-    ];
+    const resultDatabase = {
+      vscode: {
+        id: "vscode",
+        title: "Visual Studio Code",
+        path: "Applications · C:\\Program Files\\Microsoft VS Code\\Code.exe",
+        cat: "apps",
+        type: "APP",
+        badgeColor: "#60a5fa",
+        badgeBg: "rgba(0,122,204,0.18)",
+        size: "v1.95.2 · x64",
+        mod: "Active Window (PID 14820)",
+        code: `// Active Process Session\nProcess: Code.exe (PID 14820)\nStatus: Live Window foreground\nMemory: 248 MB · GPU Acceleration: Enabled`,
+        iconSvg: `<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/></svg>`,
+        actions: [
+          { name: "Launch Application", kbd: "↵", fn: () => triggerPrimaryAction("vscode") },
+          { name: "Reveal in File Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("vscode") },
+          { name: "Copy Executable Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
+          { name: "Copy Application Name", kbd: "Ctrl+Shift+C", fn: () => copyCurrentName() },
+          { name: "Pin to ProtonDock Rail", kbd: "Ctrl+P", fn: () => pinToDock() },
+          { name: "Run as Administrator", kbd: "Ctrl+Shift+↵", fn: () => showToast("⚡ Launched as Administrator: Code.exe") }
+        ]
+      },
+      spotify: {
+        id: "spotify",
+        title: "Spotify",
+        path: "Audio Player · %APPDATA%\\Spotify\\Spotify.exe",
+        cat: "apps",
+        type: "APP",
+        badgeColor: "#4ade80",
+        badgeBg: "rgba(29,185,84,0.18)",
+        size: "v1.2.49 · Desktop Client",
+        mod: "Playing · Tunnel Vision",
+        code: `// Media Player State\nTrack: Tunnel Vision\nArtist: Aurora B.Poreal\nPlayback: Active (Volume 68%)\nCodec: Ogg Vorbis 320kbps`,
+        iconSvg: `<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`,
+        actions: [
+          { name: "Open Spotify Client", kbd: "↵", fn: () => triggerPrimaryAction("spotify") },
+          { name: "Toggle Play / Pause", kbd: "Space", fn: () => showToast("⏯ Playback Toggled") },
+          { name: "Next Track", kbd: "Ctrl+→", fn: () => showToast("⏭ Skipped to next track") },
+          { name: "Copy Track Info", kbd: "Ctrl+C", fn: () => copyCurrentName() },
+          { name: "Pin to ProtonDock Rail", kbd: "Ctrl+P", fn: () => pinToDock() }
+        ]
+      },
+      terminal: {
+        id: "terminal",
+        title: "Windows Terminal",
+        path: "System Utilities · %LOCALAPPDATA%\\Microsoft\\WindowsApps\\wt.exe",
+        cat: "apps",
+        type: "APP",
+        badgeColor: "#93c5fd",
+        badgeBg: "rgba(59,130,246,0.18)",
+        size: "v1.21.3231.0 · PowerShell 7",
+        mod: "Default Profile: pwsh",
+        code: `// Terminal Configuration\nProfile: PowerShell 7 (x64)\nStarting Directory: ~\\Documents\\Projects\nColor Scheme: Campbell Powershell`,
+        iconSvg: `<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect width="20" height="18" x="2" y="3" rx="3" fill="#0c1117"/><path d="m6 8 4 4-4 4M12 16h6" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+        actions: [
+          { name: "Launch Terminal", kbd: "↵", fn: () => triggerPrimaryAction("terminal") },
+          { name: "Open as Administrator", kbd: "Ctrl+↵", fn: () => showToast("⚡ Admin Terminal Launched") },
+          { name: "Copy Executable Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
+          { name: "Pin to ProtonDock Rail", kbd: "Ctrl+P", fn: () => pinToDock() }
+        ]
+      },
+      sidebar: {
+        id: "sidebar",
+        title: "Sidebar-Bridge.tsx",
+        path: "src > components > dock > Sidebar-Bridge.tsx",
+        cat: "files",
+        type: "TSX",
+        badgeColor: "#60a5fa",
+        badgeBg: "rgba(49,120,198,0.2)",
+        size: "8.4 KB (248 lines)",
+        mod: "Modified 12m ago",
+        code: `// Bridge between Tauri backend & React dock\nexport interface DockGeometry {\n  x: number; y: number;\n  width: number; height: number;\n  radius: number;\n}\nexport function syncDockGeometry() {\n  // Sets Win32 click-through region\n}`,
+        iconSvg: `<svg style="width:19px; height:19px;" viewBox="0 0 24 24"><rect width="18" height="20" x="3" y="2" rx="3" fill="#3178c6"/><text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">TS</text></svg>`,
+        actions: [
+          { name: "Open in VS Code", kbd: "↵", fn: () => triggerPrimaryAction("sidebar") },
+          { name: "Reveal in File Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("sidebar") },
+          { name: "Copy Relative Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
+          { name: "Copy Absolute Path", kbd: "Ctrl+Shift+C", fn: () => copyCurrentName() },
+          { name: "Quick Look Preview", kbd: "Space", fn: () => togglePreviewPane() }
+        ]
+      },
+      weatherrs: {
+        id: "weatherrs",
+        title: "weather.rs",
+        path: "protonsearch > src > weather.rs",
+        cat: "files",
+        type: "RUST",
+        badgeColor: "#fb923c",
+        badgeBg: "rgba(234,88,12,0.2)",
+        size: "4.2 KB (134 lines)",
+        mod: "Modified 1h ago",
+        code: `// Native Open-Meteo cache & parser\npub struct WeatherSnapshot {\n    pub temperature_c: f32,\n    pub condition_code: u8,\n    pub cached_at_utc: u64,\n}`,
+        iconSvg: `<svg style="width:19px; height:19px;" viewBox="0 0 24 24"><rect width="18" height="20" x="3" y="2" rx="3" fill="#ea580c"/><text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">RS</text></svg>`,
+        actions: [
+          { name: "Open in VS Code", kbd: "↵", fn: () => triggerPrimaryAction("weatherrs") },
+          { name: "Reveal in File Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("weatherrs") },
+          { name: "Copy Relative Path", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
+          { name: "Quick Look Preview", kbd: "Space", fn: () => togglePreviewPane() }
+        ]
+      },
+      todofts: {
+        id: "todofts",
+        title: "TODO: Cache FTS5 token indexes",
+        path: "src-tauri > src > indexer.rs:142",
+        cat: "git",
+        type: "TODO",
+        badgeColor: "#fbbf24",
+        badgeBg: "rgba(245,158,11,0.2)",
+        size: "Code Task · Line 142",
+        mod: "Found in indexer.rs",
+        code: `// TODO: Cache FTS5 token indexes\n// Truncate document text at 50KB\nlet text_snippet = extract_doc_text(&file_path)?;\nindex_sqlite_fts5(&db, &text_snippet)?;`,
+        iconSvg: `<svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="9 12 11 14 15 10"/></svg>`,
+        actions: [
+          { name: "Jump to Line in VS Code", kbd: "↵", fn: () => triggerPrimaryAction("todofts") },
+          { name: "Open indexer.rs in Explorer", kbd: "Ctrl+↵", fn: () => triggerSecondaryAction("todofts") },
+          { name: "Copy Code Snippet", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
+          { name: "Mark Task Complete", kbd: "Ctrl+D", fn: () => showToast("✓ Task Marked Done") }
+        ]
+      },
+      gitcommit: {
+        id: "gitcommit",
+        title: "feat(ui): Ganella slender glass rail",
+        path: "Commit 6a94835 · branch dock (HEAD)",
+        cat: "git",
+        type: "GIT",
+        badgeColor: "#c084fc",
+        badgeBg: "rgba(168,85,247,0.2)",
+        size: "Git Commit · +646 / -451",
+        mod: "Committed 22m ago",
+        code: `commit 6a94835\nAuthor: Pranshul Soni <git@pranshul>\nDate:   Fri Nov 7 01:11:00 2026\n\nfeat(launcher): refined adaptive Raycast/Tahoe launcher`,
+        iconSvg: `<svg class="icon" style="color:#c084fc;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>`,
+        actions: [
+          { name: "View Commit in Git Log", kbd: "↵", fn: () => triggerPrimaryAction("gitcommit") },
+          { name: "Copy Commit Hash (6a94835)", kbd: "Ctrl+C", fn: () => copyCurrentPath() },
+          { name: "Open Git Terminal", kbd: "Ctrl+T", fn: () => showToast("🌿 Opening Git Terminal...") },
+          { name: "Checkout Branch dock", kbd: "Ctrl+B", fn: () => showToast("✓ Already on branch dock") }
+        ]
+      },
+      lock: {
+        id: "lock",
+        title: "Lock Workstation",
+        path: "System Quick Action · rundll32.exe user32.dll,LockWorkStation",
+        cat: "tools",
+        type: "SYS",
+        badgeColor: "#f87171",
+        badgeBg: "rgba(239,68,68,0.2)",
+        size: "Instant Execution",
+        mod: "Ready to run",
+        code: `// Quick System Action\nAction: Lock Workstation (Win+L equivalent)\nPrivilege: Standard User\nTarget: Desktop Session`,
+        iconSvg: `<svg class="icon" style="color:#ef4444;" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+        actions: [
+          { name: "Lock Screen Now", kbd: "↵", fn: () => triggerPrimaryAction("lock") }
+        ]
+      },
+      trash: {
+        id: "trash",
+        title: "Empty Recycle Bin",
+        path: "System Maintenance · SHEmptyRecycleBinW",
+        cat: "tools",
+        type: "SYS",
+        badgeColor: "#38bdf8",
+        badgeBg: "rgba(56,189,248,0.2)",
+        size: "Reclaim Storage",
+        mod: "32 items · ~140 MB",
+        code: `// System Maintenance Action\nTarget: %SYSTEMDRIVE%\\$Recycle.Bin\nStatus: 32 unpurged items\nConfirmation: Silent with toast`,
+        iconSvg: `<svg class="icon" style="color:#38bdf8;" viewBox="0 0 24 24"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`,
+        actions: [
+          { name: "Empty Recycle Bin", kbd: "↵", fn: () => triggerPrimaryAction("trash") }
+        ]
+      },
+      sleep: {
+        id: "sleep",
+        title: "Sleep PC",
+        path: "Power Management · SetSuspendState",
+        cat: "tools",
+        type: "SYS",
+        badgeColor: "#fbbf24",
+        badgeBg: "rgba(251,191,36,0.2)",
+        size: "Low Power State",
+        mod: "ACPI S3 Suspend",
+        code: `// Power Management Action\nTarget: System Standby (S3)\nWake Timers: Preserved\nNetwork: Connected Standby`,
+        iconSvg: `<svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
+        actions: [
+          { name: "Sleep Computer", kbd: "↵", fn: () => triggerPrimaryAction("sleep") }
+        ]
+      }
+    };
 
-    function updateClock() {
-      const now = new Date();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const year = now.getFullYear();
+    let activeScope = 'all';
+    let currentSelectedId = 'vscode';
+    let currentSearchQuery = '';
+    let isActionMode = false;
+    let selectedActionIdx = 0;
+    let toastTimer = null;
 
-      const timeEl = document.getElementById('liveTime');
-      const dateEl = document.getElementById('liveDate');
-      if (timeEl) timeEl.textContent = `${hours}:${minutes}`;
-      if (dateEl) dateEl.textContent = `${day}.${month}`;
+    const searchModal = document.getElementById('searchModal');
+    const launcherCard = document.getElementById('launcherCard');
+    const spotlightInput = document.getElementById('spotlightInput');
+    const inputScopeTag = document.getElementById('inputScopeTag');
+    const inputScopeLabel = document.getElementById('inputScopeLabel');
+    const actionDeck = document.getElementById('actionDeck');
+    const actionDeckList = document.getElementById('actionDeckList');
+    const resultsRowsContainer = document.getElementById('resultsRowsContainer');
+    const calcHeroContainer = document.getElementById('calculatorHeroContainer');
+    const calcHeroExpr = document.getElementById('calcHeroExpr');
+    const calcHeroVal = document.getElementById('calcHeroVal');
+
+    // ==========================================================================
+    // TOAST NOTIFICATION HUD
+    // ==========================================================================
+    function showToast(msg) {
+      const toast = document.getElementById('psToast');
+      const toastMsg = document.getElementById('psToastMsg');
+      if (!toast || !toastMsg) return;
+      toastMsg.textContent = msg;
+      toast.classList.add('is-visible');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('is-visible');
+      }, 1900);
     }
-    setInterval(updateClock, 1000);
-    updateClock();
+
+    // ==========================================================================
+    // WINDOW & THEME TOGGLES
+    // ==========================================================================
+    function toggleProtonSearch(force) {
+      const isOpen = force !== undefined ? force : !searchModal.classList.contains('is-open');
+      if (isOpen) {
+        searchModal.classList.add('is-open');
+        setTimeout(() => spotlightInput?.focus(), 80);
+      } else {
+        searchModal.classList.remove('is-open');
+        exitActionMode();
+      }
+    }
+
+    function handleSearchBackdrop(e) {
+      if (e.target === searchModal) toggleProtonSearch(false);
+    }
+
+    function setLauncherPosition(pos, btn) {
+      document.body.setAttribute('data-launcher-pos', pos);
+      document.querySelectorAll('.demo-toolbar-group:nth-child(1) .demo-pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
 
     function setTheme(theme, btn) {
       document.body.setAttribute('data-theme', theme);
-      document.querySelectorAll('.demo-toolbar-group:nth-child(1) .demo-pill-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.demo-toolbar-group:nth-child(3) .demo-pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
 
@@ -1897,170 +1552,111 @@
       btn.classList.add('active');
     }
 
-    function setDisplayStyle(style, btn) {
-      document.body.setAttribute('data-display-style', style);
-      
-      const btnCapsule = document.getElementById('btnStyleCapsule');
-      const btnLine = document.getElementById('btnStyleLine');
-      const modCapsule = document.getElementById('modalStyleCapsule');
-      const modLine = document.getElementById('modalStyleLine');
-
-      if (style === 'capsule') {
-        btnCapsule?.classList.add('active');
-        btnLine?.classList.remove('active');
-        modCapsule?.classList.add('active');
-        modLine?.classList.remove('active');
-      } else {
-        btnLine?.classList.add('active');
-        btnCapsule?.classList.remove('active');
-        modLine?.classList.add('active');
-        modCapsule?.classList.remove('active');
-      }
-    }
-
-    // ==========================================================================
-    // 2. REFINED LAUNCHER LOGIC & DATA (Raycast & Tahoe Model)
-    // ==========================================================================
-    const searchModal = document.getElementById('searchModal');
-    const launcherCard = document.getElementById('launcherCard');
-    const spotlightInput = document.getElementById('spotlightInput');
-    const actionPaletteMenu = document.getElementById('actionPaletteMenu');
-    const calcHeroContainer = document.getElementById('calculatorHeroContainer');
-    const calcHeroExpr = document.getElementById('calcHeroExpr');
-    const calcHeroVal = document.getElementById('calcHeroVal');
-
-    const resultDatabase = {
-      sidebar: {
-        title: "Sidebar-Bridge.tsx",
-        path: "src > components > dock",
-        type: "TSX",
-        size: "8.4 KB (248 lines)",
-        mod: "12 minutes ago",
-        hasCode: true,
-        code: `// Bridge between Tauri backend & React dock\nexport interface DockGeometry {\n  x: number; y: number;\n  width: number; height: number;\n  radius: number;\n}\nexport function syncDockGeometry() {\n  // Sets Win32 click-through region\n}`,
-        iconSvg: `<rect width="18" height="20" x="3" y="2" rx="3" fill="#3178c6"/><text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">TS</text>`
-      },
-      vscode: {
-        title: "Visual Studio Code",
-        path: "C:\\...\\Microsoft VS Code\\Code.exe",
-        type: "APP",
-        size: "Executable · v1.95.2",
-        mod: "Running (Process ID: 14820)",
-        hasCode: false,
-        code: `Application Manifest:\nExecutable: Code.exe\nRenderer: Chromium Embedded (v128)\nStatus: Active Window\nShortcuts: [↵ Open] [Ctrl+↵ Run as Admin]`,
-        iconSvg: `<path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/>`
-      },
-      weatherrs: {
-        title: "weather.rs",
-        path: "protonsearch > src > weather.rs",
-        type: "RUST",
-        size: "4.2 KB (134 lines)",
-        mod: "1 hour ago",
-        hasCode: true,
-        code: `// Native Open-Meteo cache & parser\npub struct WeatherSnapshot {\n    pub temperature_c: f32,\n    pub condition_code: u8,\n    pub cached_at_utc: u64,\n}`,
-        iconSvg: `<rect width="18" height="20" x="3" y="2" rx="3" fill="#ea580c"/><text x="12" y="16" font-size="10" font-weight="900" fill="#fff" text-anchor="middle">RS</text>`
-      },
-      spotify: {
-        title: "Spotify",
-        path: "%APPDATA%\\Spotify\\Spotify.exe",
-        type: "APP",
-        size: "Audio Player · v1.2.49",
-        mod: "Playing · Tunnel Vision",
-        hasCode: false,
-        code: `Now Playing Session:\nTrack: Tunnel Vision\nArtist: Aurora B.Poreal\nPlayback: Active (68% Volume)\nActions: [Space: Play/Pause] [N: Next Track]`,
-        iconSvg: `<circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>`
-      },
-      todofts: {
-        title: "TODO: Cache FTS5 token indexes",
-        path: "src-tauri > src > indexer.rs:142",
-        type: "TODO",
-        size: "Code Task · Line 142",
-        mod: "Commit 4b921a",
-        hasCode: true,
-        code: `// TODO: Cache FTS5 token indexes\n// Truncate document text at 50KB\nlet text_snippet = extract_doc_text(&file_path)?;\nindex_sqlite_fts5(&db, &text_snippet)?;`,
-        iconSvg: `<circle cx="12" cy="12" r="9" fill="#f59e0b"/><polyline points="9 12 11 14 15 10" stroke="#fff" stroke-width="2" fill="none"/>`
-      },
-      gitcommit: {
-        title: "feat(ui): Ganella slender glass rail",
-        path: "Commit 142f73e · branch dock (HEAD)",
-        type: "GIT",
-        size: "Git Commit · +1042 / -1199",
-        mod: "Just now",
-        hasCode: true,
-        code: `commit 142f73e72c8b4\nAuthor: Pranshul Soni <git@pranshul>\nDate:   Fri Nov 7 01:01:00 2026\n\nfeat(preview): dedicated widget manager, store catalog, capsules vs lines`,
-        iconSvg: `<circle cx="12" cy="12" r="9" fill="#c084fc"/><circle cx="12" cy="12" r="3" fill="#fff"/>`
-      }
-    };
-
-    function toggleProtonSearch(force) {
-      const isOpen = force !== undefined ? force : !searchModal.classList.contains('is-open');
-      if (isOpen) {
-        searchModal.classList.add('is-open');
-        setTimeout(() => spotlightInput?.focus(), 80);
-      } else {
-        searchModal.classList.remove('is-open');
-        actionPaletteMenu.classList.remove('is-open');
-      }
-    }
-
-    function handleSearchBackdrop(e) {
-      if (e.target === searchModal) {
-        toggleProtonSearch(false);
-      }
-    }
-
     function togglePreviewPane() {
       launcherCard.classList.toggle('with-preview');
-    }
-
-    function toggleActionPalette() {
-      actionPaletteMenu.classList.toggle('is-open');
-    }
-
-    function selectResult(id) {
-      const item = resultDatabase[id];
-      if (!item) return;
-
-      document.querySelectorAll('.ps-result-row').forEach(row => {
-        row.classList.toggle('is-selected', row.getAttribute('data-id') === id);
-      });
-
-      // Update Preview Pane with rich content
-      document.getElementById('prevTitle').textContent = item.title;
-      document.getElementById('prevPath').textContent = item.path;
-      document.getElementById('prevSize').textContent = item.size;
-      document.getElementById('prevMod').textContent = item.mod;
-      document.getElementById('prevIcon').innerHTML = item.iconSvg;
-      
-      const codeBox = document.getElementById('prevCodeBox');
-      if (codeBox) {
-        codeBox.style.display = 'block';
-        codeBox.innerHTML = escapeHtml(item.code).replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
-      }
-
-      // If app is selected, keep launcher wide or adapt gracefully
-      launcherCard.classList.add('with-preview');
     }
 
     function escapeHtml(text) {
       return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // Live search input handler
-    function handleSearchInput(val) {
-      const q = val.trim();
-      const scopePill = document.getElementById('activeScopePill');
+    function highlightMatch(text, query) {
+      if (!query) return escapeHtml(text);
+      const safeQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${safeQ})`, 'gi');
+      return escapeHtml(text).replace(regex, '<span class="ps-match-hl">$1</span>');
+    }
 
-      // Math parser detection (e.g. 24 * 1.15, 15% of 340, sqrt(16))
-      const isMath = /[0-9\+\-\*\/\%]/i.test(q) && !/[a-z]{4,}/i.test(q);
-      if (isMath && q.length > 2) {
+    // ==========================================================================
+    // SCOPE & PREFIX FILTERING
+    // ==========================================================================
+    const scopeList = ['all', 'apps', 'files', 'git', 'tools'];
+    const scopeLabels = {
+      all: 'All',
+      apps: 'Apps',
+      files: 'Files & Code',
+      git: 'Git Tasks',
+      tools: 'System & Math'
+    };
+
+    function selectNavScope(scope, btn) {
+      activeScope = scope;
+      document.querySelectorAll('.nav-scope-pill').forEach(p => p.classList.remove('active'));
+      if (btn) {
+        btn.classList.add('active');
+      } else {
+        const foundBtn = document.querySelector(`.nav-scope-pill[data-scope="${scope}"]`);
+        if (foundBtn) foundBtn.classList.add('active');
+      }
+
+      if (scope !== 'all') {
+        inputScopeTag.style.display = 'inline-flex';
+        inputScopeLabel.textContent = scopeLabels[scope] || scope;
+      } else {
+        inputScopeTag.style.display = 'none';
+      }
+
+      renderResults();
+    }
+
+    function clearActiveScope() {
+      selectNavScope('all');
+      spotlightInput.focus();
+    }
+
+    function cycleNavScope(backward = false) {
+      const curIdx = scopeList.indexOf(activeScope);
+      const step = backward ? -1 : 1;
+      const nextIdx = (curIdx + step + scopeList.length) % scopeList.length;
+      const nextScope = scopeList[nextIdx];
+      selectNavScope(nextScope);
+    }
+
+    // ==========================================================================
+    // SEARCH & RENDERING ENGINE
+    // ==========================================================================
+    function handleSearchInput(rawVal) {
+      let val = rawVal.trim();
+
+      // Native Prefix detection
+      const prefixMap = {
+        'app:': 'apps',
+        'apps:': 'apps',
+        'file:': 'files',
+        'files:': 'files',
+        'code:': 'files',
+        'git:': 'git',
+        'commits:': 'git',
+        'todo:': 'git',
+        'todos:': 'git',
+        'sys:': 'tools',
+        'tool:': 'tools',
+        'tools:': 'tools',
+        'calc:': 'tools',
+        'math:': 'tools'
+      };
+
+      for (const [prefix, scope] of Object.entries(prefixMap)) {
+        if (val.toLowerCase().startsWith(prefix)) {
+          val = val.substring(prefix.length).trim();
+          spotlightInput.value = val;
+          selectNavScope(scope);
+          return;
+        }
+      }
+
+      currentSearchQuery = val;
+
+      // Zero-Click Hero Calculator
+      const isMath = /[0-9\+\-\*\/\%]/.test(val) && !/[a-z]{3,}/i.test(val);
+      if (isMath && val.length >= 2) {
         try {
-          let sanitized = q.replace(/%/g, "*0.01");
+          let sanitized = val.replace(/%/g, "*0.01");
           let evaluated = Function(`'use strict'; return (${sanitized})`)();
           if (evaluated !== undefined && !isNaN(evaluated)) {
             calcHeroContainer.style.display = 'block';
-            calcHeroExpr.textContent = q;
-            calcHeroVal.textContent = "= " + (Math.round(evaluated * 100) / 100);
+            calcHeroExpr.textContent = val;
+            calcHeroVal.textContent = "= " + (Math.round(evaluated * 1000) / 1000);
           } else {
             calcHeroContainer.style.display = 'none';
           }
@@ -2071,278 +1667,417 @@
         calcHeroContainer.style.display = 'none';
       }
 
-      // Prefix detection
-      if (q.startsWith('app:')) {
-        scopePill.textContent = 'APPS';
-        scopePill.classList.add('is-active');
-      } else if (q.startsWith('file:')) {
-        scopePill.textContent = 'FILES';
-        scopePill.classList.add('is-active');
-      } else if (q.startsWith('git:')) {
-        scopePill.textContent = 'GIT';
-        scopePill.classList.add('is-active');
-      } else {
-        scopePill.classList.remove('is-active');
+      renderResults();
+    }
+
+    function renderResults() {
+      const query = currentSearchQuery.toLowerCase();
+      const allItems = Object.values(resultDatabase);
+
+      // Filter
+      const matchedItems = allItems.filter(item => {
+        const matchesScope = (activeScope === 'all' || item.cat === activeScope);
+        if (!matchesScope) return false;
+        if (!query) return true;
+        return (
+          item.title.toLowerCase().includes(query) ||
+          item.path.toLowerCase().includes(query) ||
+          item.type.toLowerCase().includes(query)
+        );
+      });
+
+      // Update Counts
+      const totalAll = allItems.filter(i => !query || i.title.toLowerCase().includes(query) || i.path.toLowerCase().includes(query)).length;
+      document.getElementById('count-all').textContent = totalAll;
+      ['apps', 'files', 'git', 'tools'].forEach(cat => {
+        const count = allItems.filter(i => i.cat === cat && (!query || i.title.toLowerCase().includes(query) || i.path.toLowerCase().includes(query))).length;
+        const el = document.getElementById(`count-${cat}`);
+        if (el) el.textContent = count;
+      });
+
+      // Update footer match count
+      document.getElementById('footerMatchCount').textContent = `ProtonSearch · ${matchedItems.length} matches · 0.4 ms`;
+
+      // If selected item is not in matched list, select first matched
+      if (!matchedItems.some(i => i.id === currentSelectedId) && matchedItems.length > 0) {
+        currentSelectedId = matchedItems[0].id;
       }
 
-      // Filter rows
-      const lowerQ = q.toLowerCase();
-      document.querySelectorAll('.ps-result-row').forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = (!lowerQ || text.includes(lowerQ)) ? 'flex' : 'none';
+      // Group by category sections
+      const sections = [
+        { key: 'apps', name: 'Applications' },
+        { key: 'files', name: 'Files & Code (FTS5)' },
+        { key: 'git', name: 'Git Tasks & Commits' },
+        { key: 'tools', name: 'System & Math Actions' }
+      ];
+
+      let html = '';
+      let visibleIndex = 1;
+
+      sections.forEach(sec => {
+        const secItems = matchedItems.filter(i => i.cat === sec.key);
+        if (secItems.length === 0) return;
+
+        html += `
+          <div class="ps-section-header" data-section="${sec.key}">
+            <span>${sec.name}</span>
+            <span class="ps-jump-hint">Ctrl+↓ Jump</span>
+          </div>
+        `;
+
+        secItems.forEach(item => {
+          const isSelected = item.id === currentSelectedId;
+          const numBadgeHtml = (visibleIndex <= 6)
+            ? `<kbd class="ps-num-badge" onclick="event.stopPropagation(); openByNumber(${visibleIndex})">Alt ${visibleIndex}</kbd>`
+            : '';
+
+          html += `
+            <div class="ps-result-row ${isSelected ? 'is-selected' : ''}" 
+                 data-id="${item.id}" 
+                 data-cat="${item.cat}" 
+                 data-num="${visibleIndex}"
+                 onclick="selectResult('${item.id}')"
+                 ondblclick="triggerPrimaryAction('${item.id}')">
+              <div class="ps-item-icon" style="background:${item.badgeBg};">
+                ${item.iconSvg}
+              </div>
+              <div class="ps-item-copy">
+                <b>${highlightMatch(item.title, query)}</b>
+                <small>${highlightMatch(item.path, query)}</small>
+              </div>
+              <div class="ps-row-right">
+                <span class="ps-item-badge" style="color:${item.badgeColor}; background:${item.badgeBg};" onclick="event.stopPropagation(); selectNavScope('${item.cat}')">${item.type}</span>
+                ${numBadgeHtml}
+                <span class="ps-drill-arrow" onclick="event.stopPropagation(); enterActionMode()">→</span>
+              </div>
+            </div>
+          `;
+          visibleIndex++;
+        });
       });
+
+      if (matchedItems.length === 0) {
+        html = `
+          <div style="padding: 32px 16px; text-align: center; color: var(--text-tertiary);">
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">No matching results</div>
+            <div style="font-size: 11px;">Try typing a different keyword or press <kbd style="padding:1px 4px; background:rgba(255,255,255,0.1); border-radius:3px;">Esc</kbd> to clear filter</div>
+          </div>
+        `;
+      }
+
+      resultsRowsContainer.innerHTML = html;
+
+      // Update details
+      const selectedItem = resultDatabase[currentSelectedId] || matchedItems[0];
+      if (selectedItem) {
+        updatePreviewAndActions(selectedItem);
+      }
+    }
+
+    function selectResult(id) {
+      const item = resultDatabase[id];
+      if (!item) return;
+
+      currentSelectedId = id;
+
+      document.querySelectorAll('.ps-result-row').forEach(row => {
+        row.classList.toggle('is-selected', row.getAttribute('data-id') === id);
+      });
+
+      updatePreviewAndActions(item);
+    }
+
+    function updatePreviewAndActions(item) {
+      document.getElementById('prevTitle').textContent = item.title;
+      document.getElementById('prevPath').textContent = item.path;
+      document.getElementById('prevSize').textContent = item.size;
+      document.getElementById('prevMod').textContent = item.mod;
+      document.getElementById('prevIcon').innerHTML = item.iconSvg;
+      document.getElementById('actionDeckItemName').textContent = item.title;
+
+      const codeBox = document.getElementById('prevCodeBox');
+      if (codeBox) {
+        codeBox.innerHTML = escapeHtml(item.code).replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
+      }
+
+      // Populate Action Deck
+      let actionHtml = '';
+      if (item.actions && item.actions.length > 0) {
+        item.actions.forEach((act, idx) => {
+          actionHtml += `
+            <div class="action-deck-row ${idx === selectedActionIdx ? 'is-selected' : ''}" 
+                 data-idx="${idx}"
+                 onclick="triggerActionByIndex(${idx})">
+              <span>${escapeHtml(act.name)}</span>
+              <kbd>${act.kbd}</kbd>
+            </div>
+          `;
+        });
+      }
+      actionDeckList.innerHTML = actionHtml;
+    }
+
+    // ==========================================================================
+    // ACTION EXECUTION DISPATCHERS
+    // ==========================================================================
+    function triggerPrimaryAction(targetId) {
+      const id = targetId || currentSelectedId;
+      const item = resultDatabase[id];
+      if (!item) return;
+
+      if (item.cat === 'apps') {
+        showToast(`⚡ Launching ${item.title}...`);
+      } else if (item.cat === 'files') {
+        showToast(`📄 Opening ${item.title} in editor...`);
+      } else if (item.cat === 'git') {
+        showToast(`🌿 Navigating to ${item.title}...`);
+      } else {
+        showToast(`⚙️ Executed: ${item.title}`);
+      }
+      exitActionMode();
+    }
+
+    function triggerSecondaryAction(targetId) {
+      const id = targetId || currentSelectedId;
+      const item = resultDatabase[id];
+      if (!item) return;
+
+      showToast(`📂 Revealed in File Explorer: ${item.path}`);
+      exitActionMode();
+    }
+
+    function copyCurrentPath() {
+      const item = resultDatabase[currentSelectedId];
+      if (!item) return;
+      showToast(`✓ Copied path: ${item.path}`);
+    }
+
+    function copyCurrentName() {
+      const item = resultDatabase[currentSelectedId];
+      if (!item) return;
+      showToast(`✓ Copied name: ${item.title}`);
+    }
+
+    function pinToDock() {
+      const item = resultDatabase[currentSelectedId];
+      if (!item) return;
+      showToast(`📌 Pinned "${item.title}" to ProtonDock Rail`);
+      exitActionMode();
     }
 
     function copyCalculatorResult() {
       const val = calcHeroVal.textContent.replace('= ', '');
-      alert(`Copied "${val}" to clipboard!`);
+      showToast(`✓ Copied "${val}" to clipboard`);
     }
 
-    function executePreviewAction(actionName) {
-      alert(`${actionName}: ${document.getElementById('prevTitle').textContent}`);
-      actionPaletteMenu.classList.remove('is-open');
+    // 1. Direct Number Key Access (Alt + 1..6)
+    function openByNumber(num) {
+      const visibleRows = Array.from(document.querySelectorAll('.ps-result-row'));
+      const targetRow = visibleRows.find(r => r.getAttribute('data-num') === String(num));
+      if (targetRow) {
+        const id = targetRow.getAttribute('data-id');
+        selectResult(id);
+        targetRow.classList.add('pulse-jump');
+        setTimeout(() => targetRow.classList.remove('pulse-jump'), 350);
+        triggerPrimaryAction(id);
+      }
     }
 
-    // Keyboard navigation
+    // 2. Action Drill-Down Navigation (Right Arrow or Ctrl+K)
+    function enterActionMode() {
+      isActionMode = true;
+      selectedActionIdx = 0;
+      launcherCard.classList.add('in-action-mode');
+      const item = resultDatabase[currentSelectedId];
+      if (item) updatePreviewAndActions(item);
+    }
+
+    function exitActionMode() {
+      isActionMode = false;
+      launcherCard.classList.remove('in-action-mode');
+    }
+
+    function triggerActionByIndex(idx) {
+      const item = resultDatabase[currentSelectedId];
+      if (item && item.actions && item.actions[idx]) {
+        item.actions[idx].fn();
+      }
+      exitActionMode();
+    }
+
+    // 3. Section Jumping (Ctrl+Down / Ctrl+Up)
+    function jumpSection(direction) {
+      const visibleHeaders = Array.from(document.querySelectorAll('.ps-section-header'));
+      if (!visibleHeaders.length) return;
+
+      const currentRow = document.querySelector('.ps-result-row.is-selected');
+      const curCat = currentRow?.getAttribute('data-cat') || 'apps';
+      const curIdx = visibleHeaders.findIndex(s => s.getAttribute('data-section') === curCat);
+
+      let targetIdx = (curIdx + direction + visibleHeaders.length) % visibleHeaders.length;
+      const targetSec = visibleHeaders[targetIdx].getAttribute('data-section');
+
+      const targetRow = Array.from(document.querySelectorAll('.ps-result-row')).find(r => r.getAttribute('data-cat') === targetSec);
+      if (targetRow) {
+        selectResult(targetRow.getAttribute('data-id'));
+        targetRow.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    // Helper for navigation
+    function navigateResults(direction) {
+      const visibleRows = Array.from(document.querySelectorAll('.ps-result-row'));
+      if (!visibleRows.length) return;
+      const curIdx = visibleRows.findIndex(r => r.classList.contains('is-selected'));
+      let nextIdx = (curIdx + direction + visibleRows.length) % visibleRows.length;
+      selectResult(visibleRows[nextIdx].getAttribute('data-id'));
+      visibleRows[nextIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    // ==========================================================================
+    // GLOBAL KEYBOARD NAVIGATION DISPATCHER
+    // ==========================================================================
     window.addEventListener('keydown', (e) => {
+      // Global toggle
       if (e.altKey && (e.code === 'Space' || e.key === ' ')) {
         e.preventDefault();
         toggleProtonSearch();
-      } else if (e.key === 'Escape') {
-        if (actionPaletteMenu.classList.contains('is-open')) {
-          actionPaletteMenu.classList.remove('is-open');
-        } else if (searchModal.classList.contains('is-open')) {
-          toggleProtonSearch(false);
-        } else if (customizerModal.classList.contains('is-open')) {
-          closeCustomizerModal();
-        }
-      } else if (e.ctrlKey && (e.key === 'k' || e.key === 'K')) {
+        return;
+      }
+
+      if (!searchModal.classList.contains('is-open')) return;
+
+      // 1. Direct Number Key Access: Alt + 1..6
+      if (e.altKey && e.key >= '1' && e.key <= '6') {
         e.preventDefault();
-        if (searchModal.classList.contains('is-open')) {
-          toggleActionPalette();
+        openByNumber(parseInt(e.key, 10));
+        return;
+      }
+
+      // 2. Escape Priority: Action Mode -> Clear Query -> Close Launcher
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isActionMode) {
+          exitActionMode();
+        } else if (spotlightInput.value.length > 0) {
+          spotlightInput.value = '';
+          handleSearchInput('');
+        } else if (activeScope !== 'all') {
+          clearActiveScope();
+        } else {
+          toggleProtonSearch(false);
         }
-      } else if (e.key === 'Tab' && searchModal.classList.contains('is-open')) {
+        return;
+      }
+
+      // 3. Right Arrow: Drill down into Action Deck
+      if (e.key === 'ArrowRight' && !isActionMode) {
+        e.preventDefault();
+        enterActionMode();
+        return;
+      }
+
+      // 4. Left Arrow: Return from Action Deck
+      if (e.key === 'ArrowLeft' && isActionMode) {
+        e.preventDefault();
+        exitActionMode();
+        return;
+      }
+
+      // 5. Ctrl + K: Toggle Action Deck
+      if (e.ctrlKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (isActionMode) exitActionMode(); else enterActionMode();
+        return;
+      }
+
+      // 6. Secondary Action: Ctrl + Enter
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        triggerSecondaryAction();
+        return;
+      }
+
+      // 7. Clipboard Shortcuts: Ctrl + C / Ctrl + Shift + C
+      if (e.ctrlKey && (e.key === 'c' || e.key === 'C') && !window.getSelection().toString()) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          copyCurrentName();
+        } else {
+          copyCurrentPath();
+        }
+        return;
+      }
+
+      // 8. Section Jumping: Ctrl + Down / Ctrl + Up
+      if (e.ctrlKey && e.key === 'ArrowDown') {
+        e.preventDefault();
+        jumpSection(1);
+        return;
+      }
+      if (e.ctrlKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        jumpSection(-1);
+        return;
+      }
+
+      // 9. Tab / Shift + Tab: Cycle Scopes
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        cycleNavScope(e.shiftKey);
+        return;
+      }
+
+      // 10. Space: Quick Look Preview
+      if (e.code === 'Space' && (e.ctrlKey || spotlightInput.value === '')) {
         e.preventDefault();
         togglePreviewPane();
-      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        if (searchModal.classList.contains('is-open')) {
-          const visibleRows = Array.from(document.querySelectorAll('.ps-result-row')).filter(r => r.style.display !== 'none');
-          const currentIdx = visibleRows.findIndex(r => r.classList.contains('is-selected'));
-          if (visibleRows.length > 0) {
-            e.preventDefault();
-            let nextIdx = currentIdx;
-            if (e.key === 'ArrowDown') {
-              nextIdx = (currentIdx + 1) % visibleRows.length;
-            } else {
-              nextIdx = (currentIdx - 1 + visibleRows.length) % visibleRows.length;
-            }
-            const targetId = visibleRows[nextIdx].getAttribute('data-id');
-            selectResult(targetId);
-            visibleRows[nextIdx].scrollIntoView({ block: 'nearest' });
+        return;
+      }
+
+      // 11. Backspace: Dissolve Active Scope if input empty
+      if (e.key === 'Backspace' && spotlightInput.value === '' && activeScope !== 'all') {
+        e.preventDefault();
+        clearActiveScope();
+        return;
+      }
+
+      // 12. Arrow & Home-row Navigation: Down (↓, Ctrl+N, Ctrl+J) & Up (↑, Ctrl+P)
+      const isDownKey = e.key === 'ArrowDown' || (e.ctrlKey && (e.key === 'n' || e.key === 'j'));
+      const isUpKey = e.key === 'ArrowUp' || (e.ctrlKey && e.key === 'p');
+
+      if (isDownKey || isUpKey) {
+        e.preventDefault();
+        if (isActionMode) {
+          const actionRows = Array.from(document.querySelectorAll('.action-deck-row'));
+          if (actionRows.length) {
+            selectedActionIdx = isDownKey 
+              ? (selectedActionIdx + 1) % actionRows.length 
+              : (selectedActionIdx - 1 + actionRows.length) % actionRows.length;
+            actionRows.forEach((r, idx) => r.classList.toggle('is-selected', idx === selectedActionIdx));
           }
+        } else {
+          navigateResults(isDownKey ? 1 : -1);
         }
-      } else if (e.key === 'Enter' && searchModal.classList.contains('is-open')) {
-        if (calcHeroContainer.style.display !== 'none') {
+        return;
+      }
+
+      // 13. Enter Key: Open or execute
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (isActionMode) {
+          triggerActionByIndex(selectedActionIdx);
+        } else if (calcHeroContainer.style.display !== 'none') {
           copyCalculatorResult();
         } else {
-          executePreviewAction('Open');
+          triggerPrimaryAction();
         }
       }
     });
 
-    // ==========================================================================
-    // 3. WIDGET MANAGER & STORE LOGIC
-    // ==========================================================================
-    const customizerModal = document.getElementById('customizerModal');
-
-    function openCustomizerModal() {
-      renderWidgetManageList();
-      customizerModal.classList.add('is-open');
-    }
-
-    function closeCustomizerModal() {
-      customizerModal.classList.remove('is-open');
-    }
-
-    function handleCustBackdrop(e) {
-      if (e.target === customizerModal) {
-        closeCustomizerModal();
-      }
-    }
-
-    function switchCustTab(tab) {
-      const tabBtnInstalled = document.getElementById('tabBtnInstalled');
-      const tabBtnStore = document.getElementById('tabBtnStore');
-      const contentInstalled = document.getElementById('tabContentInstalled');
-      const contentStore = document.getElementById('tabContentStore');
-
-      if (tab === 'installed') {
-        tabBtnInstalled?.classList.add('active');
-        tabBtnStore?.classList.remove('active');
-        if (contentInstalled) contentInstalled.style.display = 'flex';
-        if (contentStore) contentStore.style.display = 'none';
-      } else {
-        tabBtnStore?.classList.add('active');
-        tabBtnInstalled?.classList.remove('active');
-        if (contentStore) contentStore.style.display = 'flex';
-        if (contentInstalled) contentInstalled.style.display = 'none';
-      }
-    }
-
-    function renderWidgetManageList() {
-      const listEl = document.getElementById('widgetManageList');
-      if (!listEl) return;
-      listEl.innerHTML = '';
-
-      widgetState.forEach((item, index) => {
-        const row = document.createElement('div');
-        row.className = 'widget-manage-row';
-        row.innerHTML = `
-          <div class="widget-info">
-            <div class="widget-ic-box">${item.icon}</div>
-            <div class="widget-name">
-              <b>${item.name}</b>
-              <small>${item.desc}</small>
-            </div>
-          </div>
-          <div class="widget-controls">
-            <div class="reorder-btns">
-              <button class="reorder-btn" title="Move Left / Earlier" onclick="moveWidget(${index}, -1)" ${index === 0 ? 'disabled style="opacity:0.3;"' : ''}>←</button>
-              <button class="reorder-btn" title="Move Right / Later" onclick="moveWidget(${index}, 1)" ${index === widgetState.length - 1 ? 'disabled style="opacity:0.3;"' : ''}>→</button>
-            </div>
-
-            <div class="size-select-group">
-              <button class="size-opt-btn ${item.size === 'compact' ? 'active' : ''}" onclick="setWidgetSize('${item.id}', 'compact')">Pill</button>
-              <button class="size-opt-btn ${item.size === 'medium' ? 'active' : ''}" onclick="setWidgetSize('${item.id}', 'medium')">Tile</button>
-              <button class="size-opt-btn ${item.size === 'expanded' ? 'active' : ''}" onclick="setWidgetSize('${item.id}', 'expanded')">Card</button>
-            </div>
-
-            <label class="switch" title="Toggle visible on dock">
-              <input type="checkbox" ${item.enabled ? 'checked' : ''} onchange="toggleWidgetEnabled('${item.id}', this.checked)">
-              <span class="slider"></span>
-            </label>
-          </div>
-        `;
-        listEl.appendChild(row);
-      });
-    }
-
-    function setWidgetSize(widgetId, size) {
-      const item = widgetState.find(w => w.id === widgetId);
-      if (item) {
-        item.size = size;
-        const domEl = document.getElementById('w-' + widgetId);
-        if (domEl) {
-          domEl.setAttribute('data-size', size);
-        }
-        renderWidgetManageList();
-      }
-    }
-
-    function toggleWidgetEnabled(widgetId, isEnabled) {
-      const item = widgetState.find(w => w.id === widgetId);
-      if (item) {
-        item.enabled = isEnabled;
-        const domEl = document.getElementById('w-' + widgetId);
-        if (domEl) {
-          domEl.style.display = isEnabled ? 'flex' : 'none';
-        }
-      }
-    }
-
-    function moveWidget(index, direction) {
-      const targetIndex = index + direction;
-      if (targetIndex < 0 || targetIndex >= widgetState.length) return;
-
-      const item = widgetState.splice(index, 1)[0];
-      widgetState.splice(targetIndex, 0, item);
-
-      syncDockDomOrder();
-      renderWidgetManageList();
-    }
-
-    function syncDockDomOrder() {
-      const rail = document.getElementById('dockRail');
-      if (!rail) return;
-
-      widgetState.forEach(item => {
-        const domEl = document.getElementById('w-' + item.id);
-        if (domEl) {
-          rail.appendChild(domEl);
-        }
-      });
-    }
-
-    // Direct Drag and Drop on Dock Rail
-    let draggedWidgetId = null;
-
-    document.querySelectorAll('.dock-widget').forEach(widget => {
-      widget.addEventListener('dragstart', (e) => {
-        draggedWidgetId = widget.getAttribute('data-widget');
-        widget.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-      });
-
-      widget.addEventListener('dragend', () => {
-        widget.classList.remove('dragging');
-        document.querySelectorAll('.dock-widget').forEach(w => w.classList.remove('drag-over'));
-      });
-
-      widget.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        widget.classList.add('drag-over');
-      });
-
-      widget.addEventListener('dragleave', () => {
-        widget.classList.remove('drag-over');
-      });
-
-      widget.addEventListener('drop', (e) => {
-        e.preventDefault();
-        widget.classList.remove('drag-over');
-        const targetWidgetId = widget.getAttribute('data-widget');
-        if (draggedWidgetId && targetWidgetId && draggedWidgetId !== targetWidgetId) {
-          const fromIdx = widgetState.findIndex(w => w.id === draggedWidgetId);
-          const toIdx = widgetState.findIndex(w => w.id === targetWidgetId);
-          if (fromIdx !== -1 && toIdx !== -1) {
-            const [movedItem] = widgetState.splice(fromIdx, 1);
-            widgetState.splice(toIdx, 0, movedItem);
-            syncDockDomOrder();
-            renderWidgetManageList();
-          }
-        }
-      });
-    });
-
-    const profilePresets = {
-      daily: { sizes: { windows: "compact", search: "compact", weather: "compact", system: "compact", spotify: "compact", clock: "compact" } },
-      work: { sizes: { windows: "compact", search: "medium", weather: "compact", system: "medium", spotify: "compact", clock: "compact" } },
-      founder: { sizes: { windows: "medium", search: "medium", weather: "medium", system: "compact", spotify: "medium", clock: "compact" } },
-      focus: { sizes: { windows: "compact", search: "compact", weather: "compact", system: "compact", spotify: "compact", clock: "compact" } }
-    };
-
-    function switchProfile(profileKey, btn) {
-      document.querySelectorAll('.profile-tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const preset = profilePresets[profileKey];
-      if (preset && preset.sizes) {
-        Object.entries(preset.sizes).forEach(([wId, sz]) => {
-          setWidgetSize(wId, sz);
-        });
-      }
-    }
-
-    function addNewProfile() {
-      const name = prompt("Enter new profile name (e.g. Gaming, Design):");
-      if (!name) return;
-      alert(`Profile "${name}" created and configured.`);
-    }
-
-    // Initialize customizer on startup
-    renderWidgetManageList();
-    selectResult('sidebar');
+    // Default Initialization
+    renderResults();
+    selectResult('vscode');
   </script>
 </body>
 </html>
