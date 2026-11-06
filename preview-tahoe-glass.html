@@ -11,55 +11,57 @@
     :root {
       /* Slender, Modern Dock Dimensions */
       --dock-height: 52px;
-      --dock-padding: 4px 8px;
+      --dock-padding: 5px 8px;
       --dock-radius: 18px;
       --icon-size: 32px;
-      --gap: 6px;
+      --gap: 5px;
 
       /* Deep Cobalt/Charcoal Frosted Glass */
-      --glass-base: rgba(16, 22, 34, 0.78);
+      --glass-base: rgba(14, 20, 32, 0.78);
       --glass-surface: rgba(255, 255, 255, 0.07);
-      --glass-surface-hover: rgba(255, 255, 255, 0.13);
-      --glass-surface-active: rgba(255, 255, 255, 0.18);
+      --glass-surface-hover: rgba(255, 255, 255, 0.14);
+      --glass-surface-active: rgba(255, 255, 255, 0.20);
       --glass-border: rgba(255, 255, 255, 0.14);
       --glass-border-subtle: rgba(255, 255, 255, 0.08);
-      --glass-top-highlight: rgba(255, 255, 255, 0.28);
-      --glass-blur: blur(36px) saturate(190%) contrast(102%);
+      --glass-top-highlight: rgba(255, 255, 255, 0.32);
+      --glass-blur: blur(40px) saturate(190%) contrast(104%);
       --glass-shadow: 
-        0 20px 48px -8px rgba(0, 0, 0, 0.55),
-        0 6px 16px -4px rgba(0, 0, 0, 0.35),
+        0 22px 50px -10px rgba(0, 0, 0, 0.65),
+        0 6px 18px -4px rgba(0, 0, 0, 0.40),
         inset 0 1px 0 0 var(--glass-top-highlight),
         inset 0 0 0 1px var(--glass-border);
 
       /* Typography & Colors */
       --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", sans-serif;
       --text-primary: rgba(255, 255, 255, 0.96);
-      --text-secondary: rgba(255, 255, 255, 0.65);
+      --text-secondary: rgba(255, 255, 255, 0.68);
       --text-tertiary: rgba(255, 255, 255, 0.45);
-      --accent: #5ef1c2;
-      --accent-glow: rgba(94, 241, 194, 0.40);
+      --accent: #007aff;
+      --accent-emerald: #5ef1c2;
+      --accent-glow: rgba(0, 122, 255, 0.45);
 
-      /* Spring Easing */
+      /* Apple Spring Easing */
       --spring-ease: cubic-bezier(0.16, 1, 0.3, 1);
       --trans-hover: 160ms var(--spring-ease);
+      --trans-resize: 340ms var(--spring-ease);
     }
 
     /* Light Theme */
     body[data-theme="light"] {
-      --glass-base: rgba(244, 246, 250, 0.78);
+      --glass-base: rgba(244, 246, 252, 0.82);
       --glass-surface: rgba(0, 0, 0, 0.045);
-      --glass-surface-hover: rgba(0, 0, 0, 0.08);
-      --glass-surface-active: rgba(0, 0, 0, 0.12);
-      --glass-border: rgba(255, 255, 255, 0.90);
+      --glass-surface-hover: rgba(0, 0, 0, 0.085);
+      --glass-surface-active: rgba(0, 0, 0, 0.13);
+      --glass-border: rgba(255, 255, 255, 0.95);
       --glass-border-subtle: rgba(0, 0, 0, 0.08);
-      --glass-top-highlight: rgba(255, 255, 255, 0.98);
+      --glass-top-highlight: rgba(255, 255, 255, 1);
       --glass-shadow: 
-        0 18px 42px -6px rgba(24, 38, 62, 0.16),
-        0 6px 14px -3px rgba(24, 38, 62, 0.09),
+        0 20px 44px -8px rgba(20, 32, 54, 0.16),
+        0 6px 14px -3px rgba(20, 32, 54, 0.10),
         inset 0 1px 0 0 var(--glass-top-highlight),
         inset 0 0 0 1px var(--glass-border);
       --text-primary: rgba(14, 20, 28, 0.94);
-      --text-secondary: rgba(24, 34, 48, 0.65);
+      --text-secondary: rgba(24, 34, 48, 0.68);
       --text-tertiary: rgba(24, 34, 48, 0.42);
       --accent: #007aff;
     }
@@ -106,7 +108,7 @@
     /* Desktop Ambient Header */
     .desktop-hint {
       position: absolute;
-      top: 75px;
+      top: 72px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 2;
@@ -114,7 +116,7 @@
       pointer-events: none;
     }
     .desktop-hint h1 {
-      font-size: 24px;
+      font-size: 23px;
       font-weight: 700;
       letter-spacing: -0.02em;
       text-shadow: 0 4px 18px rgba(0,0,0,0.5);
@@ -124,7 +126,7 @@
       font-size: 13px;
       color: var(--text-secondary);
       text-shadow: 0 2px 8px rgba(0,0,0,0.4);
-      max-width: 640px;
+      max-width: 660px;
       line-height: 1.5;
     }
 
@@ -153,9 +155,9 @@
     .demo-toolbar span {
       color: var(--text-secondary);
       font-weight: 600;
-      font-size: 10.5px;
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.05em;
     }
     .demo-pill-btn {
       background: var(--glass-surface);
@@ -176,9 +178,9 @@
       border-color: var(--glass-top-highlight);
     }
     .demo-pill-btn.active {
-      background: var(--accent-bg);
+      background: rgba(0, 122, 255, 0.25);
       border-color: var(--accent);
-      color: var(--accent);
+      color: #fff;
     }
     .demo-divider {
       width: 1px;
@@ -198,7 +200,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      max-width: calc(100vw - 24px);
+      max-width: calc(100vw - 20px);
     }
 
     .dock-rail {
@@ -212,7 +214,7 @@
       backdrop-filter: var(--glass-blur);
       border-radius: var(--dock-radius);
       box-shadow: var(--glass-shadow);
-      transition: width 0.35s var(--spring-ease), padding 0.35s var(--spring-ease);
+      transition: width var(--trans-resize), padding var(--trans-resize);
     }
 
     .dock-rail::before {
@@ -229,9 +231,9 @@
 
     .dock-divider {
       width: 1px;
-      height: 26px;
+      height: 24px;
       background: var(--glass-border-subtle);
-      margin: 0 1px;
+      margin: 0 2px;
       flex-shrink: 0;
     }
 
@@ -242,16 +244,16 @@
       position: relative;
       display: flex;
       align-items: center;
-      height: 40px;
-      border-radius: 12px;
+      height: 38px;
+      border-radius: 11px;
       cursor: pointer;
       transition: all var(--trans-hover);
     }
 
     .app-icon-btn {
-      width: 40px;
-      height: 40px;
-      border-radius: 11px;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -272,45 +274,45 @@
     /* Running App Indicator Dot */
     .app-dot {
       position: absolute;
-      bottom: 2px;
+      bottom: 1.5px;
       left: 50%;
       transform: translateX(-50%);
-      width: 3.5px;
-      height: 3.5px;
+      width: 3px;
+      height: 3px;
       border-radius: 50%;
       background: var(--text-primary);
-      box-shadow: 0 0 4px rgba(255, 255, 255, 0.7);
+      box-shadow: 0 0 3px rgba(255, 255, 255, 0.7);
     }
 
     /* Window Count Badge */
     .app-badge {
       position: absolute;
-      top: 1px;
-      right: 1px;
-      min-width: 15px;
-      height: 14px;
-      padding: 0 4px;
+      top: 0px;
+      right: 0px;
+      min-width: 14px;
+      height: 13px;
+      padding: 0 3.5px;
       border-radius: 999px;
       background: rgba(255, 59, 48, 0.95);
       color: #fff;
-      font-size: 8.5px;
+      font-size: 8px;
       font-weight: 800;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
     }
     .app-badge.neutral {
-      background: rgba(0, 0, 0, 0.55);
+      background: rgba(0, 0, 0, 0.65);
       border: 1px solid var(--glass-border);
       color: var(--text-primary);
     }
 
     /* Active Window Title Pill (VS Code in user screenshot) */
     .active-window-pill {
-      height: 38px;
-      padding: 0 10px 0 6px;
-      border-radius: 11px;
+      height: 36px;
+      padding: 0 9px 0 6px;
+      border-radius: 10px;
       background: var(--glass-surface-active);
       border: 1px solid var(--glass-border);
       display: flex;
@@ -329,13 +331,13 @@
       font-weight: 600;
       color: var(--text-primary);
       white-space: nowrap;
-      max-width: 110px;
+      max-width: 115px;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     /* ==========================================================================
-       FLOATING WINDOW PREVIEWS POPOVER (Hover Over App, e.g. Finder)
+       FLOATING WINDOW PREVIEWS POPOVER (Hover Over Finder)
        ========================================================================== */
     .window-preview-popover {
       position: absolute;
@@ -346,17 +348,18 @@
       backdrop-filter: var(--glass-blur);
       border: 1px solid var(--glass-border);
       border-radius: 16px;
-      padding: 10px 12px;
+      padding: 10px 12px 12px 12px;
       box-shadow: 
-        0 24px 60px rgba(0,0,0,0.6),
-        0 8px 20px rgba(0,0,0,0.4),
+        0 24px 60px rgba(0,0,0,0.65),
+        0 8px 20px rgba(0,0,0,0.40),
         inset 0 1px 0 var(--glass-top-highlight);
       opacity: 0;
       pointer-events: none;
-      transition: all 180ms var(--spring-ease);
+      transition: opacity 180ms var(--spring-ease), transform 180ms var(--spring-ease);
       z-index: 100;
     }
-    .dock-item:hover .window-preview-popover {
+    .dock-item:hover .window-preview-popover,
+    .window-preview-popover.force-show {
       opacity: 1;
       pointer-events: auto;
       transform: translateX(-50%) translateY(0);
@@ -366,14 +369,30 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 11.5px;
+      margin-bottom: 9px;
+      font-size: 12px;
       font-weight: 700;
+      color: var(--text-primary);
     }
     .preview-header-left {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
+    }
+    .preview-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+    }
+    .preview-header-actions svg {
+      width: 13px;
+      height: 13px;
+      cursor: pointer;
+      transition: color 120ms ease;
+    }
+    .preview-header-actions svg:hover {
+      color: var(--text-primary);
     }
 
     .preview-thumbnails-deck {
@@ -381,21 +400,26 @@
       gap: 10px;
     }
     .window-card {
-      width: 140px;
-      height: 90px;
-      border-radius: 10px;
-      background: rgba(14, 18, 26, 0.92);
+      width: 145px;
+      height: 98px;
+      border-radius: 9px;
+      background: rgba(12, 16, 24, 0.94);
       border: 1px solid var(--glass-border-subtle);
       display: flex;
       flex-direction: column;
       overflow: hidden;
       cursor: pointer;
-      transition: all 140ms ease;
+      position: relative;
+      transition: all 150ms ease;
     }
     .window-card:hover {
       border-color: var(--accent);
-      transform: scale(1.03);
-      box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    }
+    .window-card.active-window {
+      border: 1.5px solid var(--accent);
+      box-shadow: 0 0 14px var(--accent-glow);
     }
     .window-card-bar {
       height: 18px;
@@ -411,26 +435,39 @@
       height: 5px;
       border-radius: 50%;
     }
-    .window-card-body {
+    .window-mock-list {
       flex: 1;
-      padding: 6px;
+      padding: 6px 8px;
       display: flex;
       flex-direction: column;
-      justify-content: flex-end;
+      gap: 4px;
+    }
+    .mock-row {
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .mock-row.subtle {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .window-card-footer {
+      padding: 4px 8px 6px 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
     }
     .window-card-title {
       font-size: 10px;
       font-weight: 600;
-      color: var(--text-secondary);
+      color: var(--text-primary);
     }
 
     /* ==========================================================================
        INTEGRATED MEDIA PLAYER PILL (Spotify / Docktor Style)
        ========================================================================== */
     .dock-media-pill {
-      height: 38px;
-      padding: 0 10px 0 6px;
-      border-radius: 11px;
+      height: 36px;
+      padding: 0 9px 0 6px;
+      border-radius: 10px;
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
       display: flex;
@@ -446,8 +483,8 @@
       transform: translateY(-2px);
     }
     .media-pill-icon {
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       border-radius: 6px;
       background: #1db954;
       display: flex;
@@ -480,7 +517,7 @@
     .media-pill-controls {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       margin-left: 2px;
     }
     .media-ctrl-icon {
@@ -500,60 +537,80 @@
       bottom: calc(100% + 12px);
       left: 50%;
       transform: translateX(-50%) translateY(8px);
-      width: 180px;
+      width: 195px;
       background: var(--glass-base);
       backdrop-filter: var(--glass-blur);
       border: 1px solid var(--glass-border);
       border-radius: 16px;
       padding: 12px;
       box-shadow: 
-        0 24px 60px rgba(0,0,0,0.6),
-        0 8px 20px rgba(0,0,0,0.4),
+        0 24px 60px rgba(0,0,0,0.65),
+        0 8px 20px rgba(0,0,0,0.40),
         inset 0 1px 0 var(--glass-top-highlight);
       opacity: 0;
       pointer-events: none;
-      transition: all 180ms var(--spring-ease);
+      transition: opacity 180ms var(--spring-ease), transform 180ms var(--spring-ease);
       z-index: 100;
       display: flex;
       flex-direction: column;
-      align-items: center;
       gap: 8px;
     }
-    .dock-media-pill:hover .media-popover-card {
+    .dock-media-pill:hover .media-popover-card,
+    .media-popover-card.force-show {
       opacity: 1;
       pointer-events: auto;
       transform: translateX(-50%) translateY(0);
     }
+    .media-popover-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+    }
     .media-popover-art {
-      width: 110px;
-      height: 110px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #1f1c2c, #928dab);
-      box-shadow: 0 8px 22px rgba(0,0,0,0.5);
+      width: 100%;
+      height: 120px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1b263b, #0d1b2a);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      position: relative;
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
     }
+    .media-popover-art::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 60%, rgba(0, 122, 255, 0.35), transparent 70%);
+    }
     .media-popover-title {
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 700;
-      text-align: center;
       color: var(--text-primary);
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
     }
     .media-popover-artist {
       font-size: 10px;
       color: var(--text-secondary);
-      text-align: center;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
     }
     .media-popover-buttons {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 14px;
-      margin-top: 4px;
+      margin-top: 2px;
     }
     .popover-btn {
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
       background: var(--glass-surface-active);
       border: 1px solid var(--glass-border-subtle);
@@ -566,106 +623,149 @@
     }
     .popover-btn:hover {
       background: var(--accent);
-      color: #000;
+      color: #fff;
       transform: scale(1.1);
     }
 
     /* ==========================================================================
-       PROTONDOCK UNIQUE WIDGET PILLS (Weather, System, Clock)
+       PROTONDOCK ADAPTIVE RESIZABLE WIDGETS (Smooth Spring Resizing)
        ========================================================================== */
-    .dock-widget-pill {
-      height: 38px;
-      padding: 0 9px;
-      border-radius: 11px;
+    .dock-widget-container {
+      position: relative;
+      height: 36px;
+      border-radius: 10px;
       background: var(--glass-surface);
       border: 1px solid var(--glass-border-subtle);
       display: flex;
       align-items: center;
-      gap: 6px;
       cursor: pointer;
-      transition: all var(--trans-hover);
-      position: relative;
+      transition: width var(--trans-resize), padding var(--trans-resize), background var(--trans-hover), border-color var(--trans-hover);
+      overflow: hidden;
     }
-    .dock-widget-pill:hover {
+    .dock-widget-container:hover {
       background: var(--glass-surface-hover);
       border-color: var(--glass-border);
       transform: translateY(-2px);
     }
 
-    /* Weather Pill */
-    .weather-pill-temp {
-      font-size: 12px;
+    /* Weather Widget: Adaptive Lengths */
+    .weather-widget {
+      width: 54px;
+      padding: 0 8px;
+    }
+    .weather-widget[data-size="medium"] {
+      width: 95px;
+      padding: 0 10px;
+    }
+    .weather-widget[data-size="expanded"] {
+      width: 148px;
+      padding: 0 12px;
+    }
+
+    .weather-widget-content {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      width: 100%;
+    }
+    .weather-temp {
+      font-size: 11.5px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
     }
-
-    /* Weather Floating Forecast Popover */
-    .weather-popover-card {
-      position: absolute;
-      bottom: calc(100% + 12px);
-      left: 50%;
-      transform: translateX(-50%) translateY(8px);
-      background: var(--glass-base);
-      backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--glass-border);
-      border-radius: 16px;
-      padding: 12px 14px;
-      box-shadow: 
-        0 24px 60px rgba(0,0,0,0.6),
-        0 8px 20px rgba(0,0,0,0.4),
-        inset 0 1px 0 var(--glass-top-highlight);
-      opacity: 0;
-      pointer-events: none;
-      transition: all 180ms var(--spring-ease);
-      z-index: 100;
-      display: flex;
-      gap: 12px;
-      white-space: nowrap;
-    }
-    .dock-widget-pill:hover .weather-popover-card {
-      opacity: 1;
-      pointer-events: auto;
-      transform: translateX(-50%) translateY(0);
-    }
-    .forecast-item {
-      display: flex;
+    .weather-detail {
+      display: none;
       flex-direction: column;
-      align-items: center;
-      gap: 3px;
-      font-size: 9px;
+      line-height: 1.1;
+      overflow: hidden;
+    }
+    .weather-widget[data-size="medium"] .weather-detail,
+    .weather-widget[data-size="expanded"] .weather-detail {
+      display: flex;
+    }
+    .weather-condition {
+      font-size: 9.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .weather-highlow {
+      font-size: 8px;
       color: var(--text-secondary);
     }
-    .forecast-item b {
-      color: var(--text-primary);
-      font-size: 11.5px;
+    .weather-sparkline {
+      display: none;
+      align-items: flex-end;
+      gap: 3px;
+      height: 16px;
+      margin-left: auto;
+    }
+    .weather-widget[data-size="expanded"] .weather-sparkline {
+      display: flex;
+    }
+    .spark-bar {
+      width: 4px;
+      border-radius: 2px;
+      background: var(--accent);
     }
 
-    /* System Stats Pill */
-    .system-pill-stats {
+    /* Hardware Stats Widget: Adaptive Lengths */
+    .system-widget {
+      width: 86px;
+      padding: 0 8px;
+    }
+    .system-widget[data-size="medium"] {
+      width: 116px;
+      padding: 0 10px;
+    }
+    .system-widget[data-size="expanded"] {
+      width: 154px;
+      padding: 0 10px;
+    }
+    .system-widget-content {
       display: flex;
       align-items: center;
       gap: 6px;
       font-size: 10px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      width: 100%;
     }
-    .sys-badge {
+    .sys-pill-item {
       display: flex;
       align-items: center;
       gap: 3px;
     }
-    .sys-badge span {
+    .sys-pill-item span {
       color: var(--text-secondary);
-      font-size: 9px;
+      font-size: 8.5px;
+      font-weight: 600;
+    }
+    .sys-mini-meter {
+      display: none;
+      width: 22px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+    }
+    .system-widget[data-size="medium"] .sys-mini-meter,
+    .system-widget[data-size="expanded"] .sys-mini-meter {
+      display: block;
+    }
+    .sys-meter-fill {
+      height: 100%;
+      border-radius: 999px;
     }
 
-    /* Clock & Date (2-Line Stacked: Exactly like reference) */
+    /* Stacked 2-Line Clock & Date (Exact Reference Style: 20:36 / 07.11.2025) */
     .dock-clock-block {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
       justify-content: center;
-      padding: 0 4px;
+      padding: 0 5px;
       line-height: 1.1;
       font-variant-numeric: tabular-nums;
       cursor: pointer;
@@ -682,11 +782,11 @@
       color: var(--text-secondary);
     }
 
-    /* System Tray Icons (Volume, Trash, Start) */
+    /* System Utility Icons (Trash, Sound) */
     .utility-icon-btn {
-      width: 34px;
-      height: 38px;
-      border-radius: 9px;
+      width: 30px;
+      height: 36px;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -701,8 +801,8 @@
     }
 
     .icon {
-      width: 17px;
-      height: 17px;
+      width: 16px;
+      height: 16px;
       stroke: currentColor;
       fill: none;
       stroke-width: 1.8;
@@ -713,16 +813,16 @@
 </head>
 <body data-theme="dark">
 
-  <!-- Cobalt Silk Wave Wallpaper (Matching Reference) -->
+  <!-- Cobalt Silk Wave Wallpaper (Matching User Screenshot) -->
   <div class="desktop-wallpaper wallpaper-cobalt-wave" id="wallpaperEl"></div>
 
   <!-- Header -->
   <div class="desktop-hint">
     <h1>ProtonDock: Modern & Sleek Glass Rail</h1>
-    <p>Inspired by <b>Ganella</b> & <b>Docktor</b>: Slender 52px height, active window title pills, live hover window previews, integrated Spotify controls, and stacked clock typography.</p>
+    <p>Slender 52px height inspired by <b>Ganella</b> & <b>Docktor</b>. Features active window title pills, hover window previews, Spotify media bar, and Apple spring adaptive resizable widgets.</p>
   </div>
 
-  <!-- Top Demo Toolbar -->
+  <!-- Top Demo Controls Toolbar -->
   <div class="demo-toolbar">
     <div class="demo-toolbar-group">
       <span>Theme:</span>
@@ -734,49 +834,31 @@
       <span>Wallpaper:</span>
       <button class="demo-pill-btn active" onclick="setWallpaper('cobalt-wave', this)">Cobalt Wave</button>
       <button class="demo-pill-btn" onclick="setWallpaper('sunset', this)">Sunset Glow</button>
-      <button class="demo-pill-btn" onclick="setWallpaper('minimal', this)">Minimal Studio</button>
+      <button class="demo-pill-btn" onclick="setWallpaper('minimal', this)">Minimal Dark</button>
     </div>
     <div class="demo-divider"></div>
-    <button class="demo-pill-btn" style="background: var(--accent-bg); border-color: var(--accent); color: var(--accent);" onclick="toggleSpotlight()">
-      <svg class="icon" style="width:13px; height:13px;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      Spotlight Search
-    </button>
+    <div class="demo-toolbar-group">
+      <span>Widget Length:</span>
+      <button class="demo-pill-btn active" id="btnSizePill" onclick="setAllWidgetSizes('compact', this)">Compact Pill</button>
+      <button class="demo-pill-btn" id="btnSizeMed" onclick="setAllWidgetSizes('medium', this)">Medium Tile</button>
+      <button class="demo-pill-btn" id="btnSizeExp" onclick="setAllWidgetSizes('expanded', this)">Wide Card</button>
+    </div>
+    <div class="demo-divider"></div>
+    <div class="demo-toolbar-group">
+      <span>Popovers:</span>
+      <button class="demo-pill-btn" id="pinFinderBtn" onclick="togglePinPopover('finderPopover', this)">Pin Finder</button>
+      <button class="demo-pill-btn" id="pinSpotifyBtn" onclick="togglePinPopover('spotifyPopover', this)">Pin Spotify</button>
+    </div>
   </div>
 
   <!-- The ProtonDock Rail (Slender 52px Height) -->
   <div class="dock-stage">
     <nav class="dock-rail" aria-label="ProtonDock">
 
-      <!-- Windows Start Menu / Launcher Button -->
-      <div class="dock-item">
-        <div class="app-icon-btn" title="Windows Start Menu" onclick="triggerEffect(this)">
-          <svg style="width:20px; height:20px;" viewBox="0 0 24 24" fill="#0078d4">
-            <rect x="3" y="3" width="8" height="8" rx="1.5"/>
-            <rect x="13" y="3" width="8" height="8" rx="1.5"/>
-            <rect x="3" y="13" width="8" height="8" rx="1.5"/>
-            <rect x="13" y="13" width="8" height="8" rx="1.5"/>
-          </svg>
-        </div>
-      </div>
-
-      <!-- ProtonSearch Trigger Pill -->
-      <div class="dock-item">
-        <div class="app-icon-btn" title="ProtonSearch (Alt + Space)" onclick="toggleSpotlight()">
-          <svg class="icon" style="color:var(--accent);" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="7"/>
-            <path d="m20 20-3.5-3.5"/>
-          </svg>
-        </div>
-      </div>
-
-      <div class="dock-divider"></div>
-
-      <!-- RUNNING APPS SECTION -->
-
-      <!-- App 1: Sublime Text / Text Editor with Window Count Badge '2' -->
+      <!-- 1. Sublime Text (with badge '2') -->
       <div class="dock-item">
         <div class="app-icon-btn" title="Sublime Text (2 windows open)">
-          <svg style="width:22px; height:22px;" viewBox="0 0 24 24">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <path d="M4 6.5 12 2l8 4.5v11L12 22 4 17.5V6.5Z" fill="#ff9800"/>
             <path d="M12 2v20" stroke="#fff" stroke-width="1.5"/>
           </svg>
@@ -785,57 +867,34 @@
         </div>
       </div>
 
-      <!-- App 2: File Explorer / Finder with LIVE HOVER WINDOW PREVIEWS (Ganella/Docktor) -->
+      <!-- 2. Apple Notes / Document App -->
       <div class="dock-item">
-        <div class="app-icon-btn" title="Finder / File Explorer">
-          <svg style="width:23px; height:23px;" viewBox="0 0 24 24">
-            <rect width="20" height="20" x="2" y="2" rx="5" fill="#4dabf7"/>
-            <path d="M12 2v20" stroke="#fff" stroke-width="1.5"/>
-            <circle cx="7" cy="9" r="1.5" fill="#fff"/>
-            <circle cx="17" cy="9" r="1.5" fill="#fff"/>
-            <path d="M8 15c2 2 6 2 8 0" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <div class="app-icon-btn" title="Notes">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="4" fill="#ffffff"/>
+            <path d="M7 7h10M7 11h10M7 15h6" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          <span class="app-badge">17</span>
+          <span class="app-badge">2</span>
           <span class="app-dot"></span>
-        </div>
-        <!-- Live Window Thumbnails Popover Card (Image 2 in User Request) -->
-        <div class="window-preview-popover">
-          <div class="preview-header">
-            <div class="preview-header-left">
-              <svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="#4dabf7"><rect width="20" height="20" x="2" y="2" rx="4"/></svg>
-              <span>Finder</span>
-            </div>
-            <span style="font-size:10px; color:var(--text-secondary);">2 Windows</span>
-          </div>
-          <div class="preview-thumbnails-deck">
-            <div class="window-card">
-              <div class="window-card-bar">
-                <span class="window-dot" style="background:#ff5f56;"></span>
-                <span class="window-dot" style="background:#ffbd2e;"></span>
-                <span class="window-dot" style="background:#27c93f;"></span>
-              </div>
-              <div class="window-card-body">
-                <div class="window-card-title">📁 Desktop</div>
-              </div>
-            </div>
-            <div class="window-card" style="border-color:var(--accent);">
-              <div class="window-card-bar">
-                <span class="window-dot" style="background:#ff5f56;"></span>
-                <span class="window-dot" style="background:#ffbd2e;"></span>
-                <span class="window-dot" style="background:#27c93f;"></span>
-              </div>
-              <div class="window-card-body">
-                <div class="window-card-title">📁 Downloads</div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      <!-- App 3: ACTIVE APP PILL with Window Title (VS Code in User Screenshot) -->
+      <!-- 3. Calendar App (Date 17 Badge) -->
+      <div class="dock-item">
+        <div class="app-icon-btn" title="Calendar: Friday 17">
+          <svg style="width:21px; height:21px;" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="17" rx="3.5" fill="#f8f9fa"/>
+            <path d="M3 4h18v5H3z" fill="#ff3b30"/>
+            <text x="12" y="19" font-size="10" font-weight="900" fill="#1c1c1e" text-anchor="middle">17</text>
+          </svg>
+          <span class="app-dot"></span>
+        </div>
+      </div>
+
+      <!-- 4. ACTIVE APP PILL with Window Title (VS Code in User Screenshot) -->
       <div class="dock-item">
         <div class="active-window-pill" title="Visual Studio Code: Sidebar-Bridge.tsx">
-          <svg style="width:20px; height:20px; flex-shrink:0;" viewBox="0 0 24 24">
+          <svg style="width:19px; height:19px; flex-shrink:0;" viewBox="0 0 24 24">
             <path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/>
             <path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/>
           </svg>
@@ -843,23 +902,158 @@
         </div>
       </div>
 
-      <!-- App 4: Browser (Arc / Edge) -->
+      <div class="dock-divider"></div>
+
+      <!-- 5. Obsidian / Lightning Bolt App -->
       <div class="dock-item">
-        <div class="app-icon-btn" title="Browser (Edge / Arc)">
-          <svg style="width:23px; height:23px;" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10" fill="#0078d4"/>
-            <circle cx="12" cy="12" r="5" fill="#50e6ff"/>
+        <div class="app-icon-btn" title="Obsidian">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+            <rect width="20" height="20" x="2" y="2" rx="5" fill="#7c3aed"/>
+            <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" fill="#fff"/>
           </svg>
           <span class="app-dot"></span>
         </div>
       </div>
 
-      <!-- App 5: Terminal -->
+      <!-- 6. Claude / Sparkle App -->
       <div class="dock-item">
-        <div class="app-icon-btn" title="Windows Terminal">
-          <svg style="width:20px; height:20px;" viewBox="0 0 24 24" stroke="var(--text-primary)" fill="none" stroke-width="2">
-            <path d="m4 17 6-5-6-5"/>
-            <path d="M12 19h8"/>
+        <div class="app-icon-btn" title="Claude / Cursor">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+            <rect width="20" height="20" x="2" y="2" rx="5" fill="#1c1917"/>
+            <path d="M12 4l1.8 5.2L19 11l-5.2 1.8L12 18l-1.8-5.2L5 11l5.2-1.8z" fill="#d97706"/>
+          </svg>
+          <span class="app-dot"></span>
+        </div>
+      </div>
+
+      <!-- 7. Figma / Vector App -->
+      <div class="dock-item">
+        <div class="app-icon-btn" title="Figma">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+            <rect width="20" height="20" x="2" y="2" rx="5" fill="#a855f7"/>
+            <polygon points="12 4 18 9 16 17 8 17 6 9" fill="#fff"/>
+          </svg>
+          <span class="app-dot"></span>
+        </div>
+      </div>
+
+      <!-- 8. Blender / 3D App -->
+      <div class="dock-item">
+        <div class="app-icon-btn" title="Blender">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+            <rect width="20" height="20" x="2" y="2" rx="5" fill="#334155"/>
+            <circle cx="12" cy="12" r="6" fill="#ea580c"/>
+            <circle cx="12" cy="12" r="2.5" fill="#fff"/>
+          </svg>
+          <span class="app-dot"></span>
+        </div>
+      </div>
+
+      <!-- 9. Finder / File Explorer with LIVE HOVER WINDOW PREVIEWS -->
+      <div class="dock-item">
+        <div class="app-icon-btn" title="Finder / File Explorer">
+          <svg style="width:22px; height:22px;" viewBox="0 0 24 24">
+            <rect width="20" height="20" x="2" y="2" rx="5" fill="#38bdf8"/>
+            <path d="M12 2v20" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="7" cy="9" r="1.5" fill="#fff"/>
+            <circle cx="17" cy="9" r="1.5" fill="#fff"/>
+            <path d="M8 15c2 2 6 2 8 0" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          </svg>
+          <span class="app-dot"></span>
+        </div>
+
+        <!-- Live Window Thumbnails Popover Card (Matching User Screenshot 2) -->
+        <div class="window-preview-popover" id="finderPopover">
+          <div class="preview-header">
+            <div class="preview-header-left">
+              <svg style="width:15px; height:15px;" viewBox="0 0 24 24" fill="#38bdf8"><rect width="20" height="20" x="2" y="2" rx="4"/></svg>
+              <span>Finder</span>
+            </div>
+            <div class="preview-header-actions">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </div>
+          </div>
+          <div class="preview-thumbnails-deck">
+            <!-- Window 1: Desktop -->
+            <div class="window-card">
+              <div class="window-card-bar">
+                <span class="window-dot" style="background:#ff5f56;"></span>
+                <span class="window-dot" style="background:#ffbd2e;"></span>
+                <span class="window-dot" style="background:#27c93f;"></span>
+              </div>
+              <div class="window-mock-list">
+                <div class="mock-row" style="width: 75%;"></div>
+                <div class="mock-row subtle" style="width: 50%;"></div>
+                <div class="mock-row" style="width: 85%;"></div>
+                <div class="mock-row subtle" style="width: 60%;"></div>
+                <div class="mock-row" style="width: 40%;"></div>
+              </div>
+              <div class="window-card-footer">
+                <div class="window-card-title">Desktop</div>
+              </div>
+            </div>
+
+            <!-- Window 2: Downloads (Active Blue Highlight) -->
+            <div class="window-card active-window">
+              <div class="window-card-bar">
+                <span class="window-dot" style="background:#ff5f56;"></span>
+                <span class="window-dot" style="background:#ffbd2e;"></span>
+                <span class="window-dot" style="background:#27c93f;"></span>
+              </div>
+              <div class="window-mock-list">
+                <div class="mock-row" style="width: 90%; background: #007aff;"></div>
+                <div class="mock-row subtle" style="width: 65%;"></div>
+                <div class="mock-row" style="width: 80%;"></div>
+                <div class="mock-row subtle" style="width: 55%;"></div>
+                <div class="mock-row" style="width: 70%;"></div>
+              </div>
+              <div class="window-card-footer">
+                <div class="window-card-title">Downloads</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 10. Documents Folder -->
+      <div class="dock-item">
+        <div class="app-icon-btn" title="Documents">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24" fill="#0284c7">
+            <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- 11. DuckDuckGo / Safari Browser -->
+      <div class="dock-item">
+        <div class="app-icon-btn" title="Browser (Safari / DuckDuckGo)">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" fill="#ea580c"/>
+            <circle cx="12" cy="12" r="6" fill="#fff"/>
+            <polygon points="12 7 14 12 12 17 10 12" fill="#ea580c"/>
+          </svg>
+          <span class="app-dot"></span>
+        </div>
+      </div>
+
+      <!-- 12. Telegram / Messages -->
+      <div class="dock-item">
+        <div class="app-icon-btn" title="Telegram">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" fill="#229ed9"/>
+            <path d="m6 12 11-5-3 10-3-4-2 2v-3l-3-2z" fill="#fff"/>
+          </svg>
+          <span class="app-dot"></span>
+        </div>
+      </div>
+
+      <!-- 13. Apple Music -->
+      <div class="dock-item">
+        <div class="app-icon-btn" title="Apple Music">
+          <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
+            <rect width="20" height="20" x="2" y="2" rx="5" fill="#fa233b"/>
+            <path d="M14 6v8a2 2 0 1 1-2-2 2 2 0 0 1 2 2V9h4V6h-4z" fill="#fff"/>
           </svg>
           <span class="app-dot"></span>
         </div>
@@ -867,11 +1061,11 @@
 
       <div class="dock-divider"></div>
 
-      <!-- INTEGRATED SPOTIFY MEDIA PILL (Ganella / Docktor Style) -->
+      <!-- 14. INTEGRATED SPOTIFY MEDIA PILL (Ganella / Docktor Style) -->
       <div class="dock-item">
         <div class="dock-media-pill" title="Spotify: Tunnel Vision">
           <div class="media-pill-icon">
-            <svg style="width:16px; height:16px;" viewBox="0 0 24 24">
+            <svg style="width:14px; height:14px;" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="11" fill="#1db954"/>
               <path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
             </svg>
@@ -889,24 +1083,34 @@
             <svg class="media-ctrl-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/></svg>
           </div>
 
-          <!-- Floating Popover Now Playing Card (Image 3 in User Request) -->
-          <div class="media-popover-card">
+          <!-- Floating Popover Now Playing Card (Matching User Screenshot 3) -->
+          <div class="media-popover-card" id="spotifyPopover">
+            <div class="media-popover-header">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <svg style="width:13px; height:13px;" viewBox="0 0 24 24" fill="#1db954"><circle cx="12" cy="12" r="10"/></svg>
+                <span>Spotify</span>
+              </div>
+              <svg style="width:12px; height:12px; color:var(--text-secondary); cursor:pointer;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </div>
             <div class="media-popover-art">
-              <svg style="width:40px; height:40px; color:rgba(255,255,255,0.7);" viewBox="0 0 24 24" fill="currentColor">
+              <!-- Dark Silhouettes Album Art Representation -->
+              <svg style="width:50px; height:50px; color:rgba(255,255,255,0.85); z-index:2;" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
               </svg>
             </div>
-            <div class="media-popover-title">Tunnel Vision</div>
-            <div class="media-popover-artist">Aurora B.Poreal</div>
+            <div>
+              <div class="media-popover-title">Tunnel Vision - Remastered</div>
+              <div class="media-popover-artist">Aurora B.Poreal</div>
+            </div>
             <div class="media-popover-buttons">
               <div class="popover-btn">
-                <svg style="width:12px; height:12px;" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/></svg>
+                <svg style="width:11px; height:11px;" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/></svg>
               </div>
-              <div class="popover-btn" style="width:34px; height:34px; background:var(--accent); color:#000;">
-                <svg style="width:14px; height:14px;" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              <div class="popover-btn" style="width:30px; height:30px; background:var(--accent); color:#fff;">
+                <svg style="width:13px; height:13px;" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
               </div>
               <div class="popover-btn">
-                <svg style="width:12px; height:12px;" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/></svg>
+                <svg style="width:11px; height:11px;" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/></svg>
               </div>
             </div>
           </div>
@@ -915,52 +1119,51 @@
 
       <div class="dock-divider"></div>
 
-      <!-- PROTONDOCK SLEEK WIDGETS -->
-
-      <!-- Weather Pill with Hover Forecast Popover -->
+      <!-- 15. PROTONDOCK ADAPTIVE WEATHER WIDGET (Click to cycle length smoothly) -->
       <div class="dock-item">
-        <div class="dock-widget-pill" title="Weather: 24° Sunny">
-          <svg class="icon" style="width:18px; height:18px; color:#ffd166;" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="4" fill="#ffd166" stroke="none"/>
-            <path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7a3.5 3.5 0 0 0 0-7z" fill="var(--text-primary)" stroke="none" opacity="0.9"/>
-          </svg>
-          <span class="weather-pill-temp">24°</span>
-
-          <!-- Forecast Popover -->
-          <div class="weather-popover-card">
-            <div class="forecast-item">
-              <span>Now</span>
-              <svg class="icon" style="width:14px; height:14px; color:#ffd166;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
-              <b>24°</b>
+        <div class="dock-widget-container weather-widget" id="weatherWidget" data-size="compact" onclick="cycleWidgetSize('weatherWidget')" title="Weather: Click to resize smoothly">
+          <div class="weather-widget-content">
+            <svg class="icon" style="width:17px; height:17px; color:#ffd166; flex-shrink:0;" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="4" fill="#ffd166" stroke="none"/>
+              <path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7a3.5 3.5 0 0 0 0-7z" fill="var(--text-primary)" stroke="none" opacity="0.9"/>
+            </svg>
+            <span class="weather-temp">24°</span>
+            <div class="weather-detail">
+              <span class="weather-condition">Sunny Clear</span>
+              <span class="weather-highlow">H:26° L:18°</span>
             </div>
-            <div class="forecast-item">
-              <span>2 PM</span>
-              <svg class="icon" style="width:14px; height:14px; color:#f59e0b;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
-              <b>25°</b>
-            </div>
-            <div class="forecast-item">
-              <span>4 PM</span>
-              <svg class="icon" style="width:14px; height:14px; color:#60a5fa;" viewBox="0 0 24 24"><path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7z" fill="currentColor"/></svg>
-              <b>22°</b>
+            <div class="weather-sparkline">
+              <div class="spark-bar" style="height: 8px;"></div>
+              <div class="spark-bar" style="height: 14px; background: #ffd166;"></div>
+              <div class="spark-bar" style="height: 11px;"></div>
+              <div class="spark-bar" style="height: 6px;"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Hardware System Status Pill -->
+      <!-- 16. PROTONDOCK ADAPTIVE HARDWARE STATUS WIDGET (Click to cycle length smoothly) -->
       <div class="dock-item">
-        <div class="dock-widget-pill" title="Hardware Status">
-          <div class="system-pill-stats">
-            <div class="sys-badge"><span>CPU</span> <b>24%</b></div>
-            <span style="color:var(--text-tertiary);">·</span>
-            <div class="sys-badge"><span>RAM</span> <b>58%</b></div>
+        <div class="dock-widget-container system-widget" id="systemWidget" data-size="compact" onclick="cycleWidgetSize('systemWidget')" title="Hardware: Click to resize smoothly">
+          <div class="system-widget-content">
+            <div class="sys-pill-item">
+              <span>CPU</span>
+              <b>24%</b>
+              <div class="sys-mini-meter"><div class="sys-meter-fill" style="width: 24%; background: var(--accent-emerald);"></div></div>
+            </div>
+            <span style="color:var(--text-tertiary); font-size:9px;">·</span>
+            <div class="sys-pill-item">
+              <span>RAM</span>
+              <b>58%</b>
+              <div class="sys-mini-meter"><div class="sys-meter-fill" style="width: 58%; background: #60a5fa;"></div></div>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="dock-divider"></div>
 
-      <!-- Trash Utility -->
+      <!-- 17. Trash Utility -->
       <div class="dock-item">
         <div class="utility-icon-btn" title="Empty Recycle Bin" onclick="triggerEffect(this)">
           <svg class="icon" viewBox="0 0 24 24">
@@ -969,9 +1172,9 @@
         </div>
       </div>
 
-      <!-- Volume Utility -->
+      <!-- 18. Volume Utility -->
       <div class="dock-item">
-        <div class="utility-icon-btn" title="Sound and Audio" onclick="triggerEffect(this)">
+        <div class="utility-icon-btn" title="Audio Output" onclick="triggerEffect(this)">
           <svg class="icon" viewBox="0 0 24 24">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
@@ -980,10 +1183,10 @@
         </div>
       </div>
 
-      <!-- STACKED CLOCK & DATE (Exact Reference Style: 20:37 / 07.11.2025) -->
+      <!-- 19. STACKED CLOCK & DATE (Exact Reference Style: 20:36 / 07.11.2025) -->
       <div class="dock-item">
-        <div class="dock-clock-block" title="Clock and Calendar">
-          <span class="clock-time-val" id="liveTime">20:37</span>
+        <div class="dock-clock-block" title="Clock & Calendar">
+          <span class="clock-time-val" id="liveTime">20:36</span>
           <span class="clock-date-val" id="liveDate">07.11.2025</span>
         </div>
       </div>
@@ -1022,13 +1225,36 @@
       btn.classList.add('active');
     }
 
+    // Interactive Widget Resizing: Cycles smooth lengths
+    const sizeCycle = ['compact', 'medium', 'expanded'];
+    function cycleWidgetSize(widgetId) {
+      const el = document.getElementById(widgetId);
+      if (!el) return;
+      const current = el.getAttribute('data-size') || 'compact';
+      const nextIdx = (sizeCycle.indexOf(current) + 1) % sizeCycle.length;
+      el.setAttribute('data-size', sizeCycle[nextIdx]);
+    }
+
+    function setAllWidgetSizes(size, btn) {
+      ['weatherWidget', 'systemWidget'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('data-size', size);
+      });
+      document.querySelectorAll('.demo-toolbar-group:nth-child(5) .demo-pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // Toggle Pin Popovers for easy inspection without hovering
+    function togglePinPopover(popoverId, btn) {
+      const popover = document.getElementById(popoverId);
+      if (!popover) return;
+      popover.classList.toggle('force-show');
+      btn.classList.toggle('active');
+    }
+
     function triggerEffect(el) {
       el.style.transform = 'scale(0.92)';
       setTimeout(() => el.style.transform = '', 120);
-    }
-
-    function toggleSpotlight() {
-      alert("ProtonSearch Spotlight Palette triggered (Alt + Space). Integrated search query and FTS5 local index.");
     }
   </script>
 </body>
