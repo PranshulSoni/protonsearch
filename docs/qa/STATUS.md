@@ -2,6 +2,27 @@
 
 This is a working evidence ledger, not a release certification.
 
+## Preview dock and widget manager - 2026-11-07
+
+HTML preview only (`preview-tahoe-glass.html`); the React/native port was not
+started. The dock is an 82px graphite rail with nine default widgets, inline SVG
+icons, and Pill/Tile/Card variants. All 14 widgets appear in the manager, with
+preview-first installed/store grids, per-widget settings, per-profile in-memory
+state, and a full-card detail preview. Optional widgets install into the dock.
+
+Chrome headless checks at 1600x1000 found 14 installed cards, five store cards,
+nine dock widgets, and no page errors. The launcher still has five scope pills
+and twelve default result rows. Every settings field was exercised and changed
+its detail preview; `node --check` and `git diff --check` pass. Evidence:
+`dock-final.png`, `widgets-manager.png`, `widget-spotify-card.png`,
+`widget-system-card.png`, `widgets-store.png`, `widgets-popover.png`,
+`widgets-dock-1280.png`.
+
+Open gates: all provider values in the preview are marked SAMPLE; live native
+providers, real account usage, settings persistence across reloads, packaged-app
+rendering, and physical 125%/DPI visual checks remain unverified. The preview
+does not claim live metrics.
+
 ## Launch recovery — 2026-11-06
 
 The project-tree debug executable fails WebView2 initialization. Isolated tests
