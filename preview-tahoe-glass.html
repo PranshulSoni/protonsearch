@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ProtonDock: Modern Sleek Glass Dock (Ganella & Docktor Inspired)</title>
+  <title>ProtonDock & ProtonSearch: Modern Sleek Glass UI (Tahoe & Ganella Inspired)</title>
   <style>
     /* ==========================================================================
-       DESIGN TOKENS & SYSTEM VARIABLES (Modern Sleek Glass Dock)
+       DESIGN TOKENS & SYSTEM VARIABLES (Modern Sleek Glass UI)
        ========================================================================== */
     :root {
       /* Slender, Modern Dock Dimensions */
@@ -16,8 +16,9 @@
       --icon-size: 32px;
       --gap: 5px;
 
-      /* Deep Cobalt/Charcoal Frosted Glass */
+      /* Deep Cobalt/Obsidian Frosted Glass */
       --glass-base: rgba(14, 20, 32, 0.78);
+      --glass-modal: rgba(16, 22, 34, 0.88);
       --glass-surface: rgba(255, 255, 255, 0.07);
       --glass-surface-hover: rgba(255, 255, 255, 0.14);
       --glass-surface-active: rgba(255, 255, 255, 0.20);
@@ -37,6 +38,7 @@
       --text-secondary: rgba(255, 255, 255, 0.68);
       --text-tertiary: rgba(255, 255, 255, 0.45);
       --accent: #007aff;
+      --accent-hover: #1f8eff;
       --accent-emerald: #5ef1c2;
       --accent-glow: rgba(0, 122, 255, 0.45);
 
@@ -49,6 +51,7 @@
     /* Light Theme */
     body[data-theme="light"] {
       --glass-base: rgba(244, 246, 252, 0.82);
+      --glass-modal: rgba(248, 250, 254, 0.92);
       --glass-surface: rgba(0, 0, 0, 0.045);
       --glass-surface-hover: rgba(0, 0, 0, 0.085);
       --glass-surface-active: rgba(0, 0, 0, 0.13);
@@ -64,6 +67,7 @@
       --text-secondary: rgba(24, 34, 48, 0.68);
       --text-tertiary: rgba(24, 34, 48, 0.42);
       --accent: #007aff;
+      --accent-hover: #0066d6;
     }
 
     * {
@@ -108,7 +112,7 @@
     /* Desktop Ambient Header */
     .desktop-hint {
       position: absolute;
-      top: 72px;
+      top: 68px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 2;
@@ -116,18 +120,18 @@
       pointer-events: none;
     }
     .desktop-hint h1 {
-      font-size: 23px;
+      font-size: 22px;
       font-weight: 700;
       letter-spacing: -0.02em;
       text-shadow: 0 4px 18px rgba(0,0,0,0.5);
-      margin-bottom: 5px;
+      margin-bottom: 4px;
     }
     .desktop-hint p {
-      font-size: 13px;
+      font-size: 12.5px;
       color: var(--text-secondary);
       text-shadow: 0 2px 8px rgba(0,0,0,0.4);
-      max-width: 660px;
-      line-height: 1.5;
+      max-width: 680px;
+      line-height: 1.45;
     }
 
     /* Demo Controls Toolbar */
@@ -136,7 +140,7 @@
       top: 14px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 50;
+      z-index: 80;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -171,14 +175,14 @@
       transition: all var(--trans-hover);
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
     }
     .demo-pill-btn:hover {
       background: var(--glass-surface-hover);
       border-color: var(--glass-top-highlight);
     }
     .demo-pill-btn.active {
-      background: rgba(0, 122, 255, 0.25);
+      background: rgba(0, 122, 255, 0.28);
       border-color: var(--accent);
       color: #fff;
     }
@@ -189,20 +193,570 @@
     }
 
     /* ==========================================================================
-       THE PROTONDOCK RAIL (Sleek Ganella / Docktor Style)
+       PROTONSEARCH SPOTLIGHT MODAL (Tahoe Glass Palette)
+       ========================================================================== */
+    .ps-spotlight-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(10px);
+      z-index: 150;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: clamp(60px, 12vh, 130px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms ease;
+    }
+    .ps-spotlight-backdrop.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .ps-spotlight-card {
+      width: min(720px, calc(100vw - 32px));
+      background: var(--glass-modal);
+      backdrop-filter: blur(48px) saturate(190%) contrast(104%);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      box-shadow: 
+        0 36px 90px rgba(0, 0, 0, 0.70),
+        0 10px 24px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 var(--glass-top-highlight);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateY(-12px) scale(0.98);
+      transition: transform 240ms var(--spring-ease), opacity 200ms ease;
+    }
+    .ps-spotlight-backdrop.is-open .ps-spotlight-card {
+      transform: translateY(0) scale(1);
+    }
+
+    /* Search Input Top Bar */
+    .ps-search-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .ps-brand-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #007aff, #5856d6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.35);
+    }
+    .ps-search-input {
+      flex: 1;
+      height: 36px;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    .ps-search-input::placeholder {
+      color: var(--text-tertiary);
+    }
+    .ps-esc-btn {
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .ps-esc-btn:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+    }
+
+    /* Category Filter Chips Bar */
+    .ps-category-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 18px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+      background: rgba(0, 0, 0, 0.15);
+      overflow-x: auto;
+    }
+    .ps-chip {
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-secondary);
+      font-size: 10.5px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--trans-hover);
+    }
+    .ps-chip:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+    }
+    .ps-chip.active {
+      background: rgba(0, 122, 255, 0.28);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Search Results Split View */
+    .ps-search-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(210px, 0.85fr);
+      min-height: 290px;
+      max-height: 380px;
+      overflow: hidden;
+    }
+    .ps-results-column {
+      padding: 10px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .ps-results-heading {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 10px 4px 10px;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+    }
+    .ps-result-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .ps-result-item:hover,
+    .ps-result-item.is-selected {
+      background: var(--glass-surface-active);
+      border-color: var(--glass-border-subtle);
+    }
+    .ps-result-item.is-selected {
+      border-color: rgba(0, 122, 255, 0.4);
+      background: rgba(0, 122, 255, 0.16);
+    }
+    .ps-result-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--accent);
+    }
+    .ps-result-copy {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      flex: 1;
+      line-height: 1.25;
+    }
+    .ps-result-copy b {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    .ps-result-copy small {
+      font-size: 10px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    .ps-result-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
+      letter-spacing: 0.03em;
+    }
+
+    /* Right Preview Pane */
+    .ps-preview-column {
+      border-left: 1px solid var(--glass-border-subtle);
+      background: rgba(0, 0, 0, 0.12);
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ps-preview-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 8px;
+    }
+    .ps-preview-big-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(0, 122, 255, 0.2), rgba(0, 122, 255, 0.05));
+      border: 1px solid rgba(0, 122, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .ps-preview-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      word-break: break-all;
+    }
+    .ps-preview-path {
+      font-size: 10px;
+      color: var(--text-secondary);
+      font-family: monospace;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 4px 8px;
+      border-radius: 6px;
+      max-width: 100%;
+      word-break: break-all;
+    }
+    .ps-preview-details {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .ps-preview-row {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      padding-bottom: 4px;
+    }
+    .ps-preview-row span:last-child {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .ps-preview-actions {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .ps-action-btn {
+      padding: 6px 10px;
+      border-radius: 7px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .ps-action-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Search Footer */
+    .ps-search-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px;
+      border-top: 1px solid var(--glass-border-subtle);
+      background: rgba(0, 0, 0, 0.2);
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+    .ps-engine-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+    .ps-engine-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 6px var(--accent-emerald);
+    }
+    .ps-footer-keys {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ==========================================================================
+       THE PROTONDOCK RAIL & FLOATING SHELF ABOVE DOCK
        ========================================================================== */
     .dock-stage {
       position: absolute;
       bottom: 14px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 20;
+      z-index: 50;
       display: flex;
       flex-direction: column;
       align-items: center;
       max-width: calc(100vw - 20px);
     }
 
+    /* Floating Shelf Above Dock: Profile Switcher & Customize Trigger */
+    .dock-floating-shelf {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      opacity: 0.95;
+      transform: translateY(0);
+      transition: opacity 180ms ease, transform 180ms ease;
+      position: relative;
+    }
+    .dock-stage.hover-only-shelf .dock-floating-shelf {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(6px);
+    }
+    .dock-stage.hover-only-shelf:hover .dock-floating-shelf {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    /* Profile Switcher Pill */
+    .profile-switcher-pill {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      padding: 3px 4px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 var(--glass-top-highlight);
+    }
+    .profile-tab-btn {
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: transparent;
+      border: none;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--trans-hover);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .profile-tab-btn:hover {
+      color: var(--text-primary);
+      background: var(--glass-surface-hover);
+    }
+    .profile-tab-btn.active {
+      background: rgba(0, 122, 255, 0.35);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+    .profile-add-btn {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all 120ms ease;
+    }
+    .profile-add-btn:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+      transform: scale(1.1);
+    }
+
+    /* Customize Dock Trigger Button */
+    .customize-dock-trigger {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--glass-base);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      padding: 4px 11px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 var(--glass-top-highlight);
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all var(--trans-hover);
+    }
+    .customize-dock-trigger:hover,
+    .customize-dock-trigger.active {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-top-highlight);
+      transform: translateY(-1px);
+    }
+    .customize-dock-trigger.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Floating Customization Popover Panel */
+    .dock-customize-popover {
+      position: absolute;
+      bottom: calc(100% + 12px);
+      right: 0;
+      width: 270px;
+      background: var(--glass-modal);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 
+        0 24px 60px rgba(0,0,0,0.65),
+        0 8px 20px rgba(0,0,0,0.40),
+        inset 0 1px 0 var(--glass-top-highlight);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 180ms var(--spring-ease), transform 180ms var(--spring-ease);
+      z-index: 120;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dock-customize-popover.is-open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .customizer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .customizer-header-close {
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+    .customizer-header-close:hover {
+      color: var(--text-primary);
+    }
+
+    .customizer-section-title {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 6px;
+    }
+
+    .customizer-toggle-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .customizer-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-primary);
+      padding: 4px 6px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .customizer-toggle-row span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 32px;
+      height: 18px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      transition: 0.2s;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    input:checked + .slider {
+      background-color: var(--accent);
+    }
+    input:checked + .slider:before {
+      transform: translateX(14px);
+    }
+
+    /* THE DOCK RAIL */
     .dock-rail {
       position: relative;
       height: var(--dock-height);
@@ -235,11 +789,10 @@
       background: var(--glass-border-subtle);
       margin: 0 2px;
       flex-shrink: 0;
+      transition: opacity var(--trans-resize);
     }
 
-    /* ==========================================================================
-       APP ITEMS & ACTIVE WINDOW PILLS
-       ========================================================================== */
+    /* DOCK ITEMS */
     .dock-item {
       position: relative;
       display: flex;
@@ -248,6 +801,9 @@
       border-radius: 11px;
       cursor: pointer;
       transition: all var(--trans-hover);
+    }
+    .dock-item.hidden-widget {
+      display: none !important;
     }
 
     .app-icon-btn {
@@ -336,9 +892,7 @@
       text-overflow: ellipsis;
     }
 
-    /* ==========================================================================
-       FLOATING WINDOW PREVIEWS POPOVER (Hover Over Finder)
-       ========================================================================== */
+    /* FLOATING WINDOW PREVIEWS POPOVER (Hover Over Finder) */
     .window-preview-popover {
       position: absolute;
       bottom: calc(100% + 12px);
@@ -461,9 +1015,7 @@
       color: var(--text-primary);
     }
 
-    /* ==========================================================================
-       INTEGRATED MEDIA PLAYER PILL (Spotify / Docktor Style)
-       ========================================================================== */
+    /* INTEGRATED MEDIA PLAYER PILL (Spotify / Docktor Style) */
     .dock-media-pill {
       height: 36px;
       padding: 0 9px 0 6px;
@@ -627,9 +1179,7 @@
       transform: scale(1.1);
     }
 
-    /* ==========================================================================
-       PROTONDOCK ADAPTIVE RESIZABLE WIDGETS (Smooth Spring Resizing)
-       ========================================================================== */
+    /* PROTONDOCK ADAPTIVE RESIZABLE WIDGETS */
     .dock-widget-container {
       position: relative;
       height: 36px;
@@ -759,7 +1309,7 @@
       border-radius: 999px;
     }
 
-    /* Stacked 2-Line Clock & Date (Exact Reference Style: 20:36 / 07.11.2025) */
+    /* Stacked 2-Line Clock & Date */
     .dock-clock-block {
       display: flex;
       flex-direction: column;
@@ -816,10 +1366,10 @@
   <!-- Cobalt Silk Wave Wallpaper (Matching User Screenshot) -->
   <div class="desktop-wallpaper wallpaper-cobalt-wave" id="wallpaperEl"></div>
 
-  <!-- Header -->
+  <!-- Ambient Header -->
   <div class="desktop-hint">
-    <h1>ProtonDock: Modern & Sleek Glass Rail</h1>
-    <p>Slender 52px height inspired by <b>Ganella</b> & <b>Docktor</b>. Features active window title pills, hover window previews, Spotify media bar, and Apple spring adaptive resizable widgets.</p>
+    <h1>ProtonDock & ProtonSearch: Sleek Tahoe Glass</h1>
+    <p>Slender 52px floating dock with live window thumbnails and Spotify media bar. Features floating profile switcher, live widget customizer, and full interactive ProtonSearch palette.</p>
   </div>
 
   <!-- Top Demo Controls Toolbar -->
@@ -837,26 +1387,293 @@
       <button class="demo-pill-btn" onclick="setWallpaper('minimal', this)">Minimal Dark</button>
     </div>
     <div class="demo-divider"></div>
-    <div class="demo-toolbar-group">
-      <span>Widget Length:</span>
-      <button class="demo-pill-btn active" id="btnSizePill" onclick="setAllWidgetSizes('compact', this)">Compact Pill</button>
-      <button class="demo-pill-btn" id="btnSizeMed" onclick="setAllWidgetSizes('medium', this)">Medium Tile</button>
-      <button class="demo-pill-btn" id="btnSizeExp" onclick="setAllWidgetSizes('expanded', this)">Wide Card</button>
-    </div>
+    <button class="demo-pill-btn" id="btnToggleSearch" style="background: rgba(0, 122, 255, 0.25); border-color: var(--accent); color: #fff;" onclick="toggleProtonSearch()">
+      <svg class="icon" style="width:13px; height:13px; color:#5ef1c2;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      ProtonSearch (Alt+Space)
+    </button>
     <div class="demo-divider"></div>
     <div class="demo-toolbar-group">
-      <span>Popovers:</span>
-      <button class="demo-pill-btn" id="pinFinderBtn" onclick="togglePinPopover('finderPopover', this)">Pin Finder</button>
-      <button class="demo-pill-btn" id="pinSpotifyBtn" onclick="togglePinPopover('spotifyPopover', this)">Pin Spotify</button>
+      <span>Shelf Behavior:</span>
+      <button class="demo-pill-btn active" id="btnShelfAlways" onclick="setShelfMode('always', this)">Always Visible</button>
+      <button class="demo-pill-btn" id="btnShelfHover" onclick="setShelfMode('hover', this)">Hover Only</button>
     </div>
   </div>
 
-  <!-- The ProtonDock Rail (Slender 52px Height) -->
-  <div class="dock-stage">
+  <!-- ==========================================================================
+       PROTONSEARCH PALETTE MODAL (Interactive Spotlight Window)
+       ========================================================================== -->
+  <div class="ps-spotlight-backdrop" id="searchModal" onclick="handleBackdropClick(event)">
+    <section class="ps-spotlight-card" role="dialog" aria-label="ProtonSearch Spotlight">
+      <!-- Search Input Top Bar -->
+      <div class="ps-search-top">
+        <div class="ps-brand-badge" title="ProtonSearch FTS5 Engine">
+          <svg class="icon" style="width:18px; height:18px; stroke:#fff;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </div>
+        <input 
+          id="spotlightInput"
+          class="ps-search-input" 
+          type="text" 
+          placeholder="Search apps, files, git commits, code, math formulas..." 
+          autocomplete="off"
+          oninput="handleSearchInput(this.value)"
+        />
+        <button class="ps-esc-btn" onclick="toggleProtonSearch(false)">esc</button>
+      </div>
+
+      <!-- Category Filter Chips Bar -->
+      <div class="ps-category-bar">
+        <button class="ps-chip active" onclick="setFilterCategory('all', this)">All Results</button>
+        <button class="ps-chip" onclick="setFilterCategory('apps', this)">Apps</button>
+        <button class="ps-chip" onclick="setFilterCategory('files', this)">Local Files (FTS5)</button>
+        <button class="ps-chip" onclick="setFilterCategory('git', this)">Git Commits & TODOs</button>
+        <button class="ps-chip" onclick="setFilterCategory('actions', this)">Actions & Math</button>
+      </div>
+
+      <!-- Search Results Body (Split Columns) -->
+      <div class="ps-search-body">
+        <!-- Results Column (Left) -->
+        <div class="ps-results-column" id="resultsList">
+          <div class="ps-results-heading">
+            <span>Results</span>
+            <span id="resultsCount">6 matches</span>
+          </div>
+
+          <!-- Result 1 -->
+          <div class="ps-result-item is-selected" data-idx="0" onclick="selectResult(0)">
+            <div class="ps-result-icon">
+              <svg style="width:18px; height:18px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/></svg>
+            </div>
+            <div class="ps-result-copy">
+              <b>Visual Studio Code</b>
+              <small>Applications · C:\Program Files\Microsoft VS Code\Code.exe</small>
+            </div>
+            <span class="ps-result-badge">APP</span>
+          </div>
+
+          <!-- Result 2 -->
+          <div class="ps-result-item" data-idx="1" onclick="selectResult(1)">
+            <div class="ps-result-icon">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="ps-result-copy">
+              <b>Sidebar-Bridge.tsx</b>
+              <small>ProtonDock · src/components/dock/Sidebar-Bridge.tsx</small>
+            </div>
+            <span class="ps-result-badge">CODE</span>
+          </div>
+
+          <!-- Result 3 -->
+          <div class="ps-result-item" data-idx="2" onclick="selectResult(2)">
+            <div class="ps-result-icon">
+              <svg class="icon" style="color:#f59e0b;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="ps-result-copy">
+              <b>TODO: Cache FTS5 token indexes</b>
+              <small>Git Code Tasks · src-tauri/src/indexer.rs:142</small>
+            </div>
+            <span class="ps-result-badge">TODO</span>
+          </div>
+
+          <!-- Result 4 -->
+          <div class="ps-result-item" data-idx="3" onclick="selectResult(3)">
+            <div class="ps-result-icon">
+              <svg class="icon" style="color:#5ef1c2;" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="14" x2="8" y2="14"/></svg>
+            </div>
+            <div class="ps-result-copy">
+              <b>24 * 1.15 = 27.60</b>
+              <small>Calculator · Recursive descent math parser</small>
+            </div>
+            <span class="ps-result-badge">MATH</span>
+          </div>
+
+          <!-- Result 5 -->
+          <div class="ps-result-item" data-idx="4" onclick="selectResult(4)">
+            <div class="ps-result-icon">
+              <svg class="icon" style="color:#ffd166;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 16a3.5 3.5 0 0 0-7 0 2.5 2.5 0 0 0 0 5h7z"/></svg>
+            </div>
+            <div class="ps-result-copy">
+              <b>weather.rs</b>
+              <small>Native Rust Engine · protonsearch/src/weather.rs</small>
+            </div>
+            <span class="ps-result-badge">FILE</span>
+          </div>
+
+          <!-- Result 6 -->
+          <div class="ps-result-item" data-idx="5" onclick="selectResult(5)">
+            <div class="ps-result-icon">
+              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+            </div>
+            <div class="ps-result-copy">
+              <b>feat(ui): Ganella slender glass rail</b>
+              <small>Git Commit · dock branch (HEAD)</small>
+            </div>
+            <span class="ps-result-badge">COMMIT</span>
+          </div>
+        </div>
+
+        <!-- Preview Column (Right) -->
+        <div class="ps-preview-column" id="previewPane">
+          <div class="ps-preview-header">
+            <div class="ps-preview-big-icon" id="prevIcon">
+              <svg style="width:28px; height:28px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/></svg>
+            </div>
+            <div class="ps-preview-title" id="prevTitle">Visual Studio Code</div>
+            <div class="ps-preview-path" id="prevPath">C:\Program Files\Microsoft VS Code\Code.exe</div>
+          </div>
+          <div class="ps-preview-details">
+            <div class="ps-preview-row">
+              <span>Category</span>
+              <span id="prevCategory">Application</span>
+            </div>
+            <div class="ps-preview-row">
+              <span>Status</span>
+              <span id="prevStatus" style="color:var(--accent-emerald);">Running (Active)</span>
+            </div>
+            <div class="ps-preview-row">
+              <span>Indexed Via</span>
+              <span>Windows IShellItem</span>
+            </div>
+          </div>
+          <div class="ps-preview-actions">
+            <button class="ps-action-btn" onclick="executePreviewAction()">
+              <span>Open Application</span>
+              <span>↵</span>
+            </button>
+            <button class="ps-action-btn" onclick="executePreviewAction()">
+              <span>Show in Explorer</span>
+              <span>⌥↵</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Footer -->
+      <footer class="ps-search-footer">
+        <div class="ps-engine-badge">
+          <span class="ps-engine-dot"></span>
+          <span>ProtonSearch · SQLite FTS5 Indexed (12,418 items) · 0.4 ms</span>
+        </div>
+        <div class="ps-footer-keys">
+          <span>↑↓ Navigate</span>
+          <span>↵ Open</span>
+          <span>Tab Filter</span>
+          <span>Esc Dismiss</span>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <!-- ==========================================================================
+       THE PROTONDOCK RAIL WITH FLOATING SHELF ABOVE
+       ========================================================================== */
+  -->
+  <div class="dock-stage" id="dockStage">
+
+    <!-- FLOATING SHELF ABOVE DOCK (Profile Switcher & Customizer Button) -->
+    <div class="dock-floating-shelf" id="dockShelf">
+
+      <!-- Profile Switcher Pill -->
+      <div class="profile-switcher-pill" aria-label="Profiles">
+        <button class="profile-tab-btn active" onclick="switchProfile('daily', this)">
+          <span>Daily</span>
+        </button>
+        <button class="profile-tab-btn" onclick="switchProfile('work', this)">
+          <span>Work</span>
+        </button>
+        <button class="profile-tab-btn" onclick="switchProfile('founder', this)">
+          <span>Founder</span>
+        </button>
+        <button class="profile-tab-btn" onclick="switchProfile('focus', this)">
+          <span>Focus</span>
+        </button>
+        <button class="profile-add-btn" title="Add New Profile" onclick="addNewProfile()">+</button>
+      </div>
+
+      <!-- Customize Dock Trigger Button -->
+      <button class="customize-dock-trigger" id="customizerTriggerBtn" onclick="toggleCustomizerPopover()">
+        <svg class="icon" style="width:13px; height:13px;" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Customize</span>
+      </button>
+
+      <!-- Floating Customization Popover Panel (Above Dock) -->
+      <div class="dock-customize-popover" id="customizerPopover">
+        <div class="customizer-header">
+          <span>Customize Dock</span>
+          <span class="customizer-header-close" onclick="toggleCustomizerPopover(false)">✕</span>
+        </div>
+
+        <div>
+          <div class="customizer-section-title">Enabled Widgets</div>
+          <div class="customizer-toggle-list">
+            <div class="customizer-toggle-row">
+              <span>☀️ Weather Widget</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleWeather" checked onchange="toggleWidgetVisibility('widgetWeather', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="customizer-toggle-row">
+              <span>⚡ System Hardware</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleSystem" checked onchange="toggleWidgetVisibility('widgetSystem', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="customizer-toggle-row">
+              <span>🎵 Spotify Media Bar</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleSpotify" checked onchange="toggleWidgetVisibility('widgetSpotify', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="customizer-toggle-row">
+              <span>🗂️ Live Window Previews</span>
+              <label class="switch">
+                <input type="checkbox" id="togglePreviews" checked onchange="toggleFeature('previews', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="customizer-toggle-row">
+              <span>🗑️ Recycle Bin</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleTrash" checked onchange="toggleWidgetVisibility('widgetTrash', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="customizer-toggle-row">
+              <span>🔊 Audio Output</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleVolume" checked onchange="toggleWidgetVisibility('widgetVolume', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="customizer-toggle-row">
+              <span>🕒 Stacked Clock</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleClock" checked onchange="toggleWidgetVisibility('widgetClock', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="customizer-section-title">Widget Default Size</div>
+          <div style="display:flex; gap:4px;">
+            <button class="demo-pill-btn active" style="flex:1; justify-content:center; padding:3px 0;" onclick="setAllWidgetSizes('compact')">Pill</button>
+            <button class="demo-pill-btn" style="flex:1; justify-content:center; padding:3px 0;" onclick="setAllWidgetSizes('medium')">Tile</button>
+            <button class="demo-pill-btn" style="flex:1; justify-content:center; padding:3px 0;" onclick="setAllWidgetSizes('expanded')">Card</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MAIN DOCK RAIL (Slender 52px Height) -->
     <nav class="dock-rail" aria-label="ProtonDock">
 
       <!-- 1. Sublime Text (with badge '2') -->
-      <div class="dock-item">
+      <div class="dock-item" id="appSublime">
         <div class="app-icon-btn" title="Sublime Text (2 windows open)">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <path d="M4 6.5 12 2l8 4.5v11L12 22 4 17.5V6.5Z" fill="#ff9800"/>
@@ -868,7 +1685,7 @@
       </div>
 
       <!-- 2. Apple Notes / Document App -->
-      <div class="dock-item">
+      <div class="dock-item" id="appNotes">
         <div class="app-icon-btn" title="Notes">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <rect x="3" y="3" width="18" height="18" rx="4" fill="#ffffff"/>
@@ -880,7 +1697,7 @@
       </div>
 
       <!-- 3. Calendar App (Date 17 Badge) -->
-      <div class="dock-item">
+      <div class="dock-item" id="appCalendar">
         <div class="app-icon-btn" title="Calendar: Friday 17">
           <svg style="width:21px; height:21px;" viewBox="0 0 24 24">
             <rect x="3" y="4" width="18" height="17" rx="3.5" fill="#f8f9fa"/>
@@ -892,7 +1709,7 @@
       </div>
 
       <!-- 4. ACTIVE APP PILL with Window Title (VS Code in User Screenshot) -->
-      <div class="dock-item">
+      <div class="dock-item" id="appVscode">
         <div class="active-window-pill" title="Visual Studio Code: Sidebar-Bridge.tsx">
           <svg style="width:19px; height:19px; flex-shrink:0;" viewBox="0 0 24 24">
             <path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/>
@@ -905,7 +1722,7 @@
       <div class="dock-divider"></div>
 
       <!-- 5. Obsidian / Lightning Bolt App -->
-      <div class="dock-item">
+      <div class="dock-item" id="appObsidian">
         <div class="app-icon-btn" title="Obsidian">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <rect width="20" height="20" x="2" y="2" rx="5" fill="#7c3aed"/>
@@ -916,7 +1733,7 @@
       </div>
 
       <!-- 6. Claude / Sparkle App -->
-      <div class="dock-item">
+      <div class="dock-item" id="appClaude">
         <div class="app-icon-btn" title="Claude / Cursor">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <rect width="20" height="20" x="2" y="2" rx="5" fill="#1c1917"/>
@@ -927,7 +1744,7 @@
       </div>
 
       <!-- 7. Figma / Vector App -->
-      <div class="dock-item">
+      <div class="dock-item" id="appFigma">
         <div class="app-icon-btn" title="Figma">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <rect width="20" height="20" x="2" y="2" rx="5" fill="#a855f7"/>
@@ -938,7 +1755,7 @@
       </div>
 
       <!-- 8. Blender / 3D App -->
-      <div class="dock-item">
+      <div class="dock-item" id="appBlender">
         <div class="app-icon-btn" title="Blender">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <rect width="20" height="20" x="2" y="2" rx="5" fill="#334155"/>
@@ -950,7 +1767,7 @@
       </div>
 
       <!-- 9. Finder / File Explorer with LIVE HOVER WINDOW PREVIEWS -->
-      <div class="dock-item">
+      <div class="dock-item" id="appFinder">
         <div class="app-icon-btn" title="Finder / File Explorer">
           <svg style="width:22px; height:22px;" viewBox="0 0 24 24">
             <rect width="20" height="20" x="2" y="2" rx="5" fill="#38bdf8"/>
@@ -1017,7 +1834,7 @@
       </div>
 
       <!-- 10. Documents Folder -->
-      <div class="dock-item">
+      <div class="dock-item" id="appDocs">
         <div class="app-icon-btn" title="Documents">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24" fill="#0284c7">
             <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>
@@ -1025,8 +1842,8 @@
         </div>
       </div>
 
-      <!-- 11. DuckDuckGo / Safari Browser -->
-      <div class="dock-item">
+      <!-- 11. Safari / Browser -->
+      <div class="dock-item" id="appBrowser">
         <div class="app-icon-btn" title="Browser (Safari / DuckDuckGo)">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10" fill="#ea580c"/>
@@ -1038,7 +1855,7 @@
       </div>
 
       <!-- 12. Telegram / Messages -->
-      <div class="dock-item">
+      <div class="dock-item" id="appTelegram">
         <div class="app-icon-btn" title="Telegram">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10" fill="#229ed9"/>
@@ -1049,7 +1866,7 @@
       </div>
 
       <!-- 13. Apple Music -->
-      <div class="dock-item">
+      <div class="dock-item" id="appMusic">
         <div class="app-icon-btn" title="Apple Music">
           <svg style="width:20px; height:20px;" viewBox="0 0 24 24">
             <rect width="20" height="20" x="2" y="2" rx="5" fill="#fa233b"/>
@@ -1059,10 +1876,10 @@
         </div>
       </div>
 
-      <div class="dock-divider"></div>
+      <div class="dock-divider" id="divSpotify"></div>
 
-      <!-- 14. INTEGRATED SPOTIFY MEDIA PILL (Ganella / Docktor Style) -->
-      <div class="dock-item">
+      <!-- 14. SPOTIFY MEDIA STRIP (Ganella / Docktor Style) -->
+      <div class="dock-item" id="widgetSpotify">
         <div class="dock-media-pill" title="Spotify: Tunnel Vision">
           <div class="media-pill-icon">
             <svg style="width:14px; height:14px;" viewBox="0 0 24 24">
@@ -1117,11 +1934,11 @@
         </div>
       </div>
 
-      <div class="dock-divider"></div>
+      <div class="dock-divider" id="divWidgets"></div>
 
-      <!-- 15. PROTONDOCK ADAPTIVE WEATHER WIDGET (Click to cycle length smoothly) -->
-      <div class="dock-item">
-        <div class="dock-widget-container weather-widget" id="weatherWidget" data-size="compact" onclick="cycleWidgetSize('weatherWidget')" title="Weather: Click to resize smoothly">
+      <!-- 15. PROTONDOCK ADAPTIVE WEATHER WIDGET -->
+      <div class="dock-item" id="widgetWeather">
+        <div class="dock-widget-container weather-widget" id="weatherContainer" data-size="compact" onclick="cycleWidgetSize('weatherContainer')" title="Weather: Click to resize smoothly">
           <div class="weather-widget-content">
             <svg class="icon" style="width:17px; height:17px; color:#ffd166; flex-shrink:0;" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="4" fill="#ffd166" stroke="none"/>
@@ -1142,9 +1959,9 @@
         </div>
       </div>
 
-      <!-- 16. PROTONDOCK ADAPTIVE HARDWARE STATUS WIDGET (Click to cycle length smoothly) -->
-      <div class="dock-item">
-        <div class="dock-widget-container system-widget" id="systemWidget" data-size="compact" onclick="cycleWidgetSize('systemWidget')" title="Hardware: Click to resize smoothly">
+      <!-- 16. PROTONDOCK ADAPTIVE HARDWARE STATUS WIDGET -->
+      <div class="dock-item" id="widgetSystem">
+        <div class="dock-widget-container system-widget" id="systemContainer" data-size="compact" onclick="cycleWidgetSize('systemContainer')" title="Hardware: Click to resize smoothly">
           <div class="system-widget-content">
             <div class="sys-pill-item">
               <span>CPU</span>
@@ -1161,10 +1978,10 @@
         </div>
       </div>
 
-      <div class="dock-divider"></div>
+      <div class="dock-divider" id="divUtilities"></div>
 
       <!-- 17. Trash Utility -->
-      <div class="dock-item">
+      <div class="dock-item" id="widgetTrash">
         <div class="utility-icon-btn" title="Empty Recycle Bin" onclick="triggerEffect(this)">
           <svg class="icon" viewBox="0 0 24 24">
             <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
@@ -1173,7 +1990,7 @@
       </div>
 
       <!-- 18. Volume Utility -->
-      <div class="dock-item">
+      <div class="dock-item" id="widgetVolume">
         <div class="utility-icon-btn" title="Audio Output" onclick="triggerEffect(this)">
           <svg class="icon" viewBox="0 0 24 24">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -1184,7 +2001,7 @@
       </div>
 
       <!-- 19. STACKED CLOCK & DATE (Exact Reference Style: 20:36 / 07.11.2025) -->
-      <div class="dock-item">
+      <div class="dock-item" id="widgetClock">
         <div class="dock-clock-block" title="Clock & Calendar">
           <span class="clock-time-val" id="liveTime">20:36</span>
           <span class="clock-date-val" id="liveDate">07.11.2025</span>
@@ -1225,31 +2042,263 @@
       btn.classList.add('active');
     }
 
+    function setShelfMode(mode, btn) {
+      const stage = document.getElementById('dockStage');
+      if (mode === 'hover') {
+        stage.classList.add('hover-only-shelf');
+      } else {
+        stage.classList.remove('hover-only-shelf');
+      }
+      document.querySelectorAll('.demo-toolbar-group:nth-child(6) .demo-pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // ==========================================================================
+    // PROTONSEARCH SPOTLIGHT MODAL LOGIC
+    // ==========================================================================
+    const searchModal = document.getElementById('searchModal');
+    const spotlightInput = document.getElementById('spotlightInput');
+    const resultsList = document.getElementById('resultsList');
+    const resultsCount = document.getElementById('resultsCount');
+
+    // Search Database Mock (Mirroring local indexer & FTS5 results)
+    const mockDb = [
+      { id: 0, title: "Visual Studio Code", detail: "Applications · C:\\Program Files\\Microsoft VS Code\\Code.exe", type: "APP", cat: "apps", icon: "code" },
+      { id: 1, title: "Sidebar-Bridge.tsx", detail: "ProtonDock · src/components/dock/Sidebar-Bridge.tsx", type: "CODE", cat: "files", icon: "file" },
+      { id: 2, title: "TODO: Cache FTS5 token indexes", detail: "Git Code Tasks · src-tauri/src/indexer.rs:142", type: "TODO", cat: "git", icon: "todo" },
+      { id: 3, title: "24 * 1.15 = 27.60", detail: "Calculator · Recursive descent math parser", type: "MATH", cat: "actions", icon: "math" },
+      { id: 4, title: "weather.rs", detail: "Native Rust Engine · protonsearch/src/weather.rs", type: "FILE", cat: "files", icon: "file" },
+      { id: 5, title: "feat(ui): Ganella slender glass rail", detail: "Git Commit · dock branch (HEAD)", type: "COMMIT", cat: "git", icon: "git" },
+      { id: 6, title: "Spotify.exe", detail: "Applications · %APPDATA%\\Spotify\\Spotify.exe", type: "APP", cat: "apps", icon: "music" },
+      { id: 7, title: "Empty Recycle Bin", detail: "System Command · Purge deleted files", type: "ACTION", cat: "actions", icon: "action" }
+    ];
+
+    let currentFilter = 'all';
+
+    function toggleProtonSearch(force) {
+      const isOpen = force !== undefined ? force : !searchModal.classList.contains('is-open');
+      if (isOpen) {
+        searchModal.classList.add('is-open');
+        setTimeout(() => spotlightInput.focus(), 80);
+      } else {
+        searchModal.classList.remove('is-open');
+      }
+    }
+
+    function handleBackdropClick(e) {
+      if (e.target === searchModal) {
+        toggleProtonSearch(false);
+      }
+    }
+
+    // Global Alt+Space and Esc Listener
+    window.addEventListener('keydown', (e) => {
+      if (e.altKey && (e.code === 'Space' || e.key === ' ')) {
+        e.preventDefault();
+        toggleProtonSearch();
+      } else if (e.key === 'Escape' && searchModal.classList.contains('is-open')) {
+        toggleProtonSearch(false);
+      }
+    });
+
+    function setFilterCategory(cat, btn) {
+      currentFilter = cat;
+      document.querySelectorAll('.ps-category-bar .ps-chip').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      filterAndRenderResults(spotlightInput.value);
+    }
+
+    function handleSearchInput(query) {
+      filterAndRenderResults(query);
+    }
+
+    function filterAndRenderResults(query) {
+      const q = (query || '').toLowerCase().trim();
+      const filtered = mockDb.filter(item => {
+        const matchesCategory = currentFilter === 'all' || item.cat === currentFilter;
+        const matchesQuery = !q || item.title.toLowerCase().includes(q) || item.detail.toLowerCase().includes(q);
+        return matchesCategory && matchesQuery;
+      });
+
+      resultsCount.textContent = `${filtered.length} matches`;
+
+      // Render items
+      const existingItems = resultsList.querySelectorAll('.ps-result-item');
+      existingItems.forEach(el => el.remove());
+
+      if (filtered.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'ps-result-item';
+        emptyDiv.style.color = 'var(--text-secondary)';
+        emptyDiv.textContent = 'No matching items in local index.';
+        resultsList.appendChild(emptyDiv);
+        return;
+      }
+
+      filtered.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = `ps-result-item ${i === 0 ? 'is-selected' : ''}`;
+        div.setAttribute('data-idx', item.id);
+        div.onclick = () => selectResult(item.id);
+        div.innerHTML = `
+          <div class="ps-result-icon">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>
+          </div>
+          <div class="ps-result-copy">
+            <b>${item.title}</b>
+            <small>${item.detail}</small>
+          </div>
+          <span class="ps-result-badge">${item.type}</span>
+        `;
+        resultsList.appendChild(div);
+      });
+
+      if (filtered[0]) {
+        selectResult(filtered[0].id);
+      }
+    }
+
+    function selectResult(id) {
+      const item = mockDb.find(m => m.id === id);
+      if (!item) return;
+
+      document.querySelectorAll('.ps-result-item').forEach(el => {
+        el.classList.toggle('is-selected', el.getAttribute('data-idx') == id);
+      });
+
+      document.getElementById('prevTitle').textContent = item.title;
+      document.getElementById('prevPath').textContent = item.detail;
+      document.getElementById('prevCategory').textContent = item.type;
+    }
+
+    function executePreviewAction() {
+      alert("Opening: " + document.getElementById('prevTitle').textContent);
+      toggleProtonSearch(false);
+    }
+
+    // ==========================================================================
+    // PROFILE SWITCHER & DOCK CUSTOMIZER LOGIC
+    // ==========================================================================
+    const profilePresets = {
+      daily: {
+        apps: ['appSublime', 'appNotes', 'appCalendar', 'appVscode', 'appObsidian', 'appClaude', 'appFigma', 'appBlender', 'appFinder', 'appDocs', 'appBrowser', 'appTelegram', 'appMusic'],
+        widgets: { weather: true, system: true, spotify: true, trash: true, volume: true, clock: true },
+        size: 'compact'
+      },
+      work: {
+        apps: ['appVscode', 'appSublime', 'appFigma', 'appFinder', 'appDocs', 'appBrowser', 'appClaude'],
+        widgets: { weather: true, system: true, spotify: false, trash: true, volume: true, clock: true },
+        size: 'compact'
+      },
+      founder: {
+        apps: ['appNotes', 'appObsidian', 'appVscode', 'appBrowser', 'appTelegram', 'appMusic'],
+        widgets: { weather: true, system: true, spotify: true, trash: false, volume: true, clock: true },
+        size: 'medium'
+      },
+      focus: {
+        apps: ['appVscode', 'appNotes'],
+        widgets: { weather: false, system: true, spotify: false, trash: false, volume: false, clock: true },
+        size: 'compact'
+      }
+    };
+
+    function switchProfile(profileKey, btn) {
+      const preset = profilePresets[profileKey];
+      if (!preset) return;
+
+      document.querySelectorAll('.profile-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Update app visibility
+      const allAppIds = ['appSublime', 'appNotes', 'appCalendar', 'appVscode', 'appObsidian', 'appClaude', 'appFigma', 'appBlender', 'appFinder', 'appDocs', 'appBrowser', 'appTelegram', 'appMusic'];
+      allAppIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.style.display = preset.apps.includes(id) ? 'flex' : 'none';
+        }
+      });
+
+      // Update widget toggles
+      document.getElementById('toggleWeather').checked = preset.widgets.weather;
+      toggleWidgetVisibility('widgetWeather', preset.widgets.weather);
+
+      document.getElementById('toggleSystem').checked = preset.widgets.system;
+      toggleWidgetVisibility('widgetSystem', preset.widgets.system);
+
+      document.getElementById('toggleSpotify').checked = preset.widgets.spotify;
+      toggleWidgetVisibility('widgetSpotify', preset.widgets.spotify);
+
+      document.getElementById('toggleTrash').checked = preset.widgets.trash;
+      toggleWidgetVisibility('widgetTrash', preset.widgets.trash);
+
+      document.getElementById('toggleVolume').checked = preset.widgets.volume;
+      toggleWidgetVisibility('widgetVolume', preset.widgets.volume);
+
+      document.getElementById('toggleClock').checked = preset.widgets.clock;
+      toggleWidgetVisibility('widgetClock', preset.widgets.clock);
+
+      setAllWidgetSizes(preset.size);
+    }
+
+    function addNewProfile() {
+      const name = prompt("Enter new profile name (e.g. Gaming, Design):");
+      if (!name) return;
+      alert(`Profile "${name}" created and saved to local settings.`);
+    }
+
+    function toggleCustomizerPopover(force) {
+      const popover = document.getElementById('customizerPopover');
+      const trigger = document.getElementById('customizerTriggerBtn');
+      const isOpen = force !== undefined ? force : !popover.classList.contains('is-open');
+      if (isOpen) {
+        popover.classList.add('is-open');
+        trigger.classList.add('active');
+      } else {
+        popover.classList.remove('is-open');
+        trigger.classList.remove('active');
+      }
+    }
+
+    function toggleWidgetVisibility(widgetId, isVisible) {
+      const el = document.getElementById(widgetId);
+      if (el) {
+        el.style.display = isVisible ? 'flex' : 'none';
+      }
+      // Hide dividers if adjoining items hidden
+      const divWidgets = document.getElementById('divWidgets');
+      const weatherVis = document.getElementById('widgetWeather').style.display !== 'none';
+      const systemVis = document.getElementById('widgetSystem').style.display !== 'none';
+      if (divWidgets) {
+        divWidgets.style.display = (weatherVis || systemVis) ? 'block' : 'none';
+      }
+    }
+
+    function toggleFeature(feature, enabled) {
+      if (feature === 'previews') {
+        const popover = document.getElementById('finderPopover');
+        if (!enabled) {
+          popover.style.display = 'none';
+        } else {
+          popover.style.display = '';
+        }
+      }
+    }
+
     // Interactive Widget Resizing: Cycles smooth lengths
     const sizeCycle = ['compact', 'medium', 'expanded'];
-    function cycleWidgetSize(widgetId) {
-      const el = document.getElementById(widgetId);
+    function cycleWidgetSize(containerId) {
+      const el = document.getElementById(containerId);
       if (!el) return;
       const current = el.getAttribute('data-size') || 'compact';
       const nextIdx = (sizeCycle.indexOf(current) + 1) % sizeCycle.length;
       el.setAttribute('data-size', sizeCycle[nextIdx]);
     }
 
-    function setAllWidgetSizes(size, btn) {
-      ['weatherWidget', 'systemWidget'].forEach(id => {
+    function setAllWidgetSizes(size) {
+      ['weatherContainer', 'systemContainer'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.setAttribute('data-size', size);
       });
-      document.querySelectorAll('.demo-toolbar-group:nth-child(5) .demo-pill-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    }
-
-    // Toggle Pin Popovers for easy inspection without hovering
-    function togglePinPopover(popoverId, btn) {
-      const popover = document.getElementById(popoverId);
-      if (!popover) return;
-      popover.classList.toggle('force-show');
-      btn.classList.toggle('active');
     }
 
     function triggerEffect(el) {
