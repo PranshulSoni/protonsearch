@@ -23,7 +23,8 @@ Workflow: Haiku (`dock-implementer`) implements one task, Sonnet (`dock-reviewer
 - CONTRACT.md: the renderer never sends paths, commands or URIs; Rust validates every ID. Absent data renders `--`, a dimmed glyph or an honest label.
 - Every animation/transition has a `prefers-reduced-motion: reduce` off-switch. Every control keeps a focus ring (`2px solid #0a84ff`, offset 2px) and a name.
 - Ambiguous or wrong spec: stop and report NEEDS_CONTEXT. jsdom has no `PointerEvent`; pointer tests define
-  `window.PointerEvent ??= class extends MouseEvent { pointerId: number; constructor(t: string, i: PointerEventInit = {}) { super(t, i); this.pointerId = i.pointerId ?? 1; } }`.
+  `window.PointerEvent ??= class extends MouseEvent { pointerId: number; constructor(t: string, i: PointerEventInit = {}) { super(t, i); this.pointerId = i.pointerId ?? 1; } } as unknown as typeof PointerEvent`
+  (the cast is required: without it strict `tsc -b` fails with TS2322, as found in T2.2).
 
 ## 1. Decisions (no judgment left to implementers)
 
