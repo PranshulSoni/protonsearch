@@ -150,10 +150,10 @@ function usageSlot(
   );
 }
 
-export function DockWidget({ id, size, settings, data, preview = false, status, onAction }: DockWidgetProps) {
+export function DockWidget({ id, size, width, settings, data, preview = false, status, onAction }: DockWidgetProps) {
   const meta = getWidgetMeta(id);
   const source = (preview ? sampleFor(id) : data) as FinalWidgetData | undefined;
-  const style = { ...tintStyle(id), width: meta.widths[size] } as CSSProperties;
+  const style = { ...tintStyle(id), width: width ?? meta.widths[size] } as CSSProperties;
   const interactive = id === 'windows' || id === 'search';
   const action = id === 'windows' ? 'start' : id === 'search' ? 'search' : null;
   const common = {

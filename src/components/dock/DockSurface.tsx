@@ -4,7 +4,7 @@ import { DockWidget } from '../../widgets/final/DockWidget';
 import { WidgetCard } from '../../widgets/final/WidgetCard';
 import { getWidgetMeta } from '../../widgets/final/meta';
 import { useFinalWidgetData } from '../../widgets/final/useFinalWidgetData';
-import type { FinalWidgetSettings } from '../../widgets/final/types';
+import type { FinalWidgetId, FinalWidgetSettings } from '../../widgets/final/types';
 import type { WidgetSize } from '../../widgets/sdk/types';
 import { performWidgetAction } from './actions';
 import {
@@ -31,13 +31,45 @@ function availableWidth(): number {
   return Math.max(screenWidth || 0, window.innerWidth || 0);
 }
 
+export const DOCK_WIDTHS: Record<FinalWidgetId, Record<WidgetSize, number>> = {
+  windows: { compact: 76, standard: 116, wide: 140 },
+  search: { compact: 100, standard: 154, wide: 190 },
+  apps: { compact: 94, standard: 168, wide: 204 },
+  spotify: { compact: 104, standard: 180, wide: 220 },
+  weather: { compact: 96, standard: 140, wide: 180 },
+  system: { compact: 116, standard: 184, wide: 216 },
+  claude: { compact: 92, standard: 152, wide: 190 },
+  chatgpt: { compact: 92, standard: 152, wide: 190 },
+  agent: { compact: 92, standard: 164, wide: 204 },
+  files: { compact: 92, standard: 158, wide: 196 },
+  folders: { compact: 92, standard: 158, wide: 196 },
+  trash: { compact: 78, standard: 104, wide: 134 },
+  volume: { compact: 90, standard: 124, wide: 158 },
+  clock: { compact: 84, standard: 112, wide: 142 },
+};
+
+export const DOCK_DENSE_WIDTHS: Record<FinalWidgetId, number> = {
+  windows: 68,
+  search: 104,
+  apps: 112,
+  spotify: 120,
+  weather: 88,
+  system: 122,
+  claude: 104,
+  chatgpt: 104,
+  agent: 96,
+  files: 104,
+  folders: 104,
+  trash: 68,
+  volume: 84,
+  clock: 68,
+};
+
 function railWidth(items: DockItem[], dense: boolean): number {
-  const widths = items.reduce((total, item) => {
-    const size: WidgetSize = dense ? 'compact' : effectiveSize(item);
-    return total + getWidgetMeta(item.id).widths[size];
-  }, 0);
-  const gap = dense ? 6 : 8;
-  return widths + Math.max(0, items.length - 1) * gap + (dense ? 18 : 22);
+  const widths = items.reduce((total, item) => (
+    total + (dense ? DOCK_DENSE_WIDTHS[item.id] : DOCK_WIDTHS[item.id][effectiveSize(item)])
+  ), 0);
+  return widths + Math.max(0, items.length - 1) * 5 + 16;
 }
 
 function useDockWidth() {
@@ -53,7 +85,7 @@ function useDockWidth() {
 export function DockSurface({ layout, onChange, onCustomize, disabled = false }: DockSurfaceProps) {
   const items = layout.profiles[layout.profile];
   const width = useDockWidth();
-  const dense = width < 1460 || railWidth(items, false) + 32 > width - 32;
+  const dense = width < 1366 || railWidth(items, false) + 8 > width;
   const preview = !isNative() && new URLSearchParams(window.location.search).get('preview') === '1';
   const settings: Partial<Record<DockItem['id'], FinalWidgetSettings>> = {};
   for (const item of items) settings[item.id] = effectiveSettings(item);
@@ -105,14 +137,14 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
           y: Math.max(0, Math.round(pillsRect.top)),
           width: Math.ceil(pillsRect.width),
           height: Math.ceil(pillsRect.height),
-          radius: 14,
+          radius: 15,
         },
         {
           x: origin + (railRect.left - left),
           y: Math.max(0, Math.round(railRect.top)),
           width: Math.ceil(Math.max(railRect.width, rail.scrollWidth)),
           height: Math.ceil(railRect.height),
-          radius: 20,
+          radius: 18,
         },
       ];
       void native.fitDock(widthRequest, 132, regions).catch(() => {});
@@ -155,7 +187,7 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
       </div>
       <div
         className={`dock-final-rail${dense ? ' is-dense' : ''}`}
-        style={{ width: Math.min(visibleRail, Math.max(0, width - 24)) }}
+        style={{ width: Math.min(visibleRail, Math.max(0, width - 8)) }}
         data-profile={layout.profile}
         ref={railRef}
       >
@@ -185,7 +217,8 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
             >
               <DockWidget
                 id={item.id}
-                size={dense ? 'compact' : effectiveSize(item)}
+                size={effectiveSize(item)}
+                width={dense ? DOCK_DENSE_WIDTHS[item.id] : DOCK_WIDTHS[item.id][effectiveSize(item)]}
                 settings={settings[item.id]}
                 data={view.data}
                 preview={view.preview}

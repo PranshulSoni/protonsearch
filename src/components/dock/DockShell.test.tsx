@@ -91,8 +91,8 @@ describe('DockShell integration', () => {
       width: 832,
       height: 132,
       regions: [
-        { x: 216, y: 10, width: 360, height: 28, radius: 14 },
-        { x: 16, y: 50, width: 800, height: 82, radius: 20 },
+        { x: 216, y: 10, width: 360, height: 28, radius: 15 },
+        { x: 16, y: 50, width: 800, height: 82, radius: 18 },
       ],
     }));
   });
@@ -112,8 +112,8 @@ describe('DockShell integration', () => {
       width: 1132,
       height: 132,
       regions: [
-        { x: 304, y: 10, width: 360, height: 28, radius: 14 },
-        { x: 16, y: 50, width: 1100, height: 82, radius: 20 },
+        { x: 304, y: 10, width: 360, height: 28, radius: 15 },
+        { x: 16, y: 50, width: 1100, height: 82, radius: 18 },
       ],
     }));
   });
