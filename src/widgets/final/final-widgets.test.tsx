@@ -127,6 +127,133 @@ test('AI widgets ask for a local connection without data', () => {
   }
 });
 
+test('AI docks show an honest disconnected state instead of fake limits', () => {
+  for (const id of ['claude', 'chatgpt'] as const) {
+    const label = id === 'claude' ? 'Claude' : 'ChatGPT';
+    const disconnected = render(
+      <DockWidget
+        id={id}
+        size="standard"
+        data={{ status: 'disconnected', sessionPercent: 62, weeklyPercent: 41 }}
+        settings={settingsFor(id)}
+      />,
+    );
+    expect(disconnected.getByText('Not connected')).toBeTruthy();
+    expect(disconnected.getByText(`Connect ${label}`)).toBeTruthy();
+    expect(disconnected.container.textContent ?? '').not.toContain('62%');
+    expect(disconnected.container.textContent ?? '').not.toContain('Max 20x');
+    disconnected.unmount();
+
+    const missing = render(<DockWidget id={id} size="standard" />);
+    expect(missing.getByText('Not connected')).toBeTruthy();
+    missing.unmount();
+  }
+  const live = render(
+    <DockWidget
+      id="chatgpt"
+      size="standard"
+      data={{ status: 'live', sessionPercent: 62, weeklyPercent: 41 }}
+      settings={settingsFor('chatgpt')}
+    />,
+  );
+  expect(live.container.textContent ?? '').toContain('62%');
+  expect(live.getByText('Week 41%')).toBeTruthy();
+  live.unmount();
+});
+
+test('app icons render only safe data URLs and fall back otherwise', () => {
+  const apps = {
+    items: [
+      { id: 'chrome', title: 'Google Chrome', icon: 'data:image/png;base64,iVBORw0KGgo=', active: true },
+      { id: 'code', title: 'Visual Studio Code', icon: 'https://example.com/icon.png', active: false },
+    ],
+    activeTitle: 'Google Chrome',
+    windowCount: 2,
+  };
+  const card = render(<WidgetCard id="apps" data={apps} settings={settingsFor('apps')} />);
+  const images = Array.from(card.container.querySelectorAll('img.fw-app-img'));
+  expect(images).toHaveLength(2);
+  expect(images[0]?.getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=');
+  expect(card.getAllByText('Google Chrome').length).toBeGreaterThan(0);
+  card.unmount();
+
+  const dock = render(<DockWidget id="apps" size="standard" data={apps} settings={settingsFor('apps')} />);
+  expect(dock.container.querySelectorAll('img.fw-app-img')).toHaveLength(1);
+  dock.unmount();
+
+  const unsafe: typeof apps = {
+    items: [{ id: 'code', title: 'Visual Studio Code', icon: 'https://example.com/icon.png', active: true }],
+    activeTitle: 'Visual Studio Code',
+    windowCount: 1,
+  };
+  const fallback = render(<WidgetCard id="apps" data={unsafe} settings={settingsFor('apps')} />);
+  expect(fallback.container.querySelector('img.fw-app-img')).toBeNull();
+  fallback.unmount();
+});
+
+test('system dock shows Wi-Fi and Bluetooth state and respects visibility settings', () => {
+  const data = {
+    cpu: 20,
+    ram: 40,
+    battery: 80,
+    batteryCharging: false,
+    temperatureC: 45,
+    uptimeSeconds: 3600,
+    connectivity: {
+      wifi: { connected: true, ssid: 'HomeNet', signalPercent: 90, state: 'connected' },
+      bluetooth: { available: true, enabled: true, name: 'Buds' },
+      ethernet: { connected: false, adapter: null },
+      vpn: { connected: false, adapter: null },
+    },
+  };
+  const view = render(<DockWidget id="system" size="standard" data={data} settings={settingsFor('system')} />);
+  expect(view.getByText('HomeNet')).toBeTruthy();
+  expect(view.getByText('Buds')).toBeTruthy();
+  expect(view.getByText('CPU')).toBeTruthy();
+  expect(view.getByText('RAM')).toBeTruthy();
+  expect(view.getByText('BAT')).toBeTruthy();
+  view.unmount();
+
+  const hidden = render(
+    <DockWidget
+      id="system"
+      size="standard"
+      data={data}
+      settings={{ ...settingsFor('system'), showWifi: false, showBluetooth: false }}
+    />,
+  );
+  expect(hidden.queryByText('HomeNet')).toBeNull();
+  expect(hidden.queryByText('Buds')).toBeNull();
+  expect(hidden.container.querySelector('.fw-sys-net')).toBeNull();
+  hidden.unmount();
+
+  const offline = render(
+    <DockWidget
+      id="system"
+      size="standard"
+      data={{
+        ...data,
+        connectivity: {
+          wifi: { connected: false, ssid: null, signalPercent: null, state: 'disconnected' },
+          bluetooth: { available: false, enabled: false, name: null },
+        },
+      }}
+      settings={settingsFor('system')}
+    />,
+  );
+  expect(offline.getByText('Off')).toBeTruthy();
+  expect(offline.getByText('Unavailable')).toBeTruthy();
+  offline.unmount();
+
+  const empty = render(<DockWidget id="system" size="standard" data={{ ...data, connectivity: null }} settings={settingsFor('system')} />);
+  expect(empty.container.querySelector('.fw-sys-net')).toBeNull();
+  empty.unmount();
+
+  const compact = render(<DockWidget id="system" size="compact" data={data} settings={settingsFor('system')} />);
+  expect(compact.container.querySelectorAll('.fw-sys-net-ic')).toHaveLength(2);
+  compact.unmount();
+});
+
 test('allowed actions dispatch through onAction', () => {
   const actions: string[] = [];
   const onAction = (action: string) => actions.push(action);

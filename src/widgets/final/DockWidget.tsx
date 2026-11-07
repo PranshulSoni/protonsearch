@@ -60,13 +60,15 @@ function appsSlot(id: 'apps', size: WidgetSize, data: AppsData | undefined, sett
   const active = data?.activeTitle || data?.items?.find((item) => item.active)?.title || null;
   const items = data?.items ?? [];
   const scoped = settings.activeOnly ? items.filter((item) => item.active).slice(0, 1) : items;
-  const titles = scoped.slice(0, settings.maxApps).map((item) => item.title);
+  const visible = scoped.slice(0, settings.maxApps);
+  const titles = visible.map((item) => item.title);
+  const icons = visible.map((item) => item.icon);
   const count = data ? data.windowCount ?? items.length : null;
   if (size === 'compact') {
     return (
       <>
         <span className="fw-dock-ic fw-dock-ic--apps">
-          <AppIconStack titles={titles} limit={2} />
+          <AppIconStack titles={titles} icons={icons} limit={2} />
         </span>
         <span className="fw-dock-value">{count == null ? '--' : count}</span>
       </>
@@ -75,7 +77,7 @@ function appsSlot(id: 'apps', size: WidgetSize, data: AppsData | undefined, sett
   return (
     <>
       <span className="fw-dock-ic fw-dock-ic--apps fw-dock-ic--lg">
-        <AppIconStack titles={titles} limit={size === 'wide' ? 3 : 2} />
+        <AppIconStack titles={titles} icons={icons} limit={size === 'wide' ? 3 : 2} />
       </span>
       <span className="fw-dock-stack fw-dock-stack--tight">
         <strong className="fw-dock-title">{active ?? 'Running apps'}</strong>
@@ -95,10 +97,24 @@ function usageSlot(
   settings: { plan: string; showSession: boolean; showWeekly: boolean; showReset: boolean; warnAt: number },
   kind: 'claude' | 'chatgpt',
 ) {
+  const live = data?.status === 'live';
+  const label = kind === 'claude' ? 'Claude' : 'ChatGPT';
+  if (!live) {
+    return (
+      <>
+        <span className="fw-dock-ic fw-usage-plan-ic">
+          <Icon name={kind} size={16} />
+        </span>
+        <span className="fw-dock-stack fw-dock-stack--tight fw-usage-off" title={`Not connected to ${label}`}>
+          <strong className="fw-dock-title">{size === 'compact' ? 'Offline' : 'Not connected'}</strong>
+          {size !== 'compact' ? <small className="fw-dock-sub">Connect {label}</small> : null}
+        </span>
+      </>
+    );
+  }
   const session = data?.sessionPercent ?? null;
   const weekly = data?.weeklyPercent ?? null;
   const reset = kind === 'claude' ? data?.resetIn : (data as ChatGPTData | undefined)?.resetIn;
-  const connected = data?.status !== 'disconnected' && data?.status !== 'empty';
   return (
     <>
       <span className="fw-dock-ic fw-usage-plan-ic">
@@ -107,13 +123,13 @@ function usageSlot(
       <span className="fw-dock-stack fw-dock-stack--tight">
         <strong className="fw-dock-title">
           {settings.plan}
-          {size !== 'compact' ? <span className="fw-dock-title-accent"> · {connected ? pct(session) : '--'}</span> : null}
+          {size !== 'compact' ? <span className="fw-dock-title-accent"> · {pct(session)}</span> : null}
         </strong>
         {size === 'compact' ? (
-          <span className="fw-dock-value fw-dock-value--tiny">{connected ? pct(session) : '--'}</span>
+          <span className="fw-dock-value fw-dock-value--tiny">{pct(session)}</span>
         ) : (
           <small className="fw-dock-sub">
-            {settings.showWeekly ? `Week ${connected ? pct(weekly) : '--'}` : 'Local session'}
+            {settings.showWeekly ? `Week ${pct(weekly)}` : 'Local session'}
             {settings.showReset && reset ? ` · ${reset}` : ''}
           </small>
         )}
@@ -255,34 +271,87 @@ export function DockWidget({ id, size, settings, data, preview = false, status, 
       const system = source as SystemData | undefined;
       const compact = size === 'compact';
       const wide = size === 'wide';
+      const conn = system?.connectivity;
+      const wifi = conn?.wifi;
+      const bluetooth = conn?.bluetooth;
+      const ethernet = conn?.ethernet;
+      const vpn = conn?.vpn;
+      const showWifi = s.showWifi ? wifi : null;
+      const showBluetooth = s.showBluetooth ? bluetooth : null;
+      const showEthernet = wide && s.showNetwork ? ethernet : null;
+      const showVpn = wide && s.showNetwork ? vpn : null;
       const extras = [
         s.showTemp ? (system?.temperatureC == null ? '-- temp' : `${Math.round(system.temperatureC)}°C`) : null,
         s.showUptime ? uptime(system?.uptimeSeconds) : null,
       ].filter(Boolean).join(' · ');
       content = (
         <span className="fw-sys-dock">
-          {s.showCpu ? (
-            <span className="fw-sys-mini">
-              <span className="fw-sys-mini-top"><Icon name="cpu" size={10} /> CPU</span>
-              <strong>{pct(system?.cpu)}</strong>
-              {wide ? <MetricBar value={system?.cpu} label="CPU load" tone="blue" /> : null}
+          <span className="fw-sys-metrics">
+            {s.showCpu ? (
+              <span className="fw-sys-mini">
+                <span className="fw-sys-mini-top"><Icon name="cpu" size={10} /> CPU</span>
+                <strong>{pct(system?.cpu)}</strong>
+                {wide ? <MetricBar value={system?.cpu} label="CPU load" tone="blue" /> : null}
+              </span>
+            ) : null}
+            {s.showRam ? (
+              <span className="fw-sys-mini">
+                <span className="fw-sys-mini-top"><Icon name="ram" size={10} /> RAM</span>
+                <strong>{pct(system?.ram)}</strong>
+                {wide ? <MetricBar value={system?.ram} label="RAM load" tone="blue" /> : null}
+              </span>
+            ) : null}
+            {!compact && s.showBattery ? (
+              <span className="fw-sys-mini">
+                <span className="fw-sys-mini-top"><Icon name="battery" size={10} /> BAT</span>
+                <strong>{pct(system?.battery)}</strong>
+                {wide ? <MetricBar value={system?.battery} label="Battery level" tone="green" /> : null}
+              </span>
+            ) : null}
+          </span>
+          {compact && (showWifi || showBluetooth) ? (
+            <span className="fw-sys-net fw-sys-net--compact">
+              {showWifi ? (
+                <span className={`fw-sys-net-ic${showWifi.connected ? ' is-on' : ' is-off'}`} title={showWifi.connected ? showWifi.ssid ?? 'Wi-Fi connected' : 'Wi-Fi off'} aria-label={showWifi.connected ? `Wi-Fi ${showWifi.ssid ?? 'connected'}` : 'Wi-Fi off'}>
+                  <Icon name="wifi" size={10} />
+                </span>
+              ) : null}
+              {showBluetooth ? (
+                <span className={`fw-sys-net-ic${showBluetooth.enabled ? ' is-on' : ' is-off'}`} title={showBluetooth.enabled ? showBluetooth.name ?? 'Bluetooth on' : showBluetooth.available === false ? 'Bluetooth unavailable' : 'Bluetooth off'} aria-label={showBluetooth.enabled ? `Bluetooth ${showBluetooth.name ?? 'on'}` : 'Bluetooth off'}>
+                  <Icon name="bluetooth" size={10} />
+                </span>
+              ) : null}
             </span>
           ) : null}
-          {s.showRam ? (
-            <span className="fw-sys-mini">
-              <span className="fw-sys-mini-top"><Icon name="ram" size={10} /> RAM</span>
-              <strong>{pct(system?.ram)}</strong>
-              {wide ? <MetricBar value={system?.ram} label="RAM load" tone="blue" /> : null}
+          {!compact && (showWifi || showBluetooth || showEthernet?.connected || showVpn?.connected || (wide && extras)) ? (
+            <span className="fw-sys-net">
+              {showWifi ? (
+                <span className={`fw-sys-net-item${showWifi.connected ? ' is-on' : ' is-off'}`} title={showWifi.connected ? showWifi.ssid ?? 'Connected' : 'Wi-Fi off'}>
+                  <Icon name="wifi" size={10} />
+                  <span>{showWifi.connected ? showWifi.ssid ?? 'Connected' : 'Off'}</span>
+                </span>
+              ) : null}
+              {showBluetooth ? (
+                <span className={`fw-sys-net-item${showBluetooth.enabled ? ' is-on' : ' is-off'}`} title={showBluetooth.enabled ? showBluetooth.name ?? 'Bluetooth on' : showBluetooth.available === false ? 'Bluetooth unavailable' : 'Bluetooth off'}>
+                  <Icon name="bluetooth" size={10} />
+                  <span>{showBluetooth.enabled ? showBluetooth.name ?? 'On' : showBluetooth.available === false ? 'Unavailable' : 'Off'}</span>
+                </span>
+              ) : null}
+              {showEthernet?.connected ? (
+                <span className="fw-sys-net-item is-on" title={showEthernet.adapter ?? 'Ethernet'}>
+                  <Icon name="ethernet" size={10} />
+                  <span>{showEthernet.adapter ?? 'Ethernet'}</span>
+                </span>
+              ) : null}
+              {showVpn?.connected ? (
+                <span className="fw-sys-net-item is-on" title={showVpn.adapter ?? 'VPN'}>
+                  <Icon name="vpn" size={10} />
+                  <span>{showVpn.adapter ?? 'VPN'}</span>
+                </span>
+              ) : null}
+              {wide && extras ? <span className="fw-sys-net-extra">{extras}</span> : null}
             </span>
           ) : null}
-          {!compact && s.showBattery ? (
-            <span className="fw-sys-mini">
-              <span className="fw-sys-mini-top"><Icon name="battery" size={10} /> BAT</span>
-              <strong>{pct(system?.battery)}</strong>
-              {wide ? <MetricBar value={system?.battery} label="Battery level" tone="green" /> : null}
-            </span>
-          ) : null}
-          {wide && extras ? <span className="fw-sys-extra">{extras}</span> : null}
           {!s.showCpu && !s.showRam && (!s.showBattery || compact) ? <span className="fw-dock-value">--</span> : null}
         </span>
       );

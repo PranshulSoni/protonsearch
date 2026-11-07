@@ -168,6 +168,15 @@ button.fw-dock {
   font-weight: 650;
 }
 
+.fw-usage-off .fw-dock-title {
+  color: var(--fw-muted);
+  font-weight: 600;
+}
+
+.fw-usage-off .fw-dock-sub {
+  color: var(--fw-tint);
+}
+
 .fw-dock-sub {
   display: block;
   min-width: 0;
@@ -268,6 +277,20 @@ button.fw-dock {
 
 .fw-app-stack-item:first-child {
   margin-left: 0;
+}
+
+.fw-app-img-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.fw-app-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .fw-dock--compact .fw-app-stack-item {
@@ -390,22 +413,29 @@ button.fw-dock {
 
 /* System */
 .fw-sys-dock {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.fw-sys-metrics {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(48px, 1fr);
+  grid-auto-columns: minmax(0, 1fr);
   align-items: center;
   gap: 9px;
   width: 100%;
   min-width: 0;
 }
 
-.fw-dock--compact .fw-sys-dock {
-  grid-auto-columns: minmax(32px, 1fr);
+.fw-dock--compact .fw-sys-metrics {
   gap: 6px;
 }
 
-.fw-dock--wide .fw-sys-dock {
-  grid-auto-columns: minmax(42px, 1fr);
+.fw-dock--wide .fw-sys-metrics {
   gap: 7px;
 }
 
@@ -433,10 +463,69 @@ button.fw-dock {
   letter-spacing: -0.02em;
 }
 
-.fw-sys-extra {
-  position: absolute;
-  right: 10px;
-  bottom: 6px;
+.fw-sys-net {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  font-size: 7px;
+  line-height: 1;
+  color: var(--fw-muted);
+}
+
+.fw-sys-net--compact {
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.fw-sys-net-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.fw-sys-net-item svg {
+  flex: none;
+}
+
+.fw-sys-net-item > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fw-sys-net-item.is-on svg {
+  color: var(--fw-tint);
+}
+
+.fw-sys-net-item.is-off {
+  color: var(--fw-dim);
+  opacity: 0.65;
+}
+
+.fw-sys-net-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.fw-sys-net-ic.is-on {
+  color: var(--fw-tint);
+}
+
+.fw-sys-net-ic.is-off {
+  color: var(--fw-dim);
+  opacity: 0.65;
+}
+
+.fw-sys-net-extra {
+  flex: none;
+  margin-left: auto;
   font-size: 7px;
   color: var(--fw-dim);
   white-space: nowrap;

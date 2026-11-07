@@ -96,11 +96,11 @@ function statusFor(preview: boolean, status: WidgetStatus | undefined, aiStatus?
   return status;
 }
 
-function AppTile({ title, count, showTitles }: { title: string; count?: number | null; showTitles: boolean }) {
+function AppTile({ title, icon, count, showTitles }: { title: string; icon?: string | null; count?: number | null; showTitles: boolean }) {
   return (
     <div className="fw-app-tile">
       <span className="fw-app-tile-icon">
-        <AppGlyph title={title} size={24} />
+        <AppGlyph title={title} icon={icon} size={24} />
       </span>
       {showTitles ? <span className="fw-app-tile-name">{title}</span> : null}
       {count != null ? <span className="fw-app-tile-count">{count}</span> : null}
@@ -373,7 +373,8 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
       const s = settingsFor('apps', settings);
       const appsData = source as AppsData | undefined;
       const items = appsData?.items ?? [];
-      const active = appsData?.activeTitle ?? items.find((item) => item.active)?.title ?? null;
+      const activeItem = items.find((item) => item.active) ?? items.find((item) => item.title === appsData?.activeTitle) ?? null;
+      const active = appsData?.activeTitle ?? activeItem?.title ?? null;
       const scoped = s.activeOnly ? items.filter((item) => item.active).slice(0, 1) : items;
       const visible = scoped.slice(0, s.maxApps);
       body = (
@@ -383,7 +384,7 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
             {appsData && items.length ? (
               <>
                 <div className="fw-apps-active">
-                  <span className="fw-apps-active-icon"><AppGlyph title={active ?? 'App'} size={24} /></span>
+                  <span className="fw-apps-active-icon"><AppGlyph title={active ?? 'App'} icon={activeItem?.icon} size={24} /></span>
                   <div>
                     <span className="fw-eyebrow">{active ? 'Active window' : 'No active window'}</span>
                     <strong>{active ?? 'Windows is idle'}</strong>
@@ -393,7 +394,7 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
                 </div>
                 <div className="fw-split-label"><span>{s.activeOnly ? 'Active app' : 'Grouped apps'}</span><span>{scoped.length} open</span></div>
                 <div className="fw-app-row">
-                  {visible.map((item) => <AppTile key={item.id} title={item.title} showTitles={s.showTitles} count={item.active ? 1 : null} />)}
+                  {visible.map((item) => <AppTile key={item.id} title={item.title} icon={item.icon} showTitles={s.showTitles} count={item.active ? 1 : null} />)}
                 </div>
               </>
             ) : (

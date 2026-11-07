@@ -110,7 +110,23 @@ export function StatusDot({ state = 'idle' }: { state?: 'running' | 'idle' | 'of
   return <span className={`fw-dot fw-dot--${state}`} aria-hidden="true" />;
 }
 
-export function AppGlyph({ title, size = 18 }: { title: string; size?: number }) {
+const SAFE_APP_ICON = /^data:image\/(?:png|jpe?g|webp|gif|bmp|x-icon|vnd\.microsoft\.icon);base64,[a-z0-9+/=\s]+$/i;
+
+export function safeAppIcon(icon: string | null | undefined): string | null {
+  if (typeof icon !== 'string') return null;
+  const value = icon.trim();
+  return SAFE_APP_ICON.test(value) ? value : null;
+}
+
+export function AppGlyph({ title, icon, size = 18 }: { title: string; icon?: string | null; size?: number }) {
+  const source = safeAppIcon(icon);
+  if (source) {
+    return (
+      <span className="fw-app-img-box" style={{ width: size, height: size }}>
+        <img className="fw-app-img" src={source} alt="" aria-hidden="true" draggable={false} />
+      </span>
+    );
+  }
   return <AppIcon kind={appGlyphFor(title)} size={size} />;
 }
 
@@ -124,12 +140,20 @@ export function AlbumArt({ title, size = 96 }: { title?: string | null; size?: n
   );
 }
 
-export function AppIconStack({ titles, limit = 4 }: { titles: string[]; limit?: number }) {
+export function AppIconStack({
+  titles,
+  icons,
+  limit = 4,
+}: {
+  titles: string[];
+  icons?: Array<string | null | undefined>;
+  limit?: number;
+}) {
   return (
     <span className="fw-app-stack" aria-label={`${titles.length} running apps`}>
-      {titles.slice(0, limit).map((title) => (
-        <span className="fw-app-stack-item" key={title} title={title}>
-          <AppGlyph title={title} size={15} />
+      {titles.slice(0, limit).map((title, index) => (
+        <span className="fw-app-stack-item" key={`${title}-${index}`} title={title}>
+          <AppGlyph title={title} icon={icons?.[index]} size={15} />
         </span>
       ))}
     </span>

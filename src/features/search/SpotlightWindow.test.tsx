@@ -49,10 +49,14 @@ function mockSearch(results: unknown[]) {
       : undefined,
   ));
 }
+async function typeQuery(value: string) {
+  fireEvent.change(screen.getByRole("combobox"), { target: { value } });
+  await act(async () => { vi.advanceTimersByTime(100); });
+}
 async function showResults(results: unknown[] = [row]) {
   mockSearch(results);
   render(<SpotlightWindow />);
-  await act(async () => { vi.advanceTimersByTime(100); });
+  await typeQuery("current");
 }
 test("discards stale query responses and executes keyboard selection", async () => {
   const pending: Array<(value: unknown) => void> = [];
@@ -62,15 +66,8 @@ test("discards stale query responses and executes keyboard selection", async () 
       : Promise.resolve(),
   );
   render(<SpotlightWindow />);
-  await act(async () => {
-    vi.advanceTimersByTime(100);
-  });
-  fireEvent.change(screen.getByRole("combobox"), {
-    target: { value: "latest" },
-  });
-  await act(async () => {
-    vi.advanceTimersByTime(100);
-  });
+  await typeQuery("earlier");
+  await typeQuery("latest");
   await act(async () =>
     pending[1]({
       requestId: 2,
@@ -140,7 +137,6 @@ test("routes scope queries through Rust prefixes without double-prefixing", asyn
   mockSearch([]);
   render(<SpotlightWindow />);
   const input = screen.getByRole("combobox");
-  await act(async () => { vi.advanceTimersByTime(100); });
   fireEvent.change(input, { target: { value: "chrome" } });
   await act(async () => { vi.advanceTimersByTime(100); });
   expect(lastSearchQuery()).toBe("chrome");
@@ -163,10 +159,13 @@ test("routes scope queries through Rust prefixes without double-prefixing", asyn
   fireEvent.click(screen.getByRole("button", { name: "All" }));
   await act(async () => { vi.advanceTimersByTime(100); });
   expect(lastSearchQuery()).toBe("file:report");
+  const searchesBeforeClear = searchQueries().length;
   fireEvent.change(input, { target: { value: "" } });
   await act(async () => { vi.advanceTimersByTime(100); });
   expect(screen.getByRole("button", { name: "All" }).getAttribute("aria-pressed")).toBe("true");
-  expect(lastSearchQuery()).toBe("");
+  expect(searchQueries()).toHaveLength(searchesBeforeClear);
+  expect(lastSearchQuery()).toBe("file:report");
+  expect(screen.getByText("Type to search")).toBeTruthy();
 });
 test("a changed query cannot execute the previous results during debounce", async () => {
   await showResults();
@@ -187,12 +186,29 @@ test("repeated Enter cannot dispatch duplicate actions while execution is pendin
   fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter", repeat: true });
   expect(invoke.mock.calls.filter(([command]) => command === "execute_search_result")).toHaveLength(1);
 });
-test("empty queries show a quiet type-to-search state", async () => {
+test("empty queries show a quiet type-to-search state without searching", async () => {
   mockSearch([]);
   render(<SpotlightWindow />);
   await act(async () => { vi.advanceTimersByTime(100); });
   expect(screen.getByText("Type to search")).toBeTruthy();
   expect(screen.getByRole("status").textContent).toBe("Type to search");
+  expect(searchQueries()).toHaveLength(0);
+  expect(invoke).toHaveBeenCalledWith("fit_search", { height: 174 });
+});
+test("a typed query invokes the native search and renders results", async () => {
+  await showResults();
+  expect(searchQueries()).toEqual(["current"]);
+  expect(screen.getByText("Current result")).toBeTruthy();
+  expect(screen.queryByText("Type to search")).toBeNull();
+});
+test("request IDs are seeded above prior WebView sessions", async () => {
+  vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+  const seed = Date.now() * 1000;
+  mockSearch([]);
+  render(<SpotlightWindow />);
+  await typeQuery("reload");
+  const call = invoke.mock.calls.find(([command]) => command === "search");
+  expect((call?.[1] as { requestId: number }).requestId).toBe(seed + 1);
 });
 test("completed queries announce no matching results", async () => {
   mockSearch([]);
@@ -208,6 +224,8 @@ test("reports aria-busy while a search is pending", async () => {
     ? new Promise((resolve) => pending.push(resolve))
     : Promise.resolve());
   render(<SpotlightWindow />);
+  expect(screen.getByRole("listbox").getAttribute("aria-busy")).toBe("false");
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "busy" } });
   expect(screen.getByRole("listbox").getAttribute("aria-busy")).toBe("true");
   await act(async () => { vi.advanceTimersByTime(100); pending[0]({ requestId: 1, results: [], elapsedMs: 1 }); });
   expect(screen.getByRole("listbox").getAttribute("aria-busy")).toBe("false");
@@ -282,7 +300,7 @@ test("search opens compact and expands to a bounded height for results", async (
   mockSearch(Array.from({ length: 30 }, (_, i) => ({ ...row, id: String(i) })));
   render(<SpotlightWindow />);
   expect(invoke).toHaveBeenCalledWith("fit_search", { height: 174 });
-  await act(async () => { vi.advanceTimersByTime(100); });
+  await typeQuery("results");
   expect(invoke).toHaveBeenCalledWith("fit_search", { height: 500 });
 });
 test("search restores persisted theme and follows cross-window settings updates", async () => {
@@ -308,7 +326,7 @@ test("theme read failure does not hide or prevent executing valid search results
     ? Promise.reject(new Error("disk unavailable"))
     : Promise.resolve(command === "search" ? { requestId: 1, results: [row], elapsedMs: 1 } : undefined));
   render(<SpotlightWindow />);
-  await act(async () => { vi.advanceTimersByTime(100); });
+  await typeQuery("current");
   expect(screen.getByText("Current result")).toBeTruthy();
   expect(screen.getByText("Theme unavailable")).toBeTruthy();
   fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });

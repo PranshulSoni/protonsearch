@@ -336,7 +336,8 @@ export function SpotlightWindow() {
   const [error, setError] = useState("");
   const [themeError, setThemeError] = useState("");
   const [opened, setOpened] = useState(0);
-  const sequence = useRef(0);
+  // Rust keeps latest_request across WebView reloads, so seed above any prior session.
+  const sequence = useRef(Date.now() * 1000);
   const executing = useRef(false);
   const input = useRef<HTMLInputElement>(null);
   const itemsRef = useRef<Result[]>([]);
@@ -403,11 +404,17 @@ export function SpotlightWindow() {
     };
   }, []);
   useEffect(() => {
-    const id = ++sequence.current;
     let current = true;
+    setError("");
+    if (!query.trim()) {
+      setSearching(false);
+      setResults([]);
+      setSelected(0);
+      return;
+    }
+    const id = ++sequence.current;
     const priorId = itemsRef.current[selectedRef.current]?.id ?? null;
     setSearching(true);
-    setError("");
     setResults([]);
     setSelected(0);
     const timer = setTimeout(() => {
