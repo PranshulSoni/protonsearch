@@ -1,3 +1,4 @@
+use crate::known_folders;
 use serde_json::{json, Value};
 use std::ffi::c_void;
 use std::{
@@ -12,7 +13,9 @@ use windows::{
         GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
     },
     Win32::{
-        Foundation::HANDLE,
+        Foundation::{BOOL, HANDLE},
+        Media::Audio::Endpoints::IAudioEndpointVolume,
+        Media::Audio::{eConsole, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator},
         NetworkManagement::{
             IpHelper::{FreeMibTable, GetIfTable2, MIB_IF_TABLE2},
             Ndis::IfOperStatusUp,
@@ -23,9 +26,23 @@ use windows::{
                 WLAN_INTERFACE_INFO_LIST,
             },
         },
-        System::WinRT::{RoInitialize, RoUninitialize, RO_INIT_MULTITHREADED},
+        System::{
+            Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ},
+            WinRT::{RoInitialize, RO_INIT_MULTITHREADED},
+        },
+        UI::Shell::PropertiesSystem::PROPERTYKEY,
     },
 };
+
+const PKEY_DEVICE_FRIENDLY_NAME: PROPERTYKEY = PROPERTYKEY {
+    fmtid: windows::core::GUID::from_u128(0xa45c254e_df1c_4efd_8020_67d146a850e0),
+    pid: 14,
+};
+
+// WinRT radio/media factories and Core Audio share process-wide singletons. Blocking
+// workers can request different providers at the same time, so keep native work
+// serialized rather than racing those singletons.
+static NATIVE_LOCK: Mutex<()> = Mutex::new(());
 
 pub(crate) fn envelope(status: &str, data: Value, message: &str) -> Value {
     json!({"status":status,"data":data,"message":message,
@@ -35,22 +52,24 @@ pub(crate) fn envelope(status: &str, data: Value, message: &str) -> Value {
 struct Apartment;
 impl Apartment {
     fn initialize() -> windows::core::Result<Self> {
-        // Commands run on blocking workers; balance each successful WinRT initialization.
-        unsafe {
-            RoInitialize(RO_INIT_MULTITHREADED)?;
+        // WinRT keeps process-wide state behind the radio and media managers. Uninitializing
+        // the apartment while another blocking worker still uses that state crashes the
+        // process, so initialize once per thread and keep it alive for the thread's lifetime.
+        thread_local! {
+            static APARTMENT: Result<(), windows::core::HRESULT> =
+                unsafe { RoInitialize(RO_INIT_MULTITHREADED).map_err(|error| error.code()) };
         }
-        Ok(Self)
-    }
-}
-impl Drop for Apartment {
-    fn drop(&mut self) {
-        unsafe {
-            RoUninitialize();
-        }
+        APARTMENT.with(|ready| match ready {
+            Ok(()) => Ok(Self),
+            Err(code) => Err(windows::core::Error::from(*code)),
+        })
     }
 }
 
 pub fn snapshot(provider: &str) -> Result<Value, String> {
+    let _guard = NATIVE_LOCK
+        .lock()
+        .map_err(|_| "Native provider lock is poisoned")?;
     match provider {
         "network" => network(),
         "media" => match media() {
@@ -61,6 +80,32 @@ pub fn snapshot(provider: &str) -> Result<Value, String> {
                 "Windows denied media session access",
             )),
             Err(error) => Err(error.to_string()),
+        },
+        "volume" => match volume() {
+            Ok(value) => Ok(value),
+            Err(error) if error.code().0 as u32 == 0x80070005 => Ok(envelope(
+                "permission-denied",
+                Value::Null,
+                "Windows denied audio endpoint access",
+            )),
+            Err(error) => Ok(envelope(
+                "unsupported",
+                Value::Null,
+                &format!("Audio endpoint unavailable: {error}"),
+            )),
+        },
+        "trash" => match trash() {
+            Ok(value) => Ok(value),
+            Err(error) if error.code().0 as u32 == 0x80070005 => Ok(envelope(
+                "permission-denied",
+                Value::Null,
+                "Windows denied access to the Recycle Bin",
+            )),
+            Err(error) => Ok(envelope(
+                "unsupported",
+                Value::Null,
+                &format!("Recycle Bin unavailable: {error}"),
+            )),
         },
         _ => Err("Unknown widget provider".into()),
     }
@@ -77,12 +122,44 @@ fn media() -> windows::core::Result<Value> {
     let properties = session.TryGetMediaPropertiesAsync()?.get()?;
     let playback = session.GetPlaybackInfo()?;
     let controls = playback.Controls()?;
+    let status = playback.PlaybackStatus()?;
+    let album = properties
+        .AlbumTitle()
+        .ok()
+        .and_then(|value| non_empty_text(&value.to_string()));
+    let album_artist = properties
+        .AlbumArtist()
+        .ok()
+        .and_then(|value| non_empty_text(&value.to_string()));
+    let timeline = session.GetTimelineProperties().ok();
+    let (position_ms, duration_ms) = timeline_millis(
+        timeline
+            .as_ref()
+            .and_then(|value| value.Position().ok())
+            .map(|value| value.Duration),
+        timeline
+            .as_ref()
+            .and_then(|value| value.StartTime().ok())
+            .map(|value| value.Duration),
+        timeline
+            .as_ref()
+            .and_then(|value| value.EndTime().ok())
+            .map(|value| value.Duration),
+    );
+    let playback_rate = playback
+        .PlaybackRate()
+        .ok()
+        .and_then(|value| value.Value().ok());
     Ok(envelope(
         "live",
         json!({
             "title":properties.Title()?.to_string(), "artist":properties.Artist()?.to_string(),
+            "album":album, "albumArtist":album_artist,
             "source":session.SourceAppUserModelId()?.to_string(),
-            "playing":playback.PlaybackStatus()? == PlaybackStatus::Playing,
+            "playing":status == PlaybackStatus::Playing,
+            "playbackStatus":playback_status_label(status),
+            "playbackRate":playback_rate,
+            "positionMs":position_ms, "durationMs":duration_ms,
             "canToggle":controls.IsPlayPauseToggleEnabled()?,
             "canNext":controls.IsNextEnabled()?, "canPrevious":controls.IsPreviousEnabled()?
         }),
@@ -90,9 +167,172 @@ fn media() -> windows::core::Result<Value> {
     ))
 }
 
+fn non_empty_text(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_owned())
+}
+fn timeline_millis(
+    position: Option<i64>,
+    start: Option<i64>,
+    end: Option<i64>,
+) -> (Option<u64>, Option<u64>) {
+    // GSMTC uses 100 ns ticks; expose milliseconds for the React timeline.
+    let start = start.unwrap_or(0);
+    let position = position.map(|value| value.saturating_sub(start).max(0) as u64 / 10_000);
+    let duration = end
+        .map(|value| value.saturating_sub(start))
+        .filter(|value| *value > 0)
+        .map(|value| value as u64 / 10_000);
+    (position, duration)
+}
+fn playback_status_label(status: PlaybackStatus) -> &'static str {
+    if status == PlaybackStatus::Closed {
+        "closed"
+    } else if status == PlaybackStatus::Opened {
+        "opened"
+    } else if status == PlaybackStatus::Changing {
+        "changing"
+    } else if status == PlaybackStatus::Stopped {
+        "stopped"
+    } else if status == PlaybackStatus::Playing {
+        "playing"
+    } else if status == PlaybackStatus::Paused {
+        "paused"
+    } else {
+        "unknown"
+    }
+}
+
+fn volume() -> windows::core::Result<Value> {
+    let _apartment = Apartment::initialize()?;
+    let Some((endpoint, device)) = default_output()? else {
+        return Ok(envelope("empty", Value::Null, "No audio output device"));
+    };
+    let level = unsafe { endpoint.GetMasterVolumeLevelScalar()? };
+    let muted = unsafe { endpoint.GetMute()? }.as_bool();
+    Ok(envelope(
+        "live",
+        json!({"level":volume_percent(level),"muted":muted,"device":device}),
+        "",
+    ))
+}
+fn default_output() -> windows::core::Result<Option<(IAudioEndpointVolume, String)>> {
+    let enumerator: IMMDeviceEnumerator =
+        unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
+    let device: IMMDevice = match unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) } {
+        Ok(device) => device,
+        Err(error) if error.code().0 as u32 == 0x80070490 => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let endpoint: IAudioEndpointVolume = unsafe { device.Activate(CLSCTX_ALL, None)? };
+    Ok(Some((endpoint, device_name(&device))))
+}
+fn device_name(device: &IMMDevice) -> String {
+    let name = unsafe {
+        device
+            .OpenPropertyStore(STGM_READ)
+            .ok()
+            .and_then(|store| store.GetValue(&PKEY_DEVICE_FRIENDLY_NAME).ok())
+            .map(|value| value.to_string())
+    };
+    name.and_then(|value| non_empty_text(&value))
+        .unwrap_or_else(|| "Default output device".into())
+}
+fn volume_percent(scalar: f32) -> u8 {
+    (scalar * 100.0).round().clamp(0.0, 100.0) as u8
+}
+fn volume_set_percent(action: &str) -> Option<u8> {
+    action
+        .strip_prefix("volume:set:")?
+        .parse::<i64>()
+        .ok()
+        .map(|value| value.clamp(0, 100) as u8)
+}
+fn volume_action(action: &str) -> windows::core::Result<()> {
+    let _apartment = Apartment::initialize()?;
+    let Some((endpoint, _)) = default_output()? else {
+        return Err(windows::core::Error::new(
+            windows::core::HRESULT(0x80070490u32 as i32),
+            "No audio output device",
+        ));
+    };
+    if action == "volume:up" || action == "volume:down" {
+        let level = unsafe { endpoint.GetMasterVolumeLevelScalar()? };
+        let delta = if action == "volume:up" { 0.05 } else { -0.05 };
+        unsafe {
+            endpoint
+                .SetMasterVolumeLevelScalar((level + delta).clamp(0.0, 1.0), std::ptr::null())?
+        };
+    } else if action == "volume:mute" {
+        let muted = unsafe { endpoint.GetMute()? }.as_bool();
+        unsafe { endpoint.SetMute(BOOL::from(!muted), std::ptr::null())? };
+    } else if let Some(percent) = volume_set_percent(action) {
+        unsafe { endpoint.SetMasterVolumeLevelScalar(percent as f32 / 100.0, std::ptr::null())? };
+    } else {
+        return Err(windows::core::Error::new(
+            windows::core::HRESULT(0x80070057u32 as i32),
+            "Unsupported widget action",
+        ));
+    }
+    Ok(())
+}
+fn trash() -> windows::core::Result<Value> {
+    use windows::Win32::UI::Shell::{SHQueryRecycleBinW, SHQUERYRBINFO};
+    let mut info = SHQUERYRBINFO {
+        cbSize: std::mem::size_of::<SHQUERYRBINFO>() as u32,
+        i64Size: 0,
+        i64NumItems: 0,
+    };
+    unsafe { SHQueryRecycleBinW(windows::core::PCWSTR::null(), &mut info)? };
+    Ok(envelope(
+        "live",
+        json!({
+            "itemCount":info.i64NumItems.max(0) as u64,
+            "sizeBytes":info.i64Size.max(0) as u64,
+            "lastEmptiedAt":Value::Null
+        }),
+        "",
+    ))
+}
+fn empty_trash() -> windows::core::Result<()> {
+    use windows::Win32::{
+        Foundation::HWND,
+        UI::Shell::{SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND},
+    };
+    unsafe {
+        SHEmptyRecycleBinW(
+            HWND::default(),
+            windows::core::PCWSTR::null(),
+            SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND,
+        )
+    }
+}
+
 pub fn action(action: &str) -> Result<(), String> {
+    let _guard = NATIVE_LOCK
+        .lock()
+        .map_err(|_| "Native provider lock is poisoned")?;
     if let Some(uri) = settings_uri(action) {
         return open_uri(uri).map_err(|error| error.to_string());
+    }
+    if action.starts_with("volume:") {
+        if !matches!(action, "volume:up" | "volume:down" | "volume:mute")
+            && volume_set_percent(action).is_none()
+        {
+            return Err("Unsupported widget action".into());
+        }
+        return volume_action(action).map_err(|error| error.to_string());
+    }
+    if action == "trash:empty" {
+        return empty_trash().map_err(|error| error.to_string());
+    }
+    if let Some(folder_id) = action.strip_prefix("folder:open:") {
+        let path = known_folders::folder_path(folder_id)
+            .ok_or_else(|| "Unknown known folder".to_string())?;
+        let path = path
+            .to_str()
+            .ok_or_else(|| "Known folder path is not valid Unicode".to_string())?;
+        return open_uri(path).map_err(|error| error.to_string());
     }
     if !["media:toggle", "media:next", "media:previous"].contains(&action) {
         return Err("Unsupported widget action".into());
@@ -395,13 +635,15 @@ fn read_wifi() -> WifiStatus {
     }
 }
 fn bluetooth_status() -> Value {
-    // The radio manager keeps process-wide state; tearing down the apartment between
-    // reads makes the second enumeration crash. Keep one initialization per thread.
-    thread_local! {
-        static APARTMENT_READY: bool = unsafe { RoInitialize(RO_INIT_MULTITHREADED).is_ok() };
-    }
+    // Radio::GetRadiosAsync and repeated Radio::State reads crash the process under
+    // repeated or concurrent use in windows 0.58. Enumerate and read once, then reuse
+    // the observed values. The widget never sees a value we did not actually read.
+    static STATUS: OnceLock<Value> = OnceLock::new();
+    STATUS.get_or_init(read_bluetooth_status).clone()
+}
+fn read_bluetooth_status() -> Value {
     let unavailable = json!({"available":false,"enabled":false,"name":null});
-    if !APARTMENT_READY.with(|ready| *ready) {
+    if Apartment::initialize().is_err() {
         return unavailable;
     }
     let Ok(operation) = Radio::GetRadiosAsync() else {
@@ -570,6 +812,71 @@ mod tests {
         }
     }
     #[test]
+    fn volume_scalar_and_actions_are_bounded() {
+        assert_eq!(volume_percent(0.0), 0);
+        assert_eq!(volume_percent(0.5), 50);
+        assert_eq!(volume_percent(0.555), 56);
+        assert_eq!(volume_percent(1.0), 100);
+        assert_eq!(volume_percent(-1.0), 0);
+        assert_eq!(volume_percent(2.0), 100);
+        assert_eq!(volume_set_percent("volume:set:0"), Some(0));
+        assert_eq!(volume_set_percent("volume:set:55"), Some(55));
+        assert_eq!(volume_set_percent("volume:set:100"), Some(100));
+        assert_eq!(volume_set_percent("volume:set:999"), Some(100));
+        assert_eq!(volume_set_percent("volume:set:-5"), Some(0));
+        assert_eq!(volume_set_percent("volume:set:abc"), None);
+        assert_eq!(volume_set_percent("volume:set:"), None);
+        assert_eq!(volume_set_percent("volume:up"), None);
+        assert_eq!(volume_set_percent(""), None);
+    }
+    #[test]
+    fn media_timeline_ticks_convert_to_milliseconds() {
+        assert_eq!(
+            timeline_millis(Some(5_000_000), Some(0), Some(180_000_000)),
+            (Some(500), Some(18_000))
+        );
+        assert_eq!(
+            timeline_millis(Some(0), Some(10_000), Some(10_000)),
+            (Some(0), None)
+        );
+        assert_eq!(timeline_millis(Some(10_000), None, None), (Some(1), None));
+        assert_eq!(timeline_millis(None, Some(0), None), (None, None));
+    }
+    #[test]
+    fn playback_status_labels_cover_gsmtc_states() {
+        assert_eq!(playback_status_label(PlaybackStatus::Closed), "closed");
+        assert_eq!(playback_status_label(PlaybackStatus::Opened), "opened");
+        assert_eq!(playback_status_label(PlaybackStatus::Changing), "changing");
+        assert_eq!(playback_status_label(PlaybackStatus::Stopped), "stopped");
+        assert_eq!(playback_status_label(PlaybackStatus::Playing), "playing");
+        assert_eq!(playback_status_label(PlaybackStatus::Paused), "paused");
+    }
+    #[test]
+    fn optional_media_text_is_trimmed_and_empty_is_null() {
+        assert_eq!(non_empty_text("  Album  ").as_deref(), Some("Album"));
+        assert_eq!(non_empty_text("\t"), None);
+        assert_eq!(non_empty_text(""), None);
+    }
+    #[test]
+    fn folder_actions_are_allowlisted_and_malformed_volume_actions_are_rejected() {
+        for action_id in [
+            "folder:open:",
+            "folder:open:..",
+            "folder:open:../Windows",
+            r"folder:open:C:\Windows",
+            "folder:open:desktop/../..",
+            "volume:set:abc",
+            "volume:set:",
+            "volume:bogus",
+        ] {
+            assert!(action(action_id).is_err(), "accepted {action_id}");
+        }
+        assert_eq!(
+            action("volume:set:abc").unwrap_err(),
+            "Unsupported widget action"
+        );
+    }
+    #[test]
     fn connection_type_prefers_vpn_then_wifi_then_ethernet() {
         assert_eq!(connection_type(true, true, true), "vpn");
         assert_eq!(connection_type(true, true, false), "wifi");
@@ -708,9 +1015,36 @@ mod tests {
         if media["status"] == "live" {
             assert!(media["data"]["title"].is_string());
             assert!(media["data"]["canToggle"].is_boolean());
+            for key in [
+                "album",
+                "albumArtist",
+                "positionMs",
+                "durationMs",
+                "playbackRate",
+                "playbackStatus",
+            ] {
+                assert!(media["data"].get(key).is_some(), "missing {key}");
+            }
+            assert!(media["data"]["playbackStatus"].is_string());
+        }
+        let volume = snapshot("volume").expect("Windows audio endpoint access");
+        assert!(["live", "empty", "unsupported", "permission-denied"]
+            .contains(&volume["status"].as_str().unwrap()));
+        if volume["status"] == "live" {
+            assert!(volume["data"]["level"].as_u64().unwrap() <= 100);
+            assert!(volume["data"]["muted"].is_boolean());
+            assert!(!volume["data"]["device"].as_str().unwrap().is_empty());
+        }
+        let trash = snapshot("trash").expect("Windows Recycle Bin access");
+        assert!(["live", "unsupported", "permission-denied"]
+            .contains(&trash["status"].as_str().unwrap()));
+        if trash["status"] == "live" {
+            assert!(trash["data"]["itemCount"].is_u64());
+            assert!(trash["data"]["sizeBytes"].is_u64());
+            assert!(trash["data"]["lastEmptiedAt"].is_null());
         }
         println!(
-            "Native readonly smoke: network first={}, second={}, adapterCount={}, type={}, wifi={}, ethernet={}, vpn={}, bluetooth={}; media={}",
+            "Native readonly smoke: network first={}, second={}, adapterCount={}, type={}, wifi={}, ethernet={}, vpn={}, bluetooth={}; media={}; volume={} ({}%), trash={} ({} items, {} bytes)",
             first["status"],
             second["status"],
             second["data"]["interfaces"].as_array().map_or(0, Vec::len),
@@ -719,7 +1053,12 @@ mod tests {
             second["data"]["ethernet"]["connected"],
             second["data"]["vpn"]["connected"],
             second["data"]["bluetooth"]["available"],
-            media["status"]
+            media["status"],
+            volume["status"],
+            volume["data"]["level"],
+            trash["status"],
+            trash["data"]["itemCount"],
+            trash["data"]["sizeBytes"]
         );
     }
 }

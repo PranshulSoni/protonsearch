@@ -1,8 +1,9 @@
 # Native widget providers
 
 Native Rust is authoritative for every value below. Nothing is sampled from the
-DOM, fabricated, or inferred from a provider that is not running. Commands are
-read-only except for the existing media and settings actions.
+DOM, fabricated, or inferred from a provider that is not running. Provider reads
+are read-only. Only explicit `widget_action` IDs can change media transport,
+system settings, volume, the Recycle Bin, or open an allowlisted known folder.
 
 ## Envelope
 
@@ -88,6 +89,10 @@ Existing keys are preserved: `downloadBytesPerSecond`, `uploadBytesPerSecond` an
   reported as `false`, never guessed. `name` is `null` when Windows does not
   expose one. The provider does not call `RequestAccessAsync`, so it never shows
   a consent prompt; failure degrades to the same `available: false` shape.
+  Bluetooth is sampled once per process: the windows 0.58 radio APIs crash when
+  `GetRadiosAsync`/`State` are called repeatedly, so the first real observation
+  is cached. A radio toggled after the first sample is not reflected until the
+  app restarts; this is a documented native limitation, not a live feed.
 - `interfaces` lists up hardware Ethernet/Wi-Fi adapter names used for throughput.
   An unassociated Wi-Fi adapter can still appear here; use `wifi.connected` and
   `connectionType` for connectivity.
@@ -117,7 +122,22 @@ Windows APIs: `GetIfTable2`/`FreeMibTable` (IP Helper), `WlanOpenHandle`,
     "battery": 81,
     "batteryCharging": true,
     "temperatureC": null,
-    "uptimeSeconds": 18342
+    "uptimeSeconds": 18342,
+    "connectivity": {
+      "downloadBytesPerSecond": 12500.0,
+      "uploadBytesPerSecond": 800.0,
+      "interfaces": ["Wi-Fi"],
+      "connectionType": "wifi",
+      "wifi": {
+        "connected": true,
+        "ssid": "Home",
+        "signalPercent": 82,
+        "state": "connected"
+      },
+      "ethernet": { "connected": false, "adapter": null },
+      "vpn": { "connected": false, "adapter": null },
+      "bluetooth": { "available": true, "enabled": true, "name": "Bluetooth" }
+    }
   }
 }
 ```
@@ -133,9 +153,136 @@ Windows APIs: `GetIfTable2`/`FreeMibTable` (IP Helper), `WlanOpenHandle`,
   source in this provider yet; do not render a number.
 - `uptimeSeconds` is `GetTickCount64() / 1000`, i.e. milliseconds since boot
   truncated to whole seconds.
+- `connectivity` is the network provider's entire `data` object, embedded without
+  its envelope. It is `null` only when the network read itself fails; the system
+  provider still stays `live` because the system metrics are independently real.
+  Do not read connectivity from `system.status`.
 
 Windows APIs: `GlobalMemoryStatusEx`, `GetSystemPowerStatus`, `GetSystemTimes`,
-`GetTickCount64`.
+`GetTickCount64`, plus the network provider APIs listed above for `connectivity`.
+
+## `provider_snapshot("media")`
+
+```json
+{
+  "status": "live",
+  "updatedAt": 1767225600000,
+  "message": "",
+  "data": {
+    "title": "Track title",
+    "artist": "Artist",
+    "album": "Album",
+    "albumArtist": "Album artist",
+    "source": "Spotify.exe",
+    "playing": true,
+    "playbackStatus": "playing",
+    "playbackRate": 1.0,
+    "positionMs": 42000,
+    "durationMs": 215000,
+    "canToggle": true,
+    "canNext": true,
+    "canPrevious": true
+  }
+}
+```
+
+- Existing keys `title`, `artist`, `source`, `playing`, `canToggle`, `canNext`
+  and `canPrevious` are preserved.
+- `album` and `albumArtist` are `null` when the media properties do not expose
+  them. `positionMs` and `durationMs` are `null` when the session has no timeline.
+  Timeline values are converted from GSMTC 100 ns ticks; position is relative to
+  the timeline start and duration is `end - start`.
+- `playbackRate` is `null` when the session does not expose a rate. It is usually
+  `1.0` for normal playback.
+- `playbackStatus` is one of `closed`, `opened`, `changing`, `stopped`,
+  `playing`, `paused` or `unknown`. `playing` remains the boolean used by the
+  existing widget.
+- `status` is `empty` with `data: null` when no session exists, and
+  `permission-denied` when Windows rejects media-session access.
+- No artwork is read. `TryGetMediaPropertiesAsync` is used only for text metadata.
+
+Windows APIs: `GlobalSystemMediaTransportControlsSessionManager`,
+`GlobalSystemMediaTransportControlsSession.TryGetMediaPropertiesAsync`,
+`GetPlaybackInfo`, `GetTimelineProperties`, `PlaybackRate`, and the existing
+transport control calls.
+
+## `provider_snapshot("volume")`
+
+```json
+{
+  "status": "live",
+  "updatedAt": 1767225600000,
+  "message": "",
+  "data": {
+    "level": 16,
+    "muted": true,
+    "device": "Speakers (Cirrus Logic XU (with APO Extensions))"
+  }
+}
+```
+
+- `level` is the default render endpoint's master scalar rounded and clamped to
+  `0..=100`. `muted` is the endpoint mute flag. `device` is the endpoint friendly
+  name, or `Default output device` if Windows exposes no name.
+- `status` is `empty` with `data: null` and message `No audio output device`
+  when no default render endpoint exists; `permission-denied` when access is
+  denied; `unsupported` with a diagnostic message for other Core Audio failures.
+- The read does not change volume or mute state.
+
+Windows APIs: `IMMDeviceEnumerator::GetDefaultAudioEndpoint(eRender, eConsole)`,
+`IMMDevice::Activate<IAudioEndpointVolume>`,
+`IAudioEndpointVolume::GetMasterVolumeLevelScalar`, `GetMute`, and
+`IMMDevice::OpenPropertyStore` for `PKEY_Device_FriendlyName`.
+
+## `provider_snapshot("trash")`
+
+```json
+{
+  "status": "live",
+  "updatedAt": 1767225600000,
+  "message": "",
+  "data": {
+    "itemCount": 0,
+    "sizeBytes": 0,
+    "lastEmptiedAt": null
+  }
+}
+```
+
+- `itemCount` and `sizeBytes` are aggregate Recycle Bin values across all drives.
+  Negative native values are clamped to zero.
+- `lastEmptiedAt` is always `null`. Windows does not provide a reliable
+  last-emptied timestamp through `SHQueryRecycleBinW`; do not invent one.
+- `status` is `live` when the query succeeds, `permission-denied` when Windows
+  denies access, and `unsupported` with a diagnostic message for other shell
+  failures.
+
+Windows API: `SHQueryRecycleBinW` with a null root path.
+
+## Actions
+
+All of these are accepted only through `widget_action(action_id)`. They are not
+provider reads and do not accept arbitrary paths, shells, or scripts.
+
+| Action ID | Effect |
+| --- | --- |
+| `volume:up` | Raise the default output volume by 5 percentage points, clamped at 100. |
+| `volume:down` | Lower the default output volume by 5 percentage points, clamped at 0. |
+| `volume:mute` | Toggle the default output mute state. |
+| `volume:set:<0..100>` | Set the master volume to the parsed integer, clamped to `0..=100`. |
+| `trash:empty` | Empty the Recycle Bin with `SHERB_NOCONFIRMATION \| SHERB_NOPROGRESSUI \| SHERB_NOSOUND`. Irreversible; the UI should confirm first. |
+| `folder:open:<folder-id>` | Open Explorer at an allowlisted known folder: `desktop`, `documents`, `downloads`, `pictures`, `screenshots`, `projects`. |
+
+- A malformed `volume:set` value or unknown volume suffix fails with
+  `Unsupported widget action` before touching the endpoint.
+- `folder:open` resolves the ID through `SHGetKnownFolderPath` again. It rejects
+  path strings, `..`, and unknown IDs. The resolved path is passed to the existing
+  ShellExecuteExW opener; there is no shell command construction.
+- `trash:empty` and volume actions are intentionally not invoked by the automated
+  tests because they change user state. The provider reads are tested.
+
+Windows APIs: `IAudioEndpointVolume::SetMasterVolumeLevelScalar`, `SetMute`,
+`SHEmptyRecycleBinW`, and `ShellExecuteExW` through the existing `open_uri`.
 
 Storage remains the existing `{totalBytes, freeBytes, mountPoint}` shape from
 `GetDiskFreeSpaceExW`.
@@ -191,13 +338,21 @@ Windows APIs: `SHGetKnownFolderPath`, `CoTaskMemFree`, `symlink_metadata` /
 ## Permissions and host behaviour
 
 - Required capabilities: `system:read` for system, `network:read` for network,
-  `storage:read` for storage and known folders, `media:read` for media.
+  `storage:read` for storage, trash and known folders, `media:read` for media,
+  `media:control` for media transport. Volume, trash-empty and folder-open remain
+  behind the existing `widget_action` command and the widget layer's action
+  allowlist; they introduce no new capability name.
 - No administrator elevation, credentials, tokens, browser cookies, AI provider
   APIs, or network requests are used.
 - WLAN/radio/folder failures return `unsupported`, `empty` or
   `permission-denied` with a message; they do not panic on headless hosts or VMs.
 - Bluetooth never requests user consent. If the radio cannot be enumerated or its
-  state cannot be read, `enabled` stays `false`.
+  state cannot be read, `enabled` stays `false`. Its first successful sample is
+  cached for the process lifetime because repeated radio reads crash under
+  windows 0.58.
+- Native provider and action calls are serialized by a process-wide lock. A slow
+  media/volume query therefore delays another provider call briefly; it does not
+  run concurrently with a write action.
 
 ## React follow-up
 
@@ -208,5 +363,17 @@ Windows APIs: `SHGetKnownFolderPath`, `CoTaskMemFree`, `symlink_metadata` /
   `connected: false`.
 - `connectionType == "vpn"` can be true while `wifi.connected` is false or while
   `ethernet.connected` is false; that is expected.
+- `system.data.connectivity` is nullable and is the network `data` object, not a
+  status. Read `connectionType`, `wifi`, `ethernet`, `vpn` and `bluetooth` from
+  it; do not require `system.status == "live"` to mean connectivity is live.
+- Media `album`, `albumArtist`, `playbackRate` and the timeline fields can be
+  `null`. Use `playbackStatus` for a richer label and keep `playing` as the
+  primary transport state. Do not render a zero-duration progress bar when
+  `durationMs` is null or zero.
+- Volume and trash return `data: null` for `empty`, `unsupported` or
+  `permission-denied`; render the message and do not coerce the missing object.
+- Send only the documented action IDs. Confirm `trash:empty` with the user before
+  invoking it; it bypasses the Windows confirmation UI. Do not construct
+  `folder:open` from a path, only from one of the six IDs.
 - The files widget can call `invoke("known_folders_snapshot")` and read
   `data.folders` / `data.recent` after this native command is wired into the UI.

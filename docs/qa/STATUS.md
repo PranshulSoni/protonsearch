@@ -464,3 +464,115 @@ Not verified / still open:
 * No Computer Use or visual UI verification was performed for these provider
   changes; only native Rust tests were run.
 * `known_folders_snapshot` has no frontend consumer yet.
+
+## Native provider expansion: volume, trash, media progress, connectivity (2026-11-07)
+
+Scope: `src-tauri/src/widget_data.rs`, `src-tauri/src/main.rs`,
+`src-tauri/src/known_folders.rs`, `src-tauri/Cargo.toml`,
+`docs/widgets/NATIVE_PROVIDERS.md`. No React, CSS or
+`preview-tahoe-glass.html` edits.
+
+Implemented and compiled:
+
+* `provider_snapshot("system")` now embeds the network provider's complete `data`
+  object at `data.connectivity`. Existing system fields and null semantics are
+  unchanged.
+* `provider_snapshot("volume")` uses Core Audio (`IMMDeviceEnumerator`,
+  `IAudioEndpointVolume`, endpoint property store) and returns
+  `{level:0..100,muted,device}`. Missing device, access denial and other Core
+  Audio failures degrade to `empty`, `permission-denied` or `unsupported`.
+* `provider_snapshot("trash")` uses `SHQueryRecycleBinW` and returns
+  `{itemCount:u64,sizeBytes:u64,lastEmptiedAt:null}`. No timestamp is invented.
+* Media now also returns nullable `album`, `albumArtist`, `positionMs`,
+  `durationMs`, `playbackRate` and string `playbackStatus`, while preserving all
+  existing fields.
+* `widget_action` accepts `volume:up`, `volume:down`, `volume:mute`,
+  `volume:set:<0..100>`, `trash:empty` (no confirmation/progress/sound UI), and
+  `folder:open:<desktop|documents|downloads|pictures|screenshots|projects>`.
+  Folder IDs are resolved natively through the known-folder allowlist; arbitrary
+  paths are rejected.
+
+Observed on this Windows 11 host:
+
+* Volume provider: `status=live`, `level=16`, `muted=true`,
+  `device="Speakers (Cirrus Logic XU (with APO Extensions))"`.
+* Trash provider: `status=live`, `itemCount=0`, `sizeBytes=0`,
+  `lastEmptiedAt=null`.
+* System provider: `cpu=null` on the first sample, `ram=65`, `battery=85`,
+  `batteryCharging=false`, `uptimeSeconds=48236`, `connectivity.connectionType=vpn`.
+* Network/media smoke remained: network second sample `live`,
+  `connectionType=vpn`, Wi-Fi `disconnected`, VPN `connected`; media `empty`
+  because no media session was active.
+
+Verification commands and exact outcomes:
+
+* `cargo fmt --manifest-path src-tauri/Cargo.toml --check` -> clean.
+* `cargo check --manifest-path src-tauri/Cargo.toml` -> passed. Only pre-existing
+  ProtonSearch warnings; protondock emitted none.
+* `cargo test --manifest-path src-tauri/Cargo.toml --bin protondock -- --skip
+  local_calendar::` -> 49 passed, 0 failed, 10 filtered.
+* Targeted `native_readonly_provider_smoke` -> 1 passed; printed the volume and
+  trash values above.
+
+Not verified / still open:
+
+* No media session was active during the smoke run, so `album`, `albumArtist`,
+  `positionMs`, `durationMs`, `playbackRate` and live `playbackStatus` were not
+  observed from real playback. Their key presence and conversion helpers are
+  unit-tested; the media branch itself still needs an active-session check.
+* Volume up/down/mute/set, `trash:empty` and `folder:open:*` were not executed
+  because they change user state or open Explorer. Their parsing/allowlists and
+  error paths are unit-tested; the write calls themselves were only compiled.
+* `trash:empty` on a non-empty Recycle Bin and `lastEmptiedAt` behavior on a
+  non-empty bin were not exercised.
+* Full `cargo test` still has the five pre-existing `local_calendar` access-denied
+  failures at `src-tauri/src/local_calendar.rs:465`; this expansion does not fix
+  or claim them.
+* No Computer Use or visual UI verification was performed. The React layer still
+  needs to consume `system.data.connectivity`, the new media fields, volume/trash
+  providers and the new action IDs.
+
+### Parallel test crash fix and final native-provider verification (2026-11-07)
+
+Parallel provider tests initially crashed with `0xc0000005`
+(`STATUS_ACCESS_VIOLATION`) after most tests passed. The crash was traced to
+repeated Windows 0.58 WinRT radio access: `Radio::GetRadiosAsync`/`State` can
+crash when called repeatedly or against a cached `Radio` object from another
+apartment. The same investigation also confirmed that per-call
+`RoInitialize`/`RoUninitialize` is unsafe while WinRT media/radio objects are
+still in use.
+
+Fixes applied in `src-tauri/src/widget_data.rs`:
+
+* COM/WinRT is initialized once per worker thread and never torn down.
+* `snapshot` and `action` are serialized by a process-wide `NATIVE_LOCK`.
+* Bluetooth is enumerated and read exactly once per process in
+  `read_bluetooth_status`, then the observed JSON is cached in a `OnceLock`.
+  This is a deliberate limitation: a Bluetooth radio toggled after the first
+  sample is not reflected until the app restarts. It is documented in
+  `docs/widgets/NATIVE_PROVIDERS.md`; no value is fabricated.
+
+Verification after the fix:
+
+* `cargo fmt --manifest-path src-tauri/Cargo.toml --check` -> clean.
+* `cargo check --manifest-path src-tauri/Cargo.toml` -> passed; only pre-existing
+  ProtonSearch warnings.
+* `cargo test --manifest-path src-tauri/Cargo.toml --bin protondock provider --
+  --nocapture` repeated 15 times -> all passed (7 tests each).
+* `cargo test --manifest-path src-tauri/Cargo.toml --bin protondock -- --skip
+  local_calendar::` repeated 5 times -> 50 passed, 0 failed each, no crash.
+* Full `cargo test --manifest-path src-tauri/Cargo.toml --no-fail-fast` -> bin
+  target 55 passed, 5 failed; integration target 5 passed, 5 failed. All ten
+  failures are the pre-existing `local_calendar` fixture `create_dir` access
+  denied at `src-tauri/src/local_calendar.rs:465`. No native-provider test failed
+  and no access violation occurred.
+* Observed after the fix: network second sample `live`, `connectionType=vpn`,
+  Wi-Fi `disconnected`, VPN `connected`, Bluetooth `available=true`; media
+  `empty` (no active session); volume `live` level 16, muted true; trash `live`
+  0 items/0 bytes; system `ram=64`, `battery=85`, `charging=false`,
+  `uptimeSeconds=49061`, `connectivity.connectionType=vpn`.
+* Volume changes, `trash:empty`, `folder:open:*`, live Wi-Fi association,
+  non-PANGP VPNs, connected Bluetooth audio, live media metadata/progress,
+  permission-denied paths and Computer Use/visual UI remain unverified. The
+  write actions were compiled and their parsing/allowlists are tested, but they
+  were not executed because they change user state or open Explorer.

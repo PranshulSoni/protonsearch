@@ -528,7 +528,10 @@ async fn calendar_forget_source(
     .map_err(|error| error.to_string())?
 }
 fn provider_snapshot_data(provider_id: String) -> Result<Value, String> {
-    if matches!(provider_id.as_str(), "network" | "media") {
+    if matches!(
+        provider_id.as_str(),
+        "network" | "media" | "volume" | "trash"
+    ) {
         return widget_data::snapshot(&provider_id);
     }
     let updated = std::time::SystemTime::now()
@@ -555,6 +558,10 @@ fn provider_snapshot_data(provider_id: String) -> Result<Value, String> {
             } else {
                 (None, None)
             };
+            let connectivity = widget_data::snapshot("network")
+                .ok()
+                .and_then(|snapshot| snapshot.get("data").cloned())
+                .unwrap_or(Value::Null);
             (
                 "live",
                 json!({
@@ -563,7 +570,8 @@ fn provider_snapshot_data(provider_id: String) -> Result<Value, String> {
                     "batteryCharging":charging,
                     "cpu":cpu_usage(),
                     "temperatureC":Value::Null,
-                    "uptimeSeconds":GetTickCount64() / 1000
+                    "uptimeSeconds":GetTickCount64() / 1000,
+                    "connectivity":connectivity
                 }),
                 "",
             )
@@ -1174,6 +1182,7 @@ mod tests {
             "batteryCharging",
             "temperatureC",
             "uptimeSeconds",
+            "connectivity",
         ] {
             assert!(snapshot["data"].get(key).is_some(), "missing {key}");
         }
@@ -1184,13 +1193,50 @@ mod tests {
             snapshot["data"]["batteryCharging"].is_boolean()
                 || snapshot["data"]["batteryCharging"].is_null()
         );
+        let connectivity = &snapshot["data"]["connectivity"];
+        assert!(connectivity.is_object() || connectivity.is_null());
+        if connectivity.is_object() {
+            assert!(["wifi", "ethernet", "vpn", "none"]
+                .contains(&connectivity["connectionType"].as_str().unwrap()));
+            assert!(connectivity["wifi"]["state"].is_string());
+        }
         println!(
-            "System provider: cpu={}, ram={}, battery={}, charging={}, uptime={}s",
+            "System provider: cpu={}, ram={}, battery={}, charging={}, uptime={}s, connectivity={}",
             snapshot["data"]["cpu"],
             snapshot["data"]["ram"],
             snapshot["data"]["battery"],
             snapshot["data"]["batteryCharging"],
-            snapshot["data"]["uptimeSeconds"]
+            snapshot["data"]["uptimeSeconds"],
+            snapshot["data"]["connectivity"]["connectionType"]
+        );
+    }
+    #[test]
+    fn volume_and_trash_providers_are_routed_and_shaped() {
+        let volume = provider_snapshot_data("volume".into()).unwrap();
+        assert!(["live", "empty", "unsupported", "permission-denied"]
+            .contains(&volume["status"].as_str().unwrap()));
+        if volume["status"] == "live" {
+            assert!(volume["data"]["level"].as_u64().unwrap() <= 100);
+            assert!(volume["data"]["muted"].is_boolean());
+            assert!(volume["data"]["device"].is_string());
+        }
+        let trash = provider_snapshot_data("trash".into()).unwrap();
+        assert!(["live", "unsupported", "permission-denied"]
+            .contains(&trash["status"].as_str().unwrap()));
+        if trash["status"] == "live" {
+            assert!(trash["data"]["itemCount"].is_u64());
+            assert!(trash["data"]["sizeBytes"].is_u64());
+            assert!(trash["data"]["lastEmptiedAt"].is_null());
+        }
+        println!(
+            "Volume provider: status={}, level={}, muted={}, device={}; trash: status={}, items={}, bytes={}",
+            volume["status"],
+            volume["data"]["level"],
+            volume["data"]["muted"],
+            volume["data"]["device"],
+            trash["status"],
+            trash["data"]["itemCount"],
+            trash["data"]["sizeBytes"]
         );
     }
     #[test]

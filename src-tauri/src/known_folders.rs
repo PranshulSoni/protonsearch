@@ -163,6 +163,26 @@ pub(crate) fn is_local_absolute_path(path: &Path) -> bool {
         && bytes[1] == b':'
         && matches!(bytes[2], b'\\' | b'/')
 }
+pub(crate) fn folder_path(id: &str) -> Option<PathBuf> {
+    if id == "projects" {
+        if let Ok(documents) = known_folder_path(&FOLDERID_Documents) {
+            let path = documents.join("Projects");
+            if valid_folder(&path) {
+                return Some(path);
+            }
+        }
+        let path = known_folder_path(&FOLDERID_Profile).ok()?.join("Projects");
+        return valid_folder(&path).then_some(path);
+    }
+    STANDARD_FOLDERS
+        .iter()
+        .find(|folder| folder.0 == id)
+        .and_then(|folder| known_folder_path(&folder.3).ok())
+        .filter(|path| valid_folder(path))
+}
+fn valid_folder(path: &Path) -> bool {
+    is_local_absolute_path(path) && path.is_dir() && path.to_str().is_some()
+}
 fn collect_recent(folders: &[FolderRecord]) -> Vec<Value> {
     let mut files = Vec::new();
     let mut seen = HashSet::new();
@@ -291,6 +311,37 @@ mod tests {
         assert!(!is_local_absolute_path(Path::new(r"C:relative")));
         assert!(!is_local_absolute_path(Path::new(r"relative\path")));
         assert!(!is_local_absolute_path(Path::new(r"C:\")));
+    }
+    #[test]
+    fn folder_open_allowlist_rejects_paths_and_unknown_ids() {
+        for id in [
+            "",
+            "..",
+            "../Windows",
+            r"C:\Windows",
+            "desktop/../..",
+            r"documents\..",
+            "shell:startup",
+        ] {
+            assert!(folder_path(id).is_none(), "unexpected folder for {id}");
+        }
+    }
+    #[test]
+    fn known_folder_ids_resolve_only_to_existing_local_directories() {
+        for id in [
+            "desktop",
+            "documents",
+            "downloads",
+            "pictures",
+            "screenshots",
+            "projects",
+        ] {
+            if let Some(path) = folder_path(id) {
+                assert!(is_local_absolute_path(&path), "{id} is not local");
+                assert!(path.is_dir(), "{id} is not a directory");
+                assert!(path.to_str().is_some(), "{id} is not Unicode");
+            }
+        }
     }
     #[test]
     fn recent_file_kinds_cover_the_widget_groups() {
