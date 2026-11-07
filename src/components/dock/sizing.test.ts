@@ -32,8 +32,16 @@ describe('tile sizing', () => {
       '--icon-size': '46px',
       '--dock-glyph-scale': '1.000',
     });
-    expect(slotStyle({ width: 80, height: 64 })).toMatchObject({ '--dock-glyph-scale': '1.391' });
-    expect(slotStyle({ width: 32, height: 96 })).toMatchObject({ '--dock-glyph-scale': '0.696' });
+    expect(slotStyle({ width: 80, height: 64 })).toEqual({
+      '--icon-width': '80px',
+      '--icon-size': '64px',
+      '--dock-glyph-scale': '1.391',
+    });
+    expect(slotStyle({ width: 32, height: 96 })).toEqual({
+      '--icon-width': '32px',
+      '--icon-size': '96px',
+      '--dock-glyph-scale': '0.696',
+    });
   });
 
   it('largestTile returns the widest and tallest sizes', () => {
