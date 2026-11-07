@@ -1,0 +1,405 @@
+:root {
+  --dock-tile: 46px;
+  --dock-tile-radius: 11px;
+  --dock-rail: 60px;
+  --dock-gap: 6px;
+  --dock-glass: rgba(14, 20, 32, 0.78);
+  --dock-glass-border: rgba(255, 255, 255, 0.14);
+  --dock-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --dock-pop: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --dock-focus: #0a84ff;
+}
+
+.dock-final {
+  height: 146px;
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+
+.dock-final-shelf {
+  transition: opacity 120ms ease-out;
+}
+
+.dock-final[data-hot="true"] .dock-final-shelf {
+  opacity: 0;
+}
+
+.dock-final[data-hot="true"] .dock-final-shelf > * {
+  pointer-events: none;
+}
+
+.dock-final-rail {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  height: var(--dock-rail);
+  max-width: calc(100vw - 32px);
+  gap: var(--dock-gap);
+  padding: 0 7px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  overflow: visible;
+  transition: none;
+}
+
+.dock-final-rail::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--mag-before, 0px));
+  right: calc(-1 * var(--mag-after, 0px));
+  pointer-events: none;
+  border: 1px solid var(--dock-glass-border);
+  border-radius: 18px;
+  background: var(--dock-glass);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 8px 20px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(40px) saturate(190%) contrast(104%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%) contrast(104%);
+  transition:
+    left 140ms var(--dock-spring),
+    right 140ms var(--dock-spring),
+    top 140ms var(--dock-spring),
+    bottom 140ms var(--dock-spring);
+}
+
+.dock-final-slot {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: var(--dock-tile);
+  height: var(--dock-tile);
+  border-radius: var(--dock-tile-radius);
+  background: none;
+  outline: none;
+  cursor: default;
+  transition: none;
+}
+
+.dock-final-slot:hover {
+  background: none;
+}
+
+.dock-final-slot:focus-visible {
+  outline: none;
+}
+
+.dock-final-slot--group {
+  width: auto;
+}
+
+.dock-group {
+  display: flex;
+  gap: var(--dock-gap);
+  height: 100%;
+}
+
+.dock-cell {
+  position: relative;
+  flex: 0 0 var(--dock-tile);
+  width: var(--dock-tile);
+  height: var(--dock-tile);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  cursor: default;
+}
+
+.dock-tile {
+  --fw-dim: #6f747b;
+  --fw-green: #5fd99a;
+  --fw-amber: #f0bd6a;
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: var(--dock-tile);
+  height: var(--dock-tile);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--dock-tile-radius);
+  background:
+    linear-gradient(160deg, rgba(var(--fw-tint-rgb, 195, 201, 209), 0.34), rgba(var(--fw-tint-rgb, 195, 201, 209), 0.1)),
+    rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  color: var(--fw-tint, #c3c9d1);
+  transform-origin: 50% 100%;
+  transform: translate(var(--shift, 0px), 0) scale(var(--mag, 1));
+  transition:
+    transform 140ms var(--dock-spring),
+    border-color 160ms var(--dock-spring),
+    filter 120ms ease-out;
+  will-change: transform;
+}
+
+.dock-tile--app {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.dock-tile.is-off > svg,
+.dock-tile.is-off .dock-weather {
+  opacity: 0.55;
+}
+
+.dock-cell:hover > .dock-tile {
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.dock-cell:active > .dock-tile {
+  filter: brightness(0.82);
+}
+
+.dock-cell:focus-visible > .dock-tile {
+  outline: 2px solid var(--dock-focus);
+  outline-offset: 2px;
+}
+
+.dock-glyph-value {
+  font: 600 13px/1 "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  color: #fff;
+  letter-spacing: -0.2px;
+}
+
+.dock-weather {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.dock-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+}
+
+.dock-ring > svg {
+  position: absolute;
+  inset: 0;
+}
+
+.dock-ring-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 3;
+}
+
+.dock-ring-fill {
+  fill: none;
+  stroke: var(--fw-tint, #74b7ff);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.dock-ring--warn .dock-ring-fill {
+  stroke: #f0bd6a;
+}
+
+.dock-ring-center {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.dock-ring-center .dock-glyph-value {
+  font-size: 11px;
+}
+
+.dock-clock-face {
+  fill: rgba(255, 255, 255, 0.94);
+}
+
+.dock-clock-tick {
+  stroke: rgba(20, 22, 26, 0.5);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.dock-clock-hour {
+  stroke: #14161a;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.dock-clock-minute {
+  stroke: #14161a;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.dock-clock-second {
+  stroke: #ff9f0a;
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.dock-clock-pin {
+  fill: #ff9f0a;
+}
+
+.dock-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: #ff453a;
+  color: #fff;
+  font: 700 10.5px/18px "Segoe UI", sans-serif;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.dock-tile > .fw-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.dock-level {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 7px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.dock-level > span {
+  display: block;
+  height: 100%;
+  background: currentColor;
+}
+
+.dock-eq {
+  position: absolute;
+  bottom: 7px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 8px;
+}
+
+.dock-eq i {
+  width: 2px;
+  height: 3px;
+  border-radius: 1px;
+  background: currentColor;
+  animation: dock-eq 900ms ease-in-out infinite alternate;
+}
+
+.dock-eq i:nth-child(2) {
+  animation-delay: -300ms;
+}
+
+.dock-eq i:nth-child(3) {
+  animation-delay: -600ms;
+}
+
+@keyframes dock-eq {
+  to {
+    height: 8px;
+  }
+}
+
+.dock-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 4;
+  padding: 4px 10px;
+  max-width: 280px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(16, 22, 34, 0.9);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.96);
+  font: 500 12px/16px "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(calc(-50% + var(--shift, 0px)), calc(-46px * (var(--mag, 1) - 1)));
+  transition:
+    opacity 120ms ease-out,
+    transform 140ms var(--dock-spring);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-cell:hover > .dock-tip,
+.dock-cell:focus-visible > .dock-tip {
+  opacity: 1;
+}
+
+.dock-dot {
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+  transform: translateX(calc(-50% + var(--shift, 0px)));
+  transition: transform 140ms var(--dock-spring);
+}
+
+.dock-final[data-appearance="lines"] .dock-tile:not(.dock-tile--app) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dock-final[data-appearance="lines"] .dock-final-slot:not(:first-child)::before {
+  left: -4px;
+  top: 10px;
+  bottom: 10px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-tile,
+  .dock-tip,
+  .dock-dot,
+  .dock-final-rail::after,
+  .dock-final-shelf {
+    transition: none;
+  }
+
+  .dock-tile {
+    transform: none;
+  }
+
+  .dock-tip {
+    transform: translate(-50%, 0);
+  }
+
+  .dock-dot {
+    transform: translateX(-50%);
+  }
+
+  .dock-eq i {
+    animation: none;
+    height: 6px;
+  }
+}

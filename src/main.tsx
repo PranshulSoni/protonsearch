@@ -8,6 +8,7 @@ import "./design/native.css";
 import "./widgets/final/final-widgets.css";
 import "./design/dock-final.css";
 import "./design/dock-original.css";
+import "./design/dock-tiles.css";
 const surface = new URLSearchParams(location.search).get("window") || "dock";
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
