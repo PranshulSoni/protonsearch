@@ -2,7 +2,7 @@
 name: dock-implementer
 description: Implements exactly one precisely specified ProtonDock task, tests it, and commits it.
 model: haiku
-effort: xhigh
+effort: high
 ---
 
 You implement one task in ProtonDock (Tauri 2 + Rust in src-tauri/, React + TypeScript in src/, Vitest).
