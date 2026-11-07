@@ -404,7 +404,7 @@ body[data-theme="light"] .theme-btn.is-active {
   background: none;
   font-family: inherit;
   color: inherit;
-  cursor: grab;
+  cursor: pointer;
   border-radius: var(--tile-radius);
   transition: width var(--speed-rail) var(--ease), transform 220ms var(--ease);
 }
@@ -707,68 +707,15 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   text-overflow: ellipsis;
 }
 
-/* In-dock reorder arrows on hover */
-.dw-reorder-nav {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  right: 2px;
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  pointer-events: auto;
-  z-index: 6;
-}
-.dock-slot:hover .dw-reorder-nav {
-  display: flex;
-}
-.dw-nav-btn {
-  appearance: none;
-  border: 0;
-  background: rgba(14, 17, 24, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: var(--text-2);
-  font-size: 9px;
-  line-height: 1;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
+/* Clean Pristine Dock: Hover arrows removed; all repositioning & resizing operates exclusively in Edit Mode */
+.dock-slot {
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.dw-nav-btn:hover {
-  color: #fff;
-  background: rgba(30, 36, 48, 0.95);
-  border-color: rgba(255, 255, 255, 0.35);
+.dock-rail.is-editing .dock-slot {
+  cursor: grab;
 }
-
-/* Quick width expand indicator on hover */
-.dw-expand-btn {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: rgba(14, 17, 24, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: var(--text-2);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  font-size: 8px;
-  cursor: pointer;
-  z-index: 6;
-}
-.dock-slot:hover .dw-expand-btn {
-  display: flex;
-}
-.dw-expand-btn:hover {
-  background: rgba(30, 36, 48, 0.95);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.35);
+.dock-rail.is-editing .dock-slot:active {
+  cursor: grabbing;
 }
 
 /* Tooltips */
@@ -3267,14 +3214,10 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       /* If running apps: expand each application as its own discrete 48px square tile */
       if (id === 'running-apps') {
         runningApps.forEach(function (app, appIdx) {
-          html += '<button class="dock-slot dock-slot-app" data-id="app-' + app.id + '" data-app-id="' + app.id + '" data-app-idx="' + appIdx + '" data-shape="square" style="--w:48px" draggable="true" type="button" aria-label="' + escapeHtml(app.name) + '">' +
+          html += '<button class="dock-slot dock-slot-app" data-id="app-' + app.id + '" data-app-id="' + app.id + '" data-app-idx="' + appIdx + '" data-shape="square" style="--w:48px" ' + (isEditMode ? 'draggable="true"' : 'draggable="false"') + ' type="button" aria-label="' + escapeHtml(app.name) + '">' +
             '<span class="dock-widget">' +
               '<span class="w-glyph-box">' +
                 app.icon +
-              '</span>' +
-              '<span class="dw-reorder-nav">' +
-                '<span class="dw-nav-btn sub-nav-btn" data-sub-move="-1" data-sub-idx="' + appIdx + '" title="Move Left">&lsaquo;</span>' +
-                '<span class="dw-nav-btn sub-nav-btn" data-sub-move="1" data-sub-idx="' + appIdx + '" title="Move Right">&rsaquo;</span>' +
               '</span>' +
             '</span>' +
             '<span class="dock-dot"></span>' +
@@ -3289,7 +3232,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         pinnedAppIds.forEach(function (pId) {
           var pApp = INSTALLED_APPS.find(function (a) { return a.id === pId; });
           if (!pApp) return;
-          html += '<button class="dock-slot dock-slot-pinned" data-id="pinned-' + pApp.id + '" data-pinned-id="' + pApp.id + '" data-shape="square" style="--w:48px" draggable="true" type="button" aria-label="Pinned: ' + escapeHtml(pApp.name) + '">' +
+          html += '<button class="dock-slot dock-slot-pinned" data-id="pinned-' + pApp.id + '" data-pinned-id="' + pApp.id + '" data-shape="square" style="--w:48px" ' + (isEditMode ? 'draggable="true"' : 'draggable="false"') + ' type="button" aria-label="Pinned: ' + escapeHtml(pApp.name) + '">' +
             '<span class="dock-widget">' +
               '<span class="w-glyph-box">' +
                 pApp.icon +
@@ -3304,7 +3247,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       var width = getWidth(id);
       var shape = width > 52 ? 'rect' : 'square';
 
-      html += '<button class="dock-slot" data-id="' + id + '" data-index="' + idx + '" data-shape="' + shape + '" style="--w:' + width + 'px" draggable="true" type="button" aria-label="' + escapeHtml(w.title) + '">' +
+      html += '<button class="dock-slot" data-id="' + id + '" data-index="' + idx + '" data-shape="' + shape + '" style="--w:' + width + 'px" ' + (isEditMode ? 'draggable="true"' : 'draggable="false"') + ' type="button" aria-label="' + escapeHtml(w.title) + '">' +
         '<span class="dock-widget">' +
           '<span class="w-glyph-box">' +
             renderWidgetGlyph(w) +
@@ -3327,13 +3270,10 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
               '</span>'
             )
           ) : '') +
-          '<span class="dw-reorder-nav">' +
-            '<span class="dw-nav-btn" data-move="-1" title="Move Left">&lsaquo;</span>' +
-            '<span class="dw-nav-btn" data-move="1" title="Move Right">&rsaquo;</span>' +
-          '</span>' +
-          '<span class="dw-expand-btn" title="Toggle Square / Rectangle" data-toggle-id="' + id + '">&#x2194;</span>' +
         '</span>' +
-        '<span class="dw-resize-chip" data-resize-id="' + id + '" title="Resize Widget (' + width + 'px)">+</span>' +
+        '<span class="dw-resize-chip" data-resize-id="' + id + '" title="Resize Widget (' + width + 'px)">' +
+          '<svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor"><path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-4zm13 0a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0 0 1h3.5zm-13 14a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-1 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 0-1h-3.5zm13 0a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h4z"/></svg>' +
+        '</span>' +
         (w.hasDot ? '<span class="dock-dot"></span>' : '') +
         '<span class="dock-tip">' + escapeHtml(w.title) + '</span>' +
       '</button>';
@@ -3475,54 +3415,14 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         }
       });
 
-      /* Double-click toggles width between 48px square and 124px rectangle */
-      slot.addEventListener('dblclick', function (e) {
-        if (slot.classList.contains('dock-slot-app') || slot.classList.contains('dock-slot-pinned')) return;
-        e.stopPropagation();
-        toggleWidgetWidth(id);
-      });
+      /* Pristine dock: Hover arrows removed; all repositioning & resizing operates exclusively in Edit Mode */
 
-      /* Quick expand button */
-      var expandBtn = slot.querySelector('.dw-expand-btn');
-      if (expandBtn) {
-        expandBtn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          toggleWidgetWidth(id);
-        });
-      }
-
-      /* In-dock navigation arrows for widgets */
-      var navBtns = slot.querySelectorAll('.dw-nav-btn:not(.sub-nav-btn)');
-      navBtns.forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var delta = parseInt(btn.dataset.move, 10);
-          moveWidgetPosition(id, delta);
-        });
-      });
-
-      /* In-dock navigation arrows for running apps */
-      if (slot.classList.contains('dock-slot-app')) {
-        var subNavBtns = slot.querySelectorAll('.sub-nav-btn');
-        subNavBtns.forEach(function (btn) {
-          btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            var delta = parseInt(btn.dataset.subMove, 10);
-            var curIdx = parseInt(btn.dataset.subIdx, 10);
-            var nextIdx = curIdx + delta;
-            if (nextIdx >= 0 && nextIdx < runningApps.length) {
-              var temp = runningApps[curIdx];
-              runningApps[curIdx] = runningApps[nextIdx];
-              runningApps[nextIdx] = temp;
-              saveState();
-              renderDock();
-            }
-          });
-        });
-      }
-
-      /* Drag and drop reordering */
+      /* Drag and drop reordering (only active in Edit Mode) */
       slot.addEventListener('dragstart', function (e) {
+        if (!isEditMode) {
+          e.preventDefault();
+          return false;
+        }
         draggedSlotId = id;
         slot.classList.add('is-dragging');
         e.dataTransfer.effectAllowed = 'move';
@@ -3929,11 +3829,15 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     if (dockEditToggle) {
       dockEditToggle.classList.toggle('is-active', isEditMode);
       dockEditToggle.setAttribute('aria-pressed', isEditMode ? 'true' : 'false');
+      dockEditToggle.innerHTML = isEditMode
+        ? '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 8 6.5 11.5 13 4.5"/></svg><span>Done</span>'
+        : '<svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L4.5 13.5 2 14l.5-2.5 9-9z"/></svg><span>Edit</span>';
     }
     if (rail) {
       rail.classList.toggle('is-editing', isEditMode);
     }
-    showToast(isEditMode ? 'Edit Mode: Click any widget to resize' : 'Edit Mode exited');
+    renderDock(true);
+    showToast(isEditMode ? 'Edit Mode active: Drag to reorder, click to resize' : 'Edit Mode saved');
   }
 
   if (dockEditToggle) {

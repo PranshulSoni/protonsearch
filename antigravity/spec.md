@@ -40,12 +40,14 @@
    - Measuring new width and running a smooth CSS spring transition on the dock rail container: `transition: width 380ms cubic-bezier(0.16, 1, 0.3, 1)`.
    - Sibling widgets glide horizontally into position via FLIP transforms (`translateX(dx)` -> `0`).
    - Entering widgets scale smoothly from `scale(0.85)` and `opacity: 0` to `scale(1.0)` and `opacity: 1`.
-3. **In-Place Widget Resizing & Edit Mode**:
-   - Activated via top-shelf `Edit` pill button or shortcut.
-   - Reveals an Apple-style discrete resize control on each widget (`.dw-resize-chip`).
-   - Cycling width between `48px` (Square), `96px` (Compact), `140px` (Standard), and `168px` (Wide).
-   - Dynamic width expansion triggers FLIP spring transitions on neighboring widgets and the dock container.
-   - Strict height invariant (`--tile-h: 48px`) is maintained without vertical shifting.
+3. **In-Place Widget Resizing & Edit Mode Contract**:
+   - **Pristine Normal Mode**: Zero hover navigation arrows, zero expand buttons, zero accidental dragging. Clicking any widget triggers launch or anchored popovers.
+   - **Explicit Edit Mode Activation**: Clicking the top-shelf `Edit` pill button toggles edit mode and changes button label to `Done`.
+   - **Direct Manipulation Reordering**: Slots become draggable (`draggable="true"` with `cursor: grab`) exclusively in edit mode.
+   - **In-Place Resizing**: Clicking any widget or its top-right resize chip (`.dw-resize-chip`) cycles widths between `48px` (Square), `96px` (Compact), `140px` (Standard), and `168px` (Wide).
+   - **Fluid Physical Spring Transitions**: Dynamic width shifts animate the outer dock rail and slide sibling widgets via FLIP spring physics (`cubic-bezier(0.16, 1, 0.3, 1)`).
+   - **Height Invariant Guarantee**: Height strictly remains locked at `48px` across all sizing transitions.
+   - **Layout Locking**: Clicking `Done` or pressing `Escape` exits edit mode and synchronizes preferences to local storage.
 
 ---
 
