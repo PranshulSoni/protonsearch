@@ -1,6 +1,7 @@
 # ProtonDock macOS (Tahoe) Dock Pass - Implementation Plan
 
-Date: 2026-11-07. Branch: `dock`. Status: planned; nothing implemented or verified.
+Date: 2026-11-07. Branch: `dock`. Status: T1.1, T1.2, T1.4 landed and reviewed (nothing natively verified). Amended 2026-11-07 to follow
+`preview-tahoe-glass.html` sizing instead of fixed 46px squares (items marked "(amended: preview sizing)").
 Workflow: Haiku (`dock-implementer`) implements one task, Sonnet (`dock-reviewer`) reviews it, Sonnet
 (`dock-integrator`) runs the integration checkpoint (IC) that closes each phase.
 
@@ -15,6 +16,9 @@ Workflow: Haiku (`dock-implementer`) implements one task, Sonnet (`dock-reviewer
 - Budget: 1-3 source files per task. Tests and named one-line call-site edits ("one-liners") are extra. Exceptions are flagged.
 - `src-tauri/src/running_apps.rs` and `window_geometry.rs` are untracked; their first commit adds the whole file (expected).
 - `src/widgets/final/*` sources must stay free of en/em dashes and emoji (test enforced). Use ASCII punctuation in new strings.
+- vitest excludes `scripts/**` (commit 6b5ae94): plain Node scripts there run with `node`, never through `npm test`. `scripts/tahoe-preview.test.mjs`
+  (jsdom; `node scripts/tahoe-preview.test.mjs`) pins the behaviour of `preview-tahoe-glass.html`, including its sizing controls. The app mirrors that
+  sizing behaviour (decision 11); the script never tests the app. Do not edit the preview or the script.
 - graphify-out is stale (built from 5be3ef09): read named files directly. Integrators run `graphify update .` and never commit graphify-out.
 - CONTRACT.md: the renderer never sends paths, commands or URIs; Rust validates every ID. Absent data renders `--`, a dimmed glyph or an honest label.
 - Every animation/transition has a `prefers-reduced-motion: reduce` off-switch. Every control keeps a focus ring (`2px solid #0a84ff`, offset 2px) and a name.
@@ -23,13 +27,14 @@ Workflow: Haiku (`dock-implementer`) implements one task, Sonnet (`dock-reviewer
 
 ## 1. Decisions (no judgment left to implementers)
 
-1. Every widget is a 46px square tile in a 60px glass rail. Size (Pill/Tile/Card) no longer changes the dock; size controls leave Customize;
-   saved `size` stays in the layout and is still sent to `open_widget_card`.
+1. Every widget is a rounded tile in a glass rail: 46px square in a 60px rail by default (amended: preview sizing - tile width and height are
+   configurable, decision 11; rail thickness is the tallest tile + 14). Size (Pill/Tile/Card) no longer changes the dock; size controls leave
+   Customize; saved `size` stays in the layout and is still sent to `open_widget_card`.
 2. Click: Start tile opens the Windows Start menu, Search opens Spotlight, others open their card. Right-click or Shift+F10 opens any card.
    Group squares (running/pinned apps): click activates/launches, right-click opens the group card; an empty group shows one dimmed placeholder.
 3. Magnification: macOS fisheye, on by default, togglable, off under reduced motion.
-4. `dock` placement (`edge`, `align`, `magnify`) and `pinned` app IDs are global (layout v3). Alignment positions the content-sized dock along
-   its edge; magnification grows away from the aligned side.
+4. `dock` placement (`edge`, `align`, `magnify`, plus the global tile sizes `iconSize` and `iconWidth`, decision 11) and `pinned` app IDs are global
+   (layout v3). Alignment positions the content-sized dock along its edge; magnification grows away from the aligned side.
 5. While the rail is hot (hovered/focused) the profile shelf fades out and the native hit region grows for magnified tiles and tooltips;
    it shrinks 240ms after pointer/focus leave.
 6. Pinned ID = `app-` + 16 lowercase hex FNV-1a-64 of the lowercased AppsFolder parsing name; max 24. Rust reads them from the saved layout.
@@ -37,16 +42,28 @@ Workflow: Haiku (`dock-implementer`) implements one task, Sonnet (`dock-reviewer
 8. A running pinned app gets a dot and still appears in Running Apps (merging is out of scope).
 9. Pinned Apps is a final-system widget. `npm run widget:create` targets the legacy SDK registry the dock no longer renders, so it is not used (T10.2 records it).
 10. Old `.fw-dock*` rules in final-widgets.css become unused; left for a follow-up deletion (STATUS note).
+11. (amended: preview sizing) Tile sizing mirrors `preview-tahoe-glass.html`, pinned by `scripts/tahoe-preview.test.mjs`:
+    - Global `iconSize` = tile height (`--icon-size`), integer 32-64, default 46. Global `iconWidth` = tile width (`--icon-width`), integer 32-96, default
+      = `iconSize` when absent or invalid. They are independent: changing one never moves the other. Controls use step 2.
+    - Per-widget `tileWidth` (integer 32-200) and `tileHeight` (integer 32-96) on a profile item override the globals for that widget only, per profile.
+      A non-integer or out-of-range value is ignored, never clamped, on load and on edit (the preview's `resizePreviewWidget` rejects it the same way).
+      The preview has no per-widget reset; the app's existing "Reset to defaults" also clears them (T4.4).
+    - Every slot always carries its resolved `--icon-width` and `--icon-size` plus `--dock-glyph-scale = min(width, height) / 46` (3 decimals), which
+      scales glyphs and app icons. Width stays horizontal and height stays vertical on every edge (no swap); along the axis the rail sums widths
+      (bottom) or heights (left/right), and its thickness is the tallest (bottom) or widest (left/right) tile + 14.
+12. (amended: preview sizing) Native allowances derive from the configured tiles, never from 46/60/146: section 2 (Bottom stage, Allowances) and `fit.ts`
+    (T2.1). Magnification stays transform-based; the preview reflows cells in layout and thickens its rail, and only its sizing semantics are mirrored.
 
 ## 2. Design contract
 
 | Item | Value |
 |---|---|
-| Rail | 60px, radius 18px, padding `0 7px` (vertical `7px 0`), gap 6px; glass `rgba(14,20,32,.78)`; border `1px rgba(255,255,255,.14)`; shadow `0 24px 60px rgba(0,0,0,.55), 0 8px 20px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.32)`; `backdrop-filter: blur(40px) saturate(190%) contrast(104%)` |
-| Tile | 46x46, radius 11px, border `1px rgba(255,255,255,.14)`, background `linear-gradient(160deg, rgba(var(--fw-tint-rgb),.34), rgba(var(--fw-tint-rgb),.10)), rgba(255,255,255,.06)`, shadow `0 4px 10px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.24)`; app squares `rgba(255,255,255,.08)` + 32px icon |
-| Bottom stage | window 146px tall: 14px bottom inset, rail 60, headroom 64; shelf 8px above the rail |
-| Magnify | `s(d) = 1 + 0.55*(1 + cos(PI*d/150))/2` for `abs(d) < 150`, else 1 (peak 1.55 = 71px); neighbours shift by the extra width; origin bottom-center / left-center / right-center; rAF; `transform 140ms cubic-bezier(0.16,1,0.3,1)` |
-| Allowances | MAG_ALONG 80px along the axis; MAG_HEADROOM 64px inward |
+| Rail (amended: preview sizing) | thickness = tallest (bottom) or widest (left/right) tile + 14: 60px at the default tile; radius 18px, padding `7px`, gap 6px; glass `rgba(14,20,32,.78)`; border `1px rgba(255,255,255,.14)`; shadow `0 24px 60px rgba(0,0,0,.55), 0 8px 20px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.32)`; `backdrop-filter: blur(40px) saturate(190%) contrast(104%)` |
+| Tile (amended: preview sizing) | `var(--icon-width)` x `var(--icon-size)`, 46x46 by default, radius 24% (11px at 46), border `1px rgba(255,255,255,.14)`, background `linear-gradient(160deg, rgba(var(--fw-tint-rgb),.34), rgba(var(--fw-tint-rgb),.10)), rgba(255,255,255,.06)`, shadow `0 4px 10px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.24)`; app squares `rgba(255,255,255,.08)` + 32px icon |
+| Sizing (amended: preview sizing) | global height `iconSize` 32-64 (default 46); global width `iconWidth` 32-96 (default = height); per-widget `tileWidth` 32-200 and `tileHeight` 32-96; integers, step 2 in controls, invalid values ignored; glyph and app-icon scale `--dock-glyph-scale = min(width, height) / 46`; every pixel value in this table is at the default 46px tile |
+| Bottom stage (amended: preview sizing) | window height = 14px bottom inset + rail + headroom + 8px top margin (146px at the default tile: 14 + 60 + 64 + 8); shelf 8px above the rail |
+| Magnify | `s(d) = 1 + 0.55*(1 + cos(PI*d/150))/2` for `abs(d) < 150`, else 1 (peak 1.55 x the configured tile = 71px at 46); neighbours shift by the extra width; origin bottom-center / left-center / right-center; rAF; `transform 140ms cubic-bezier(0.16,1,0.3,1)` |
+| Allowances (amended: preview sizing) | along the axis `magAlong(a) = max(80, ceil(0.55 * a) + 24)` for the largest along-size `a`; inward `magHeadroom(c) = ceil(0.55 * c) + 38` for the largest cross-size `c` (tooltip 10px gap + 24px box + 4px slack); integer math, so 80 and 64 at the default tile |
 | Tooltip | 10px past the tile, follows magnification; padding `4px 10px`, radius 8px, `500 12px/16px "Segoe UI Variable Text"`, `rgba(255,255,255,.96)` on `rgba(16,22,34,.90)`, border `1px rgba(255,255,255,.14)`, shadow `0 8px 20px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.18)`, opacity 120ms ease-out, max-width 280px ellipsis |
 | Running dot | 4px `rgba(255,255,255,.85)`, 5px outside the square on the screen-edge side |
 | Easing | `--dock-spring: cubic-bezier(0.16,1,0.3,1)`; `--dock-pop: cubic-bezier(0.34,1.36,0.64,1)` |
@@ -64,7 +81,8 @@ smoke look; native behaviour is only accepted through Phase 11.
 
 ## Phase 1 - Square tiles and glyphs
 
-Parallel-safe: T1.1 and T1.4. T1.2 needs T1.1; T1.3 needs T1.2.
+Landed and approved: T1.1, T1.2, T1.4. Remaining order (amended: preview sizing): T1.5 and T1.6 (disjoint, either order), then T1.3 (needs T1.2 and
+T1.5; disjoint from T1.6), then IC1.
 
 ### T1.1 Glyph primitives [TS]
 - **Files:** `src/widgets/final/glyphs.tsx` (new). Test: `src/widgets/final/glyphs.test.tsx` (new, jsdom).
@@ -111,8 +129,9 @@ Parallel-safe: T1.1 and T1.4. T1.2 needs T1.1; T1.3 needs T1.2.
   itemCount 3: badge `3`; 0: no badge; 16:05 with hour12 false: img `16:05`).
 - **Verify:** TS. **Commit:** `feat(dock): render widgets as 46px glyph tiles`
 
-### T1.3 Tile slots and app groups [TS]
+### T1.3 Tile slots and app groups [TS] (amended: preview sizing, Search dispatch test)
 - **Files:** `src/components/dock/DockGroup.tsx` (new), `src/components/dock/DockSurface.tsx`. Tests: `DockGroup.test.tsx` (new), `DockSurface.test.tsx`, `DockShell.test.tsx`.
+  Imports `DEFAULT_TILE`, `slotStyle`, type `TileSize` from `./sizing` (T1.5).
 - **Spec:** `export interface DockGroupItem { id: string; title: string; icon: string | null; running: boolean }`;
   `DockGroup({ label, placeholder: FinalIconName, items, disabled = false, onOpen(id), onCard(anchor: HTMLElement) })`. Empty items: one
   `<button className="dock-cell" aria-label={\`Open ${label} card\`}>` with `<span className="dock-tile dock-tile--app is-off"><Icon name={placeholder} size={22}/></span>`
@@ -128,11 +147,19 @@ Parallel-safe: T1.1 and T1.4. T1.2 needs T1.1; T1.3 needs T1.2.
   `<div className="dock-final-slot dock-cell" data-widget-id role="button" tabIndex>` with `<DockWidget/>` and `<span className="dock-tip" aria-hidden="true">{meta.title}</span>`;
   `primary = dockActionFor(id)`; aria-label `Open Start` / `Open Spotlight search` / `Open ${meta.title} card`; click and Enter/Space run
   `performWidgetAction(primary)` or `openCard`; `onContextMenu` preventDefault + `openCard`. Remove the `closest('button')` guard.
+  Sizes: module-level `function sizeOf(_item: DockItem): TileSize { return DEFAULT_TILE; }` (T4.3 gives it the layout; no other change then); every
+  `.dock-final-slot` root (single widgets and the group wrapper) gets `style={slotStyle(sizeOf(item))}`. `DockGroup` takes no size prop: its cells inherit
+  the slot's custom properties.
 - **Tests:** DockGroup: `renders safe icons, tooltips and running dots` (data-URL Chrome running + `https://x/y.png` Code: 1 `img.fw-app-img`,
   1 `.dock-dot`, tips `Chrome`,`Code`); `click opens and right-click asks for the card`; `empty group shows a placeholder that opens the card`.
   DockSurface: delete both width tests and the `DOCK_*` import; add `renders single widgets as tiles and running apps as a group` (preview daily:
   8 `.dock-final-slot.dock-cell`, 4 `.dock-app`, 4 `.dock-dot`, clock tip `Clock`) and `right-click opens a card even for Start` (dialog
-  `Windows Start card`). DockShell: `starts Windows from the Start tile` (invoke `open_start`).
+  `Windows Start card`); `puts the resolved tile size on every slot` (preview daily: each of the 9 `.dock-final-slot` has `style.getPropertyValue`
+  `--icon-width` `46px`, `--icon-size` `46px`, `--dock-glyph-scale` `1.000`). DockShell (`mockCommands(defaultLayout())`, `render(<DockShell />)`,
+  `await screen.findByRole('tab', { name: 'Daily' })`, `fireEvent.click` the slot, then `await waitFor`): `starts Windows from the Start tile`
+  (`[data-widget-id="windows"]`: `invoke` toHaveBeenCalledWith `'open_start'`) and `opens Spotlight from the Search tile` (`[data-widget-id="search"]`:
+  `invoke` toHaveBeenCalledWith `'open_search', { query: '' }`); both also assert
+  `expect(invoke.mock.calls.map(([command]) => command)).not.toContain('open_widget_card')`.
 - **Verify:** TS. **Commit:** `feat(dock): render tiles and running-app groups in the rail`
 
 ### T1.4 Tahoe tile CSS [CSS]
@@ -156,56 +183,136 @@ Parallel-safe: T1.1 and T1.4. T1.2 needs T1.1; T1.3 needs T1.2.
   - Lines mode: `.dock-final[data-appearance="lines"] .dock-tile:not(.dock-tile--app) { border-color:transparent; background:transparent; box-shadow:none }`; `.dock-final[data-appearance="lines"] .dock-final-slot:not(:first-child)::before { left:-4px; top:10px; bottom:10px; background:rgba(255,255,255,.12) }`
   - `@media (prefers-reduced-motion: reduce) { .dock-tile, .dock-tip, .dock-dot, .dock-final-rail::after, .dock-final-shelf { transition:none } .dock-tile { transform:none } .dock-tip { transform:translate(-50%, 0) } .dock-dot { transform:translateX(-50%) } .dock-eq i { animation:none; height:6px } }`
 - **Verify:** TS; `npm run build`. **Commit:** `style(dock): add Tahoe tile, tooltip and dot styles`
+- **Amended by T1.6 (preview sizing):** the landed `--dock-tile`, `--dock-rail`, `--dock-tile-radius: 11px`, the 146px `.dock-final` height, the
+  `0 7px` rail padding and the `-46px` in `.dock-tip` are replaced there. Do not reuse them in later tasks.
+
+### T1.5 Tile sizing helpers [TS] (new: preview sizing)
+- **Files:** `src/components/dock/sizing.ts` (new). Test: `src/components/dock/sizing.test.ts` (new, node environment). No dependencies; T1.3, T2.1, T2.3,
+  T4.1, T4.2, T4.3 and T4.4 import it. Disjoint from T1.6.
+- **Spec:**
+```ts
+import type { CSSProperties } from 'react';
+export interface TileSize { width: number; height: number }
+/** The tile size the pixel values in dock-tiles.css were authored for. */
+export const BASE_TILE = 46;
+export const DEFAULT_TILE: TileSize = { width: BASE_TILE, height: BASE_TILE };
+/** Inclusive integer ranges copied from preview-tahoe-glass.html. */
+export const ICON_SIZE = { min: 32, max: 64 } as const;   // global tile height, --icon-size
+export const ICON_WIDTH = { min: 32, max: 96 } as const;  // global tile width, --icon-width
+export const TILE_WIDTH = { min: 32, max: 200 } as const; // per-widget width override
+export const TILE_HEIGHT = { min: 32, max: 96 } as const; // per-widget height override
+/** The value when it is an integer inside the range, else undefined. Invalid values are rejected, never clamped. */
+export function validInt(value: unknown, range: { min: number; max: number }): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= range.min && value <= range.max ? value : undefined;
+}
+/** A valid per-widget width or height replaces the matching shared (global) dimension. */
+export function tileSize(shared: TileSize, item?: { tileWidth?: unknown; tileHeight?: unknown }): TileSize {
+  return { width: validInt(item?.tileWidth, TILE_WIDTH) ?? shared.width, height: validInt(item?.tileHeight, TILE_HEIGHT) ?? shared.height };
+}
+export function largestTile(sizes: TileSize[]): TileSize {
+  return sizes.reduce((max, s) => ({ width: Math.max(max.width, s.width), height: Math.max(max.height, s.height) }), { width: 0, height: 0 });
+}
+/** Inline custom properties for one slot; the glyph scale follows the smaller side (1.000 at 46). */
+export function slotStyle(size: TileSize): CSSProperties {
+  return { '--icon-width': `${size.width}px`, '--icon-size': `${size.height}px`, '--dock-glyph-scale': (Math.min(size.width, size.height) / BASE_TILE).toFixed(3) } as CSSProperties;
+}
+```
+- **Tests:** `validInt accepts integers inside the range and rejects everything else` (`validInt(32, ICON_SIZE)` is 32, `(64, ICON_SIZE)` is 64;
+  `(31, ICON_SIZE)`, `(65, ICON_SIZE)`, `(46.5, ICON_SIZE)`, `('46', ICON_SIZE)`, `(Number.NaN, ICON_SIZE)`, `(null, ICON_SIZE)`, `(undefined, ICON_SIZE)` are
+  `undefined`; `(200, TILE_WIDTH)` is 200 and `(201, TILE_WIDTH)` is `undefined`; `(96, TILE_HEIGHT)` is 96 and `(97, TILE_HEIGHT)` is `undefined`);
+  `tileSize lets each valid override replace its own dimension` (global `{ width: 80, height: 64 }`: no item -> `{ width: 80, height: 64 }`;
+  `{ tileWidth: 120, tileHeight: 56 }` -> `{ width: 120, height: 56 }`; `{ tileWidth: 999, tileHeight: 56 }` -> `{ width: 80, height: 56 }`;
+  `{ tileWidth: '120', tileHeight: 31 }` -> `{ width: 80, height: 64 }`); `slotStyle exposes the resolved size and the glyph scale` (`{ width: 46, height: 46 }`
+  -> `{ '--icon-width': '46px', '--icon-size': '46px', '--dock-glyph-scale': '1.000' }`; `{ width: 80, height: 64 }` scale `'1.391'`; `{ width: 32, height: 96 }`
+  scale `'0.696'`); `largestTile returns the widest and tallest sizes` (`[{46,46},{80,32},{40,96}]` -> `{ width: 80, height: 96 }`; `[]` -> `{ width: 0, height: 0 }`).
+- **Verify:** TS. **Commit:** `feat(dock): add tile sizing helpers`
+
+### T1.6 Size-aware tile CSS [CSS] (new: preview sizing; amends landed T1.4)
+- **Files:** `src/design/dock-tiles.css` only. T1.2's TSX needs no change: its icon `size` props stay as authored for the 46px tile and the glyph scale below enlarges or shrinks them. Disjoint from T1.3 and T1.5.
+- **Spec:** edit the landed file and nothing else:
+  - `:root`: delete `--dock-tile` and `--dock-rail`; `--dock-tile-radius: 24%`; add `--icon-size: 46px;` and `--icon-width: 46px;` (defaults only: every slot
+    overrides them inline through `slotStyle`).
+  - `.dock-final`: `height: auto;` (was `height: 146px`; the native window is sized by `dockFit`, T2.1); keep `gap: 8px; padding: 0 16px 14px`.
+  - `.dock-final-rail`: `height: auto; min-height: 46px; padding: 7px;` (were `height: var(--dock-rail)` and `padding: 0 7px`). The rail is now as thick as its
+    tallest tile + 14 (60px at 46) and an empty rail keeps a 46px strip.
+  - `.dock-final-slot` and `.dock-tile`: `width: var(--icon-width); height: var(--icon-size);`. `.dock-cell`: `flex: 0 0 var(--icon-width); width: var(--icon-width);
+    height: var(--icon-size);` (all were `var(--dock-tile)`).
+  - After `.dock-tile--app` add (static scaling, not motion, so it also stays under reduced motion; badge, level bar, equalizer and status dot keep their pixel sizes):
+    `.dock-tile > svg, .dock-tile > .dock-weather, .dock-tile > .dock-ring, .dock-tile > .fw-app-img-box { transform: scale(var(--dock-glyph-scale, 1)); }`
+  - `.dock-tip` transform becomes `translate(calc(-50% + var(--shift, 0px)), calc(-1 * var(--icon-size) * (var(--mag, 1) - 1)))` (was `-46px`).
+- **Verify:** TS; `npm run build`; `grep -nE "dock-tile\)|dock-rail\)" src/design/dock-tiles.css` prints nothing; `grep -n "\b46px" src/design/dock-tiles.css` prints
+  exactly three lines (`--icon-size: 46px;`, `--icon-width: 46px;`, `min-height: 46px;`). **Commit:** `style(dock): size tiles from --icon-size and --icon-width`
 
 **IC1:** full gate. Wiring: dock-tiles.css is the last CSS import; DockSurface renders no `.fw-dock`; `views.apps` feeds DockGroup; the
-WidgetManager preview strip shows tiles. Web preview `?window=dock&preview=1`: tiles, tooltips, sample clock face (not native evidence).
+WidgetManager preview strip shows tiles; every `.dock-final-slot` carries `--icon-width`, `--icon-size` and `--dock-glyph-scale` (amended: preview sizing).
+Web preview `?window=dock&preview=1`: tiles, tooltips, sample clock face (not native evidence). Decide the lines-mode hover (amended: review notes):
+the lines rule `.dock-final[data-appearance="lines"] .dock-tile:not(.dock-tile--app)` (specificity 0,4,0; dock-tiles.css:367 before T1.6) beats
+`.dock-cell:hover > .dock-tile` (0,3,0; :157), so non-app tiles show no hover border in lines mode. Either accept it (flat lines mode) or add
+`.dock-final[data-appearance="lines"] .dock-cell:hover > .dock-tile:not(.dock-tile--app) { border-color: rgba(255,255,255,.26); }` to dock-tiles.css; record
+the choice in STATUS (T10.2).
 
 ---
 
 ## Phase 2 - Magnification, hot hit regions, fit geometry
 
-T2.1 first (types), then T2.2; T2.3 needs both.
+T2.1 first (types; needs T1.5), then T2.2; T2.3 needs both.
 
-### T2.1 Native fit geometry [TS]
-- **Files:** `src/components/dock/fit.ts` (new). Test: `src/components/dock/fit.test.ts` (new).
+### T2.1 Native fit geometry [TS] (amended: preview sizing)
+- **Files:** `src/components/dock/fit.ts` (new). Test: `src/components/dock/fit.test.ts` (new). Imports the `TileSize` type from `./sizing` (T1.5).
 - **Spec:**
 ```ts
 import type { DockRegion } from '../../services/native';
+import type { TileSize } from './sizing';
 export type DockEdge = 'bottom' | 'left' | 'right';
 export type DockAlign = 'start' | 'center' | 'end';
 export interface Box { left: number; top: number; width: number; height: number }
-export const MAG_ALONG = 80, MAG_HEADROOM = 64, BOTTOM_STAGE = 146;
+export const MAG_RISE_PCT = 55, MAG_MAX = 1 + MAG_RISE_PCT / 100; // peak scale 1.55; magnify.ts imports MAG_MAX
+export const MAG_ALONG_MIN = 80, TIP_ALLOWANCE = 38, BOTTOM_INSET = 14, TOP_MARGIN = 8;
+/** Room a magnified tile and its tooltip need beyond the rail, inward: 64 at a 46px tile. Integer math keeps 55% of 40 exact. */
+export const magHeadroom = (cross: number) => Math.ceil((MAG_RISE_PCT * cross) / 100) + TIP_ALLOWANCE;
+/** Room the spread neighbours need along the axis: 80 until the largest along-size passes 101px. */
+export const magAlong = (along: number) => Math.max(MAG_ALONG_MIN, Math.ceil((MAG_RISE_PCT * along) / 100) + 24);
 export const ANCHOR: Record<DockAlign, number> = { start: 0, center: 0.5, end: 1 };
-/** Window size and hit regions after the native resize; mirrors the edge/align layout in dock-tiles.css. */
-export function dockFit(edge: DockEdge, align: DockAlign, shelf: Box, rail: Box, viewport: { width: number; height: number }, hot: boolean) {
+/** Window size and hit regions after the native resize; mirrors the edge/align layout in dock-tiles.css. `tile` is the largest configured tile in px. */
+export function dockFit(edge: DockEdge, align: DockAlign, shelf: Box, rail: Box, viewport: { width: number; height: number }, hot: boolean, tile: TileSize) {
   const a = ANCHOR[align], vertical = edge !== 'bottom';
+  const along = magAlong(vertical ? tile.height : tile.width), headroom = magHeadroom(vertical ? tile.width : tile.height);
   const left = Math.min(shelf.left, rail.left), top = Math.min(shelf.top, rail.top);
   const right = Math.max(shelf.left + shelf.width, rail.left + rail.width), bottom = Math.max(shelf.top + shelf.height, rail.top + rail.height);
-  const width = vertical ? Math.ceil(Math.max(right - left, rail.width + MAG_HEADROOM)) + 22 : Math.ceil(right - left + MAG_ALONG) + 32;
-  const height = vertical ? Math.ceil(bottom - top + MAG_ALONG) + 32 : BOTTOM_STAGE;
+  const width = vertical ? Math.ceil(Math.max(right - left, rail.width + headroom)) + 22 : Math.ceil(right - left + along) + 32;
+  const height = vertical ? Math.ceil(bottom - top + along) + 32 : BOTTOM_INSET + Math.ceil(rail.height) + headroom + TOP_MARGIN;
   const dx = (width - viewport.width) * (edge === 'bottom' ? a : edge === 'left' ? 0 : 1);
   const dy = (height - viewport.height) * (edge === 'bottom' ? 1 : a);
   const place = (box: Box, radius: number): Required<DockRegion> => ({ x: Math.round(box.left + dx), y: Math.round(box.top + dy), width: Math.ceil(box.width), height: Math.ceil(box.height), radius });
   const r = place(rail, 18);
-  if (hot && vertical) { r.y -= Math.round(MAG_ALONG * a); r.height += MAG_ALONG; r.width += MAG_HEADROOM; if (edge === 'right') r.x -= MAG_HEADROOM; }
-  else if (hot) { r.x -= Math.round(MAG_ALONG * a); r.width += MAG_ALONG; r.y -= MAG_HEADROOM; r.height += MAG_HEADROOM; }
+  if (hot && vertical) { r.y -= Math.round(along * a); r.height += along; r.width += headroom; if (edge === 'right') r.x -= headroom; }
+  else if (hot) { r.x -= Math.round(along * a); r.width += along; r.y -= headroom; r.height += headroom; }
   return { width, height, regions: [place(shelf, 15), r] };
 }
 ```
-- **Tests** (`toEqual`, boxes as `{left,top,width,height}`):
+- **Tests** (`toEqual`, boxes as `{left,top,width,height}`; vectors 1-5 pass `DEFAULT_TILE` as `tile`, so they keep the 80/64/146 values):
   1. bottom/center cold, shelf `332,38,360,26`, rail `112,72,800,60`, viewport `1024x146` -> `{width:912,height:146,regions:[{x:276,y:38,width:360,height:26,radius:15},{x:56,y:72,width:800,height:60,radius:18}]}`.
   2. same hot -> rail `{x:16,y:8,width:880,height:124,radius:18}`.
   3. bottom/start hot, shelf `16,38,360,26`, rail `16,72,800,60` -> width 912, shelf x 16, rail `{x:16,y:8,width:880,height:124,radius:18}`.
   4. left/center, shelf `14,233,360,26`, rail `14,267,60,400`, viewport `400x900` -> width 382, height 546, shelf `{x:14,y:56,...}`, rail `{x:14,y:90,width:60,height:400,radius:18}`; hot rail `{x:14,y:50,width:124,height:480,radius:18}`.
   5. right/end hot, shelf `26,450,360,26`, rail `326,484,60,400`, viewport `400x900` -> width 382, height 546, shelf `{x:8,y:96,width:360,height:26,radius:15}`, rail `{x:244,y:50,width:124,height:480,radius:18}`.
+  6. (preview sizing) bottom/center, tile `{width:80,height:64}`, shelf `332,20,360,26`, rail `112,54,800,78`, viewport `1024x146`: cold ->
+     `{width:912,height:174,regions:[{x:276,y:48,width:360,height:26,radius:15},{x:56,y:82,width:800,height:78,radius:18}]}`; hot rail
+     `{x:16,y:8,width:880,height:152,radius:18}` (window = 14 + 78 + 74 + 8; headroom 74).
+  7. (preview sizing) left/center, tile `{width:80,height:46}` (width runs across, height along), shelf `14,233,360,26`, rail `14,267,94,400`, viewport `400x900`:
+     width 382, height 546, shelf `{x:14,y:56,width:360,height:26,radius:15}`, rail `{x:14,y:90,width:94,height:400,radius:18}`; hot rail
+     `{x:14,y:50,width:176,height:480,radius:18}` (headroom 82).
+  8. (preview sizing) bottom/start hot, tile `{width:200,height:46}`, shelf `16,38,360,26`, rail `16,72,800,60`, viewport `1024x146`: width 966, height 146,
+     hot rail `{x:16,y:8,width:934,height:124,radius:18}` (along 134).
+  9. (preview sizing) `allowances follow the configured tile`: `magHeadroom` of 32, 40, 46, 64, 96 is 56, 60, 64, 74, 91; `magAlong` of 46, 101, 102, 200 is 80, 80, 81, 134.
 - **Verify:** TS. **Commit:** `feat(dock): compute edge-aware native fit regions`
 
-### T2.2 Magnification math and hook [TS]
+### T2.2 Magnification math and hook [TS] (amended: preview sizing)
 - **Files:** `src/components/dock/magnify.ts` (new). Test: `src/components/dock/magnify.test.tsx` (new, jsdom).
 - **Spec:**
 ```ts
-import { ANCHOR, type DockAlign, type DockEdge } from './fit';
-export const MAG_MAX = 1.55, MAG_RADIUS = 150;
+import { ANCHOR, MAG_MAX, type DockAlign, type DockEdge } from './fit'; // MAG_MAX (1.55) lives in fit.ts so the allowances share it
+export const MAG_RADIUS = 150;
 export function magnifyScale(distance: number): number {
   const d = Math.abs(distance);
   return d >= MAG_RADIUS ? 1 : 1 + ((MAG_MAX - 1) * (1 + Math.cos((Math.PI * d) / MAG_RADIUS))) / 2;
@@ -232,19 +339,22 @@ export function magnifyLayout(centers: number[], sizes: number[], pointer: numbe
 - **Tests:** `scale peaks under the pointer and fades to 1 at the radius` (0 -> 1.55; +-75 -> 1.275; 150 and 400 -> 1);
   `neighbours shift symmetrically for a centered dock` (`[23,75,127]`, sizes 46, pointer 75, anchor .5: scales[1] 1.55, scales[0]/[2]
   toBeCloseTo(1.4024, 3), shifts[1] ~0, shifts[0] ~ -shifts[2], total toBeCloseTo(62.32, 1)); `start-aligned docks grow toward the end only`
-  (pointer 23, anchor 0: all shifts >= 0, shifts[0] toBeCloseTo(12.65, 2)); `no pointer leaves every cell at rest`. Hook harness: rail + 3
+  (pointer 23, anchor 0: all shifts >= 0, shifts[0] toBeCloseTo(12.65, 2)); `no pointer leaves every cell at rest`; `each cell grows by its own size` (preview sizing: centers
+  `[23,98]`, sizes `[46,96]`, pointer 23, anchor 0: scales[0] 1.55, scales[1] toBeCloseTo(1.275, 3), shifts[0] toBeCloseTo(12.65, 2), shifts[1]
+  toBeCloseTo(38.5, 2), total toBeCloseTo(51.7, 1)). The hook measures each `.dock-cell` rect, so mixed tile sizes need no constants. Hook harness: rail + 3
   `.dock-cell`, synchronous `requestAnimationFrame` stub, rects rail `0,0,174,60`, cell i `7+52*i,7,46,46`: `pointer over the middle cell
   magnifies it most` (pointerMove clientX 82: cell1 `--mag` `1.550`, cell0 `1.402`, rail `--mag-before` `31.16px`); `leaving restores rest
   scale` (`1.000`); `disabled or reduced motion sets nothing` (`enabled` false, and `matchMedia` stubbed `{ matches: true }`: `--mag` is `''`).
 - **Verify:** TS. **Commit:** `feat(dock): add macOS magnification math and pointer hook`
 
-### T2.3 Wire magnification, hot state and fit [TS]
+### T2.3 Wire magnification, hot state and fit [TS] (amended: preview sizing)
 - **Files:** `src/components/dock/DockSurface.tsx`. Test: `DockShell.test.tsx`.
 - **Spec:** `useMagnify(railRef, 'bottom', 'center', true)`. Hot: `const [hot, setHot] = useState(false); const cool = useRef(0);`
   `heat = () => { clearTimeout(cool.current); setHot(true) }`, `relax = () => { clearTimeout(cool.current); cool.current = window.setTimeout(() => setHot(false), 240) }`,
   unmount clears the timer. Rail: `onPointerEnter={heat} onPointerLeave={relax} onFocus={heat}`, `onBlur` relaxes only when
   `!event.currentTarget.contains(event.relatedTarget as Node | null)`. Root `data-hot={hot ? 'true' : undefined}`. Fit: return when either rect
-  width is 0; `next = dockFit('bottom', 'center', shelfBox, { left, top, width: Math.max(r.width, rail.scrollWidth), height: Math.max(r.height, rail.scrollHeight) }, { width: innerWidth, height: innerHeight }, hot)`;
+  width is 0; `next = dockFit('bottom', 'center', shelfBox, { left, top, width: Math.max(r.width, rail.scrollWidth), height: Math.max(r.height, rail.scrollHeight) }, { width: innerWidth, height: innerHeight }, hot, largestTile(items.map(sizeOf)))`
+  (`items = layout.profiles[layout.profile]`; `largestTile` from `./sizing`; `sizeOf` is T1.3's, so the window follows the configured tiles once T4.3 lands);
   `native.fitDock(next.width, next.height, next.regions)`; deps `[layout, hot]`; keep rAF, ResizeObserver and resize listener.
 - **Tests:** both fit tests set `window.innerHeight` 146 (restore after) and mock rail `112,72,800,60`, shelf `332,38,360,26`: `fit_dock`
   args equal T2.1 vector 1. Clipped (rail left 12, scrollWidth 1100): `{width:1212,height:146,regions:[{x:426,y:38,width:360,height:26,radius:15},{x:106,y:72,width:1100,height:60,radius:18}]}`.
@@ -252,7 +362,8 @@ export function magnifyLayout(centers: number[], sizes: number[], pointer: numbe
   `[data-hot="true"]`; pointerLeave, wait 300ms: regions[1] back to vector 1).
 - **Verify:** TS. **Commit:** `feat(dock): magnify tiles and grow hit regions while hovered`
 
-**IC2 (+native):** `useMagnify` bound to `railRef`; fit goes through `dockFit`; `data-hot` toggles; tooltips are not clipped in the smoke look.
+**IC2 (+native):** `useMagnify` bound to `railRef`; fit goes through `dockFit`; `data-hot` toggles; tooltips are not clipped in the smoke look. No
+`MAG_ALONG`, `MAG_HEADROOM` or `BOTTOM_STAGE` constants remain; at the default tile the window is 146px tall with allowances 80 and 64 (amended: preview sizing).
 
 ---
 
@@ -293,20 +404,26 @@ Parallel-safe: T3.1 and T3.2.
 
 ## Phase 4 - Layout v3 and placement controls
 
-### T4.1 Layout v3 migration [TS]
+Order (amended: preview sizing): T4.1 first; T4.2 next (WidgetManager.tsx, one-liner in DockSurface.tsx); then T4.3 (DockSurface.tsx) and T4.4
+(WidgetManager.tsx, after T4.2) are disjoint and may run side by side.
+
+### T4.1 Layout v3 migration [TS] (amended: preview sizing)
 - **Files:** `src/components/dock/layout.ts`. Tests: `layout.test.ts`, `DockShell.test.tsx` (`version: 2` -> `3`).
 - **Spec:** add
 ```ts
 import type { DockAlign, DockEdge } from './fit';
-export interface DockPlacement { edge: DockEdge; align: DockAlign; magnify: boolean }
-export const DEFAULT_PLACEMENT: DockPlacement = { edge: 'bottom', align: 'center', magnify: true };
+import { DEFAULT_TILE, ICON_SIZE, ICON_WIDTH, TILE_HEIGHT, TILE_WIDTH, validInt } from './sizing';
+export interface DockPlacement { edge: DockEdge; align: DockAlign; magnify: boolean; iconSize: number; iconWidth: number }
+export const DEFAULT_PLACEMENT: DockPlacement = { edge: 'bottom', align: 'center', magnify: true, iconSize: DEFAULT_TILE.height, iconWidth: DEFAULT_TILE.width };
 export const PINNED_LIMIT = 24;
 export const PINNED_ID = /^app-[0-9a-f]{16}$/;
 function parsePlacement(value: unknown): DockPlacement {
   const raw = isRecord(value) ? value : {};
+  const iconSize = validInt(raw.iconSize, ICON_SIZE) ?? DEFAULT_PLACEMENT.iconSize;
   return { edge: raw.edge === 'left' || raw.edge === 'right' ? raw.edge : 'bottom',
     align: raw.align === 'start' || raw.align === 'end' ? raw.align : 'center',
-    magnify: typeof raw.magnify === 'boolean' ? raw.magnify : true };
+    magnify: typeof raw.magnify === 'boolean' ? raw.magnify : true,
+    iconSize, iconWidth: validInt(raw.iconWidth, ICON_WIDTH) ?? iconSize }; // a missing width follows the loaded height, as in the preview
 }
 function parsePinned(value: unknown): string[] {
   const pinned: string[] = [];
@@ -320,11 +437,21 @@ export const pinApp = (layout: DockLayout, id: string): DockLayout =>
 ```
   Also export `setPlacement(layout, patch: Partial<DockPlacement>)` (`{ ...layout, dock: { ...layout.dock, ...patch } }`), `unpinApp(layout, id)`
   (filter it out) and `movePinned(layout, from, to)` (same splice and bounds rules as `moveWidget`, on `layout.pinned`).
+  Items (preview sizing): `DockItem` gains `tileWidth?: number; tileHeight?: number`; `normalizeItem` copies each only when `validInt(raw.tileWidth, TILE_WIDTH)` /
+  `validInt(raw.tileHeight, TILE_HEIGHT)` is defined (v2 and v3 files alike); `patchItem`'s `Pick` adds `'tileWidth' | 'tileHeight'`. Add
+```ts
+/** resizePreviewWidget semantics: an invalid value, or a widget outside the active profile, changes nothing (same object back). */
+export function resizeWidget(layout: DockLayout, id: FinalWidgetId, dimension: 'width' | 'height', value: unknown): DockLayout {
+  const size = validInt(value, dimension === 'width' ? TILE_WIDTH : TILE_HEIGHT);
+  if (size === undefined || !layout.profiles[layout.profile].some((item) => item.id === id)) return layout;
+  return patchItem(layout, id, dimension === 'width' ? { tileWidth: size } : { tileHeight: size });
+}
+```
   `DockLayout`: `version: 3`, `dock: DockPlacement`, `pinned: string[]`. `defaultLayout`: version 3, `dock: { ...DEFAULT_PLACEMENT }`, `pinned: []`.
   Rename `parseV2` to `parseCurrent`: accepts versions 2 and 3, returns version 3 with `dock: parsePlacement(value.dock)` and
   `pinned: parsePinned(value.pinned)` (profiles, unknown IDs, appearances, theme unchanged). `parseLayout`: 2|3 -> `parseCurrent`, 1 -> `parseV1`,
   else `null` (future files stay untouched). `isLayout`: require `value.version === 3`; allowed keys add `dock`, `pinned`; `dock` must be exactly
-  `{edge,align,magnify}` with valid values; `pinned` must equal `parsePinned(value.pinned)` (compare `JSON.stringify`). Commit body: the Rust
+  `{edge,align,magnify,iconSize,iconWidth}` with valid values (sizes pass `validInt`); an item may also carry `tileWidth` / `tileHeight`, rejected unless `validInt` accepts them; `pinned` must equal `parsePinned(value.pinned)` (compare `JSON.stringify`). Commit body: the Rust
   weather fallback reads only v1/v2 but the dock always sends coordinates, so Rust is unchanged.
 - **Tests:** describe `dock layout v3`; defaults expect version 3, `DEFAULT_PLACEMENT`, `pinned []`; v1 migration expects version 3;
   `migrates v2 to v3 keeping profiles, unknown ids, settings, appearances and theme` (focus weather `{units:'F'}`, unknown `['legacy']`,
@@ -332,22 +459,82 @@ export const pinApp = (layout: DockLayout, id: string): DockLayout =>
   `{top,middle,'yes'}` -> defaults; `['app-0123456789abcdef','bad','app-0123456789abcdef','APP-0123456789ABCDEF']` -> first only); null test uses
   `{ version: 4, profiles: {} }`; structural test rejects `version: 2`, `dock.edge 'top'`, `pinned ['x']`; `pins, unpins, reorders pinned apps
   and patches placement` (duplicate/invalid/25th ignored; `movePinned(0,1)`; `setPlacement({edge:'right'})` keeps align and magnify).
-- **Verify:** TS. **Commit:** `feat(layout): migrate dock layout to v3 with placement and pinned apps`
+- **Sizing tests (preview sizing):** default `dock` toEqual `{ edge:'bottom', align:'center', magnify:true, iconSize:46, iconWidth:46 }`;
+  `reads global tile sizes like the preview` (`{iconSize:64,iconWidth:80}` kept; `{iconSize:65,iconWidth:97}` -> 46 and 46; `{iconSize:60}` alone -> `iconSize` 60 and
+  `iconWidth` 60; `{iconSize:40.5,iconWidth:'80'}` -> 46 and 46); `keeps valid per-widget sizes and drops invalid ones` (daily `weather {tileWidth:120,tileHeight:56}` kept;
+  boundaries `{tileWidth:32,tileHeight:32}` and `{tileWidth:200,tileHeight:96}` kept; `clock {tileWidth:201,tileHeight:31}` and `system {tileWidth:'120',tileHeight:56.5}` lose both keys);
+  `resizeWidget follows resizePreviewWidget` (weather width 120 then height 56 set both keys and leave other items untouched; width 999, 31, 120.5 and `'120'`, height 97, and a widget
+  outside the active profile return the same layout object, `toBe`); `isLayout` rejects `dock.iconSize` 65, `dock.iconWidth` 97 and an item `tileWidth` 201 and accepts valid sizes;
+  `JSON.parse(JSON.stringify(layout))` through `parseLayout` round-trips every size.
+- **Verify:** TS. **Commit:** `feat(layout): migrate dock layout to v3 with placement, tile sizes and pinned apps`
 
-### T4.2 Placement controls in Customize [TS+CSS]
+### T4.2 Placement and tile-size controls in Customize [TS+CSS] (amended: preview sizing)
 - **Files:** `src/components/settings/WidgetManager.tsx`, `src/design/dock-final.css`, `src/widgets/final/meta.ts` (delete orphaned `SIZE_LABELS`).
   One-liner: DockSurface `useMagnify(railRef, 'bottom', 'center', layout.dock.magnify)`. Test: `WidgetManager.test.tsx`.
 - **Spec:** remove `SizeControl`, `SIZE_ORDER`, `setSize`, `onSize`, every size control and orphaned imports. Wrap the Installed toolbar's
   `Dock tile style` group in `<div className="wm-toolbar-controls">` and append: group `aria-label="Dock edge"` of `wm-style-pill` buttons
   `Bottom` `Left` `Right` (`aria-pressed`, `onChange(setPlacement(layout, { edge }))`); group `aria-label="Dock alignment"` `Start` `Center` `End`;
   `<span className="wm-toolbar-label" aria-hidden="true">Magnify</span>` and a `wm-enable` switch (`role="switch"`, `aria-checked={layout.dock.magnify}`,
-  `aria-label="Magnification"`, same track/thumb). CSS after `.wm-style-pill[aria-pressed="true"]`:
-  `.wm-toolbar-controls { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }`, `.wm-toolbar-label { color:var(--dock-secondary); font-size:11px; font-weight:600 }`.
+  `aria-label="Magnification"`, same track/thumb); then two range inputs copied from the preview, each in `<label className="wm-range">` with an `<output>`
+  showing `{n} px`: `Default width` (`aria-label="Dock icon width"`, `step=2`, min/max from `ICON_WIDTH`, value `layout.dock.iconWidth`, `onChange(setPlacement(layout,
+  { iconWidth: Number(event.target.value) }))`) and `Default height` (`aria-label="Dock icon height"`, `step=2`, min/max from `ICON_SIZE`, `iconSize`); neither moves the other.
+  `PreviewStrip` takes `layout` instead of `items` and wraps each `DockWidget` in `<span className="wm-dock-tile" style={slotStyle(tileSize({ width: layout.dock.iconWidth,
+  height: layout.dock.iconSize }, item))}>`, so the strip shows the configured sizes. CSS after `.wm-style-pill[aria-pressed="true"]`:
+  `.wm-toolbar-controls { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }`, `.wm-toolbar-label { color:var(--dock-secondary); font-size:11px; font-weight:600 }`,
+  `.wm-range { display:flex; align-items:center; gap:6px; color:var(--dock-secondary); font-size:11px; font-weight:600 }`, `.wm-range input { width:120px }`,
+  `.wm-range input:focus-visible { outline:2px solid #0a84ff; outline-offset:2px }`, `.wm-range output { min-width:42px; color:var(--dock-text) }`,
+  `.wm-dock-tile { display:grid; flex:none }`; and edit `.wm-dock-strip`: `height: 82px` becomes `height: auto; min-height: 82px` so tall tiles fit.
 - **Tests:** drop size assertions from the settings-reset and appearance tests; replace the size-detail test with `shows install state in the
-  widget detail view`; new `changes dock edge, alignment and magnification` (Left and End pressed; `Magnification` true -> false).
-- **Verify:** TS. **Commit:** `feat(settings): add dock edge, alignment and magnification controls`
+  widget detail view`; new `changes dock edge, alignment and magnification` (Left and End pressed; `Magnification` true -> false); new
+  `changes the default tile width and height` (Harness; `getByLabelText('Dock icon width')` has min `32`, max `96`, step `2`, and `'Dock icon height'` min `32`, max `64`, step `2`;
+  `fireEvent.change` height to `64`: output `64 px`, width slider still `46`; width to `80`: output `80 px`, height still `64`; the first `.wm-dock-tile` style has `--icon-width` `80px`
+  and `--icon-size` `64px`).
+- **Verify:** TS. **Commit:** `feat(settings): add dock edge, alignment, magnification and tile size controls`
 
-**IC4:** saved layout is v3 (web preview localStorage); the magnify toggle reaches `useMagnify`.
+### T4.3 Apply the configured tile sizes in the dock [TS] (new: preview sizing)
+- **Files:** `src/components/dock/DockSurface.tsx`. Test: `src/components/dock/DockShell.test.tsx`. Needs T4.1 and T4.2 (same file); disjoint from T4.4.
+- **Spec:** delete T1.3's module-level `sizeOf`. Inside the component, above the fit effect: `const shared: TileSize = { width: layout.dock.iconWidth, height: layout.dock.iconSize };`
+  `const sizeOf = (item: DockItem): TileSize => tileSize(shared, item);` (import `tileSize`; drop `DEFAULT_TILE` if now unused). The slots (T1.3) and the fit call
+  (T2.3, `largestTile(items.map(sizeOf))`) then follow the layout; nothing else changes. No `--icon-*` on the root: nothing reads a global value outside a slot.
+- **Tests:** `applies the saved tile sizes to every slot` (saved layout `{ ...defaultLayout(), dock: { ...DEFAULT_PLACEMENT, iconSize: 64, iconWidth: 80 } }` whose daily `weather`
+  item has `tileWidth: 120, tileHeight: 56`: slot `windows` has `--icon-width` `80px`, `--icon-size` `64px`, `--dock-glyph-scale` `1.391`; slot `weather` has `120px`, `56px`, `1.217`);
+  `refits the native window for the configured tiles` (rAF stubbed like the other fit tests, `window.innerHeight` 146 restored after, saved `dock { ...DEFAULT_PLACEMENT,
+  iconSize: 64, iconWidth: 80 }`, shelf `332,20,360,26`, rail `112,54,800,78`: `fit_dock` called with T2.1 vector 6, `{ width:912, height:174, regions:[{x:276,y:48,width:360,height:26,radius:15},
+  {x:56,y:82,width:800,height:78,radius:18}] }`).
+- **Verify:** TS. **Commit:** `feat(dock): apply configured tile sizes to slots and native fit`
+
+### T4.4 Resize and move one widget [TS+CSS] (new: preview sizing)
+- **Files:** `src/components/settings/WidgetLayoutControls.tsx` (new), `src/components/settings/WidgetManager.tsx`, `src/design/dock-final.css`. Tests:
+  `src/components/settings/WidgetLayoutControls.test.tsx` (new), one case in `WidgetManager.test.tsx`. Needs T4.1 and T4.2 (same WidgetManager.tsx); disjoint from T4.3.
+- **Spec:** copy the preview's "Resize & move one widget" panel. Props `{ layout: DockLayout; onChange: (layout: DockLayout) => void }`. `items = layout.profiles[layout.profile]`; render
+  nothing when empty. Local state `selected` (a widget id; defaults to the first item, and falls back to the first when it leaves `items`). Markup, in order:
+  `<fieldset className="wm-layout"><legend>Resize &amp; move one widget</legend>`; `<label>Widget <select aria-label="Widget to resize">` with an `<option value={id}>` per item showing
+  `getWidgetMeta(id).title`; `<label>Width <input type="range" aria-label="Selected widget width" min={TILE_WIDTH.min} max={TILE_WIDTH.max} step={2} value={size.width} />
+  <output>{size.width} px</output></label>`; `Height` the same with `aria-label="Selected widget height"` and `TILE_HEIGHT`; `size = tileSize({ width: layout.dock.iconWidth,
+  height: layout.dock.iconSize }, item)`. Range `onChange` -> `onChange(resizeWidget(layout, selected, 'width' | 'height', Number(event.target.value)))`. Then
+  `<button type="button" className="wm-customize">Move earlier</button>`, `<span>Position {index + 1} of {items.length}</span>`, `<button type="button" className="wm-customize">Move later</button>`
+  (`Move earlier` calls `onChange(moveWidget(layout, index, index - 1))`, `Move later` `index + 1`; `Move earlier` is disabled at index 0 and `Move later` at the last index; the selection
+  follows the moved widget), and
+  `<p>Drag widgets in the dock to reorder, or use these buttons. Each profile saves its own sizes and order.</p>`.
+  WidgetManager renders `<WidgetLayoutControls layout={layout} onChange={onChange} />` between `<PreviewStrip />` and `.wm-grid` when `tab === 'installed'`; `resetWidget` becomes
+  `patchItem(layout, id, { settings: undefined, size: undefined, tileWidth: undefined, tileHeight: undefined })` (an addition to the preview, which has no reset: otherwise an override could never be removed).
+  CSS in dock-final.css after the T4.2 rules: `.wm-layout { display:flex; flex-wrap:wrap; align-items:center; gap:12px; min-width:0; margin:0 0 14px; padding:12px 14px;
+  border:1px solid rgba(255,255,255,.1); border-radius:12px; color:var(--dock-secondary); font-size:11px }`, `.wm-layout legend { padding:0 6px; color:var(--dock-text); font-weight:600 }`,
+  `.wm-layout label { display:flex; align-items:center; gap:6px }`, `.wm-layout select { height:26px; border:1px solid rgba(255,255,255,.12); border-radius:8px;
+  background:rgba(255,255,255,.05); color:var(--dock-text); font:inherit }`, `.wm-layout input[type="range"] { width:120px }`, `.wm-layout output { min-width:42px; color:var(--dock-text) }`,
+  `.wm-layout p { flex-basis:100%; margin:0; line-height:1.5 }`, `.wm-layout :is(select, input, button):focus-visible { outline:2px solid #0a84ff; outline-offset:2px }`,
+  `.wm-layout button:disabled { opacity:.4; cursor:default }`.
+- **Tests** (Harness holding the layout in state, default layout; `const panel = within(screen.getByRole('group', { name: 'Resize & move one widget' }))`; select a widget with
+  `fireEvent.change(panel.getByLabelText('Widget to resize'), { target: { value: 'weather' } })`): `resizes the selected widget` (Weather: width slider min `32` max `200` step `2` value `46`,
+  height slider min `32` max `96` step `2` value `46`; width to `120` shows `120 px`, height to `56` shows `56 px`; selecting `windows` still shows `46` and `46`); `moves the selected widget and
+  keeps it selected` (Weather: `Position 5 of 9`; `Move earlier`: `Position 4 of 9` and the select still has value `weather`; `Move later` twice: `Position 6 of 9`); `disables the move buttons at
+  the ends` (`windows`: `Move earlier` disabled; `clock`: `Move later` disabled). `WidgetManager.test.tsx`: `reset clears tile size overrides` (initial layout `resizeWidget(defaultLayout(),
+  'weather', 'width', 120)`; select `weather` in the panel: width `120 px`; Weather `Customize` -> `Reset to defaults` -> `Back` (the detail view has two `Done` buttons); select
+  `weather` again: width `46 px`).
+- **Verify:** TS. **Commit:** `feat(settings): resize and reorder one widget from Customize`
+
+**IC4:** saved layout is v3 (web preview localStorage); the magnify toggle reaches `useMagnify`; the Default width/height sliders and the per-widget panel change `--icon-width` and
+`--icon-size` on the slots and refit the window (T4.3), and a saved v2 file opens at 46x46 with no per-widget overrides (amended: preview sizing).
 
 ---
 
@@ -406,30 +593,33 @@ let (desired_x, desired_y) = match edge {
   `[74,308,520,430]`; right: dock `(1764,300)`, anchor x 86 -> `[1326,308,520,430]`; `widget_card_state_reports_the_dock_edge` (serialized `edge` = `left`).
 - **Verify:** RS(widget_card). **Commit:** `feat(cards): open cards beside left and right docks`
 
-### T5.3 Send edge and alignment from the dock; edge-aware card window [TS]
+### T5.3 Send edge and alignment from the dock; edge-aware card window [TS] (amended: preview sizing)
 - **Files:** `src/components/dock/DockSurface.tsx`, `src/services/native.ts`, `src/features/widget-card/WidgetCardWindow.tsx`. Tests: `DockShell.test.tsx`, `WidgetCardWindow.test.tsx`.
 - **Spec:** `const { edge, align, magnify } = layout.dock`; `useMagnify(railRef, edge, align, magnify)`; `dockFit(edge, align, ...)`; root
   `data-edge={edge} data-align={align}`. native.ts: `fitDock(width, height, regions, edge: DockEdge, align: DockAlign)` -> `fit_dock`
   `{ width, height, regions, edge, align }` (type import from `../components/dock/fit`); `WidgetCardState.edge?: 'bottom' | 'left' | 'right'`.
   WidgetCardWindow: `.wc-window` gets `data-edge={card.edge ?? 'bottom'}`.
 - **Tests:** `fit_dock` expectations add `edge: 'bottom', align: 'center'`; new `places the dock on the saved edge` (saved `dock {left,start,true}`:
-  `.dock-final[data-edge="left"]`, `fit_dock` called with `expect.objectContaining({ edge: 'left', align: 'start' })`); card show payload with
-  `edge: 'left'` -> `.wc-window[data-edge="left"]`.
+  `.dock-final[data-edge="left"]`, `fit_dock` called with `expect.objectContaining({ edge: 'left', align: 'start' })`); new `maps tile width across and height along on a left dock`
+  (saved `dock { ...DEFAULT_PLACEMENT, edge: 'left', iconWidth: 80 }`; `innerWidth` 400 and `innerHeight` 900 restored after; shelf `14,233,360,26`, rail `14,267,94,400`: `fit_dock` equals
+  `{ width:382, height:546, regions:[{x:14,y:56,width:360,height:26,radius:15},{x:14,y:90,width:94,height:400,radius:18}], edge:'left', align:'center' }`, i.e. T2.1 vector 7: an 80px-wide tile
+  widens the vertical rail and does not lengthen it); card show payload with `edge: 'left'` -> `.wc-window[data-edge="left"]`.
 - **Verify:** TS. **Commit:** `feat(dock): send dock edge and alignment to the native host`
 
-### T5.4 Vertical rail and card edge CSS [CSS]
+### T5.4 Vertical rail and card edge CSS [CSS] (amended: preview sizing)
 - **Files:** `src/design/dock-tiles.css`, `src/design/dock-final.css`.
 - **Spec:** dock-tiles.css before the reduced-motion block (write each `left`/`right` pair as two selectors, prefix `.dock-final`):
   `[data-align="start"] { align-items:flex-start }`, `[data-align="end"] { align-items:flex-end }`;
   `[data-edge="left"], [data-edge="right"] { top:0; bottom:0; height:auto; justify-content:center }`;
   `[data-edge="left"] { align-items:flex-start; padding:16px 0 16px 14px }`; `[data-edge="right"] { align-items:flex-end; padding:16px 14px 16px 0 }`;
   left/right with `[data-align="start"]` -> `justify-content:flex-start`, with `[data-align="end"]` -> `flex-end`;
-  vertical `.dock-final-rail { flex-direction:column; width:var(--dock-rail); height:auto; max-width:none; max-height:calc(100vh - 32px); padding:7px 0 }`;
+  vertical `.dock-final-rail { flex-direction:column; min-width:46px; min-height:0; max-width:none; max-height:calc(100vh - 32px) }` (width and height stay auto, padding stays `7px`: the
+  rail is as wide as its widest tile + 14 and tiles keep `--icon-width` x `--icon-size`, so a wide tile widens the rail and never swaps with its height);
   vertical `.dock-final-rail::after { top:calc(-1 * var(--mag-before, 0px)); bottom:calc(-1 * var(--mag-after, 0px)); left:0; right:0 }`;
-  vertical `.dock-group { flex-direction:column }`, vertical `.dock-final-slot--group { width:var(--dock-tile); height:auto }`;
+  vertical `.dock-group { flex-direction:column }`, vertical `.dock-final-slot--group { width:var(--icon-width); height:auto }`;
   left `.dock-tile { transform-origin:0% 50%; transform:translate(0, var(--shift, 0px)) scale(var(--mag, 1)) }`, right the same with `100% 50%`;
-  left `.dock-tip { left:calc(100% + 10px); right:auto; top:50%; bottom:auto; transform:translate(calc(46px * (var(--mag, 1) - 1)), calc(-50% + var(--shift, 0px))) }`;
-  right `.dock-tip { right:calc(100% + 10px); left:auto; top:50%; bottom:auto; transform:translate(calc(-46px * (var(--mag, 1) - 1)), calc(-50% + var(--shift, 0px))) }`;
+  left `.dock-tip { left:calc(100% + 10px); right:auto; top:50%; bottom:auto; transform:translate(calc(var(--icon-width) * (var(--mag, 1) - 1)), calc(-50% + var(--shift, 0px))) }`;
+  right `.dock-tip { right:calc(100% + 10px); left:auto; top:50%; bottom:auto; transform:translate(calc(-1 * var(--icon-width) * (var(--mag, 1) - 1)), calc(-50% + var(--shift, 0px))) }`;
   left `.dock-dot { left:-5px; top:50%; bottom:auto; transform:translateY(calc(-50% + var(--shift, 0px))) }`, right `.dock-dot { left:auto; right:-5px; top:50%; bottom:auto; same transform }`;
   vertical lines separators `left:10px; right:10px; top:-4px; bottom:auto; width:auto; height:1px`. Reduced-motion block adds vertical
   `.dock-tile { transform:none }`, `.dock-tip { transform:translate(0, -50%) }`, `.dock-dot { transform:translateY(-50%) }`.
@@ -438,7 +628,8 @@ let (desired_x, desired_y) = match edge {
 - **Verify:** TS; `npm run build`. **Commit:** `style(dock): lay out vertical rails and edge-aware cards`
 
 **IC5 (+native):** edge flows layout -> DockSurface -> `fit_dock(edge, align)` -> `DockGeometry` -> card placement and payload; CSS insets match
-`dockFit` (14px edge side, 16px along-axis padding, 146px bottom stage).
+`dockFit` (14px edge side, 16px along-axis padding, bottom stage = 14 + rail + headroom + 8); on left and right docks width stays horizontal and height vertical, the
+rail is as wide as its widest tile + 14, and the window width and hit regions use `magHeadroom(widest tile)` (T2.1 vector 7; amended: preview sizing).
 
 ---
 
@@ -785,13 +976,15 @@ Parallel-safe: T8.1, T8.2, T8.5. T8.3 needs T8.2; T8.4 needs T8.3.
 | Running Apps | activate (T1.3) | - | card | none | Card tiles do not activate | T9.6 |
 | Pinned Apps | launch (T7.6) | - | card | launch, manage | - | - |
 | Spotify | card | - | card | prev/play/next, volume set | - | - |
-| Weather, System, Claude, ChatGPT, Agent, Clock | card | - | card | read-only or settings links | - (honest states kept) | - |
+| Weather | card | - | card | read-only | A null weather code shows the partly-cloudy icon and the label "Partly cloudy" (`weatherKind(null)` returns `'partly'`, icons.tsx:313) | T9.8 |
+| System, Claude, ChatGPT, Agent, Clock | card | - | card | read-only or settings links | - (honest states kept) | - |
 | Recent Files | card | - | card | rows send `folder:open:<label>` | Wrong target; fails unless the label is a known folder | T9.2-T9.4 |
 | Quick Folders | card | - | card | `folder:open:<id>` | - | - |
 | Trash | card | - | card | Empty | Permanent empty in one click | T9.5 |
 | Volume | card | none | card | mute, up, down, set | No wheel control | T9.7 |
 
-Parallel-safe: T9.1, T9.2, T9.3, T9.7. T9.4 -> T9.5 -> T9.6 share WidgetCard.tsx.
+Parallel-safe: T9.1, T9.2, T9.3, T9.7. T9.4 -> T9.5 -> T9.6 share WidgetCard.tsx. T9.8 touches only icons.tsx and DockWidget.tsx (its test is a new
+file), so it may run beside any of them.
 
 ### T9.1 Start opens the Windows Start menu [RUST]
 - **Files:** `src-tauri/src/main.rs`, `src-tauri/Cargo.toml` (features += `"Win32_UI_Input_KeyboardAndMouse"`).
@@ -850,7 +1043,20 @@ Parallel-safe: T9.1, T9.2, T9.3, T9.7. T9.4 -> T9.5 -> T9.6 share WidgetCard.tsx
 - **Tests:** `wheel over the volume tile steps the volume` (deltaY -100 -> `widget_action` `{ actionId: 'volume:up' }`; an immediate second wheel adds nothing).
 - **Verify:** TS. **Commit:** `feat(dock): adjust volume with the wheel on its tile`
 
-**IC9 (+native):** every table action maps to an allowlisted Rust action; `open_start` is never invoked by tests.
+### T9.8 Honest unknown weather conditions [TS] (new: review gap)
+- **Files:** `src/widgets/final/icons.tsx`, `src/widgets/final/DockWidget.tsx`. Test: `src/widgets/final/weather-unknown.test.tsx` (new, jsdom).
+- **Spec:** icons.tsx: `WeatherKind` (line 4) becomes `'sun' | 'cloud' | 'rain' | 'partly' | 'unknown'`; `weatherKind` returns `'unknown'` for `code == null` (line 313 returned `'partly'`);
+  `WeatherIcon` adds `{kind === 'unknown' && <path d="M7.2 18.5h9.3a3.7 3.7 0 0 0 0-7.4h-.7A5.2 5.2 0 0 0 6 11.7a3.5 3.5 0 0 0 1.2 6.8Z" strokeDasharray="2.5 2.5" />}` (the cloud outline,
+  dashed). DockWidget.tsx: delete `weatherLabelShort`, import `weatherLabel` from `./icons`, and build the weather label as `` `${temp}, ${weatherLabel(weather.weatherCode)}` `` (a null or unrecognised
+  code reads "Conditions unavailable"; codes 0 and 2 keep "Clear" and "Partly cloudy", so the T1.2 tests still pass). The card already prints `weatherLabel`; its two icons
+  (WidgetCard.tsx lines 486 and 510) become honest through `weatherKind` with no edit.
+- **Tests:** `unknown codes map to an unknown kind and label` (`weatherKind(null)` and `(undefined)` are `'unknown'`, `(2)` is `'partly'`; `weatherLabel(null)` is `Conditions unavailable`);
+  `weather tile never claims partly cloudy without a code` (`DockWidget` weather, data `{ temperature: 31, weatherCode: null, time: 0, utcOffsetSeconds: 0, hours: [], highC: 34, lowC: 22 }`,
+  `{ ...settingsFor('weather'), units: 'C' }`: role img `31°, Conditions unavailable`, container HTML lacks `Partly cloudy`, and `.dock-weather path[stroke-dasharray="2.5 2.5"]` exists);
+  `weather card prints the unknown label` (`WidgetCard` with the same data and settings: `getByText('Conditions unavailable')` and no `Partly cloudy`).
+- **Verify:** TS. **Commit:** `fix(widgets): never present an unknown weather code as partly cloudy`
+
+**IC9 (+native):** every table action maps to an allowlisted Rust action; `open_start` is never invoked by tests; no weather surface shows "Partly cloudy" without a weather code.
 
 ---
 
@@ -858,20 +1064,27 @@ Parallel-safe: T9.1, T9.2, T9.3, T9.7. T9.4 -> T9.5 -> T9.6 share WidgetCard.tsx
 
 Parallel-safe: T10.1, T10.2.
 
-### T10.1 Design reference [DOCS]
+### T10.1 Design reference [DOCS] (amended: preview sizing)
 - **Files:** `docs/design-reference.md`.
 - **Spec:** keep source, baseline and comparison sections; replace "Geometry and states" with section 2 of this plan; list superseded rules (82px dock,
-  66px tiles, "no magnification, bounce or spring", unsectioned search); cite the 2026-11-07 user decisions and `preview-tahoe-glass.html`.
+  66px tiles, fixed 46px tiles, fixed 60px rail, fixed 146px window, "no magnification, bounce or spring", unsectioned search); state that tile width and height are
+  configurable per decision 11; cite the 2026-11-07 user decisions and `preview-tahoe-glass.html`.
 - **Commit:** `docs(design): adopt the Tahoe tile dock reference`
 
-### T10.2 Contract, widget README, status [DOCS]
+### T10.2 Contract, widget README, status [DOCS] (amended: preview sizing, review notes)
 - **Files:** `docs/widgets/CONTRACT.md`, `docs/widgets/README.md`, `docs/qa/STATUS.md`.
 - **Spec:** CONTRACT: Pinned Apps (permissions, AppsFolder catalog, ID formula, layout-sourced IDs, `pinned_apps_*`, `pin_search_result` accepting only
   engine app results and emitting `dock:pin-app` to the dock), `recent:open:<id>` (rescan; documents open, others revealed), `fit_dock` edge/align
   validation, edge-aware card placement, Start via the Windows key with AppsFolder fallback. README: Pinned Apps entry (provider, permissions, 5s
   refresh, layout v3 migration, limits: UWP apps get no running dot; pinned and running squares are not merged). STATUS: section "macOS dock pass -
   2026-11-07" with landed tasks and IC command results, the no-scaffold decision, unused `.fw-dock*` CSS, backdrop blur not sampling the desktop in
-  transparent WebView2 windows, the Windows-key UIPI limit, and every Phase 11 CU item marked **unverified** until a Computer Use run records evidence.
+  transparent WebView2 windows, the Windows-key UIPI limit, and every Phase 11 CU item marked **unverified** until a Computer Use run records evidence. Also record:
+  (1) the rules left dead in dock-final.css after T1.3 (line numbers are from before T1.6; find them by selector): `.dock-final-rail.is-dense` (:135), `.dock-final-slot > .fw-dock` (:161)
+  and `.dock-final[data-appearance="lines"] .dock-final-slot > .fw-dock` with its `:hover` rule (:179-187); keep the `.dock-final[data-appearance="lines"] .dock-final-slot:not(:first-child)::before`
+  rule (:169-177), which still supplies `content: ""`, `position: absolute` and `width: 1px` for the lines-mode divider that dock-tiles.css restyles, or move those three declarations into
+  dock-tiles.css and delete it; (2) the lines-mode hover decision made at IC1; (3) the sizing semantics mirrored from the preview and what differs: transform-based magnification, no
+  `fitPreview` zoom-to-fit (very wide or many tiles clip at the work-area edge), tile sizes dropped with a disabled widget (the preview keeps them), and the added "Reset to defaults"
+  that clears tile sizes; CU-15 unverified.
 - **Commit:** `docs(qa): record the macOS dock pass and open native gates`
 
 **IC10:** doc links resolve; no doc claims native verification.
@@ -884,8 +1097,8 @@ Integrator: full gate + debug build; back up `%APPDATA%\protonsearch\protondock-
 Computer Use run (bundled skill; honour physical-Escape stops and locked desktops; never bypass them) checks the list at 100%, 125% and 150% DPI.
 Record each result with evidence (`docs/qa/native/dock-tahoe-*.png`) or the exact blocker in docs/qa/STATUS.md. Nothing counts as verified unless observed.
 
-- CU-1 Idle dock: 60px glass rail, 46px rounded tiles, live glyphs, separate shelf and Customize pill; no text pills (vs `dock-original-separate.png`).
-- CU-2 Magnification: about 71px peak, neighbours spread, glass grows, nothing clipped, tooltip above the hovered tile, relaxes in about 150ms, shelf hides and returns.
+- CU-1 Idle dock: default 60px glass rail with 46px rounded tiles, live glyphs, separate shelf and Customize pill; no text pills (vs `dock-original-separate.png`).
+- CU-2 Magnification: peak 1.55x the configured tile (about 71px at the default 46px), neighbours spread, glass grows, nothing clipped, tooltip above the hovered tile, relaxes in about 150ms, shelf hides and returns.
 - CU-3 Hit regions: clicks 20px above an idle rail (away from the shelf) reach the window behind; while hovered only the headroom is captured.
 - CU-4 Magnification off in Customize: no scaling; tooltips remain.
 - CU-5 Windows "Animation effects" off, relaunch: no magnification, card pop, Spotlight animation or equalizer motion.
@@ -897,4 +1110,8 @@ Record each result with evidence (`docs/qa/native/dock-tahoe-*.png`) or the exac
 - CU-11 Drag: Start dragged to the middle shows the indicator and persists after relaunch; Escape cancels; no card opens after a drag.
 - CU-12 Spotlight: Alt+Space shows the 94px bar with animation; Top Hit/Applications/Documents/Folders; real app icons; arrows, Enter, Escape, Tab scopes, blue selection.
 - CU-13 Phase 9 actions: Start menu, volume wheel, Trash confirm, recent file open/reveal, folders, media controls.
-- CU-14 Persistence: a v2 layout migrates on first save; edge/align/magnify/pins/order survive relaunch; unknown widget IDs remain in the file.
+- CU-14 Persistence: a v2 layout migrates on first save; edge/align/magnify/tile sizes/pins/order survive relaunch; unknown widget IDs remain in the file.
+- CU-15 Tile sizes (amended: preview sizing): the Customize Default height (32-64) and Default width (32-96) sliders resize every tile live and the window refits with nothing clipped, including
+  64px tall and 96px wide tiles; a per-widget width (up to 200) or height (up to 96) changes only that widget and the rail grows to the tallest tile; Reset to defaults clears it; on left and
+  right docks width stays horizontal and height vertical and the rail widens for a wide tile; tooltips and cards still sit beside the magnified tile; Move earlier and Move later reorder; a
+  saved v2 layout opens at 46x46.
