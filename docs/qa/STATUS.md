@@ -698,3 +698,91 @@ Not verified / still open:
 * Full `cargo test` still has the pre-existing ten `local_calendar` access-denied
   failures at `src-tauri/src/local_calendar.rs:465`; it was not rerun here.
 * No visual/UI verification was performed.
+
+## Native Windows build and live UI verification (2026-11-07)
+
+Scope: final React dock/search/settings/widget-card surfaces, native providers, and
+the Rust search/weather paths. The build was exercised from a temporary install
+copy because the project-tree executable still hits the pre-existing WebView2
+location failure. No taskbar replacement, startup registration, or installer
+installation is claimed.
+
+Build and automated checks:
+
+* `npx tsc -b` passed.
+* `npm test -- --reporter=dot` passed: 18 files, 184 tests.
+* `cargo fmt` clean; `cargo check --manifest-path src-tauri/Cargo.toml` passed with
+  only the five pre-existing ProtonSearch warnings.
+* `cargo test --manifest-path protonsearch/Cargo.toml --lib` passed 48 tests.
+* `cargo test --manifest-path src-tauri/Cargo.toml --bin protondock ai_usage`
+  passed 6 tests.
+* `npm run tauri -- build --debug --no-bundle` passed and produced
+  `src-tauri/target/debug/protondock.exe`.
+* `npm run tauri -- build --bundles nsis` compiled the optimized release binary
+  `src-tauri/target/release/protondock.exe` (21,161,984 bytes), but the NSIS step
+  failed with `Internal compiler error #12345: error creating mmap` at
+  `38,050,718` bytes. The debug NSIS attempt failed the same way at
+  `48,346,526` bytes.
+* `npm run tauri -- build --bundles msi` failed in WiX `light.exe` with
+  `System.UnauthorizedAccessException` creating a temporary file in the user temp
+  directory, including after pointing `TEMP`/`TMP` at a writable subdirectory.
+* A portable release artifact was produced:
+  `output/ProtonDock-0.1.0-x64-portable.zip` (9,247,911 bytes) containing
+  `ProtonDock.exe` and `README.txt`.
+* The app was launched from `%TEMP%\protondock-run` with WebView2 CDP enabled on
+  port 9333. The dock, search, settings and widget-card windows all rendered.
+  The optimized release binary was also launched from `%TEMP%\protondock-release`
+  and rendered the dock at 1664x132 (`dock-release.png`).
+
+Native UI evidence:
+
+* Dock: `dock-build-final.png`, `dock-founder.png` (seeded layout, Work and
+  Founder profiles). 82px graphite rail, profile pills, real running-app icons,
+  system Wi-Fi/Bluetooth/uptime, ChatGPT usage, agent state, files/folders, clock.
+* Search: `search-empty-final.png`, `search-chrome-final.png`. Empty search is a
+  clean 174px card; `chrome` returned 30 mixed results; Folders scope returned 29
+  rows, all with `Folder > ...` details after the Rust directory-scope fix.
+* Settings: `settings-build-final.png`. 1040x760, Installed 14 / Store 5,
+  two-column 448px preview cards, SAMPLE labels, per-widget size/settings,
+  reorder, profile switch.
+* Widget cards: `widget-system-final.png`, `widget-weather-final2.png`,
+  `widget-chatgpt-final2.png`, `widget-agent-final3.png`. System exposes live
+  Wi-Fi SSID/signal, Bluetooth off, Ethernet offline, VPN, uptime. Weather exposes
+  current conditions plus high/low, feels-like, wind, humidity, UV, visibility and
+  six hourly slots. ChatGPT exposes the local Codex plan and 5-hour/weekly usage.
+  Agent shows the live workspace, idle state, tokens, session and an honest
+  "Waiting for a task" when no real task exists.
+
+Fixes made during native verification:
+
+* Rust `folders` scope now selects directories only; file/code scopes exclude
+  directories and unified search still includes them.
+* Empty search no longer invokes the engine; request IDs are monotonic across
+  WebView reloads; System dock uses connectivity data; app icons use safe data
+  URLs; disconnected AI widgets no longer imply a live account.
+* Agent widget card no longer treats an idle session as empty and prefers the live
+  workspace over the settings label.
+* AI task extraction rejects injected system prompts over 4,000 bytes and common
+  instruction wrappers, so the agent card does not present a system prompt as a
+  user task.
+* Weather response now includes high/low, feels-like, wind, humidity, UV and
+  visibility; hourly timestamps are converted from seconds correctly and the
+  forecast shows six future slots.
+
+Open gates, not certified by this pass:
+
+* Search app and action rows still use generic SVG type icons rather than the
+  original Windows app icon; result type icons are correct.
+* Widget-card transparent margins, focus-loss behavior and physical 125%/150% DPI
+  rendering were not visually certified with a desktop compositor capture.
+* Spotify remains empty without an active media session; media progress and
+  transport were not observed live. Volume/trash write actions were not executed.
+* Claude remains disconnected because no local assistant usage record exists.
+  Claude limits are not fabricated.
+* NSIS and MSI installer builds failed for environment-level reasons recorded
+  above; installer execution, upgrade/uninstall, startup registration,
+  multi-monitor placement and taskbar-replacement behavior remain unverified.
+  The portable ZIP is not an installer.
+* Full `cargo test` still has the pre-existing ten `local_calendar` access-denied
+  failures at `src-tauri/src/local_calendar.rs:465`.
+* No pixel-perfect comparison against the HTML preview is claimed.

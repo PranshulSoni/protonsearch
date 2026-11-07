@@ -196,14 +196,10 @@ function AiShell({
   const sessionTone = usageTone(session, settings.warnAt);
   const weeklyTone = usageTone(weekly, settings.warnAt);
   const chat = id === 'chatgpt' ? (data as ChatGPTData | undefined) : undefined;
+  const showCredits = id === 'chatgpt' && (chat?.creditsPercent != null || chat?.creditsUsed != null);
   return (
     <>
-      <WidgetHeader
-        id={id}
-        status={effective}
-        preview={preview}
-        aside={<Chip>{settings.plan || 'Local plan'}</Chip>}
-      />
+      <WidgetHeader id={id} status={effective} preview={preview} />
       <div className="fw-card-body fw-ai">
         <div className="fw-ai-head">
           <div>
@@ -220,8 +216,8 @@ function AiShell({
             </div>
             <MetricBar value={session} warnAt={settings.warnAt} label={`${id} session usage`} tone={id === 'claude' ? 'violet' : 'green'} />
             <div className="fw-use-meta">
-              <span>{settings.showReset && data?.resetIn ? `Resets in ${data.resetIn}` : 'Session window'}</span>
-              <span>{data?.tokensUsed != null && data?.tokensLimit != null ? `${compactNumber(data.tokensUsed)} / ${compactNumber(data.tokensLimit)}` : 'Tokens --'}</span>
+              <span>{settings.showReset && data?.resetIn ? (data.resetIn === 'now' ? 'Resets now' : `Resets in ${data.resetIn}`) : 'Session window'}</span>
+              <span>{data?.tokensUsed != null ? (data.tokensLimit != null ? `${compactNumber(data.tokensUsed)} / ${compactNumber(data.tokensLimit)}` : `${compactNumber(data.tokensUsed)} used`) : 'Tokens --'}</span>
             </div>
           </div>
         ) : null}
@@ -233,12 +229,12 @@ function AiShell({
             </div>
             <MetricBar value={weekly} warnAt={settings.warnAt} label={`${id} weekly usage`} tone="blue" />
             <div className="fw-use-meta">
-              <span>{settings.showReset && data?.weeklyResetIn ? `Resets in ${data.weeklyResetIn}` : '7-day window'}</span>
+              <span>{settings.showReset && data?.weeklyResetIn ? (data.weeklyResetIn === 'now' ? 'Resets now' : `Resets in ${data.weeklyResetIn}`) : '7-day window'}</span>
               <span>{id === 'chatgpt' ? 'Weekly limit' : 'Sample window'}</span>
             </div>
           </div>
         ) : null}
-        {id === 'chatgpt' ? (
+        {showCredits ? (
           <div className="fw-use-block is-credits">
             <div className="fw-use-top">
               <span>Credits</span>
@@ -510,7 +506,7 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
                     <div className="fw-wx-hourly">
                       {hours.map((hour) => (
                         <span className="fw-wx-hour" key={hour.time}>
-                          <small>{new Date(hour.time).toLocaleTimeString('en-US', { hour: 'numeric' })}</small>
+                          <small>{new Date(hour.time * 1000).toLocaleTimeString('en-US', { hour: 'numeric' })}</small>
                           <WeatherIcon kind={weatherKind(hour.weatherCode)} size={14} />
                           <strong>{temperature(hour.temperature, units)}</strong>
                         </span>
@@ -622,14 +618,15 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
       const s = settingsFor('agent', settings);
       const agent = source as AgentData | undefined;
       const running = agent?.status === 'live';
-      const empty = agent?.status === 'disconnected' || agent?.status === 'empty' || !agent;
+      const hasAgentData = Boolean(agent?.workspace || agent?.task || agent?.duration || agent?.tokens != null);
+      const empty = !agent || agent.status === 'disconnected' || (agent.status === 'empty' && !hasAgentData);
       body = (
         <>
           <WidgetHeader
             id={id}
-            status={statusFor(preview, status, agent?.status)}
+            status={hasAgentData && agent?.status !== 'disconnected' ? undefined : statusFor(preview, status, agent?.status)}
             preview={preview}
-            aside={<Chip>{running ? 'running' : agent?.status === 'empty' ? 'idle' : 'offline'}</Chip>}
+            aside={<Chip>{running ? 'running' : !empty && hasAgentData ? 'idle' : 'offline'}</Chip>}
           />
           <div className="fw-card-body">
             {empty ? (
@@ -642,7 +639,7 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
                 <div className="fw-agent-head">
                   <span className="fw-agent-workspace-icon"><Icon name="terminal" size={16} /></span>
                   <div>
-                    <strong>{s.workspace || agent?.workspace || 'Workspace'}</strong>
+                    <strong>{(!preview && agent?.workspace) || s.workspace || agent?.workspace || 'Workspace'}</strong>
                     <span><StatusDot state={running ? 'running' : 'idle'} /> {running ? 'Agent running' : 'Agent idle'}</span>
                   </div>
                   {agent?.branch ? <Chip>{agent.branch}</Chip> : null}
@@ -661,7 +658,7 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
               </>
             )}
           </div>
-          <CardFooter left={sourceFoot(id, preview)} right={agent?.status === 'live' ? 'Session active' : 'No session'} />
+          <CardFooter left={sourceFoot(id, preview)} right={running ? 'Session active' : hasAgentData ? 'Idle session' : 'No session'} />
         </>
       );
       break;

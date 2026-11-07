@@ -127,6 +127,27 @@ test('AI widgets ask for a local connection without data', () => {
   }
 });
 
+test('an idle agent still shows its last workspace and session', () => {
+  const view = render(
+    <WidgetCard
+      id="agent"
+      status="empty"
+      data={{
+        status: 'empty',
+        workspace: 'C:\\Users\\demo\\projects\\protonsearch',
+        task: 'Port dock widgets to native providers',
+        duration: '1h 24m',
+        tokens: '34.8K',
+      }}
+    />,
+  );
+  expect(view.queryByText('No workspace agent')).toBeNull();
+  expect(view.getByText('C:\\Users\\demo\\projects\\protonsearch')).not.toBeNull();
+  expect(view.getByText('Port dock widgets to native providers')).not.toBeNull();
+  expect(view.getByText('1h 24m')).not.toBeNull();
+  view.unmount();
+});
+
 test('AI docks show an honest disconnected state instead of fake limits', () => {
   for (const id of ['claude', 'chatgpt'] as const) {
     const label = id === 'claude' ? 'Claude' : 'ChatGPT';

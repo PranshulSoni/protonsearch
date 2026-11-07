@@ -118,24 +118,30 @@ fn compact_text(value: &str, limit: usize) -> String {
     truncated
 }
 
+const TASK_SOURCE_LIMIT: usize = 4_000;
+
+fn task_candidate(text: &str) -> Option<&str> {
+    let text = text.trim();
+    if text.is_empty()
+        || text.len() > TASK_SOURCE_LIMIT
+        || text.starts_with("<environment_context>")
+        || text.starts_with("<user_instructions>")
+        || text.starts_with("<INSTRUCTIONS>")
+    {
+        None
+    } else {
+        Some(text)
+    }
+}
+
 fn user_task(payload: &Value) -> Option<String> {
     if payload["type"] != "message" || payload["role"] != "user" {
         return None;
     }
-    let mut selected = None;
-    if let Some(content) = payload["content"].as_str() {
-        let text = content.trim();
-        if !text.is_empty() && !text.starts_with("<environment_context>") {
-            selected = Some(text);
-        }
-    }
+    let mut selected = payload["content"].as_str().and_then(task_candidate);
     if let Some(items) = payload["content"].as_array() {
         for item in items {
-            let Some(text) = item["text"].as_str() else {
-                continue;
-            };
-            let text = text.trim();
-            if !text.is_empty() && !text.starts_with("<environment_context>") {
+            if let Some(text) = item["text"].as_str().and_then(task_candidate) {
                 selected = Some(text);
             }
         }
@@ -442,6 +448,16 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64
+    }
+
+    #[test]
+    fn ignores_injected_system_prompts_when_looking_for_a_task() {
+        let payload = json!({
+            "type": "message",
+            "role": "user",
+            "content": [{"type": "input_text", "text": "x".repeat(5_000)}]
+        });
+        assert!(user_task(&payload).is_none());
     }
 
     #[test]

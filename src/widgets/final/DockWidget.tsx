@@ -42,6 +42,13 @@ function emit(onAction: WidgetActionHandler | undefined, action: Parameters<Widg
   onAction?.(action);
 }
 
+function workspaceLabel(value?: string | null): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return 'Workspace';
+  const parts = trimmed.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] ?? trimmed;
+}
+
 function tintStyle(id: FinalWidgetId): CSSProperties {
   const meta = getWidgetMeta(id);
   return { '--fw-tint': TINT_COLORS[meta.tint] ?? '#c3c9d1', '--fw-tint-rgb': meta.tintRgb } as CSSProperties;
@@ -375,7 +382,7 @@ export function DockWidget({ id, size, settings, data, preview = false, status, 
           </span>
           {size !== 'compact' ? (
             <span className="fw-dock-stack fw-dock-stack--tight">
-              <small className="fw-dock-sub fw-dock-sub--strong">{agent?.workspace ?? s.workspace}</small>
+              <small className="fw-dock-sub fw-dock-sub--strong">{workspaceLabel(agent?.workspace ?? s.workspace)}</small>
               <span className="fw-dock-meta">{s.showSession && agent?.duration ? agent.duration : meta.shortTitle}</span>
             </span>
           ) : null}

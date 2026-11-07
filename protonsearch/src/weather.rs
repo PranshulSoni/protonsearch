@@ -102,28 +102,85 @@ fn parse_weather(value: Value) -> Result<Value, String> {
         .as_array()
         .ok_or("Missing weather forecast")?;
     if times.is_empty()
-        || times.len() > 8
+        || times.len() > 12
         || times.len() != temperatures.len()
         || times.len() != codes.len()
     {
         return Err("Invalid weather forecast length".into());
     }
+    let visibilities = hourly["visibility"].as_array();
+    if visibilities.is_some_and(|values| values.len() != times.len()) {
+        return Err("Invalid weather visibility".into());
+    }
     let mut hours = Vec::new();
     let mut previous = None;
+    let mut closest: Option<(i64, usize)> = None;
     for (index, value) in times.iter().enumerate() {
         let hour = timestamp(value)?;
         if previous.is_some_and(|previous| hour <= previous) {
             return Err("Invalid weather forecast order".into());
         }
         previous = Some(hour);
+        let distance = (hour - time).abs();
+        if closest.is_none_or(|(current, _)| distance < current) {
+            closest = Some((distance, index));
+        }
         let item = json!({"time":hour,"temperature":temperature(&temperatures[index])?,"weatherCode":code(&codes[index])?});
-        if hour > time && hours.len() < 3 {
+        if hour > time && hours.len() < 6 {
             hours.push(item);
         }
     }
-    Ok(
-        json!({"temperature":temperature(&current["temperature_2m"])?,"weatherCode":code(&current["weather_code"])?,"time":time,"utcOffsetSeconds":offset,"hours":hours}),
-    )
+    let visibility_km = closest
+        .and_then(|(_, index)| {
+            visibilities
+                .and_then(|values| values.get(index))
+                .and_then(Value::as_f64)
+        })
+        .filter(|value| value.is_finite() && *value >= 0.0)
+        .map(|meters| (meters / 100.0).round() / 10.0);
+
+    let current = &value["current"];
+    let daily = &value["daily"];
+    let high_c = daily["temperature_2m_max"]
+        .as_array()
+        .and_then(|values| values.first())
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && (-100.0..=70.0).contains(value));
+    let low_c = daily["temperature_2m_min"]
+        .as_array()
+        .and_then(|values| values.first())
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && (-100.0..=70.0).contains(value));
+    let uv_index = daily["uv_index_max"]
+        .as_array()
+        .and_then(|values| values.first())
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && (0.0..=30.0).contains(value));
+    let feels_like_c = current["apparent_temperature"]
+        .as_f64()
+        .filter(|value| value.is_finite() && (-100.0..=70.0).contains(value));
+    let wind_kph = current["wind_speed_10m"]
+        .as_f64()
+        .filter(|value| value.is_finite() && (0.0..=1_000.0).contains(value));
+    let humidity_percent = current["relative_humidity_2m"]
+        .as_f64()
+        .filter(|value| (0.0..=100.0).contains(value));
+
+    let mut data = json!({"temperature":temperature(&current["temperature_2m"])?,"weatherCode":code(&current["weather_code"])?,"time":time,"utcOffsetSeconds":offset,"hours":hours});
+    for (key, value) in [
+        ("highC", high_c),
+        ("lowC", low_c),
+        ("uvIndex", uv_index),
+        ("feelsLikeC", feels_like_c),
+        ("windKph", wind_kph),
+        ("humidityPercent", humidity_percent),
+        ("visibilityKm", visibility_km),
+    ] {
+        if let Some(value) = value {
+            data[key] = json!(value);
+        }
+    }
+    Ok(data)
 }
 
 fn fetch(coordinates: (f64, f64)) -> Result<Value, String> {
@@ -137,9 +194,17 @@ fn fetch(coordinates: (f64, f64)) -> Result<Value, String> {
         .get("https://api.open-meteo.com/v1/forecast")
         .query("latitude", &coordinates.0.to_string())
         .query("longitude", &coordinates.1.to_string())
-        .query("current", "temperature_2m,weather_code")
-        .query("hourly", "temperature_2m,weather_code")
-        .query("forecast_hours", "4")
+        .query(
+            "current",
+            "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",
+        )
+        .query(
+            "daily",
+            "temperature_2m_max,temperature_2m_min,uv_index_max",
+        )
+        .query("hourly", "temperature_2m,weather_code,visibility")
+        .query("forecast_hours", "10")
+        .query("wind_speed_unit", "kmh")
         .query("timezone", "auto")
         .query("timeformat", "unixtime")
         .call()
@@ -245,8 +310,28 @@ mod tests {
         json!({"version":version,"profile":profile,"profiles":{profile:[{"id":"weather","settings":settings}]}})
     }
     fn fixture() -> Value {
-        json!({"utc_offset_seconds":19800,"current":{"time":1760000400_i64,"temperature_2m":21.5,"weather_code":2},
-            "hourly":{"time":[1760000400_i64,1760004000,1760007600],"temperature_2m":[21.5,22.0,23.0],"weather_code":[2,3,0]}})
+        json!({
+            "utc_offset_seconds":19800,
+            "current":{
+                "time":1760000400_i64,
+                "temperature_2m":21.5,
+                "relative_humidity_2m":64,
+                "apparent_temperature":23.0,
+                "weather_code":2,
+                "wind_speed_10m":14.0
+            },
+            "daily":{
+                "temperature_2m_max":[28.0],
+                "temperature_2m_min":[18.0],
+                "uv_index_max":[5.4]
+            },
+            "hourly":{
+                "time":[1760000400_i64,1760004000,1760007600],
+                "temperature_2m":[21.5,22.0,23.0],
+                "weather_code":[2,3,0],
+                "visibility":[12000,10000,8000]
+            }
+        })
     }
 
     #[test]
@@ -325,6 +410,13 @@ mod tests {
         let data = parse_weather(fixture()).unwrap();
         assert_eq!(data["temperature"], 21.5);
         assert_eq!(data["hours"].as_array().unwrap().len(), 2);
+        assert_eq!(data["highC"], 28.0);
+        assert_eq!(data["lowC"], 18.0);
+        assert_eq!(data["feelsLikeC"], 23.0);
+        assert_eq!(data["windKph"], 14.0);
+        assert_eq!(data["humidityPercent"], 64.0);
+        assert_eq!(data["uvIndex"], 5.4);
+        assert_eq!(data["visibilityKm"], 12.0);
         let mut value = fixture();
         value["current"]["temperature_2m"] = json!(null);
         assert!(parse_weather(value).is_err());
