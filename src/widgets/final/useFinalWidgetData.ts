@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useWeather } from '../../services/weather';
 import { isNative } from '../../services/native';
 import type { Snapshot, WidgetStatus } from '../sdk/types';
 import { useProvider } from '../sdk/provider';
 import type {
+  AgentData,
   AppsData,
+  ChatGPTData,
+  ClaudeData,
   ClockData,
+  FinalAIStatus,
   FinalWidgetData,
   FinalWidgetId,
   FinalWidgetSettings,
@@ -217,6 +222,125 @@ export function mapWeather(snapshot: Snapshot): WeatherData | undefined {
   };
 }
 
+export function mapChatGPT(snapshot: Snapshot | undefined): ChatGPTData | undefined {
+  if (!snapshot) return undefined;
+  const data = record(record(snapshot.data)?.chatgpt);
+  if (!data) return undefined;
+  return {
+    status: aiStatus(data.status, snapshot.status),
+    model: text(data.model),
+    sessionPercent: number(data.sessionPercent),
+    weeklyPercent: number(data.weeklyPercent),
+    resetIn: text(data.resetIn),
+    weeklyResetIn: text(data.weeklyResetIn),
+    tokensUsed: number(data.tokensUsed),
+    tokensLimit: number(data.tokensLimit),
+    plan: text(data.plan),
+    creditsPercent: number(data.creditsPercent),
+    creditsUsed: number(data.creditsUsed),
+    creditsLimit: number(data.creditsLimit),
+  };
+}
+
+export function mapClaude(snapshot: Snapshot | undefined): ClaudeData | undefined {
+  if (!snapshot) return undefined;
+  const data = record(record(snapshot.data)?.claude);
+  if (!data) return undefined;
+  return {
+    status: aiStatus(data.status, snapshot.status),
+    model: text(data.model),
+    sessionPercent: number(data.sessionPercent),
+    weeklyPercent: number(data.weeklyPercent),
+    resetIn: text(data.resetIn),
+    weeklyResetIn: text(data.weeklyResetIn),
+    tokensUsed: number(data.tokensUsed),
+    tokensLimit: number(data.tokensLimit),
+    plan: text(data.plan),
+  };
+}
+
+export function mapAgent(snapshot: Snapshot | undefined): AgentData | undefined {
+  if (!snapshot) return undefined;
+  const data = record(record(snapshot.data)?.agent);
+  if (!data) return undefined;
+  return {
+    status: data.status === 'idle' ? 'empty' : aiStatus(data.status, snapshot.status),
+    workspace: text(data.workspace),
+    branch: text(data.branch),
+    task: text(data.task),
+    duration: text(data.duration),
+    tokens: text(data.tokens),
+    filesChanged: number(data.filesChanged),
+    toolCalls: number(data.toolCalls),
+  };
+}
+
+function aiStatus(value: unknown, fallback: WidgetStatus): FinalAIStatus | undefined {
+  if (value === 'live' || value === 'empty' || value === 'disconnected') return value;
+  if (fallback === 'live' || fallback === 'empty' || fallback === 'disconnected') return fallback;
+  return undefined;
+}
+
+function aiViewStatus(data: { status?: FinalAIStatus } | undefined, snapshot: Snapshot): WidgetStatus {
+  return data?.status ?? snapshot.status;
+}
+
+type AIUsageSnapshot = Snapshot<{ chatgpt?: unknown; claude?: unknown; agent?: unknown }>;
+
+const initialAIUsage: AIUsageSnapshot = { status: 'disconnected', updatedAt: 0 };
+
+function useAIUsage(enabled: boolean): AIUsageSnapshot {
+  const [snapshot, setSnapshot] = useState<AIUsageSnapshot>(initialAIUsage);
+  useEffect(() => {
+    if (!enabled || !isNative()) {
+      setSnapshot(initialAIUsage);
+      return;
+    }
+    let current = true;
+    let pending = false;
+    let queued = false;
+    const refresh = () => {
+      if (!current || document.hidden) return;
+      if (pending) {
+        queued = true;
+        return;
+      }
+      pending = true;
+      void invoke<AIUsageSnapshot>('ai_usage_snapshot')
+        .then((value) => {
+          if (current && value && typeof value === 'object' && typeof value.status === 'string') {
+            setSnapshot(value);
+          }
+        })
+        .catch(() => {
+          if (current) {
+            setSnapshot((previous) => ({
+              ...previous,
+              status: previous.data ? 'stale' : 'error',
+              message: 'Local AI usage unavailable',
+            }));
+          }
+        })
+        .finally(() => {
+          pending = false;
+          if (queued && current) {
+            queued = false;
+            refresh();
+          }
+        });
+    };
+    refresh();
+    const timer = setInterval(refresh, 60000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      current = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [enabled]);
+  return snapshot;
+}
+
 export function isPreviewMode(search = window.location.search): boolean {
   return !isNative() && new URLSearchParams(search).get('preview') === '1';
 }
@@ -237,6 +361,7 @@ export function useFinalWidgetData(
   const folders = useProvider('known-folders', 60000);
   const runningApps = useProvider('running-apps', 5000);
   const weather = useWeather((settings.weather as unknown as Record<string, unknown> | undefined) ?? {});
+  const aiUsage = useAIUsage(!preview);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -247,6 +372,9 @@ export function useFinalWidgetData(
   return useMemo(() => {
     const known = mapKnownFolders(folders);
     const sound = mapVolume(volume);
+    const chatgpt = mapChatGPT(aiUsage);
+    const claude = mapClaude(aiUsage);
+    const agent = mapAgent(aiUsage);
     const views: FinalWidgetViews = {
       windows: { data: mapWindows(runningApps), status: statusOf(runningApps), preview },
       search: { status: 'live', preview },
@@ -254,9 +382,9 @@ export function useFinalWidgetData(
       spotify: { data: mapMedia(media, volume), status: statusOf(media), preview },
       weather: { data: mapWeather(weather), status: statusOf(weather), preview },
       system: { data: mapSystem(system), status: statusOf(system), preview },
-      claude: { status: 'disconnected', preview },
-      chatgpt: { status: 'disconnected', preview },
-      agent: { status: 'disconnected', preview },
+      claude: { data: claude, status: aiViewStatus(claude, aiUsage), preview },
+      chatgpt: { data: chatgpt, status: aiViewStatus(chatgpt, aiUsage), preview },
+      agent: { data: agent, status: aiViewStatus(agent, aiUsage), preview },
       files: { data: known ? { recent: known.recent } : undefined, status: statusOf(folders), preview },
       folders: { data: known ? { folders: known.folders } : undefined, status: statusOf(folders), preview },
       trash: { data: mapTrash(trash), status: statusOf(trash), preview },
@@ -264,5 +392,5 @@ export function useFinalWidgetData(
       clock: { data: mapClock(now), status: 'live', preview },
     };
     return views;
-  }, [folders, media, now, preview, runningApps, system, trash, volume, weather]);
+  }, [aiUsage, folders, media, now, preview, runningApps, system, trash, volume, weather]);
 }

@@ -29,7 +29,10 @@ export function useWeather(settings: Record<string, unknown>): Snapshot<WeatherD
       if (!current || document.hidden) return;
       if (pending) { queued = true; return; }
       pending = true;
-      void invoke<WeatherSnapshot>('weather_snapshot')
+      void invoke<WeatherSnapshot>('weather_snapshot', {
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      })
         .then((value) => {
           if (current && value.location?.latitude === coordinates.latitude && value.location?.longitude === coordinates.longitude) setSnapshot(value);
         })

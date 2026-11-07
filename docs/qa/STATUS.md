@@ -609,3 +609,92 @@ Verification after the fix:
   permission-denied paths and Computer Use/visual UI remain unverified. The
   write actions were compiled and their parsing/allowlists are tested, but they
   were not executed because they change user state or open Explorer.
+
+## Live weather v2 and local AI usage provider (2026-11-07)
+
+Scope: `protonsearch/src/weather.rs`, `src-tauri/src/ai_usage.rs`,
+`src-tauri/src/main.rs`, `src-tauri/permissions/commands.toml`,
+`src/services/weather.ts`, `src/widgets/final/useFinalWidgetData.ts`,
+`src/widgets/final/useFinalWidgetData.test.ts`. No launcher/search UI,
+`DockWidget.tsx`, `primitives.tsx`, `icons.tsx` or `final-widgets.css` edits.
+No sample values are labelled live.
+
+Implemented and compiled:
+
+* `weather_snapshot` accepts optional `latitude`/`longitude` (both or neither).
+  The React dock resolves coordinates from the active widget settings and passes
+  them explicitly; the command does not invent a city. The saved-layout fallback
+  accepts version 1 (`daily`, `founder`) and version 2 (`daily`, `work`,
+  `founder`, `focus`), reads the active profile's weather item, and requires an
+  explicit `weatherEnabled: true` plus finite in-range coordinates. Version 2
+  profiles that do not contain the weather item return `disconnected`.
+* `ai_usage_snapshot` reads the newest
+  `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`, using the last
+  `event_msg/token_count` record for `rate_limits` and total tokens,
+  `session_meta.payload.cwd` for the workspace, the latest non-environment user
+  message for the task, and `turn_context`/`thread_settings_applied` for the
+  model. It also scans `%USERPROFILE%\.claude\projects\**\*.jsonl` for real
+  assistant `message.usage` totals. The envelope is
+  `{status,updatedAt,data:{chatgpt,claude,agent},message?}`.
+* The command is allowed in `dock-commands` and `widget-card-commands`, and is
+  consumed by the dock and widget-card data hooks. It polls every 60000 ms and
+  does not run in preview. Claude is reported as `disconnected` when no real
+  assistant usage record exists; no Claude limits are invented.
+* Agent state is `live` only when the newest rollout was modified within 5
+  minutes, otherwise `idle`. The frontend maps `idle` to its existing `empty`
+  state so the dock renders "idle" without claiming an active session. Unknown
+  branch, changed files, tool calls and Codex token limits/credits remain null.
+
+Observed on this Windows 11 host (real local data, not fixtures):
+
+* Codex rollout: `plan=plus`, `model=gpt-6-luna`, session `83%`,
+  weekly `13%`, `resetIn=now`, `weeklyResetIn=6d 13h`,
+  `tokensUsed=34769`; token limit and credits were absent, so they are null.
+  Agent: `status=idle` (the newest session was older than 5 minutes when
+  probed; the frontend maps it to `empty`), duration `8h 50m`, tokens `34.8K`,
+  workspace
+  `C:\Users\Pranshul\AppData\Local\Temp\open-notebook-codex-1d74zj3x`,
+  task truncated from the latest user message; branch/files/toolCalls null.
+* Claude: local `.claude/projects` transcripts contained no assistant
+  `message.usage`, so the result was `disconnected` with
+  `Claude Code usage limits are unavailable`.
+* Weather network: a direct request to the same Open-Meteo endpoint for the
+  frontend default coordinates (23.0225, 72.5714) returned current `27.0 C`,
+  code `0`, and four hourly entries `25.5/28.6/31.7/33.7 C`, all code `0`,
+  with `utc_offset_seconds=19800`. This verifies network reachability, not the
+  Rust fetch path through the running app.
+
+Verification commands and exact outcomes:
+
+* `cargo fmt --manifest-path protonsearch/Cargo.toml --check` -> clean.
+* `cargo fmt --manifest-path src-tauri/Cargo.toml --check` -> clean.
+* `cargo check --manifest-path src-tauri/Cargo.toml` -> passed; only pre-existing
+  ProtonSearch warnings.
+* `cargo test --manifest-path protonsearch/Cargo.toml weather` -> 8 passed,
+  0 failed.
+* `cargo test --manifest-path src-tauri/Cargo.toml --bin protondock ai_usage`
+  -> 5 passed, 0 failed.
+* `cargo test --manifest-path src-tauri/Cargo.toml --bin protondock --
+  --skip local_calendar::` -> 58 passed, 0 failed, 10 filtered.
+* `npx tsc -b` -> passed. `npm test` -> 18 files, 183 tests passed.
+  `npm run build` -> passed.
+
+Not verified / still open:
+
+* The Tauri IPC calls were not exercised in the running app. `cargo run` for
+  this shell fails while creating the WebView2 window with
+  `HRESULT(0x800700AA)` ("The requested resource is in use.") and, with an
+  alternate user-data folder, `HRESULT(0x8000FFFF)` ("Catastrophic failure").
+  CDP on port 9333 is therefore unavailable here. Command registration, ACL
+  entries and compilation are verified; live IPC/ACL enforcement is not.
+* The Rust Open-Meteo fetch was not run through the app for the same reason.
+  The direct HTTPS request above only verifies the network and response shape.
+* Claude usage limits are not available from local transcripts. Claude remains
+  `disconnected` unless a transcript contains real assistant usage totals; no
+  percentage, reset time or plan is fabricated.
+* Codex token limits and credits are null because the local `rate_limits`
+  record does not contain usable values. Agent branch, changed-file count and
+  tool-call count are always null.
+* Full `cargo test` still has the pre-existing ten `local_calendar` access-denied
+  failures at `src-tauri/src/local_calendar.rs:465`; it was not rerun here.
+* No visual/UI verification was performed.

@@ -13,6 +13,7 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+mod ai_usage;
 mod clipboard_widget;
 mod dock_lifecycle;
 mod known_folders;
@@ -647,9 +648,23 @@ fn clipboard_snapshot_data(engine: &Engine) -> Result<Value, String> {
     ))
 }
 #[tauri::command]
-async fn weather_snapshot() -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        protonsearch::weather::snapshot(&data_dir()?.join("protondock-layout.json"))
+async fn ai_usage_snapshot() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(ai_usage::snapshot)
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn weather_snapshot(latitude: Option<f64>, longitude: Option<f64>) -> Result<Value, String> {
+    let coordinates = match (latitude, longitude) {
+        (Some(latitude), Some(longitude)) => Some((latitude, longitude)),
+        (None, None) => None,
+        _ => return Err("Weather coordinates must be provided together".into()),
+    };
+    tauri::async_runtime::spawn_blocking(move || match coordinates {
+        Some((latitude, longitude)) => {
+            protonsearch::weather::snapshot_coordinates(latitude, longitude)
+        }
+        None => protonsearch::weather::snapshot(&data_dir()?.join("protondock-layout.json")),
     })
     .await
     .map_err(|e| e.to_string())?
@@ -1074,6 +1089,7 @@ fn main() {
             clipboard_snapshot,
             running_apps_snapshot,
             running_apps_activate,
+            ai_usage_snapshot,
             weather_snapshot,
             calendar_select_source,
             calendar_snapshot,

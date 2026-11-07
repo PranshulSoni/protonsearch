@@ -2,6 +2,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   isPreviewMode,
+  mapAgent,
+  mapChatGPT,
+  mapClaude,
   mapClock,
   mapKnownFolders,
   mapMedia,
@@ -142,6 +145,62 @@ describe('final widget data mapping', () => {
       mediaApp: null,
     });
     expect(mapClock(123)).toEqual({ now: 123, timezone: null, nextEvent: null });
+  });
+
+  it('maps local AI usage without inventing missing limits or agent metrics', () => {
+    const snapshot = live({
+      chatgpt: {
+        status: 'live',
+        model: 'gpt-6-luna',
+        sessionPercent: 83,
+        weeklyPercent: 13,
+        resetIn: '4h 12m',
+        weeklyResetIn: '6d 3h',
+        tokensUsed: 34769,
+        tokensLimit: null,
+        plan: 'plus',
+        creditsPercent: null,
+        creditsUsed: null,
+        creditsLimit: null,
+      },
+      claude: { status: 'disconnected' },
+      agent: {
+        status: 'live',
+        workspace: 'C:\\Projects\\demo',
+        branch: null,
+        task: 'Fix live weather and AI usage',
+        duration: '1h 3m',
+        tokens: '34.8K',
+        filesChanged: null,
+        toolCalls: null,
+      },
+    });
+    expect(mapChatGPT(snapshot)).toMatchObject({
+      status: 'live',
+      sessionPercent: 83,
+      weeklyPercent: 13,
+      tokensUsed: 34769,
+      tokensLimit: null,
+      plan: 'plus',
+      creditsPercent: null,
+    });
+    expect(mapClaude(snapshot)).toMatchObject({ status: 'disconnected' });
+    expect(mapAgent(snapshot)).toMatchObject({
+      status: 'live',
+      workspace: 'C:\\Projects\\demo',
+      branch: null,
+      tokens: '34.8K',
+      filesChanged: null,
+      toolCalls: null,
+    });
+    expect(mapAgent(live({ agent: { status: 'idle', workspace: 'C:\\Projects\\demo' } }))).toMatchObject({
+      status: 'empty',
+      workspace: 'C:\\Projects\\demo',
+    });
+    expect(mapChatGPT({ status: 'error', updatedAt: 1 })).toBeUndefined();
+    expect(mapChatGPT(undefined)).toBeUndefined();
+    expect(mapClaude(undefined)).toBeUndefined();
+    expect(mapAgent(undefined)).toBeUndefined();
   });
 
   it('only enables sample preview mode outside the native app', () => {
