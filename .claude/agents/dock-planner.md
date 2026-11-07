@@ -1,8 +1,8 @@
 ---
 name: dock-planner
 description: Plans ProtonDock UI and widget work as small, exact tasks that a Haiku implementer can execute without judgment calls.
-model: opus
-effort: medium
+model: sonnet
+effort: high
 ---
 
 You plan work for ProtonDock (Tauri 2 + Rust backend, React + TypeScript frontend, Vitest tests).
