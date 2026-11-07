@@ -2,6 +2,39 @@
 
 This is a working evidence ledger, not a release certification.
 
+## React final-widget dock integration - 2026-11-07
+
+The React app now renders the 14 final widgets through `DockWidget`/`WidgetCard`
+with a version-2, four-profile layout (`daily`, `work`, `founder`, `focus`).
+Legacy version-1 layouts migrate known IDs (`time` to `clock`, `status` to
+`system`, `media` to `spotify`, `protonsearch` to `search`), preserve unknown IDs
+in `unknown[]`, clamp settings through `settingsFor` and validate them with
+`validateWidgetSettings`. Saves are debounced and use the native settings command
+with a localStorage fallback. The settings surface is the preview-first
+`WidgetManager` with installed/store tabs, per-widget size and settings, and
+profile editing. The widget popover route calls `widget_card_state` on mount and
+listens for `widget-card:show`; the browser preview renders an in-viewport card.
+
+Verification this run:
+
+* `npx tsc -b` passed.
+* `npm test -- --reporter=dot` passed: 18 files, 171 tests.
+* `npm run build` passed (Vite 7.3.7, 54 modules).
+* `npm run widgets:validate` accepted 29 legacy IDs.
+* `git diff --check` reported CRLF warnings only.
+* Browser evidence: `dock-final-1200.png`, `dock-final-1366.png`,
+  `dock-final-1600.png`, `dock-final-overlay.png`, `settings-final-manager.png`,
+  `settings-final-grid-top/mid/bottom.png`, `settings-final-store.png`,
+  `settings-final-store-bottom.png`, `settings-final-detail.png`,
+  `settings-final-detail-bottom.png`, `widget-final-spotify-520.png`.
+
+Open native gates: the Windows Tauri app was not launched in this pass, so
+transparent-window rendering, rounded hit-testing, DPI behavior, native provider
+states, settings-window dragging/closing, widget-card placement/focus-loss, and
+the real Windows app are not visually certified. Browser preview values marked
+SAMPLE are not live data. The settings window config was changed to 1040x760
+with transparency and no decorations but was not exercised in a native build.
+
 ## Single-column launcher port - 2026-11-07
 
 The React search window now uses the finalized single-column launcher: one
