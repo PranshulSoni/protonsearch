@@ -1,6 +1,6 @@
-use anyhow::{bail, Result};
 use crate::calculator::try_calc;
 use crate::quick_actions::QUICK_ACTIONS;
+use anyhow::{bail, Result};
 use rusqlite::{params, Connection};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -633,6 +633,13 @@ struct FileRow {
     path_modifier: f32,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FileScope {
+    All,
+    Files,
+    Folders,
+}
+
 pub struct SearchEngine {
     vecs: Vec<f32>,
     meta: Vec<CatalogEntry>,
@@ -1125,6 +1132,7 @@ impl SearchEngine {
         &self,
         query: &str,
         only_code: bool,
+        scope: FileScope,
         max_results: usize,
         with_fts_content: bool,
     ) -> Vec<SearchResult> {
@@ -1142,19 +1150,23 @@ impl SearchEngine {
             ];
             let mut results = Vec::new();
             // Pull recent files sorted by modification time descending
-            let query_str = if only_code {
+            let query_str = if scope == FileScope::Folders {
+                "SELECT path, name, extension, modified, is_dir FROM files WHERE is_dir=1 ORDER BY modified DESC LIMIT ?".to_string()
+            } else if only_code {
                 let placeholders: Vec<String> =
                     code_exts_local.iter().map(|_| "?".to_string()).collect();
                 format!(
-                    "SELECT path, name, extension, modified FROM files WHERE is_dir=0 AND extension IN ({}) ORDER BY modified DESC LIMIT ?",
+                    "SELECT path, name, extension, modified, is_dir FROM files WHERE is_dir=0 AND extension IN ({}) ORDER BY modified DESC LIMIT ?",
                     placeholders.join(",")
                 )
+            } else if scope == FileScope::Files {
+                "SELECT path, name, extension, modified, is_dir FROM files WHERE is_dir=0 ORDER BY modified DESC LIMIT ?".to_string()
             } else {
-                "SELECT path, name, extension, modified FROM files WHERE is_dir=0 ORDER BY modified DESC LIMIT ?".to_string()
+                "SELECT path, name, extension, modified, is_dir FROM files ORDER BY modified DESC LIMIT ?".to_string()
             };
             if let Ok(mut stmt) = conn.prepare(&query_str) {
                 let mut params_vec: Vec<rusqlite::types::Value> = vec![];
-                if only_code {
+                if only_code && scope != FileScope::Folders {
                     for ext in &code_exts_local {
                         params_vec.push(rusqlite::types::Value::Text(ext.to_string()));
                     }
@@ -1167,10 +1179,11 @@ impl SearchEngine {
                         row.get::<_, String>(1)?,
                         row.get::<_, String>(2)?,
                         row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
                     ))
                 }) {
                     for row in rows.filter_map(|r| r.ok()) {
-                        let (path, name, ext, _modified) = row;
+                        let (path, name, ext, _modified, is_dir) = row;
                         let path_modifier = Self::get_path_score_modifier(&path);
                         if path_modifier < -1.0 {
                             continue;
@@ -1182,19 +1195,27 @@ impl SearchEngine {
                             0.0
                         };
                         let recency_score = 1.0 + path_modifier + image_bonus;
-                        let source = if only_code || code_exts_local.contains(&ext.as_str()) {
+                        let source = if is_dir != 0 {
+                            "FOLDER"
+                        } else if only_code || code_exts_local.contains(&ext.as_str()) {
                             "CODE"
-                        } else if image_exts.contains(&ext.as_str()) {
-                            "FILE"
                         } else {
                             "FILE"
                         };
-                        let breadcrumb = format!(
-                            "{} > {}",
-                            if source == "CODE" { "Code" } else { "File" },
-                            path
-                        );
-                        let description = format!("Local {} file", ext.to_uppercase());
+                        let breadcrumb = if source == "FOLDER" {
+                            format!("Folder > {}", path)
+                        } else {
+                            format!(
+                                "{} > {}",
+                                if source == "CODE" { "Code" } else { "File" },
+                                path
+                            )
+                        };
+                        let description = if source == "FOLDER" {
+                            "Local folder".to_string()
+                        } else {
+                            format!("Local {} file", ext.to_uppercase())
+                        };
                         results.push(SearchResult {
                             entry: CatalogEntry {
                                 id: format!("{}.{}", source.to_lowercase(), path),
@@ -1255,19 +1276,25 @@ impl SearchEngine {
         let mut results = Vec::new();
 
         let name_query = format!("%{}%", q_lower);
-        let query_str = if only_code {
+        let query_str = if scope == FileScope::Folders {
+            "SELECT path, name, extension, is_dir FROM files WHERE name LIKE ? AND is_dir=1 LIMIT ?"
+                .to_string()
+        } else if only_code {
             let placeholders: Vec<String> = code_exts.iter().map(|_| "?".to_string()).collect();
             format!(
-                "SELECT path, name, extension FROM files WHERE name LIKE ? AND extension IN ({}) LIMIT ?",
+                "SELECT path, name, extension, is_dir FROM files WHERE name LIKE ? AND is_dir=0 AND extension IN ({}) LIMIT ?",
                 placeholders.join(",")
             )
+        } else if scope == FileScope::Files {
+            "SELECT path, name, extension, is_dir FROM files WHERE name LIKE ? AND is_dir=0 LIMIT ?"
+                .to_string()
         } else {
-            "SELECT path, name, extension FROM files WHERE name LIKE ? LIMIT ?".to_string()
+            "SELECT path, name, extension, is_dir FROM files WHERE name LIKE ? LIMIT ?".to_string()
         };
         if let Ok(mut stmt) = conn.prepare(&query_str) {
             let mut params_vec: Vec<rusqlite::types::Value> =
                 vec![rusqlite::types::Value::Text(name_query)];
-            if only_code {
+            if only_code && scope != FileScope::Folders {
                 for ext in &code_exts {
                     params_vec.push(rusqlite::types::Value::Text(ext.to_string()));
                 }
@@ -1279,10 +1306,11 @@ impl SearchEngine {
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
                 ))
             }) {
                 for row in rows.filter_map(|r| r.ok()) {
-                    let (path, name, ext) = row;
+                    let (path, name, ext, is_dir) = row;
                     let path_modifier = Self::get_path_score_modifier(&path);
                     if path_modifier < -1.0 {
                         continue;
@@ -1292,7 +1320,7 @@ impl SearchEngine {
                         continue;
                     }
                     score += path_modifier;
-                    let source = if ext == "folder" {
+                    let source = if is_dir != 0 {
                         "FOLDER"
                     } else if only_code || code_exts.contains(&ext.as_str()) {
                         "CODE"
@@ -1332,7 +1360,8 @@ impl SearchEngine {
 
         // ── 3. FTS5 content search — only in dedicated prefix searches (file:/code:)
         // In general search (with_fts_content=false), we skip content-only matches to prevent UI stutters.
-        if !with_fts_content {
+        // Folders have no FTS content, so folder-only searches stop after the name phase.
+        if scope == FileScope::Folders || !with_fts_content {
             return results;
         }
 
@@ -1464,7 +1493,7 @@ impl SearchEngine {
     }
 
     fn search_local_files(&self, query: &str) -> Vec<SearchResult> {
-        self.search_files_generic(query, false, 300, false)
+        self.search_files_generic(query, false, FileScope::All, 300, false)
     }
 
     fn search_local_files_with_fts(&self, query: &str, with_fts: bool) -> Vec<SearchResult> {
@@ -1473,7 +1502,7 @@ impl SearchEngine {
             // Fast phase: instant in-memory filename/folder scan, no SQL full-table LIKE.
             return self.search_files_in_memory(query, false, limit);
         }
-        self.search_files_generic(query, false, limit, with_fts)
+        self.search_files_generic(query, false, FileScope::All, limit, with_fts)
     }
 
     /*
@@ -2560,17 +2589,17 @@ impl SearchEngine {
 
     pub fn search_files_only(&self, query: &str) -> Vec<SearchResult> {
         // Dedicated file: prefix — include full content search
-        self.search_files_generic(query, false, 50, true)
+        self.search_files_generic(query, false, FileScope::Files, 50, true)
     }
 
     pub fn search_folders_only(&self, query: &str) -> Vec<SearchResult> {
         // Dedicated folder: prefix — title match only (no FTS content)
-        self.search_files_generic(query, false, 50, false)
+        self.search_files_generic(query, false, FileScope::Folders, 50, false)
     }
 
     pub fn search_code_only(&self, query: &str) -> Vec<SearchResult> {
         // Dedicated code: prefix — include full content search
-        self.search_files_generic(query, true, 50, true)
+        self.search_files_generic(query, true, FileScope::Files, 50, true)
     }
 
     /// img: / screenshots: prefix — search images by OCR'd text content and filename.
@@ -5778,8 +5807,7 @@ mod tests {
 
     #[test]
     fn ai_prefixes_work_without_space_or_prompt() {
-        let mut engine = SearchEngine::new(unique_test_db("ai_prefixes"), false)
-            .expect("engine");
+        let mut engine = SearchEngine::new(unique_test_db("ai_prefixes"), false).expect("engine");
 
         let chatgpt = engine.search("chatgpt:", 5);
         assert_eq!(chatgpt[0].entry.control_name, "Open ChatGPT");
@@ -6133,6 +6161,82 @@ mod tests {
                     &result.entry.launch_command
                 ))
                 .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn folder_scope_returns_directories_only() {
+        let db_path = unique_test_db("folder_scope_directories");
+        let mut engine = SearchEngine::new(db_path.clone(), false).expect("engine");
+        engine
+            .conn
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS files (
+                    path TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    extension TEXT NOT NULL,
+                    modified INTEGER NOT NULL,
+                    size INTEGER NOT NULL DEFAULT 0,
+                    is_dir INTEGER NOT NULL DEFAULT 0
+                );",
+            )
+            .expect("files table");
+        for (path, name, extension, is_dir) in [
+            (
+                "C:\\Users\\tester\\Documents\\target-folder",
+                "target-folder",
+                "",
+                1,
+            ),
+            (
+                "C:\\Users\\tester\\Documents\\other-folder",
+                "other-folder",
+                "",
+                1,
+            ),
+            (
+                "C:\\Users\\tester\\Documents\\target.txt",
+                "target.txt",
+                "txt",
+                0,
+            ),
+        ] {
+            engine
+                .conn
+                .execute(
+                    "INSERT INTO files (path, name, extension, modified, size, is_dir)
+                     VALUES (?1, ?2, ?3, ?4, 1, ?5)",
+                    rusqlite::params![path, name, extension, is_dir as i64, is_dir],
+                )
+                .expect("insert result");
+        }
+
+        let folders = engine.search_folders_only("target");
+        let files = engine.search_files_only("target");
+        let all = engine.search_local_files("target");
+        let _ = std::fs::remove_file(&db_path);
+
+        assert!(
+            folders.len() == 1
+                && folders[0].entry.source == "FOLDER"
+                && folders[0].entry.control_name == "target-folder",
+            "folder scope should return only matching directories, got {:?}",
+            folders
+                .iter()
+                .map(|result| (&result.entry.control_name, &result.entry.source))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            files.iter().all(|result| result.entry.source != "FOLDER"),
+            "file scope should not return directories, got {:?}",
+            files
+                .iter()
+                .map(|result| (&result.entry.control_name, &result.entry.source))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            all.iter().any(|result| result.entry.source == "FOLDER"),
+            "unified file search should include matching directories"
         );
     }
 
@@ -6888,7 +6992,9 @@ pub fn resolve_lnk_path(lnk_path: &std::path::Path) -> Option<String> {
 }
 
 /// Enumerate applications without constructing a search engine or touching its database.
-pub(crate) fn installed_apps() -> Vec<AppInfo> { scan_apps() }
+pub(crate) fn installed_apps() -> Vec<AppInfo> {
+    scan_apps()
+}
 
 fn scan_apps() -> Vec<AppInfo> {
     let mut apps = Vec::new();
@@ -6907,11 +7013,15 @@ fn scan_apps() -> Vec<AppInfo> {
             fn drop(&mut self) {
                 if self.0 {
                     // SAFETY: balances successful initialization on this same calling thread.
-                    unsafe { windows::Win32::System::Com::CoUninitialize(); }
+                    unsafe {
+                        windows::Win32::System::Com::CoUninitialize();
+                    }
                 }
             }
         }
-        let _apartment = ApartmentGuard(CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).is_ok());
+        let _apartment = ApartmentGuard(
+            CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).is_ok(),
+        );
 
         let apps_folder: IShellItem =
             match SHGetKnownFolderItem(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, HANDLE::default()) {
