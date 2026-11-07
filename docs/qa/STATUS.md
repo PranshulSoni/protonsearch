@@ -705,7 +705,8 @@ Scope: final React dock/search/settings/widget-card surfaces, native providers, 
 the Rust search/weather paths. The build was exercised from a temporary install
 copy because the project-tree executable still hits the pre-existing WebView2
 location failure. No taskbar replacement, startup registration, or installer
-installation is claimed.
+installation is claimed. Screenshots referenced below are under
+`docs/qa/native/`.
 
 Build and automated checks:
 
@@ -751,7 +752,7 @@ Native UI evidence:
   two-column 448px preview cards, SAMPLE labels, per-widget size/settings,
   reorder, profile switch.
 * Widget cards: `widget-system-final.png`, `widget-weather-final2.png`,
-  `widget-chatgpt-final2.png`, `widget-agent-final3.png`. System exposes live
+  `widget-chatgpt-final3.png`, `widget-agent-final3.png`. System exposes live
   Wi-Fi SSID/signal, Bluetooth off, Ethernet offline, VPN, uptime. Weather exposes
   current conditions plus high/low, feels-like, wind, humidity, UV, visibility and
   six hourly slots. ChatGPT exposes the local Codex plan and 5-hour/weekly usage.
