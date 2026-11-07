@@ -77,6 +77,24 @@ describe('DockShell integration', () => {
     }));
   });
 
+  it('starts Windows from the Start tile', async () => {
+    mockCommands(defaultLayout());
+    const { container } = render(<DockShell />);
+    await screen.findByRole('tab', { name: 'Daily' });
+    fireEvent.click(container.querySelector<HTMLElement>('[data-widget-id="windows"]')!);
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('open_start'));
+    expect(invoke.mock.calls.map(([command]) => command)).not.toContain('open_widget_card');
+  });
+
+  it('opens Spotlight from the Search tile', async () => {
+    mockCommands(defaultLayout());
+    const { container } = render(<DockShell />);
+    await screen.findByRole('tab', { name: 'Daily' });
+    fireEvent.click(container.querySelector<HTMLElement>('[data-widget-id="search"]')!);
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('open_search', { query: '' }));
+    expect(invoke.mock.calls.map(([command]) => command)).not.toContain('open_widget_card');
+  });
+
   it('reports only the profile shelf and rail as native hit regions', async () => {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
     vi.stubGlobal('cancelAnimationFrame', clearTimeout);

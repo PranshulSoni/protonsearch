@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isNative, native } from '../../services/native';
-import { DockWidget } from '../../widgets/final/DockWidget';
+import { DockWidget, dockActionFor } from '../../widgets/final/DockWidget';
 import { WidgetCard } from '../../widgets/final/WidgetCard';
-import { getWidgetMeta } from '../../widgets/final/meta';
+import { getWidgetMeta, settingsFor } from '../../widgets/final/meta';
+import { sampleFor } from '../../widgets/final/sample';
 import { useFinalWidgetData } from '../../widgets/final/useFinalWidgetData';
-import type { FinalWidgetId, FinalWidgetSettings } from '../../widgets/final/types';
-import type { WidgetSize } from '../../widgets/sdk/types';
+import type { AppsData, FinalWidgetSettings } from '../../widgets/final/types';
 import { performWidgetAction } from './actions';
+import { DockGroup, type DockGroupItem } from './DockGroup';
 import {
   PROFILE_IDS,
   PROFILE_LABELS,
@@ -17,6 +18,7 @@ import {
   type DockLayout,
   type ProfileId,
 } from './layout';
+import { DEFAULT_TILE, slotStyle, type TileSize } from './sizing';
 
 export interface DockSurfaceProps {
   layout: DockLayout;
@@ -25,67 +27,12 @@ export interface DockSurfaceProps {
   disabled?: boolean;
 }
 
-function availableWidth(): number {
-  if (typeof window === 'undefined') return 1200;
-  const screenWidth = isNative() ? window.screen?.availWidth ?? 0 : 0;
-  return Math.max(screenWidth || 0, window.innerWidth || 0);
-}
-
-export const DOCK_WIDTHS: Record<FinalWidgetId, Record<WidgetSize, number>> = {
-  windows: { compact: 76, standard: 116, wide: 140 },
-  search: { compact: 100, standard: 154, wide: 190 },
-  apps: { compact: 94, standard: 168, wide: 204 },
-  spotify: { compact: 104, standard: 180, wide: 220 },
-  weather: { compact: 96, standard: 140, wide: 180 },
-  system: { compact: 116, standard: 184, wide: 216 },
-  claude: { compact: 92, standard: 152, wide: 190 },
-  chatgpt: { compact: 92, standard: 152, wide: 190 },
-  agent: { compact: 92, standard: 164, wide: 204 },
-  files: { compact: 92, standard: 158, wide: 196 },
-  folders: { compact: 92, standard: 158, wide: 196 },
-  trash: { compact: 78, standard: 104, wide: 134 },
-  volume: { compact: 90, standard: 124, wide: 158 },
-  clock: { compact: 84, standard: 112, wide: 142 },
-};
-
-export const DOCK_DENSE_WIDTHS: Record<FinalWidgetId, number> = {
-  windows: 68,
-  search: 104,
-  apps: 112,
-  spotify: 120,
-  weather: 88,
-  system: 122,
-  claude: 104,
-  chatgpt: 104,
-  agent: 96,
-  files: 104,
-  folders: 104,
-  trash: 68,
-  volume: 84,
-  clock: 68,
-};
-
-function railWidth(items: DockItem[], dense: boolean): number {
-  const widths = items.reduce((total, item) => (
-    total + (dense ? DOCK_DENSE_WIDTHS[item.id] : DOCK_WIDTHS[item.id][effectiveSize(item)])
-  ), 0);
-  return widths + Math.max(0, items.length - 1) * 5 + 16;
-}
-
-function useDockWidth() {
-  const [width, setWidth] = useState(availableWidth);
-  useEffect(() => {
-    const update = () => setWidth(availableWidth());
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  return width;
+function sizeOf(_item: DockItem): TileSize {
+  return DEFAULT_TILE;
 }
 
 export function DockSurface({ layout, onChange, onCustomize, disabled = false }: DockSurfaceProps) {
   const items = layout.profiles[layout.profile];
-  const width = useDockWidth();
-  const dense = width < 1366 || railWidth(items, false) + 8 > width;
   const preview = !isNative() && new URLSearchParams(window.location.search).get('preview') === '1';
   const settings: Partial<Record<DockItem['id'], FinalWidgetSettings>> = {};
   for (const item of items) settings[item.id] = effectiveSettings(item);
@@ -112,6 +59,12 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
     }
     setPreviewCard(item);
   }, []);
+
+  const activate = (item: DockItem, element: HTMLElement) => {
+    const primary = dockActionFor(item.id);
+    if (primary) void performWidgetAction(primary).catch(() => {});
+    else openCard(item, element);
+  };
 
   useEffect(() => {
     if (!isNative()) return;
@@ -160,10 +113,9 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
       observer?.disconnect();
       window.removeEventListener('resize', fit);
     };
-  }, [layout, dense]);
+  }, [layout]);
 
   const appearance: AppearanceMode = layout.appearances?.[layout.profile] ?? 'capsules';
-  const visibleRail = useMemo(() => railWidth(items, dense), [dense, items]);
 
   return (
     <div className="dock-final" data-appearance={appearance} aria-label="ProtonDock">
@@ -187,33 +139,62 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
         </button>
       </div>
       <div
-        className={`dock-final-rail${dense ? ' is-dense' : ''}`}
-        style={{ width: Math.min(visibleRail, Math.max(0, width - 8)) }}
+        className="dock-final-rail"
         data-profile={layout.profile}
         ref={railRef}
       >
         {items.length ? items.map((item) => {
           const meta = getWidgetMeta(item.id);
           const view = views[item.id];
+          if (item.id === 'apps') {
+            const s = settingsFor('apps', item.settings);
+            const apps = ((view.preview ? sampleFor('apps') : view.data) as AppsData | undefined)?.items ?? [];
+            const running: DockGroupItem[] = apps
+              .filter((app) => !s.activeOnly || app.active)
+              .slice(0, s.maxApps)
+              .map((app) => ({ id: app.id, title: app.title, icon: app.icon, running: true }));
+            return (
+              <div
+                className="dock-final-slot dock-final-slot--group"
+                key={item.id}
+                data-widget-id="apps"
+                style={slotStyle(sizeOf(item))}
+              >
+                <DockGroup
+                  label={meta.title}
+                  placeholder="apps"
+                  items={running}
+                  disabled={disabled}
+                  onOpen={(id) => void performWidgetAction(id).catch(() => {})}
+                  onCard={(anchor) => openCard(item, anchor)}
+                />
+              </div>
+            );
+          }
+          const primary = dockActionFor(item.id);
           return (
             <div
-              className="dock-final-slot"
+              className="dock-final-slot dock-cell"
               key={item.id}
               data-widget-id={item.id}
               role="button"
               tabIndex={disabled ? -1 : 0}
-              aria-label={`Open ${meta.title} card`}
+              aria-label={primary === 'start' ? 'Open Start' : primary === 'search' ? 'Open Spotlight search' : `Open ${meta.title} card`}
+              style={slotStyle(sizeOf(item))}
               onClick={(event) => {
                 if (disabled) return;
-                if ((event.target as HTMLElement).closest('button')) return;
-                openCard(item, event.currentTarget);
+                activate(item, event.currentTarget);
               }}
               onKeyDown={(event) => {
                 if (disabled || event.target !== event.currentTarget) return;
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  openCard(item, event.currentTarget);
+                  activate(item, event.currentTarget);
                 }
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                openCard(item, event.currentTarget);
               }}
             >
               <DockWidget
@@ -222,6 +203,7 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
                 data={view.data}
                 preview={view.preview}
               />
+              <span className="dock-tip" aria-hidden="true">{meta.title}</span>
             </div>
           );
         }) : <span className="dock-final-empty">No widgets enabled</span>}
