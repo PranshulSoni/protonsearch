@@ -81,6 +81,19 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
 
 ## 2. Core Widget Catalog & Backend IPC Mapping
 
+### 2.0 Windows 11 Start Widget (`start`)
+* **Design & Alignment Contract**:
+  - Discrete 48px square tile featuring the official Windows 11 brand geometry: four flat, symmetrical square panes (`8.2px x 8.2px` with `0.8px` corner radius) separated by a clean `1.6px` divider cross in Fluent Blue (`#0078d4` / `var(--win-blue)`).
+  - Tilted or perspective-angled Windows 10 / 8 logos are strictly superseded.
+  - Optical centering: `20px x 20px` vector graphic centered in a `32px` glyph box with `shape-rendering="geometricPrecision"`.
+* **Rust Backend Module**:
+  - Source file: `src-tauri/src/start_menu.rs`.
+  - Native API: Triggers the Windows 11 Start Menu without lag via Win32 `keybd_event(VK_LWIN, 0, 0, 0); keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0)` or posting `WM_SYSCOMMAND` with `SC_TASKLIST` to `FindWindowW("Shell_TrayWnd", NULL)`.
+* **IPC Contract**:
+  - Command: `invoke('toggle_start_menu')`.
+
+---
+
 ### 2.1 Weather Widget (`weather`)
 * **Design & Behavior**:
   - Square Mode (48px): Centered weather glyph with temperature readout (`24°`).
