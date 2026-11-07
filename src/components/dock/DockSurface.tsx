@@ -91,6 +91,8 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
       const railRect = rail.getBoundingClientRect();
       const pillsRect = pills.getBoundingClientRect();
       if (!railRect.width || !pillsRect.width) return;
+      // useMagnify widens the ::after backing by --mag-after, which would grow scrollWidth and resize the window on hover.
+      const spread = Math.ceil(Number.parseFloat(rail.style.getPropertyValue('--mag-after')) || 0);
       const next = dockFit(
         'bottom',
         'center',
@@ -98,7 +100,7 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
         {
           left: railRect.left,
           top: railRect.top,
-          width: Math.max(railRect.width, rail.scrollWidth),
+          width: Math.max(railRect.width, rail.scrollWidth - spread),
           height: Math.max(railRect.height, rail.scrollHeight),
         },
         { width: window.innerWidth, height: window.innerHeight },

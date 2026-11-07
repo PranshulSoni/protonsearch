@@ -176,6 +176,28 @@ describe('DockShell integration', () => {
     expect(container.querySelector('[data-hot="true"]')).toBeNull();
   });
 
+  it('keeps the window width while magnified tiles widen the glass backing', async () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
+    vi.stubGlobal('cancelAnimationFrame', clearTimeout);
+    vi.stubGlobal('innerHeight', 146);
+    mockCommands(defaultLayout());
+    const { container } = render(<DockShell />);
+    await screen.findByRole('tab', { name: 'Daily' });
+    const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
+    const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
+    rail.getBoundingClientRect = () => ({ x: 112, y: 72, width: 800, height: 60, left: 112, top: 72, right: 912, bottom: 132, toJSON() {} });
+    pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
+    const lastFit = () => invoke.mock.calls.filter(([command]) => command === 'fit_dock').at(-1)?.[1];
+    const hovered = { width: 912, height: 146, regions: [expect.anything(), { x: 16, y: 8, width: 880, height: 124, radius: 18 }] };
+    fireEvent.pointerEnter(rail);
+    await waitFor(() => expect(lastFit()).toEqual(hovered));
+    // useMagnify sets --mag-after and the ::after backing then overflows the rail by that much, inflating scrollWidth.
+    rail.style.setProperty('--mag-after', '24.62px');
+    Object.defineProperty(rail, 'scrollWidth', { value: 825, configurable: true });
+    window.dispatchEvent(new Event('resize'));
+    expect(lastFit()).toEqual(hovered);
+  });
+
   it('opens the native settings window from Customize Widgets', async () => {
     mockCommands(defaultLayout());
     render(<DockShell />);
