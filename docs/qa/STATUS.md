@@ -727,7 +727,7 @@ Build and automated checks:
   `System.UnauthorizedAccessException` creating a temporary file in the user temp
   directory, including after pointing `TEMP`/`TMP` at a writable subdirectory.
 * A portable release artifact was produced:
-  `output/ProtonDock-0.1.0-x64-portable.zip` (9,247,911 bytes) containing
+  `output/ProtonDock-0.1.0-x64-portable.zip` (9,247,956 bytes) containing
   `ProtonDock.exe` and `README.txt`.
 * The app was launched from `%TEMP%\protondock-run` with WebView2 CDP enabled on
   port 9333. The dock, search, settings and widget-card windows all rendered.
