@@ -259,7 +259,12 @@ export function WidgetManager({ layout, onChange, onClose, error }: WidgetManage
             <div className="wm-detail-preview">
               <WidgetPreview id={detail} />
               <div className="wm-detail-summary">
-                <span>{SIZE_LABELS[detailItem ? effectiveSize(detailItem) : getWidgetMeta(detail).defaultSize]} size</span>
+                <SizeControl
+                  id={detail}
+                  value={detailItem ? effectiveSize(detailItem) : getWidgetMeta(detail).defaultSize}
+                  onChange={(size) => setSize(detail, size)}
+                  disabled={!installed.has(detail)}
+                />
                 <span>{installed.has(detail) ? 'Installed' : 'Not installed'}</span>
               </div>
             </div>

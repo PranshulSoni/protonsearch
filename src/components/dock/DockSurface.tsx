@@ -155,7 +155,7 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
       </div>
       <div
         className={`dock-final-rail${dense ? ' is-dense' : ''}`}
-        style={{ width: Math.min(visibleRail, Math.max(0, window.innerWidth - 24)) }}
+        style={{ width: Math.min(visibleRail, Math.max(0, width - 24)) }}
         data-profile={layout.profile}
         ref={railRef}
       >

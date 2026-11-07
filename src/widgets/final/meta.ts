@@ -204,7 +204,7 @@ export const FINAL_WIDGET_META: readonly FinalWidgetMeta[] = [
     providers: provider([]),
     permissions: ['search:local'],
     optional: false,
-    settingsDefaults: { showHint: true, showShortcut: true },
+    settingsDefaults: { showHint: true, showShortcut: false },
   },
   {
     id: 'apps',
@@ -261,7 +261,7 @@ export const FINAL_WIDGET_META: readonly FinalWidgetMeta[] = [
     providers: provider([]),
     permissions: ['weather:read'],
     optional: false,
-    settingsDefaults: { weatherEnabled: false, weatherLatitude: 23.0225, weatherLongitude: 72.5714, location: 'Ahmedabad', units: 'C', showHourly: true, showDetails: true, forecastHours: 6 },
+    settingsDefaults: { weatherEnabled: true, weatherLatitude: 23.0225, weatherLongitude: 72.5714, location: 'Ahmedabad', units: 'C', showHourly: true, showDetails: true, forecastHours: 6 },
   },
   {
     id: 'system',

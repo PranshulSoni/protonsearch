@@ -50,7 +50,9 @@ export function useWeather(settings: Record<string, unknown>): Snapshot<WeatherD
       current = false;
       clearInterval(timer);
       document.removeEventListener('visibilitychange', refresh);
-      void listener.then((unlisten) => unlisten());
+      void listener
+        .then((unlisten) => Promise.resolve(unlisten()).catch(() => undefined))
+        .catch(() => undefined);
     };
   }, [coordinates?.latitude, coordinates?.longitude]);
   return snapshot;

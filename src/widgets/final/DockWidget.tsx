@@ -230,17 +230,20 @@ export function DockWidget({ id, size, settings, data, preview = false, status, 
       const weather = source as WeatherData | undefined;
       const units = s.units;
       const kind = weatherKind(weather?.weatherCode);
+      const label = weather
+        ? weatherLabelShort(weather.weatherCode)
+        : s.weatherEnabled ? 'No data' : 'Set location';
       content = (
         <>
           <span className="fw-dock-weather-ic">
             <WeatherIcon kind={kind} size={size === 'compact' ? 22 : 25} />
           </span>
-          <span className="fw-dock-weather-temp">{temperature(weather?.temperature, units)}</span>
+          <span className="fw-dock-weather-temp">{weather ? temperature(weather.temperature, units) : '--°'}</span>
           {size !== 'compact' ? (
             <span className="fw-dock-stack fw-dock-stack--tight">
-              <small className="fw-dock-sub">{s.weatherEnabled ? weatherLabelShort(weather?.weatherCode) : 'Set location'}</small>
-              <span className="fw-dock-weather-meta">{s.weatherEnabled ? highLow(weather?.highC, weather?.lowC, units) : 'Weather'}</span>
-              {size === 'wide' ? <span className="fw-dock-location">{s.location}</span> : null}
+              <small className="fw-dock-sub">{label}</small>
+              {weather ? <span className="fw-dock-weather-meta">{highLow(weather.highC, weather.lowC, units)}</span> : null}
+              {size === 'wide' && (weather || s.weatherEnabled) ? <span className="fw-dock-location">{s.location}</span> : null}
             </span>
           ) : null}
         </>
