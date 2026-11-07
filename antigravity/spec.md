@@ -57,13 +57,21 @@
 * **Design & Behavior**:
   - Square Mode (48px): Pill battery outline with green/amber fill proportional to charge, charging lightning bolt indicator, and centered text (`88%`).
   - Rectangle Mode (124px): Battery icon on left + `88% Charging` (primary) / `Power: On AC (4h 12m)` (secondary).
+  - **Anchored Popover HUD (Power Delivery Telemetry)**:
+    - Live charge/drain rate in Watts: `+48.2W Fast Charge` or `-16.4W Draining`.
+    - Voltage (`19.8 V`) and Current (`2.43 A`).
+    - Battery Health (`96%`), Cycle Count (`142 cycles`), and Full Charge Capacity vs Design Capacity (`68.2 Wh / 71.0 Wh`).
+    - Internal Pack Temperature (`31.4°C`).
+    - Estimated Time to Full / Time Remaining (`42 min until full`).
+    - Interactive simulation button to toggle between AC Fast Charge and On Battery drain.
 * **Rust Backend Module**:
   - Source file: `src-tauri/src/system_battery.rs`.
-  - Native API: Win32 `GetSystemPowerStatus(&mut SYSTEM_POWER_STATUS)`.
-    - `ACLineStatus`: `0` (Offline/Battery), `1` (Online/AC), `255` (Unknown).
-    - `BatteryFlag`: High, Low, Critical, Charging, NoSystemBattery.
-    - `BatteryLifePercent`: `0` to `100`, or `255` (Unknown).
-    - `BatteryLifeTime`: Estimated seconds remaining.
+  - Native APIs:
+    - Win32 `GetSystemPowerStatus(&mut SYSTEM_POWER_STATUS)`.
+    - Native `CallNtPowerInformation(SystemBatteryState, ...)`:
+      - Field `Rate`: signed integer reporting milliwatts (mW) entering or leaving the battery pack.
+      - Wattage calculation: `watts = (Rate as f64) / 1000.0`. Positive for charging, negative for discharging.
+    - WMI query to `SELECT DesignCapacity, FullChargeCapacity, CycleCount, EstimatedChargeRemaining, Voltage FROM Win32_Battery`.
 * **IPC Contract**:
   - Command: `invoke('get_battery_status')` -> returns `BatteryPayload`.
   - Event: Listen on Win32 message `WM_POWERBROADCAST` to emit Tauri event `battery-changed`.
@@ -75,6 +83,13 @@
       acConnected: boolean;
       timeRemainingSec: number | null; // null if on AC or calculating
       healthPercent: number;    // From WMI Win32_Battery or estimate
+      wattageRate: number;      // Live power rate in Watts (+W charging, -W draining)
+      voltageVolts: number;     // e.g. 19.8
+      amperageAmps: number;     // e.g. 2.43
+      cycleCount: number;       // e.g. 142
+      fullCapacityWh: number;   // e.g. 68.2
+      designCapacityWh: number; // e.g. 71.0
+      temperatureC: number;     // e.g. 31.4
     }
     ```
 
@@ -285,6 +300,193 @@
 
 ---
 
+### 2.11 Wi-Fi Network Widget (`wifi`)
+* **Design & Behavior**:
+  - Square Mode (48px): Wi-Fi signal glyph with active connection strength indicator.
+  - Rectangle Mode (124px): Wi-Fi icon + `Studio-5GHz` (primary) / `Wi-Fi 6` (secondary).
+  - **Anchored Popover Menu**:
+    - Radio power toggle switch (enable/disable Wi-Fi adapter).
+    - Active Connection Card: SSID (`Studio-5GHz`), 802.11ax Wi-Fi 6 protocol, link speed (866 Mbps), RSSI (-52 dBm), and local IP address (`192.168.1.145`).
+    - Available Networks List: Discovered SSIDs with signal bars and one-click "Connect" actions with toast feedback.
+* **Rust Backend Module**:
+  - Source file: `src-tauri/src/wifi_wlan.rs`.
+  - Native API: Windows Native Wifi API (`wlanapi.dll`):
+    - `WlanOpenHandle`: Opens a client session with the WLAN service.
+    - `WlanEnumInterfaces`: Enumerates all wireless network cards.
+    - `WlanGetAvailableNetworkList`: Scans BSSID networks and retrieves signal quality percentages.
+    - `WlanConnect` / `WlanDisconnect`: Controls network associations.
+* **IPC Contract**:
+  - Command: `invoke('get_wifi_status')` -> returns `WifiStatusPayload`.
+  - Command: `invoke('toggle_wifi_radio', { enabled: boolean })`.
+  - Command: `invoke('connect_wifi_network', { ssid: string, password?: string })`.
+  - Schema:
+    ```typescript
+    interface WifiStatusPayload {
+      enabled: boolean;
+      connected: boolean;
+      ssid: string | null;
+      bssid: string | null;
+      signalPercent: number;    // 0 - 100
+      linkSpeedMbps: number;
+      frequencyGhz: number;     // 2.4, 5.0, or 6.0
+      ipv4Address: string | null;
+      availableNetworks: Array<{
+        ssid: string;
+        signalPercent: number;
+        security: string;       // "WPA3", "WPA2", "Open"
+      }>;
+    }
+    ```
+
+---
+
+### 2.12 Bluetooth Devices Widget (`bluetooth`)
+* **Design & Behavior**:
+  - Square Mode (48px): Bluetooth glyph with active device badge indicator.
+  - Rectangle Mode (120px): Bluetooth glyph + `Bluetooth` / `3 Devices`.
+  - **Anchored Popover Menu**:
+    - Bluetooth master radio toggle switch.
+    - Connected Devices List: Real-time battery levels for connected peripherals (`AirPods Pro 85%`, `MX Master 3S 60%`, `Keychron K2 92%`).
+    - Available Discovered Devices: One-click "Pair" action buttons with toast feedback.
+* **Rust Backend Module**:
+  - Source file: `src-tauri/src/bluetooth_devices.rs`.
+  - Native API: Windows Runtime Bluetooth APIs (`windows::Devices::Bluetooth`):
+    - `BluetoothDevice::FromIdAsync` to obtain connected device references.
+    - GATT Battery Service (`0x180F`) query on Battery Level Characteristic (`0x2A19`) to read peripheral battery percentages.
+    - `DeviceWatcher` to discover nearby pairing advertisements.
+* **IPC Contract**:
+  - Command: `invoke('get_bluetooth_status')` -> returns `BluetoothPayload`.
+  - Command: `invoke('pair_bluetooth_device', { deviceId: string })`.
+  - Schema:
+    ```typescript
+    interface BluetoothPayload {
+      radioEnabled: boolean;
+      connectedDevices: Array<{
+        id: string;
+        name: string;
+        category: 'audio' | 'mouse' | 'keyboard' | 'other';
+        batteryPercent: number | null;
+        signalRssi: number | null;
+      }>;
+      discoveredDevices: Array<{
+        id: string;
+        name: string;
+        pairingStatus: string;
+      }>;
+    }
+    ```
+
+---
+
+### 2.13 Notification Center Widget (`notifications`)
+* **Design & Behavior**:
+  - Square Mode (48px): Notification bell glyph with unread badge count (`3`).
+  - Rectangle Mode (124px): Bell icon + `Notifications` / `3 New`.
+  - **Anchored Popover Menu**:
+    - Header with total unread count and "Clear All" action button.
+    - Cards List: App name, relative arrival timestamp (`2m ago`), text body, and per-card dismiss button (`×`).
+    - Dismissing individual items or clearing all updates the dock widget badge in real time.
+* **Rust Backend Module**:
+  - Source file: `src-tauri/src/notifications.rs`.
+  - Native API: WinRT User Notification Listener (`windows::UI::Notifications::Management::UserNotificationListener`):
+    - `RequestAccessAsync`: Prompts user permissions for notification reading.
+    - `GetNotificationsAsync(NotificationKinds::Toast)`: Reads system toast notifications queue.
+    - `RemoveNotification`: Clears dismissed toast from Windows Action Center.
+* **IPC Contract**:
+  - Command: `invoke('get_unread_notifications')` -> returns `NotificationItemPayload[]`.
+  - Command: `invoke('clear_all_notifications')`.
+  - Command: `invoke('dismiss_notification', { id: string })`.
+  - Event: `notification-arrived` emitted on incoming Windows toast.
+  - Schema:
+    ```typescript
+    interface NotificationItemPayload {
+      id: string;
+      appName: string;
+      title: string;
+      body: string;
+      timestampMs: number;
+    }
+    ```
+
+---
+
+### 2.14 Date & Time Customizer Widget (`clock`)
+* **Design & Behavior**:
+  - Square Mode (48px): Digital time format or authentic analog watch face.
+  - Rectangle Mode (110px): Digital time + full day of week & date stack.
+  - **Anchored Popover Menu**:
+    - Large digital time with live seconds (`20:36:42`) ticking every second.
+    - Full day and date display (`Sunday, November 8, 2026`).
+    - Format switcher buttons:
+      - `Time Only`: 48px square width digital clock.
+      - `Time + Date`: 110px rectangle width digital clock with date sub-label.
+      - `Analog Face`: 48px square width classic round watch dial with 12 ticks, dark hour/minute hands, and orange second hand.
+    - Selecting any mode instantly updates the dock widget format and width without page reload.
+* **Rust Backend Module**:
+  - Source file: `src-tauri/src/clock.rs`.
+  - Native API: Win32 `GetLocalTime(&mut SYSTEMTIME)` / Rust `chrono` local time.
+* **IPC Contract**:
+  - Command: `invoke('get_system_time')` -> returns `SystemTimePayload`.
+  - Schema:
+    ```typescript
+    interface SystemTimePayload {
+      hours24: number;
+      minutes: number;
+      seconds: number;
+      dayOfWeek: string;
+      dateFormatted: string;
+      timezone: string;
+    }
+    ```
+
+---
+
+### 2.15 System Tray Widget (`system-tray`)
+* **Design & Behavior**:
+  - Square Mode (48px): Up chevron icon (`^`) representing the Windows notification area tray.
+  - **Anchored Popover Menu**:
+    - Clean 4x2 grid of running background service icons (Windows Security, NVIDIA Settings, Docker Desktop, OneDrive, Steam, Discord, Proton VPN, Realtek Audio).
+    - Clicking any tray application tile activates or restores that background window and shows an immediate toast confirmation HUD.
+* **Rust Backend Module**:
+  - Source file: `src-tauri/src/system_tray_hook.rs`.
+  - Native API:
+    - Enumerates notify icons from `Shell_TrayWnd` -> `TrayNotifyWnd` -> `SysPager` -> `ToolbarWindow32`.
+    - Reads icon tooltips, executable paths, and sends `WM_COMMAND` / `WM_LBUTTONDOWN` messages to trigger native context menus or activate background windows.
+* **IPC Contract**:
+  - Command: `invoke('get_tray_icons')` -> returns `TrayIconItem[]`.
+  - Command: `invoke('activate_tray_icon', { iconId: string })`.
+  - Schema:
+    ```typescript
+    interface TrayIconItem {
+      id: string;
+      title: string;
+      processName: string;
+      iconBase64: string;
+    }
+    ```
+
+---
+
+### 2.16 Anchored Popover System Contract
+* **Dynamic Placement**:
+  - All popover menus are rendered fixed in the viewport above the clicked dock widget slot.
+  - Coordinates are computed relative to the slot bounding box:
+    ```javascript
+    popBottom = window.innerHeight - slotRect.top + 10;
+    popLeft = Math.max(margin, Math.min(window.innerWidth - popWidth - margin, slotCenterX - popWidth / 2));
+    caretX = Math.max(18, Math.min(popWidth - 18, slotCenterX - popLeft));
+    ```
+  - The caret indicator (`::after`) uses `--caret-x` to point directly at the clicked widget regardless of slot reordering.
+* **Dismiss Triggers**:
+  - Clicking outside the popover or outside the dock rail.
+  - Pressing the `Escape` key.
+  - Clicking the same widget slot again.
+* **Backdrop**:
+  - High-fidelity Tahoe frosted glass blur (`backdrop-filter: blur(40px) saturate(160%)`).
+  - Dark glass surface (`rgba(18, 22, 30, 0.95)` with `1px solid rgba(255, 255, 255, 0.12)`).
+
+---
+
 ## 3. Motion & Animation Standards
 
 1. **Reorder FLIP Animations**:
@@ -299,10 +501,15 @@
 
 ## 4. Porting Checklist to Tauri v2 & React 19
 
-- [ ] Connect `WeatherWidget.tsx` to `weather.rs` IPC command.
-- [ ] Connect `BatteryWidget.tsx` to `system_battery.rs` Win32 listener.
-- [ ] Implement `SiriOrb.tsx` WebGL / CSS radial gradient shader.
-- [ ] Bind `RunningApps.tsx` to `src-tauri/src/running_apps.rs` with alphabetized default and manual override store.
+- [ ] Connect `WeatherWidget.tsx` to `weather.rs` IPC command and anchored weather popover.
+- [ ] Connect `BatteryWidget.tsx` to `system_battery.rs` with `CallNtPowerInformation` wattage telemetry HUD.
+- [ ] Implement `WifiWidget.tsx` connecting to `wifi_wlan.rs` Win32 WLAN API.
+- [ ] Implement `BluetoothWidget.tsx` connecting to `bluetooth_devices.rs` WinRT battery GATT service.
+- [ ] Implement `NotificationsWidget.tsx` connecting to `notifications.rs` WinRT UserNotificationListener.
+- [ ] Implement `ClockWidget.tsx` with dynamic format switcher (`time`, `time-date`, `analog`).
+- [ ] Implement `SystemTrayWidget.tsx` connecting to `system_tray_hook.rs`.
+- [ ] Implement `SiriRobot.tsx` vector UI with voice listener bridge.
+- [ ] Bind `RunningApps.tsx` to `src-tauri/src/running_apps.rs` with discrete 48px square tiles, dot indicators, and in-dock reordering.
 - [ ] Add `InstalledAppsPicker.tsx` inside `WidgetManager.tsx` connecting to `shell:AppsFolder` enumeration.
 - [ ] Connect `MusicPlayerWidget.tsx` to `media_player.rs` Windows SMTC session manager.
 - [ ] Connect `QuickNotesCard.tsx` to `notes.rs` SQLite storage.

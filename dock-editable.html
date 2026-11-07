@@ -1159,45 +1159,57 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 }
 
 /* ==========================================================================
-   FLOATING TAKE A NOTE POPOVER (TAHOE FROSTED GLASS)
+   ANCHORED DOCK POPOVERS (TAHOE FROSTED GLASS SURFACES)
    ========================================================================== */
-.note-popover {
-  position: absolute;
-  bottom: calc(100% + 14px);
-  left: 50%;
-  transform: translateX(-50%) translateY(10px) scale(0.96);
+.dock-popover {
+  position: fixed;
+  z-index: 120;
   width: 330px;
-  max-width: calc(100vw - 32px);
-  background: rgba(18, 22, 30, 0.94);
+  max-width: calc(100vw - 24px);
+  background: rgba(18, 22, 30, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.70),
-    0 8px 20px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(32px) saturate(150%);
-  -webkit-backdrop-filter: blur(32px) saturate(150%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 180ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 100;
-  display: flex;
+    0 28px 70px rgba(0, 0, 0, 0.72),
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(40px) saturate(160%);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  display: none;
   flex-direction: column;
   overflow: hidden;
+  transform: translateY(8px) scale(0.97);
+  opacity: 0;
+  transition: opacity 180ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
 }
-.note-popover.is-open {
+.dock-popover.is-open {
+  display: flex;
   opacity: 1;
+  transform: translateY(0) scale(1);
   pointer-events: auto;
-  transform: translateX(-50%) translateY(0) scale(1);
 }
-.note-popover-head {
+.dock-popover::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: var(--caret-x, 50%);
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: rgba(18, 22, 30, 0.96);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+.dpop-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-.note-popover-title {
+.dpop-title {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1206,31 +1218,457 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   color: #fff;
   letter-spacing: -0.01em;
 }
-.note-close-btn {
-  appearance: none;
-  border: 0;
-  background: rgba(255, 255, 255, 0.06);
+.dpop-badge {
+  font-size: 9.5px;
+  font-weight: 650;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-2);
-  font-size: 16px;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 120ms ease;
 }
-.note-close-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+.dpop-badge.is-green {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--battery-green);
+  border: 1px solid rgba(52, 211, 153, 0.25);
 }
-.note-popover-body {
+.dpop-body {
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
+  max-height: 380px;
+  overflow-y: auto;
 }
+.dpop-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.dpop-btn-text {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--win-blue);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.dpop-btn-text:hover {
+  text-decoration: underline;
+}
+
+/* Switches */
+.dpop-switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+}
+.dpop-switch input { opacity: 0; width: 0; height: 0; }
+.dpop-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: 160ms;
+  border-radius: 999px;
+}
+.dpop-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 160ms;
+  border-radius: 50%;
+}
+.dpop-switch input:checked + .dpop-slider {
+  background-color: var(--win-blue);
+}
+.dpop-switch input:checked + .dpop-slider:before {
+  transform: translateX(14px);
+}
+
+/* Weather Popover specifics */
+.wthr-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wthr-temp-big {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1;
+}
+.wthr-cond-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wthr-cond {
+  font-size: 13px;
+  font-weight: 650;
+  color: #f3f5f7;
+}
+.wthr-hi-lo {
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+.wthr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  padding: 8px 10px;
+}
+.wthr-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.wthr-label {
+  font-size: 10px;
+  color: var(--text-3);
+}
+.wthr-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+.wthr-hourly-heading {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wthr-hourly-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.wthr-hour {
+  flex: 1;
+  min-width: 48px;
+  padding: 6px 4px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.wthr-hour.is-now {
+  background: rgba(240, 189, 106, 0.12);
+  border: 1px solid rgba(240, 189, 106, 0.25);
+}
+.wh-time {
+  font-size: 9.5px;
+  color: var(--text-2);
+}
+.wh-temp {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Battery Popover specifics */
+.batt-telemetry-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.batt-percent-num {
+  font-size: 34px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.batt-power-rate {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--battery-green);
+  background: rgba(52, 211, 153, 0.1);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+.batt-power-rate.is-discharging {
+  color: #f59c35;
+  background: rgba(245, 156, 53, 0.1);
+  border-color: rgba(245, 156, 53, 0.2);
+}
+.batt-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  padding: 8px 10px;
+}
+.batt-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bc-label {
+  font-size: 10px;
+  color: var(--text-3);
+}
+.bc-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.batt-est-line {
+  font-size: 10.5px;
+  color: var(--text-2);
+  text-align: center;
+  padding: 2px 0;
+}
+.batt-sim-toggle {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  text-align: center;
+}
+.batt-sim-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Wi-Fi & Bluetooth specifics */
+.net-connected-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.net-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.net-name {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: #fff;
+}
+.net-tag {
+  font-size: 9.5px;
+  font-weight: 650;
+  padding: 1.5px 6px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--battery-green);
+}
+.net-meta {
+  font-size: 10px;
+  color: var(--text-3);
+}
+.net-list, .bt-dev-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.net-item, .bt-dev-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 11.5px;
+}
+.net-item-name, .bt-dev-name {
+  color: var(--text);
+  font-weight: 550;
+}
+.net-connect-btn, .bt-pair-btn {
+  appearance: none;
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.net-connect-btn:hover, .bt-pair-btn:hover {
+  background: var(--win-blue);
+  color: #000;
+}
+.bt-dev-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.bt-dev-type {
+  font-size: 9.5px;
+  color: var(--text-3);
+}
+.bt-dev-batt {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--battery-green);
+}
+
+/* Notifications specifics */
+.notif-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.notif-card {
+  position: relative;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.notif-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-right: 14px;
+}
+.notif-app {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--win-blue);
+}
+.notif-time {
+  font-size: 9.5px;
+  color: var(--text-3);
+}
+.notif-card-text {
+  font-size: 11px;
+  color: var(--text-2);
+  line-height: 1.35;
+}
+.notif-del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+}
+.notif-del:hover { color: #fff; }
+.dock-badge-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+}
+
+/* Clock popover specifics */
+.clock-display-big {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.clock-display-date {
+  font-size: 11.5px;
+  color: var(--text-2);
+  text-align: center;
+}
+.clock-mode-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 3px;
+  border-radius: 8px;
+}
+.clock-mode-pill {
+  flex: 1;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  text-align: center;
+}
+.clock-mode-pill.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+/* System Tray specifics */
+.tray-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 4px 0;
+}
+.tray-app-tile {
+  width: 100%;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+}
+.tray-app-tile:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Note popover specifics */
 .note-textarea {
   width: 100%;
   background: rgba(255, 255, 255, 0.04);
@@ -1685,31 +2123,257 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       </button>
     </div>
 
-    <!-- Floating Take a Note Card Popover (Tahoe glass elevation directly above dock) -->
-    <div class="note-popover" id="notePopover" role="dialog" aria-label="Take a Note">
-      <div class="note-popover-head">
-        <div class="note-popover-title">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#f0bd6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/>
-            <path d="M15 3v5h5"/>
-            <line x1="7" y1="13" x2="13" y2="13"/>
-            <line x1="7" y1="17" x2="17" y2="17"/>
-          </svg>
-          <span>Take a Note</span>
+    <!-- Anchored Tahoe Frosted Glass Popovers for Dock Widgets -->
+    <div id="dockPopoversContainer">
+
+      <!-- 1. Weather Popover -->
+      <div class="dock-popover" id="popover-weather" role="dialog" aria-label="Weather Forecast">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f0bd6a" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <span>San Francisco, CA</span>
+          </div>
+          <span class="dpop-badge">24° Clear</span>
         </div>
-        <button class="note-close-btn" id="closeNoteBtn" type="button" aria-label="Close note">&times;</button>
-      </div>
-      <div class="note-popover-body">
-        <textarea class="note-textarea" id="noteTextarea" placeholder="Jot down a quick thought, task, or scratch idea..." rows="3"></textarea>
-        <div class="note-actions">
-          <span class="note-char-count" id="noteCharCount">0 chars</span>
-          <button class="note-save-btn" id="saveNoteBtn" type="button">Save Note</button>
+        <div class="dpop-body">
+          <div class="wthr-summary">
+            <div class="wthr-temp-big">24°</div>
+            <div class="wthr-cond-stack">
+              <span class="wthr-cond">Clear Sky</span>
+              <span class="wthr-hi-lo">Feels like 25° · H: 28° L: 19°</span>
+            </div>
+          </div>
+          <div class="wthr-grid">
+            <div class="wthr-cell"><span class="wthr-label">Humidity</span><span class="wthr-val">48%</span></div>
+            <div class="wthr-cell"><span class="wthr-label">Wind</span><span class="wthr-val">11 km/h NW</span></div>
+            <div class="wthr-cell"><span class="wthr-label">UV Index</span><span class="wthr-val">3 Mod</span></div>
+            <div class="wthr-cell"><span class="wthr-label">Air Quality</span><span class="wthr-val">28 Good</span></div>
+          </div>
+          <div class="wthr-hourly-heading">Hourly Forecast</div>
+          <div class="wthr-hourly-row">
+            <div class="wthr-hour is-now"><span class="wh-time">Now</span><span class="wh-temp">24°</span></div>
+            <div class="wthr-hour"><span class="wh-time">21:00</span><span class="wh-temp">22°</span></div>
+            <div class="wthr-hour"><span class="wh-time">22:00</span><span class="wh-temp">21°</span></div>
+            <div class="wthr-hour"><span class="wh-time">23:00</span><span class="wh-temp">20°</span></div>
+            <div class="wthr-hour"><span class="wh-time">00:00</span><span class="wh-temp">19°</span></div>
+          </div>
         </div>
       </div>
-      <div class="note-recent-section" id="noteRecentSection">
-        <div class="note-recent-heading">Recent Notes</div>
-        <div class="note-recent-list" id="noteRecentList"></div>
+
+      <!-- 2. Battery & Power Telemetry Popover -->
+      <div class="dock-popover" id="popover-status-battery" role="dialog" aria-label="Battery and Power Telemetry">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="color:var(--battery-green);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Power Delivery</span>
+          </div>
+          <span class="dpop-badge is-green" id="battStateBadge">65W AC Connected</span>
+        </div>
+        <div class="dpop-body">
+          <div class="batt-telemetry-top">
+            <div class="batt-percent-num" id="battPercentDisplay">88%</div>
+            <div class="batt-power-rate" id="battPowerRate">+48.2 W Fast Charge</div>
+          </div>
+          <div class="batt-metrics-grid">
+            <div class="batt-cell"><span class="bc-label">Flow Rate</span><span class="bc-val" id="bcFlow">+48.2W</span></div>
+            <div class="batt-cell"><span class="bc-label">Cycle Count</span><span class="bc-val" id="bcCycles">142 cycles</span></div>
+            <div class="batt-cell"><span class="bc-label">Health</span><span class="bc-val" id="bcHealth">96.4%</span></div>
+            <div class="batt-cell"><span class="bc-label">Capacity</span><span class="bc-val">68.4 / 71.0 Wh</span></div>
+            <div class="batt-cell"><span class="bc-label">Voltage</span><span class="bc-val">19.85 V</span></div>
+            <div class="batt-cell"><span class="bc-label">Temperature</span><span class="bc-val">31.2°C</span></div>
+          </div>
+          <div class="batt-est-line" id="battEstTime">Estimated time to 100%: 34 minutes remaining</div>
+          <button class="batt-sim-toggle" id="battSimToggleBtn" type="button">Toggle Charging / Draining Simulation</button>
+        </div>
       </div>
+
+      <!-- 3. Wi-Fi Networks Popover -->
+      <div class="dock-popover" id="popover-wifi" role="dialog" aria-label="Wi-Fi Networks">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+            <span>Wi-Fi</span>
+          </div>
+          <label class="dpop-switch"><input type="checkbox" checked id="wifiSwitch"><span class="dpop-slider"></span></label>
+        </div>
+        <div class="dpop-body">
+          <div class="net-connected-card">
+            <div class="net-item-top">
+              <span class="net-name" id="wifiActiveSsid">Studio-5GHz</span>
+              <span class="net-tag">Connected</span>
+            </div>
+            <div class="net-meta">802.11ax · 866 Mbps · -52 dBm · IP: 192.168.1.145</div>
+          </div>
+          <div class="dpop-section-title">Available Networks</div>
+          <div class="net-list" id="wifiNetList">
+            <div class="net-item" data-ssid="Proton-Office-5G">
+              <span class="net-item-name">Proton-Office-5G</span>
+              <button class="net-connect-btn" type="button">Connect</button>
+            </div>
+            <div class="net-item" data-ssid="Guest_Fiber_Open">
+              <span class="net-item-name">Guest_Fiber_Open</span>
+              <button class="net-connect-btn" type="button">Connect</button>
+            </div>
+            <div class="net-item" data-ssid="Home_IOT_2.4G">
+              <span class="net-item-name">Home_IOT_2.4G</span>
+              <button class="net-connect-btn" type="button">Connect</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Bluetooth Devices Popover -->
+      <div class="dock-popover" id="popover-bluetooth" role="dialog" aria-label="Bluetooth Devices">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg>
+            <span>Bluetooth</span>
+          </div>
+          <label class="dpop-switch"><input type="checkbox" checked id="btSwitch"><span class="dpop-slider"></span></label>
+        </div>
+        <div class="dpop-body">
+          <div class="dpop-section-title">Connected Devices</div>
+          <div class="bt-dev-list">
+            <div class="bt-dev-item">
+              <div class="bt-dev-info"><span class="bt-dev-name">AirPods Pro</span><span class="bt-dev-type">Audio · Active</span></div>
+              <span class="bt-dev-batt">85%</span>
+            </div>
+            <div class="bt-dev-item">
+              <div class="bt-dev-info"><span class="bt-dev-name">MX Master 3S</span><span class="bt-dev-type">Mouse</span></div>
+              <span class="bt-dev-batt">60%</span>
+            </div>
+            <div class="bt-dev-item">
+              <div class="bt-dev-info"><span class="bt-dev-name">Keychron K2</span><span class="bt-dev-type">Keyboard</span></div>
+              <span class="bt-dev-batt">92%</span>
+            </div>
+          </div>
+          <div class="dpop-section-title">Available Devices</div>
+          <div class="bt-dev-list">
+            <div class="bt-dev-item is-avail" data-dev="Sony WH-1000XM5">
+              <span class="bt-dev-name">Sony WH-1000XM5</span>
+              <button class="bt-pair-btn" type="button">Pair</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Notifications Popover -->
+      <div class="dock-popover" id="popover-notifications" role="dialog" aria-label="Notification Center">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span id="notifHeadCount">Notifications (3)</span>
+          </div>
+          <button class="dpop-btn-text" id="clearAllNotifsBtn" type="button">Clear All</button>
+        </div>
+        <div class="dpop-body">
+          <div class="notif-cards-list" id="notifCardsList">
+            <div class="notif-card" data-nid="1">
+              <div class="notif-card-top"><span class="notif-app">Slack</span><span class="notif-time">2m ago</span></div>
+              <div class="notif-card-text">Dev Team: Sprint review starts in 10 minutes. Please join meeting room.</div>
+              <button class="notif-del" data-close-nid="1" type="button">&times;</button>
+            </div>
+            <div class="notif-card" data-nid="2">
+              <div class="notif-card-top"><span class="notif-app">GitHub</span><span class="notif-time">18m ago</span></div>
+              <div class="notif-card-text">PR #42 (native-dock-sizing) successfully merged into main branch.</div>
+              <button class="notif-del" data-close-nid="2" type="button">&times;</button>
+            </div>
+            <div class="notif-card" data-nid="3">
+              <div class="notif-card-top"><span class="notif-app">Calendar</span><span class="notif-time">1h ago</span></div>
+              <div class="notif-card-text">Reminder: Design Sync with Sarah tomorrow at 10:00 AM.</div>
+              <button class="notif-del" data-close-nid="3" type="button">&times;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Date & Time Popover -->
+      <div class="dock-popover" id="popover-clock" role="dialog" aria-label="Time and Date">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Date & Time</span>
+          </div>
+          <span class="dpop-badge" id="clockZoneBadge">PST · UTC-8</span>
+        </div>
+        <div class="dpop-body">
+          <div class="clock-display-big" id="clockPopTime">20:36:42</div>
+          <div class="clock-display-date" id="clockPopDate">Sunday, November 8, 2026</div>
+          <div class="dpop-section-title">Dock Widget Display Format</div>
+          <div class="clock-mode-pills" role="group">
+            <button class="clock-mode-pill" data-clock-mode="time" type="button">Time Only</button>
+            <button class="clock-mode-pill" data-clock-mode="time-date" type="button">Time + Date</button>
+            <button class="clock-mode-pill is-active" data-clock-mode="analog" type="button">Analog Face</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. System Tray Popover -->
+      <div class="dock-popover" id="popover-system-tray" role="dialog" aria-label="System Tray Hidden Icons">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+            <span>System Tray</span>
+          </div>
+          <span class="dpop-badge">8 Running</span>
+        </div>
+        <div class="dpop-body">
+          <div class="tray-grid" id="trayGrid">
+            <div class="tray-app-tile" data-tray-app="Windows Security" title="Windows Security: Protected">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#34d399" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="tray-app-tile" data-tray-app="NVIDIA Settings" title="NVIDIA Control Panel">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="#76b900"><path d="M12 4a8 8 0 0 0-8 8 8 8 0 0 0 8 8c3.2 0 6-1.9 7.3-4.6l-2.4-1.2A5.4 5.4 0 0 1 12 17a5 5 0 0 1-5-5 5 5 0 0 1 5-5c1.8 0 3.3.9 4.2 2.2l2.3-1.4A7.8 7.8 0 0 0 12 4z"/></svg>
+            </div>
+            <div class="tray-app-tile" data-tray-app="Docker Desktop" title="Docker Desktop: 4 Containers">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="#0db7ed"><rect x="2" y="10" width="3" height="3" rx="0.5"/><rect x="6" y="10" width="3" height="3" rx="0.5"/><rect x="10" y="10" width="3" height="3" rx="0.5"/><rect x="6" y="6" width="3" height="3" rx="0.5"/><rect x="10" y="6" width="3" height="3" rx="0.5"/><path d="M22 13c-1 0-2 1-3 1s-2-1-3-1-2 1-3 1-2-1-3-1-2 1-3 1a5 5 0 0 0 9 4c4 0 6-3 6-5z"/></svg>
+            </div>
+            <div class="tray-app-tile" data-tray-app="OneDrive" title="OneDrive: Up to date">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="#0078d4"><path d="M17.5 19H6.5A4.5 4.5 0 0 1 5 10.3 6 6 0 0 1 16.6 8.5 4.5 4.5 0 0 1 17.5 19z"/></svg>
+            </div>
+            <div class="tray-app-tile" data-tray-app="Steam" title="Steam: Online">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="#171a21"><circle cx="12" cy="12" r="10" fill="#1b2838"/><circle cx="8" cy="14" r="3" fill="#66c0f4"/><circle cx="16" cy="9" r="2" fill="#fff"/></svg>
+            </div>
+            <div class="tray-app-tile" data-tray-app="Discord" title="Discord: Connected">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="#5865f2"><path d="M19 6.5A13 13 0 0 0 15.5 5l-.3.6A11 11 0 0 0 8.8 5.6L8.5 5A13 13 0 0 0 5 6.5C3 12 4.2 17.3 4.2 17.3A13 13 0 0 0 9 19l.7-1a8.4 8.4 0 0 1-1.3-.6l.3-.2c2.6 1.2 5.4 1.2 8 0l.3.2c-.4.2-.9.4-1.3.6l.7 1a13 13 0 0 0 4.8-1.7s1.4-5.3-.5-10.8z"/></svg>
+            </div>
+            <div class="tray-app-tile" data-tray-app="Proton VPN" title="Proton VPN: Shielded">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6d4aff" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </div>
+            <div class="tray-app-tile" data-tray-app="Audio Settings" title="Realtek Audio: 48 kHz">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. Take a Note Popover -->
+      <div class="dock-popover" id="popover-quick-notes" role="dialog" aria-label="Take a Note">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#f0bd6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/>
+              <path d="M15 3v5h5"/>
+              <line x1="7" y1="13" x2="13" y2="13"/>
+              <line x1="7" y1="17" x2="17" y2="17"/>
+            </svg>
+            <span>Take a Note</span>
+          </div>
+          <button class="dpop-btn-text" id="closeNoteBtn" type="button">Close</button>
+        </div>
+        <div class="dpop-body">
+          <textarea class="note-textarea" id="noteTextarea" placeholder="Jot down a quick thought, task, or scratch idea..." rows="3"></textarea>
+          <div class="note-actions">
+            <span class="note-char-count" id="noteCharCount">0 chars</span>
+            <button class="note-save-btn" id="saveNoteBtn" type="button">Save Note</button>
+          </div>
+          <div class="note-recent-section" id="noteRecentSection">
+            <div class="note-recent-heading">Recent Notes</div>
+            <div class="note-recent-list" id="noteRecentList"></div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- The Dock Rail: Contains widgets with animated drag reorder & width expansion -->
@@ -1964,7 +2628,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       isRing: true,
       ringPct: 70,
       ringColor: '#74b7ff',
-      glyphColor: '#d97706',
+      glyphColor: '#ffffff',
       iconSvg: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg>',
       hasDot: false
     },
@@ -1976,8 +2640,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       isRing: true,
       ringPct: 82,
       ringColor: '#74b7ff',
-      glyphColor: '#6ee7b7',
-      iconSvg: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+      glyphColor: '#ffffff',
+      iconSvg: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l7 4v12l-7 4-7-4V6z"/><path d="M8 9h8M8 12h8M8 15h8"/></svg>',
       hasDot: false
     },
     'siri-ai': {
@@ -2004,6 +2668,43 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       isPinnedApps: true,
       hasDot: false
     },
+    wifi: {
+      id: 'wifi',
+      title: 'Studio-5GHz',
+      sub: 'Wi-Fi 6',
+      defaultWidth: 48,
+      isWifi: true,
+      hasDot: false,
+      iconSvg: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>'
+    },
+    bluetooth: {
+      id: 'bluetooth',
+      title: 'Bluetooth',
+      sub: '3 Devices',
+      defaultWidth: 48,
+      isBluetooth: true,
+      hasDot: false,
+      iconSvg: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg>'
+    },
+    notifications: {
+      id: 'notifications',
+      title: 'Notifications',
+      sub: '3 New',
+      defaultWidth: 48,
+      isNotifications: true,
+      unreadCount: 3,
+      hasDot: false,
+      iconSvg: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>'
+    },
+    'system-tray': {
+      id: 'system-tray',
+      title: 'System Tray',
+      sub: '8 Running',
+      defaultWidth: 48,
+      isSystemTray: true,
+      hasDot: false,
+      iconSvg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>'
+    },
     'music-player': {
       id: 'music-player',
       title: 'Spotify',
@@ -2029,6 +2730,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       sub: 'Sunday 08',
       defaultWidth: 48,
       isClock: true,
+      clockMode: 'analog',
       hasDot: false
     }
   };
@@ -2056,39 +2758,47 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   /* Initial pinned apps */
   var pinnedAppIds = ['figma', 'slack'];
 
-  /* Default initial dock layout */
+  /* All widgets registered in customizer gallery */
   var DEFAULT_DOCK_ORDER = [
     'start',
     'search',
+    'running-apps',
+    'pinned-apps',
+    'siri-ai',
+    'claude',
+    'codex',
     'music-player',
     'weather',
     'status-battery',
-    'claude',
-    'codex',
-    'siri-ai',
-    'running-apps',
-    'pinned-apps',
+    'wifi',
+    'bluetooth',
+    'notifications',
     'quick-notes',
+    'system-tray',
     'clock'
   ];
 
+  /* Profiles: Daily strictly matches the target non-slop dock layout from user reference photo */
   var PROFILES = {
-    daily: ['start', 'search', 'music-player', 'weather', 'status-battery', 'running-apps', 'pinned-apps', 'quick-notes', 'clock'],
-    work: ['start', 'search', 'status-battery', 'running-apps', 'pinned-apps', 'claude', 'quick-notes', 'clock'],
-    founder: ['start', 'search', 'codex', 'running-apps', 'pinned-apps', 'siri-ai', 'music-player', 'clock']
+    daily: ['start', 'search', 'running-apps', 'siri-ai', 'claude', 'codex', 'music-player', 'clock'],
+    work: ['start', 'search', 'running-apps', 'weather', 'status-battery', 'wifi', 'bluetooth', 'notifications', 'quick-notes', 'system-tray', 'clock'],
+    founder: ['start', 'search', 'claude', 'codex', 'running-apps', 'pinned-apps', 'siri-ai', 'music-player', 'wifi', 'system-tray', 'clock']
   };
 
   var activeProfile = 'daily';
-  var widgetOrder = DEFAULT_DOCK_ORDER.slice();
+  var widgetOrder = PROFILES.daily.slice();
   var runningApps = INITIAL_RUNNING_APPS.slice();
   var enabledMap = {};
   var customWidths = {};
 
-  DEFAULT_DOCK_ORDER.forEach(function (id) { enabledMap[id] = true; });
+  /* By default for Daily profile, enable its widgets; all widgets remain in gallery */
+  DEFAULT_DOCK_ORDER.forEach(function (id) {
+    enabledMap[id] = PROFILES.daily.indexOf(id) !== -1;
+  });
 
   /* Load stored customizations */
   try {
-    var stored = localStorage.getItem('protondock_preview_state_v4');
+    var stored = localStorage.getItem('protondock_preview_state_v5');
     if (stored) {
       var parsed = JSON.parse(stored);
       if (parsed.customWidths) customWidths = parsed.customWidths;
@@ -2112,7 +2822,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   function saveState() {
     try {
-      localStorage.setItem('protondock_preview_state_v4', JSON.stringify({
+      localStorage.setItem('protondock_preview_state_v5', JSON.stringify({
         customWidths: customWidths,
         enabledMap: enabledMap,
         widgetOrder: widgetOrder,
@@ -2159,14 +2869,35 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   }
 
   function renderWidgetGlyph(w) {
-    if (w.isClock) return renderAnalogClockSvg();
+    if (w.isClock) {
+      if (w.clockMode === 'time') {
+        return '<div style="font-size:13px;font-weight:700;color:#fff;letter-spacing:-0.02em;line-height:1;">' + w.title + '</div>';
+      }
+      if (w.clockMode === 'time-date') {
+        return '<div style="display:flex;flex-direction:column;align-items:center;line-height:1.1;"><span style="font-size:12px;font-weight:700;color:#fff;">' + w.title + '</span><span style="font-size:8.5px;color:var(--text-2);">' + w.sub + '</span></div>';
+      }
+      return renderAnalogClockSvg();
+    }
+    if (w.isNotifications) {
+      return '<span class="w-ico" style="position:relative;">' +
+        w.iconSvg +
+        (w.unreadCount > 0 ? '<span class="dock-badge-dot" id="dockNotifBadge">' + w.unreadCount + '</span>' : '') +
+      '</span>';
+    }
     if (w.isSiri) {
-      return '<div class="siri-orb-wrap"><div class="siri-orb-inner"></div></div>';
+      return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="4" y="8" width="16" height="12" rx="4" fill="rgba(255,255,255,0.06)" />' +
+        '<line x1="12" y1="4" x2="12" y2="8" />' +
+        '<circle cx="12" cy="3.5" r="1.2" fill="#ffffff" />' +
+        '<circle cx="9" cy="13" r="1.3" fill="#ffffff" />' +
+        '<circle cx="15" cy="13" r="1.3" fill="#ffffff" />' +
+        '<line x1="9.5" y1="16.5" x2="14.5" y2="16.5" stroke="#ffffff" />' +
+      '</svg>';
     }
     if (w.isMusicPlayer) {
       return '<div class="dock-music-wrap">' +
         '<div class="dock-music-art" title="' + (w.isPlaying ? 'Playing: ' + w.trackTitle : 'Paused') + '">' +
-          '<svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>' +
+          '<svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>' +
         '</div>' +
         '<div class="dock-eq ' + (w.isPlaying ? '' : 'is-paused') + '"><i></i><i></i><i></i></div>' +
       '</div>';
@@ -2286,19 +3017,57 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
     activeList.forEach(function (id, idx) {
       var w = WIDGETS[id];
-      var width = getWidth(id);
-      var shape = (w.isRunningApps || w.isPinnedApps || width > 52) ? 'rect' : 'square';
 
-      html += '<button class="dock-slot" data-id="' + id + '" data-index="' + idx + '" data-shape="' + shape + '" style="--w:' + width + 'px" draggable="true" type="button" aria-label="' + w.title + '">' +
+      /* If running apps: expand each application as its own discrete 48px square tile */
+      if (id === 'running-apps') {
+        runningApps.forEach(function (app, appIdx) {
+          html += '<button class="dock-slot dock-slot-app" data-id="app-' + app.id + '" data-app-id="' + app.id + '" data-app-idx="' + appIdx + '" data-shape="square" style="--w:48px" draggable="true" type="button" aria-label="' + escapeHtml(app.name) + '">' +
+            '<span class="dock-widget">' +
+              '<span class="w-glyph-box">' +
+                app.icon +
+              '</span>' +
+              '<span class="dw-reorder-nav">' +
+                '<span class="dw-nav-btn sub-nav-btn" data-sub-move="-1" data-sub-idx="' + appIdx + '" title="Move Left">&lsaquo;</span>' +
+                '<span class="dw-nav-btn sub-nav-btn" data-sub-move="1" data-sub-idx="' + appIdx + '" title="Move Right">&rsaquo;</span>' +
+              '</span>' +
+            '</span>' +
+            '<span class="dock-dot"></span>' +
+            '<span class="dock-tip">' + escapeHtml(app.name) + '</span>' +
+          '</button>';
+        });
+        return;
+      }
+
+      /* If pinned apps: expand each application as its own discrete 48px square tile */
+      if (id === 'pinned-apps') {
+        pinnedAppIds.forEach(function (pId) {
+          var pApp = INSTALLED_APPS.find(function (a) { return a.id === pId; });
+          if (!pApp) return;
+          html += '<button class="dock-slot dock-slot-pinned" data-id="pinned-' + pApp.id + '" data-pinned-id="' + pApp.id + '" data-shape="square" style="--w:48px" draggable="true" type="button" aria-label="Pinned: ' + escapeHtml(pApp.name) + '">' +
+            '<span class="dock-widget">' +
+              '<span class="w-glyph-box">' +
+                pApp.icon +
+              '</span>' +
+            '</span>' +
+            '<span class="dock-tip">Pinned: ' + escapeHtml(pApp.name) + '</span>' +
+          '</button>';
+        });
+        return;
+      }
+
+      var width = getWidth(id);
+      var shape = width > 52 ? 'rect' : 'square';
+
+      html += '<button class="dock-slot" data-id="' + id + '" data-index="' + idx + '" data-shape="' + shape + '" style="--w:' + width + 'px" draggable="true" type="button" aria-label="' + escapeHtml(w.title) + '">' +
         '<span class="dock-widget">' +
           '<span class="w-glyph-box">' +
             renderWidgetGlyph(w) +
           '</span>' +
-          (!w.isRunningApps && !w.isPinnedApps ? (
-            w.isMusicPlayer && width > 52 ? (
+          (width > 52 ? (
+            w.isMusicPlayer ? (
               '<span class="dw-stack">' +
-                '<span class="dw-strong">' + (w.isPlaying ? w.trackTitle : 'Spotify') + '</span>' +
-                '<span class="dw-sub">' + (w.isPlaying ? w.artist : 'Paused') + '</span>' +
+                '<span class="dw-strong">' + escapeHtml(w.isPlaying ? w.trackTitle : 'Spotify') + '</span>' +
+                '<span class="dw-sub">' + escapeHtml(w.isPlaying ? w.artist : 'Paused') + '</span>' +
               '</span>' +
               '<span class="dock-music-playbtn" data-music-play="1" title="' + (w.isPlaying ? 'Pause' : 'Play') + '">' +
                 '<svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">' +
@@ -2307,8 +3076,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
               '</span>'
             ) : (
               '<span class="dw-stack">' +
-                '<span class="dw-strong">' + w.title + '</span>' +
-                '<span class="dw-sub">' + w.sub + '</span>' +
+                '<span class="dw-strong">' + escapeHtml(w.title) + '</span>' +
+                '<span class="dw-sub">' + escapeHtml(w.sub) + '</span>' +
               '</span>'
             )
           ) : '') +
@@ -2316,10 +3085,10 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
             '<span class="dw-nav-btn" data-move="-1" title="Move Left">&lsaquo;</span>' +
             '<span class="dw-nav-btn" data-move="1" title="Move Right">&rsaquo;</span>' +
           '</span>' +
-          (!w.isRunningApps && !w.isPinnedApps ? '<span class="dw-expand-btn" title="Toggle Square / Rectangle" data-toggle-id="' + id + '">&#x2194;</span>' : '') +
+          '<span class="dw-expand-btn" title="Toggle Square / Rectangle" data-toggle-id="' + id + '">&#x2194;</span>' +
         '</span>' +
         (w.hasDot ? '<span class="dock-dot"></span>' : '') +
-        '<span class="dock-tip">' + w.title + '</span>' +
+        '<span class="dock-tip">' + escapeHtml(w.title) + '</span>' +
       '</button>';
     });
 
@@ -2336,16 +3105,27 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       /* Primary click interactions for widgets */
       slot.addEventListener('click', function (e) {
         if (e.target.closest('.dw-nav-btn') || e.target.closest('.dw-expand-btn') || e.target.closest('.sub-nav-btn')) return;
-        if (id === 'quick-notes') {
+
+        if (slot.classList.contains('dock-slot-app')) {
           e.stopPropagation();
-          toggleNotesPopover();
+          var appName = slot.getAttribute('aria-label') || 'App';
+          showToast('Activated ' + appName);
           return;
         }
+
+        if (slot.classList.contains('dock-slot-pinned')) {
+          e.stopPropagation();
+          var pAppName = slot.getAttribute('aria-label') || 'Pinned App';
+          showToast('Launching ' + pAppName);
+          return;
+        }
+
         if (id === 'search') {
           e.stopPropagation();
           openSearchLauncher();
           return;
         }
+
         if (id === 'music-player') {
           e.stopPropagation();
           var mw = WIDGETS['music-player'];
@@ -2354,14 +3134,46 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
             mw.sub = mw.isPlaying ? 'Play' : 'Paused';
             saveState();
             renderDock();
+            showToast(mw.isPlaying ? 'Spotify: Playing ' + mw.trackTitle : 'Spotify: Paused');
           }
+          return;
+        }
+
+        if (id === 'start') {
+          e.stopPropagation();
+          showToast('Windows Start');
+          return;
+        }
+
+        if (id === 'siri-ai') {
+          e.stopPropagation();
+          showToast('Siri AI: Ready to assist');
+          return;
+        }
+
+        if (id === 'claude') {
+          e.stopPropagation();
+          showToast('Claude 3.7 Sonnet: 70% session quota used');
+          return;
+        }
+
+        if (id === 'codex') {
+          e.stopPropagation();
+          showToast('Codex AI: 82% quota used (18,400 tokens remaining)');
+          return;
+        }
+
+        /* Anchored Popovers */
+        if (document.getElementById('popover-' + id)) {
+          e.stopPropagation();
+          openPopoverForWidget(id, slot);
           return;
         }
       });
 
       /* Double-click toggles width between 48px square and 124px rectangle */
       slot.addEventListener('dblclick', function (e) {
-        if (id === 'running-apps' || id === 'pinned-apps') return;
+        if (slot.classList.contains('dock-slot-app') || slot.classList.contains('dock-slot-pinned')) return;
         e.stopPropagation();
         toggleWidgetWidth(id);
       });
@@ -2375,8 +3187,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         });
       }
 
-      /* In-dock navigation arrows */
-      var navBtns = slot.querySelectorAll('.dw-nav-btn');
+      /* In-dock navigation arrows for widgets */
+      var navBtns = slot.querySelectorAll('.dw-nav-btn:not(.sub-nav-btn)');
       navBtns.forEach(function (btn) {
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
@@ -2385,38 +3197,25 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         });
       });
 
-      /* Direct in-dock running app sub-reorder */
-      var subAppSlots = slot.querySelectorAll('.dock-sub-app');
-      subAppSlots.forEach(function (subSlot) {
-        subSlot.addEventListener('mouseenter', function () {
-          var nav = subSlot.querySelector('.dock-subapp-nav');
-          if (nav) nav.style.display = 'flex';
-        });
-        subSlot.addEventListener('mouseleave', function () {
-          var nav = subSlot.querySelector('.dock-subapp-nav');
-          if (nav) nav.style.display = 'none';
-        });
-        var subNavBtns = subSlot.querySelectorAll('.sub-nav-btn');
-        subNavBtns.forEach(function (sBtn) {
-          sBtn.addEventListener('click', function (e) {
+      /* In-dock navigation arrows for running apps */
+      if (slot.classList.contains('dock-slot-app')) {
+        var subNavBtns = slot.querySelectorAll('.sub-nav-btn');
+        subNavBtns.forEach(function (btn) {
+          btn.addEventListener('click', function (e) {
             e.stopPropagation();
-            var subDelta = parseInt(sBtn.dataset.subMove, 10);
-            var subIdx = parseInt(sBtn.dataset.subIdx, 10);
-            var targetIdx = subIdx + subDelta;
-            if (targetIdx >= 0 && targetIdx < runningApps.length) {
-              var temp = runningApps[subIdx];
-              runningApps[subIdx] = runningApps[targetIdx];
-              runningApps[targetIdx] = temp;
+            var delta = parseInt(btn.dataset.subMove, 10);
+            var curIdx = parseInt(btn.dataset.subIdx, 10);
+            var nextIdx = curIdx + delta;
+            if (nextIdx >= 0 && nextIdx < runningApps.length) {
+              var temp = runningApps[curIdx];
+              runningApps[curIdx] = runningApps[nextIdx];
+              runningApps[nextIdx] = temp;
               saveState();
               renderDock();
             }
           });
         });
-        subSlot.addEventListener('click', function (e) {
-          e.stopPropagation();
-          /* Launching/activating does NOT reorder apps */
-        });
-      });
+      }
 
       /* Drag and drop reordering */
       slot.addEventListener('dragstart', function (e) {
@@ -2450,6 +3249,21 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         e.preventDefault();
         slot.classList.remove('is-dragover');
         if (draggedSlotId && draggedSlotId !== id) {
+          /* Reordering running apps */
+          if (draggedSlotId.startsWith('app-') && id.startsWith('app-')) {
+            var fromAppId = draggedSlotId.replace('app-', '');
+            var toAppId = id.replace('app-', '');
+            var fIdx = runningApps.findIndex(function (a) { return a.id === fromAppId; });
+            var tIdx = runningApps.findIndex(function (a) { return a.id === toAppId; });
+            if (fIdx !== -1 && tIdx !== -1) {
+              var appItem = runningApps.splice(fIdx, 1)[0];
+              runningApps.splice(tIdx, 0, appItem);
+              saveState();
+              renderDock();
+            }
+            return;
+          }
+          /* Reordering dock widgets */
           var fromIdx = widgetOrder.indexOf(draggedSlotId);
           var toIdx = widgetOrder.indexOf(id);
           if (fromIdx !== -1 && toIdx !== -1) {
@@ -2787,9 +3601,306 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   });
 
   /* ==========================================================================
-     TAHOE FROSTED GLASS NOTE POPOVER LOGIC
+     ANCHORED DOCK POPOVERS CONTROLLER (TAHOE FROSTED GLASS)
      ========================================================================== */
-  var notePopover = document.getElementById('notePopover');
+  var activePopoverId = null;
+
+  function openPopoverForWidget(widgetId, slotEl) {
+    if (activePopoverId === widgetId) {
+      closeActivePopover();
+      return;
+    }
+    closeActivePopover();
+
+    var popover = document.getElementById('popover-' + widgetId);
+    if (!popover || !slotEl) return;
+
+    popover.style.visibility = 'hidden';
+    popover.style.display = 'flex';
+    var popWidth = popover.offsetWidth || 330;
+    popover.style.display = '';
+    popover.style.visibility = '';
+
+    var slotRect = slotEl.getBoundingClientRect();
+    var slotCenterX = slotRect.left + slotRect.width / 2;
+    var margin = 12;
+    var popLeft = Math.max(margin, Math.min(window.innerWidth - popWidth - margin, slotCenterX - popWidth / 2));
+    var caretX = Math.max(18, Math.min(popWidth - 18, slotCenterX - popLeft));
+    var popBottom = window.innerHeight - slotRect.top + 10;
+
+    popover.style.left = Math.round(popLeft) + 'px';
+    popover.style.bottom = Math.round(popBottom) + 'px';
+    popover.style.setProperty('--caret-x', Math.round(caretX) + 'px');
+
+    popover.classList.add('is-open');
+    activePopoverId = widgetId;
+
+    if (widgetId === 'quick-notes') {
+      renderNotesList();
+      setTimeout(function () {
+        if (noteTextarea) noteTextarea.focus();
+      }, 60);
+    }
+  }
+
+  function closeActivePopover() {
+    if (!activePopoverId) return;
+    var pop = document.getElementById('popover-' + activePopoverId);
+    if (pop) pop.classList.remove('is-open');
+    activePopoverId = null;
+  }
+
+  /* Outside-click dismiss */
+  document.addEventListener('click', function (e) {
+    if (!activePopoverId) return;
+    var pop = document.getElementById('popover-' + activePopoverId);
+    if (!pop) return;
+    if (e.target.closest('.dock-popover') || e.target.closest('.dock-slot')) {
+      return;
+    }
+    closeActivePopover();
+  });
+
+  /* Reposition on window resize */
+  window.addEventListener('resize', function () {
+    if (activePopoverId) {
+      var slot = rail.querySelector('.dock-slot[data-id="' + activePopoverId + '"]');
+      if (slot) {
+        var pop = document.getElementById('popover-' + activePopoverId);
+        if (pop) {
+          var popWidth = pop.offsetWidth || 330;
+          var slotRect = slot.getBoundingClientRect();
+          var slotCenterX = slotRect.left + slotRect.width / 2;
+          var margin = 12;
+          var popLeft = Math.max(margin, Math.min(window.innerWidth - popWidth - margin, slotCenterX - popWidth / 2));
+          var caretX = Math.max(18, Math.min(popWidth - 18, slotCenterX - popLeft));
+          var popBottom = window.innerHeight - slotRect.top + 10;
+          pop.style.left = Math.round(popLeft) + 'px';
+          pop.style.bottom = Math.round(popBottom) + 'px';
+          pop.style.setProperty('--caret-x', Math.round(caretX) + 'px');
+        }
+      }
+    }
+  });
+
+  /* 1. Status / Battery Telemetry Controls */
+  var battSimToggleBtn = document.getElementById('battSimToggleBtn');
+  var battWattRate = document.getElementById('battWattRate');
+  var battWattSub = document.getElementById('battWattSub');
+  var battVoltsAmps = document.getElementById('battVoltsAmps');
+  var battEstTime = document.getElementById('battEstTime');
+  var battIsCharging = true;
+
+  if (battSimToggleBtn) {
+    battSimToggleBtn.addEventListener('click', function () {
+      battIsCharging = !battIsCharging;
+      var bw = WIDGETS['status-battery'];
+      if (bw) {
+        bw.charging = battIsCharging;
+        bw.batteryPct = battIsCharging ? 88 : 87;
+        bw.title = battIsCharging ? '88% Charging' : '87% On Battery';
+        bw.sub = battIsCharging ? 'Power: On AC (4h 12m)' : '-16.4W Draining (5h 10m)';
+      }
+      if (battWattRate) {
+        battWattRate.textContent = battIsCharging ? '+48.2W' : '-16.4W';
+        battWattRate.style.color = battIsCharging ? 'var(--battery-green)' : '#f59c35';
+      }
+      if (battWattSub) {
+        battWattSub.textContent = battIsCharging ? 'Fast Charge · 19.8V · 2.43A' : 'Discharging · Normal Usage';
+      }
+      if (battVoltsAmps) {
+        battVoltsAmps.textContent = battIsCharging ? '19.8 V · 2.43 A' : '11.4 V · 1.44 A';
+      }
+      if (battEstTime) {
+        battEstTime.textContent = battIsCharging ? '42 min until full' : '5h 10m remaining';
+      }
+      showToast(battIsCharging ? 'Battery: AC Fast Charge (+48.2W)' : 'Battery: On Battery Drain (-16.4W)');
+      saveState();
+      renderDock();
+    });
+  }
+
+  /* 2. Wi-Fi Switch & Network Connect */
+  var wifiSwitch = document.getElementById('wifiSwitch');
+  var wifiActiveSsid = document.getElementById('wifiActiveSsid');
+  var wifiNetList = document.getElementById('wifiNetList');
+
+  if (wifiSwitch) {
+    wifiSwitch.addEventListener('change', function () {
+      var enabled = wifiSwitch.checked;
+      var ww = WIDGETS['wifi'];
+      if (ww) {
+        ww.sub = enabled ? 'Wi-Fi 6' : 'Disabled';
+        ww.title = enabled ? 'Studio-5GHz' : 'Wi-Fi Off';
+      }
+      if (wifiActiveSsid) {
+        wifiActiveSsid.textContent = enabled ? 'Studio-5GHz' : 'Disconnected';
+      }
+      showToast(enabled ? 'Wi-Fi connected' : 'Wi-Fi disabled');
+      saveState();
+      renderDock();
+    });
+  }
+
+  if (wifiNetList) {
+    var connBtns = wifiNetList.querySelectorAll('.net-connect-btn');
+    connBtns.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var item = btn.closest('.net-item');
+        var ssid = item ? item.dataset.ssid : 'Network';
+        if (wifiActiveSsid) wifiActiveSsid.textContent = ssid;
+        var ww = WIDGETS['wifi'];
+        if (ww) {
+          ww.title = ssid;
+          ww.sub = 'Connected';
+        }
+        showToast('Connected to ' + ssid);
+        saveState();
+        renderDock();
+      });
+    });
+  }
+
+  /* 3. Bluetooth Switch & Pair */
+  var btSwitch = document.getElementById('btSwitch');
+  if (btSwitch) {
+    btSwitch.addEventListener('change', function () {
+      var enabled = btSwitch.checked;
+      var bw = WIDGETS['bluetooth'];
+      if (bw) {
+        bw.sub = enabled ? '3 Devices' : 'Disabled';
+      }
+      showToast(enabled ? 'Bluetooth enabled' : 'Bluetooth disabled');
+      saveState();
+      renderDock();
+    });
+  }
+
+  var btPairBtns = document.querySelectorAll('.bt-pair-btn');
+  btPairBtns.forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var item = btn.closest('.bt-dev-item');
+      var name = item ? item.dataset.dev : 'Device';
+      showToast('Paired with ' + name);
+      btn.textContent = 'Connected';
+      btn.disabled = true;
+    });
+  });
+
+  /* 4. Notification Center Controls */
+  var clearAllNotifsBtn = document.getElementById('clearAllNotifsBtn');
+  var notifCardsList = document.getElementById('notifCardsList');
+  var notifHeadCount = document.getElementById('notifHeadCount');
+
+  function updateNotificationBadge() {
+    var count = notifCardsList ? notifCardsList.querySelectorAll('.notif-card').length : 0;
+    if (notifHeadCount) notifHeadCount.textContent = 'Notifications (' + count + ')';
+    var nw = WIDGETS['notifications'];
+    if (nw) {
+      nw.unreadCount = count;
+      nw.sub = count > 0 ? (count + ' New') : 'None';
+    }
+    var badge = document.getElementById('dockNotifBadge');
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+    saveState();
+  }
+
+  if (clearAllNotifsBtn) {
+    clearAllNotifsBtn.addEventListener('click', function () {
+      if (notifCardsList) {
+        notifCardsList.innerHTML = '<div style="font-size:11px;color:var(--text-3);padding:14px 0;text-align:center;">No unread notifications</div>';
+      }
+      updateNotificationBadge();
+      showToast('All notifications cleared');
+      setTimeout(closeActivePopover, 400);
+    });
+  }
+
+  if (notifCardsList) {
+    notifCardsList.addEventListener('click', function (e) {
+      var del = e.target.closest('.notif-del');
+      if (del) {
+        var card = del.closest('.notif-card');
+        if (card) {
+          card.remove();
+          updateNotificationBadge();
+        }
+      }
+    });
+  }
+
+  /* 5. Date & Time Format Switcher and Live Clock Ticker */
+  var clockModePills = document.querySelectorAll('.clock-mode-pill');
+  var clockPopTime = document.getElementById('clockPopTime');
+
+  clockModePills.forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      clockModePills.forEach(function (p) { p.classList.remove('is-active'); });
+      pill.classList.add('is-active');
+      var mode = pill.dataset.clockMode || 'analog';
+      var cw = WIDGETS['clock'];
+      if (cw) {
+        cw.clockMode = mode;
+        if (mode === 'time') {
+          customWidths['clock'] = 48;
+        } else if (mode === 'time-date') {
+          customWidths['clock'] = 110;
+        } else {
+          customWidths['clock'] = 48;
+        }
+        saveState();
+        renderDock();
+        showToast('Clock display: ' + pill.textContent);
+      }
+    });
+  });
+
+  function updateLiveClock() {
+    var now = new Date();
+    var h = now.getHours().toString().padStart(2, '0');
+    var m = now.getMinutes().toString().padStart(2, '0');
+    var s = now.getSeconds().toString().padStart(2, '0');
+    var timeStr = h + ':' + m;
+    var fullTimeStr = h + ':' + m + ':' + s;
+
+    if (clockPopTime) clockPopTime.textContent = fullTimeStr;
+
+    var cw = WIDGETS['clock'];
+    if (cw && cw.title !== timeStr) {
+      cw.title = timeStr;
+      var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      cw.sub = days[now.getDay()] + ' ' + now.getDate().toString().padStart(2, '0');
+      var clockSlot = rail.querySelector('.dock-slot[data-id="clock"]');
+      if (clockSlot && (cw.clockMode === 'time' || cw.clockMode === 'time-date')) {
+        var glyph = clockSlot.querySelector('.w-glyph-box');
+        if (glyph) glyph.innerHTML = renderWidgetGlyph(cw);
+      }
+    }
+  }
+  setInterval(updateLiveClock, 1000);
+  updateLiveClock();
+
+  /* 6. System Tray App Launchers */
+  var trayAppTiles = document.querySelectorAll('.tray-app-tile');
+  trayAppTiles.forEach(function (tile) {
+    tile.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var app = tile.dataset.trayApp || 'Service';
+      showToast('Activated ' + app);
+      setTimeout(closeActivePopover, 300);
+    });
+  });
+
+  /* 7. Quick Notes Card Logic */
   var noteTextarea = document.getElementById('noteTextarea');
   var closeNoteBtn = document.getElementById('closeNoteBtn');
   var saveNoteBtn = document.getElementById('saveNoteBtn');
@@ -2805,27 +3916,6 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     }
   } catch (e) {
     notesList = [];
-  }
-
-  function toggleNotesPopover() {
-    if (notePopover && notePopover.classList.contains('is-open')) {
-      closeNotesPopover();
-    } else {
-      openNotesPopover();
-    }
-  }
-
-  function openNotesPopover() {
-    if (!notePopover) return;
-    notePopover.classList.add('is-open');
-    renderNotesList();
-    setTimeout(function () {
-      if (noteTextarea) noteTextarea.focus();
-    }, 60);
-  }
-
-  function closeNotesPopover() {
-    if (notePopover) notePopover.classList.remove('is-open');
   }
 
   function saveNotesToStorage() {
@@ -2868,7 +3958,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  if (closeNoteBtn) closeNoteBtn.addEventListener('click', closeNotesPopover);
+  if (closeNoteBtn) closeNoteBtn.addEventListener('click', closeActivePopover);
 
   if (noteTextarea) {
     noteTextarea.addEventListener('input', function () {
@@ -3234,8 +4324,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       return;
     }
     if (e.key === 'Escape') {
-      if (notePopover && notePopover.classList.contains('is-open')) {
-        closeNotesPopover();
+      if (activePopoverId) {
+        closeActivePopover();
         return;
       }
       if (searchModal && searchModal.classList.contains('is-open')) {
