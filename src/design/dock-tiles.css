@@ -1,7 +1,7 @@
 :root {
-  --dock-tile: 46px;
-  --dock-tile-radius: 11px;
-  --dock-rail: 60px;
+  --icon-size: 46px;
+  --icon-width: 46px;
+  --dock-tile-radius: 24%;
   --dock-gap: 6px;
   --dock-glass: rgba(14, 20, 32, 0.78);
   --dock-glass-border: rgba(255, 255, 255, 0.14);
@@ -11,7 +11,7 @@
 }
 
 .dock-final {
-  height: 146px;
+  height: auto;
   gap: 8px;
   padding: 0 16px 14px;
 }
@@ -33,10 +33,11 @@
   isolation: isolate;
   display: flex;
   align-items: center;
-  height: var(--dock-rail);
+  height: auto;
+  min-height: 46px;
   max-width: calc(100vw - 32px);
   gap: var(--dock-gap);
-  padding: 0 7px;
+  padding: 7px;
   box-sizing: border-box;
   border: 0;
   border-radius: 18px;
@@ -77,8 +78,8 @@
   position: relative;
   flex: 0 0 auto;
   display: block;
-  width: var(--dock-tile);
-  height: var(--dock-tile);
+  width: var(--icon-width);
+  height: var(--icon-size);
   border-radius: var(--dock-tile-radius);
   background: none;
   outline: none;
@@ -106,9 +107,9 @@
 
 .dock-cell {
   position: relative;
-  flex: 0 0 var(--dock-tile);
-  width: var(--dock-tile);
-  height: var(--dock-tile);
+  flex: 0 0 var(--icon-width);
+  width: var(--icon-width);
+  height: var(--icon-size);
   padding: 0;
   border: 0;
   background: none;
@@ -126,8 +127,8 @@
   box-sizing: border-box;
   display: grid;
   place-items: center;
-  width: var(--dock-tile);
-  height: var(--dock-tile);
+  width: var(--icon-width);
+  height: var(--icon-size);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--dock-tile-radius);
   background:
@@ -147,6 +148,13 @@
 .dock-tile--app {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
+.dock-tile > svg,
+.dock-tile > .dock-weather,
+.dock-tile > .dock-ring,
+.dock-tile > .fw-app-img-box {
+  transform: scale(var(--dock-glyph-scale, 1));
 }
 
 .dock-tile.is-off > svg,
@@ -337,7 +345,7 @@
   font: 500 12px/16px "Segoe UI Variable Text", "Segoe UI", sans-serif;
   pointer-events: none;
   opacity: 0;
-  transform: translate(calc(-50% + var(--shift, 0px)), calc(-46px * (var(--mag, 1) - 1)));
+  transform: translate(calc(-50% + var(--shift, 0px)), calc(-1 * var(--icon-size) * (var(--mag, 1) - 1)));
   transition:
     opacity 120ms ease-out,
     transform 140ms var(--dock-spring);
