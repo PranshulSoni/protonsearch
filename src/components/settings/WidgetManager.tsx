@@ -48,7 +48,6 @@ function PreviewStrip({ items }: { items: DockItem[] }) {
           <DockWidget
             key={item.id}
             id={item.id}
-            size="compact"
             settings={effectiveSettings(item)}
             preview
           />

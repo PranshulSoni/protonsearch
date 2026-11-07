@@ -18,8 +18,6 @@ import type { FinalWidgetId, FinalWidgetSettings } from './index';
 
 afterEach(cleanup);
 
-const sizes = ['compact', 'standard', 'wide'] as const;
-
 test('metadata covers the 14 widgets, dock order and store set', () => {
   expect(FINAL_WIDGET_IDS).toHaveLength(14);
   expect(DEFAULT_DOCK_ORDER).toEqual([
@@ -57,20 +55,18 @@ test('defaults enable live weather and hide the search shortcut badge', () => {
   expect(weather.weatherLongitude).toBeCloseTo(72.5714);
   expect(settingsFor('search').showShortcut).toBe(false);
 
-  const search = render(<DockWidget id="search" size="standard" />);
+  const search = render(<DockWidget id="search" />);
   expect(search.queryByText('Alt')).toBeNull();
   search.unmount();
 });
 
-test('all dock sizes and all cards render without emoji or mojibake', () => {
+test('every dock tile and card renders without emoji or mojibake', () => {
   for (const id of FINAL_WIDGET_IDS) {
-    for (const size of sizes) {
-      const view = render(<DockWidget id={id} size={size} preview />);
-      expect(view.container.querySelector(`[data-widget="${id}"][data-size="${size}"]`)).not.toBeNull();
-      expect(view.container.textContent ?? '').not.toMatch(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
-      expect(view.container.textContent ?? '').not.toMatch(/[\u00C2\u00E2\uFFFD]/);
-      view.unmount();
-    }
+    const view = render(<DockWidget id={id} preview />);
+    expect(view.container.querySelector(`[data-widget="${id}"]`)).not.toBeNull();
+    expect(view.container.textContent ?? '').not.toMatch(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
+    expect(view.container.textContent ?? '').not.toMatch(/[\u00C2\u00E2\uFFFD]/);
+    view.unmount();
     const card = render(<WidgetCard id={id} preview />);
     expect(card.container.querySelector(`[data-widget-card="${id}"]`)).not.toBeNull();
     expect(card.container.textContent ?? '').not.toMatch(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
@@ -150,35 +146,32 @@ test('an idle agent still shows its last workspace and session', () => {
 
 test('AI docks show an honest disconnected state instead of fake limits', () => {
   for (const id of ['claude', 'chatgpt'] as const) {
-    const label = id === 'claude' ? 'Claude' : 'ChatGPT';
     const disconnected = render(
       <DockWidget
         id={id}
-        size="standard"
         data={{ status: 'disconnected', sessionPercent: 62, weeklyPercent: 41 }}
         settings={settingsFor(id)}
       />,
     );
-    expect(disconnected.getByText('Not connected')).toBeTruthy();
-    expect(disconnected.getByText(`Connect ${label}`)).toBeTruthy();
-    expect(disconnected.container.textContent ?? '').not.toContain('62%');
-    expect(disconnected.container.textContent ?? '').not.toContain('Max 20x');
+    expect(disconnected.getByRole('img', { name: 'Not connected' })).toBeTruthy();
+    expect(disconnected.container.textContent ?? '').not.toContain('62');
+    expect(disconnected.container.querySelector('.dock-ring-fill')).toBeNull();
     disconnected.unmount();
 
-    const missing = render(<DockWidget id={id} size="standard" />);
-    expect(missing.getByText('Not connected')).toBeTruthy();
+    const missing = render(<DockWidget id={id} />);
+    expect(missing.getByRole('img', { name: 'Not connected' })).toBeTruthy();
+    expect(missing.container.querySelector('.dock-ring-fill')).toBeNull();
     missing.unmount();
   }
   const live = render(
     <DockWidget
       id="chatgpt"
-      size="standard"
       data={{ status: 'live', sessionPercent: 62, weeklyPercent: 41 }}
       settings={settingsFor('chatgpt')}
     />,
   );
-  expect(live.container.textContent ?? '').toContain('62%');
-  expect(live.getByText('Week 41%')).toBeTruthy();
+  expect(live.getByRole('img', { name: 'Session 62%' })).toBeTruthy();
+  expect(live.container.querySelector('.dock-ring-fill')).not.toBeNull();
   live.unmount();
 });
 
@@ -198,10 +191,6 @@ test('app icons render only safe data URLs and fall back otherwise', () => {
   expect(card.getAllByText('Google Chrome').length).toBeGreaterThan(0);
   card.unmount();
 
-  const dock = render(<DockWidget id="apps" size="standard" data={apps} settings={settingsFor('apps')} />);
-  expect(dock.container.querySelectorAll('img.fw-app-img')).toHaveLength(1);
-  dock.unmount();
-
   const unsafe: typeof apps = {
     items: [{ id: 'code', title: 'Visual Studio Code', icon: 'https://example.com/icon.png', active: true }],
     activeTitle: 'Visual Studio Code',
@@ -212,7 +201,7 @@ test('app icons render only safe data URLs and fall back otherwise', () => {
   fallback.unmount();
 });
 
-test('system dock shows Wi-Fi and Bluetooth state and respects visibility settings', () => {
+test('system tile shows CPU load honestly', () => {
   const data = {
     cpu: 20,
     ram: 40,
@@ -220,59 +209,54 @@ test('system dock shows Wi-Fi and Bluetooth state and respects visibility settin
     batteryCharging: false,
     temperatureC: 45,
     uptimeSeconds: 3600,
-    connectivity: {
-      wifi: { connected: true, ssid: 'HomeNet', signalPercent: 90, state: 'connected' },
-      bluetooth: { available: true, enabled: true, name: 'Buds' },
-      ethernet: { connected: false, adapter: null },
-      vpn: { connected: false, adapter: null },
-    },
+    connectivity: null,
   };
-  const view = render(<DockWidget id="system" size="standard" data={data} settings={settingsFor('system')} />);
-  expect(view.getByText('HomeNet')).toBeTruthy();
-  expect(view.getByText('Buds')).toBeTruthy();
-  expect(view.getByText('CPU')).toBeTruthy();
-  expect(view.getByText('RAM')).toBeTruthy();
-  expect(view.getByText('BAT')).toBeTruthy();
+  const view = render(<DockWidget id="system" data={data} />);
+  expect(view.getByRole('img', { name: 'CPU 20%' })).toBeTruthy();
+  expect(view.getByText('20')).toBeTruthy();
+  expect(view.container.querySelector('.dock-ring-fill')).not.toBeNull();
   view.unmount();
 
-  const hidden = render(
+  const unknown = render(<DockWidget id="system" data={{ ...data, cpu: null }} />);
+  expect(unknown.getByRole('img', { name: 'CPU unavailable' })).toBeTruthy();
+  expect(unknown.getByText('--')).toBeTruthy();
+  expect(unknown.container.querySelector('.dock-ring-fill')).toBeNull();
+  unknown.unmount();
+});
+
+test('volume, trash and clock tiles show live values only', () => {
+  const volume = render(<DockWidget id="volume" data={{ level: 68, muted: false, device: null }} />);
+  expect(volume.getByRole('img', { name: 'Volume 68%' })).toBeTruthy();
+  expect(volume.container.querySelector('.dock-level')).not.toBeNull();
+  volume.unmount();
+
+  const muted = render(<DockWidget id="volume" data={{ level: 68, muted: true, device: null }} />);
+  expect(muted.getByRole('img', { name: 'Muted' })).toBeTruthy();
+  expect(muted.container.querySelector('.dock-level')).toBeNull();
+  muted.unmount();
+
+  const unknown = render(<DockWidget id="volume" data={{ level: null, muted: null, device: null }} />);
+  expect(unknown.getByRole('img', { name: 'Volume unavailable' })).toBeTruthy();
+  expect(unknown.container.querySelector('.dock-level')).toBeNull();
+  unknown.unmount();
+
+  const trash = render(<DockWidget id="trash" data={{ itemCount: 3, sizeBytes: null, lastEmptiedAt: null }} />);
+  expect(trash.container.querySelector('.dock-badge')?.textContent).toBe('3');
+  trash.unmount();
+
+  const emptyTrash = render(<DockWidget id="trash" data={{ itemCount: 0, sizeBytes: null, lastEmptiedAt: null }} />);
+  expect(emptyTrash.container.querySelector('.dock-badge')).toBeNull();
+  emptyTrash.unmount();
+
+  const clock = render(
     <DockWidget
-      id="system"
-      size="standard"
-      data={data}
-      settings={{ ...settingsFor('system'), showWifi: false, showBluetooth: false }}
+      id="clock"
+      data={{ now: new Date(2026, 10, 7, 16, 5).getTime() }}
+      settings={{ ...settingsFor('clock'), hour12: false }}
     />,
   );
-  expect(hidden.queryByText('HomeNet')).toBeNull();
-  expect(hidden.queryByText('Buds')).toBeNull();
-  expect(hidden.container.querySelector('.fw-sys-net')).toBeNull();
-  hidden.unmount();
-
-  const offline = render(
-    <DockWidget
-      id="system"
-      size="standard"
-      data={{
-        ...data,
-        connectivity: {
-          wifi: { connected: false, ssid: null, signalPercent: null, state: 'disconnected' },
-          bluetooth: { available: false, enabled: false, name: null },
-        },
-      }}
-      settings={settingsFor('system')}
-    />,
-  );
-  expect(offline.getByText('Off')).toBeTruthy();
-  expect(offline.getByText('Unavailable')).toBeTruthy();
-  offline.unmount();
-
-  const empty = render(<DockWidget id="system" size="standard" data={{ ...data, connectivity: null }} settings={settingsFor('system')} />);
-  expect(empty.container.querySelector('.fw-sys-net')).toBeNull();
-  empty.unmount();
-
-  const compact = render(<DockWidget id="system" size="compact" data={data} settings={settingsFor('system')} />);
-  expect(compact.container.querySelectorAll('.fw-sys-net-ic')).toHaveLength(2);
-  compact.unmount();
+  expect(clock.getByRole('img', { name: '16:05' })).toBeTruthy();
+  clock.unmount();
 });
 
 test('allowed actions dispatch through onAction', () => {
@@ -331,25 +315,14 @@ test('weather card asks for a location when live weather is disabled', () => {
 });
 
 test('weather dock states stay honest without a snapshot', () => {
-  const disabled = render(
-    <DockWidget
-      id="weather"
-      size="standard"
-      settings={{ ...settingsFor('weather'), weatherEnabled: false }}
-    />,
-  );
+  const disabled = render(<DockWidget id="weather" settings={{ ...settingsFor('weather'), weatherEnabled: false }} />);
+  expect(disabled.getByRole('img', { name: 'Weather location not set' })).toBeTruthy();
   expect(disabled.getByText('--°')).toBeTruthy();
-  expect(disabled.getByText('Set location')).toBeTruthy();
-  expect(disabled.queryByText('Partly cloudy')).toBeNull();
-  expect(disabled.queryByText(/High \/ low unavailable/)).toBeNull();
   disabled.unmount();
 
-  const enabled = render(<DockWidget id="weather" size="wide" settings={settingsFor('weather')} />);
+  const enabled = render(<DockWidget id="weather" settings={settingsFor('weather')} />);
+  expect(enabled.getByRole('img', { name: 'No weather data' })).toBeTruthy();
   expect(enabled.getByText('--°')).toBeTruthy();
-  expect(enabled.getByText('No data')).toBeTruthy();
-  expect(enabled.getByText('Ahmedabad')).toBeTruthy();
-  expect(enabled.queryByText('Partly cloudy')).toBeNull();
-  expect(enabled.queryByText(/High \/ low unavailable/)).toBeNull();
   enabled.unmount();
 });
 
@@ -357,31 +330,23 @@ test('weather dock renders live data and preview samples without placeholder cop
   const live = render(
     <DockWidget
       id="weather"
-      size="wide"
       data={{ temperature: 31, weatherCode: 0, time: 0, utcOffsetSeconds: 19800, hours: [], highC: 34, lowC: 22 }}
       settings={{ ...settingsFor('weather'), units: 'F' }}
     />,
   );
   expect(live.getByText('88°')).toBeTruthy();
-  expect(live.getByText('Clear')).toBeTruthy();
-  expect(live.getByText('High 93° · Low 72°')).toBeTruthy();
-  expect(live.getByText('Ahmedabad')).toBeTruthy();
-  expect(live.queryByText('No data')).toBeNull();
+  expect(live.getByRole('img', { name: '88°, Clear' })).toBeTruthy();
   live.unmount();
 
   const preview = render(
     <DockWidget
       id="weather"
-      size="wide"
       preview
       settings={{ ...settingsFor('weather'), weatherEnabled: false }}
     />,
   );
   expect(preview.getByText('24°')).toBeTruthy();
-  expect(preview.getByText('Partly cloudy')).toBeTruthy();
-  expect(preview.getByText('High 27° · Low 18°')).toBeTruthy();
-  expect(preview.getByText('Ahmedabad')).toBeTruthy();
-  expect(preview.queryByText('Set location')).toBeNull();
+  expect(preview.getByRole('img', { name: '24°, Partly cloudy' })).toBeTruthy();
   preview.unmount();
 });
 

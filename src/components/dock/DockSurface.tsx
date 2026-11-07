@@ -218,13 +218,9 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
             >
               <DockWidget
                 id={item.id}
-                size={effectiveSize(item)}
-                width={dense ? DOCK_DENSE_WIDTHS[item.id] : DOCK_WIDTHS[item.id][effectiveSize(item)]}
                 settings={settings[item.id]}
                 data={view.data}
                 preview={view.preview}
-                status={view.status}
-                onAction={(action) => { void performWidgetAction(action).catch(() => {}); }}
               />
             </div>
           );

@@ -375,13 +375,9 @@ export type WidgetActionHandler = (action: WidgetAction, payload?: unknown) => v
 
 export interface DockWidgetProps {
   id: FinalWidgetId;
-  size: WidgetSize;
-  width?: number;
   settings?: FinalWidgetSettings;
   data?: FinalWidgetData;
   preview?: boolean;
-  status?: WidgetStatus;
-  onAction?: WidgetActionHandler;
 }
 
 export interface WidgetCardProps {
