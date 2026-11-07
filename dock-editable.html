@@ -498,10 +498,19 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   position: relative;
   width: var(--tile-square-w);
   height: var(--tile-h);
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 .dock-slot[data-shape="rect"] .w-glyph-box {
   width: 26px;
   height: 26px;
+}
+.w-glyph-box svg,
+.w-glyph-box img {
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+  shape-rendering: geometricPrecision;
+  transform: translateZ(0);
 }
 
 .w-ico {
@@ -2823,16 +2832,16 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     'running-apps': {
       id: 'running-apps',
       title: 'Running Apps',
-      sub: 'Alphabetical Order',
-      defaultWidth: 168,
+      sub: 'Discrete 48px Square Tiles',
+      defaultWidth: 48,
       isRunningApps: true,
       hasDot: false
     },
     'pinned-apps': {
       id: 'pinned-apps',
       title: 'Pinned Apps',
-      sub: 'Dock Favorites',
-      defaultWidth: 96,
+      sub: 'Discrete 48px Square Tiles',
+      defaultWidth: 48,
       isPinnedApps: true,
       hasDot: false
     },
@@ -2905,25 +2914,22 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   /* Default running apps (initially sorted alphabetically A-Z) */
   var INITIAL_RUNNING_APPS = [
-    { id: 'chrome', name: 'Google Chrome', icon: '<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285f4"/><path d="M12 2a10 10 0 0 1 8.66 5H12z" fill="#ea4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5z" fill="#fbbc05"/><path d="M12 22A10 10 0 0 1 3.34 7H12z" fill="#34a853"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>' },
-    { id: 'spotify', name: 'Spotify', icon: '<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>' },
-    { id: 'terminal', name: 'Terminal', icon: '<svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14181f"/><path d="m6.5 8 4 4-4 4M12.5 16H18" stroke="var(--terminal-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>' },
-    { id: 'vscode', name: 'VS Code', icon: '<svg width="20" height="20" viewBox="0 0 24 24"><path d="m18.4 2.6-9.7 8.2L3.6 7.4 1.5 8.7l4.8 3.9-4.8 3.9 2.1 1.3 5.1-3.4 9.7 8.2 4.4-2V4.6z" fill="#0078d7"/><path d="m18.4 2.6-7.8 7.3 7.8 7.3 4.4-2.2V4.6z" fill="#29a8ff"/></svg>' }
+    { id: 'chrome', name: 'Google Chrome', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="10" fill="#4285f4"/><path d="M12 2a10 10 0 0 1 8.66 5H12z" fill="#ea4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5z" fill="#fbbc05"/><path d="M12 22A10 10 0 0 1 3.34 7H12z" fill="#34a853"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>' },
+    { id: 'spotify', name: 'Spotify', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>' },
+    { id: 'terminal', name: 'Terminal', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14181f"/><path d="m6.5 8 4 4-4 4M12.5 16H18" stroke="var(--terminal-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>' },
+    { id: 'vscode', name: 'VS Code', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><path d="m18.4 2.6-9.7 8.2L3.6 7.4 1.5 8.7l4.8 3.9-4.8 3.9 2.1 1.3 5.1-3.4 9.7 8.2 4.4-2V4.6z" fill="#0078d7"/><path d="m18.4 2.6-7.8 7.3 7.8 7.3 4.4-2.2V4.6z" fill="#29a8ff"/></svg>' }
   ];
 
-  /* Installed apps database for Pinning */
+  /* Installed apps database for Pinning (small 20px sharp vector icons centered in 48px square tiles) */
   var INSTALLED_APPS = [
     { id: 'vscode', name: 'Visual Studio Code', icon: INITIAL_RUNNING_APPS[3].icon },
     { id: 'chrome', name: 'Google Chrome', icon: INITIAL_RUNNING_APPS[0].icon },
     { id: 'terminal', name: 'Windows Terminal', icon: INITIAL_RUNNING_APPS[2].icon },
     { id: 'spotify', name: 'Spotify Music', icon: INITIAL_RUNNING_APPS[1].icon },
-    { id: 'slack', name: 'Slack', icon: '<svg width="20" height="20" viewBox="0 0 24 24"><rect x="9.5" y="2" width="3.4" height="9" rx="1.7" fill="#36c5f0"/><rect x="13" y="9.5" width="9" height="3.4" rx="1.7" fill="#2eb67d"/><rect x="11" y="13" width="3.4" height="9" rx="1.7" fill="#ecb22e"/><rect x="2" y="11" width="9" height="3.4" rx="1.7" fill="#e01e5a"/></svg>' },
-    { id: 'figma', name: 'Figma', icon: '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 2h4v7H8a3.5 3.5 0 0 1 0-7Z" fill="#f24e1e"/><path d="M12 2h4a3.5 3.5 0 0 1 0 7h-4z" fill="#ff7262"/><path d="M8 9h4v7H8a3.5 3.5 0 0 1 0-7Z" fill="#a259ff"/><circle cx="15.5" cy="12.5" r="3.5" fill="#1abcfe"/><path d="M8 16h4v3.5A3.5 3.5 0 1 1 8 16Z" fill="#0acf83"/></svg>' },
-    { id: 'folders', name: 'File Explorer', icon: '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M3 6.5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#e6b566"/><path d="M3 10h18" stroke="#b68636" stroke-width="1.4"/></svg>' },
-    { id: 'settings', name: 'Windows Settings', icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ea5b0" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg>' }
+    { id: 'slack', name: 'Slack', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><rect x="9.5" y="2" width="3.4" height="9" rx="1.7" fill="#36c5f0"/><rect x="13" y="9.5" width="9" height="3.4" rx="1.7" fill="#2eb67d"/><rect x="11" y="13" width="3.4" height="9" rx="1.7" fill="#ecb22e"/><rect x="2" y="11" width="9" height="3.4" rx="1.7" fill="#e01e5a"/></svg>' },
+    { id: 'figma', name: 'Figma', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><path d="M8 2h4v7H8a3.5 3.5 0 0 1 0-7Z" fill="#f24e1e"/><path d="M12 2h4a3.5 3.5 0 0 1 0 7h-4z" fill="#ff7262"/><path d="M8 9h4v7H8a3.5 3.5 0 0 1 0-7Z" fill="#a259ff"/><path d="M12 9h4a3.5 3.5 0 0 1 0 7h-4z" fill="#1abcfe"/><path d="M8 16h4v3.5A3.5 3.5 0 0 1 8 16Z" fill="#0acf83"/></svg>' }
   ];
 
-  /* Initial pinned apps */
   var pinnedAppIds = ['figma', 'slack'];
 
   /* All widgets registered in customizer gallery */
@@ -3117,44 +3123,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         '<span class="ring-glyph" style="color:' + w.glyphColor + '">' + w.iconSvg + '</span>' +
       '</div>';
     }
-    if (w.isRunningApps) {
-      return renderRunningAppsCluster();
-    }
-    if (w.isPinnedApps) {
-      return renderPinnedAppsCluster();
-    }
     return '<span class="w-ico">' + (w.iconSvg || '') + '</span>';
-  }
-
-  /* Running Apps: Rendered in horizontal row with direct in-dock reorder affordance */
-  function renderRunningAppsCluster() {
-    var html = '<div class="dock-apps-cluster" style="display:flex;align-items:center;gap:6px;padding:0 4px;">';
-    runningApps.forEach(function (app, idx) {
-      html += '<div class="dock-sub-app" data-subapp-id="' + app.id + '" data-subapp-idx="' + idx + '" title="' + app.name + ' (Drag or click arrows to reorder)" style="position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,0.06);cursor:pointer;">' +
-        app.icon +
-        '<span class="dock-dot"></span>' +
-        '<div class="dock-subapp-nav" style="position:absolute;top:-2px;left:0;right:0;display:none;justify-content:space-between;padding:0 1px;pointer-events:auto;">' +
-          '<span class="sub-nav-btn" data-sub-move="-1" data-sub-idx="' + idx + '" style="font-size:8px;color:#fff;background:rgba(0,0,0,0.8);border-radius:2px;cursor:pointer;line-height:1;padding:1px 2px;">&lsaquo;</span>' +
-          '<span class="sub-nav-btn" data-sub-move="1" data-sub-idx="' + idx + '" style="font-size:8px;color:#fff;background:rgba(0,0,0,0.8);border-radius:2px;cursor:pointer;line-height:1;padding:1px 2px;">&rsaquo;</span>' +
-        '</div>' +
-      '</div>';
-    });
-    html += '</div>';
-    return html;
-  }
-
-  /* Pinned Apps: Rendered in horizontal cluster */
-  function renderPinnedAppsCluster() {
-    var html = '<div class="dock-pinned-cluster" style="display:flex;align-items:center;gap:6px;padding:0 4px;">';
-    pinnedAppIds.forEach(function (id) {
-      var app = INSTALLED_APPS.find(function (a) { return a.id === id; });
-      if (!app) return;
-      html += '<div class="dock-pinned-app" title="Pinned: ' + app.name + '" style="position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,0.06);cursor:pointer;">' +
-        app.icon +
-      '</div>';
-    });
-    html += '</div>';
-    return html;
   }
 
   /* FLIP animated reorder */

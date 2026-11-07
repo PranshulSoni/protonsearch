@@ -205,18 +205,18 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
 ---
 
 ### 2.6 Running Apps Widget (`running-apps`)
-* **Design & Behavior**:
-  - Shows active running applications with running indicator dots.
-  - **Alphabetical Left-to-Right Default**: Items are initially sorted alphabetically by application name (`A` to `Z`).
-  - **In-Dock Direct Reordering**: Users can reorder apps directly on the dock (via drag-and-drop or hover ‹ / › buttons) without opening the customize menu.
-  - **Order Persistence**: Activating or launching an app does NOT reorder or jump the position; the user's manual sequence is strictly preserved.
+* **Design & Alignment Contract**:
+  - **Discrete Standalone 48px Tiles**: Each active application renders as an independent 48px square tile directly on the dock rail. Grouping running apps into a wide capsule or nested container is strictly prohibited.
+  - **Uniform Spacing & Height**: Exactly matches all other dock slots with locked 48px height (`--tile-h: 48px`), 48px width, and uniform 6px rail gaps (`var(--dock-gap: 6px)`).
+  - **Running Dot Indicator**: A crisp white dot (`3.5px` diameter) is centered at `bottom: 3.5px` directly beneath the app icon.
+  - **Alphabetical Default with Order Lock**: Running apps sort alphabetically (`A` to `Z`) on first launch; reordering by dragging in Edit Mode is permanently remembered. Launching or activating apps preserves the user manual sequence.
 * **Rust Backend Module**:
-  - Source file: `src-tauri/src/running_apps.rs`.
+  - Source file: `src-tauri/src/running_apps.rs` / `protonsearch/src/running_apps.rs`.
   - Native API:
     - Enumerates top-level windows via `EnumWindows`.
-    - Filters invisible/cloaked windows via `DwmGetWindowAttribute(DWMWA_CLOAKED)`.
+    - Filters cloaked/invisible windows via `DwmGetWindowAttribute(DWMWA_CLOAKED)`.
     - Resolves executable PID via `GetWindowThreadProcessId`.
-    - Extracts high-res 48px/32px icons via Win32 `SHGetFileInfoW` or `ExtractIconExW`.
+    - Extracts high-resolution raw icons via the Sharp Icon Pipeline (Section 2.8).
 * **IPC Contract**:
   - Command: `invoke('get_running_apps')` -> returns `RunningApp[]`.
   - Command: `invoke('activate_app', { appId: string })` -> brings window to foreground via `SetForegroundWindow`.
@@ -226,7 +226,7 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
     interface RunningApp {
       id: string;               // e.g. "code.exe"
       title: string;            // "Visual Studio Code"
-      icon: string;             // Base64 PNG data URI or icon slug
+      icon: string;             // Razor-sharp Base64 PNG data URI
       processId: number;
       active: boolean;          // Has focus
       orderIndex: number;
@@ -236,13 +236,39 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
 ---
 
 ### 2.7 Pinned Apps Widget & App Catalog Picker (`pinned-apps`)
-* **Design & Behavior**:
-  - Dedicated dock widget hosting user-pinned application shortcuts.
-  - **Apps Catalog Picker in Customize**: The Customize modal contains an `Apps` catalog displaying all installed applications on the computer. Clicking any installed application pins it to the dock.
-  - Pinned apps can be moved left/right directly on the dock or unpinned via right-click / customize menu.
+* **Design & Alignment Contract**:
+  - **Discrete Standalone 48px Tiles**: Each pinned application shortcut renders as an independent 48px square tile on the dock rail, perfectly aligned with running apps and system widgets.
+  - **Apps Catalog Picker in Customize**: The Customize modal features an `Apps` catalog enumerating all installed desktop and Windows Store applications. Clicking any app pins it directly to the dock.
+  - **Reordering & Unpinning**: Pinned apps can be dragged in Edit Mode to reorder or unpinned via the customizer modal.
 * **Rust Backend Module**:
   - Source file: `src-tauri/src/installed_apps.rs` & `protonsearch/src/indexer.rs`.
-  - Native API: COM `IShellItem` enumeration of `shell:AppsFolder` (covers both Win32 desktop applications and modern UWP / MSIX Store apps).
+  - Native API: COM `IShellItem` enumeration of `shell:AppsFolder` resolving clean target PIDs and Store AppIDs.
+
+---
+
+### 2.8 Windows Native Icon Extraction & Sharpness Architecture Contract
+
+A common defect in Windows launchers is blurry, fuzzy application icons. This occurs when apps naively query Win32 `ExtractIconExW` or `SHGetFileInfoW(SHGFI_ICON)`, which extracts low-resolution 32x32 or 16x16 bitmaps that degrade severely when displayed on modern High-DPI screens (125%, 150%, 200% Windows scaling). Conversely, downsampling raw 256x256 icons using standard bilinear interpolation produces soft, blurry edges.
+
+To guarantee razor-sharp, crystal-clear icons, ProtonDock enforces the following multi-stage icon pipeline:
+
+1. **Small Icon Sizing Contract (Preventing Giant Bloated Icons)**:
+   - Within each 48px square dock tile, the application icon must be **small**: `20px x 20px` to `22px x 22px` (never exceeding `24px x 24px`).
+   - The icon must NEVER fill the 48px square. It is centered inside a `32px x 32px` glyph container with `13px` to `14px` of optical padding on all sides. This leaves balanced breathing room and ensures the `3.5px` white running dot sits neatly underneath without overlapping the icon graphic.
+
+2. **Win32 & COM Jumbo Extraction (Never Use Low-Res Bitmaps)**:
+   - Win32 Desktop Executables: Query the system image list via `SHGetImageList(SHIL_JUMBO, IID_IImageList, ...)` or extract the uncompressed 256x256 PNG resource from `RT_GROUP_ICON`.
+   - Windows Store / UWP Packaged Apps: Resolve through `IShellItemImageFactory::GetImage` with flags `SIIGBF_RESIZETOFIT | SIIGBF_SCALEUP`, passing the exact device pixel dimensions computed from `GetDpiForWindow(hwnd)`.
+
+3. **High-Quality Lanczos3 Resampling with Unsharp Mask (Rust Backend)**:
+   - Resample high-resolution source bitmaps (256x256 or 128x128) down to target physical device pixels using the 3-lobed Lanczos filter (`image::imageops::FilterType::Lanczos3` in Rust, or Direct2D `D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC`).
+   - Apply a micro unsharp mask filter (radius 0.5, amount 0.35) after resampling to restore micro-contrast and edge sharpness lost during fractional scaling.
+   - Encode output strictly as uncompressed or losslessly compressed 32-bit PNG (`RGBA8888`) with pre-multiplied alpha. Never encode icons as JPEG or lossy WebP.
+
+4. **Frontend Subpixel Crispness & Anti-Blur CSS Rules**:
+   - Apply `image-rendering: -webkit-optimize-contrast;` and `image-rendering: crisp-edges;` to all icon images.
+   - For SVG vector icons, enforce `shape-rendering="geometricPrecision"` and integer viewBox dimensions.
+   - Enforce GPU subpixel snapping via `transform: translateZ(0)` on the icon container to prevent GPU bilinear texture filtering blur caused by subpixel fractional coordinates. (covers both Win32 desktop applications and modern UWP / MSIX Store apps).
 * **IPC Contract**:
   - Command: `invoke('list_installed_apps')` -> returns `InstalledApp[]`.
   - Command: `invoke('pin_app', { appId: string })`.
