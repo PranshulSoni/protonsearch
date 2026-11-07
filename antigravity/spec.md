@@ -22,8 +22,30 @@
    - `Capsules`: Discrete rounded glass squircle tiles with 6px gap (`--dock-gap: 6px`).
    - `Lines`: Seamless rail with 1px translucent vertical dividers between widgets.
 4. **Dock Profiles**:
-   - Top-shelf switcher supporting `Daily`, `Work`, and `Founder` modes.
-   - Each profile retains independent widget ordering, enabled sets, and sizing preferences.
+   - Preset profiles: `Daily`, `Work`, `Founder`, and `Focus`.
+   - Native User Profile Creation: Top-shelf `+` button and modal allows users to instantiate custom profiles (e.g. `Coding`, `Gaming`, `Studio`) persisted in local storage.
+   - Fluid Physical Morphing: Switching profiles animates dock rail width and widget positions dynamically via Apple spring curves (`cubic-bezier(0.16, 1, 0.3, 1)`).
+
+---
+
+### 1.2 Multi-Profile Architecture & Dynamic Rail Morphing
+
+1. **Profile Persistence Contract**:
+   - Default profiles stored statically in configuration.
+   - Custom profiles serialized to local storage under key `protondock_custom_profiles` as `Record<string, string[]>`.
+   - Dynamic profile tabs generated on runtime boot and synchronized with the dock rail.
+2. **Dynamic Dock Width Morphing**:
+   - Measuring previous width and layout coordinates before state mutation.
+   - Applying target profile widget layout.
+   - Measuring new width and running a smooth CSS spring transition on the dock rail container: `transition: width 380ms cubic-bezier(0.16, 1, 0.3, 1)`.
+   - Sibling widgets glide horizontally into position via FLIP transforms (`translateX(dx)` -> `0`).
+   - Entering widgets scale smoothly from `scale(0.85)` and `opacity: 0` to `scale(1.0)` and `opacity: 1`.
+3. **In-Place Widget Resizing & Edit Mode**:
+   - Activated via top-shelf `Edit` pill button or shortcut.
+   - Reveals an Apple-style discrete resize control on each widget (`.dw-resize-chip`).
+   - Cycling width between `48px` (Square), `96px` (Compact), `140px` (Standard), and `168px` (Wide).
+   - Dynamic width expansion triggers FLIP spring transitions on neighboring widgets and the dock container.
+   - Strict height invariant (`--tile-h: 48px`) is maintained without vertical shifting.
 
 ---
 
@@ -622,15 +644,21 @@ ProtonDock integrates the architecture and UI philosophy of **Kensaku** (`https:
 
 ---
 
-## 3. Motion & Animation Standards
+## 3. Motion & Animation Standards (Apple Design System)
 
-1. **Reorder FLIP Animations**:
-   - Reordering triggers FLIP (First, Last, Invert, Play) transitions.
-   - Transition duration: `220ms var(--ease)` where `--ease: cubic-bezier(0.16, 1, 0.3, 1)`.
-   - Never causes layout jitter, scroll displacement, or vertical clipping.
-2. **Sizing Transitions**:
-   - Toggling between Square (48px) and Rectangle widths animates smoothly with `width: var(--speed-rail) var(--ease)`.
-   - Dock rail dynamically expands and contracts around the modified slot.
+1. **Apple Two-Parameter Spring Dynamics**:
+   - Damping Ratio: `1.0` (critically damped, no overshoot) for all layout and width morphing transitions.
+   - Response Time: `0.38s` for rail expansion, `0.32s` for widget reordering.
+   - CSS Spring Curve: `cubic-bezier(0.16, 1, 0.3, 1)` approximating native iOS fluid interface springs.
+2. **Reorder & Resize FLIP Pipeline**:
+   - Reordering or resizing widgets captures initial bounding client rects.
+   - Inverts horizontal offset delta `dx = first.left - last.left`.
+   - Animates to zero displacement using Web Animations API without layout jitter or vertical clipping.
+3. **Dynamic Dock Rail Morphing**:
+   - Changing profiles or expanding widget widths animates the outer dock container smoothly between computed widths.
+   - Dock rail width is animated explicitly using `rail.style.transition = 'width 380ms cubic-bezier(0.16, 1, 0.3, 1)'` to prevent layout snapping.
+4. **Instant Pointer-Down Response**:
+   - Buttons and widget slots respond on pointer-down with `transform: scale(0.96)` over 100ms ease-out, providing physical directness.
 
 ---
 
@@ -649,6 +677,9 @@ ProtonDock integrates the architecture and UI philosophy of **Kensaku** (`https:
 - [ ] Connect `MusicPlayerWidget.tsx` to `media_player.rs` Windows SMTC session manager.
 - [ ] Connect `QuickNotesCard.tsx` to `notes.rs` SQLite storage.
 - [ ] Connect `SpotlightWindow.tsx` to `calculator.rs` in-process math evaluator.
+- [ ] Connect multi-profile management to `profiles.rs` SQLite storage with native profile creation and dynamic switching.
+- [ ] Implement Apple Design spring animation controller for fluid dock rail width morphing and FLIP transitions.
+- [ ] Bind in-place widget resize controller with 48px square height invariant guarantee.
 - [ ] Connect `SpotlightWindow.tsx` to `kensaku_search.rs` with FTS5, OCR, and semantic vector endpoints.
 - [ ] Connect Spacebar Quick Look preview modal to `kensaku_quick_look` IPC command.
 - [ ] Wire native theme switcher across Dark, Light, and Liquid Glass tokens with `localStorage` persistence.

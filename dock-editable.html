@@ -2215,10 +2215,12 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
     <!-- Top Shelf: Profiles, Capsules vs Lines style switcher, and Customize pill -->
     <div class="dock-shelf">
-      <div class="profile-pill" role="group" aria-label="Dock profiles">
+      <div class="profile-pill" id="profilePill" role="group" aria-label="Dock profiles">
         <button class="profile-tab is-active" data-profile="daily" type="button" aria-pressed="true">Daily</button>
         <button class="profile-tab" data-profile="work" type="button" aria-pressed="false">Work</button>
         <button class="profile-tab" data-profile="founder" type="button" aria-pressed="false">Founder</button>
+        <button class="profile-tab" data-profile="focus" type="button" aria-pressed="false">Focus</button>
+        <button class="profile-add-tab" id="addProfileBtn" type="button" title="Add Custom Profile" aria-label="Add Custom Profile">+</button>
       </div>
 
       <div class="theme-pill" role="group" aria-label="Dock theme">
@@ -2247,6 +2249,10 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         </button>
       </div>
 
+      <button class="edit-pill" id="dockEditToggle" type="button" aria-pressed="false" aria-label="Toggle In-Place Widget Resizing">
+        <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L4.5 13.5 2 14l.5-2.5 9-9z"/></svg>
+        <span>Edit</span>
+      </button>
       <button class="customize-pill" id="openCustomizerBtn" type="button" aria-label="Customize dock widgets and width">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
           <path d="M4 7h9M17 7h3M4 17h3M11 17h9"/>
@@ -2660,6 +2666,50 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 <!-- ==========================================================================
      PROTONSEARCH LAUNCHER: SPOTLIGHT PALETTE & IN-PROCESS MATH ENGINE
      ========================================================================== -->
+
+<!-- New Profile Modal (Apple Design Translucent Dialog) -->
+<div class="ps-spotlight-backdrop" id="newProfileModal">
+  <div class="profile-create-card" role="dialog" aria-label="Create New Profile">
+    <div class="pcc-header">
+      <div class="pcc-title">Create New Profile</div>
+      <button class="pcc-close-btn" id="closeNewProfileModalBtn" type="button" aria-label="Close dialog">&times;</button>
+    </div>
+    <div class="pcc-sub">Personalize an isolated dock layout for specific workflows or contexts.</div>
+    
+    <div class="pcc-field">
+      <label class="pcc-label" for="newProfileNameInput">Profile Name</label>
+      <input type="text" id="newProfileNameInput" class="pcc-input" placeholder="e.g. Coding, Gaming, Streaming, Zen..." autocomplete="off" />
+    </div>
+
+    <div class="pcc-field">
+      <label class="pcc-label">Starting Layout</label>
+      <div class="pcc-presets" role="radiogroup">
+        <label class="pcc-preset-opt">
+          <input type="radio" name="baseProfilePreset" value="current" checked />
+          <span>From Current Dock</span>
+        </label>
+        <label class="pcc-preset-opt">
+          <input type="radio" name="baseProfilePreset" value="daily" />
+          <span>Daily (Essentials)</span>
+        </label>
+        <label class="pcc-preset-opt">
+          <input type="radio" name="baseProfilePreset" value="work" />
+          <span>Work (Full Telemetry)</span>
+        </label>
+        <label class="pcc-preset-opt">
+          <input type="radio" name="baseProfilePreset" value="focus" />
+          <span>Focus (Zero Distraction)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="pcc-footer">
+      <button class="pcc-btn is-secondary" id="cancelNewProfileBtn" type="button">Cancel</button>
+      <button class="pcc-btn is-primary" id="confirmNewProfileBtn" type="button">Create Profile</button>
+    </div>
+  </div>
+</div>
+
 <div class="ps-spotlight-backdrop" id="searchModal">
   <section class="ps-spotlight-card" id="launcherCard" role="dialog" aria-label="ProtonSearch Kensaku Spotlight">
     <div class="ps-toast" id="psToast">
@@ -2950,14 +3000,26 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   ];
 
   /* Profiles: Daily strictly matches the target non-slop dock layout from user reference photo */
-  var PROFILES = {
+  var DEFAULT_PROFILES = {
     daily: ['start', 'search', 'running-apps', 'siri-ai', 'claude', 'codex', 'music-player', 'clock'],
     work: ['start', 'search', 'running-apps', 'weather', 'status-battery', 'wifi', 'bluetooth', 'notifications', 'quick-notes', 'system-tray', 'clock'],
-    founder: ['start', 'search', 'claude', 'codex', 'running-apps', 'pinned-apps', 'siri-ai', 'music-player', 'wifi', 'system-tray', 'clock']
+    founder: ['start', 'search', 'claude', 'codex', 'running-apps', 'pinned-apps', 'siri-ai', 'music-player', 'wifi', 'system-tray', 'clock'],
+    focus: ['start', 'search', 'clock', 'quick-notes', 'music-player']
   };
 
+  var PROFILES = Object.assign({}, DEFAULT_PROFILES);
+
+  try {
+    var storedCustomProfiles = localStorage.getItem('protondock_custom_profiles');
+    if (storedCustomProfiles) {
+      var parsedCustom = JSON.parse(storedCustomProfiles);
+      Object.assign(PROFILES, parsedCustom);
+    }
+  } catch (e) {}
+
   var activeProfile = 'daily';
-  var widgetOrder = PROFILES.daily.slice();
+  var widgetOrder = (PROFILES.daily || DEFAULT_PROFILES.daily).slice();
+  var isEditMode = false;
   var runningApps = INITIAL_RUNNING_APPS.slice();
   var enabledMap = {};
   var customWidths = {};
@@ -3180,7 +3242,20 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     updateCustomizerList();
   }
 
-  function renderDock() {
+  function renderDock(animate) {
+    var firstWidth = 0;
+    var firstPositions = new Map();
+
+    if (animate && rail) {
+      firstWidth = rail.getBoundingClientRect().width;
+      rail.querySelectorAll('.dock-slot').forEach(function (slot) {
+        var id = slot.dataset.id;
+        if (id) {
+          firstPositions.set(id, slot.getBoundingClientRect());
+        }
+      });
+    }
+
     var html = '';
     var activeList = widgetOrder.filter(function (id) {
       return isEnabled(id) && WIDGETS[id];
@@ -3258,6 +3333,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
           '</span>' +
           '<span class="dw-expand-btn" title="Toggle Square / Rectangle" data-toggle-id="' + id + '">&#x2194;</span>' +
         '</span>' +
+        '<span class="dw-resize-chip" data-resize-id="' + id + '" title="Resize Widget (' + width + 'px)">+</span>' +
         (w.hasDot ? '<span class="dock-dot"></span>' : '') +
         '<span class="dock-tip">' + escapeHtml(w.title) + '</span>' +
       '</button>';
@@ -3265,6 +3341,49 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
     rail.innerHTML = html;
     attachDockInteractions();
+
+    if (animate && rail && firstWidth > 0) {
+      var lastWidth = rail.getBoundingClientRect().width;
+      var deltaW = lastWidth - firstWidth;
+
+      if (Math.abs(deltaW) > 0.5) {
+        rail.style.width = firstWidth + 'px';
+        rail.style.transition = 'none';
+        rail.offsetHeight; // force reflow
+        rail.style.transition = 'width 380ms cubic-bezier(0.16, 1, 0.3, 1)';
+        rail.style.width = lastWidth + 'px';
+        setTimeout(function () {
+          rail.style.width = '';
+          rail.style.transition = '';
+        }, 390);
+      }
+
+      rail.querySelectorAll('.dock-slot').forEach(function (slot) {
+        var id = slot.dataset.id;
+        var first = firstPositions.get(id);
+        if (first) {
+          var last = slot.getBoundingClientRect();
+          var dx = first.left - last.left;
+          if (Math.abs(dx) > 0.5) {
+            slot.animate([
+              { transform: 'translateX(' + dx + 'px)' },
+              { transform: 'translateX(0)' }
+            ], {
+              duration: 380,
+              easing: 'cubic-bezier(0.16, 1, 0.3, 1)'
+            });
+          }
+        } else {
+          slot.animate([
+            { opacity: 0, transform: 'scale(0.85)' },
+            { opacity: 1, transform: 'scale(1)' }
+          ], {
+            duration: 320,
+            easing: 'cubic-bezier(0.16, 1, 0.3, 1)'
+          });
+        }
+      });
+    }
   }
 
   function attachDockInteractions() {
@@ -3275,6 +3394,20 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
       /* Primary click interactions for widgets */
       slot.addEventListener('click', function (e) {
+        var resizeTarget = e.target.closest('.dw-resize-chip');
+        if (resizeTarget) {
+          e.stopPropagation();
+          var resId = resizeTarget.dataset.resizeId || id;
+          cycleWidgetWidth(resId);
+          return;
+        }
+
+        if (isEditMode) {
+          e.stopPropagation();
+          cycleWidgetWidth(id);
+          return;
+        }
+
         if (e.target.closest('.dw-nav-btn') || e.target.closest('.dw-expand-btn') || e.target.closest('.sub-nav-btn')) return;
 
         if (slot.classList.contains('dock-slot-app')) {
@@ -3737,25 +3870,169 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
      ========================================================================== */
 
   var profileTabs = document.querySelectorAll('.profile-tab');
-  profileTabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      var p = tab.dataset.profile;
-      if (PROFILES[p]) {
-        activeProfile = p;
-        widgetOrder = PROFILES[p].slice();
-        profileTabs.forEach(function (t) {
-          var active = t.dataset.profile === p;
-          t.classList.toggle('is-active', active);
-          t.setAttribute('aria-pressed', active ? 'true' : 'false');
-        });
-        saveState();
-        renderDock();
-        if (custModal.classList.contains('is-open')) {
-          updateCustomizerList();
-        }
-      }
+  /* Multi-Profile Dynamic Tabs & FLIP Switcher */
+  function renderProfileTabs() {
+    var pill = document.getElementById('profilePill');
+    if (!pill) return;
+    var html = '';
+    Object.keys(PROFILES).forEach(function (key) {
+      var isActive = key === activeProfile;
+      var label = key.charAt(0).toUpperCase() + key.slice(1);
+      html += '<button class="profile-tab' + (isActive ? ' is-active' : '') + '" data-profile="' + key + '" type="button" aria-pressed="' + (isActive ? 'true' : 'false') + '">' +
+        escapeHtml(label) +
+      '</button>';
     });
-  });
+    html += '<button class="profile-add-tab" id="addProfileBtn" type="button" title="Add Custom Profile" aria-label="Add Custom Profile">+</button>';
+    pill.innerHTML = html;
+
+    pill.querySelectorAll('.profile-tab').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var p = tab.dataset.profile;
+        if (p && PROFILES[p] && p !== activeProfile) {
+          switchProfile(p);
+        }
+      });
+    });
+
+    var addBtn = document.getElementById('addProfileBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', function () {
+        openNewProfileModal();
+      });
+    }
+  }
+
+  function switchProfile(profileKey) {
+    if (!PROFILES[profileKey]) return;
+    activeProfile = profileKey;
+    widgetOrder = PROFILES[profileKey].slice();
+
+    DEFAULT_DOCK_ORDER.forEach(function (id) {
+      enabledMap[id] = PROFILES[profileKey].indexOf(id) !== -1;
+    });
+
+    renderProfileTabs();
+    saveState();
+    renderDock(true); // Fluid FLIP and rail width spring!
+
+    showToast('Switched to ' + profileKey.charAt(0).toUpperCase() + profileKey.slice(1) + ' profile');
+    if (custModal && custModal.classList.contains('is-open')) {
+      updateCustomizerList();
+    }
+  }
+
+  /* Edit Mode Controller (Apple Design In-Place Resizing) */
+  var dockEditToggle = document.getElementById('dockEditToggle');
+
+  function setEditMode(active) {
+    isEditMode = active;
+    if (dockEditToggle) {
+      dockEditToggle.classList.toggle('is-active', isEditMode);
+      dockEditToggle.setAttribute('aria-pressed', isEditMode ? 'true' : 'false');
+    }
+    if (rail) {
+      rail.classList.toggle('is-editing', isEditMode);
+    }
+    showToast(isEditMode ? 'Edit Mode: Click any widget to resize' : 'Edit Mode exited');
+  }
+
+  if (dockEditToggle) {
+    dockEditToggle.addEventListener('click', function () {
+      setEditMode(!isEditMode);
+    });
+  }
+
+  function cycleWidgetWidth(widgetId) {
+    var cur = getWidth(widgetId);
+    var next = 48;
+    if (cur <= 52) next = 96;
+    else if (cur <= 100) next = 140;
+    else if (cur <= 150) next = 168;
+    else next = 48;
+
+    customWidths[widgetId] = next;
+    saveState();
+    renderDock(true); // Apple spring FLIP transition
+    var wTitle = (WIDGETS[widgetId] && WIDGETS[widgetId].title) || widgetId;
+    showToast(wTitle + ' resized to ' + next + 'px');
+  }
+
+  /* New Profile Modal Controller */
+  var newProfileModal = document.getElementById('newProfileModal');
+  var newProfileNameInput = document.getElementById('newProfileNameInput');
+  var closeNewProfileModalBtn = document.getElementById('closeNewProfileModalBtn');
+  var cancelNewProfileBtn = document.getElementById('cancelNewProfileBtn');
+  var confirmNewProfileBtn = document.getElementById('confirmNewProfileBtn');
+
+  function openNewProfileModal() {
+    if (newProfileModal) {
+      newProfileModal.classList.add('is-open');
+      if (newProfileNameInput) {
+        newProfileNameInput.value = '';
+        setTimeout(function () { newProfileNameInput.focus(); }, 60);
+      }
+    }
+  }
+
+  function closeNewProfileModal() {
+    if (newProfileModal) {
+      newProfileModal.classList.remove('is-open');
+    }
+  }
+
+  if (closeNewProfileModalBtn) closeNewProfileModalBtn.addEventListener('click', closeNewProfileModal);
+  if (cancelNewProfileBtn) cancelNewProfileBtn.addEventListener('click', closeNewProfileModal);
+  if (newProfileModal) {
+    newProfileModal.addEventListener('click', function (e) {
+      if (e.target === newProfileModal) closeNewProfileModal();
+    });
+  }
+
+  if (confirmNewProfileBtn) {
+    confirmNewProfileBtn.addEventListener('click', function () {
+      var name = (newProfileNameInput ? newProfileNameInput.value : '').trim();
+      if (!name) {
+        showToast('Please enter a profile name');
+        return;
+      }
+      var slug = name.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-');
+      if (!slug) slug = 'profile-' + Date.now();
+
+      var selectedPreset = 'current';
+      var checkedRadio = document.querySelector('input[name="baseProfilePreset"]:checked');
+      if (checkedRadio) selectedPreset = checkedRadio.value;
+
+      var baseWidgets = [];
+      if (selectedPreset === 'current') {
+        baseWidgets = widgetOrder.slice();
+      } else if (selectedPreset === 'daily') {
+        baseWidgets = DEFAULT_PROFILES.daily.slice();
+      } else if (selectedPreset === 'work') {
+        baseWidgets = DEFAULT_PROFILES.work.slice();
+      } else if (selectedPreset === 'focus') {
+        baseWidgets = DEFAULT_PROFILES.focus.slice();
+      } else {
+        baseWidgets = ['start', 'search', 'clock'];
+      }
+
+      PROFILES[slug] = baseWidgets;
+
+      try {
+        var customOnly = {};
+        Object.keys(PROFILES).forEach(function (k) {
+          if (!DEFAULT_PROFILES[k]) customOnly[k] = PROFILES[k];
+        });
+        localStorage.setItem('protondock_custom_profiles', JSON.stringify(customOnly));
+      } catch (e) {}
+
+      closeNewProfileModal();
+      renderProfileTabs();
+      switchProfile(slug);
+      showToast('Created profile: ' + name);
+    });
+  }
+
+  renderProfileTabs();
 
   var styleBtns = document.querySelectorAll('.style-btn');
   styleBtns.forEach(function (btn) {
@@ -4759,6 +5036,14 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       return;
     }
     if (e.key === 'Escape') {
+      if (newProfileModal && newProfileModal.classList.contains('is-open')) {
+        closeNewProfileModal();
+        return;
+      }
+      if (isEditMode) {
+        setEditMode(false);
+        return;
+      }
       if (activePopoverId) {
         closeActivePopover();
         return;
