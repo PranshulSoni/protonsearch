@@ -2148,6 +2148,222 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   color: #ff6b6b;
 }
 
+/* AI Agents Working Halo & Spin (Ganella Inspired) */
+.dock-ring-wrap.is-working .dock-ring-svg {
+  animation: ringSpin 1.4s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(116, 183, 255, 0.7));
+}
+@keyframes ringSpin {
+  100% { transform: rotate(270deg); }
+}
+
+/* Calendar Week Strip & Events */
+.cal-week-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px 8px;
+  margin-bottom: 12px;
+}
+.cws-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  min-width: 28px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.cws-day:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.cws-day.is-active-day {
+  background: linear-gradient(180deg, #e11d48 0%, #be123c 100%);
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.4);
+}
+.cws-label {
+  font-size: 8px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+}
+.cws-day.is-active-day .cws-label {
+  color: rgba(255, 255, 255, 0.9);
+}
+.cws-num {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+.cws-dot {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: transparent;
+}
+.cws-dot.has-event {
+  background: #38bdf8;
+}
+.cws-day.is-active-day .cws-dot.has-event {
+  background: #fff;
+}
+.cal-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-event-card {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.cec-bar {
+  width: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.cec-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cec-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cec-time {
+  font-size: 9px;
+  color: var(--text-3);
+}
+
+/* Peripherals Popover specifics */
+.periph-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.periph-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.periph-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+.periph-batt-pill {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.periph-buds-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.periph-bud-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pbi-label {
+  font-size: 9px;
+  color: var(--text-3);
+  font-weight: 600;
+}
+.pbi-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.pbi-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+.pbi-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+.periph-anc-pills {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 3px;
+  border-radius: 8px;
+}
+.p-anc-btn {
+  flex: 1;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  white-space: nowrap;
+}
+.p-anc-btn:hover {
+  color: #fff;
+}
+.p-anc-btn.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.periph-sub-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.periph-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+.pr-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.pr-pct {
+  font-size: 10px;
+  font-weight: 700;
+  color: #34d399;
+}
+
 /* ==========================================================================
    MUSIC PLAYER GLYPH & CONTROLS
    ========================================================================== */
@@ -2810,6 +3026,98 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
           <div style="display:flex;flex-direction:column;gap:8px;">
             <input type="password" id="codexApiKeyInput" placeholder="sk-proj-... or ghu_..." style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:12px;font-family:monospace;" />
             <button class="dpop-btn-primary" id="saveCodexConfigBtn" type="button" style="width:100%;padding:8px 12px;border-radius:8px;background:#0a84ff;color:#fff;border:0;font-weight:600;font-size:12px;cursor:pointer;">Connect & Save Key</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 11. Calendar Week Strip Popover (Ganella Inspired) -->
+      <div class="dock-popover" id="popover-calendar" role="dialog" aria-label="Calendar and Weekly Schedule">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="calPopMonth">November 2026</span>
+          </div>
+          <span class="dpop-badge" id="calPopTodayBadge">Today</span>
+        </div>
+        <div class="dpop-body">
+          <div class="cal-week-strip" id="calWeekStrip">
+            <div class="cws-day is-active-day"><span class="cws-label">S</span><span class="cws-num">8</span><span class="cws-dot has-event"></span></div>
+            <div class="cws-day"><span class="cws-label">M</span><span class="cws-num">9</span><span class="cws-dot has-event"></span></div>
+            <div class="cws-day"><span class="cws-label">T</span><span class="cws-num">10</span><span class="cws-dot"></span></div>
+            <div class="cws-day"><span class="cws-label">W</span><span class="cws-num">11</span><span class="cws-dot has-event"></span></div>
+            <div class="cws-day"><span class="cws-label">T</span><span class="cws-num">12</span><span class="cws-dot"></span></div>
+            <div class="cws-day"><span class="cws-label">F</span><span class="cws-num">13</span><span class="cws-dot has-event"></span></div>
+            <div class="cws-day"><span class="cws-label">S</span><span class="cws-num">14</span><span class="cws-dot"></span></div>
+          </div>
+          <div class="dpop-section-title">Today's Schedule</div>
+          <div class="cal-events-list">
+            <div class="cal-event-card">
+              <span class="cec-bar" style="background:#e11d48;"></span>
+              <div class="cec-content">
+                <div class="cec-title">ProtonDock Design & Fluid Motion Review</div>
+                <div class="cec-time">10:00 AM - 11:30 AM · Design Room A</div>
+              </div>
+            </div>
+            <div class="cal-event-card">
+              <span class="cec-bar" style="background:#0a84ff;"></span>
+              <div class="cec-content">
+                <div class="cec-title">Rust Kensaku Indexer & FTS5 Concurrency</div>
+                <div class="cec-time">02:30 PM - 03:45 PM · Engineering Sync</div>
+              </div>
+            </div>
+            <div class="cal-event-card">
+              <span class="cec-bar" style="background:#34d399;"></span>
+              <div class="cec-content">
+                <div class="cec-title">Sprint Standup & Backlog Grooming</div>
+                <div class="cec-time">05:00 PM - 05:30 PM · Online</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 12. Peripherals & Bluetooth Accessories Popover -->
+      <div class="dock-popover" id="popover-peripherals" role="dialog" aria-label="Bluetooth Accessories and Battery">
+        <div class="dpop-head">
+          <div class="dpop-title">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4a2.5 2.5 0 0 1 2.5 2.5v7a1.5 1.5 0 0 1-3 0V6.5A2.5 2.5 0 0 1 6 4z"/><path d="M18 4a2.5 2.5 0 0 0-2.5 2.5v7a1.5 1.5 0 0 0 3 0V6.5A2.5 2.5 0 0 0 18 4z"/></svg>
+            <span>Peripherals Battery</span>
+          </div>
+          <span class="dpop-badge is-green">3 Connected</span>
+        </div>
+        <div class="dpop-body">
+          <div class="periph-card">
+            <div class="periph-card-head">
+              <span class="periph-name">AirPods Pro</span>
+              <span class="periph-batt-pill">Case 34%</span>
+            </div>
+            <div class="periph-buds-grid">
+              <div class="periph-bud-item">
+                <span class="pbi-label">Left Bud</span>
+                <div class="pbi-track"><div class="pbi-fill" style="width:88%;background:#34d399;"></div></div>
+                <span class="pbi-val">88%</span>
+              </div>
+              <div class="periph-bud-item">
+                <span class="pbi-label">Right Bud</span>
+                <div class="pbi-track"><div class="pbi-fill" style="width:92%;background:#34d399;"></div></div>
+                <span class="pbi-val">92%</span>
+              </div>
+            </div>
+            <div class="periph-anc-pills">
+              <button class="p-anc-btn" type="button">Off</button>
+              <button class="p-anc-btn" type="button">Transparency</button>
+              <button class="p-anc-btn is-active" type="button">Noise Cancellation</button>
+            </div>
+          </div>
+          <div class="periph-sub-items">
+            <div class="periph-row">
+              <span class="pr-title">MX Master 3S Mouse</span>
+              <span class="pr-pct">75%</span>
+            </div>
+            <div class="periph-row">
+              <span class="pr-title">Keychron K2 Keyboard</span>
+              <span class="pr-pct">82%</span>
+            </div>
           </div>
         </div>
       </div>
@@ -3608,8 +3916,9 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     if (w.isRing) {
       var circumference = 2 * Math.PI * 13;
       var offset = circumference - (circumference * w.ringPct / 100);
-      return '<div class="dock-ring-wrap">' +
-        '<svg class="dock-ring-svg" viewBox="0 0 34 34" width="28" height="28">' +
+      var workingClass = w.isWorking ? ' is-working' : '';
+      return '<div class="dock-ring-wrap' + workingClass + '">' +
+        '<svg class="dock-ring-svg' + workingClass + '" viewBox="0 0 34 34" width="28" height="28">' +
           '<circle class="ring-bg" cx="17" cy="17" r="13" />' +
           '<circle class="ring-fill" cx="17" cy="17" r="13" stroke="' + w.ringColor + '" stroke-dasharray="' + circumference.toFixed(2) + '" stroke-dashoffset="' + offset.toFixed(2) + '" />' +
         '</svg>' +
@@ -3854,6 +4163,20 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
       /* Primary click interactions for widgets */
       slot.addEventListener('click', function (e) {
+        /* Ganella-Inspired Option-Click (Alt-Click): In-Place Morph between Compact Tile & Live Widget */
+        if (e.altKey) {
+          e.stopPropagation();
+          var curW = getWidth(id);
+          var defW = (WIDGETS[id] && WIDGETS[id].defaultWidth && WIDGETS[id].defaultWidth > 52) ? WIDGETS[id].defaultWidth : 140;
+          var nextW = curW > 52 ? 48 : defW;
+          customWidths[id] = nextW;
+          saveState();
+          renderDock(true); // Apple spring FLIP
+          var wTitle = (WIDGETS[id] && WIDGETS[id].title) || id;
+          showToast(wTitle + ': toggled to ' + (nextW > 52 ? 'expanded live widget' : 'compact tile') + ' (Alt-click)');
+          return;
+        }
+
         var prevTarget = e.target.closest('[data-music-prev]');
         if (prevTarget) {
           e.stopPropagation();
@@ -3950,16 +4273,25 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
         if (id === 'calendar') {
           e.stopPropagation();
-          var now = new Date();
-          showToast('Calendar: ' + now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+          openPopoverForWidget(id, slot);
           return;
         }
 
         if (id === 'peripherals') {
           e.stopPropagation();
-          var pw = WIDGETS['peripherals'];
-          showToast('AirPods Pro: ' + (pw ? pw.batteryPct : 34) + '% Battery (Connected)');
+          openPopoverForWidget(id, slot);
           return;
+        }
+
+        if (id === 'claude' || id === 'codex') {
+          var aiW = WIDGETS[id];
+          if (aiW && aiW.isConfigured) {
+            e.stopPropagation();
+            aiW.isWorking = !aiW.isWorking;
+            renderDock();
+            showToast(aiW.title + ': Agent state ' + (aiW.isWorking ? 'Working (Executing)' : 'Ready (Idle)'));
+            return;
+          }
         }
 
         if (id === 'music-player') {
@@ -5065,6 +5397,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       var w = WIDGETS['claude'];
       if (w) {
         w.isConfigured = true;
+        w.isWorking = true;
         w.ringPct = 70;
         w.ringColor = '#74b7ff';
         w.glyphColor = '#ffffff';
@@ -5091,6 +5424,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       var w = WIDGETS['codex'];
       if (w) {
         w.isConfigured = true;
+        w.isWorking = true;
         w.ringPct = 82;
         w.ringColor = '#74b7ff';
         w.glyphColor = '#ffffff';

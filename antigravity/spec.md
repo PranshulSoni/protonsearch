@@ -806,6 +806,33 @@ Inspired by CoolDock and Docktor v0.15.0, ProtonDock incorporates live telemetry
 
 ---
 
+### 2.16 Ganella-Inspired In-Place Morphing & Live Application Widgets Architecture
+
+Inspired by Ganella (macOS dock replacement app), ProtonDock bridges static launch icons and full-width live widgets through zero-friction direct manipulation:
+
+1. **Option-Click (Alt-Click on Windows) In-Place Morphing**:
+   - **Contract**: Holding the `Alt` key (Windows equivalent of macOS `Option`) while clicking any widget or app slot instantly toggles it between its compact 48px square tile and its expanded live capsule state (or vice-versa).
+   - **Physics & Motion**: Sibling slots glide horizontally using the Apple spring curve `cubic-bezier(0.16, 1, 0.3, 1)`. The rail width automatically morphs to accommodate the expansion while maintaining the strictly locked 48px square height invariant.
+   - **No Menu Dependency**: Users do not need to enter Edit Mode or open the customizer modal to toggle between an icon and a live widget.
+
+2. **Live AI Agent Activity Indicators (`claude`, `codex`, `siri-ai`)**:
+   - **Active Working State**: When background tasks or streaming completions run, the ring glyph transitions into a revolving neon halo (`animation: ringSpin 1.4s linear infinite; filter: drop-shadow(0 0 6px rgba(116, 183, 255, 0.7))`).
+   - **Ready / Idle State**: Solid resting arc indicating remaining quota or connection health.
+   - **Click Action**: Clicking when configured toggles between Working and Ready test states; clicking when unconfigured opens the anchored credentials popover.
+
+3. **Anchored Calendar Week Strip (`#popover-calendar`)**:
+   - **Visual Anatomy**: Horizontal 7-day strip displaying uppercase weekday initial (`S`, `M`, `T`, `W`, `T`, `F`, `S`), date numeral, and event presence dot indicators. Today is highlighted with an Apple-style crimson squircle badge (`#e11d48` to `#be123c`).
+   - **Schedule Cards**: Glanceable list of today's upcoming meetings and focus blocks with color-coded category indicator bars.
+
+4. **Multi-Device Peripherals HUD (`#popover-peripherals`)**:
+   - **Visual Anatomy**: Comprehensive telemetry breakdown for paired Bluetooth accessories:
+     - AirPods Pro: Independent battery telemetry for charging case (`34%`), left earbud (`88%`), and right earbud (`92%`).
+     - Active Noise Cancellation (ANC) control pills: `Off`, `Transparency`, `Noise Cancellation`.
+     - External desktop accessories: Wireless mouse (`MX Master 3S: 75%`) and mechanical keyboard (`Keychron K2: 82%`).
+   - **Rust Backend**: WinRT Bluetooth Low Energy GATT Battery Service (`0x180F`).
+
+---
+
 ## 3. Motion & Animation Standards (Apple Design System)
 
 1. **Apple Two-Parameter Spring Dynamics**:
