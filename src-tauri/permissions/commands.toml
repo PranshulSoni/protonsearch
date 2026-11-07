@@ -1,0 +1,20 @@
+[[permission]]
+identifier = "dock-commands"
+description = "Dock data and window controls"
+commands.allow = ["open_search", "open_start", "open_settings", "hide_settings", "load_dock_settings", "save_dock_settings", "provider_snapshot", "known_folders_snapshot", "fit_dock", "open_widget_card", "hide_widget_card", "widget_card_state", "widget_action", "clipboard_snapshot", "weather_snapshot", "running_apps_snapshot", "running_apps_activate"]
+[[permission]]
+identifier = "widget-card-commands"
+description = "Widget card window data and actions"
+commands.allow = ["open_widget_card", "hide_widget_card", "widget_card_state", "load_dock_settings", "provider_snapshot", "known_folders_snapshot", "weather_snapshot", "running_apps_snapshot", "running_apps_activate", "widget_action", "clipboard_snapshot"]
+[[permission]]
+identifier = "search-commands"
+description = "Search and execute only server-issued result IDs"
+commands.allow = ["search", "execute_search_result", "hide_search", "fit_search", "load_dock_settings"]
+[[permission]]
+identifier = "calendar-read"
+description = "Read the active profile's explicitly selected local calendar"
+commands.allow = ["calendar_snapshot"]
+[[permission]]
+identifier = "calendar-settings"
+description = "Choose or unlink a local calendar through native Settings"
+commands.allow = ["calendar_select_source", "calendar_forget_source"]

@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 use protonsearch::search::{SearchEngine, SearchResult};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
@@ -9,7 +9,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -34,8 +34,24 @@ struct NativeState {
     dock_geometry: Mutex<Option<DockGeometry>>,
     search_height: Mutex<f64>,
     search_focus_epoch: AtomicU64,
+    widget_card: Mutex<Option<WidgetCardState>>,
+    widget_focus_epoch: AtomicU64,
     dock_lifecycle: Mutex<dock_lifecycle::State>,
     lifecycle_running: Arc<AtomicBool>,
+}
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WidgetCardState {
+    id: String,
+    size: String,
+    settings: Value,
+}
+#[derive(Clone, Deserialize)]
+struct Anchor {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +69,72 @@ struct SearchResponse {
     results: Vec<ResultRow>,
     elapsed_ms: f64,
 }
+const WIDGET_CARD_IDS: [&str; 14] = [
+    "windows", "search", "apps", "spotify", "weather", "system", "claude", "chatgpt", "agent",
+    "files", "folders", "trash", "volume", "clock",
+];
+const WIDGET_CARD_SIZES: [&str; 3] = ["compact", "standard", "wide"];
+const WIDGET_SETTINGS_LIMIT: usize = 64 * 1024;
+
+fn valid_widget_card_id(id: &str) -> bool {
+    WIDGET_CARD_IDS.contains(&id)
+}
+fn valid_widget_card_size(size: &str) -> bool {
+    WIDGET_CARD_SIZES.contains(&size)
+}
+fn widget_card_settings(settings: Option<Value>) -> Value {
+    let Some(settings) = settings else {
+        return json!({});
+    };
+    if !settings.is_object() {
+        return json!({});
+    }
+    match serde_json::to_vec(&settings) {
+        Ok(bytes) if bytes.len() <= WIDGET_SETTINGS_LIMIT => settings,
+        _ => json!({}),
+    }
+}
+fn widget_card_position(
+    work: [i32; 4],
+    dock_position: (i32, i32),
+    dock_size: (u32, u32),
+    card_size: (u32, u32),
+    anchor: Option<&Anchor>,
+    scale: f64,
+) -> [i32; 4] {
+    let [left, top, right, bottom] = work;
+    let card_w = card_size.0.max(1) as i32;
+    let card_h = card_size.1.max(1) as i32;
+    if right <= left || bottom <= top {
+        return [0, 0, card_w, card_h];
+    }
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    let anchor = anchor.filter(|anchor| {
+        [anchor.x, anchor.y, anchor.width, anchor.height]
+            .iter()
+            .all(|value| value.is_finite())
+            && anchor.width >= 0.0
+            && anchor.height >= 0.0
+    });
+    let center_x = anchor.map_or_else(
+        || dock_position.0 as f64 + dock_size.0 as f64 / 2.0,
+        |anchor| dock_position.0 as f64 + (anchor.x + anchor.width / 2.0) * scale,
+    );
+    let desired_y = dock_position.1 as f64 - card_h as f64 - 10.0 * scale;
+    let max_x = (right - card_w).max(left);
+    let max_y = (bottom - card_h).max(top);
+    let x = (center_x - card_w as f64 / 2.0)
+        .round()
+        .clamp(left as f64, max_x as f64)
+        .max(0.0) as i32;
+    let y = desired_y.round().clamp(top as f64, max_y as f64).max(0.0) as i32;
+    [x, y, card_w, card_h]
+}
+
 impl Engine {
     fn publish_results(&mut self, found: Vec<SearchResult>, limit: usize) -> Vec<ResultRow> {
         self.generation += 1;
@@ -438,6 +520,92 @@ async fn widget_action(action_id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 #[tauri::command]
+fn open_widget_card(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, NativeState>,
+    id: String,
+    size: String,
+    settings: Option<Value>,
+    anchor: Option<Anchor>,
+) -> Result<(), String> {
+    if !valid_widget_card_id(&id) {
+        return Err(format!("Invalid widget card id: {id}"));
+    }
+    if !valid_widget_card_size(&size) {
+        return Err(format!("Invalid widget card size: {size}"));
+    }
+    let card = WidgetCardState {
+        id,
+        size,
+        settings: widget_card_settings(settings),
+    };
+    *state.widget_card.lock().map_err(|e| e.to_string())? = Some(card.clone());
+
+    let dock = app
+        .get_webview_window("dock")
+        .ok_or("Dock window unavailable")?;
+    let widget = app
+        .get_webview_window("widget")
+        .ok_or("Widget window unavailable")?;
+    let (work_area, scale) = window_geometry::work_area(&dock)?;
+    let dock_position = dock.outer_position().map_err(|e| e.to_string())?;
+    let dock_size = dock.outer_size().map_err(|e| e.to_string())?;
+    let fallback_size = (
+        (520.0 * scale).round().max(1.0) as u32,
+        (430.0 * scale).round().max(1.0) as u32,
+    );
+    let initial_size = widget
+        .outer_size()
+        .ok()
+        .filter(|size| size.width > 0 && size.height > 0)
+        .map(|size| (size.width, size.height))
+        .unwrap_or(fallback_size);
+    let placement = |card_size| {
+        widget_card_position(
+            work_area,
+            (dock_position.x, dock_position.y),
+            (dock_size.width, dock_size.height),
+            card_size,
+            anchor.as_ref(),
+            scale,
+        )
+    };
+    let position = placement(initial_size);
+    widget
+        .set_position(tauri::PhysicalPosition::new(position[0], position[1]))
+        .map_err(|e| e.to_string())?;
+    state.widget_focus_epoch.fetch_add(1, Ordering::AcqRel);
+    widget.show().map_err(|e| e.to_string())?;
+    // Moving a window between monitors can change its physical DPI size.
+    if let Ok(actual) = widget.outer_size() {
+        let actual = (actual.width.max(1), actual.height.max(1));
+        if actual != initial_size {
+            let position = placement(actual);
+            widget
+                .set_position(tauri::PhysicalPosition::new(position[0], position[1]))
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    if let Err(error) = app.emit("widget-card:show", &card) {
+        let _ = widget.hide();
+        return Err(error.to_string());
+    }
+    widget.set_focus().map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn hide_widget_card(app: tauri::AppHandle) -> Result<(), String> {
+    app.get_webview_window("widget")
+        .ok_or("Widget window unavailable")?
+        .hide()
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn widget_card_state(
+    state: tauri::State<'_, NativeState>,
+) -> Result<Option<WidgetCardState>, String> {
+    Ok(state.widget_card.lock().map_err(|e| e.to_string())?.clone())
+}
+#[tauri::command]
 async fn clipboard_snapshot(state: tauri::State<'_, NativeState>) -> Result<Value, String> {
     let shared = state.engine.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -778,6 +946,29 @@ fn defer_search_blur(window: &tauri::Window) {
         });
     });
 }
+fn defer_widget_card_hide(window: &tauri::Window) {
+    let epoch = window
+        .app_handle()
+        .state::<NativeState>()
+        .widget_focus_epoch
+        .load(Ordering::Acquire);
+    let app = window.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(Duration::from_millis(80));
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let state = handle.state::<NativeState>();
+            if state.widget_focus_epoch.load(Ordering::Acquire) != epoch {
+                return;
+            }
+            if let Some(widget) = handle.get_webview_window("widget") {
+                if widget.is_visible().unwrap_or(false) && !widget.is_focused().unwrap_or(true) {
+                    let _ = widget.hide();
+                }
+            }
+        });
+    });
+}
 fn recover_taskbar(exiting: bool) -> Result<(), String> {
     let layout = PathBuf::from(std::env::var_os("APPDATA").ok_or("APPDATA unavailable")?)
         .join("protonsearch")
@@ -857,6 +1048,8 @@ fn main() {
             dock_geometry: Mutex::new(None),
             search_height: Mutex::new(174.0),
             search_focus_epoch: AtomicU64::new(0),
+            widget_card: Mutex::new(None),
+            widget_focus_epoch: AtomicU64::new(0),
             dock_lifecycle: Mutex::new(dock_lifecycle::State::default()),
             lifecycle_running: Arc::new(AtomicBool::new(true)),
         })
@@ -874,6 +1067,9 @@ fn main() {
             known_folders_snapshot,
             fit_dock,
             fit_search,
+            open_widget_card,
+            hide_widget_card,
+            widget_card_state,
             widget_action,
             clipboard_snapshot,
             running_apps_snapshot,
@@ -956,6 +1152,18 @@ fn main() {
                         let _ = position_dock(&dock);
                     }
                 }
+            }
+            tauri::WindowEvent::Focused(true) if window.label() == "widget" => {
+                window
+                    .app_handle()
+                    .state::<NativeState>()
+                    .widget_focus_epoch
+                    .fetch_add(1, Ordering::AcqRel);
+            }
+            tauri::WindowEvent::Focused(false)
+                if window.label() == "widget" && window.is_visible().unwrap_or(false) =>
+            {
+                defer_widget_card_hide(window);
             }
             tauri::WindowEvent::Focused(true) if window.label() == "search" => {
                 window
@@ -1261,6 +1469,97 @@ mod tests {
             snapshot["status"],
             snapshot["data"]["folders"].as_array().unwrap().len(),
             snapshot["data"]["recent"].as_array().unwrap().len()
+        );
+    }
+    #[test]
+    fn widget_card_ids_and_sizes_are_allowlisted() {
+        for id in WIDGET_CARD_IDS {
+            assert!(valid_widget_card_id(id));
+        }
+        assert!(!valid_widget_card_id(""));
+        assert!(!valid_widget_card_id("calendar"));
+        assert!(!valid_widget_card_id("../dock"));
+        for size in WIDGET_CARD_SIZES {
+            assert!(valid_widget_card_size(size));
+        }
+        assert!(!valid_widget_card_size("large"));
+        assert!(!valid_widget_card_size(""));
+    }
+    #[test]
+    fn widget_card_settings_are_objects_under_the_size_cap() {
+        assert_eq!(widget_card_settings(None), json!({}));
+        assert_eq!(
+            widget_card_settings(Some(json!({"theme": "dark"}))),
+            json!({"theme": "dark"})
+        );
+        assert_eq!(widget_card_settings(Some(json!("dark"))), json!({}));
+        assert_eq!(widget_card_settings(Some(json!(["dark"]))), json!({}));
+        let oversized = json!({"payload": "x".repeat(WIDGET_SETTINGS_LIMIT)});
+        assert_eq!(widget_card_settings(Some(oversized)), json!({}));
+    }
+    #[test]
+    fn widget_card_position_centers_above_anchor_and_clamps_to_work_area() {
+        let anchor = Anchor {
+            x: 800.0,
+            y: 40.0,
+            width: 40.0,
+            height: 40.0,
+        };
+        assert_eq!(
+            widget_card_position(
+                [0, 0, 1920, 1080],
+                (0, 948),
+                (1200, 132),
+                (520, 430),
+                Some(&anchor),
+                1.0
+            ),
+            [560, 508, 520, 430]
+        );
+        let left_edge = Anchor {
+            x: 100.0,
+            y: 40.0,
+            width: 40.0,
+            height: 40.0,
+        };
+        assert_eq!(
+            widget_card_position(
+                [0, 0, 1920, 1080],
+                (0, 948),
+                (1200, 132),
+                (520, 430),
+                Some(&left_edge),
+                1.0
+            )[0],
+            0
+        );
+        let right_edge = Anchor {
+            x: 20.0,
+            y: 40.0,
+            width: 20.0,
+            height: 20.0,
+        };
+        assert_eq!(
+            widget_card_position(
+                [0, 0, 1920, 1080],
+                (1700, 948),
+                (1200, 132),
+                (520, 430),
+                Some(&right_edge),
+                1.0
+            )[0],
+            1400
+        );
+        assert_eq!(
+            widget_card_position(
+                [0, 0, 1920, 1080],
+                (0, 100),
+                (1200, 132),
+                (520, 430),
+                None,
+                1.0
+            ),
+            [340, 0, 520, 430]
         );
     }
 }
