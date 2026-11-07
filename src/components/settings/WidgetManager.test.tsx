@@ -42,11 +42,15 @@ describe('WidgetManager', () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole('tab', { name: /Widget Store/ }));
     const files = cardFor('Recent Files');
+    const customize = () => within(files).getByRole('button', { name: 'Customize' }) as HTMLButtonElement;
     expect(within(files).getByRole('button', { name: 'Install' })).toBeTruthy();
+    expect(customize().disabled).toBe(true);
     fireEvent.click(within(files).getByRole('button', { name: 'Install' }));
     expect(within(files).getByRole('button', { name: 'Remove' })).toBeTruthy();
+    expect(customize().disabled).toBe(false);
     fireEvent.click(within(files).getByRole('button', { name: 'Remove' }));
     expect(within(files).getByRole('button', { name: 'Install' })).toBeTruthy();
+    expect(customize().disabled).toBe(true);
   });
 
   it('enables and disables an installed widget immediately', () => {
@@ -58,15 +62,29 @@ describe('WidgetManager', () => {
     expect(within(clock).getByRole('switch', { name: 'Enable Clock' }).getAttribute('aria-checked')).toBe('false');
   });
 
-  it('persists per-widget settings and resets them to defaults', () => {
+  it('persists per-widget settings and resets settings and size to defaults', () => {
     render(<Harness />);
     fireEvent.click(within(cardFor('Clock')).getByRole('button', { name: 'Customize' }));
     const seconds = screen.getByRole('checkbox', { name: 'Seconds' }) as HTMLInputElement;
     expect(seconds.checked).toBe(false);
     fireEvent.click(seconds);
     expect((screen.getByRole('checkbox', { name: 'Seconds' }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(within(screen.getByRole('group', { name: 'Size for Clock' })).getByRole('button', { name: 'Card' }));
+    expect(within(screen.getByRole('group', { name: 'Size for Clock' })).getByRole('button', { name: 'Card' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
     expect((screen.getByRole('checkbox', { name: 'Seconds' }) as HTMLInputElement).checked).toBe(false);
+    expect(within(screen.getByRole('group', { name: 'Size for Clock' })).getByRole('button', { name: 'Pill' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('changes size from the widget detail view and keeps install state separate', () => {
+    render(<Harness />);
+    fireEvent.click(within(cardFor('Weather')).getByRole('button', { name: 'Customize' }));
+    const detail = screen.getByRole('group', { name: 'Size for Weather' });
+    expect(within(detail).getByRole('button', { name: 'Tile' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(within(detail).getByRole('button', { name: 'Card' }));
+    expect(within(screen.getByRole('group', { name: 'Size for Weather' })).getByRole('button', { name: 'Card' }).getAttribute('aria-pressed')).toBe('true');
+    const summary = detail.closest('.wm-detail-summary') as HTMLElement;
+    expect(within(summary).getByText('Installed')).toBeTruthy();
   });
 
   it('changes size and dock appearance for the active profile', () => {

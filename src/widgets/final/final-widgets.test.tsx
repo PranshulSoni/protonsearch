@@ -49,6 +49,19 @@ test('metadata covers the 14 widgets, dock order and store set', () => {
   }
 });
 
+test('defaults enable live weather and hide the search shortcut badge', () => {
+  const weather = settingsFor('weather');
+  expect(weather.weatherEnabled).toBe(true);
+  expect(weather.location).toBe('Ahmedabad');
+  expect(weather.weatherLatitude).toBeCloseTo(23.0225);
+  expect(weather.weatherLongitude).toBeCloseTo(72.5714);
+  expect(settingsFor('search').showShortcut).toBe(false);
+
+  const search = render(<DockWidget id="search" size="standard" />);
+  expect(search.queryByText('Alt')).toBeNull();
+  search.unmount();
+});
+
 test('all dock sizes and all cards render without emoji or mojibake', () => {
   for (const id of FINAL_WIDGET_IDS) {
     for (const size of sizes) {
@@ -167,6 +180,61 @@ test('weather card asks for a location when live weather is disabled', () => {
   );
   expect(view.getByText('Set weather location')).not.toBeNull();
   expect(view.getByText(/not estimated/)).not.toBeNull();
+});
+
+test('weather dock states stay honest without a snapshot', () => {
+  const disabled = render(
+    <DockWidget
+      id="weather"
+      size="standard"
+      settings={{ ...settingsFor('weather'), weatherEnabled: false }}
+    />,
+  );
+  expect(disabled.getByText('--°')).toBeTruthy();
+  expect(disabled.getByText('Set location')).toBeTruthy();
+  expect(disabled.queryByText('Partly cloudy')).toBeNull();
+  expect(disabled.queryByText(/High \/ low unavailable/)).toBeNull();
+  disabled.unmount();
+
+  const enabled = render(<DockWidget id="weather" size="wide" settings={settingsFor('weather')} />);
+  expect(enabled.getByText('--°')).toBeTruthy();
+  expect(enabled.getByText('No data')).toBeTruthy();
+  expect(enabled.getByText('Ahmedabad')).toBeTruthy();
+  expect(enabled.queryByText('Partly cloudy')).toBeNull();
+  expect(enabled.queryByText(/High \/ low unavailable/)).toBeNull();
+  enabled.unmount();
+});
+
+test('weather dock renders live data and preview samples without placeholder copy', () => {
+  const live = render(
+    <DockWidget
+      id="weather"
+      size="wide"
+      data={{ temperature: 31, weatherCode: 0, time: 0, utcOffsetSeconds: 19800, hours: [], highC: 34, lowC: 22 }}
+      settings={{ ...settingsFor('weather'), units: 'F' }}
+    />,
+  );
+  expect(live.getByText('88°')).toBeTruthy();
+  expect(live.getByText('Clear')).toBeTruthy();
+  expect(live.getByText('High 93° · Low 72°')).toBeTruthy();
+  expect(live.getByText('Ahmedabad')).toBeTruthy();
+  expect(live.queryByText('No data')).toBeNull();
+  live.unmount();
+
+  const preview = render(
+    <DockWidget
+      id="weather"
+      size="wide"
+      preview
+      settings={{ ...settingsFor('weather'), weatherEnabled: false }}
+    />,
+  );
+  expect(preview.getByText('24°')).toBeTruthy();
+  expect(preview.getByText('Partly cloudy')).toBeTruthy();
+  expect(preview.getByText('High 27° · Low 18°')).toBeTruthy();
+  expect(preview.getByText('Ahmedabad')).toBeTruthy();
+  expect(preview.queryByText('Set location')).toBeNull();
+  preview.unmount();
 });
 
 test('every widget setting changes the rendered card', () => {
