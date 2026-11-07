@@ -8,6 +8,7 @@ import { useFinalWidgetData } from '../../widgets/final/useFinalWidgetData';
 import type { AppsData, FinalWidgetSettings } from '../../widgets/final/types';
 import { performWidgetAction } from './actions';
 import { DockGroup, type DockGroupItem } from './DockGroup';
+import { dockFit } from './fit';
 import {
   PROFILE_IDS,
   PROFILE_LABELS,
@@ -18,7 +19,8 @@ import {
   type DockLayout,
   type ProfileId,
 } from './layout';
-import { DEFAULT_TILE, slotStyle, type TileSize } from './sizing';
+import { useMagnify } from './magnify';
+import { DEFAULT_TILE, largestTile, slotStyle, type TileSize } from './sizing';
 
 export interface DockSurfaceProps {
   layout: DockLayout;
@@ -40,6 +42,18 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
   const railRef = useRef<HTMLDivElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
   const [previewCard, setPreviewCard] = useState<DockItem | null>(null);
+  const [hot, setHot] = useState(false);
+  const cool = useRef(0);
+  useMagnify(railRef, 'bottom', 'center', true);
+  const heat = () => {
+    clearTimeout(cool.current);
+    setHot(true);
+  };
+  const relax = () => {
+    clearTimeout(cool.current);
+    cool.current = window.setTimeout(() => setHot(false), 240);
+  };
+  useEffect(() => () => clearTimeout(cool.current), []);
 
   const selectProfile = (profile: ProfileId) => {
     if (profile !== layout.profile) onChange({ ...layout, profile });
@@ -77,30 +91,21 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
       const railRect = rail.getBoundingClientRect();
       const pillsRect = pills.getBoundingClientRect();
       if (!railRect.width || !pillsRect.width) return;
-      const left = Math.min(railRect.left, pillsRect.left);
-      const contentRight = Math.max(
-        pillsRect.right,
-        railRect.left + Math.max(railRect.width, rail.scrollWidth),
+      const next = dockFit(
+        'bottom',
+        'center',
+        pillsRect,
+        {
+          left: railRect.left,
+          top: railRect.top,
+          width: Math.max(railRect.width, rail.scrollWidth),
+          height: Math.max(railRect.height, rail.scrollHeight),
+        },
+        { width: window.innerWidth, height: window.innerHeight },
+        hot,
+        largestTile(items.map(sizeOf)),
       );
-      const widthRequest = Math.ceil(contentRight - left) + 32;
-      const origin = 16;
-      const regions = [
-        {
-          x: origin + (pillsRect.left - left),
-          y: Math.max(0, Math.round(pillsRect.top)),
-          width: Math.ceil(pillsRect.width),
-          height: Math.ceil(pillsRect.height),
-          radius: 15,
-        },
-        {
-          x: origin + (railRect.left - left),
-          y: Math.max(0, Math.round(railRect.top)),
-          width: Math.ceil(Math.max(railRect.width, rail.scrollWidth)),
-          height: Math.ceil(railRect.height),
-          radius: 18,
-        },
-      ];
-      void native.fitDock(widthRequest, 132, regions).catch(() => {});
+      void native.fitDock(next.width, next.height, next.regions).catch(() => {});
     };
     const frame = requestAnimationFrame(fit);
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
@@ -113,12 +118,12 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
       observer?.disconnect();
       window.removeEventListener('resize', fit);
     };
-  }, [layout]);
+  }, [layout, hot]);
 
   const appearance: AppearanceMode = layout.appearances?.[layout.profile] ?? 'capsules';
 
   return (
-    <div className="dock-final" data-appearance={appearance} aria-label="ProtonDock">
+    <div className="dock-final" data-appearance={appearance} data-hot={hot ? 'true' : undefined} aria-label="ProtonDock">
       <div className="dock-final-shelf" ref={pillsRef}>
         <div className="dock-final-pills" role="tablist" aria-label="Dock profile">
           {PROFILE_IDS.map((profile) => (
@@ -142,6 +147,12 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
         className="dock-final-rail"
         data-profile={layout.profile}
         ref={railRef}
+        onPointerEnter={heat}
+        onPointerLeave={relax}
+        onFocus={heat}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) relax();
+        }}
       >
         {items.length ? items.map((item) => {
           const meta = getWidgetMeta(item.id);

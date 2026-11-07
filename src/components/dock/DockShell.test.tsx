@@ -11,6 +11,12 @@ vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
+// jsdom has no PointerEvent, so fireEvent.pointerEnter would create a plain Event.
+window.PointerEvent ??= class extends MouseEvent {
+  pointerId: number;
+  constructor(t: string, i: PointerEventInit = {}) { super(t, i); this.pointerId = i.pointerId ?? 1; }
+} as unknown as typeof PointerEvent;
+
 function snapshot(data: unknown = {}) {
   return { status: 'live', data, updatedAt: Date.now() };
 }
@@ -98,19 +104,20 @@ describe('DockShell integration', () => {
   it('reports only the profile shelf and rail as native hit regions', async () => {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
     vi.stubGlobal('cancelAnimationFrame', clearTimeout);
+    vi.stubGlobal('innerHeight', 146);
     mockCommands(defaultLayout());
     const { container } = render(<DockShell />);
     await screen.findByRole('tab', { name: 'Daily' });
     const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
     const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
-    rail.getBoundingClientRect = () => ({ x: 100, y: 50, width: 800, height: 82, left: 100, top: 50, right: 900, bottom: 132, toJSON() {} });
-    pills.getBoundingClientRect = () => ({ x: 300, y: 10, width: 360, height: 28, left: 300, top: 10, right: 660, bottom: 38, toJSON() {} });
+    rail.getBoundingClientRect = () => ({ x: 112, y: 72, width: 800, height: 60, left: 112, top: 72, right: 912, bottom: 132, toJSON() {} });
+    pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('fit_dock', {
-      width: 832,
-      height: 132,
+      width: 912,
+      height: 146,
       regions: [
-        { x: 216, y: 10, width: 360, height: 28, radius: 15 },
-        { x: 16, y: 50, width: 800, height: 82, radius: 18 },
+        { x: 276, y: 38, width: 360, height: 26, radius: 15 },
+        { x: 56, y: 72, width: 800, height: 60, radius: 18 },
       ],
     }));
   });
@@ -118,22 +125,55 @@ describe('DockShell integration', () => {
   it('requests enough width when the rail content is clipped', async () => {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
     vi.stubGlobal('cancelAnimationFrame', clearTimeout);
+    vi.stubGlobal('innerHeight', 146);
     mockCommands(defaultLayout());
     const { container } = render(<DockShell />);
     await screen.findByRole('tab', { name: 'Daily' });
     const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
     const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
-    rail.getBoundingClientRect = () => ({ x: 12, y: 50, width: 800, height: 82, left: 12, top: 50, right: 812, bottom: 132, toJSON() {} });
+    rail.getBoundingClientRect = () => ({ x: 12, y: 72, width: 800, height: 60, left: 12, top: 72, right: 812, bottom: 132, toJSON() {} });
     Object.defineProperty(rail, 'scrollWidth', { value: 1100, configurable: true });
-    pills.getBoundingClientRect = () => ({ x: 300, y: 10, width: 360, height: 28, left: 300, top: 10, right: 660, bottom: 38, toJSON() {} });
+    pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('fit_dock', {
-      width: 1132,
-      height: 132,
+      width: 1212,
+      height: 146,
       regions: [
-        { x: 304, y: 10, width: 360, height: 28, radius: 15 },
-        { x: 16, y: 50, width: 1100, height: 82, radius: 18 },
+        { x: 426, y: 38, width: 360, height: 26, radius: 15 },
+        { x: 106, y: 72, width: 1100, height: 60, radius: 18 },
       ],
     }));
+  });
+
+  it('expands the rail hit region while the dock is hovered', async () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
+    vi.stubGlobal('cancelAnimationFrame', clearTimeout);
+    vi.stubGlobal('innerHeight', 146);
+    mockCommands(defaultLayout());
+    const { container } = render(<DockShell />);
+    await screen.findByRole('tab', { name: 'Daily' });
+    const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
+    const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
+    rail.getBoundingClientRect = () => ({ x: 112, y: 72, width: 800, height: 60, left: 112, top: 72, right: 912, bottom: 132, toJSON() {} });
+    pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
+    const lastFit = () => invoke.mock.calls.filter(([command]) => command === 'fit_dock').at(-1)?.[1];
+    const rest = {
+      width: 912,
+      height: 146,
+      regions: [
+        { x: 276, y: 38, width: 360, height: 26, radius: 15 },
+        { x: 56, y: 72, width: 800, height: 60, radius: 18 },
+      ],
+    };
+    await waitFor(() => expect(lastFit()).toEqual(rest));
+    fireEvent.pointerEnter(rail);
+    await waitFor(() => expect(lastFit()).toEqual({
+      ...rest,
+      regions: [rest.regions[0], { x: 16, y: 8, width: 880, height: 124, radius: 18 }],
+    }));
+    expect(container.querySelector('[data-hot="true"]')).not.toBeNull();
+    fireEvent.pointerLeave(rail);
+    await waitFor(() => expect(lastFit()).toEqual(rest));
+    expect(container.querySelector('[data-hot="true"]')).toBeNull();
   });
 
   it('opens the native settings window from Customize Widgets', async () => {
