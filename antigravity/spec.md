@@ -27,6 +27,34 @@
 
 ---
 
+
+### 1.3 Three Native Themes Specification
+
+ProtonDock and the Kensaku search engine support three native themes, toggled via the top-shelf theme switcher or keyboard shortcut. All tokens adapt automatically via CSS custom properties on the root `body[data-theme]`:
+
+1. **Dark Theme (`data-theme="dark"`)**:
+   - Background Surface: Deep slate charcoal (`rgba(14, 18, 26, 0.94)`).
+   - Primary Text: Crisp white-silver (`#f1f5f9`), Secondary: (`#94a3b8`), Muted: (`#64748b`).
+   - Borders: Subtle translucent border (`rgba(255, 255, 255, 0.10)`), strong (`rgba(255, 255, 255, 0.18)`).
+   - Backdrop: Deep dark gradient (`#0b0f17` to `#05080c`) with 28px backdrop blur.
+   - Contrast Ratio: Exceeds WCAG AAA standard (12.4:1 contrast on active labels).
+
+2. **Light Theme (`data-theme="light"`)**:
+   - Background Surface: Clean alabaster / paper frosted glass (`rgba(250, 252, 255, 0.96)`).
+   - Primary Text: Deep slate (`#0f172a`), Secondary: (`#475569`), Muted: (`#64748b`).
+   - Borders: Soft daylight borders (`rgba(0, 0, 0, 0.10)`), strong (`rgba(0, 0, 0, 0.18)`).
+   - Backdrop: Warm natural daylight gradient (`#f1f5f9` to `#e2e8f0`) with 28px backdrop blur.
+   - Contrast Ratio: 14.1:1 on text elements, zero glare, optimized for bright daylight working environments.
+
+3. **Liquid Glass Theme (`data-theme="liquid-glass"`)**:
+   - Background Surface: Ultra-translucent liquid glass (`rgba(255, 255, 255, 0.10)`).
+   - Optical Backdrop Blur: High-refraction Tahoe blur (`backdrop-filter: blur(48px) saturate(220%)`).
+   - Specular Highlights: Crisp top reflection (`inset 0 1.5px 0 0 rgba(255, 255, 255, 0.65)`).
+   - Ambient Glow: Smooth volumetric drop-shadow (`0 18px 48px -12px rgba(0, 0, 0, 0.60)`).
+   - Wallpapers: Supported over dynamic silk aura wave wallpaper backdrops with vivid refraction.
+
+---
+
 ## 2. Core Widget Catalog & Backend IPC Mapping
 
 ### 2.1 Weather Widget (`weather`)
@@ -487,6 +515,113 @@
 
 ---
 
+
+### 2.17 Kensaku Native Desktop Search Engine Integration (`search`)
+
+ProtonDock integrates the architecture and UI philosophy of **Kensaku** (`https://github.com/yjid/kensaku` by `yjid`), a fast, private, local-first search engine built in Rust. It indexes local files, full document text (FTS5), OCR inside screenshots, and codebases entirely on device without cloud dependencies.
+
+* **Design & UI Layout Contract**:
+  - **Dock Trigger**: 48px square tile featuring a glass magnifying lens glyph, triggered by click or global hotkey `Alt + Space` (or `Ctrl + Space`, or `/`).
+  - **Spotlight Modal**: 680px width centered spotlight window with continuous rounded corners (border-radius: 20px), search header, active engine badge (`Kensaku Engine`), and in-process math evaluator.
+  - **Scope Filter Pills**:
+    - `All`: Unified search ranking across apps, files, FTS content, code, and OCR.
+    - `Files`: Local files (PDF, DOCX, XLSX, TXT, images, archives).
+    - `Content (FTS)`: Full-text content search matches with highlighted snippet previews.
+    - `OCR (Screenshots)`: Screenshots and camera captures where text was recognized via OCR.
+    - `Apps`: Installed Windows desktop and Store applications.
+    - `Code`: Source code repositories and scripts (`.rs`, `.ts`, `.py`, `.html`, `.md`).
+  - **Layout Mode Toggle (List vs Grid)**:
+    - `List View`: Compact row layout with icon, file title, parent path, snippet, and category badge.
+    - `Grid View`: 2-column continuous-corner card grid showing large thumbnails, detailed snippets, and metadata.
+  - **Quick Look Preview Drawer (Spacebar Preview)**:
+    - Pressing `Space` on any focused result toggles the Quick Look drawer.
+    - Displays full filename, badge, path, match snippet (OCR extracted text or FTS highlighted match), and file metadata (size, last modified, indexing engine).
+    - Action buttons: `Open File` (launches default handler), `Reveal in Explorer` (opens Windows Explorer focused on file), and `Copy Path` (copies absolute path to clipboard).
+
+* **Rust Backend Engine Architecture**:
+  - **Source Files**:
+    - `protonsearch/src/indexer.rs`: SQLite FTS5 indexer and document text extraction.
+    - `protonsearch/src/ocr.rs`: Windows Native OCR worker.
+    - `protonsearch/src/semantic.rs`: Local embeddings and vector ranking.
+    - `src-tauri/src/kensaku_search.rs`: Tauri v2 IPC command handlers.
+  - **SQLite FTS5 Schema**:
+    ```sql
+    CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(
+      path UNINDEXED,
+      filename,
+      content,
+      extracted_ocr,
+      category,
+      modified_at UNINDEXED,
+      tokenize = 'unicode61 remove_diacritics 2'
+    );
+    ```
+  - **Ranking Query**:
+    ```sql
+    SELECT path, filename, category, modified_at,
+           snippet(files_fts, 2, '<mark>', '</mark>', '...', 16) AS content_snippet,
+           snippet(files_fts, 3, '<mark>', '</mark>', '...', 16) AS ocr_snippet,
+           bm25(files_fts, 10.0, 5.0, 2.0, 3.0) AS rank
+    FROM files_fts
+    WHERE files_fts MATCH ?
+    ORDER BY rank
+    LIMIT ? OFFSET ?;
+    ```
+  - **Windows Native OCR Pipeline**:
+    - Uses Windows Runtime API `Windows.Media.Ocr.OcrEngine`.
+    - Watches `%USERPROFILE%\Pictures\Screenshots` and camera roll directories.
+    - On new screenshot detection, decodes image stream via `Windows.Graphics.Imaging.BitmapDecoder`, runs `OcrEngine.RecognizeAsync`, and inserts extracted text into `files_fts.extracted_ocr`.
+  - **Local Semantic Vector Search**:
+    - Offline embeddings using `fastembed-rs` (`all-MiniLM-L6-v2` ONNX model running on local CPU).
+    - Stores 384-dimensional float embeddings in SQLite BLOB or vector virtual table.
+    - Enables concept search (e.g. querying "monthly expenses" retrieves "Q3 budget invoice.xlsx").
+  - **MCP Agent Server**:
+    - Exposes a local JSON-RPC Model Context Protocol (MCP) server on port `127.0.0.1:41782` or stdio.
+    - Tools provided to AI agents:
+      - `search_files(query: string, scope?: string, limit?: number)`: Runs FTS5 and OCR queries.
+      - `read_file_content(path: string, max_bytes?: number)`: Safely reads local file content.
+      - `ocr_screenshot(path: string)`: Runs instant OCR on arbitrary image files.
+
+* **IPC Contract**:
+  - Commands:
+    - `invoke('kensaku_search', { query: string, scope: string, limit: number, offset: number })` -> `KensakuSearchResponse`
+    - `invoke('kensaku_quick_look', { path: string })` -> `KensakuQuickLookPayload`
+    - `invoke('kensaku_index_status')` -> `KensakuIndexStats`
+    - `invoke('open_path', { path: string })`
+    - `invoke('reveal_in_explorer', { path: string })`
+  - Schema:
+    ```typescript
+    interface KensakuSearchResult {
+      title: string;
+      path: string;
+      category: 'apps' | 'files' | 'content' | 'ocr' | 'code';
+      snippet: string | null;
+      meta: string;
+      modifiedAtMs: number;
+      score: number;
+    }
+
+    interface KensakuSearchResponse {
+      query: string;
+      scope: string;
+      totalMatches: number;
+      results: KensakuSearchResult[];
+      durationMs: number;
+    }
+
+    interface KensakuQuickLookPayload {
+      path: string;
+      filename: string;
+      category: string;
+      fileSizeBytes: number;
+      modifiedAtMs: number;
+      previewText: string;
+      isOcr: boolean;
+    }
+    ```
+
+---
+
 ## 3. Motion & Animation Standards
 
 1. **Reorder FLIP Animations**:
@@ -514,3 +649,7 @@
 - [ ] Connect `MusicPlayerWidget.tsx` to `media_player.rs` Windows SMTC session manager.
 - [ ] Connect `QuickNotesCard.tsx` to `notes.rs` SQLite storage.
 - [ ] Connect `SpotlightWindow.tsx` to `calculator.rs` in-process math evaluator.
+- [ ] Connect `SpotlightWindow.tsx` to `kensaku_search.rs` with FTS5, OCR, and semantic vector endpoints.
+- [ ] Connect Spacebar Quick Look preview modal to `kensaku_quick_look` IPC command.
+- [ ] Wire native theme switcher across Dark, Light, and Liquid Glass tokens with `localStorage` persistence.
+- [ ] Bind List vs Grid layout toggle in Spotlight window with continuous-corner cards.

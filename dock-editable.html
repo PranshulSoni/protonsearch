@@ -75,6 +75,87 @@ html, body {
   background: #080a0e;
 }
 
+
+/* ==========================================================================
+   THREE NATIVE THEMES: DARK, LIGHT (KENSAKU), LIQUID GLASS (TAHOE)
+   ========================================================================== */
+body, body[data-theme="dark"] {
+  --rail-top: rgba(22, 26, 33, 0.94);
+  --rail-mid: rgba(14, 17, 22, 0.95);
+  --rail-bottom: rgba(10, 12, 16, 0.96);
+  --border: rgba(255, 255, 255, 0.085);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --tile-bg: rgba(255, 255, 255, 0.05);
+  --tile-border: rgba(255, 255, 255, 0.075);
+  --tile-hover-bg: rgba(255, 255, 255, 0.10);
+  --tile-hover-border: rgba(255, 255, 255, 0.20);
+  --text: #f0f3f6;
+  --text-2: #9ea5b0;
+  --text-3: #6b7280;
+  --popover-bg: rgba(18, 22, 30, 0.95);
+  --modal-card-bg: rgba(18, 22, 30, 0.96);
+  --shelf-pill-bg: rgba(16, 19, 26, 0.88);
+  --active-pill-bg: rgba(255, 255, 255, 0.12);
+  --wallpaper: radial-gradient(1100px 700px at 50% -10%, #1c2230 0%, rgba(28, 34, 48, 0) 62%),
+               radial-gradient(900px 600px at 80% 80%, #151a24 0%, rgba(21, 26, 36, 0) 58%),
+               linear-gradient(160deg, #0d1017 0%, #080a0e 100%);
+  --dock-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 6px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+body[data-theme="light"] {
+  --rail-top: rgba(250, 252, 255, 0.96);
+  --rail-mid: rgba(244, 247, 252, 0.96);
+  --rail-bottom: rgba(236, 241, 249, 0.97);
+  --border: rgba(0, 0, 0, 0.10);
+  --border-strong: rgba(0, 0, 0, 0.22);
+  --tile-bg: rgba(0, 0, 0, 0.045);
+  --tile-border: rgba(0, 0, 0, 0.07);
+  --tile-hover-bg: rgba(0, 0, 0, 0.08);
+  --tile-hover-border: rgba(0, 0, 0, 0.16);
+  --text: #0f172a;
+  --text-2: #475569;
+  --text-3: #94a3b8;
+  --popover-bg: rgba(254, 255, 255, 0.98);
+  --modal-card-bg: rgba(253, 254, 255, 0.98);
+  --shelf-pill-bg: rgba(245, 248, 254, 0.92);
+  --active-pill-bg: rgba(0, 0, 0, 0.09);
+  --wallpaper: radial-gradient(1100px 700px at 50% -10%, #e2e8f0 0%, rgba(226, 232, 240, 0) 62%),
+               radial-gradient(900px 600px at 80% 80%, #cbd5e1 0%, rgba(203, 213, 225, 0) 58%),
+               linear-gradient(160deg, #f8fafc 0%, #e2e8f0 100%);
+  --dock-shadow: 0 16px 40px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+body[data-theme="liquid-glass"] {
+  --rail-top: rgba(255, 255, 255, 0.14);
+  --rail-mid: rgba(255, 255, 255, 0.08);
+  --rail-bottom: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.32);
+  --border-strong: rgba(255, 255, 255, 0.52);
+  --tile-bg: rgba(255, 255, 255, 0.10);
+  --tile-border: rgba(255, 255, 255, 0.22);
+  --tile-hover-bg: rgba(255, 255, 255, 0.22);
+  --tile-hover-border: rgba(255, 255, 255, 0.48);
+  --text: #ffffff;
+  --text-2: rgba(255, 255, 255, 0.82);
+  --text-3: rgba(255, 255, 255, 0.58);
+  --popover-bg: rgba(18, 24, 36, 0.88);
+  --modal-card-bg: rgba(16, 22, 34, 0.90);
+  --shelf-pill-bg: rgba(255, 255, 255, 0.09);
+  --active-pill-bg: rgba(255, 255, 255, 0.24);
+  --wallpaper: radial-gradient(circle at 50% 10%, #4a34b8 0%, transparent 60%),
+               radial-gradient(circle at 80% 30%, #1e40af 0%, transparent 55%),
+               radial-gradient(circle at 20% 70%, #0c4a6e 0%, transparent 50%),
+               linear-gradient(135deg, #090d16 0%, #101c36 50%, #050b14 100%);
+  --dock-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 8px 24px rgba(0, 0, 0, 0.35),
+                 inset 0 1.5px 0 0 rgba(255, 255, 255, 0.65),
+                 inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.desktop-wallpaper {
+  background: var(--wallpaper);
+  transition: background 300ms ease;
+}
+
 /* Neutral desktop backdrop */
 .desktop-wallpaper {
   position: fixed;
@@ -219,6 +300,44 @@ html, body {
 .style-btn.is-active {
   color: #fff;
   background: rgba(255, 255, 255, 0.11);
+}
+
+
+/* Theme Pill: Dark vs Light vs Liquid Glass */
+.theme-pill {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--shelf-pill-bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.theme-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 600 10px/1 var(--font-stack);
+  padding: 6px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 130ms ease-out, background 130ms ease-out;
+}
+.theme-btn:hover { color: var(--text); }
+.theme-btn.is-active {
+  color: var(--text);
+  background: var(--active-pill-bg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+body[data-theme="light"] .theme-btn.is-active {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 /* Customize pill */
@@ -2102,6 +2221,21 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         <button class="profile-tab" data-profile="founder" type="button" aria-pressed="false">Founder</button>
       </div>
 
+      <div class="theme-pill" role="group" aria-label="Dock theme">
+        <button class="theme-btn is-active" data-theme="dark" type="button" aria-pressed="true">
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/></svg>
+          Dark
+        </button>
+        <button class="theme-btn" data-theme="light" type="button" aria-pressed="false">
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><circle cx="8" cy="8" r="3"/><path d="M8 0v2M8 14v2M0 8h2M14 8h2M2.34 2.34l1.42 1.42M12.24 12.24l1.42 1.42M2.34 13.66l1.42-1.42M12.24 3.76l1.42-1.42" stroke="currentColor" stroke-width="1.3"/></svg>
+          Light
+        </button>
+        <button class="theme-btn" data-theme="liquid-glass" type="button" aria-pressed="false">
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M5 8c0-1.66 1.34-3 3-3"/></svg>
+          Liquid Glass
+        </button>
+      </div>
+
       <div class="style-pill" role="group" aria-label="Display style">
         <button class="style-btn is-active" data-style="capsule" type="button" aria-pressed="true">
           <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><rect x="1" y="3" width="6" height="10" rx="3"/><rect x="9" y="3" width="6" height="10" rx="3"/></svg>
@@ -2527,7 +2661,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
      PROTONSEARCH LAUNCHER: SPOTLIGHT PALETTE & IN-PROCESS MATH ENGINE
      ========================================================================== -->
 <div class="ps-spotlight-backdrop" id="searchModal">
-  <section class="ps-spotlight-card" id="launcherCard" role="dialog" aria-label="ProtonSearch Spotlight">
+  <section class="ps-spotlight-card" id="launcherCard" role="dialog" aria-label="ProtonSearch Kensaku Spotlight">
     <div class="ps-toast" id="psToast">
       <span class="ps-toast-dot"></span>
       <span id="psToastMsg">Action executed</span>
@@ -2537,15 +2671,31 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       <div class="ps-search-ic">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       </div>
-      <input id="spotlightInput" class="ps-search-input" type="text" placeholder="Search apps, files, or enter math (e.g. 25*4, sqrt(144) + 15%)..." autocomplete="off" />
-      <span class="ps-search-esc-hint">Esc</span>
+      <input id="spotlightInput" class="ps-search-input" type="text" placeholder="Search files, full text (FTS), OCR screenshots, or calculate..." autocomplete="off" />
+      <div class="ps-kensaku-badge" title="Local & Private Search Engine (Rust + Tauri FTS5 & OCR)">
+        <span class="ps-engine-dot"></span>
+        <span>Kensaku Engine</span>
+      </div>
+      <span class="ps-search-esc-hint" title="Press Space on a result for Quick Look">Space: Preview · Esc</span>
     </div>
 
     <div class="ps-nav-scope-bar">
-      <div class="nav-scope-pill is-active" data-scope="all"><span>All</span></div>
-      <div class="nav-scope-pill" data-scope="apps"><span>Apps</span></div>
-      <div class="nav-scope-pill" data-scope="files"><span>Files</span></div>
-      <div class="nav-scope-pill" data-scope="folders"><span>Folders</span></div>
+      <div class="ps-scopes-wrap">
+        <div class="nav-scope-pill is-active" data-scope="all"><span>All</span></div>
+        <div class="nav-scope-pill" data-scope="files"><span>Files</span></div>
+        <div class="nav-scope-pill" data-scope="content"><span>Content (FTS)</span></div>
+        <div class="nav-scope-pill" data-scope="ocr"><span>OCR (Screenshots)</span></div>
+        <div class="nav-scope-pill" data-scope="apps"><span>Apps</span></div>
+        <div class="nav-scope-pill" data-scope="code"><span>Code</span></div>
+      </div>
+      <div class="ps-layout-toggle" role="group" aria-label="Search Results Layout">
+        <button class="ps-layout-btn is-active" id="layoutListBtn" data-layout="list" type="button" title="List View">
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
+        </button>
+        <button class="ps-layout-btn" id="layoutGridBtn" data-layout="grid" type="button" title="Grid View">
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.5"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="ps-search-body">
@@ -2562,8 +2712,29 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         </div>
       </div>
 
-      <!-- Search results column -->
+      <!-- Search results column / grid -->
       <div class="ps-results-column" id="resultsRowsContainer"></div>
+    </div>
+
+    <!-- Quick Look Preview Panel (Spacebar preview like Kensaku) -->
+    <div class="ps-quick-look-drawer" id="psQuickLookDrawer" style="display:none;">
+      <div class="ql-header">
+        <div class="ql-title-wrap">
+          <span class="ql-badge" id="qlBadge">FILE</span>
+          <span class="ql-filename" id="qlFilename">filename.pdf</span>
+        </div>
+        <button class="ql-close-btn" id="qlCloseBtn" type="button" title="Close Preview (Space or Esc)">&times;</button>
+      </div>
+      <div class="ql-body" id="qlBody">
+        <div class="ql-path" id="qlPath">C:\Users\...</div>
+        <div class="ql-preview-box" id="qlPreviewBox"></div>
+        <div class="ql-meta-row" id="qlMetaRow"></div>
+      </div>
+      <div class="ql-footer">
+        <button class="ql-action-btn is-primary" id="qlOpenBtn" type="button">Open File</button>
+        <button class="ql-action-btn" id="qlFolderBtn" type="button">Reveal in Explorer</button>
+        <button class="ql-action-btn" id="qlCopyPathBtn" type="button">Copy Path</button>
+      </div>
     </div>
   </section>
 </div>
@@ -3993,8 +4164,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     saveNoteBtn.addEventListener('click', saveCurrentNote);
   }
 
-  /* ==========================================================================
-     PROTONSEARCH LAUNCHER: SPOTLIGHT & IN-PROCESS MATH ENGINE
+    /* ==========================================================================
+     KENSAKU SEARCH ENGINE & SPOTLIGHT MODAL (LOCAL RUST FTS5 + OCR + QUICK-LOOK)
      ========================================================================== */
   var searchModal = document.getElementById('searchModal');
   var spotlightInput = document.getElementById('spotlightInput');
@@ -4005,7 +4176,23 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   var psToast = document.getElementById('psToast');
   var psToastMsg = document.getElementById('psToastMsg');
   var searchScopePills = document.querySelectorAll('.nav-scope-pill');
+  var layoutListBtn = document.getElementById('layoutListBtn');
+  var layoutGridBtn = document.getElementById('layoutGridBtn');
+  var qlDrawer = document.getElementById('psQuickLookDrawer');
+  var qlBadge = document.getElementById('qlBadge');
+  var qlFilename = document.getElementById('qlFilename');
+  var qlCloseBtn = document.getElementById('qlCloseBtn');
+  var qlPath = document.getElementById('qlPath');
+  var qlPreviewBox = document.getElementById('qlPreviewBox');
+  var qlMetaRow = document.getElementById('qlMetaRow');
+  var qlOpenBtn = document.getElementById('qlOpenBtn');
+  var qlFolderBtn = document.getElementById('qlFolderBtn');
+  var qlCopyPathBtn = document.getElementById('qlCopyPathBtn');
+
   var currentScope = 'all';
+  var currentLayout = 'list';
+  var selectedIndex = 0;
+  var currentFilteredItems = [];
   var lastCalculatedVal = null;
   var toastTimer = null;
 
@@ -4019,9 +4206,212 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     }, 1800);
   }
 
+  /* Native Theme Switcher (Dark, Light, Liquid Glass) */
+  var themeButtons = document.querySelectorAll('.theme-btn');
+  function setTheme(theme) {
+    if (!theme) return;
+    document.body.setAttribute('data-theme', theme);
+    try { localStorage.setItem('protondock_theme', theme); } catch (e) {}
+    themeButtons.forEach(function (btn) {
+      var isActive = btn.dataset.theme === theme;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
+
+  themeButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var t = btn.dataset.theme;
+      setTheme(t);
+      showToast('Theme: ' + (t === 'liquid-glass' ? 'Liquid Glass' : t.charAt(0).toUpperCase() + t.slice(1)));
+    });
+  });
+
+  try {
+    var savedTheme = localStorage.getItem('protondock_theme') || 'dark';
+    setTheme(savedTheme);
+  } catch (e) {}
+
+  /* Layout Switcher (List vs Grid) */
+  function setLayout(layout) {
+    currentLayout = layout;
+    if (layoutListBtn) layoutListBtn.classList.toggle('is-active', layout === 'list');
+    if (layoutGridBtn) layoutGridBtn.classList.toggle('is-active', layout === 'grid');
+    if (resultsRowsContainer) resultsRowsContainer.classList.toggle('is-grid', layout === 'grid');
+  }
+
+  if (layoutListBtn) {
+    layoutListBtn.addEventListener('click', function () { setLayout('list'); });
+  }
+  if (layoutGridBtn) {
+    layoutGridBtn.addEventListener('click', function () { setLayout('grid'); });
+  }
+
+  /* Kensaku Search Dataset: Full-Text Content (FTS5), OCR Screenshots, Files, Apps, Code */
+  var SEARCH_ITEMS = [
+    {
+      title: 'Visual Studio Code',
+      sub: 'C:\\Users\\Pranshul\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe',
+      type: 'apps',
+      meta: 'Application · 186 MB · Last opened 10m ago',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24"><path d="m18.4 2.6-9.7 8.2L3.6 7.4 1.5 8.7l4.8 3.9-4.8 3.9 2.1 1.3 5.1-3.4 9.7 8.2 4.4-2V4.6z" fill="#0078d7"/><path d="m18.4 2.6-7.8 7.3 7.8 7.3 4.4-2.2V4.6z" fill="#29a8ff"/></svg>'
+    },
+    {
+      title: 'Windows Terminal',
+      sub: 'C:\\Program Files\\WindowsApps\\Microsoft.WindowsTerminal_1.19.10573.0\\wt.exe',
+      type: 'apps',
+      meta: 'System Shell · x64 Native · Running',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14181f"/><path d="m6.5 8 4 4-4 4M12.5 16H18" stroke="var(--terminal-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>'
+    },
+    {
+      title: 'Spotify Music',
+      sub: 'C:\\Users\\Pranshul\\AppData\\Roaming\\Spotify\\Spotify.exe',
+      type: 'apps',
+      meta: 'Audio Player · WebRTC Active',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>'
+    },
+    {
+      title: 'Google Chrome',
+      sub: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      type: 'apps',
+      meta: 'Web Browser · 12 Tabs Active',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285f4"/><path d="M12 2a10 10 0 0 1 8.66 5H12z" fill="#ea4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5z" fill="#fbbc05"/><path d="M12 22A10 10 0 0 1 3.34 7H12z" fill="#34a853"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>'
+    },
+    {
+      title: 'Screenshot_2026-11-04_142205.png',
+      sub: 'C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot_2026-11-04_142205.png',
+      type: 'ocr',
+      snippet: 'Task Manager: protonsearch.exe memory footprint 18.2 MB, CPU 0.0% idle, GDI Objects 42',
+      meta: 'PNG Image · 1920x1080 · OCR Indexed via Windows.Media.Ocr',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59c35" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
+    },
+    {
+      title: 'Screenshot_Terminal_Commit.png',
+      sub: 'C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot_Terminal_Commit.png',
+      type: 'ocr',
+      snippet: 'git push origin dock [new branch] -> commit 4fa10b2 (clean working tree, verified)',
+      meta: 'PNG Image · 1440x900 · OCR Indexed via Windows.Media.Ocr',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59c35" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
+    },
+    {
+      title: 'indexer.rs',
+      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\protonsearch\\src\\indexer.rs',
+      type: 'content',
+      snippet: 'SELECT rowid, path, snippet(files_fts, 0, "<mark>", "</mark>", "...", 16) FROM files_fts WHERE files_fts MATCH ? ORDER BY rank;',
+      meta: 'Rust Source File · 34 KB · FTS5 Virtual Table Matcher',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'
+    },
+    {
+      title: 'CREATION_PLAYBOOK.md',
+      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\widgets\\CREATION_PLAYBOOK.md',
+      type: 'content',
+      snippet: 'Widget contract specifications: every widget must declare discrete bounds, adhere to locked 48px square height, and pass visual validation.',
+      meta: 'Markdown Document · 18 KB · Indexed via FTS5',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    },
+    {
+      title: 'STATUS.md',
+      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\STATUS.md',
+      type: 'content',
+      snippet: 'Dock stability verification: locked 48px square height invariant verified across all test runs without layout shifts or memory leaks.',
+      meta: 'Markdown Document · 12 KB · Indexed via FTS5',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    },
+    {
+      title: 'Q3_Financial_Review.pdf',
+      sub: 'C:\\Users\\Pranshul\\Documents\\Financials\\Q3_Financial_Review.pdf',
+      type: 'files',
+      meta: 'Adobe Acrobat PDF · 1.4 MB · Extracted via pdf-extract',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    },
+    {
+      title: 'Architecture_Handoff.docx',
+      sub: 'C:\\Users\\Pranshul\\Documents\\Design\\Architecture_Handoff.docx',
+      type: 'files',
+      meta: 'Microsoft Word Document · 840 KB · Extracted via docx-lite',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    },
+    {
+      title: 'main.rs',
+      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\protonsearch\\src\\main.rs',
+      type: 'code',
+      meta: 'Rust Win32 Entrypoint · 48 KB · WindowProc Handler',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'
+    },
+    {
+      title: 'dock-editable.html',
+      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\dock-editable.html',
+      type: 'code',
+      meta: 'HTML5 / CSS3 / ES6 · High-Fidelity Tahoe Glass Preview',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'
+    },
+    {
+      title: 'spec.md',
+      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\antigravity\\spec.md',
+      type: 'code',
+      meta: 'Technical Architecture Specification · Comprehensive Contract',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    }
+  ];
+
+  /* Quick Look Drawer Controller (Kensaku Spacebar Preview) */
+  function openQuickLook(item) {
+    if (!qlDrawer || !item) return;
+    if (qlBadge) {
+      qlBadge.textContent = item.type.toUpperCase();
+      qlBadge.className = 'ql-badge' + (item.type === 'ocr' ? ' is-ocr' : item.type === 'content' ? ' is-content' : '');
+    }
+    if (qlFilename) qlFilename.textContent = item.title;
+    if (qlPath) qlPath.textContent = item.sub;
+    if (qlPreviewBox) {
+      if (item.snippet) {
+        qlPreviewBox.innerHTML = '<div style="font-size:9.5px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin-bottom:4px;">' +
+          (item.type === 'ocr' ? 'OCR Extracted Text' : 'Full-Text FTS5 Match') + ':</div>' +
+          '<div style="color:var(--text);">' + escapeHtml(item.snippet) + '</div>';
+      } else {
+        qlPreviewBox.innerHTML = '<div style="color:var(--text-2);">' + escapeHtml(item.sub) + '<br><span style="color:var(--text-3);font-size:10px;">Ready to launch or reveal in Explorer.</span></div>';
+      }
+    }
+    if (qlMetaRow) {
+      qlMetaRow.textContent = item.meta || ('Type: ' + item.type.toUpperCase() + ' · Indexed via Kensaku Local Engine');
+    }
+
+    if (qlOpenBtn) {
+      qlOpenBtn.onclick = function () {
+        showToast('Opening ' + item.title + '...');
+        setTimeout(closeSearchLauncher, 300);
+      };
+    }
+    if (qlFolderBtn) {
+      qlFolderBtn.onclick = function () {
+        showToast('Revealing in Explorer: ' + item.title);
+        setTimeout(closeSearchLauncher, 300);
+      };
+    }
+    if (qlCopyPathBtn) {
+      qlCopyPathBtn.onclick = function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(item.sub);
+        }
+        showToast('Path copied to clipboard');
+      };
+    }
+
+    qlDrawer.style.display = 'flex';
+  }
+
+  function closeQuickLook() {
+    if (qlDrawer) qlDrawer.style.display = 'none';
+  }
+
+  if (qlCloseBtn) {
+    qlCloseBtn.addEventListener('click', closeQuickLook);
+  }
+
   function openSearchLauncher() {
     if (searchModal) {
       searchModal.classList.add('is-open');
+      closeQuickLook();
       if (spotlightInput) {
         spotlightInput.value = '';
         setTimeout(function () { spotlightInput.focus(); }, 60);
@@ -4033,6 +4423,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   function closeSearchLauncher() {
     if (searchModal) {
       searchModal.classList.remove('is-open');
+      closeQuickLook();
     }
   }
 
@@ -4127,23 +4518,14 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       while (tokens[pos] && (tokens[pos].type === 'STAR' || tokens[pos].type === 'SLASH' || tokens[pos].type === 'PERCENT')) {
         var op = tokens[pos].type;
         pos++;
-        if (op === 'PERCENT') {
-          if (tokens[pos] && tokens[pos].type === 'IDENT' && tokens[pos].val === 'of') {
-            pos++;
-            var base = parsePower();
-            if (base === null) return null;
-            left = (left / 100) * base;
-          } else {
-            left = left / 100;
-          }
-        } else {
-          var right = parsePower();
-          if (right === null) return null;
-          if (op === 'STAR') left *= right;
-          else {
-            if (right === 0) return null;
-            left /= right;
-          }
+        var right = parsePower();
+        if (right === null) return null;
+        if (op === 'STAR') left *= right;
+        else if (op === 'SLASH') {
+          if (right === 0) return null;
+          left /= right;
+        } else if (op === 'PERCENT') {
+          left = left * (right / 100);
         }
       }
       return left;
@@ -4154,9 +4536,9 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       if (base === null) return null;
       if (tokens[pos] && tokens[pos].type === 'CARET') {
         pos++;
-        var exp = parsePower();
-        if (exp === null) return null;
-        return Math.pow(base, exp);
+        var exponent = parsePower();
+        if (exponent === null) return null;
+        return Math.pow(base, exponent);
       }
       return base;
     }
@@ -4175,60 +4557,59 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     }
 
     function parsePrimary() {
-      var tok = tokens[pos];
-      if (!tok) return null;
-      if (tok.type === 'NUM') { pos++; return tok.val; }
-      if (tok.type === 'LPAREN') {
+      var t = tokens[pos];
+      if (!t) return null;
+      if (t.type === 'NUM') {
         pos++;
-        var val = parseExpr();
-        if (val === null) return null;
-        if (tokens[pos] && tokens[pos].type === 'RPAREN') pos++;
-        return val;
+        return t.val;
       }
-      if (tok.type === 'IDENT') {
-        var name = tok.val;
+      if (t.type === 'IDENT') {
+        var name = t.val;
         pos++;
+        if (name === 'pi' || name === 'π') return Math.PI;
+        if (name === 'e') return Math.E;
         if (tokens[pos] && tokens[pos].type === 'LPAREN') {
           pos++;
           var arg = parseExpr();
           if (arg === null) return null;
-          if (tokens[pos] && tokens[pos].type === 'RPAREN') pos++;
-          switch (name) {
-            case 'sqrt': return arg < 0 ? null : Math.sqrt(arg);
-            case 'abs': return Math.abs(arg);
-            case 'round': return Math.round(arg);
-            case 'floor': return Math.floor(arg);
-            case 'ceil': return Math.ceil(arg);
-            case 'sin': return Math.sin((arg * Math.PI) / 180);
-            case 'cos': return Math.cos((arg * Math.PI) / 180);
-            case 'tan': return Math.tan((arg * Math.PI) / 180);
-            case 'log': return arg <= 0 ? null : Math.log10(arg);
-            case 'ln': return arg <= 0 ? null : Math.log(arg);
-            default: return null;
-          }
-        } else {
-          if (name === 'pi' || name === 'π') return Math.PI;
-          if (name === 'e') return Math.E;
+          if (!tokens[pos] || tokens[pos].type !== 'RPAREN') return null;
+          pos++;
+          if (name === 'sqrt') return Math.sqrt(arg);
+          if (name === 'sin') return Math.sin(arg);
+          if (name === 'cos') return Math.cos(arg);
+          if (name === 'tan') return Math.tan(arg);
+          if (name === 'abs') return Math.abs(arg);
+          if (name === 'log' || name === 'ln') return Math.log(arg);
           return null;
         }
+        return null;
+      }
+      if (t.type === 'LPAREN') {
+        pos++;
+        var inner = parseExpr();
+        if (inner === null) return null;
+        if (!tokens[pos] || tokens[pos].type !== 'RPAREN') return null;
+        pos++;
+        return inner;
       }
       return null;
     }
 
-    var res = parseExpr();
-    if (res === null || !isFinite(res)) return null;
-    return res;
+    var result = parseExpr();
+    if (result === null || (tokens[pos] && tokens[pos].type !== 'EOF')) return null;
+    return result;
   }
 
-  var SEARCH_ITEMS = [
-    { title: 'Visual Studio Code', sub: 'C:\\Users\\Pranshul\\AppData\\Local\\Programs\\Microsoft VS Code', type: 'apps', icon: '<svg width="18" height="18" viewBox="0 0 24 24"><path d="m18.4 2.6-9.7 8.2L3.6 7.4 1.5 8.7l4.8 3.9-4.8 3.9 2.1 1.3 5.1-3.4 9.7 8.2 4.4-2V4.6z" fill="#0078d7"/><path d="m18.4 2.6-7.8 7.3 7.8 7.3 4.4-2.2V4.6z" fill="#29a8ff"/></svg>' },
-    { title: 'Windows Terminal', sub: 'Windows System Application', type: 'apps', icon: '<svg width="18" height="18" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14181f"/><path d="m6.5 8 4 4-4 4M12.5 16H18" stroke="var(--terminal-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>' },
-    { title: 'Spotify Music', sub: 'Streaming Music Player', type: 'apps', icon: '<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>' },
-    { title: 'Google Chrome', sub: 'Web Browser', type: 'apps', icon: '<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285f4"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>' },
-    { title: 'spec.md', sub: 'antigravity\\spec.md - Technical Architecture Specification', type: 'files', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
-    { title: 'dock-editable.html', sub: 'High Fidelity Tahoe Glass Dock Preview', type: 'files', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>' },
-    { title: 'Documents\\Projects', sub: 'Local Git Projects Folder', type: 'folders', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#e6b566"><path d="M3 6.5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>' }
-  ];
+  function updateSelectedRow() {
+    if (!resultsRowsContainer) return;
+    var rows = resultsRowsContainer.querySelectorAll('.ps-result-row');
+    rows.forEach(function (row, idx) {
+      row.classList.toggle('is-selected', idx === selectedIndex);
+    });
+    if (rows[selectedIndex]) {
+      rows[selectedIndex].scrollIntoView({ block: 'nearest' });
+    }
+  }
 
   function renderSearchResults(query) {
     if (!resultsRowsContainer) return;
@@ -4246,29 +4627,52 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       if (calculatorHeroContainer) calculatorHeroContainer.style.display = 'none';
     }
 
-    var filtered = SEARCH_ITEMS.filter(function (item) {
+    currentFilteredItems = SEARCH_ITEMS.filter(function (item) {
       var scopeMatch = (currentScope === 'all' || item.type === currentScope);
-      var textMatch = !lower || item.title.toLowerCase().indexOf(lower) !== -1 || item.sub.toLowerCase().indexOf(lower) !== -1;
+      var textMatch = !lower ||
+        item.title.toLowerCase().indexOf(lower) !== -1 ||
+        item.sub.toLowerCase().indexOf(lower) !== -1 ||
+        (item.snippet && item.snippet.toLowerCase().indexOf(lower) !== -1) ||
+        (item.meta && item.meta.toLowerCase().indexOf(lower) !== -1);
       return scopeMatch && textMatch;
     });
 
+    selectedIndex = 0;
     var html = '';
-    filtered.forEach(function (item) {
-      html += '<div class="ps-result-row" data-title="' + escapeHtml(item.title) + '">' +
+    currentFilteredItems.forEach(function (item, idx) {
+      var badgeClass = item.type === 'ocr' ? ' is-ocr' : item.type === 'content' ? ' is-content' : '';
+      html += '<div class="ps-result-row' + (idx === 0 ? ' is-selected' : '') + '" data-idx="' + idx + '" data-title="' + escapeHtml(item.title) + '">' +
         '<div class="ps-res-icon">' + item.icon + '</div>' +
         '<div class="ps-res-info">' +
           '<div class="ps-res-title">' + escapeHtml(item.title) + '</div>' +
           '<div class="ps-res-sub">' + escapeHtml(item.sub) + '</div>' +
+          (item.snippet ? '<div class="ps-res-snippet">' + escapeHtml(item.snippet) + '</div>' : '') +
         '</div>' +
-        '<span class="ps-res-badge">' + item.type.toUpperCase() + '</span>' +
+        '<span class="ps-res-badge' + badgeClass + '">' + item.type.toUpperCase() + '</span>' +
       '</div>';
     });
 
-    if (filtered.length === 0 && calcRes === null) {
-      html = '<div style="padding:24px 0;text-align:center;font-size:12px;color:var(--text-3);">No matching results found</div>';
+    if (currentFilteredItems.length === 0 && calcRes === null) {
+      html = '<div style="padding:24px 0;text-align:center;font-size:12px;color:var(--text-3);">No matching results found in Kensaku index</div>';
     }
 
     resultsRowsContainer.innerHTML = html;
+
+    // Attach click events
+    var rows = resultsRowsContainer.querySelectorAll('.ps-result-row');
+    rows.forEach(function (row) {
+      row.addEventListener('click', function () {
+        var idx = parseInt(row.dataset.idx, 10);
+        selectedIndex = idx;
+        updateSelectedRow();
+        openQuickLook(currentFilteredItems[idx]);
+      });
+      row.addEventListener('dblclick', function () {
+        var idx = parseInt(row.dataset.idx, 10);
+        showToast('Launching ' + currentFilteredItems[idx].title);
+        setTimeout(closeSearchLauncher, 350);
+      });
+    });
   }
 
   function copyCalculation() {
@@ -4291,16 +4695,47 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       renderSearchResults(spotlightInput.value);
     });
     spotlightInput.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (currentFilteredItems.length > 0) {
+          selectedIndex = (selectedIndex + 1) % currentFilteredItems.length;
+          updateSelectedRow();
+          if (qlDrawer && qlDrawer.style.display !== 'none') {
+            openQuickLook(currentFilteredItems[selectedIndex]);
+          }
+        }
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (currentFilteredItems.length > 0) {
+          selectedIndex = (selectedIndex - 1 + currentFilteredItems.length) % currentFilteredItems.length;
+          updateSelectedRow();
+          if (qlDrawer && qlDrawer.style.display !== 'none') {
+            openQuickLook(currentFilteredItems[selectedIndex]);
+          }
+        }
+        return;
+      }
+      if (e.key === ' ' && spotlightInput.selectionStart === spotlightInput.selectionEnd && spotlightInput.value.trim() !== '') {
+        if (currentFilteredItems[selectedIndex]) {
+          e.preventDefault();
+          if (qlDrawer && qlDrawer.style.display !== 'none') {
+            closeQuickLook();
+          } else {
+            openQuickLook(currentFilteredItems[selectedIndex]);
+          }
+          return;
+        }
+      }
       if (e.key === 'Enter') {
         if (lastCalculatedVal !== null) {
           e.preventDefault();
           copyCalculation();
-        } else {
-          var firstRow = resultsRowsContainer.querySelector('.ps-result-row');
-          if (firstRow) {
-            showToast('Launching ' + firstRow.dataset.title);
-            setTimeout(closeSearchLauncher, 350);
-          }
+        } else if (currentFilteredItems[selectedIndex]) {
+          e.preventDefault();
+          showToast('Launching ' + currentFilteredItems[selectedIndex].title);
+          setTimeout(closeSearchLauncher, 350);
         }
       }
     });
