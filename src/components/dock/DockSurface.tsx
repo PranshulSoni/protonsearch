@@ -167,20 +167,21 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
 
   return (
     <div className="dock-final" data-appearance={appearance} aria-label="ProtonDock">
-      <div className="dock-final-pills" role="tablist" aria-label="Dock profile" ref={pillsRef}>
-        {PROFILE_IDS.map((profile) => (
-          <button
-            key={profile}
-            type="button"
-            role="tab"
-            aria-selected={layout.profile === profile}
-            className="dock-final-pill"
-            onClick={() => selectProfile(profile)}
-          >
-            {PROFILE_LABELS[profile]}
-          </button>
-        ))}
-        <span className="dock-final-pill-divider" aria-hidden="true" />
+      <div className="dock-final-shelf" ref={pillsRef}>
+        <div className="dock-final-pills" role="tablist" aria-label="Dock profile">
+          {PROFILE_IDS.map((profile) => (
+            <button
+              key={profile}
+              type="button"
+              role="tab"
+              aria-selected={layout.profile === profile}
+              className="dock-final-pill"
+              onClick={() => selectProfile(profile)}
+            >
+              {PROFILE_LABELS[profile]}
+            </button>
+          ))}
+        </div>
         <button type="button" className="dock-final-customize" onClick={onCustomize}>
           Customize Widgets
         </button>

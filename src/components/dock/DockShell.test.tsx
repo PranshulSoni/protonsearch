@@ -77,14 +77,14 @@ describe('DockShell integration', () => {
     }));
   });
 
-  it('reports only the pill row and rail as native hit regions', async () => {
+  it('reports only the profile shelf and rail as native hit regions', async () => {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
     vi.stubGlobal('cancelAnimationFrame', clearTimeout);
     mockCommands(defaultLayout());
     const { container } = render(<DockShell />);
     await screen.findByRole('tab', { name: 'Daily' });
     const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
-    const pills = container.querySelector<HTMLElement>('.dock-final-pills')!;
+    const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
     rail.getBoundingClientRect = () => ({ x: 100, y: 50, width: 800, height: 82, left: 100, top: 50, right: 900, bottom: 132, toJSON() {} });
     pills.getBoundingClientRect = () => ({ x: 300, y: 10, width: 360, height: 28, left: 300, top: 10, right: 660, bottom: 38, toJSON() {} });
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('fit_dock', {
@@ -104,7 +104,7 @@ describe('DockShell integration', () => {
     const { container } = render(<DockShell />);
     await screen.findByRole('tab', { name: 'Daily' });
     const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
-    const pills = container.querySelector<HTMLElement>('.dock-final-pills')!;
+    const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
     rail.getBoundingClientRect = () => ({ x: 12, y: 50, width: 800, height: 82, left: 12, top: 50, right: 812, bottom: 132, toJSON() {} });
     Object.defineProperty(rail, 'scrollWidth', { value: 1100, configurable: true });
     pills.getBoundingClientRect = () => ({ x: 300, y: 10, width: 360, height: 28, left: 300, top: 10, right: 660, bottom: 38, toJSON() {} });

@@ -35,6 +35,22 @@ describe('DockSurface web preview', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('keeps Customize Widgets as a separate pill from the profile tabs', () => {
+    const { container } = render(
+      <DockSurface layout={defaultLayout()} onChange={() => {}} onCustomize={() => {}} />,
+    );
+
+    const shelf = container.querySelector<HTMLElement>('.dock-final-shelf');
+    const tabs = container.querySelector<HTMLElement>('.dock-final-pills');
+    const customize = container.querySelector<HTMLElement>('.dock-final-customize');
+    expect(shelf).toBeTruthy();
+    expect(tabs).toBeTruthy();
+    expect(customize).toBeTruthy();
+    expect(shelf?.contains(tabs!)).toBe(true);
+    expect(shelf?.contains(customize!)).toBe(true);
+    expect(tabs?.contains(customize!)).toBe(false);
+  });
+
   it('fits the rail to the available screen width in the native dock', () => {
     const innerWidth = window.innerWidth;
     const availWidth = window.screen.availWidth;

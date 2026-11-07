@@ -5,6 +5,17 @@
   padding: 0 12px 14px;
 }
 
+.dock-final-shelf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.dock-final-shelf > * {
+  pointer-events: auto;
+}
+
 .dock-final-pills {
   height: 26px;
   padding: 3px 4px;
@@ -43,8 +54,25 @@
 }
 
 .dock-final-customize {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
   color: rgba(255, 255, 255, 0.92);
-  padding: 0 9px;
+  background: rgba(14, 20, 32, 0.78);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(40px) saturate(190%) contrast(104%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%) contrast(104%);
+  opacity: 0.95;
+}
+
+.dock-final-customize:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .dock-final-pill-divider {
