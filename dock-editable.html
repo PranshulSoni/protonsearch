@@ -686,6 +686,304 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 }
 
+/* ==========================================================================
+   COOLDOCK & DOCKTOR SLEEK LIVE WIDGETS
+   ========================================================================== */
+
+/* 1. Live System Stats Widget (Sparkline & Horizontal Bars) */
+.dock-sys-stats-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 0 10px;
+  gap: 8px;
+  box-sizing: border-box;
+}
+.dock-slot[data-shape="square"] .dock-sys-stats-wrap {
+  padding: 0;
+  justify-content: center;
+}
+.dss-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.dss-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(52, 211, 153, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #34d399;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.dss-data {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.dss-cpu-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+.dss-cpu-readout small {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+.dss-sub {
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+.dss-spark-box {
+  flex: 1 1 auto;
+  height: 32px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 74px;
+}
+.dss-spark-svg {
+  width: 86px;
+  height: 30px;
+  display: block;
+}
+.dock-slot[data-shape="square"] .dss-spark-box,
+.dock-slot[data-shape="square"] .dss-sub {
+  display: none;
+}
+.dss-bars-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3.5px;
+  flex: 1 1 auto;
+  min-width: 65px;
+}
+.dss-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 7.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+}
+.dss-bar-track {
+  flex: 1;
+  height: 3.5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  position: relative;
+}
+.dss-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 400ms ease;
+}
+.dss-bar-fill.cpu { background: #facc15; }
+.dss-bar-fill.ram { background: #f43f5e; }
+.dss-bar-fill.ssd { background: #e2e8f0; }
+
+/* 2. Iconic Apple Calendar Squircle Tile */
+.dock-cal-card {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #e11d48 0%, #be123c 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 3px 6px rgba(190, 18, 60, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 0;
+  color: #fff;
+  line-height: 1;
+  user-select: none;
+}
+.dock-cal-day {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.92;
+  margin-bottom: 1.5px;
+}
+.dock-cal-num {
+  font-size: 16px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+/* 3. AirPods / Peripherals Battery Tile */
+.dock-airpods-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5px;
+}
+.dock-airpods-icon {
+  color: #34d399;
+}
+.dock-airpods-pct {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+/* 4. App Notification Pill Badges */
+.app-notif-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #ff3b30;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 800;
+  border-radius: 8px;
+  min-width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3.5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  z-index: 5;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  line-height: 1;
+}
+
+/* 5. Live Music Expanded Capsule Controls */
+.dock-music-expanded {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  gap: 8px;
+  box-sizing: border-box;
+}
+.dme-art {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  background: #18181b;
+  display: grid;
+  place-items: center;
+}
+.dme-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 1px;
+}
+.dme-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dme-artist {
+  font-size: 8.5px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dme-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+.dme-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 120ms ease;
+}
+.dme-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.dme-btn.play {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* 6. Live Weather Expanded Capsule */
+.dock-weather-expanded {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  gap: 8px;
+  box-sizing: border-box;
+}
+.dwe-icon {
+  flex: 0 0 auto;
+  color: #f0bd6a;
+}
+.dwe-temp {
+  font-size: 17px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  flex: 0 0 auto;
+}
+.dwe-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.dwe-row1 {
+  font-size: 9.5px;
+  font-weight: 650;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dwe-row2 {
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Text Stack (Visible in rectangle mode) */
 .dw-stack {
   display: flex;
@@ -2827,13 +3125,52 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     },
     weather: {
       id: 'weather',
-      title: 'Weather',
-      sub: 'Set Location',
-      defaultWidth: 48,
+      title: '24° Clear Sky',
+      sub: 'San Francisco',
+      defaultWidth: 200,
       isWeather: true,
       hasDot: false,
-      isConfigured: false,
-      temp: null
+      isConfigured: true,
+      temp: 24,
+      condition: 'Clear Sky',
+      high: 28,
+      low: 19,
+      rainPct: 19,
+      windKph: 11,
+      city: 'San Francisco'
+    },
+    'system-stats': {
+      id: 'system-stats',
+      title: 'System Stats',
+      sub: 'CPU 18% · RAM 58%',
+      defaultWidth: 196,
+      isSystemStats: true,
+      statsMode: 'sparkline',
+      cpu: 18,
+      ram: 58,
+      ssd: 43,
+      peak: 36,
+      history: [14, 16, 22, 36, 28, 20, 17, 21],
+      hasDot: false
+    },
+    calendar: {
+      id: 'calendar',
+      title: 'Calendar',
+      sub: 'Today',
+      defaultWidth: 48,
+      isCalendar: true,
+      day: 'FRI',
+      date: '16',
+      hasDot: false
+    },
+    peripherals: {
+      id: 'peripherals',
+      title: 'AirPods Pro',
+      sub: '34% Battery',
+      defaultWidth: 48,
+      isPeripherals: true,
+      batteryPct: 34,
+      hasDot: false
     },
     'status-battery': {
       id: 'status-battery',
@@ -2937,15 +3274,21 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     },
     'music-player': {
       id: 'music-player',
-      title: 'Music',
-      sub: 'No media playing',
-      defaultWidth: 48,
+      title: 'Take a Walk',
+      sub: 'Passion Pit · Gossamer',
+      defaultWidth: 220,
       isMusicPlayer: true,
-      isPlaying: false,
-      trackTitle: 'No media playing',
-      artist: 'Idle',
+      isPlaying: true,
+      trackTitle: 'Take a Walk',
+      artist: 'Passion Pit · Gossamer',
+      playlistIndex: 0,
+      playlist: [
+        { title: 'Take a Walk', artist: 'Passion Pit · Gossamer', albumArt: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)' },
+        { title: 'Midnight City', artist: 'M83 · Hurry Up', albumArt: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)' },
+        { title: 'Instant Crush', artist: 'Daft Punk · RAM', albumArt: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)' }
+      ],
       hasDot: false,
-      isConfigured: false
+      isConfigured: true
     },
     'quick-notes': {
       id: 'quick-notes',
@@ -2966,12 +3309,12 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     }
   };
 
-  /* Default running apps (initially sorted alphabetically A-Z) */
+  /* Default running apps (initially sorted alphabetically A-Z) with live notification badges */
   var INITIAL_RUNNING_APPS = [
-    { id: 'chrome', name: 'Google Chrome', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="10" fill="#4285f4"/><path d="M12 2a10 10 0 0 1 8.66 5H12z" fill="#ea4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5z" fill="#fbbc05"/><path d="M12 22A10 10 0 0 1 3.34 7H12z" fill="#34a853"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>' },
-    { id: 'spotify', name: 'Spotify', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>' },
-    { id: 'terminal', name: 'Terminal', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14181f"/><path d="m6.5 8 4 4-4 4M12.5 16H18" stroke="var(--terminal-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>' },
-    { id: 'vscode', name: 'VS Code', icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><path d="m18.4 2.6-9.7 8.2L3.6 7.4 1.5 8.7l4.8 3.9-4.8 3.9 2.1 1.3 5.1-3.4 9.7 8.2 4.4-2V4.6z" fill="#0078d7"/><path d="m18.4 2.6-7.8 7.3 7.8 7.3 4.4-2.2V4.6z" fill="#29a8ff"/></svg>' }
+    { id: 'chrome', name: 'Google Chrome', notifCount: 0, icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="10" fill="#4285f4"/><path d="M12 2a10 10 0 0 1 8.66 5H12z" fill="#ea4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5z" fill="#fbbc05"/><path d="M12 22A10 10 0 0 1 3.34 7H12z" fill="#34a853"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>' },
+    { id: 'spotify', name: 'Spotify', notifCount: 0, icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>' },
+    { id: 'terminal', name: 'Terminal', notifCount: 2, icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14181f"/><path d="m6.5 8 4 4-4 4M12.5 16H18" stroke="var(--terminal-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>' },
+    { id: 'vscode', name: 'VS Code', notifCount: 1, icon: '<svg width="20" height="20" viewBox="0 0 24 24" shape-rendering="geometricPrecision"><path d="m18.4 2.6-9.7 8.2L3.6 7.4 1.5 8.7l4.8 3.9-4.8 3.9 2.1 1.3 5.1-3.4 9.7 8.2 4.4-2V4.6z" fill="#0078d7"/><path d="m18.4 2.6-7.8 7.3 7.8 7.3 4.4-2.2V4.6z" fill="#29a8ff"/></svg>' }
   ];
 
   /* Installed apps database for Pinning (small 20px sharp vector icons centered in 48px square tiles) */
@@ -2990,14 +3333,17 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   var DEFAULT_DOCK_ORDER = [
     'start',
     'search',
+    'peripherals',
+    'system-stats',
+    'calendar',
     'running-apps',
     'pinned-apps',
-    'siri-ai',
-    'claude',
-    'codex',
     'music-player',
     'weather',
     'status-battery',
+    'siri-ai',
+    'claude',
+    'codex',
     'wifi',
     'bluetooth',
     'notifications',
@@ -3008,10 +3354,10 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   /* Profiles: Daily strictly matches the target non-slop dock layout from user reference photo */
   var DEFAULT_PROFILES = {
-    daily: ['start', 'search', 'running-apps', 'siri-ai', 'claude', 'codex', 'music-player', 'clock'],
-    work: ['start', 'search', 'running-apps', 'weather', 'status-battery', 'wifi', 'bluetooth', 'notifications', 'quick-notes', 'system-tray', 'clock'],
-    founder: ['start', 'search', 'claude', 'codex', 'running-apps', 'pinned-apps', 'siri-ai', 'music-player', 'wifi', 'system-tray', 'clock'],
-    focus: ['start', 'search', 'clock', 'quick-notes', 'music-player']
+    daily: ['start', 'search', 'peripherals', 'system-stats', 'calendar', 'running-apps', 'music-player', 'weather', 'clock'],
+    work: ['start', 'search', 'calendar', 'system-stats', 'running-apps', 'pinned-apps', 'weather', 'status-battery', 'wifi', 'bluetooth', 'notifications', 'quick-notes', 'clock'],
+    founder: ['start', 'search', 'claude', 'codex', 'system-stats', 'calendar', 'running-apps', 'pinned-apps', 'music-player', 'wifi', 'system-tray', 'clock'],
+    focus: ['start', 'search', 'calendar', 'system-stats', 'music-player', 'quick-notes', 'clock']
   };
 
   var PROFILES = Object.assign({}, DEFAULT_PROFILES);
@@ -3108,6 +3454,71 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     '</svg>';
   }
 
+  function generateSparklineSvg(history, peak, current) {
+    var w = 86;
+    var h = 26;
+    var pts = history.map(function (val, idx) {
+      var x = 4 + (idx / (history.length - 1)) * (w - 8);
+      var y = h - 4 - (val / 50) * (h - 8);
+      return { x: x, y: y, val: val };
+    });
+    var d = 'M ' + pts[0].x.toFixed(1) + ' ' + pts[0].y.toFixed(1);
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[i];
+      var p1 = pts[i + 1];
+      var mx = (p0.x + p1.x) / 2;
+      d += ' C ' + mx.toFixed(1) + ' ' + p0.y.toFixed(1) + ', ' + mx.toFixed(1) + ' ' + p1.y.toFixed(1) + ', ' + p1.x.toFixed(1) + ' ' + p1.y.toFixed(1);
+    }
+    var lastPt = pts[pts.length - 1];
+    var peakIdx = 0;
+    var peakVal = -1;
+    pts.forEach(function (p, i) {
+      if (p.val > peakVal) { peakVal = p.val; peakIdx = i; }
+    });
+    var peakPt = pts[peakIdx];
+    var areaPath = d + ' L ' + lastPt.x.toFixed(1) + ' ' + h + ' L ' + pts[0].x.toFixed(1) + ' ' + h + ' Z';
+
+    return '<svg class="dss-spark-svg" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true">' +
+      '<defs>' +
+        '<linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="#34d399" stop-opacity="0.38"/>' +
+          '<stop offset="100%" stop-color="#34d399" stop-opacity="0.0"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+      '<path d="' + areaPath + '" fill="url(#sparkGrad)"/>' +
+      '<path d="' + d + '" fill="none" stroke="#34d399" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<circle cx="' + peakPt.x.toFixed(1) + '" cy="' + peakPt.y.toFixed(1) + '" r="1.8" fill="#34d399"/>' +
+      '<text x="' + peakPt.x.toFixed(1) + '" y="' + Math.max(8, peakPt.y + 11).toFixed(1) + '" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">' + peakVal + '%</text>' +
+      '<circle cx="' + lastPt.x.toFixed(1) + '" cy="' + lastPt.y.toFixed(1) + '" r="2.2" fill="#38bdf8"/>' +
+      '<text x="' + (w - 2) + '" y="' + Math.max(7, lastPt.y - 2).toFixed(1) + '" font-size="7.5" font-weight="800" fill="#38bdf8" text-anchor="end">' + lastPt.val + '%</text>' +
+      '<text x="' + (w - 2) + '" y="' + Math.min(h - 1, lastPt.y + 7).toFixed(1) + '" font-size="5.5" font-weight="600" fill="rgba(255,255,255,0.6)" text-anchor="end">Now</text>' +
+      '<text x="4" y="' + (h - 2) + '" font-size="6" font-weight="600" fill="rgba(255,255,255,0.45)">30s</text>' +
+    '</svg>';
+  }
+
+  function renderBarsBox(w) {
+    return '<div class="dss-bars-box">' +
+      '<div class="dss-bar-row"><span>CPU</span><div class="dss-bar-track"><div class="dss-bar-fill cpu" style="width:' + w.cpu + '%"></div></div><span style="min-width:18px;text-align:right;">' + w.cpu + '%</span></div>' +
+      '<div class="dss-bar-row"><span>RAM</span><div class="dss-bar-track"><div class="dss-bar-fill ram" style="width:' + w.ram + '%"></div></div><span style="min-width:18px;text-align:right;">' + w.ram + '%</span></div>' +
+      '<div class="dss-bar-row"><span>SSD</span><div class="dss-bar-track"><div class="dss-bar-fill ssd" style="width:' + w.ssd + '%"></div></div><span style="min-width:18px;text-align:right;">' + w.ssd + '%</span></div>' +
+    '</div>';
+  }
+
+  function cycleMusicTrack(delta) {
+    var mw = WIDGETS['music-player'];
+    if (!mw || !mw.playlist || mw.playlist.length === 0) return;
+    mw.playlistIndex = (mw.playlistIndex + delta + mw.playlist.length) % mw.playlist.length;
+    var track = mw.playlist[mw.playlistIndex];
+    mw.trackTitle = track.title;
+    mw.artist = track.artist;
+    mw.title = track.title;
+    mw.sub = track.artist;
+    mw.isPlaying = true;
+    saveState();
+    renderDock();
+    showToast('Now Playing: ' + track.title + ' (' + track.artist + ')');
+  }
+
   function renderWidgetGlyph(w) {
     if (w.isClock) {
       if (w.clockMode === 'time') {
@@ -3117,6 +3528,26 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         return '<div style="display:flex;flex-direction:column;align-items:center;line-height:1.1;"><span style="font-size:12px;font-weight:700;color:#fff;">' + w.title + '</span><span style="font-size:8.5px;color:var(--text-2);">' + w.sub + '</span></div>';
       }
       return renderAnalogClockSvg();
+    }
+    if (w.isCalendar) {
+      return '<div class="dock-cal-card"><span class="dock-cal-day">' + escapeHtml(w.day) + '</span><span class="dock-cal-num">' + escapeHtml(w.date) + '</span></div>';
+    }
+    if (w.isPeripherals) {
+      return '<div class="dock-airpods-wrap">' +
+        '<svg class="dock-airpods-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M6 4a2.5 2.5 0 0 1 2.5 2.5v7a1.5 1.5 0 0 1-3 0V6.5A2.5 2.5 0 0 1 6 4z"/>' +
+          '<path d="M18 4a2.5 2.5 0 0 0-2.5 2.5v7a1.5 1.5 0 0 0 3 0V6.5A2.5 2.5 0 0 0 18 4z"/>' +
+          '<circle cx="6" cy="6.5" r="1" fill="currentColor"/>' +
+          '<circle cx="18" cy="6.5" r="1" fill="currentColor"/>' +
+        '</svg>' +
+        '<span class="dock-airpods-pct">' + w.batteryPct + '%</span>' +
+      '</div>';
+    }
+    if (w.isSystemStats) {
+      return '<div class="dss-left" style="gap:4px;flex-direction:column;align-items:center;">' +
+        '<span class="dss-badge">CPU</span>' +
+        '<span style="font-size:10px;font-weight:800;color:#fff;line-height:1;">' + w.cpu + '%</span>' +
+      '</div>';
     }
     if (w.isNotifications) {
       return '<span class="w-ico" style="position:relative;">' +
@@ -3249,6 +3680,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
             '<span class="dock-widget">' +
               '<span class="w-glyph-box">' +
                 app.icon +
+                (app.notifCount > 0 ? '<span class="app-notif-badge">' + app.notifCount + '</span>' : '') +
               '</span>' +
             '</span>' +
             '<span class="dock-dot"></span>' +
@@ -3288,30 +3720,76 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
       var width = getWidth(id);
       var shape = width > 52 ? 'rect' : 'square';
+      var isCustomExpanded = (shape === 'rect' && (w.isSystemStats || w.isMusicPlayer || w.isWeather));
 
-      html += '<button class="dock-slot" data-id="' + id + '" data-index="' + idx + '" data-shape="' + shape + '" style="--w:' + width + 'px" ' + (isEditMode ? 'draggable="true"' : 'draggable="false"') + ' type="button" aria-label="' + escapeHtml(w.title) + '">' +
-        '<span class="dock-widget">' +
-          '<span class="w-glyph-box">' +
-            renderWidgetGlyph(w) +
-          '</span>' +
-          (width > 52 ? (
-            w.isMusicPlayer ? (
-              '<span class="dw-stack">' +
-                '<span class="dw-strong">' + escapeHtml(w.isPlaying ? w.trackTitle : 'Spotify') + '</span>' +
-                '<span class="dw-sub">' + escapeHtml(w.isPlaying ? w.artist : 'Paused') + '</span>' +
-              '</span>' +
-              '<span class="dock-music-playbtn" data-music-play="1" title="' + (w.isPlaying ? 'Pause' : 'Play') + '">' +
+      var innerContent = '';
+      if (shape === 'rect') {
+        if (w.isSystemStats) {
+          innerContent = '<div class="dock-sys-stats-wrap" data-stats-toggle="1" title="Click to toggle sparkline / bars">' +
+            '<div class="dss-left">' +
+              '<span class="dss-badge">CPU</span>' +
+              '<div class="dss-data">' +
+                '<div class="dss-cpu-readout"><span>' + w.cpu + '</span><small>%</small></div>' +
+                '<div class="dss-sub">RAM ' + w.ram + '% · SSD ' + w.ssd + '%</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="dss-spark-box">' +
+              (w.statsMode === 'bars' ? renderBarsBox(w) : generateSparklineSvg(w.history, w.peak, w.cpu)) +
+            '</div>' +
+          '</div>';
+        } else if (w.isMusicPlayer) {
+          var curTrack = (w.playlist && w.playlist[w.playlistIndex]) ? w.playlist[w.playlistIndex] : { title: w.trackTitle, artist: w.artist, albumArt: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)' };
+          innerContent = '<div class="dock-music-expanded">' +
+            '<div class="dme-art" style="background:' + curTrack.albumArt + '" title="' + escapeHtml(curTrack.title) + '">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><circle cx="12" cy="12" r="10" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/><circle cx="12" cy="12" r="3" fill="#fff"/></svg>' +
+            '</div>' +
+            '<div class="dme-info">' +
+              '<div class="dme-title">' + escapeHtml(w.isPlaying ? curTrack.title : 'Spotify') + '</div>' +
+              '<div class="dme-artist">' + escapeHtml(w.isPlaying ? curTrack.artist : 'Paused') + '</div>' +
+            '</div>' +
+            '<div class="dme-controls">' +
+              '<button class="dme-btn" data-music-prev="1" type="button" title="Previous Track">' +
+                '<svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>' +
+              '</button>' +
+              '<button class="dme-btn play" data-music-play="1" type="button" title="' + (w.isPlaying ? 'Pause' : 'Play') + '">' +
                 '<svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">' +
                   (w.isPlaying ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>' : '<polygon points="6 4 20 12 6 20 6 4"/>') +
                 '</svg>' +
-              '</span>'
-            ) : (
-              '<span class="dw-stack">' +
-                '<span class="dw-strong">' + escapeHtml(w.title) + '</span>' +
-                '<span class="dw-sub">' + escapeHtml(w.sub) + '</span>' +
-              '</span>'
-            )
-          ) : '') +
+              '</button>' +
+              '<button class="dme-btn" data-music-next="1" type="button" title="Next Track">' +
+                '<svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><polygon points="13 5 22 12 13 19 13 5"/><polygon points="2 5 11 12 2 19 2 5"/></svg>' +
+              '</button>' +
+            '</div>' +
+          '</div>';
+        } else if (w.isWeather) {
+          innerContent = '<div class="dock-weather-expanded">' +
+            '<span class="dwe-icon">' +
+              '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#f0bd6a" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>' +
+            '</span>' +
+            '<span class="dwe-temp">' + w.temp + '°</span>' +
+            '<div class="dwe-details">' +
+              '<div class="dwe-row1">' + escapeHtml(w.condition) + ' · ↑' + w.high + '° ↓' + w.low + '°</div>' +
+              '<div class="dwe-row2">💧 ' + w.rainPct + '% · 💨 ' + w.windKph + 'km/h · ' + escapeHtml(w.city) + ' ▾</div>' +
+            '</div>' +
+          '</div>';
+        } else {
+          innerContent = '<span class="w-glyph-box">' +
+            renderWidgetGlyph(w) +
+          '</span>' +
+          '<span class="dw-stack">' +
+            '<span class="dw-strong">' + escapeHtml(w.title) + '</span>' +
+            '<span class="dw-sub">' + escapeHtml(w.sub) + '</span>' +
+          '</span>';
+        }
+      } else {
+        innerContent = '<span class="w-glyph-box">' +
+          renderWidgetGlyph(w) +
+        '</span>';
+      }
+
+      html += '<button class="dock-slot ' + (isCustomExpanded ? 'is-custom-expanded' : '') + '" data-id="' + id + '" data-index="' + idx + '" data-shape="' + shape + '" style="--w:' + width + 'px" ' + (isEditMode ? 'draggable="true"' : 'draggable="false"') + ' type="button" aria-label="' + escapeHtml(w.title) + '">' +
+        '<span class="dock-widget">' +
+          innerContent +
         '</span>' +
         '<span class="dw-resize-chip" data-resize-id="' + id + '" title="Resize Widget (' + width + 'px)">' +
           '<svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor"><path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-4zm13 0a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0 0 1h3.5zm-13 14a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-1 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 0-1h-3.5zm13 0a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h4z"/></svg>' +
@@ -3376,6 +3854,45 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
       /* Primary click interactions for widgets */
       slot.addEventListener('click', function (e) {
+        var prevTarget = e.target.closest('[data-music-prev]');
+        if (prevTarget) {
+          e.stopPropagation();
+          cycleMusicTrack(-1);
+          return;
+        }
+
+        var nextTarget = e.target.closest('[data-music-next]');
+        if (nextTarget) {
+          e.stopPropagation();
+          cycleMusicTrack(1);
+          return;
+        }
+
+        var playTarget = e.target.closest('[data-music-play]');
+        if (playTarget) {
+          e.stopPropagation();
+          var mw = WIDGETS['music-player'];
+          if (mw) {
+            mw.isPlaying = !mw.isPlaying;
+            saveState();
+            renderDock();
+            showToast(mw.isPlaying ? 'Now Playing: ' + mw.trackTitle : 'Playback Paused');
+          }
+          return;
+        }
+
+        var statsTarget = e.target.closest('[data-stats-toggle]');
+        if (statsTarget) {
+          e.stopPropagation();
+          var sw = WIDGETS['system-stats'];
+          if (sw) {
+            sw.statsMode = (sw.statsMode === 'bars') ? 'sparkline' : 'bars';
+            renderDock();
+            showToast('System Stats: switched to ' + sw.statsMode + ' mode');
+          }
+          return;
+        }
+
         var resizeTarget = e.target.closest('.dw-resize-chip');
         if (resizeTarget) {
           e.stopPropagation();
@@ -3417,6 +3934,31 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
           setTab('apps');
           if (typeof openCustomizerModal === 'function') openCustomizerModal();
           showToast('Select apps to pin from the catalog');
+          return;
+        }
+
+        if (id === 'system-stats') {
+          e.stopPropagation();
+          var ssw = WIDGETS['system-stats'];
+          if (ssw) {
+            ssw.statsMode = (ssw.statsMode === 'bars') ? 'sparkline' : 'bars';
+            renderDock();
+            showToast('System Stats: CPU ' + ssw.cpu + '% (Peak ' + ssw.peak + '%) · RAM ' + ssw.ram + '% · SSD ' + ssw.ssd + '%');
+          }
+          return;
+        }
+
+        if (id === 'calendar') {
+          e.stopPropagation();
+          var now = new Date();
+          showToast('Calendar: ' + now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+          return;
+        }
+
+        if (id === 'peripherals') {
+          e.stopPropagation();
+          var pw = WIDGETS['peripherals'];
+          showToast('AirPods Pro: ' + (pw ? pw.batteryPct : 34) + '% Battery (Connected)');
           return;
         }
 
@@ -4313,6 +4855,57 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   }
   setInterval(updateLiveClock, 1000);
   updateLiveClock();
+
+  /* Live Calendar Date Synchronization */
+  function updateLiveCalendar() {
+    var now = new Date();
+    var days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    var calWidget = WIDGETS['calendar'];
+    if (calWidget) {
+      calWidget.day = days[now.getDay()];
+      calWidget.date = String(now.getDate()).padStart(2, '0');
+      var calCard = rail.querySelector('.dock-slot[data-id="calendar"] .dock-cal-card');
+      if (calCard) {
+        var dayEl = calCard.querySelector('.dock-cal-day');
+        var numEl = calCard.querySelector('.dock-cal-num');
+        if (dayEl) dayEl.textContent = calWidget.day;
+        if (numEl) numEl.textContent = calWidget.date;
+      }
+    }
+  }
+  setInterval(updateLiveCalendar, 30000);
+  updateLiveCalendar();
+
+  /* Live System Stats Dynamic Telemetry */
+  function updateLiveSystemStats() {
+    var sw = WIDGETS['system-stats'];
+    if (!sw) return;
+    var delta = Math.round(Math.random() * 8 - 4);
+    var nextCpu = Math.max(10, Math.min(65, sw.cpu + delta));
+    sw.cpu = nextCpu;
+    if (nextCpu > sw.peak) sw.peak = nextCpu;
+    sw.history.shift();
+    sw.history.push(nextCpu);
+
+    var slot = rail.querySelector('.dock-slot[data-id="system-stats"]');
+    if (slot) {
+      var isRect = slot.dataset.shape === 'rect';
+      if (isRect) {
+        var readout = slot.querySelector('.dss-cpu-readout span');
+        if (readout) readout.textContent = sw.cpu;
+        var sparkBox = slot.querySelector('.dss-spark-box');
+        if (sparkBox) {
+          sparkBox.innerHTML = (sw.statsMode === 'bars')
+            ? renderBarsBox(sw)
+            : generateSparklineSvg(sw.history, sw.peak, sw.cpu);
+        }
+      } else {
+        var glyph = slot.querySelector('.w-glyph-box');
+        if (glyph) glyph.innerHTML = renderWidgetGlyph(sw);
+      }
+    }
+  }
+  setInterval(updateLiveSystemStats, 2500);
 
   /* 6. System Tray App Launchers */
   var trayAppTiles = document.querySelectorAll('.tray-app-tile');

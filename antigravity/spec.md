@@ -750,6 +750,62 @@ ProtonDock integrates the architecture and UI philosophy of **Kensaku** (`https:
 
 ---
 
+### 2.15 CoolDock & Docktor Live Telemetry Widgets Specification
+
+Inspired by CoolDock and Docktor v0.15.0, ProtonDock incorporates live telemetry and rich media capsules that bring desktop intelligence directly to the dock rail:
+
+1. **Live System Stats Widget (`system-stats`)**:
+   - **Visual Anatomy**:
+     - Capsule Width: `196px` (or `48px` in compact square mode). Height strictly locked to `48px`.
+     - Left Section: Mint green badge (`CPU`), bold CPU percentage readout (`18%`), sub-label displaying `RAM 58% · SSD 43%`.
+     - Right Section (Dual Telemetry Presentation):
+       - **Mode A (CoolDock Curved Sparkline)**: Live SVG smooth cubic bezier curve with translucent mint green gradient area fill (`stop-opacity="0.38"` to `0.0`), peak percentage indicator with target dot (`36%`), baseline timeframe (`30s`), and current value endpoint with pulsing cyan dot (`21% Now`).
+       - **Mode B (Docktor Horizontal Stacked Bars)**: Three discrete horizontal progress tracks with high-contrast color fills: CPU (Yellow `#facc15`), RAM (Rose Magenta `#f43f5e`), and SSD (Slate White `#e2e8f0`).
+     - **Interactivity**: Clicking the widget directly on the dock toggles between curved sparkline and horizontal bars.
+   - **Rust Backend**:
+     - Crate: `sysinfo` with background polling thread every 2000ms.
+     - Metrics: CPU load per core aggregated, RAM physical usage percentage, disk I/O activity.
+     - IPC Command: `invoke('get_system_telemetry')` -> `{ cpu: number, ram: number, ssd: number, history: number[], peak: number }`.
+
+2. **Apple Calendar Squircle Tile (`calendar`)**:
+   - **Visual Anatomy**:
+     - Format: Discrete 48px square tile featuring an Apple Calendar squircle card (`34px x 34px`) with crimson red gradient (`#e11d48` to `#be123c`), 1px inset specular highlight (`rgba(255, 255, 255, 0.35)`), and ambient drop shadow (`rgba(190, 18, 60, 0.4)`).
+     - Typography: Uppercase day abbreviation (`FRI`, `SUN`, `MON`) with bold tracking (`0.06em`) above an `16px` extra-bold date numeral (`16`, `08`).
+     - Real-Time Synchronization: Automatically updates at midnight and on system time adjustments via native OS date APIs without polling overhead.
+
+3. **AirPods / Peripherals Battery Tile (`peripherals`)**:
+   - **Visual Anatomy**:
+     - Format: Discrete 48px square tile featuring a dual-stem earbuds vector icon in neon teal (`#34d399`) and a crisp bold battery percentage readout (`34%`).
+   - **Rust Backend**:
+     - Native API: Windows Runtime `Windows.Devices.Bluetooth.GenericAttributeProfile` reading GATT Battery Service UUID `0x180F` (Characteristic `0x2A19`).
+     - Supports AirPods Pro, Surface Earbuds, Galaxy Buds, and Bluetooth mice/keyboards.
+
+4. **Running Apps Live Notification Badges**:
+   - **Visual Anatomy**:
+     - Format: Apple-style high-contrast red pill badge (`#ff3b30`) with white bold numeral (`212`, `2`, `1`) anchored to the top-right corner (`top: -2px; right: -2px;`) of each discrete 48px square app tile.
+     - Sizing: `min-width: 14px; height: 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25)`.
+   - **Rust Backend**:
+     - Native API: WinRT `Windows.UI.Notifications.Management.UserNotificationListener` enumerating active badge notifications per AppUserModelID.
+
+5. **Now Playing Media Capsule (`music-player`)**:
+   - **Visual Anatomy**:
+     - Capsule Width: `220px` (or `48px` square). Height strictly locked to `48px`.
+     - Left: `32px x 32px` rounded album artwork thumbnail with subtle inner shadow.
+     - Center: Track title (`Take a Walk`) in bold white and artist (`Passion Pit · Gossamer`) in secondary white with horizontal ellipsis truncation.
+     - Right: Interactive transport buttons (`<<`, `||`/`▶`, `>>`) with hover feedback. Clicking next/prev steps through the user's active playlist; clicking play/pause toggles playback instantly.
+   - **Rust Backend**:
+     - Windows GSMTC (`GlobalSystemMediaTransportControlsSessionManager`) session binding.
+
+6. **Rich Live Weather Capsule (`weather`)**:
+   - **Visual Anatomy**:
+     - Capsule Width: `200px` (or `48px` square). Height strictly locked to `48px`.
+     - Left: Weather condition glyph with bold temperature numeral (`24°` or `61°F`).
+     - Right Stack: Row 1 displays condition and range (`Clear Sky · ↑28° ↓19°`); Row 2 displays atmospheric metrics (`💧 19% · 💨 11km/h · SF ▾`).
+   - **Rust Backend**:
+     - Open-Meteo local cached weather client with 15-minute refresh interval.
+
+---
+
 ## 3. Motion & Animation Standards (Apple Design System)
 
 1. **Apple Two-Parameter Spring Dynamics**:
