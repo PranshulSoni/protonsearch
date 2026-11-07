@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProtonDock - Customizable Dock Preview</title>
+<style>
+/* ==========================================================================
+   PROTONDOCK DESIGN SYSTEM TOKENS
+   --------------------------------------------------------------------------
+   Height Invariant: All widgets strictly share the exact same height (--tile-h).
+   Square widgets have width = --tile-h (48px x 48px).
+   Rectangle widgets have the SAME height (--tile-h = 48px), while their
+   width expands from 48px up to 220px via in-dock customization.
+   ========================================================================== */
+
+:root {
+  /* ---- Sizing Invariant: 48px square height for all widgets ---- */
+  --tile-h: 48px;
+  --tile-square-w: 48px;
+  --tile-radius: 12px;
+  --dock-gap: 6px;
+  --dock-pad: 6px;
+  --dock-radius: 18px;
+
+  /* ---- Surfaces: Deep Tahoe Glass ---- */
+  --rail-top: rgba(22, 26, 33, 0.94);
+  --rail-mid: rgba(14, 17, 22, 0.95);
+  --rail-bottom: rgba(10, 12, 16, 0.96);
+  --border: rgba(255, 255, 255, 0.085);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --tile-bg: rgba(255, 255, 255, 0.05);
+  --tile-border: rgba(255, 255, 255, 0.075);
+  --tile-hover-bg: rgba(255, 255, 255, 0.10);
+  --tile-hover-border: rgba(255, 255, 255, 0.20);
+  --blur: blur(28px) saturate(145%);
+
+  /* ---- Colors ---- */
+  --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  --text: #f0f3f6;
+  --text-2: #9ea5b0;
+  --text-3: #6b7280;
+  --glyph: #cbd3dc;
+  --win-blue: #60cdff;
+  --spotify-green: #1ed760;
+  --vscode-blue: #0078d7;
+  --terminal-green: #6ee7b7;
+  --claude-orange: #d97706;
+  --ring-blue: #74b7ff;
+  --clock-orange: #f59c35;
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --speed-tile: 160ms;
+  --speed-rail: 240ms;
+  --speed-hover: 140ms;
+  --mag-strength: 0.22;
+  --mag-radius: 86px;
+  --lift: -4px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-stack);
+  color: var(--text);
+  background: #080a0e;
+}
+
+/* Neutral desktop backdrop */
+.desktop-wallpaper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(1100px 700px at 50% -10%, #1c2230 0%, rgba(28, 34, 48, 0) 62%),
+    radial-gradient(900px 600px at 80% 80%, #151a24 0%, rgba(21, 26, 36, 0) 58%),
+    linear-gradient(160deg, #0d1017 0%, #080a0e 100%);
+}
+
+.desktop-hint {
+  position: fixed;
+  top: 18px;
+  left: 22px;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.desktop-hint h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.desktop-hint h1 .badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(96, 205, 255, 0.12);
+  color: var(--win-blue);
+  border: 1px solid rgba(96, 205, 255, 0.25);
+}
+.desktop-hint p {
+  max-width: 560px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+/* ==========================================================================
+   DOCK STAGE, SHELF AND RAIL
+   ========================================================================== */
+
+.dock-stage {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dock-cluster {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100vw - 20px);
+  pointer-events: none;
+}
+
+.dock-shelf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* Profile pill */
+.profile-pill {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(16, 19, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+.profile-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 600 10.5px/1 var(--font-stack);
+  padding: 6px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 130ms ease-out, background 130ms ease-out;
+}
+.profile-tab:hover { color: var(--text); }
+.profile-tab:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
+}
+.profile-tab.is-active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Style switch pill: Capsules vs Lines */
+.style-pill {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(16, 19, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.style-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 600 10px/1 var(--font-stack);
+  padding: 6px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 130ms ease-out, background 130ms ease-out;
+}
+.style-btn:hover { color: var(--text); }
+.style-btn.is-active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+/* Customize pill */
+.customize-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 29px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(16, 19, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-2);
+  font: 600 10.5px/1 var(--font-stack);
+  cursor: pointer;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: color 140ms ease-out, border-color 140ms ease-out, background 140ms ease-out;
+}
+.customize-pill:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(26, 30, 39, 0.94);
+}
+.customize-pill svg { display: block; }
+
+/* The Dock Rail: fixed height derived from locked tile-h */
+.dock-rail {
+  pointer-events: auto;
+  height: calc(var(--tile-h) + var(--dock-pad) * 2);
+  display: flex;
+  align-items: center;
+  gap: var(--dock-gap);
+  padding: var(--dock-pad);
+  border-radius: var(--dock-radius);
+  background: linear-gradient(180deg, var(--rail-top) 0%, var(--rail-mid) 60%, var(--rail-bottom) 100%);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.65),
+    0 4px 14px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-sizing: border-box;
+  max-width: calc(100vw - 20px);
+  overflow: visible;
+  transition: width var(--speed-rail) var(--ease), gap var(--speed-rail) var(--ease);
+}
+
+/* Offscreen clone for width measuring */
+.dock-rail.is-measuring {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  width: max-content;
+  transition: none;
+}
+
+/* ==========================================================================
+   SLOTS AND WIDGET SURFACES: CAPSULES VS LINES
+   ========================================================================== */
+
+.dock-slot {
+  position: relative;
+  flex: 0 0 auto;
+  height: var(--tile-h);
+  width: var(--w, var(--tile-square-w));
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--tile-radius);
+  transition: width var(--speed-rail) var(--ease);
+}
+.dock-slot[hidden] { display: none; }
+.dock-slot:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 3px;
+}
+
+/* The Widget Surface: strictly locked height */
+.dock-widget {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--tile-h);
+  width: 100%;
+  border-radius: var(--tile-radius);
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 3px 8px rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  overflow: hidden;
+  transform: translateY(var(--lift-y, 0px)) scale(var(--mag, 1));
+  transform-origin: bottom center;
+  transition:
+    transform 120ms ease-out,
+    background var(--speed-hover) ease-out,
+    border-color var(--speed-hover) ease-out,
+    box-shadow var(--speed-hover) ease-out;
+  will-change: transform;
+}
+
+.dock-slot:hover .dock-widget {
+  --lift-y: var(--lift);
+  background: var(--tile-hover-bg);
+  border-color: var(--tile-hover-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 22px rgba(0, 0, 0, 0.38);
+}
+
+/* Lines display style: transparent tiles with divider lines */
+body[data-display-style="line"] .dock-rail {
+  gap: 0;
+}
+body[data-display-style="line"] .dock-widget {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+body[data-display-style="line"] .dock-slot:hover .dock-widget {
+  background: rgba(255, 255, 255, 0.05);
+}
+body[data-display-style="line"] .dock-slot:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.09);
+  pointer-events: none;
+}
+
+/* Square vs Rectangle layout internals */
+.dock-slot[data-shape="square"] .dock-widget {
+  justify-content: center;
+  padding: 0;
+}
+.dock-slot[data-shape="rect"] .dock-widget {
+  justify-content: flex-start;
+  padding: 0 10px;
+  gap: 8px;
+}
+
+/* Left glyph box inside widget */
+.w-glyph-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  position: relative;
+  width: var(--tile-square-w);
+  height: var(--tile-h);
+}
+.dock-slot[data-shape="rect"] .w-glyph-box {
+  width: 26px;
+  height: 26px;
+}
+
+.w-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--glyph);
+}
+.w-ico svg { display: block; }
+
+/* Running indicator dot (at bottom of slot) */
+.dock-dot {
+  position: absolute;
+  left: 50%;
+  bottom: 3.5px;
+  width: 3.5px;
+  height: 3.5px;
+  margin-left: -1.75px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+  transition: opacity 120ms ease-out;
+}
+
+/* Animated Equalizer bars for media */
+.dock-eq {
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 6px;
+  pointer-events: none;
+}
+.dock-eq i {
+  width: 2px;
+  height: 3px;
+  background: var(--spotify-green);
+  border-radius: 1px;
+  animation: eq-bounce 650ms infinite alternate ease-in-out;
+}
+.dock-eq i:nth-child(2) { animation-delay: -220ms; }
+.dock-eq i:nth-child(3) { animation-delay: -440ms; }
+@keyframes eq-bounce {
+  0%   { height: 2px; }
+  100% { height: 6px; }
+}
+
+/* Circular progress ring for Claude & ChatGPT */
+.dock-ring-wrap {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+.dock-ring-svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.dock-ring-svg circle {
+  fill: none;
+  stroke-width: 2.4;
+}
+.dock-ring-svg .ring-bg {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+.dock-ring-svg .ring-fill {
+  stroke: var(--ring-blue);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 200ms ease;
+}
+.dock-ring-wrap .ring-glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* Analog Clock face */
+.dock-clock-analog {
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+
+/* Text Stack (Visible in rectangle mode) */
+.dw-stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.5px;
+  min-width: 0;
+  overflow: hidden;
+}
+.dock-slot[data-shape="square"] .dw-stack {
+  display: none;
+}
+.dw-strong {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: #f3f5f7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dw-sub {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Quick width expand indicator on hover */
+.dw-expand-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-2);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  cursor: pointer;
+  z-index: 5;
+}
+.dock-slot:hover .dw-expand-btn {
+  display: flex;
+}
+.dw-expand-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* Tooltips */
+.dock-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%) translateY(4px);
+  padding: 4px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  font: 500 11px/15px var(--font-stack);
+  color: #fff;
+  background: rgba(14, 16, 22, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  z-index: 20;
+}
+.dock-slot:hover .dock-tip,
+.dock-slot:focus-visible .dock-tip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ==========================================================================
+   CUSTOMIZE DRAWER / MODAL
+   ========================================================================== */
+
+.cust-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.cust-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cust-modal {
+  width: 620px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 60px);
+  background: linear-gradient(180deg, rgba(24, 28, 36, 0.98) 0%, rgba(16, 18, 24, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(14px) scale(0.97);
+  transition: transform 220ms var(--ease);
+}
+.cust-backdrop.is-open .cust-modal {
+  transform: translateY(0) scale(1);
+}
+
+.cust-head {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.cust-title-group h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.cust-title-group p {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.cust-close {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-2);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 120ms, background 120ms;
+}
+.cust-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.cust-toolbar {
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cust-action-btn {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font: 600 11px/1 var(--font-stack);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 120ms, border-color 120ms;
+}
+.cust-action-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.cust-action-btn.is-accent {
+  background: rgba(96, 205, 255, 0.15);
+  border-color: rgba(96, 205, 255, 0.35);
+  color: var(--win-blue);
+}
+.cust-action-btn.is-accent:hover {
+  background: rgba(96, 205, 255, 0.25);
+}
+
+.cust-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cust-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  transition: background 120ms, border-color 120ms;
+}
+.cust-item:hover {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.ci-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.ci-info {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.ci-title {
+  font-size: 12px;
+  font-weight: 650;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ci-sub {
+  font-size: 10px;
+  color: var(--text-2);
+  margin-top: 1px;
+}
+
+/* Preset width pills inside customize row */
+.ci-presets {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ci-preset-btn {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-2);
+  font: 600 10px/1 var(--font-stack);
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.ci-preset-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.ci-preset-btn.is-active {
+  background: rgba(96, 205, 255, 0.2);
+  border-color: rgba(96, 205, 255, 0.4);
+  color: #fff;
+}
+
+/* Slider control */
+.ci-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 130px;
+}
+.ci-slider {
+  appearance: none;
+  width: 80px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  outline: none;
+  cursor: pointer;
+}
+.ci-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 100ms;
+}
+.ci-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+.ci-val-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Order buttons */
+.ci-order-btns {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.ci-order-btn {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-2);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: background 120ms, color 120ms;
+}
+.ci-order-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.ci-order-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+</style>
+</head>
+<body data-display-style="capsule">
+
+<div class="desktop-wallpaper"></div>
+
+<header class="desktop-hint">
+  <h1>ProtonDock <span class="badge">Square Sizing System</span></h1>
+  <p>All widgets strictly share a small 48px square height. Widgets can expand into rectangles at the exact same height. Click <strong>Customize</strong> or double-click any tile to change its width.</p>
+</header>
+
+<div class="dock-stage">
+  <div class="dock-cluster">
+
+    <!-- Top Shelf: Profile pills, Style switcher, and Customize button -->
+    <div class="dock-shelf">
+      <div class="profile-pill" role="group" aria-label="Dock profiles">
+        <button class="profile-tab is-active" data-profile="photo" type="button" aria-pressed="true">Photo Match</button>
+        <button class="profile-tab" data-profile="work" type="button" aria-pressed="false">Work</button>
+        <button class="profile-tab" data-profile="dev" type="button" aria-pressed="false">Dev</button>
+        <button class="profile-tab" data-profile="focus" type="button" aria-pressed="false">Focus</button>
+      </div>
+
+      <div class="style-pill" role="group" aria-label="Display style">
+        <button class="style-btn is-active" data-style="capsule" type="button" aria-pressed="true">
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor"><rect x="1" y="3" width="6" height="10" rx="3"/><rect x="9" y="3" width="6" height="10" rx="3"/></svg>
+          Capsules
+        </button>
+        <button class="style-btn" data-style="line" type="button" aria-pressed="false">
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="1" y1="8" x2="15" y2="8"/><line x1="8" y1="2" x2="8" y2="14"/></svg>
+          Lines
+        </button>
+      </div>
+
+      <button class="customize-pill" id="openCustomizerBtn" type="button" aria-label="Customize dock widgets and width">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <path d="M4 7h9M17 7h3M4 17h3M11 17h9"/>
+          <circle cx="15" cy="7" r="2"/>
+          <circle cx="9" cy="17" r="2"/>
+        </svg>
+        <span>Customize</span>
+      </button>
+    </div>
+
+    <!-- The Dock Rail: Contains the 11 widgets matching user photo -->
+    <nav class="dock-rail" id="dockRail" aria-label="Dock widgets"></nav>
+
+  </div>
+</div>
+
+<!-- ==========================================================================
+     CUSTOMIZER MODAL (Width customization, reorder, square/rect presets)
+     ========================================================================== -->
+<div class="cust-backdrop" id="custModal" role="dialog" aria-modal="true" aria-label="Customize Dock Widgets">
+  <div class="cust-modal">
+    <div class="cust-head">
+      <div class="cust-title-group">
+        <h2>Dock Widget Width & Sizing</h2>
+        <p>All widgets are locked to a compact 48px square height. Expand any widget horizontally into a rectangle without changing dock height.</p>
+      </div>
+      <button class="cust-close" id="closeCustomizerBtn" type="button" aria-label="Close customizer">&times;</button>
+    </div>
+
+    <div class="cust-toolbar">
+      <button class="cust-action-btn is-accent" id="allSquareBtn" type="button" title="Set every widget to 48px square matching the photo">
+        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="10" height="10" rx="2"/></svg>
+        <span>All Square (Photo Match)</span>
+      </button>
+      <button class="cust-action-btn" id="allCompactBtn" type="button" title="Set widgets with text to 120px rectangle">
+        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="14" height="10" rx="2"/></svg>
+        <span>Expand Rich Rectangles</span>
+      </button>
+      <button class="cust-action-btn" id="resetDefaultsBtn" type="button" title="Reset all widths to initial defaults">
+        <span>Reset Defaults</span>
+      </button>
+    </div>
+
+    <div class="cust-body" id="custWidgetList">
+      <!-- Injected dynamically by JavaScript -->
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==========================================================================
+     WIDGET CATALOG & DEFINITIONS
+     Exact match for the 11 widgets in the photo + support for rich rectangular text
+     ========================================================================== */
+
+  var WIDGETS = {
+    start: {
+      id: 'start',
+      title: 'Windows Start',
+      sub: 'Windows 11',
+      defaultWidth: 48,
+      iconSvg: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="m3 5 8-1v8H3zm10-1.3L22 2v10h-9zM3 14h8v8l-8-1zm10 0h9v10l-9-1.5z" fill="var(--win-blue)"/></svg>',
+      hasDot: false
+    },
+    search: {
+      id: 'search',
+      title: 'ProtonSearch',
+      sub: 'Alt + Space',
+      defaultWidth: 48,
+      iconSvg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 4.5 4.5"/></svg>',
+      hasDot: false
+    },
+    'app-vscode': {
+      id: 'app-vscode',
+      title: 'Visual Studio Code',
+      sub: 'Sidebar-Bridge.tsx',
+      defaultWidth: 48,
+      iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="m18.4 2.6-9.7 8.2L3.6 7.4 1.5 8.7l4.8 3.9-4.8 3.9 2.1 1.3 5.1-3.4 9.7 8.2 4.4-2V4.6z" fill="#0078d7"/><path d="m18.4 2.6-7.8 7.3 7.8 7.3 4.4-2.2V4.6z" fill="#29a8ff"/></svg>',
+      hasDot: true
+    },
+    'app-terminal': {
+      id: 'app-terminal',
+      title: 'Terminal',
+      sub: 'zsh - 2 windows',
+      defaultWidth: 48,
+      iconSvg: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14181f"/><path d="m6.5 8 4 4-4 4M12.5 16H18" stroke="var(--terminal-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>',
+      hasDot: true
+    },
+    'app-chrome': {
+      id: 'app-chrome',
+      title: 'Google Chrome',
+      sub: '4 tabs open',
+      defaultWidth: 48,
+      iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#4285f4"/><path d="M12 2a10 10 0 0 1 8.66 5H12z" fill="#ea4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5z" fill="#fbbc05"/><path d="M12 22A10 10 0 0 1 3.34 7H12z" fill="#34a853"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>',
+      hasDot: true
+    },
+    'app-spotify': {
+      id: 'app-spotify',
+      title: 'Spotify',
+      sub: 'Desktop Client',
+      defaultWidth: 48,
+      iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
+      hasDot: true
+    },
+    agent: {
+      id: 'agent',
+      title: 'AI Agent',
+      sub: 'Workspace Ready',
+      defaultWidth: 48,
+      iconSvg: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3.5"/><path d="M12 3.4V7M8.5 12h.01M15.5 12h.01M9 15.5h6"/></svg>',
+      hasDot: false
+    },
+    claude: {
+      id: 'claude',
+      title: 'Claude 3.7',
+      sub: '70% Session',
+      defaultWidth: 48,
+      isRing: true,
+      ringPct: 70,
+      ringColor: '#74b7ff',
+      glyphColor: '#d97706',
+      iconSvg: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg>',
+      hasDot: false
+    },
+    chatgpt: {
+      id: 'chatgpt',
+      title: 'ChatGPT-4o',
+      sub: '45% Session',
+      defaultWidth: 48,
+      isRing: true,
+      ringPct: 45,
+      ringColor: '#74b7ff',
+      glyphColor: '#60cdff',
+      iconSvg: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.9 20 7.4v9.2L12 21.1 4 16.6V7.4z"/><path d="M8.3 8.9h7.4M8.3 12h7.4M8.3 15.1h7.4" opacity=".65"/></svg>',
+      hasDot: false
+    },
+    media: {
+      id: 'media',
+      title: 'Night Drive',
+      sub: 'Playing - Spotify',
+      defaultWidth: 48,
+      isMedia: true,
+      iconSvg: '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>',
+      hasDot: false
+    },
+    clock: {
+      id: 'clock',
+      title: '20:36',
+      sub: 'Sunday 08',
+      defaultWidth: 48,
+      isClock: true,
+      hasDot: false
+    }
+  };
+
+  /* Exact initial layout matching the user photo: all 11 widgets in sequence */
+  var PHOTO_LAYOUT = [
+    'start',
+    'search',
+    'app-vscode',
+    'app-terminal',
+    'app-chrome',
+    'app-spotify',
+    'agent',
+    'claude',
+    'chatgpt',
+    'media',
+    'clock'
+  ];
+
+  /* Profiles map */
+  var PROFILES = {
+    photo: PHOTO_LAYOUT.slice(),
+    work: ['start', 'search', 'app-vscode', 'app-terminal', 'claude', 'chatgpt', 'agent', 'clock'],
+    dev: ['start', 'search', 'app-vscode', 'app-terminal', 'app-chrome', 'agent', 'clock'],
+    focus: ['start', 'search', 'app-vscode', 'media', 'clock']
+  };
+
+  /* Current profile & widths state */
+  var activeProfile = 'photo';
+  var widgetOrder = PHOTO_LAYOUT.slice();
+  var customWidths = {};
+
+  /* Load stored customizations if present */
+  try {
+    var stored = localStorage.getItem('protondock_preview_state');
+    if (stored) {
+      var parsed = JSON.parse(stored);
+      if (parsed.customWidths) customWidths = parsed.customWidths;
+      if (parsed.activeProfile && PROFILES[parsed.activeProfile]) activeProfile = parsed.activeProfile;
+      if (parsed.displayStyle) document.body.setAttribute('data-display-style', parsed.displayStyle);
+    }
+  } catch (e) {
+    /* Ignore storage errors */
+  }
+
+  function getWidth(id) {
+    if (customWidths[id] != null) return customWidths[id];
+    return WIDGETS[id] ? WIDGETS[id].defaultWidth : 48;
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem('protondock_preview_state', JSON.stringify({
+        customWidths: customWidths,
+        activeProfile: activeProfile,
+        displayStyle: document.body.getAttribute('data-display-style') || 'capsule'
+      }));
+    } catch (e) {}
+  }
+
+  /* ==========================================================================
+     RENDER FUNCTIONS
+     ========================================================================== */
+
+  var rail = document.getElementById('dockRail');
+  var rootStyle = getComputedStyle(document.documentElement);
+  var MAG_STRENGTH = parseFloat(rootStyle.getPropertyValue('--mag-strength')) || 0.22;
+  var MAG_RADIUS = parseFloat(rootStyle.getPropertyValue('--mag-radius')) || 86;
+
+  function renderAnalogClockSvg() {
+    return '<svg class="dock-clock-analog" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">' +
+      '<circle cx="16" cy="16" r="14.5" fill="#ffffff" stroke="none" />' +
+      '<g stroke="#1a1d24" stroke-width="1.1" stroke-linecap="round">' +
+        '<line x1="16" y1="3" x2="16" y2="5" />' +
+        '<line x1="16" y1="27" x2="16" y2="29" />' +
+        '<line x1="3" y1="16" x2="5" y2="16" />' +
+        '<line x1="27" y1="16" x2="29" y2="16" />' +
+        '<line x1="9.5" y1="4.7" x2="10.5" y2="6.4" />' +
+        '<line x1="22.5" y1="27.3" x2="21.5" y2="25.6" />' +
+        '<line x1="22.5" y1="4.7" x2="21.5" y2="6.4" />' +
+        '<line x1="9.5" y1="27.3" x2="10.5" y2="25.6" />' +
+        '<line x1="4.7" y1="9.5" x2="6.4" y2="10.5" />' +
+        '<line x1="27.3" y1="22.5" x2="25.6" y2="21.5" />' +
+        '<line x1="27.3" y1="9.5" x2="25.6" y2="10.5" />' +
+        '<line x1="4.7" y1="22.5" x2="6.4" y2="21.5" />' +
+      '</g>' +
+      '<line x1="16" y1="16" x2="11" y2="10" stroke="#121418" stroke-width="1.8" stroke-linecap="round" />' +
+      '<line x1="16" y1="16" x2="21" y2="8" stroke="#121418" stroke-width="1.3" stroke-linecap="round" />' +
+      '<circle cx="16" cy="16" r="1.6" fill="var(--clock-orange)" />' +
+      '<line x1="16" y1="17" x2="16" y2="5.5" stroke="var(--clock-orange)" stroke-width="0.9" stroke-linecap="round" />' +
+    '</svg>';
+  }
+
+  function renderWidgetGlyph(w) {
+    if (w.isClock) {
+      return renderAnalogClockSvg();
+    }
+    if (w.isRing) {
+      var circumference = 2 * Math.PI * 13; /* ~81.68 */
+      var offset = circumference - (circumference * w.ringPct / 100);
+      return '<div class="dock-ring-wrap">' +
+        '<svg class="dock-ring-svg" viewBox="0 0 34 34" width="28" height="28">' +
+          '<circle class="ring-bg" cx="17" cy="17" r="13" />' +
+          '<circle class="ring-fill" cx="17" cy="17" r="13" stroke="' + w.ringColor + '" stroke-dasharray="' + circumference.toFixed(2) + '" stroke-dashoffset="' + offset.toFixed(2) + '" />' +
+        '</svg>' +
+        '<span class="ring-glyph" style="color:' + w.glyphColor + '">' + w.iconSvg + '</span>' +
+      '</div>';
+    }
+    if (w.isMedia) {
+      return '<div class="w-ico">' + w.iconSvg + '</div>' +
+        '<span class="dock-eq"><i></i><i></i><i></i></span>';
+    }
+    return '<span class="w-ico">' + w.iconSvg + '</span>';
+  }
+
+  function renderDock() {
+    var list = PROFILES[activeProfile] || PHOTO_LAYOUT;
+    var html = '';
+
+    list.forEach(function (id) {
+      var w = WIDGETS[id];
+      if (!w) return;
+      var width = getWidth(id);
+      var shape = width <= 52 ? 'square' : 'rect';
+
+      html += '<button class="dock-slot" data-id="' + id + '" data-shape="' + shape + '" style="--w:' + width + 'px" type="button" aria-label="' + w.title + '">' +
+        '<span class="dock-widget">' +
+          '<span class="w-glyph-box">' +
+            renderWidgetGlyph(w) +
+          '</span>' +
+          '<span class="dw-stack">' +
+            '<span class="dw-strong">' + w.title + '</span>' +
+            '<span class="dw-sub">' + w.sub + '</span>' +
+          '</span>' +
+          '<span class="dw-expand-btn" title="Toggle Square / Rectangle" data-toggle-id="' + id + '">&#x2194;</span>' +
+        '</span>' +
+        (w.hasDot ? '<span class="dock-dot"></span>' : '') +
+        '<span class="dock-tip">' + w.title + (shape === 'rect' ? ' - ' + w.sub : '') + '</span>' +
+      '</button>';
+    });
+
+    rail.innerHTML = html;
+    attachWidgetEvents();
+  }
+
+  function attachWidgetEvents() {
+    var slots = rail.querySelectorAll('.dock-slot');
+    slots.forEach(function (slot) {
+      var id = slot.dataset.id;
+
+      /* Double click toggles between 48px square and 124px rectangle */
+      slot.addEventListener('dblclick', function (e) {
+        e.stopPropagation();
+        toggleWidgetWidth(id);
+      });
+
+      /* Expand button click */
+      var expandBtn = slot.querySelector('.dw-expand-btn');
+      if (expandBtn) {
+        expandBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          toggleWidgetWidth(id);
+        });
+      }
+    });
+  }
+
+  function toggleWidgetWidth(id) {
+    var current = getWidth(id);
+    var next = current <= 52 ? 124 : 48;
+    customWidths[id] = next;
+    saveState();
+    renderDock();
+    updateCustomizerList();
+  }
+
+  /* ==========================================================================
+     POINTER MAGNIFICATION
+     ========================================================================== */
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  function magnify(event) {
+    if (reduceMotion.matches) return;
+    var slots = rail.querySelectorAll('.dock-slot');
+    slots.forEach(function (slot) {
+      var rect = slot.getBoundingClientRect();
+      var center = rect.left + rect.width / 2;
+      var falloff = Math.max(0, 1 - Math.abs(event.clientX - center) / MAG_RADIUS);
+      var scale = 1 + MAG_STRENGTH * falloff * falloff;
+      var widget = slot.querySelector('.dock-widget');
+      if (widget) {
+        widget.style.setProperty('--mag', scale.toFixed(3));
+      }
+    });
+  }
+
+  function resetMagnify() {
+    var slots = rail.querySelectorAll('.dock-slot');
+    slots.forEach(function (slot) {
+      var widget = slot.querySelector('.dock-widget');
+      if (widget) widget.style.removeProperty('--mag');
+    });
+  }
+
+  rail.addEventListener('pointermove', magnify);
+  rail.addEventListener('pointerleave', resetMagnify);
+  rail.addEventListener('blur', resetMagnify, true);
+
+  /* ==========================================================================
+     CUSTOMIZER MODAL CONTROLS
+     ========================================================================== */
+
+  var custModal = document.getElementById('custModal');
+  var openCustomizerBtn = document.getElementById('openCustomizerBtn');
+  var closeCustomizerBtn = document.getElementById('closeCustomizerBtn');
+  var custWidgetList = document.getElementById('custWidgetList');
+  var allSquareBtn = document.getElementById('allSquareBtn');
+  var allCompactBtn = document.getElementById('allCompactBtn');
+  var resetDefaultsBtn = document.getElementById('resetDefaultsBtn');
+
+  function openCustomizer() {
+    custModal.classList.add('is-open');
+    updateCustomizerList();
+  }
+
+  function closeCustomizer() {
+    custModal.classList.remove('is-open');
+  }
+
+  openCustomizerBtn.addEventListener('click', openCustomizer);
+  closeCustomizerBtn.addEventListener('click', closeCustomizer);
+  custModal.addEventListener('click', function (e) {
+    if (e.target === custModal) closeCustomizer();
+  });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && custModal.classList.contains('is-open')) {
+      closeCustomizer();
+    }
+  });
+
+  function updateCustomizerList() {
+    var list = PROFILES[activeProfile] || PHOTO_LAYOUT;
+    var html = '';
+
+    list.forEach(function (id, idx) {
+      var w = WIDGETS[id];
+      if (!w) return;
+      var width = getWidth(id);
+
+      html += '<div class="cust-item" data-id="' + id + '">' +
+        '<div class="ci-icon-box">' +
+          w.iconSvg +
+        '</div>' +
+        '<div class="ci-info">' +
+          '<div class="ci-title">' + w.title + '</div>' +
+          '<div class="ci-sub">' + (width <= 52 ? 'Square (48px)' : 'Rectangle (' + width + 'px)') + '</div>' +
+        '</div>' +
+        '<div class="ci-presets">' +
+          '<button class="ci-preset-btn ' + (width === 48 ? 'is-active' : '') + '" data-set-width="48">Square 48px</button>' +
+          '<button class="ci-preset-btn ' + (width === 96 ? 'is-active' : '') + '" data-set-width="96">96px</button>' +
+          '<button class="ci-preset-btn ' + (width === 130 ? 'is-active' : '') + '" data-set-width="130">130px</button>' +
+          '<button class="ci-preset-btn ' + (width === 180 ? 'is-active' : '') + '" data-set-width="180">180px</button>' +
+        '</div>' +
+        '<div class="ci-slider-wrap">' +
+          '<input class="ci-slider" type="range" min="48" max="220" step="2" value="' + width + '" data-slider-id="' + id + '" />' +
+          '<span class="ci-val-badge">' + width + 'px</span>' +
+        '</div>' +
+        '<div class="ci-order-btns">' +
+          '<button class="ci-order-btn" data-move="-1" data-index="' + idx + '" ' + (idx === 0 ? 'disabled' : '') + ' title="Move Left">&larr;</button>' +
+          '<button class="ci-order-btn" data-move="1" data-index="' + idx + '" ' + (idx === list.length - 1 ? 'disabled' : '') + ' title="Move Right">&rarr;</button>' +
+        '</div>' +
+      '</div>';
+    });
+
+    custWidgetList.innerHTML = html;
+    attachCustomizerEvents();
+  }
+
+  function attachCustomizerEvents() {
+    var items = custWidgetList.querySelectorAll('.cust-item');
+    items.forEach(function (item) {
+      var id = item.dataset.id;
+
+      /* Preset buttons */
+      var presets = item.querySelectorAll('.ci-preset-btn');
+      presets.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var targetWidth = parseInt(btn.dataset.setWidth, 10);
+          customWidths[id] = targetWidth;
+          saveState();
+          renderDock();
+          updateCustomizerList();
+        });
+      });
+
+      /* Slider */
+      var slider = item.querySelector('.ci-slider');
+      var badge = item.querySelector('.ci-val-badge');
+      if (slider) {
+        slider.addEventListener('input', function () {
+          var val = parseInt(slider.value, 10);
+          badge.textContent = val + 'px';
+          customWidths[id] = val;
+          saveState();
+          renderDock();
+        });
+        slider.addEventListener('change', function () {
+          updateCustomizerList();
+        });
+      }
+
+      /* Reordering */
+      var orderBtns = item.querySelectorAll('.ci-order-btn');
+      orderBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var delta = parseInt(btn.dataset.move, 10);
+          var idx = parseInt(btn.dataset.index, 10);
+          var targetIdx = idx + delta;
+          var list = PROFILES[activeProfile];
+          if (targetIdx >= 0 && targetIdx < list.length) {
+            var temp = list[idx];
+            list[idx] = list[targetIdx];
+            list[targetIdx] = temp;
+            saveState();
+            renderDock();
+            updateCustomizerList();
+          }
+        });
+      });
+    });
+  }
+
+  /* Toolbar Actions */
+  allSquareBtn.addEventListener('click', function () {
+    var list = PROFILES[activeProfile] || PHOTO_LAYOUT;
+    list.forEach(function (id) {
+      customWidths[id] = 48;
+    });
+    saveState();
+    renderDock();
+    updateCustomizerList();
+  });
+
+  allCompactBtn.addEventListener('click', function () {
+    var list = PROFILES[activeProfile] || PHOTO_LAYOUT;
+    list.forEach(function (id) {
+      var w = WIDGETS[id];
+      if (w && (w.isMedia || w.hasDot || id === 'search' || id === 'claude' || id === 'chatgpt' || id === 'clock')) {
+        customWidths[id] = 124;
+      }
+    });
+    saveState();
+    renderDock();
+    updateCustomizerList();
+  });
+
+  resetDefaultsBtn.addEventListener('click', function () {
+    customWidths = {};
+    saveState();
+    renderDock();
+    updateCustomizerList();
+  });
+
+  /* ==========================================================================
+     PROFILES & STYLE SWITCHER
+     ========================================================================== */
+
+  var profileTabs = document.querySelectorAll('.profile-tab');
+  profileTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var p = tab.dataset.profile;
+      if (PROFILES[p]) {
+        activeProfile = p;
+        profileTabs.forEach(function (t) {
+          var active = t.dataset.profile === p;
+          t.classList.toggle('is-active', active);
+          t.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        saveState();
+        renderDock();
+        if (custModal.classList.contains('is-open')) {
+          updateCustomizerList();
+        }
+      }
+    });
+  });
+
+  var styleBtns = document.querySelectorAll('.style-btn');
+  styleBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var style = btn.dataset.style;
+      document.body.setAttribute('data-display-style', style);
+      styleBtns.forEach(function (b) {
+        var active = b.dataset.style === style;
+        b.classList.toggle('is-active', active);
+        b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      saveState();
+    });
+  });
+
+  /* Initial boot */
+  renderDock();
+
+})();
+</script>
+
+</body>
+</html>
