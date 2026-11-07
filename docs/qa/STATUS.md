@@ -775,6 +775,23 @@ Fixes made during native verification:
   visibility; hourly timestamps are converted from seconds correctly and the
   forecast shows six future slots.
 
+Dock restore pass (2026-11-07, after native verification):
+
+* User asked to restore the original compact Tahoe dock while leaving the
+  launcher untouched. Commit `e6727e0` replaced the 82px dock layer with the
+  original 52px rail and 36px capsules; follow-up `0042838` separated the
+  Customize Widgets action into its own glass pill.
+* Native debug build at `%TEMP%\protondock-docktest\protondock.exe` renders the
+  restored Daily dock at 1390x132 with the original glass rail, profile pills,
+  separate Customize pill, Start, Search, running apps, Spotify, weather, system,
+  Claude, agent and clock (`dock-original-daily.png`). The Work profile with the
+  separated pill is `dock-original-separate.png`.
+* Hover lift, theme selection and reduced-motion paths are implemented in
+  `src/design/dock-original.css`; the compact rail is 1358px wide on the Daily
+  profile and switches to dense sizing below 1366px.
+* `npx tsc -b` passed; `npm test` 18 files / 186 tests passed; debug Tauri build
+  passed. The launcher and search surfaces were not changed in this pass.
+
 Open gates, not certified by this pass:
 
 * Search app and action rows still use generic SVG type icons rather than the
