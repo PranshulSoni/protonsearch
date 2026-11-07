@@ -41,6 +41,7 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
   const views = useFinalWidgetData(settings, { preview });
   const railRef = useRef<HTMLDivElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
+  const lastFit = useRef<ReturnType<typeof dockFit> | null>(null);
   const [previewCard, setPreviewCard] = useState<DockItem | null>(null);
   const [hot, setHot] = useState(false);
   const cool = useRef(0);
@@ -91,22 +92,19 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
       const railRect = rail.getBoundingClientRect();
       const pillsRect = pills.getBoundingClientRect();
       if (!railRect.width || !pillsRect.width) return;
-      // useMagnify widens the ::after backing by --mag-after, which would grow scrollWidth and resize the window on hover.
-      const spread = Math.ceil(Number.parseFloat(rail.style.getPropertyValue('--mag-after')) || 0);
       const next = dockFit(
         'bottom',
         'center',
         pillsRect,
-        {
-          left: railRect.left,
-          top: railRect.top,
-          width: Math.max(railRect.width, rail.scrollWidth - spread),
-          height: Math.max(railRect.height, rail.scrollHeight),
-        },
+        { left: railRect.left, top: railRect.top, width: rail.clientWidth, height: rail.clientHeight },
         { width: window.innerWidth, height: window.innerHeight },
         hot,
         largestTile(items.map(sizeOf)),
       );
+      const last = lastFit.current;
+      // A native resize re-fires this listener, so skip identical requests to stop fit feeding itself.
+      if (last && last.width === next.width && last.height === next.height && JSON.stringify(last.regions) === JSON.stringify(next.regions)) return;
+      lastFit.current = next;
       void native.fitDock(next.width, next.height, next.regions).catch(() => {});
     };
     const frame = requestAnimationFrame(fit);

@@ -111,6 +111,8 @@ describe('DockShell integration', () => {
     const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
     const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
     rail.getBoundingClientRect = () => ({ x: 112, y: 72, width: 800, height: 60, left: 112, top: 72, right: 912, bottom: 132, toJSON() {} });
+    Object.defineProperty(rail, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(rail, 'clientHeight', { value: 60, configurable: true });
     pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('fit_dock', {
       width: 912,
@@ -122,7 +124,7 @@ describe('DockShell integration', () => {
     }));
   });
 
-  it('requests enough width when the rail content is clipped', async () => {
+  it('ignores magnified and clipped overflow when sizing the window', async () => {
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
     vi.stubGlobal('cancelAnimationFrame', clearTimeout);
     vi.stubGlobal('innerHeight', 146);
@@ -131,17 +133,42 @@ describe('DockShell integration', () => {
     await screen.findByRole('tab', { name: 'Daily' });
     const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
     const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
-    rail.getBoundingClientRect = () => ({ x: 12, y: 72, width: 800, height: 60, left: 12, top: 72, right: 812, bottom: 132, toJSON() {} });
+    rail.getBoundingClientRect = () => ({ x: 112, y: 72, width: 800, height: 60, left: 112, top: 72, right: 912, bottom: 132, toJSON() {} });
+    Object.defineProperty(rail, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(rail, 'clientHeight', { value: 60, configurable: true });
+    // useMagnify transforms and its --mag-after backing overflow the rail without changing its layout box.
+    rail.style.setProperty('--mag-after', '24.62px');
     Object.defineProperty(rail, 'scrollWidth', { value: 1100, configurable: true });
+    Object.defineProperty(rail, 'scrollHeight', { value: 86, configurable: true });
     pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('fit_dock', {
-      width: 1212,
+      width: 912,
       height: 146,
       regions: [
-        { x: 426, y: 38, width: 360, height: 26, radius: 15 },
-        { x: 106, y: 72, width: 1100, height: 60, radius: 18 },
+        { x: 276, y: 38, width: 360, height: 26, radius: 15 },
+        { x: 56, y: 72, width: 800, height: 60, radius: 18 },
       ],
     }));
+  });
+
+  it('does not request an identical fit again on window resize', async () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
+    vi.stubGlobal('cancelAnimationFrame', clearTimeout);
+    vi.stubGlobal('innerHeight', 146);
+    mockCommands(defaultLayout());
+    const { container } = render(<DockShell />);
+    await screen.findByRole('tab', { name: 'Daily' });
+    const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
+    const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
+    rail.getBoundingClientRect = () => ({ x: 112, y: 72, width: 800, height: 60, left: 112, top: 72, right: 912, bottom: 132, toJSON() {} });
+    Object.defineProperty(rail, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(rail, 'clientHeight', { value: 60, configurable: true });
+    pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
+    const fits = () => invoke.mock.calls.filter(([command]) => command === 'fit_dock');
+    await waitFor(() => expect(fits().length).toBeGreaterThan(0));
+    const before = fits().length;
+    window.dispatchEvent(new Event('resize'));
+    expect(fits()).toHaveLength(before);
   });
 
   it('expands the rail hit region while the dock is hovered', async () => {
@@ -154,6 +181,8 @@ describe('DockShell integration', () => {
     const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
     const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
     rail.getBoundingClientRect = () => ({ x: 112, y: 72, width: 800, height: 60, left: 112, top: 72, right: 912, bottom: 132, toJSON() {} });
+    Object.defineProperty(rail, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(rail, 'clientHeight', { value: 60, configurable: true });
     pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
     const lastFit = () => invoke.mock.calls.filter(([command]) => command === 'fit_dock').at(-1)?.[1];
     const rest = {
@@ -186,6 +215,8 @@ describe('DockShell integration', () => {
     const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
     const pills = container.querySelector<HTMLElement>('.dock-final-shelf')!;
     rail.getBoundingClientRect = () => ({ x: 112, y: 72, width: 800, height: 60, left: 112, top: 72, right: 912, bottom: 132, toJSON() {} });
+    Object.defineProperty(rail, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(rail, 'clientHeight', { value: 60, configurable: true });
     pills.getBoundingClientRect = () => ({ x: 332, y: 38, width: 360, height: 26, left: 332, top: 38, right: 692, bottom: 64, toJSON() {} });
     const lastFit = () => invoke.mock.calls.filter(([command]) => command === 'fit_dock').at(-1)?.[1];
     const hovered = { width: 912, height: 146, regions: [expect.anything(), { x: 16, y: 8, width: 880, height: 124, radius: 18 }] };
