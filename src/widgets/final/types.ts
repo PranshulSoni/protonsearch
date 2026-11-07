@@ -41,6 +41,9 @@ export interface SpotifySettings {
   compactProgress: boolean;
 }
 export interface WeatherSettings {
+  weatherEnabled: boolean;
+  weatherLatitude: number;
+  weatherLongitude: number;
   location: string;
   units: 'C' | 'F';
   showHourly: boolean;

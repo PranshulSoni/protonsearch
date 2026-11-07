@@ -158,6 +158,17 @@ function SettingsHarness({ id }: { id: FinalWidgetId }) {
   );
 }
 
+test('weather card asks for a location when live weather is disabled', () => {
+  const view = render(
+    <WidgetCard
+      id="weather"
+      settings={{ ...settingsFor('weather'), weatherEnabled: false }}
+    />,
+  );
+  expect(view.getByText('Set weather location')).not.toBeNull();
+  expect(view.getByText(/not estimated/)).not.toBeNull();
+});
+
 test('every widget setting changes the rendered card', () => {
   for (const id of FINAL_WIDGET_IDS) {
     for (const field of FINAL_SETTING_FIELDS[id]) {
@@ -165,6 +176,12 @@ test('every widget setting changes the rendered card', () => {
       const card = view.container.querySelector('[data-widget-card]');
       expect(card).not.toBeNull();
       const before = card?.innerHTML;
+
+      // These fields configure live weather acquisition; the sample card does not display coordinates.
+      if (id === 'weather' && ['weatherEnabled', 'weatherLatitude', 'weatherLongitude'].includes(field.key)) {
+        view.unmount();
+        continue;
+      }
 
       if (field.type === 'toggle') {
         fireEvent.click(view.getByRole('checkbox', { name: field.label }));
@@ -177,6 +194,8 @@ test('every widget setting changes the rendered card', () => {
         const next = field.options.find((option) => option.value !== select.value);
         expect(next).toBeDefined();
         fireEvent.change(select, { target: { value: next?.value } });
+      } else if (field.type === 'number') {
+        fireEvent.change(view.getByLabelText(field.label), { target: { value: String(field.max) } });
       } else {
         fireEvent.change(view.getByLabelText(field.label), { target: { value: 'Preview value' } });
       }

@@ -519,10 +519,15 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
                 ) : null}
               </>
             ) : (
-              <EmptyState title="Weather unavailable" detail="No weather snapshot has been provided. Values are not estimated." />
+              <EmptyState
+                title={s.weatherEnabled ? 'Weather unavailable' : 'Set weather location'}
+                detail={s.weatherEnabled
+                  ? 'No weather snapshot has been provided. Values are not estimated.'
+                  : 'Enable live weather and enter latitude and longitude in widget settings. Values are not estimated.'}
+              />
             )}
           </div>
-          <CardFooter left={sourceFoot(id, preview)} right={weather ? s.location : 'Not available'} />
+          <CardFooter left={sourceFoot(id, preview)} right={weather ? s.location : s.weatherEnabled ? 'No snapshot' : 'Not configured'} />
         </>
       );
       break;

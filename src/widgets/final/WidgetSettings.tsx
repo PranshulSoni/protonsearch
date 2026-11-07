@@ -73,6 +73,30 @@ export function WidgetSettings({ id, value, onChange, disabled = false }: Widget
             );
           }
 
+          if (field.type === 'number') {
+            return (
+              <div className="fw-setting fw-setting--number" key={field.key}>
+                <label htmlFor={inputId}>{field.label}</label>
+                <input
+                  id={inputId}
+                  className="fw-input fw-number-input"
+                  type="number"
+                  min={field.min}
+                  max={field.max}
+                  step={field.step}
+                  value={Number(fieldValue ?? 0)}
+                  placeholder={field.placeholder}
+                  onChange={(event) => {
+                    const incoming = event.target.valueAsNumber;
+                    if (Number.isFinite(incoming)) update(field.key, incoming);
+                  }}
+                  aria-describedby={descriptionId}
+                />
+                <small id={descriptionId}>{field.description}</small>
+              </div>
+            );
+          }
+
           if (field.type === 'select') {
             return (
               <div className="fw-setting fw-setting--select" key={field.key}>

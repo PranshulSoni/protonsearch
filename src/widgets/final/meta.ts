@@ -62,6 +62,16 @@ export type FinalSettingField =
       key: string;
       label: string;
       description: string;
+      type: 'number';
+      min: number;
+      max: number;
+      step: number;
+      placeholder: string;
+    }
+  | {
+      key: string;
+      label: string;
+      description: string;
       type: 'select';
       options: readonly { value: string; label: string }[];
     }
@@ -89,8 +99,11 @@ export const FINAL_SETTING_FIELDS: Record<FinalWidgetId, readonly FinalSettingFi
     { key: 'compactProgress', label: 'Compact progress', description: 'Uses a slimmer progress line in dense sizes.', type: 'toggle' },
   ],
   weather: [
+    { key: 'weatherEnabled', label: 'Live weather', description: 'Fetches current conditions for the coordinates below.', type: 'toggle' },
     { key: 'location', label: 'Location label', description: 'Display name shown in the widget.', type: 'text', placeholder: 'Ahmedabad', maxLength: 40 },
     { key: 'units', label: 'Temperature units', description: 'Celsius or Fahrenheit.', type: 'select', options: [{ value: 'C', label: 'Celsius (C)' }, { value: 'F', label: 'Fahrenheit (F)' }] },
+    { key: 'weatherLatitude', label: 'Latitude', description: 'Decimal degrees, -90 to 90.', type: 'number', min: -90, max: 90, step: 0.0001, placeholder: '23.0225' },
+    { key: 'weatherLongitude', label: 'Longitude', description: 'Decimal degrees, -180 to 180.', type: 'number', min: -180, max: 180, step: 0.0001, placeholder: '72.5714' },
     { key: 'showHourly', label: 'Hourly forecast', description: 'Shows the forecast strip.', type: 'toggle' },
     { key: 'showDetails', label: 'Weather details', description: 'Shows wind, humidity, UV and visibility.', type: 'toggle' },
     { key: 'forecastHours', label: 'Forecast hours', description: 'Number of hourly slots to show.', type: 'range', min: 3, max: 8, step: 1, suffix: 'h' },
@@ -226,7 +239,7 @@ export const FINAL_WIDGET_META: readonly FinalWidgetMeta[] = [
     defaultWidth: 192,
     widths: { compact: 78, standard: 192, wide: 236 },
     cardWidth: 460,
-    providers: provider(['media']),
+    providers: provider(['media', 'volume']),
     permissions: ['media:read', 'media:control'],
     optional: false,
     settingsDefaults: { showProgress: true, showControls: true, showDevice: true, showVolume: true, compactProgress: false },
@@ -248,7 +261,7 @@ export const FINAL_WIDGET_META: readonly FinalWidgetMeta[] = [
     providers: provider([]),
     permissions: ['weather:read'],
     optional: false,
-    settingsDefaults: { location: 'Ahmedabad', units: 'C', showHourly: true, showDetails: true, forecastHours: 6 },
+    settingsDefaults: { weatherEnabled: false, weatherLatitude: 23.0225, weatherLongitude: 72.5714, location: 'Ahmedabad', units: 'C', showHourly: true, showDetails: true, forecastHours: 6 },
   },
   {
     id: 'system',
@@ -355,7 +368,7 @@ export const FINAL_WIDGET_META: readonly FinalWidgetMeta[] = [
     defaultWidth: 190,
     widths: { compact: 80, standard: 190, wide: 240 },
     cardWidth: 452,
-    providers: provider(['storage']),
+    providers: provider(['known-folders']),
     permissions: ['storage:read'],
     optional: true,
     settingsDefaults: { source: 'Projects', maxItems: 4, showType: true },
@@ -374,7 +387,7 @@ export const FINAL_WIDGET_META: readonly FinalWidgetMeta[] = [
     defaultWidth: 180,
     widths: { compact: 80, standard: 180, wide: 230 },
     cardWidth: 452,
-    providers: provider(['storage']),
+    providers: provider(['known-folders']),
     permissions: ['storage:read'],
     optional: true,
     settingsDefaults: { maxItems: 6, showCounts: true },
@@ -393,7 +406,7 @@ export const FINAL_WIDGET_META: readonly FinalWidgetMeta[] = [
     defaultWidth: 78,
     widths: { compact: 78, standard: 160, wide: 210 },
     cardWidth: 440,
-    providers: provider(['storage']),
+    providers: provider(['trash']),
     permissions: ['storage:read', 'storage:write'],
     optional: true,
     settingsDefaults: { showSize: true, showLastEmptied: true },
@@ -412,7 +425,7 @@ export const FINAL_WIDGET_META: readonly FinalWidgetMeta[] = [
     defaultWidth: 96,
     widths: { compact: 96, standard: 176, wide: 214 },
     cardWidth: 440,
-    providers: provider([]),
+    providers: provider(['volume']),
     permissions: ['audio:read', 'audio:write'],
     optional: true,
     settingsDefaults: { showDevice: true, showSlider: true, showMute: true },
@@ -475,6 +488,12 @@ export function settingsFor<Id extends FinalWidgetId>(
       }
       continue;
     }
+    if (field.type === 'number') {
+      if (typeof incoming === 'number' && Number.isFinite(incoming)) {
+        next[field.key] = Math.min(field.max, Math.max(field.min, incoming));
+      }
+      continue;
+    }
     if (field.type === 'select') {
       if (typeof incoming === 'string' && field.options.some((option) => option.value === incoming)) {
         next[field.key] = incoming;
@@ -500,6 +519,10 @@ export function validateWidgetSettings(id: FinalWidgetId, value: unknown): boole
     const incoming = value[field.key];
     if (field.type === 'toggle' && typeof incoming !== 'boolean') return false;
     if (field.type === 'range') {
+      if (typeof incoming !== 'number' || !Number.isFinite(incoming)) return false;
+      if (incoming < field.min || incoming > field.max) return false;
+    }
+    if (field.type === 'number') {
       if (typeof incoming !== 'number' || !Number.isFinite(incoming)) return false;
       if (incoming < field.min || incoming > field.max) return false;
     }

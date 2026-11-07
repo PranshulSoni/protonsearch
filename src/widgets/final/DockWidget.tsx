@@ -238,8 +238,8 @@ export function DockWidget({ id, size, settings, data, preview = false, status, 
           <span className="fw-dock-weather-temp">{temperature(weather?.temperature, units)}</span>
           {size !== 'compact' ? (
             <span className="fw-dock-stack fw-dock-stack--tight">
-              <small className="fw-dock-sub">{weatherLabelShort(weather?.weatherCode)}</small>
-              <span className="fw-dock-weather-meta">{highLow(weather?.highC, weather?.lowC, units)}</span>
+              <small className="fw-dock-sub">{s.weatherEnabled ? weatherLabelShort(weather?.weatherCode) : 'Set location'}</small>
+              <span className="fw-dock-weather-meta">{s.weatherEnabled ? highLow(weather?.highC, weather?.lowC, units) : 'Weather'}</span>
               {size === 'wide' ? <span className="fw-dock-location">{s.location}</span> : null}
             </span>
           ) : null}

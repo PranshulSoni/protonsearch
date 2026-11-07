@@ -1,0 +1,1 @@
+export { WidgetRenderer } from '../index';
