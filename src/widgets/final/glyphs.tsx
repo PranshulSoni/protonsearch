@@ -33,10 +33,11 @@ export function Ring({
   );
 }
 
-export function ClockFace({ now, seconds = false }: { now: Date; seconds?: boolean }) {
-  const s = now.getSeconds();
-  const m = now.getMinutes() + s / 60;
-  const h = now.getHours() % 12 + m / 60;
+export function ClockFace({ now, seconds = false }: { now: Date | number; seconds?: boolean }) {
+  const d = new Date(now);
+  const s = d.getSeconds();
+  const m = d.getMinutes() + s / 60;
+  const h = d.getHours() % 12 + m / 60;
   return (
     <svg className="dock-clock" width="36" height="36" viewBox="0 0 36 36">
       <circle className="dock-clock-face" cx="18" cy="18" r="16.5" />

@@ -40,7 +40,7 @@ test('clock face hands follow the time', () => {
   expect(plain.container.querySelector('.dock-clock-second')).toBeNull();
   plain.unmount();
 
-  const ticking = render(<ClockFace now={three} seconds />);
+  const ticking = render(<ClockFace now={three.getTime()} seconds />);
   expect(ticking.container.querySelector('.dock-clock-second')).not.toBeNull();
   ticking.unmount();
 });
