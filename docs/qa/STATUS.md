@@ -732,7 +732,12 @@ Build and automated checks:
 * The app was launched from `%TEMP%\protondock-run` with WebView2 CDP enabled on
   port 9333. The dock, search, settings and widget-card windows all rendered.
   The optimized release binary was also launched from `%TEMP%\protondock-release`
-  and rendered the dock at 1664x132 (`dock-release.png`).
+  and rendered the dock at 1664x132 (`dock-release.png`). The portable ZIP was
+  extracted to a clean directory, launched, and rendered the same dock
+  (`dock-portable-final.png`); search returned real mixed results, Folders returned
+  only folder rows, and `24*1.15` produced the calculator card `27.6`
+  (`search-final-portable.png`, `search-final-folders.png`,
+  `search-final-calc.png`).
 
 Native UI evidence:
 
