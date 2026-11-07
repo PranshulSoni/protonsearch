@@ -213,7 +213,9 @@ body[data-theme="liquid-glass"] {
   bottom: 16px;
   z-index: 10;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
   pointer-events: none;
 }
 
@@ -395,6 +397,9 @@ body[data-theme="light"] .theme-btn.is-active {
 
 .dock-slot {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
   height: var(--tile-h);
   width: var(--w, var(--tile-square-w));
@@ -406,6 +411,8 @@ body[data-theme="light"] .theme-btn.is-active {
   color: inherit;
   cursor: pointer;
   border-radius: var(--tile-radius);
+  vertical-align: middle;
+  line-height: 1;
   transition: width var(--speed-rail) var(--ease), transform 220ms var(--ease);
 }
 .dock-slot:active { cursor: grabbing; }
@@ -413,6 +420,31 @@ body[data-theme="light"] .theme-btn.is-active {
 .dock-slot:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.55);
   outline-offset: 3px;
+}
+
+/* Edit Mode Resize Chip (Strictly hidden in Normal Mode) */
+.dw-resize-chip {
+  display: none !important;
+}
+.dock-rail.is-editing .dw-resize-chip {
+  display: flex !important;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #0a84ff;
+  color: #ffffff;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  z-index: 10;
+  transition: transform 120ms ease;
+}
+.dock-rail.is-editing .dw-resize-chip:hover {
+  transform: scale(1.15);
 }
 
 /* Direct reorder dragging feedback */
@@ -2675,11 +2707,6 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
 <div class="desktop-wallpaper"></div>
 
-<header class="desktop-hint">
-  <h1>ProtonDock <span class="badge">Square Sizing System</span></h1>
-  <p>All widgets strictly share a 48px square height. Reorder running apps directly on the dock. Click <strong>Customize</strong> to open the Widget Gallery, App Pinner, and Store.</p>
-</header>
-
 <div class="dock-stage">
   <div class="dock-cluster">
 
@@ -2762,8 +2789,6 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
             <div class="wthr-cell"><span class="wthr-label">Wind</span><span class="wthr-val" id="wthrWind">--</span></div>
             <div class="wthr-cell"><span class="wthr-label">UV Index</span><span class="wthr-val" id="wthrUv">--</span></div>
             <div class="wthr-cell"><span class="wthr-label">Air Quality</span><span class="wthr-val" id="wthrAqi">--</span></div>
-          </div>
-            <div class="wthr-cell"><span class="wthr-label">Air Quality</span><span class="wthr-val">28 Good</span></div>
           </div>
           <div class="wthr-hourly-heading">Hourly Forecast</div>
           <div class="wthr-hourly-row">
@@ -3692,7 +3717,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   /* Load stored customizations */
   try {
-    var stored = localStorage.getItem('protondock_preview_state_v5');
+    var stored = localStorage.getItem('protondock_preview_state_v6');
     if (stored) {
       var parsed = JSON.parse(stored);
       if (parsed.customWidths) customWidths = parsed.customWidths;
@@ -3716,7 +3741,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   function saveState() {
     try {
-      localStorage.setItem('protondock_preview_state_v5', JSON.stringify({
+      localStorage.setItem('protondock_preview_state_v6', JSON.stringify({
         customWidths: customWidths,
         enabledMap: enabledMap,
         widgetOrder: widgetOrder,
@@ -4002,14 +4027,16 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       /* If pinned apps: expand each application as its own discrete 48px square tile */
       if (id === 'pinned-apps') {
         if (pinnedAppIds.length === 0) {
-          html += '<button class="dock-slot" data-id="pinned-apps" data-index="' + idx + '" data-shape="square" style="--w:48px" ' + (isEditMode ? 'draggable="true"' : 'draggable="false"') + ' type="button" aria-label="Pinned Apps (Empty - Click to Pin)">' +
-            '<span class="dock-widget">' +
-              '<span class="w-glyph-box">' +
-                renderWidgetGlyph(w) +
+          if (isEditMode) {
+            html += '<button class="dock-slot dock-slot-empty-pin" data-id="pinned-apps" data-index="' + idx + '" data-shape="square" style="--w:48px" type="button" aria-label="Pin Apps">' +
+              '<span class="dock-widget" style="border:1px dashed rgba(255,255,255,0.22);">' +
+                '<span class="w-glyph-box" style="color:var(--text-2);">' +
+                  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+                '</span>' +
               '</span>' +
-            '</span>' +
-            '<span class="dock-tip">Pinned Apps (Empty - Click to Pin)</span>' +
-          '</button>';
+              '<span class="dock-tip">Pin Apps (Edit Mode)</span>' +
+            '</button>';
+          }
           return;
         }
         pinnedAppIds.forEach(function (pId) {
@@ -4096,13 +4123,18 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         '</span>';
       }
 
+      var resizeChipHtml = '';
+      if (isEditMode) {
+        resizeChipHtml = '<span class="dw-resize-chip" data-resize-id="' + id + '" title="Resize Widget (' + width + 'px)">' +
+          '<svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor"><path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-4zm13 0a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0 0 1h3.5zm-13 14a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-1 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 0-1h-3.5zm13 0a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h4z"/></svg>' +
+        '</span>';
+      }
+
       html += '<button class="dock-slot ' + (isCustomExpanded ? 'is-custom-expanded' : '') + '" data-id="' + id + '" data-index="' + idx + '" data-shape="' + shape + '" style="--w:' + width + 'px" ' + (isEditMode ? 'draggable="true"' : 'draggable="false"') + ' type="button" aria-label="' + escapeHtml(w.title) + '">' +
         '<span class="dock-widget">' +
           innerContent +
         '</span>' +
-        '<span class="dw-resize-chip" data-resize-id="' + id + '" title="Resize Widget (' + width + 'px)">' +
-          '<svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor"><path d="M1.5 1a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-4zm13 0a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0v-4a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0 0 1h3.5zm-13 14a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-1 0v4a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 0-1h-3.5zm13 0a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h4z"/></svg>' +
-        '</span>' +
+        resizeChipHtml +
         (w.hasDot ? '<span class="dock-dot"></span>' : '') +
         '<span class="dock-tip">' + escapeHtml(w.title) + '</span>' +
       '</button>';

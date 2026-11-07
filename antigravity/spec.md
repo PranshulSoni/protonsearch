@@ -833,6 +833,53 @@ Inspired by Ganella (macOS dock replacement app), ProtonDock bridges static laun
 
 ---
 
+### 2.17 Native Windows Icon Extraction, Sharpness & Alignment Contract
+
+To guarantee a non-slop, razor-sharp visual presentation matching Apple and CoolDock aesthetic standards:
+
+1. **Authentic Windows 11 Branding**:
+   - The Windows Start widget strictly renders the authentic Windows 11 logo: four discrete squares with `0.8px` corner radius separated by equal gutters, filled with signature Windows 11 vibrant cyan `#60cdff` (`#00a4ef`), centered inside a 48px square squircle tile.
+   - Never use outdated Windows 10 trapezoidal flags or generic grid icons.
+
+2. **Native Icon Extraction Sharpness Standards**:
+   - **Resolution Invariant**: All application icons (running apps and pinned apps) must be extracted at high resolution (`SHIL_EXTRALARGE` 48x48 or `SHIL_JUMBO` 256x256) via Windows COM Shell `SHGetImageList` or `IShellItemImageFactory::GetImage`.
+   - **High-Quality Downscaling**: Extracted icons must be downsampled to `20x20px` (or max `22x22px`) using Bicubic or Lanczos resampling with premultiplied alpha before sending to the UI. Never display raw stretched 16px/32px icons that appear blurry or pixelated.
+   - **CSS Rendering Directives**:
+     ```css
+     .w-glyph-box svg,
+     .w-glyph-box img {
+       display: block;
+       image-rendering: -webkit-optimize-contrast;
+       image-rendering: crisp-edges;
+       shape-rendering: geometricPrecision;
+       transform: translateZ(0);
+     }
+     ```
+   - **Optical Margin**: Small 20px icons inside a 48px square tile provide the critical 14px optical padding margin required by Apple Human Interface Guidelines and Windows 11 Fluent Design.
+
+3. **Strict Vertical Alignment & Slot Sizing**:
+   - Every slot on the dock rail (system widgets, discrete running apps, and pinned apps) strictly implements:
+     ```css
+     .dock-slot {
+       position: relative;
+       display: inline-flex;
+       align-items: center;
+       justify-content: center;
+       height: var(--tile-h); /* strictly 48px */
+       vertical-align: middle;
+       line-height: 1;
+     }
+     ```
+   - Overlays such as the running active dot (`.dock-dot`) and notification counter pill (`.app-notif-badge`) are `position: absolute` with zero flex dimension, ensuring running apps and pinned apps remain perfectly aligned with adjacent telemetry capsules and squircles.
+   - If pinned apps catalog is empty, no blank placeholder slots are rendered in normal view.
+
+4. **Edit Mode Isolation (Zero Clutter in Pristine Mode)**:
+   - In normal pristine mode, all resize handles, arrows, and edit chips (`.dw-resize-chip`) are strictly hidden (`display: none !important;`).
+   - Resizing and reordering controls are only displayed when the user explicitly clicks the "Edit" button in the shelf (`rail.classList.contains('is-editing')`).
+   - The desktop workspace contains zero developer banners or hint headers.
+
+---
+
 ## 3. Motion & Animation Standards (Apple Design System)
 
 1. **Apple Two-Parameter Spring Dynamics**:

@@ -164,10 +164,11 @@ Every widget in `dock-editable.html` must be backed by a concrete Rust implement
 ### 6. Discrete Running Applications (`running-apps`)
 - **Action**: Displays running apps as discrete 48px square tiles with small 20px sharp icons, running indicator dots, and red Apple-style notification pill badges (`212`, `2`, `1`). Direct drag-and-drop reordering on the dock.
 - **Backend File**: `src-tauri/src/running_apps.rs`
-- **Native Implementation**:
+- **Native Implementation & Sharpness Guarantees**:
   - Enumerates top-level desktop windows via Win32 `EnumWindows` and `GetWindowThreadProcessId`.
   - Filters out tooltips, hidden overlays, and background host processes (`WS_VISIBLE && !WS_EX_TOOLWINDOW`).
-  - Jumbo Icon Extraction: Win32 `SHGetImageList(SHIL_JUMBO, ...)` downsampled via Lanczos3 filter to 20x20 device pixels with unsharp mask.
+  - **High-DPI Sharp Icon Extraction**: Extract icons at 48x48 or 256x256 via Win32 `SHGetImageList(SHIL_EXTRALARGE | SHIL_JUMBO)` and downsample using high-quality Lanczos3 / Bicubic filter to strictly 20x20 device pixels with unsharp mask. Never upscale or stretch low-res 16px/32px icons which results in blurry icons.
+  - **Alignment Invariant**: Every running app tile is strictly an `inline-flex` 48px square (`width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center;`). The running indicator dot and notification count badge are positioned absolutely so they never distort the baseline alignment.
   - Notification Badges: WinRT `Windows.UI.Notifications.Management.UserNotificationListener` reading active notification count per AppUserModelID.
 - **IPC Commands**:
   - `invoke('list_running_apps')` -> `RunningAppItem[]`
@@ -176,10 +177,11 @@ Every widget in `dock-editable.html` must be backed by a concrete Rust implement
 - **Event**: `running-apps-changed` emitted on window creation or exit via Win32 `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)`.
 
 ### 7. Pinned Applications Catalog (`pinned-apps`)
-- **Action**: Users pin apps from an installed application catalog. Each pinned app renders as a discrete 48px square tile.
+- **Action**: Users pin apps from an installed application catalog. Each pinned app renders as a discrete 48px square tile. When the pinned list is empty, it remains hidden in normal mode (rendering no blank or empty boxes).
 - **Backend File**: `src-tauri/src/installed_apps.rs`
 - **Native Implementation**:
   - Enumerates desktop `.lnk` shortcuts in Start Menu and modern Store apps in `shell:AppsFolder` via COM `IShellItem`.
+  - Icon extraction uses identical 20x20 Lanczos3 sharp downsampling.
   - Persists pinned selections in SQLite `pinned_apps` table.
 - **IPC Commands**:
   - `invoke('list_installed_apps')` -> `InstalledApp[]`

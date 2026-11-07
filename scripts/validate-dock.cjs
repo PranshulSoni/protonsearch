@@ -70,9 +70,41 @@ for (const id of expectedIdentifiers) {
 }
 console.log('✓ CoolDock & Docktor live components and telemetry curves verified');
 
-// Check no em dashes
-const emDashMatch = html.match(/\u2014/g);
-assert(!emDashMatch, 'Violation of anti-slop: em dashes found in dock-editable.html (' + (emDashMatch ? emDashMatch.length : 0) + ')');
-console.log('✓ Zero em dashes in dock-editable.html (anti-slop verified)');
+// Check DOM structure & nesting
+const stageIdx = html.indexOf('class="dock-stage"');
+const clusterIdx = html.indexOf('class="dock-cluster"');
+const shelfIdx = html.indexOf('class="dock-shelf"');
+const railIdx = html.indexOf('id="dockRail"');
+
+assert(stageIdx !== -1, 'dock-stage missing');
+assert(clusterIdx !== -1, 'dock-cluster missing');
+assert(shelfIdx !== -1, 'dock-shelf missing');
+assert(railIdx !== -1, 'dockRail missing');
+assert(stageIdx < clusterIdx, 'dock-cluster must be inside dock-stage');
+assert(clusterIdx < shelfIdx, 'dock-shelf must be inside dock-cluster');
+assert(shelfIdx < railIdx, 'dock-shelf must precede dockRail');
+
+// Verify tag balance in body before script
+const bodyHtml = html.slice(html.indexOf('<body'), html.indexOf('<script>'));
+assert(!bodyHtml.includes('<header class="desktop-hint">'), 'Unnecessary clutter: desktop-hint header found');
+const divOpens = (bodyHtml.match(/<div\b/g) || []).length;
+const divCloses = (bodyHtml.match(/<\/div>/g) || []).length;
+assert.strictEqual(divOpens, divCloses, 'DIV tag mismatch in body: opens=' + divOpens + ' closes=' + divCloses);
+console.log('✓ HTML div structure perfectly balanced (opens: ' + divOpens + ', closes: ' + divCloses + ')');
+console.log('✓ Dock hierarchy verified (stage -> cluster -> [shelf, popovers, rail])');
+
+// Check no em dashes across touched files
+const filesToCheck = [
+  'dock-editable.html',
+  'antigravity/spec.md',
+  'antigravity/BACKEND_IMPLEMENTATION_PROMPT.md'
+];
+
+for (const filePath of filesToCheck) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const emDashMatch = content.match(/\u2014/g);
+  assert(!emDashMatch, 'Violation of anti-slop: em dashes found in ' + filePath + ' (' + (emDashMatch ? emDashMatch.length : 0) + ')');
+  console.log('✓ Zero em dashes in ' + filePath + ' (anti-slop verified)');
+}
 
 console.log('ALL DOCK-EDITABLE VALIDATIONS PASSED.');
