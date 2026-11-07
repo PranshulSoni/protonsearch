@@ -21,6 +21,9 @@
 3. **Display Modes**:
    - `Capsules`: Discrete rounded glass squircle tiles with 6px gap (`--dock-gap: 6px`).
    - `Lines`: Seamless rail with 1px translucent vertical dividers between widgets.
+4. **Dock Profiles**:
+   - Top-shelf switcher supporting `Daily`, `Work`, and `Founder` modes.
+   - Each profile retains independent widget ordering, enabled sets, and sizing preferences.
 
 ---
 
@@ -192,6 +195,96 @@
 
 ---
 
+### 2.8 Music Player Widget (`music-player`)
+* **Design & Behavior**:
+  - Square Mode (48px): Album art rounded tile with animated equalizer bars and play/pause toggle.
+  - Rectangle Mode (150px): Album art on left + track title ("Night Drive") & artist ("Kavinsky") stack in the middle + playback controls (prev, play/pause, next) and progress indicator on the right.
+  - Strictly locked to 48px square height.
+* **Rust Backend Module**:
+  - Source file: `src-tauri/src/media_player.rs`.
+  - Native API: Windows System Media Transport Controls (`GlobalSystemMediaTransportControlsSessionManager`) via WinRT `windows::Media::Control`.
+    - Reads `MediaProperties` (Title, Artist, Album, Thumbnail stream).
+    - Reads `PlaybackInfo` (PlaybackStatus: Playing, Paused, Stopped).
+    - Controls playback via `TryPlayAsync`, `TryPauseAsync`, `TrySkipNextAsync`, `TrySkipPreviousAsync`.
+* **IPC Contract**:
+  - Command: `invoke('get_media_status')` -> returns `MediaPayload`.
+  - Command: `invoke('toggle_media_playback')`.
+  - Command: `invoke('media_next_track')`.
+  - Command: `invoke('media_prev_track')`.
+  - Event: `media-playback-updated` emitted on SMTC state change.
+  - Schema:
+    ```typescript
+    interface MediaPayload {
+      title: string;
+      artist: string;
+      album: string;
+      isPlaying: boolean;
+      positionSec: number;
+      durationSec: number;
+      thumbnailBase64: string | null;
+    }
+    ```
+
+---
+
+### 2.9 Take a Note Widget (`quick-notes`)
+* **Design & Behavior**:
+  - Square Mode (48px): Warm amber notepad glyph (`#f0bd6a`).
+  - Rectangle Mode (120px): Notepad glyph on left + `Take a Note` / `Recent Notes`.
+  - **Click Interaction (Floating Card Popup)**:
+    - Clicking the widget opens an elevated Tahoe glass floating note card directly above the dock slot.
+    - Features:
+      - Clean scratchpad textarea with auto-focus.
+      - "Save Note" action (saves to local database and adds to recent list).
+      - Quick list of recent notes with relative timestamps.
+      - Close button / dismiss on `Escape` or backdrop click.
+* **Rust Backend Module**:
+  - Source file: `src-tauri/src/notes.rs`.
+  - Storage: SQLite table `notes` in `%LOCALAPPDATA%/protondock/protondock.db` or individual Markdown files in `%APPDATA%/protondock/notes/`.
+* **IPC Contract**:
+  - Command: `invoke('get_recent_notes')` -> returns `NoteItem[]`.
+  - Command: `invoke('save_note', { content: string, title?: string })` -> returns `NoteItem`.
+  - Command: `invoke('delete_note', { id: string })`.
+  - Schema:
+    ```typescript
+    interface NoteItem {
+      id: string;
+      title: string;
+      content: string;
+      createdAt: number;       // Unix timestamp ms
+      updatedAt: number;
+    }
+    ```
+
+---
+
+### 2.10 ProtonSearch Launcher & In-Process Math Engine (`search`)
+* **Design & Behavior**:
+  - Square Mode (48px): Magnifying glass glyph with subtle highlight ring.
+  - Shortcut: Triggered via clicking dock slot or pressing `Alt + Space` / `/`.
+  - Spotlight Palette: Tahoe frosted glass spotlight window centered horizontally, elevated above wallpaper.
+  - In-Process Math Parser:
+    - Instant recursive descent evaluation for arithmetic, percentages (`15% of 340`), powers, roots (`sqrt(144)`), and trigonometric functions.
+    - Renders calculation hero card directly above search results.
+    - Hitting `Enter` copies calculated value to system clipboard and presents toast confirmation HUD.
+* **Rust Backend Module**:
+  - Source file: `protonsearch/src/calculator.rs` / `src-tauri/src/calculator.rs`.
+  - Native Engine: In-process recursive descent tokenizer and AST evaluator with zero external cloud dependencies.
+* **IPC Contract**:
+  - Command: `invoke('calculate_expression', { expr: string })` -> returns `CalculationResult`.
+  - Command: `invoke('search_query', { query: string, scope: string })` -> returns `SearchResult[]`.
+  - Schema:
+    ```typescript
+    interface CalculationResult {
+      expression: string;
+      result: number;
+      displayValue: string;
+      valid: boolean;
+    }
+    ```
+
+---
+
 ## 3. Motion & Animation Standards
 
 1. **Reorder FLIP Animations**:
@@ -211,3 +304,6 @@
 - [ ] Implement `SiriOrb.tsx` WebGL / CSS radial gradient shader.
 - [ ] Bind `RunningApps.tsx` to `src-tauri/src/running_apps.rs` with alphabetized default and manual override store.
 - [ ] Add `InstalledAppsPicker.tsx` inside `WidgetManager.tsx` connecting to `shell:AppsFolder` enumeration.
+- [ ] Connect `MusicPlayerWidget.tsx` to `media_player.rs` Windows SMTC session manager.
+- [ ] Connect `QuickNotesCard.tsx` to `notes.rs` SQLite storage.
+- [ ] Connect `SpotlightWindow.tsx` to `calculator.rs` in-process math evaluator.
