@@ -79,6 +79,43 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
 
 ---
 
+### 1.4 Authoritative Widget Classification: System-Mapped vs User-Configured Contract
+
+To ensure strict engineering integrity, ProtonDock divides all widgets into two architectural tiers:
+
+1. **System-Based Tier (Live Windows OS Subsystems)**:
+   - Connects directly to native Windows 11 kernel, Win32, or WinRT subsystems.
+   - Zero user setup required. Always pre-enabled, live, and self-discovering on boot.
+   - Never mock or fabricate system states.
+
+2. **User-Based Tier (User Accounts, Services & Custom Personal Data)**:
+   - Covers third-party APIs, AI providers, personal locations, notes, and media playback.
+   - Pre-enabled in dock catalog and profile templates, but defaults strictly to **`none` / unconfigured** on initial boot.
+   - Never fabricate mock quotas (e.g. fake "70% Session" or "82% Quota") or fake temperatures as live metrics.
+   - Unconfigured widgets render an unconfigured state (neutral glyph, `none` indicator, `--` progress). Clicking opens an anchored configuration card prompting the user to supply their credentials, city, or preferences.
+   - Credentials persist securely in `%LOCALAPPDATA%/protondock/credentials.json`.
+
+| Widget ID | Classification | Default Pre-Enabled | Default Data State | Underlying System / Service Mapping | Unconfigured Behavior & Setup Action |
+|---|---|---|---|---|---|
+| `start` | System | Yes | Live Active | Win32 `keybd_event(VK_LWIN)` / `Shell_TrayWnd` | Always live; triggers Windows 11 Start Menu |
+| `search` | System | Yes | Live Active | Kensaku Local Search (FTS5 + OCR + Math AST) | Always live; instant local desktop search |
+| `running-apps` | System | Yes | Live Enumerate | Win32 `EnumWindows` + `DwmGetWindowAttribute` | Always live; enumerates active desktop processes |
+| `status-battery` | System | Yes | Live Telemetry | Win32 `GetSystemPowerStatus` + `CallNtPowerInformation` | Always live; real-time wattage rate, battery % |
+| `wifi` | System | Yes | Live Adapter | Windows WLAN API (`wlanapi.dll`) | Always live; active SSID and discovered networks |
+| `bluetooth` | System | Yes | Live Radio | WinRT Bluetooth (`Windows.Devices.Bluetooth`) | Always live; paired devices and battery levels |
+| `notifications` | System | Yes | Live Queue | WinRT `UserNotificationListener` | Always live; reads Windows Action Center toasts |
+| `clock` | System | Yes | Live Clock | Win32 `GetLocalTime` / OS system clock | Always live; local time with live seconds ticking |
+| `system-tray` | System | Yes | Live Overflow | Windows Shell Tray (`Shell_TrayWnd` -> `SysPager`) | Always live; enumerates background notification apps |
+| `weather` | User | Yes | `none` (Unconfigured) | Open-Meteo API / Windows Location Sensor | Shows `--°` / `Set Location`. Clicking opens location search |
+| `claude` | User | Yes | `none` (Unconfigured) | Anthropic API / session token | Shows neutral glyph / `Connect`. Clicking opens API key setup |
+| `codex` | User | Yes | `none` (Unconfigured) | OpenAI API / GitHub Copilot token | Shows neutral glyph / `Connect`. Clicking opens token setup |
+| `siri-ai` | User | Yes | `none` (Unconfigured) | Local Whisper/LLM or Cloud Assistant Provider | Shows idle orb / `Configure`. Clicking opens model setup |
+| `music-player` | User | Yes | `none` (Idle) | Windows GSMTC / Spotify Session | Shows `No Media Playing`. Clicking prompts launch music app |
+| `quick-notes` | User | Yes | `none` (Empty) | SQLite Notes Database (`notes.db`) | Clean blank scratchpad ready for first note |
+| `pinned-apps` | User | Yes | `none` (Empty `[]`) | COM `IShellItem` Apps Folder | Empty until user pins items from Apps Catalog |
+
+---
+
 ## 2. Core Widget Catalog & Backend IPC Mapping
 
 ### 2.0 Windows 11 Start Widget (`start`)
@@ -96,22 +133,28 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
 
 ### 2.1 Weather Widget (`weather`)
 * **Design & Behavior**:
-  - Square Mode (48px): Centered weather glyph with temperature readout (`24°`).
-  - Rectangle Mode (120px): Weather icon on left, two-line stack on right: `24° Clear` / `H:28° L:19° · San Francisco`.
+  - Square Mode (48px): Centered weather glyph with temperature readout (`24°` or `--°` when unconfigured).
+  - Rectangle Mode (120px): Weather icon on left, two-line stack on right: `24° Clear` / `H:28° L:19° · San Francisco` (or `Weather` / `Set Location` when unconfigured).
+  - **User-Based Configuration Contract**:
+    - Pre-enabled on dock, but defaults to `none` (unconfigured) until location or city is set by user.
+    - Zero fabrication: Never present a mock city or static temperature as live user weather.
+    - Anchored popover provides instant City search and "Use Current Location" sensor button.
 * **Rust Backend Module**:
   - Source file: `src-tauri/src/weather.rs` / `protonsearch/src/weather.rs`.
   - Native API: Windows Location API (`ISensorManager` / `ILocationReport`) for coordinates, cached query to Open-Meteo API.
 * **IPC Contract**:
   - Command: `invoke('get_weather')` -> returns `WeatherPayload`.
+  - Command: `invoke('set_weather_location', { city: string, lat?: number, lon?: number })`.
   - Schema:
     ```typescript
     interface WeatherPayload {
-      temperature: number;      // Celsius
-      weatherCode: number;      // WMO code (0: Clear, 1-3: Partly Cloudy, 51-67: Rain, etc.)
-      condition: string;        // Human readable ("Clear", "Partly Cloudy")
-      high: number;
-      low: number;
-      location: string;
+      status: 'unconfigured' | 'ready' | 'error';
+      temperature: number | null; // Celsius (null if unconfigured)
+      weatherCode: number | null; // WMO code (0: Clear, 1-3: Partly Cloudy, 51-67: Rain, etc.)
+      condition: string;        // Human readable ("Clear", "Partly Cloudy" or "Unconfigured")
+      high: number | null;
+      low: number | null;
+      location: string | null;  // e.g. "San Francisco, CA" or null
       cachedAt: number;         // Unix timestamp ms
     }
     ```
@@ -162,21 +205,28 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
 
 ### 2.3 Claude Usage Widget (`claude`)
 * **Design & Behavior**:
-  - Square Mode (48px): Warm orange asterisk glyph inside a circular SVG progress ring (`--ring-blue: #74b7ff`) depicting session quota.
-  - Rectangle Mode (120px): Circular ring on left + `Claude 3.7` (primary) / `70% Session` (secondary).
+  - Square Mode (48px): Asterisk glyph inside a circular SVG progress ring.
+  - Rectangle Mode (120px): Circular ring on left + `Claude` (primary) / `Connect Account` (secondary).
+  - **User-Based Configuration Contract**:
+    - Pre-enabled on dock, but defaults to `none` (unconfigured) with ring progress at `0%` and neutral muted glyph.
+    - Zero fabrication: Never display mock session percentages (such as "70% Session") as live user telemetry.
+    - Clicking opens anchored setup card to input Anthropic API Key (`sk-ant-...`) or session token.
+    - Stored securely in `%LOCALAPPDATA%/protondock/credentials.json`.
 * **Backend Mapping**:
   - Source file: `src-tauri/src/ai_usage.rs`.
   - Service: Reads Anthropic local token cache / OAuth credentials or configured API key stats.
 * **IPC Contract**:
-  - Command: `invoke('get_claude_usage')`.
+  - Command: `invoke('get_claude_usage')` -> returns `AIUsagePayload`.
+  - Command: `invoke('save_ai_credentials', { provider: 'claude', apiKey: string })`.
   - Schema:
     ```typescript
     interface AIUsagePayload {
       provider: 'claude' | 'codex';
-      usedPercent: number;      // 0 - 100
+      status: 'unconfigured' | 'connected' | 'error';
+      usedPercent: number;      // 0 - 100 (0 when unconfigured)
       tokensUsed: number;
       tokenLimit: number;
-      resetTimeIso: string;
+      resetTimeIso: string | null;
       active: boolean;
     }
     ```
@@ -186,25 +236,33 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
 ### 2.4 Codex / Copilot Usage Widget (`codex`)
 * **Design & Behavior**:
   - Square Mode (48px): Hexagonal code glyph inside a circular SVG progress ring.
-  - Rectangle Mode (120px): Circular ring on left + `Codex AI` / `82% Quota`.
+  - Rectangle Mode (120px): Circular ring on left + `Codex AI` / `Connect Account`.
+  - **User-Based Configuration Contract**:
+    - Pre-enabled on dock, but defaults to `none` (unconfigured) with `0%` progress and neutral glyph.
+    - Zero fabrication: Never display mock quota (such as "82% Quota") as live user telemetry.
+    - Clicking opens anchored setup card to input OpenAI API key or GitHub Copilot token.
 * **Backend Mapping**:
   - Source file: `src-tauri/src/ai_usage.rs`.
   - Service: Reads GitHub Copilot token telemetry from local VS Code config or OpenAI API endpoint.
 * **IPC Contract**:
   - Command: `invoke('get_codex_usage')` -> returns `AIUsagePayload`.
+  - Command: `invoke('save_ai_credentials', { provider: 'codex', apiKey: string })`.
 
 ---
 
 ### 2.5 Siri-Based AI Widget (`siri-ai`)
 * **Design & Behavior**:
-  - Square Mode (48px): Apple Intelligence / Siri-style fluid multi-color glowing orb. Animated gentle chromatic pulse (cyan `#60cdff`, magenta `#e056fd`, violet `#686de0`, and blue `#30336b`) with inner ripple.
-  - Rectangle Mode (136px): Siri orb on left + `Siri AI` (primary) + `Listening...` / `Ready to assist` (secondary).
-  - Interaction: Single click opens voice input overlay or local AI spotlight prompt; double click activates continuous microphone listening.
+  - Square Mode (48px): Apple Intelligence fluid multi-color glowing orb. Animated gentle chromatic pulse (cyan `#60cdff`, magenta `#e056fd`, violet `#686de0`, and blue `#30336b`) with inner ripple.
+  - Rectangle Mode (136px): Siri orb on left + `Assistant` / `Configure Assistant`.
+  - **User-Based Configuration Contract**:
+    - Pre-enabled on dock, but defaults to `none` (idle/unconfigured).
+    - Setup card allows choosing local LLM (e.g. Ollama `http://localhost:11434` / Whisper) or cloud speech provider.
 * **Rust Backend Module**:
   - Source file: `src-tauri/src/voice_assistant.rs`.
   - Native API: Windows Speech Recognition / whisper.cpp local model bridge or Windows `winrt::Media::SpeechSynthesis`.
 * **IPC Contract**:
   - Command: `invoke('trigger_siri_assistant', { mode: 'voice' | 'text' })`.
+  - Command: `invoke('configure_assistant_model', { endpoint: string, model: string })`.
   - Event: Listen for `assistant-state-changed` (`'idle' | 'listening' | 'thinking' | 'speaking'`).
   - Schema:
     ```typescript
@@ -251,7 +309,10 @@ ProtonDock and the Kensaku search engine support three native themes, toggled vi
 ### 2.7 Pinned Apps Widget & App Catalog Picker (`pinned-apps`)
 * **Design & Alignment Contract**:
   - **Discrete Standalone 48px Tiles**: Each pinned application shortcut renders as an independent 48px square tile on the dock rail, perfectly aligned with running apps and system widgets.
-  - **Apps Catalog Picker in Customize**: The Customize modal features an `Apps` catalog enumerating all installed desktop and Windows Store applications. Clicking any app pins it directly to the dock.
+  - **User-Based Configuration Contract**:
+    - Default state: strictly `none` (`pinnedAppIds = []`). Zero dummy preinstalled apps are pinned by default.
+    - User customization: The Customize modal features an `Apps` catalog tab enumerating all installed desktop and Windows Store applications. Users select and toggle apps to pin them to the dock.
+    - When empty, clicking the dock slot or the Customize button directly routes to the Apps catalog picker.
   - **Reordering & Unpinning**: Pinned apps can be dragged in Edit Mode to reorder or unpinned via the customizer modal.
 * **Rust Backend Module**:
   - Source file: `src-tauri/src/installed_apps.rs` & `protonsearch/src/indexer.rs`.
@@ -303,9 +364,13 @@ To guarantee razor-sharp, crystal-clear icons, ProtonDock enforces the following
 
 ### 2.8 Music Player Widget (`music-player`)
 * **Design & Behavior**:
-  - Square Mode (48px): Album art rounded tile with animated equalizer bars and play/pause toggle.
-  - Rectangle Mode (150px): Album art on left + track title ("Night Drive") & artist ("Kavinsky") stack in the middle + playback controls (prev, play/pause, next) and progress indicator on the right.
+  - Square Mode (48px): Album art rounded tile with animated equalizer bars and play/pause toggle (or neutral music glyph when idle).
+  - Rectangle Mode (150px): Album art on left + track title & artist stack in the middle + playback controls (prev, play/pause, next) on the right (or `Music` / `No media playing` when idle).
   - Strictly locked to 48px square height.
+  - **User-Based State Contract**:
+    - Default state: `none` / idle (`isPlaying: false`, `title: 'No media playing'`).
+    - Connects directly to active Windows GSMTC media sessions without hardcoding dummy songs.
+    - Clicking when idle prompts the user to launch their preferred music application (e.g. Spotify, Apple Music).
 * **Rust Backend Module**:
   - Source file: `src-tauri/src/media_player.rs`.
   - Native API: Windows System Media Transport Controls (`GlobalSystemMediaTransportControlsSessionManager`) via WinRT `windows::Media::Control`.
