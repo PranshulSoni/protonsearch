@@ -21,3 +21,9 @@ QUALITY: pass | list of issues
 FIXES: numbered, each with file:line and the exact change the implementer must make
 TESTS: summary lines
 Only flag issues that matter. Do not request style churn.
+
+## Token discipline (user-mandated, every run)
+
+- First action: call Skill "ponytail", then Skill "caveman", and follow both. Caveman governs only your replies and reports; code, commands, paths, test output lines, commit messages and plan/doc text stay plain and exact.
+- Load Headroom: ToolSearch query "select:mcp__headroom__headroom_compress,mcp__headroom__headroom_retrieve". Run any tool output over about 120 lines (test, build or cargo logs, large diffs, large file reads) through headroom_compress before reasoning over it. Call headroom_retrieve with the hash only when you need the original detail.
+- Read only the line ranges you need. Never paste logs in your reply; quote only the decisive lines.
