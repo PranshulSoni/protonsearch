@@ -9,13 +9,13 @@
    PROTONDOCK DESIGN SYSTEM TOKENS
    --------------------------------------------------------------------------
    Height Invariant: All widgets strictly share the exact same height (--tile-h).
-   Square widgets have width = --tile-h (48px x 48px).
-   Rectangle widgets have the SAME height (--tile-h = 48px), while their
-   width expands from 48px up to 220px via in-dock customization.
+   Square widgets: 48px x 48px.
+   Rectangle widgets: exact same 48px height, customizable width (48px - 220px).
+   Non-AI Slop: Purpose-driven glass surfaces, zero decorative purple slop.
    ========================================================================== */
 
 :root {
-  /* ---- Sizing Invariant: 48px square height for all widgets ---- */
+  /* Sizing invariant: 48px height for all widgets */
   --tile-h: 48px;
   --tile-square-w: 48px;
   --tile-radius: 12px;
@@ -23,7 +23,7 @@
   --dock-pad: 6px;
   --dock-radius: 18px;
 
-  /* ---- Surfaces: Deep Tahoe Glass ---- */
+  /* Surfaces: Deep Tahoe Glass */
   --rail-top: rgba(22, 26, 33, 0.94);
   --rail-mid: rgba(14, 17, 22, 0.95);
   --rail-bottom: rgba(10, 12, 16, 0.96);
@@ -35,7 +35,7 @@
   --tile-hover-border: rgba(255, 255, 255, 0.20);
   --blur: blur(28px) saturate(145%);
 
-  /* ---- Colors ---- */
+  /* Neutral palette */
   --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", sans-serif;
   --text: #f0f3f6;
   --text-2: #9ea5b0;
@@ -43,13 +43,11 @@
   --glyph: #cbd3dc;
   --win-blue: #60cdff;
   --spotify-green: #1ed760;
-  --vscode-blue: #0078d7;
   --terminal-green: #6ee7b7;
-  --claude-orange: #d97706;
   --ring-blue: #74b7ff;
   --clock-orange: #f59c35;
 
-  /* ---- Motion ---- */
+  /* Motion: Apple spring cubic-bezier */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --speed-tile: 160ms;
   --speed-rail: 240ms;
@@ -116,7 +114,7 @@ html, body {
   border: 1px solid rgba(96, 205, 255, 0.25);
 }
 .desktop-hint p {
-  max-width: 560px;
+  max-width: 580px;
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--text-2);
@@ -228,7 +226,7 @@ html, body {
   align-items: center;
   gap: 6px;
   height: 29px;
-  padding: 0 11px;
+  padding: 0 12px;
   border-radius: 999px;
   background: rgba(16, 19, 26, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -271,17 +269,6 @@ html, body {
   transition: width var(--speed-rail) var(--ease), gap var(--speed-rail) var(--ease);
 }
 
-/* Offscreen clone for width measuring */
-.dock-rail.is-measuring {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  visibility: hidden;
-  pointer-events: none;
-  width: max-content;
-  transition: none;
-}
-
 /* ==========================================================================
    SLOTS AND WIDGET SURFACES: CAPSULES VS LINES
    ========================================================================== */
@@ -297,14 +284,24 @@ html, body {
   background: none;
   font-family: inherit;
   color: inherit;
-  cursor: pointer;
+  cursor: grab;
   border-radius: var(--tile-radius);
-  transition: width var(--speed-rail) var(--ease);
+  transition: width var(--speed-rail) var(--ease), transform 220ms var(--ease);
 }
+.dock-slot:active { cursor: grabbing; }
 .dock-slot[hidden] { display: none; }
 .dock-slot:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.55);
   outline-offset: 3px;
+}
+
+/* Direct reorder dragging feedback */
+.dock-slot.is-dragging {
+  opacity: 0.35;
+  cursor: grabbing;
+}
+.dock-slot.is-dragover {
+  transform: scale(0.96);
 }
 
 /* The Widget Surface: strictly locked height */
@@ -503,30 +500,68 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   text-overflow: ellipsis;
 }
 
-/* Quick width expand indicator on hover */
-.dw-expand-btn {
+/* In-dock reorder arrows on hover */
+.dw-reorder-nav {
   position: absolute;
-  top: 3px;
-  right: 3px;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+  z-index: 6;
+}
+.dock-slot:hover .dw-reorder-nav {
+  display: flex;
+}
+.dw-nav-btn {
+  appearance: none;
+  border: 0;
+  background: rgba(14, 17, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-2);
+  font-size: 9px;
+  line-height: 1;
   width: 14px;
   height: 14px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dw-nav-btn:hover {
+  color: #fff;
+  background: rgba(30, 36, 48, 0.95);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Quick width expand indicator on hover */
+.dw-expand-btn {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(14, 17, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   color: var(--text-2);
   display: none;
   align-items: center;
   justify-content: center;
   font-size: 8px;
   cursor: pointer;
-  z-index: 5;
+  z-index: 6;
 }
 .dock-slot:hover .dw-expand-btn {
   display: flex;
 }
 .dw-expand-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(30, 36, 48, 0.95);
   color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 /* Tooltips */
@@ -555,22 +590,22 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 }
 
 /* ==========================================================================
-   CUSTOMIZE DRAWER / MODAL
+   CUSTOMIZE MENU: WIDGET GALLERY & WIDGET STORE (COMING SOON)
    ========================================================================== */
 
 .cust-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms ease;
+  transition: opacity 180ms ease;
 }
 .cust-backdrop.is-open {
   opacity: 1;
@@ -578,29 +613,33 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 }
 
 .cust-modal {
-  width: 620px;
+  width: 660px;
   max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 60px);
-  background: linear-gradient(180deg, rgba(24, 28, 36, 0.98) 0%, rgba(16, 18, 24, 0.98) 100%);
+  max-height: calc(100vh - 50px);
+  background: linear-gradient(180deg, rgba(22, 26, 34, 0.98) 0%, rgba(14, 16, 22, 0.99) 100%);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 20px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.75);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transform: translateY(14px) scale(0.97);
-  transition: transform 220ms var(--ease);
+  transform: translateY(12px) scale(0.97);
+  transition: transform 200ms var(--ease);
 }
 .cust-backdrop.is-open .cust-modal {
   transform: translateY(0) scale(1);
 }
 
+/* Header & Tabs */
 .cust-head {
-  padding: 16px 20px;
+  padding: 16px 20px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.cust-head-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 14px;
 }
 .cust-title-group h2 {
   font-size: 15px;
@@ -632,6 +671,53 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   color: #fff;
 }
 
+/* Top Menu Tabs */
+.cust-nav-tabs {
+  display: flex;
+  gap: 18px;
+}
+.cust-nav-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: 600 12px/1 var(--font-stack);
+  padding: 0 2px 10px;
+  cursor: pointer;
+  position: relative;
+  transition: color 130ms;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cust-nav-tab:hover { color: var(--text); }
+.cust-nav-tab.is-active {
+  color: #fff;
+}
+.cust-nav-tab.is-active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--win-blue);
+  border-radius: 2px 2px 0 0;
+}
+.cust-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-2);
+}
+.cust-tag.is-accent {
+  background: rgba(96, 205, 255, 0.16);
+  color: var(--win-blue);
+}
+
+/* Toolbar actions inside Gallery */
 .cust-toolbar {
   padding: 10px 20px;
   background: rgba(0, 0, 0, 0.22);
@@ -668,20 +754,29 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   background: rgba(96, 205, 255, 0.25);
 }
 
-.cust-body {
-  padding: 16px 20px;
+.cust-pane {
+  display: none;
+  flex-direction: column;
   overflow-y: auto;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 190px);
+}
+.cust-pane.is-active {
+  display: flex;
+}
+
+/* Widget Gallery List */
+.cust-gallery-list {
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .cust-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 9px 12px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
@@ -691,10 +786,47 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   background: rgba(255, 255, 255, 0.055);
   border-color: rgba(255, 255, 255, 0.1);
 }
+.cust-item.is-disabled {
+  opacity: 0.55;
+}
+
+/* Switch toggle */
+.cust-toggle-wrap {
+  display: flex;
+  align-items: center;
+}
+.cust-toggle {
+  appearance: none;
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  transition: background 140ms ease;
+}
+.cust-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 140ms var(--ease);
+}
+.cust-toggle:checked {
+  background: var(--win-blue);
+}
+.cust-toggle:checked::after {
+  transform: translateX(14px);
+}
 
 .ci-icon-box {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -705,11 +837,11 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 }
 
 .ci-info {
-  flex: 1 1 120px;
+  flex: 1 1 110px;
   min-width: 0;
 }
 .ci-title {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 650;
   color: #fff;
   white-space: nowrap;
@@ -717,7 +849,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   text-overflow: ellipsis;
 }
 .ci-sub {
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--text-2);
   margin-top: 1px;
 }
@@ -733,8 +865,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-2);
-  font: 600 10px/1 var(--font-stack);
-  padding: 5px 8px;
+  font: 600 9.5px/1 var(--font-stack);
+  padding: 5px 7px;
   border-radius: 6px;
   cursor: pointer;
   transition: background 120ms, color 120ms, border-color 120ms;
@@ -753,12 +885,12 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 .ci-slider-wrap {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 130px;
+  gap: 7px;
+  min-width: 120px;
 }
 .ci-slider {
   appearance: none;
-  width: 80px;
+  width: 72px;
   height: 4px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.14);
@@ -767,22 +899,18 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 }
 .ci-slider::-webkit-slider-thumb {
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   cursor: pointer;
-  transition: transform 100ms;
-}
-.ci-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
 }
 .ci-val-badge {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
   color: var(--text);
-  min-width: 38px;
+  min-width: 34px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -798,8 +926,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-2);
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -813,8 +941,72 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   color: #fff;
 }
 .ci-order-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: not-allowed;
+}
+
+/* Widget Store Section (Coming Soon) */
+.cust-store-grid {
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.store-card {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  transition: background 130ms, border-color 130ms;
+}
+.store-card:hover {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.store-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.store-card-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.store-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--glyph);
+}
+.store-title {
+  font-size: 12px;
+  font-weight: 650;
+  color: #fff;
+}
+.store-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(245, 156, 53, 0.14);
+  color: #f59c35;
+  border: 1px solid rgba(245, 156, 53, 0.28);
+}
+.store-desc {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--text-2);
 }
 </style>
 </head>
@@ -824,13 +1016,13 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
 <header class="desktop-hint">
   <h1>ProtonDock <span class="badge">Square Sizing System</span></h1>
-  <p>All widgets strictly share a small 48px square height. Widgets can expand into rectangles at the exact same height. Click <strong>Customize</strong> or double-click any tile to change its width.</p>
+  <p>All widgets strictly share a 48px square height. Drag any widget left or right on the dock to reorder with smooth physical animations. Click <strong>Customize</strong> to open the Widget Gallery and Store.</p>
 </header>
 
 <div class="dock-stage">
   <div class="dock-cluster">
 
-    <!-- Top Shelf: Profile pills, Style switcher, and Customize button -->
+    <!-- Top Shelf: Profiles, Capsules vs Lines style switcher, and Customize pill -->
     <div class="dock-shelf">
       <div class="profile-pill" role="group" aria-label="Dock profiles">
         <button class="profile-tab is-active" data-profile="photo" type="button" aria-pressed="true">Photo Match</button>
@@ -860,41 +1052,138 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       </button>
     </div>
 
-    <!-- The Dock Rail: Contains the 11 widgets matching user photo -->
+    <!-- The Dock Rail: Contains widgets with animated drag reorder & width expansion -->
     <nav class="dock-rail" id="dockRail" aria-label="Dock widgets"></nav>
 
   </div>
 </div>
 
 <!-- ==========================================================================
-     CUSTOMIZER MODAL (Width customization, reorder, square/rect presets)
+     CUSTOMIZE MODAL: WIDGET GALLERY & WIDGET STORE (COMING SOON)
      ========================================================================== -->
 <div class="cust-backdrop" id="custModal" role="dialog" aria-modal="true" aria-label="Customize Dock Widgets">
   <div class="cust-modal">
     <div class="cust-head">
-      <div class="cust-title-group">
-        <h2>Dock Widget Width & Sizing</h2>
-        <p>All widgets are locked to a compact 48px square height. Expand any widget horizontally into a rectangle without changing dock height.</p>
+      <div class="cust-head-top">
+        <div class="cust-title-group">
+          <h2>ProtonDock Customizer</h2>
+          <p>Locked 48px square height for all widgets. Enable or disable widgets and customize their widths.</p>
+        </div>
+        <button class="cust-close" id="closeCustomizerBtn" type="button" aria-label="Close customizer">&times;</button>
       </div>
-      <button class="cust-close" id="closeCustomizerBtn" type="button" aria-label="Close customizer">&times;</button>
+      <div class="cust-nav-tabs">
+        <button class="cust-nav-tab is-active" id="tabGalleryBtn" type="button">
+          <span>Widget Gallery</span>
+          <span class="cust-tag is-accent" id="galleryCountTag">11</span>
+        </button>
+        <button class="cust-nav-tab" id="tabStoreBtn" type="button">
+          <span>Widget Store</span>
+          <span class="cust-tag">Coming Soon</span>
+        </button>
+      </div>
     </div>
 
-    <div class="cust-toolbar">
-      <button class="cust-action-btn is-accent" id="allSquareBtn" type="button" title="Set every widget to 48px square matching the photo">
-        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="10" height="10" rx="2"/></svg>
-        <span>All Square (Photo Match)</span>
-      </button>
-      <button class="cust-action-btn" id="allCompactBtn" type="button" title="Set widgets with text to 120px rectangle">
-        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="14" height="10" rx="2"/></svg>
-        <span>Expand Rich Rectangles</span>
-      </button>
-      <button class="cust-action-btn" id="resetDefaultsBtn" type="button" title="Reset all widths to initial defaults">
-        <span>Reset Defaults</span>
-      </button>
+    <!-- PANE 1: WIDGET GALLERY (INSTALLED WIDGETS) -->
+    <div class="cust-pane is-active" id="paneGallery">
+      <div class="cust-toolbar">
+        <button class="cust-action-btn is-accent" id="allSquareBtn" type="button" title="Set every widget to 48px square matching the photo">
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="10" height="10" rx="2"/></svg>
+          <span>All Square (Photo Match)</span>
+        </button>
+        <button class="cust-action-btn" id="allCompactBtn" type="button" title="Set widgets with text to 124px rectangle">
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="14" height="10" rx="2"/></svg>
+          <span>Expand Rich Rectangles</span>
+        </button>
+        <button class="cust-action-btn" id="resetDefaultsBtn" type="button" title="Reset all widths and enabled status to defaults">
+          <span>Reset Defaults</span>
+        </button>
+      </div>
+      <div class="cust-gallery-list" id="custWidgetList">
+        <!-- Injected dynamically -->
+      </div>
     </div>
 
-    <div class="cust-body" id="custWidgetList">
-      <!-- Injected dynamically by JavaScript -->
+    <!-- PANE 2: WIDGET STORE (COMING SOON) -->
+    <div class="cust-pane" id="paneStore">
+      <div class="cust-store-grid">
+        <div class="store-card">
+          <div class="store-card-head">
+            <div class="store-card-title-wrap">
+              <span class="store-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              </span>
+              <span class="store-title">Calendar & Events</span>
+            </div>
+            <span class="store-badge">Coming Soon</span>
+          </div>
+          <p class="store-desc">Agenda overview, countdown to next meeting, and local ICS calendar synchronization.</p>
+        </div>
+
+        <div class="store-card">
+          <div class="store-card-head">
+            <div class="store-card-title-wrap">
+              <span class="store-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+              </span>
+              <span class="store-title">Clipboard Manager</span>
+            </div>
+            <span class="store-badge">Coming Soon</span>
+          </div>
+          <p class="store-desc">Access recent snippets, pinned text templates, and quick clipboard history.</p>
+        </div>
+
+        <div class="store-card">
+          <div class="store-card-head">
+            <div class="store-card-title-wrap">
+              <span class="store-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/></svg>
+              </span>
+              <span class="store-title">Focus & Pomodoro</span>
+            </div>
+            <span class="store-badge">Coming Soon</span>
+          </div>
+          <p class="store-desc">Distraction-free focus sessions, custom intervals, and break timers right on the rail.</p>
+        </div>
+
+        <div class="store-card">
+          <div class="store-card-head">
+            <div class="store-card-title-wrap">
+              <span class="store-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </span>
+              <span class="store-title">Network & Ping</span>
+            </div>
+            <span class="store-badge">Coming Soon</span>
+          </div>
+          <p class="store-desc">Live bandwidth throughput gauges, gateway ping latency, and connection status.</p>
+        </div>
+
+        <div class="store-card">
+          <div class="store-card-head">
+            <div class="store-card-title-wrap">
+              <span class="store-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+              </span>
+              <span class="store-title">GitHub & PRs</span>
+            </div>
+            <span class="store-badge">Coming Soon</span>
+          </div>
+          <p class="store-desc">Review requests, GitHub Actions workflow states, and assigned issue tracking.</p>
+        </div>
+
+        <div class="store-card">
+          <div class="store-card-head">
+            <div class="store-card-title-wrap">
+              <span class="store-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </span>
+              <span class="store-title">Market Ticker</span>
+            </div>
+            <span class="store-badge">Coming Soon</span>
+          </div>
+          <p class="store-desc">Real-time stock and cryptocurrency pricing, day change percentages, and watchlists.</p>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -905,7 +1194,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   /* ==========================================================================
      WIDGET CATALOG & DEFINITIONS
-     Exact match for the 11 widgets in the photo + support for rich rectangular text
+     All widgets strictly 48px square height, customizable width
      ========================================================================== */
 
   var WIDGETS = {
@@ -1008,8 +1297,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     }
   };
 
-  /* Exact initial layout matching the user photo: all 11 widgets in sequence */
-  var PHOTO_LAYOUT = [
+  /* Default initial order matching the photo */
+  var PHOTO_ORDER = [
     'start',
     'search',
     'app-vscode',
@@ -1023,41 +1312,50 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     'clock'
   ];
 
-  /* Profiles map */
+  /* Profiles with active order & enabled sets */
   var PROFILES = {
-    photo: PHOTO_LAYOUT.slice(),
+    photo: PHOTO_ORDER.slice(),
     work: ['start', 'search', 'app-vscode', 'app-terminal', 'claude', 'chatgpt', 'agent', 'clock'],
     dev: ['start', 'search', 'app-vscode', 'app-terminal', 'app-chrome', 'agent', 'clock'],
     focus: ['start', 'search', 'app-vscode', 'media', 'clock']
   };
 
-  /* Current profile & widths state */
   var activeProfile = 'photo';
-  var widgetOrder = PHOTO_LAYOUT.slice();
+  var widgetOrder = PHOTO_ORDER.slice();
+  var enabledMap = {};
   var customWidths = {};
 
-  /* Load stored customizations if present */
+  /* Default all initial widgets enabled */
+  PHOTO_ORDER.forEach(function (id) { enabledMap[id] = true; });
+
+  /* Load stored customizations */
   try {
-    var stored = localStorage.getItem('protondock_preview_state');
+    var stored = localStorage.getItem('protondock_preview_state_v3');
     if (stored) {
       var parsed = JSON.parse(stored);
       if (parsed.customWidths) customWidths = parsed.customWidths;
+      if (parsed.enabledMap) enabledMap = parsed.enabledMap;
+      if (parsed.widgetOrder && Array.isArray(parsed.widgetOrder)) widgetOrder = parsed.widgetOrder;
       if (parsed.activeProfile && PROFILES[parsed.activeProfile]) activeProfile = parsed.activeProfile;
       if (parsed.displayStyle) document.body.setAttribute('data-display-style', parsed.displayStyle);
     }
-  } catch (e) {
-    /* Ignore storage errors */
-  }
+  } catch (e) {}
 
   function getWidth(id) {
     if (customWidths[id] != null) return customWidths[id];
     return WIDGETS[id] ? WIDGETS[id].defaultWidth : 48;
   }
 
+  function isEnabled(id) {
+    return enabledMap[id] !== false;
+  }
+
   function saveState() {
     try {
-      localStorage.setItem('protondock_preview_state', JSON.stringify({
+      localStorage.setItem('protondock_preview_state_v3', JSON.stringify({
         customWidths: customWidths,
+        enabledMap: enabledMap,
+        widgetOrder: widgetOrder,
         activeProfile: activeProfile,
         displayStyle: document.body.getAttribute('data-display-style') || 'capsule'
       }));
@@ -1065,13 +1363,14 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   }
 
   /* ==========================================================================
-     RENDER FUNCTIONS
+     DOCK RENDERING & FLIP ANIMATION
      ========================================================================== */
 
   var rail = document.getElementById('dockRail');
   var rootStyle = getComputedStyle(document.documentElement);
   var MAG_STRENGTH = parseFloat(rootStyle.getPropertyValue('--mag-strength')) || 0.22;
   var MAG_RADIUS = parseFloat(rootStyle.getPropertyValue('--mag-radius')) || 86;
+  var draggedSlotId = null;
 
   function renderAnalogClockSvg() {
     return '<svg class="dock-clock-analog" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">' +
@@ -1098,11 +1397,9 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   }
 
   function renderWidgetGlyph(w) {
-    if (w.isClock) {
-      return renderAnalogClockSvg();
-    }
+    if (w.isClock) return renderAnalogClockSvg();
     if (w.isRing) {
-      var circumference = 2 * Math.PI * 13; /* ~81.68 */
+      var circumference = 2 * Math.PI * 13;
       var offset = circumference - (circumference * w.ringPct / 100);
       return '<div class="dock-ring-wrap">' +
         '<svg class="dock-ring-svg" viewBox="0 0 34 34" width="28" height="28">' +
@@ -1119,17 +1416,50 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     return '<span class="w-ico">' + w.iconSvg + '</span>';
   }
 
-  function renderDock() {
-    var list = PROFILES[activeProfile] || PHOTO_LAYOUT;
-    var html = '';
+  /* FLIP animated reorder */
+  function reorderWithFlip(newOrder) {
+    var oldPositions = {};
+    var slots = rail.querySelectorAll('.dock-slot');
+    slots.forEach(function (slot) {
+      oldPositions[slot.dataset.id] = slot.getBoundingClientRect().left;
+    });
 
-    list.forEach(function (id) {
+    widgetOrder = newOrder;
+    saveState();
+    renderDock();
+
+    var newSlots = rail.querySelectorAll('.dock-slot');
+    newSlots.forEach(function (slot) {
+      var id = slot.dataset.id;
+      if (oldPositions[id] != null) {
+        var newLeft = slot.getBoundingClientRect().left;
+        var deltaX = oldPositions[id] - newLeft;
+        if (deltaX !== 0) {
+          slot.style.transition = 'none';
+          slot.style.transform = 'translateX(' + deltaX + 'px)';
+          requestAnimationFrame(function () {
+            slot.style.transition = 'transform 220ms var(--ease)';
+            slot.style.transform = '';
+          });
+        }
+      }
+    });
+
+    updateCustomizerList();
+  }
+
+  function renderDock() {
+    var html = '';
+    var activeList = widgetOrder.filter(function (id) {
+      return isEnabled(id) && WIDGETS[id];
+    });
+
+    activeList.forEach(function (id, idx) {
       var w = WIDGETS[id];
-      if (!w) return;
       var width = getWidth(id);
       var shape = width <= 52 ? 'square' : 'rect';
 
-      html += '<button class="dock-slot" data-id="' + id + '" data-shape="' + shape + '" style="--w:' + width + 'px" type="button" aria-label="' + w.title + '">' +
+      html += '<button class="dock-slot" data-id="' + id + '" data-index="' + idx + '" data-shape="' + shape + '" style="--w:' + width + 'px" draggable="true" type="button" aria-label="' + w.title + '">' +
         '<span class="dock-widget">' +
           '<span class="w-glyph-box">' +
             renderWidgetGlyph(w) +
@@ -1137,6 +1467,10 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
           '<span class="dw-stack">' +
             '<span class="dw-strong">' + w.title + '</span>' +
             '<span class="dw-sub">' + w.sub + '</span>' +
+          '</span>' +
+          '<span class="dw-reorder-nav">' +
+            '<span class="dw-nav-btn" data-move="-1" title="Move Left">&lsaquo;</span>' +
+            '<span class="dw-nav-btn" data-move="1" title="Move Right">&rsaquo;</span>' +
           '</span>' +
           '<span class="dw-expand-btn" title="Toggle Square / Rectangle" data-toggle-id="' + id + '">&#x2194;</span>' +
         '</span>' +
@@ -1146,21 +1480,22 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     });
 
     rail.innerHTML = html;
-    attachWidgetEvents();
+    attachDockInteractions();
   }
 
-  function attachWidgetEvents() {
+  function attachDockInteractions() {
     var slots = rail.querySelectorAll('.dock-slot');
+
     slots.forEach(function (slot) {
       var id = slot.dataset.id;
 
-      /* Double click toggles between 48px square and 124px rectangle */
+      /* Double-click toggles width between 48px square and 124px rectangle */
       slot.addEventListener('dblclick', function (e) {
         e.stopPropagation();
         toggleWidgetWidth(id);
       });
 
-      /* Expand button click */
+      /* Quick expand button */
       var expandBtn = slot.querySelector('.dw-expand-btn');
       if (expandBtn) {
         expandBtn.addEventListener('click', function (e) {
@@ -1168,7 +1503,72 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
           toggleWidgetWidth(id);
         });
       }
+
+      /* In-dock navigation arrows */
+      var navBtns = slot.querySelectorAll('.dw-nav-btn');
+      navBtns.forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var delta = parseInt(btn.dataset.move, 10);
+          moveWidgetPosition(id, delta);
+        });
+      });
+
+      /* Drag and drop reordering */
+      slot.addEventListener('dragstart', function (e) {
+        draggedSlotId = id;
+        slot.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', id);
+      });
+
+      slot.addEventListener('dragend', function () {
+        draggedSlotId = null;
+        slots.forEach(function (s) {
+          s.classList.remove('is-dragging');
+          s.classList.remove('is-dragover');
+        });
+      });
+
+      slot.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (draggedSlotId && draggedSlotId !== id) {
+          slot.classList.add('is-dragover');
+        }
+      });
+
+      slot.addEventListener('dragleave', function () {
+        slot.classList.remove('is-dragover');
+      });
+
+      slot.addEventListener('drop', function (e) {
+        e.preventDefault();
+        slot.classList.remove('is-dragover');
+        if (draggedSlotId && draggedSlotId !== id) {
+          var fromIdx = widgetOrder.indexOf(draggedSlotId);
+          var toIdx = widgetOrder.indexOf(id);
+          if (fromIdx !== -1 && toIdx !== -1) {
+            var next = widgetOrder.slice();
+            next.splice(fromIdx, 1);
+            next.splice(toIdx, 0, draggedSlotId);
+            reorderWithFlip(next);
+          }
+        }
+      });
     });
+  }
+
+  function moveWidgetPosition(id, delta) {
+    var fromIdx = widgetOrder.indexOf(id);
+    var toIdx = fromIdx + delta;
+    if (fromIdx !== -1 && toIdx >= 0 && toIdx < widgetOrder.length) {
+      var next = widgetOrder.slice();
+      var temp = next[fromIdx];
+      next[fromIdx] = next[toIdx];
+      next[toIdx] = temp;
+      reorderWithFlip(next);
+    }
   }
 
   function toggleWidgetWidth(id) {
@@ -1187,7 +1587,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   function magnify(event) {
-    if (reduceMotion.matches) return;
+    if (reduceMotion.matches || draggedSlotId) return;
     var slots = rail.querySelectorAll('.dock-slot');
     slots.forEach(function (slot) {
       var rect = slot.getBoundingClientRect();
@@ -1214,13 +1614,19 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   rail.addEventListener('blur', resetMagnify, true);
 
   /* ==========================================================================
-     CUSTOMIZER MODAL CONTROLS
+     CUSTOMIZER MODAL: GALLERY & STORE LOGIC
      ========================================================================== */
 
   var custModal = document.getElementById('custModal');
   var openCustomizerBtn = document.getElementById('openCustomizerBtn');
   var closeCustomizerBtn = document.getElementById('closeCustomizerBtn');
   var custWidgetList = document.getElementById('custWidgetList');
+  var galleryCountTag = document.getElementById('galleryCountTag');
+  var tabGalleryBtn = document.getElementById('tabGalleryBtn');
+  var tabStoreBtn = document.getElementById('tabStoreBtn');
+  var paneGallery = document.getElementById('paneGallery');
+  var paneStore = document.getElementById('paneStore');
+
   var allSquareBtn = document.getElementById('allSquareBtn');
   var allCompactBtn = document.getElementById('allCompactBtn');
   var resetDefaultsBtn = document.getElementById('resetDefaultsBtn');
@@ -1245,16 +1651,36 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     }
   });
 
-  function updateCustomizerList() {
-    var list = PROFILES[activeProfile] || PHOTO_LAYOUT;
-    var html = '';
+  /* Switch between Gallery and Store tabs */
+  tabGalleryBtn.addEventListener('click', function () {
+    tabGalleryBtn.classList.add('is-active');
+    tabStoreBtn.classList.remove('is-active');
+    paneGallery.classList.add('is-active');
+    paneStore.classList.remove('is-active');
+  });
 
-    list.forEach(function (id, idx) {
+  tabStoreBtn.addEventListener('click', function () {
+    tabStoreBtn.classList.add('is-active');
+    tabGalleryBtn.classList.remove('is-active');
+    paneStore.classList.add('is-active');
+    paneGallery.classList.remove('is-active');
+  });
+
+  function updateCustomizerList() {
+    var html = '';
+    var enabledCount = 0;
+
+    widgetOrder.forEach(function (id, idx) {
       var w = WIDGETS[id];
       if (!w) return;
       var width = getWidth(id);
+      var enabled = isEnabled(id);
+      if (enabled) enabledCount++;
 
-      html += '<div class="cust-item" data-id="' + id + '">' +
+      html += '<div class="cust-item ' + (enabled ? '' : 'is-disabled') + '" data-id="' + id + '">' +
+        '<div class="cust-toggle-wrap">' +
+          '<input type="checkbox" class="cust-toggle" data-toggle-enable="' + id + '" ' + (enabled ? 'checked' : '') + ' title="Enable or disable widget" />' +
+        '</div>' +
         '<div class="ci-icon-box">' +
           w.iconSvg +
         '</div>' +
@@ -1263,7 +1689,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
           '<div class="ci-sub">' + (width <= 52 ? 'Square (48px)' : 'Rectangle (' + width + 'px)') + '</div>' +
         '</div>' +
         '<div class="ci-presets">' +
-          '<button class="ci-preset-btn ' + (width === 48 ? 'is-active' : '') + '" data-set-width="48">Square 48px</button>' +
+          '<button class="ci-preset-btn ' + (width === 48 ? 'is-active' : '') + '" data-set-width="48">48px</button>' +
           '<button class="ci-preset-btn ' + (width === 96 ? 'is-active' : '') + '" data-set-width="96">96px</button>' +
           '<button class="ci-preset-btn ' + (width === 130 ? 'is-active' : '') + '" data-set-width="130">130px</button>' +
           '<button class="ci-preset-btn ' + (width === 180 ? 'is-active' : '') + '" data-set-width="180">180px</button>' +
@@ -1273,13 +1699,14 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
           '<span class="ci-val-badge">' + width + 'px</span>' +
         '</div>' +
         '<div class="ci-order-btns">' +
-          '<button class="ci-order-btn" data-move="-1" data-index="' + idx + '" ' + (idx === 0 ? 'disabled' : '') + ' title="Move Left">&larr;</button>' +
-          '<button class="ci-order-btn" data-move="1" data-index="' + idx + '" ' + (idx === list.length - 1 ? 'disabled' : '') + ' title="Move Right">&rarr;</button>' +
+          '<button class="ci-order-btn" data-move="-1" data-id="' + id + '" ' + (idx === 0 ? 'disabled' : '') + ' title="Move Left">&larr;</button>' +
+          '<button class="ci-order-btn" data-move="1" data-id="' + id + '" ' + (idx === widgetOrder.length - 1 ? 'disabled' : '') + ' title="Move Right">&rarr;</button>' +
         '</div>' +
       '</div>';
     });
 
     custWidgetList.innerHTML = html;
+    galleryCountTag.textContent = enabledCount;
     attachCustomizerEvents();
   }
 
@@ -1288,7 +1715,18 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     items.forEach(function (item) {
       var id = item.dataset.id;
 
-      /* Preset buttons */
+      /* Enable/Disable toggle */
+      var toggle = item.querySelector('.cust-toggle');
+      if (toggle) {
+        toggle.addEventListener('change', function () {
+          enabledMap[id] = toggle.checked;
+          saveState();
+          renderDock();
+          updateCustomizerList();
+        });
+      }
+
+      /* Preset width buttons */
       var presets = item.querySelectorAll('.ci-preset-btn');
       presets.forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1300,7 +1738,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         });
       });
 
-      /* Slider */
+      /* Range slider */
       var slider = item.querySelector('.ci-slider');
       var badge = item.querySelector('.ci-val-badge');
       if (slider) {
@@ -1316,22 +1754,12 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         });
       }
 
-      /* Reordering */
+      /* Position buttons */
       var orderBtns = item.querySelectorAll('.ci-order-btn');
       orderBtns.forEach(function (btn) {
         btn.addEventListener('click', function () {
           var delta = parseInt(btn.dataset.move, 10);
-          var idx = parseInt(btn.dataset.index, 10);
-          var targetIdx = idx + delta;
-          var list = PROFILES[activeProfile];
-          if (targetIdx >= 0 && targetIdx < list.length) {
-            var temp = list[idx];
-            list[idx] = list[targetIdx];
-            list[targetIdx] = temp;
-            saveState();
-            renderDock();
-            updateCustomizerList();
-          }
+          moveWidgetPosition(id, delta);
         });
       });
     });
@@ -1339,8 +1767,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   /* Toolbar Actions */
   allSquareBtn.addEventListener('click', function () {
-    var list = PROFILES[activeProfile] || PHOTO_LAYOUT;
-    list.forEach(function (id) {
+    widgetOrder.forEach(function (id) {
       customWidths[id] = 48;
     });
     saveState();
@@ -1349,8 +1776,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   });
 
   allCompactBtn.addEventListener('click', function () {
-    var list = PROFILES[activeProfile] || PHOTO_LAYOUT;
-    list.forEach(function (id) {
+    widgetOrder.forEach(function (id) {
       var w = WIDGETS[id];
       if (w && (w.isMedia || w.hasDot || id === 'search' || id === 'claude' || id === 'chatgpt' || id === 'clock')) {
         customWidths[id] = 124;
@@ -1363,6 +1789,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   resetDefaultsBtn.addEventListener('click', function () {
     customWidths = {};
+    PHOTO_ORDER.forEach(function (id) { enabledMap[id] = true; });
+    widgetOrder = PHOTO_ORDER.slice();
     saveState();
     renderDock();
     updateCustomizerList();
@@ -1378,6 +1806,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       var p = tab.dataset.profile;
       if (PROFILES[p]) {
         activeProfile = p;
+        widgetOrder = PROFILES[p].slice();
         profileTabs.forEach(function (t) {
           var active = t.dataset.profile === p;
           t.classList.toggle('is-active', active);
@@ -1406,7 +1835,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     });
   });
 
-  /* Initial boot */
+  /* Initial render */
   renderDock();
 
 })();
