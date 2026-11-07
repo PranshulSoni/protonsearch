@@ -685,6 +685,43 @@ button.fw-dock {
   min-width: 0;
 }
 
+.fw-card-loading {
+  gap: 8px;
+  min-height: 150px;
+  justify-content: center;
+}
+
+.fw-skeleton {
+  display: block;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.045) 25%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.045) 75%
+  );
+  background-size: 200% 100%;
+  animation: fw-shimmer 1.5s ease-in-out infinite;
+}
+
+.fw-skeleton--hero { height: 54px; border-radius: 8px; }
+
+.fw-skeleton-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: 8px;
+}
+
+.fw-skeleton--icon { width: 32px; height: 32px; border-radius: 8px; }
+.fw-skeleton--line { height: 10px; }
+.fw-skeleton--short { width: 56%; justify-self: end; }
+
+@keyframes fw-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
 .fw-card-foot {
   position: relative;
   z-index: 1;
@@ -2372,5 +2409,9 @@ button.fw-dock {
   .fw-settings * {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+
+  .fw-skeleton {
+    animation: none !important;
   }
 }

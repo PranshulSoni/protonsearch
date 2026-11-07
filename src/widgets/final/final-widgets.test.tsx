@@ -97,6 +97,14 @@ test('unknown system data renders honestly', () => {
   expect(text).toContain('Not available');
 });
 
+test('loading state renders a skeleton and never claims empty data', () => {
+  const view = render(<WidgetCard id="system" status="loading" />);
+  expect(view.getByText('SYNCING')).not.toBeNull();
+  expect(view.container.querySelector('.fw-skeleton--hero')).not.toBeNull();
+  expect(view.container.textContent ?? '').not.toContain('Not available');
+  view.unmount();
+});
+
 test('AI widgets ask for a local connection without data', () => {
   for (const id of ['claude', 'chatgpt'] as const) {
     const view = render(<WidgetCard id={id} />);

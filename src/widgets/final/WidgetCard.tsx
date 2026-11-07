@@ -264,6 +264,34 @@ export function WidgetCard({ id, settings, data, preview = false, status, onActi
   const meta = getWidgetMeta(id);
   const source = (preview ? sampleFor(id) : data) as unknown;
 
+  if (status === 'loading' && !preview) {
+    return (
+      <section
+        className={`fw-card fw-tint-${meta.tint} fw-card--${id}`}
+        style={styleFor(id)}
+        aria-label={`${meta.title} widget card`}
+        aria-busy="true"
+        data-widget-card={id}
+      >
+        <WidgetHeader id={id} status="loading" preview={preview} />
+        <div className="fw-card-body fw-card-loading">
+          <span className="fw-skeleton fw-skeleton--hero" />
+          <span className="fw-skeleton-row">
+            <span className="fw-skeleton fw-skeleton--icon" />
+            <span className="fw-skeleton fw-skeleton--line" />
+            <span className="fw-skeleton fw-skeleton--line fw-skeleton--short" />
+          </span>
+          <span className="fw-skeleton-row">
+            <span className="fw-skeleton fw-skeleton--icon" />
+            <span className="fw-skeleton fw-skeleton--line" />
+            <span className="fw-skeleton fw-skeleton--line fw-skeleton--short" />
+          </span>
+        </div>
+        <CardFooter left={sourceFoot(id, preview, 'loading')} right="Syncing local data" />
+      </section>
+    );
+  }
+
   let body: ReactNode;
 
   switch (id) {
