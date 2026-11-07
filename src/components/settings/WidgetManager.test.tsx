@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WidgetManager } from './WidgetManager';
 import { defaultLayout, type DockLayout } from '../dock/layout';
+import { FINAL_WIDGET_IDS, getWidgetMeta } from '../../widgets/final';
 
 function Harness({ initial = defaultLayout() }: { initial?: DockLayout }) {
   const [layout, setLayout] = useState(initial);
@@ -23,6 +24,18 @@ describe('WidgetManager', () => {
     expect(container.querySelectorAll('.wm-grid [data-widget-card]')).toHaveLength(14);
     expect(screen.getByText('Installed widgets')).toBeTruthy();
     expect(screen.getByText(/9 enabled/)).toBeTruthy();
+  });
+
+  it('orders the installed grid by the active profile and appends disabled widgets', () => {
+    const layout = defaultLayout();
+    const active = layout.profiles.daily.map((item) => getWidgetMeta(item.id).title);
+    const disabled = FINAL_WIDGET_IDS
+      .filter((id) => !layout.profiles.daily.some((item) => item.id === id))
+      .map((id) => getWidgetMeta(id).title);
+    render(<Harness />);
+    const headings = Array.from(document.querySelectorAll('.wm-grid .wm-card-copy h3'))
+      .map((node) => node.textContent);
+    expect(headings).toEqual([...active, ...disabled]);
   });
 
   it('installs and removes a store widget in the active profile', () => {

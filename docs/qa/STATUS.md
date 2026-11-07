@@ -18,7 +18,7 @@ listens for `widget-card:show`; the browser preview renders an in-viewport card.
 Verification this run:
 
 * `npx tsc -b` passed.
-* `npm test -- --reporter=dot` passed: 18 files, 171 tests.
+* `npm test -- --reporter=dot` passed: 18 files, 172 tests.
 * `npm run build` passed (Vite 7.3.7, 54 modules).
 * `npm run widgets:validate` accepted 29 legacy IDs.
 * `git diff --check` reported CRLF warnings only.

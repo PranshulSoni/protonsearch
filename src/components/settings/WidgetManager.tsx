@@ -118,7 +118,7 @@ function WidgetCardItem({
       onDrop={(event) => {
         event.preventDefault();
         const from = Number(event.dataTransfer.getData('text/plain'));
-        if (Number.isInteger(from)) onMove(from, index);
+        if (Number.isInteger(from) && index >= 0) onMove(from, index);
         setDragging(false);
       }}
     >
@@ -175,6 +175,10 @@ export function WidgetManager({ layout, onChange, onClose, error }: WidgetManage
   const items = layout.profiles[profile];
   const appearance: AppearanceMode = layout.appearances?.[profile] ?? 'capsules';
   const installed = useMemo(() => new Set(items.map((item) => item.id)), [items]);
+  const orderedIds = useMemo(
+    () => [...items.map((item) => item.id), ...FINAL_WIDGET_IDS.filter((id) => !installed.has(id))],
+    [installed, items],
+  );
   const detailItem = detail ? itemFor(layout, detail) : undefined;
 
   const toggle = (id: FinalWidgetId) => {
@@ -310,7 +314,7 @@ export function WidgetManager({ layout, onChange, onClose, error }: WidgetManage
           <PreviewStrip items={items} />
 
           <div className="wm-grid">
-            {tab === 'installed' ? FINAL_WIDGET_IDS.map((id) => {
+            {tab === 'installed' ? orderedIds.map((id) => {
               const item = itemFor(layout, id) ?? { id };
               const index = items.findIndex((entry) => entry.id === id);
               return (
