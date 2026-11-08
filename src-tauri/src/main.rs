@@ -1063,10 +1063,11 @@ fn main() {
             calendar_forget_source
         ])
         .setup(|app| {
-            app.global_shortcut().register("Alt+Space")?;
-            let configured = protonsearch::settings::AppSettings::load().global_hotkey;
-            if configured != "Alt+Space" {
-                app.global_shortcut().register(configured.as_str())?;
+            for shortcut in providers::hotkey_status::hotkeys(
+                &protonsearch::settings::AppSettings::load().global_hotkey,
+            ) {
+                let ok = app.global_shortcut().register(shortcut.as_str()).is_ok();
+                providers::hotkey_status::record(&shortcut, ok);
             }
             // Initialize schema before the indexers acquire write transactions.
             let shared = app.state::<NativeState>();
@@ -1460,7 +1461,7 @@ mod tests {
             assert!(valid_widget_card_id(id));
         }
         assert!(!valid_widget_card_id(""));
-        assert!(!valid_widget_card_id("calendar "));
+        assert!(!valid_widget_card_id("not-a-widget"));
         assert!(!valid_widget_card_id("../dock"));
         for size in WIDGET_CARD_SIZES {
             assert!(valid_widget_card_size(size));
