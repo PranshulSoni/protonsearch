@@ -246,3 +246,238 @@ Order: A0 alone; then the UI lane (A1, A10) beside the backend lane (A2 to A9, s
 - Later backend phases (F, H): registry providers run outside `NATIVE_LOCK`; the first provider that touches WinRT or Core Audio must make that lock reachable and take it.
 - IC-A: `ai_usage::tests::reads_newest_codex_limits_and_agent_metadata_without_inventing_quota` is flaky across a minute rollover (fixture `now + 4h12m`); rerun once, and if it fails again fix it by injecting a fixed `now` in the test only. Run N-A1 exactly as A11 listed (idle 60 s shots every 2 s with edge crops; ten hover cycles judged 700 ms after leave; five Daily to Focus round trips plus one narrow-to-wide burst; three relaunches; current display scale only) and N-A2 after A9 (Notepad tile beside its taskbar icon at rest and at hover peak; one small-icon app; hover smoothness with many apps). Update the "review pending" headings at `docs/qa/dock-defects-2026-11-07.md` lines 5 and 37 with the A11 verdicts.
 - A12 (new, from the A10 review; UI lane, runs alone in the UI lane, before IC-A): blur must reset magnification and pointer movement must re-heat the rail. (1) `src/components/dock/magnify.ts`: after the `pointerleave` listener add `window.addEventListener('blur', leave);` and in the cleanup, after the `pointerleave` removal, `window.removeEventListener('blur', leave);`. (2) `src/components/dock/DockSurface.tsx`: add `onPointerMove={heat}` to the `.dock-final-rail` element. (3) `src/components/dock/magnify.test.tsx`, after `leaving restores rest scale`: test `window blur restores rest scale` (pointerMove clientX 82, dispatch window `blur`, expect `cells[1]` `--mag` `'1.000'`). (4) `src/components/dock/DockSurface.test.tsx`: test `heats again on pointer move after blur` (pointerEnter, act(blur), pointerMove on the rail, expect `data-hot` `'true'`). Optional only if N-A3 shows a tooltip sliver over the returned shelf: `.dock-final:not([data-hot="true"]) .dock-cell:hover > .dock-tip { opacity: 0; }` in dock-tiles.css. Phase B U2.2 (useMagnify rewrite) must keep the blur reset and its test. N-A3 keeps the mouse still.
+
+### A13 Weather and calendar read the layout through layout_store
+
+All paths are relative to `C:\Users\Pranshul\Documents\Projects\protonsearch`.
+
+- **Lane and order.**
+  - Backend lane. Depends on A9, and needs A5 and A6 landed.
+  - `main.rs` is hot, so one task at a time.
+  - `local_calendar.rs` editor order: A6, then A13, then any BE-39 task.
+  - Land before IC-A.
+- **Why (BE-04 follow-up from the A4 review).**
+  - `weather_snapshot` and `local_calendar::active_profile` still open `protondock-layout.json` themselves. With a corrupt file and a good backup, the dock loads the backup but weather errors and every calendar command fails.
+  - After A13, `grep -rn "protondock-layout" src-tauri/src protonsearch/src` prints only the two constant lines in `src-tauri/src/layout_store.rs`.
+- **Files (exact).**
+  - `protonsearch/src/weather.rs`
+  - `src-tauri/src/local_calendar.rs`
+  - `src-tauri/src/main.rs`
+  - `src-tauri/tests/layout_store.rs` (append one test)
+  - `src-tauri/tests/local_calendar.rs` (add one include, one `use`, one test)
+- **Stop and report** if A6's `active_profile` or `profile_is_active` differs from A6's spec, or if any caller of the changed functions exists outside `main.rs` and `local_calendar.rs`'s `mod tests`.
+
+**1. `weather.rs`**
+
+Replace the whole `snapshot` function (the doc line plus the body that opens the file by path):
+```rust
+/// Read the saved layout's active-profile opt-in before any external request. `Null` means nothing is saved.
+pub fn snapshot(layout: &Value) -> Result<Value, String> {
+    let coordinates = if layout.is_null() { None } else { location(layout)? };
+    let Some(coordinates) = coordinates else {
+        return Ok(json!({"status":"disconnected","updatedAt":0}));
+    };
+    snapshot_for(coordinates)
+}
+```
+- Delete the `path::Path,` line from the `use std::{...}` block. `Path` has no other use in the file.
+- Keep `io::Read` and `bounded_json`; `fetch` and an existing test still use them.
+
+**2. `local_calendar.rs` (written against the post-A6 file)**
+
+- Replace `active_profile` entirely:
+```rust
+// The layout is loaded on every check on purpose: select_source and snapshot re-check after slow work, so a profile switch in between must be seen.
+fn active_profile(
+    load_layout: &dyn Fn() -> Result<Value, String>,
+    profile: &str,
+) -> Result<bool, String> {
+    profile_name(profile)?;
+    let layout = load_layout().map_err(|_| "Native dock profile could not be validated")?;
+    profile_is_active((!layout.is_null()).then_some(&layout), profile)
+}
+#[cfg(test)]
+fn no_layout() -> Result<Value, String> {
+    Ok(Value::Null)
+}
+```
+- Add `load_layout: &dyn Fn() -> Result<Value, String>` as the last parameter of three functions:
+  - `pub fn select_source(directory: PathBuf, profile: String, owner: isize, load_layout: ...) -> Result<Option<Value>, String>`
+  - `pub fn snapshot(directory: &Path, profile: &str, token: &str, load_layout: ...) -> Result<Value, String>`
+  - `pub fn forget_source(directory: &Path, profile: &str, token: &str, load_layout: ...) -> Result<(), String>`
+- Update the five call sites:
+  - `select_source`, two places: `active_profile(&directory, &profile)?` becomes `active_profile(load_layout, &profile)?`.
+  - `snapshot`, two places, and `forget_source`, one place: `active_profile(directory, profile)?` becomes `active_profile(load_layout, profile)?`.
+- Existing `mod tests`:
+  - Add `&no_layout` as the last argument to all 11 calls: 7 `snapshot(&fixture.0, ...)` and 4 `forget_source(&fixture.0, ...)`.
+  - `no_layout` means no saved layout with daily active, which is the old NotFound behaviour.
+  - These fixture tests still fail at runtime here (known `create_dir` error 5). They only have to compile, and the failure count must not change.
+- Unchanged:
+  - No `crate::` in this file.
+  - `bounded_json` stays, because `grants` uses it for `calendar-sources.json`.
+  - `mod ics;`, `GRANTS`, `grants`, `save_grants`, `profile_name`, `profile_is_active`, `check_grants` and all existing error strings stay as they are.
+
+**3. `main.rs`**
+
+`weather_snapshot`, the `None` arm (the coordinates arm is untouched). Replace `None => protonsearch::weather::snapshot(&data_dir()?.join("protondock-layout.json")),` with:
+```rust
+        None => {
+            let layout = layout_store::load(&data_dir()?)
+                .map_err(|_| "Cannot read weather settings".to_string())?;
+            protonsearch::weather::snapshot(&layout)
+        }
+```
+Calendar commands, inside their existing `spawn_blocking(move || ...)`:
+```rust
+local_calendar::select_source(directory.clone(), profile, owner, &|| {
+    layout_store::load(&directory)
+})
+local_calendar::snapshot(&directory, &profile, &token, &|| layout_store::load(&directory))
+local_calendar::forget_source(&directory, &profile, &token, &|| layout_store::load(&directory))
+```
+- `directory.clone()` is required in `select_source`, because the closure borrows `directory` after the call moves it.
+- No persistence lock is added. These readers were lock-free before, `save` replaces the file atomically, and it writes the backup only while the file is valid.
+- No new command, `build.rs`, `permissions/commands.toml`, capability, `Cargo.toml` or `Cargo.lock` change, and no frontend change.
+
+**Behaviour after**
+- Layout file missing: weather is `disconnected` and calendar is daily-only, as before.
+- File corrupt, backup valid: both read the backup (new).
+- Both bad: weather returns `Err("Cannot read weather settings")` and calendar returns `Err("Native dock profile could not be validated")`.
+  - The old texts were "Invalid weather response" and "Native calendar configuration is invalid".
+  - A grep of `src/`, `docs/` and the Rust sources found no consumer of those strings.
+- The old 1 MiB read bound in the two readers is gone. `layout_store::save` caps the file at 1 MiB, and `load_dock_settings` already reads unbounded.
+
+**Tests**
+
+`weather.rs`, appended to the existing `mod tests` (uses its `layout(settings)` helper):
+```rust
+    #[test]
+    fn snapshot_without_a_saved_layout_or_opt_in_is_disconnected_without_a_fetch() {
+        for saved in [Value::Null, layout(json!({})), layout(json!({"weatherEnabled":false}))] {
+            let result = snapshot(&saved).unwrap();
+            assert_eq!(result["status"], "disconnected");
+            assert_eq!(result["updatedAt"], 0);
+        }
+    }
+
+    #[test]
+    fn snapshot_rejects_an_invalid_layout_before_any_fetch() {
+        assert_eq!(
+            snapshot(&json!({"version":9,"profile":"daily"})).unwrap_err(),
+            "Invalid weather layout version"
+        );
+        assert_eq!(
+            snapshot(&layout(
+                json!({"weatherEnabled":true,"weatherLatitude":91,"weatherLongitude":0})
+            ))
+            .unwrap_err(),
+            "Invalid weather latitude"
+        );
+    }
+```
+
+`local_calendar.rs`, appended to A6's `mod profile_tests` (pure; uses `super::*` only, as the file's `mod tests` does):
+```rust
+    #[test]
+    fn active_profile_reads_the_loader_on_every_call() {
+        let calls = std::cell::Cell::new(0);
+        let layout = || -> Result<Value, String> {
+            calls.set(calls.get() + 1);
+            let profile = if calls.get() == 1 { "daily" } else { "founder" };
+            Ok(json!({"version":1,"profile":profile}))
+        };
+        assert_eq!(active_profile(&layout, "daily"), Ok(true));
+        assert_eq!(active_profile(&layout, "daily"), Ok(false));
+        assert_eq!(calls.get(), 2);
+    }
+
+    #[test]
+    fn active_profile_treats_a_null_layout_as_daily_and_hides_load_errors() {
+        assert_eq!(active_profile(&no_layout, "daily"), Ok(true));
+        assert_eq!(active_profile(&no_layout, "founder"), Ok(false));
+        let broken = || -> Result<Value, String> { Err("os error 5 at secret path".into()) };
+        assert_eq!(
+            active_profile(&broken, "daily"),
+            Err("Native dock profile could not be validated".to_string())
+        );
+    }
+```
+
+`tests/layout_store.rs`, appended (uses the file's existing `fresh`). Corrupt FILE with a valid BACKUP still yields a weather snapshot:
+```rust
+#[test]
+fn weather_reads_the_backup_when_the_file_is_corrupt() {
+    let dir = fresh("weather_reads_the_backup_when_the_file_is_corrupt");
+    let layout = |settings: Value| {
+        json!({"version":1,"profile":"daily","profiles":{"daily":[{"id":"weather","settings":settings}]}})
+    };
+    layout_store::save(&dir, &layout(json!({"weatherEnabled":false}))).unwrap();
+    layout_store::save(
+        &dir,
+        &layout(json!({"weatherEnabled":true,"weatherLatitude":91,"weatherLongitude":0})),
+    )
+    .unwrap();
+    // FILE errors before any fetch; only BACKUP answers "disconnected".
+    let snapshot = || protonsearch::weather::snapshot(&layout_store::load(&dir).unwrap());
+    assert_eq!(snapshot().unwrap_err(), "Invalid weather latitude");
+    std::fs::write(dir.join(layout_store::FILE), "{trunc").unwrap();
+    assert_eq!(snapshot().unwrap()["status"], "disconnected");
+}
+```
+
+`tests/local_calendar.rs`. Keep the existing three lines (the `#[allow(dead_code)]` comment, the `#[path = "../src/local_calendar.rs"]` include and `mod local_calendar;`) and add below them. Corrupt FILE with a valid BACKUP yields the calendar active profile from the backup:
+```rust
+#[path = "../src/layout_store.rs"]
+mod layout_store;
+
+use serde_json::json;
+
+#[test]
+fn calendar_profile_comes_from_the_backup_when_the_layout_file_is_corrupt() {
+    const TOKEN: &str = "0123456789abcdef0123456789abcdef";
+    const INACTIVE: &str = "Calendar profile changed; source was not removed";
+    const ACTIVE: &str = "Calendar source is not authorized for this profile";
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join("calendar_profile_comes_from_the_backup");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    // FILE will say daily; the previous good copy says founder.
+    layout_store::save(&dir, &json!({"version":1,"profile":"founder"})).unwrap();
+    layout_store::save(&dir, &json!({"version":1,"profile":"daily"})).unwrap();
+    let layout = || layout_store::load(&dir);
+    let forget =
+        |profile: &str| local_calendar::forget_source(&dir, profile, TOKEN, &layout).unwrap_err();
+    assert_eq!(forget("daily"), ACTIVE);
+    assert_eq!(forget("founder"), INACTIVE);
+    std::fs::write(dir.join(layout_store::FILE), "{trunc").unwrap();
+    assert_eq!(forget("daily"), INACTIVE);
+    assert_eq!(forget("founder"), ACTIVE);
+}
+```
+No test writes under `std::env::temp_dir()`.
+
+**Verify (from the repo root)**
+1. Before editing, run `cargo test --manifest-path src-tauri/Cargo.toml local_calendar::tests::` and note the failed count.
+2. After editing, run these:
+   - `cargo test --manifest-path protonsearch/Cargo.toml --lib weather`
+   - `cargo test --manifest-path src-tauri/Cargo.toml --test layout_store`: 8 passed.
+   - `cargo test --manifest-path src-tauri/Cargo.toml --test local_calendar -- --skip local_calendar::tests::`: 0 failed.
+   - `cargo test --manifest-path src-tauri/Cargo.toml local_calendar::profile_tests`
+   - `cargo test --manifest-path src-tauri/Cargo.toml -- --skip local_calendar::tests::`: 0 failures.
+   - `cargo test --manifest-path src-tauri/Cargo.toml local_calendar::tests::`: failed count equals step 1.
+   - `grep -rn "protondock-layout" src-tauri/src protonsearch/src`: only the two lines in `src-tauri/src/layout_store.rs`.
+   - `git diff --stat`: only the five files above.
+
+**Commit:** `fix(native): read the layout through layout_store in weather and calendar`
+
+Push by pathspec on the five files, per the section 0 protocol.
+
+**Review**
+- `tests/local_calendar.rs` keeps its original three lines and compiles.
+- All five `active_profile` call sites pass `load_layout`.
+- `weather.rs` no longer imports `Path`.
+- Only the two fixed error strings appear on load failure.
+- `no_layout` is defined once and all 11 test calls are updated.
+- Both corrupt-file tests flip from the file's answer to the backup's answer.
+
+**IC-A wiring addition:** `weather_snapshot` and the three calendar commands load through `layout_store::load`.
