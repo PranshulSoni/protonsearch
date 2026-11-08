@@ -47,10 +47,12 @@ export function useMagnify(rail: RefObject<HTMLElement | null>, edge: DockEdge, 
     node.addEventListener('pointerenter', move);
     node.addEventListener('pointermove', move);
     node.addEventListener('pointerleave', leave);
+    window.addEventListener('blur', leave);
     return () => {
       node.removeEventListener('pointerenter', move);
       node.removeEventListener('pointermove', move);
       node.removeEventListener('pointerleave', leave);
+      window.removeEventListener('blur', leave);
       cancelAnimationFrame(frame);
       pointer = null;
       apply();

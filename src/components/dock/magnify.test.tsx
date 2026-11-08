@@ -99,6 +99,13 @@ describe('useMagnify', () => {
     expect(cells[1].style.getPropertyValue('--mag')).toBe('1.000');
   });
 
+  it('window blur restores rest scale', () => {
+    const { rail, cells } = renderRail();
+    fireEvent.pointerMove(rail, { clientX: 82 });
+    window.dispatchEvent(new Event('blur'));
+    expect(cells[1].style.getPropertyValue('--mag')).toBe('1.000');
+  });
+
   it('disabled or reduced motion sets nothing', () => {
     const off = renderRail(false);
     fireEvent.pointerMove(off.rail, { clientX: 82 });

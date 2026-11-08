@@ -163,6 +163,7 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
         data-profile={layout.profile}
         ref={railRef}
         onPointerEnter={heat}
+        onPointerMove={heat}
         onPointerLeave={relax}
         onFocus={heat}
         onBlur={(event) => {

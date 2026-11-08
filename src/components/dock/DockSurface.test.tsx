@@ -94,6 +94,18 @@ describe('DockSurface web preview', () => {
     expect(dock.getAttribute('data-hot')).toBeNull();
   });
 
+  it('heats again on pointer move after blur', () => {
+    const { container } = render(
+      <DockSurface layout={defaultLayout()} onChange={() => {}} onCustomize={() => {}} />,
+    );
+    const dock = container.querySelector<HTMLElement>('.dock-final')!;
+    const rail = container.querySelector<HTMLElement>('.dock-final-rail')!;
+    fireEvent.pointerEnter(rail);
+    act(() => window.dispatchEvent(new Event('blur')));
+    fireEvent.pointerMove(rail);
+    expect(dock.getAttribute('data-hot')).toBe('true');
+  });
+
   it('leaves the hot state when the document is hidden', () => {
     const { container } = render(
       <DockSurface layout={defaultLayout()} onChange={() => {}} onCustomize={() => {}} />,
