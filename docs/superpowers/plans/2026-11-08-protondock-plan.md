@@ -481,3 +481,9 @@ Push by pathspec on the five files, per the section 0 protocol.
 - Both corrupt-file tests flip from the file's answer to the backup's answer.
 
 **IC-A wiring addition:** `weather_snapshot` and the three calendar commands load through `layout_store::load`.
+
+## 5. More carry-over notes (orchestrator)
+
+- A13 also takes the A7 review follow-up (BE-08 says a hotkey failure is logged): in `src-tauri/src/main.rs` setup, replace the `let ok = ...register(...)...is_ok()` line and the `record` call with `let result = app.global_shortcut().register(shortcut.as_str()); if let Err(error) = &result { protonsearch::applog::log(&format!("Hotkey {shortcut} not registered: {error}")); } providers::hotkey_status::record(&shortcut, result.is_ok());`.
+- UI phase that renders Wi-Fi (C or H): A8 added the `settings:location` action and the `accessDenied` field in Rust. Update the TS action unions (`src/services/native.ts`, `src/widgets/final/types.ts`, `src/components/dock/actions.ts`), read `accessDenied` in `useFinalWidgetData.ts`, and add `settings:location` to `docs/widgets/CONTRACT.md` (quick-controls list).
+- IC-A records as "needs user" (not verified unless the user switches the setting): Wi-Fi with location consent off (A8); the dock starting while another program holds Alt+Space, with the failure listed by the `hotkey` provider (A7, BE-08).
