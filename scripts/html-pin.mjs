@@ -5,10 +5,9 @@ import assert from 'node:assert/strict';
 const PINNED_ID = '2126c4990818e68d157e2207977702f5ab349d19';
 const blobId = (bytes) => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 
-// The git blob id covers the raw CRLF bytes; the LF text is only for the pattern checks.
-const pinned = readFileSync('docs/design/dock-editable.2126c49.html');
-assert.equal(blobId(pinned), PINNED_ID);
-const html = pinned.toString('utf8').replace(/\r\n/g, '\n');
+const lf = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+const html = lf('docs/design/dock-editable.2126c49.html');
+assert.equal(blobId(Buffer.from(html)), PINNED_ID);
 
 const style = html.slice(html.indexOf('<style'), html.indexOf('</style>'));
 for (const re of [
@@ -38,6 +37,6 @@ assert.deepEqual(profileIds('focus'), ['start', 'search', 'calendar', 'system-st
 const cycle = html.slice(html.indexOf('function cycleWidgetWidth'));
 assert.match(cycle.slice(0, cycle.indexOf('function ', 1)), /48[\s\S]*96[\s\S]*140[\s\S]*168/);
 
-const live = blobId(readFileSync('dock-editable.html'));
+const live = blobId(Buffer.from(lf('dock-editable.html')));
 console.log(`dock-editable.html drift: ${live === PINNED_ID ? 'none' : `yes (${live})`}`);
 console.log('html-pin: ok');
