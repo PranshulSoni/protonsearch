@@ -1,0 +1,33 @@
+.focus-widget,.network-widget{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
+.focus-time,.network-values{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.focus-time b{font-size:20px;font-variant-numeric:tabular-nums;color:var(--text)}
+.focus-time small,.network-values small{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.network-values b{font-size:11px;color:var(--text);white-space:nowrap}
+.network-widget>.fresh-icon{width:24px;height:24px;flex:0 0 24px}
+.focus-widget select{background:var(--tile);color:var(--text);border:1px solid var(--line);border-radius:5px;max-width:70px;font-size:10px}
+.focus-time progress{width:100%;height:3px;accent-color:var(--accent)}
+.widget-action-error{position:absolute;bottom:1px;left:6px;right:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;color:var(--text);background:var(--glass)}
+.system-controls{display:flex;flex-direction:column;gap:5px;width:100%;min-width:0}
+.system-controls-row{display:flex;align-items:center;justify-content:space-around;gap:6px}
+.system-controls .fresh-control{width:36px;height:36px;flex:0 0 36px}
+.system-controls-wide .fresh-control{width:auto;flex:1;height:37px;display:flex;flex-direction:column;gap:2px;justify-content:center;padding:2px}
+.system-controls-wide .fresh-control span{font-size:8px;line-height:10px}
+.system-controls-status{font-size:8px;color:var(--muted);white-space:nowrap}
+.clipboard-widget{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:3px 5px;min-width:0}
+.clipboard-widget .clipboard-privacy{width:24px;height:26px;flex-basis:24px}
+.clipboard-previews,.clipboard-provider-state{grid-column:1/-1;min-width:0}
+.clipboard-preview-row{display:flex;gap:5px;justify-content:space-between;min-width:0;font-size:9px;line-height:11px}
+.clipboard-preview-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clipboard-preview-row small{max-width:75px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:8px}
+.clipboard-provider-state{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.running-apps{display:flex;flex-direction:column;justify-content:center;gap:3px;width:100%;min-width:0}
+.running-apps-list{display:flex;align-items:center;gap:3px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:var(--line-ui) transparent}
+.running-apps-list::-webkit-scrollbar{height:3px}
+.running-apps-list::-webkit-scrollbar-thumb{background:var(--line-ui);border-radius:3px}
+.running-app{position:relative;display:grid;place-items:center;flex:0 0 36px;width:36px;height:40px;padding:3px 3px 6px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer}
+.running-app:hover{background:var(--tile-strong)}
+.running-app:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.running-app:disabled{opacity:.55;cursor:default}
+.running-app img,.running-app svg{width:28px;height:28px;object-fit:contain}
+.running-app-indicator{position:absolute;bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--muted)}
+.running-app[aria-current="true"] .running-app-indicator{width:12px;border-radius:3px;background:var(--accent)}

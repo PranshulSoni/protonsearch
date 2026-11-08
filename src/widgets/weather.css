@@ -1,0 +1,11 @@
+.weather-live { width: 100%; min-width: 0; }
+.weather-live .fresh-weather-copy { min-width: 0; }
+.weather-live .fresh-weather-copy small { display: block; font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.weather-live .fresh-kicker { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.weather-settings { display: grid; gap: 7px; margin-top: 12px; font-size: 11px; }
+.weather-settings label { display: flex; align-items: center; gap: 5px; }
+.weather-settings input:not([type="checkbox"]) { min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 5px; background: var(--surface2); color: var(--text); padding: 5px; font: inherit; }
+.weather-coordinate-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.weather-coordinate-fields label { align-items: flex-start; flex-direction: column; }
+.weather-settings input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.weather-settings small { color: var(--muted); line-height: 1.5; }

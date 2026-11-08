@@ -1,0 +1,1 @@
+{"identifier":"dock","windows":["dock","settings"],"permissions":["core:event:allow-listen","core:event:allow-unlisten","dock-commands","calendar-read"]}
