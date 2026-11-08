@@ -335,7 +335,8 @@ pub fn action(action: &str) -> Result<(), String> {
         return open_uri(path).map_err(|error| error.to_string());
     }
     if !["media:toggle", "media:next", "media:previous"].contains(&action) {
-        return Err("Unsupported widget action".into());
+        drop(_guard);
+        return crate::providers::action(action);
     }
     media_action(action).map_err(|error| error.to_string())
 }

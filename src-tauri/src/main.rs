@@ -18,6 +18,7 @@ mod clipboard_widget;
 mod dock_lifecycle;
 mod known_folders;
 mod local_calendar;
+mod providers;
 mod running_apps;
 mod widget_data;
 mod window_geometry;
@@ -777,7 +778,7 @@ fn provider_snapshot_data(provider_id: String) -> Result<Value, String> {
                 "",
             )
         },
-        _ => return Err("Unknown provider".into()),
+        _ => return providers::snapshot(&provider_id),
     };
     Ok(json!({"status":status,"data":data,"updatedAt":updated,"message":message}))
 }
