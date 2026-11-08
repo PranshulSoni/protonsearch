@@ -106,30 +106,62 @@ fn icon(hwnd: HWND) -> Option<String> {
         if handle == 0 {
             handle = GetClassLongPtrW(hwnd, GCLP_HICONSM);
         }
-        if handle != 0 {
-            if let Some(rendered) = render_icon(HICON(handle as *mut _)) {
-                return Some(rendered);
+        let window = (handle != 0).then(|| HICON(handle as *mut _));
+        let window_px = window.and_then(icon_size);
+        let path = process_path(hwnd);
+        let prefer = path
+            .as_deref()
+            .is_some_and(|p| prefer_executable_icon(window_px, p));
+        if prefer {
+            if let Some(i) = path.as_deref().and_then(executable_icon) {
+                return Some(i);
             }
         }
-        let mut pid = 0;
-        GetWindowThreadProcessId(hwnd, Some(&mut pid));
-        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
-        let mut path = [0u16; 32768];
-        let mut length = path.len() as u32;
-        let queried = QueryFullProcessImageNameW(
-            process,
-            PROCESS_NAME_WIN32,
-            PWSTR(path.as_mut_ptr()),
-            &mut length,
-        )
-        .is_ok();
-        let _ = CloseHandle(process);
-        if !queried || length as usize >= path.len() {
-            return None;
+        if let Some(i) = window.and_then(render_icon) {
+            return Some(i);
         }
-        path[length as usize] = 0;
-        executable_icon(&path)
+        if prefer {
+            None
+        } else {
+            path.as_deref().and_then(executable_icon)
+        }
     }
+}
+
+// SAFETY: hwnd is passed only to Win32 queries; the process handle is closed on every path.
+unsafe fn process_path(hwnd: HWND) -> Option<Vec<u16>> {
+    let mut pid = 0;
+    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+    let mut path = [0u16; 32768];
+    let mut length = path.len() as u32;
+    let queried = QueryFullProcessImageNameW(
+        process,
+        PROCESS_NAME_WIN32,
+        PWSTR(path.as_mut_ptr()),
+        &mut length,
+    )
+    .is_ok();
+    let _ = CloseHandle(process);
+    if !queried || length as usize >= path.len() {
+        return None;
+    }
+    path[length as usize] = 0;
+    Some(path[..=length as usize].to_vec())
+}
+
+fn prefer_executable_icon(window_px: Option<u32>, exe: &[u16]) -> bool {
+    let text = String::from_utf16_lossy(exe);
+    let file = text
+        .trim_end_matches('\0')
+        .rsplit('\\')
+        .next()
+        .unwrap_or_default();
+    // ApplicationFrameHost hosts UWP apps; its exe icon is generic, so keep the window icon.
+    if file.eq_ignore_ascii_case("applicationframehost.exe") {
+        return false;
+    }
+    window_px.map_or(true, |px| px < 64)
 }
 
 fn executable_icon(path: &[u16]) -> Option<String> {
@@ -166,7 +198,7 @@ fn icon_size(handle: HICON) -> Option<u32> {
     // SAFETY: GetIconInfo copies the icon bitmaps; both copies are released before return.
     unsafe {
         let mut info = ICONINFO::default();
-        if GetIconInfo(handle, &mut info).is_err() || info.hbmColor.is_invalid() {
+        if GetIconInfo(handle, &mut info).is_err() {
             return None;
         }
         let mut bitmap = BITMAP::default();
@@ -406,9 +438,10 @@ mod tests {
     #[test]
     fn renders_windows_shared_icon_as_png() {
         let icon = unsafe { LoadIconW(None, IDI_APPLICATION) }.unwrap();
-        assert!(render_icon(icon)
-            .unwrap()
-            .starts_with("data:image/png;base64,"));
+        let png = render_icon(icon).unwrap();
+        assert!(png.starts_with("data:image/png;base64,"));
+        let side = icon_size(icon).unwrap();
+        assert_eq!(png_dimensions(&png), (side, side));
     }
     fn png_dimensions(data: &str) -> (u32, u32) {
         let bytes = STANDARD
@@ -440,5 +473,28 @@ mod tests {
     fn rejects_missing_executable_path() {
         let wide: Vec<u16> = "C:\\protondock-missing-icon.exe\0".encode_utf16().collect();
         assert!(executable_icon(&wide).is_none());
+    }
+    #[test]
+    fn prefers_executable_icon_below_64px() {
+        let wide: Vec<u16> = "C:\\Apps\\tool.exe\0".encode_utf16().collect();
+        assert!(prefer_executable_icon(Some(32), &wide));
+        assert!(prefer_executable_icon(None, &wide));
+    }
+    #[test]
+    fn keeps_window_icon_at_64px_and_above() {
+        let wide: Vec<u16> = "C:\\Apps\\tool.exe\0".encode_utf16().collect();
+        assert!(!prefer_executable_icon(Some(64), &wide));
+        assert!(!prefer_executable_icon(Some(256), &wide));
+    }
+    #[test]
+    fn never_prefers_application_frame_host_icon() {
+        let wide: Vec<u16> = "C:\\Windows\\System32\\ApplicationFrameHost.exe\0"
+            .encode_utf16()
+            .collect();
+        assert!(!prefer_executable_icon(Some(16), &wide));
+        let lower: Vec<u16> = "C:\\Windows\\System32\\applicationframehost.exe\0"
+            .encode_utf16()
+            .collect();
+        assert!(!prefer_executable_icon(Some(16), &lower));
     }
 }
