@@ -55,6 +55,21 @@ export function DockSurface({ layout, onChange, onCustomize, disabled = false }:
     cool.current = window.setTimeout(() => setHot(false), 240);
   };
   useEffect(() => () => clearTimeout(cool.current), []);
+  useEffect(() => {
+    const settle = () => {
+      clearTimeout(cool.current);
+      setHot(false);
+    };
+    const hidden = () => {
+      if (document.hidden) settle();
+    };
+    window.addEventListener('blur', settle);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('blur', settle);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, []);
 
   const selectProfile = (profile: ProfileId) => {
     if (profile !== layout.profile) onChange({ ...layout, profile });

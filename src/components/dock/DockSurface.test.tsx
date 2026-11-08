@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DockSurface from './DockSurface';
 import { defaultLayout } from './layout';
@@ -80,5 +80,31 @@ describe('DockSurface web preview', () => {
       expect(slot.style.getPropertyValue('--icon-size')).toBe('46px');
       expect(slot.style.getPropertyValue('--dock-glyph-scale')).toBe('1.000');
     });
+  });
+
+  it('leaves the hot state when the window loses focus', () => {
+    const { container } = render(
+      <DockSurface layout={defaultLayout()} onChange={() => {}} onCustomize={() => {}} />,
+    );
+    const dock = container.querySelector<HTMLElement>('.dock-final')!;
+    fireEvent.pointerEnter(container.querySelector<HTMLElement>('.dock-final-rail')!);
+    expect(dock.getAttribute('data-hot')).toBe('true');
+
+    act(() => window.dispatchEvent(new Event('blur')));
+    expect(dock.getAttribute('data-hot')).toBeNull();
+  });
+
+  it('leaves the hot state when the document is hidden', () => {
+    const { container } = render(
+      <DockSurface layout={defaultLayout()} onChange={() => {}} onCustomize={() => {}} />,
+    );
+    const dock = container.querySelector<HTMLElement>('.dock-final')!;
+    fireEvent.pointerEnter(container.querySelector<HTMLElement>('.dock-final-rail')!);
+    expect(dock.getAttribute('data-hot')).toBe('true');
+
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(dock.getAttribute('data-hot')).toBeNull();
+    delete (document as unknown as Record<string, unknown>).hidden;
   });
 });
