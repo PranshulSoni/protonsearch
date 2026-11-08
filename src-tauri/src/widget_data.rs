@@ -346,6 +346,7 @@ fn settings_uri(action: &str) -> Option<&'static str> {
         "settings:network" => Some("ms-settings:network-status"),
         "settings:bluetooth" => Some("ms-settings:bluetooth"),
         "settings:notifications" => Some("ms-settings:notifications"),
+        "settings:location" => Some("ms-settings:privacy-location"),
         _ => None,
     }
 }
@@ -516,6 +517,7 @@ struct WifiStatus {
     signal_percent: Option<u8>,
     state: &'static str,
     api_available: bool,
+    access_denied: bool,
 }
 impl WifiStatus {
     fn unsupported() -> Self {
@@ -525,6 +527,7 @@ impl WifiStatus {
             signal_percent: None,
             state: "unsupported",
             api_available: false,
+            access_denied: false,
         }
     }
 }
@@ -561,9 +564,10 @@ fn wlan_interfaces(handle: &WlanHandle) -> Option<Vec<WLAN_INTERFACE_INFO>> {
 fn current_wifi_connection(
     handle: &WlanHandle,
     guid: &windows::core::GUID,
-) -> Option<WLAN_CONNECTION_ATTRIBUTES> {
+) -> Result<Option<WLAN_CONNECTION_ATTRIBUTES>, u32> {
     let mut size = 0u32;
     let mut data: *mut c_void = std::ptr::null_mut();
+    // SAFETY: `handle` is open, `guid` names one of its interfaces, and both out-pointers are valid for the call.
     let code = unsafe {
         WlanQueryInterface(
             handle.0,
@@ -580,13 +584,51 @@ fn current_wifi_connection(
         || size < std::mem::size_of::<WLAN_CONNECTION_ATTRIBUTES>() as u32
     {
         if !data.is_null() {
+            // SAFETY: a non-null `data` was allocated by `WlanQueryInterface` and is freed exactly once here.
             unsafe { WlanFreeMemory(data) };
         }
-        return None;
+        return if code != 0 { Err(code) } else { Ok(None) };
     }
+    // SAFETY: `data` is non-null and holds at least one `WLAN_CONNECTION_ATTRIBUTES`; it is copied out before the free below.
     let attributes = unsafe { std::ptr::read_unaligned(data.cast::<WLAN_CONNECTION_ATTRIBUTES>()) };
+    // SAFETY: `data` is non-null, allocated by `WlanQueryInterface`, and freed exactly once on this path.
     unsafe { WlanFreeMemory(data) };
-    Some(attributes)
+    Ok(Some(attributes))
+}
+fn wifi_from_query(query: Result<Option<WLAN_CONNECTION_ATTRIBUTES>, u32>) -> WifiStatus {
+    match query {
+        // ERROR_ACCESS_DENIED: Windows withholds Wi-Fi details until location consent is granted.
+        Err(5) => WifiStatus {
+            connected: true,
+            ssid: None,
+            signal_percent: None,
+            state: "connected",
+            api_available: true,
+            access_denied: true,
+        },
+        Ok(Some(connection)) if connection.isState == wlan_interface_state_connected => {
+            let association = connection.wlanAssociationAttributes;
+            WifiStatus {
+                connected: true,
+                ssid: ssid_text(
+                    association.dot11Ssid.uSSIDLength,
+                    &association.dot11Ssid.ucSSID,
+                ),
+                signal_percent: Some(signal_percent(association.wlanSignalQuality)),
+                state: "connected",
+                api_available: true,
+                access_denied: false,
+            }
+        }
+        _ => WifiStatus {
+            connected: false,
+            ssid: None,
+            signal_percent: None,
+            state: "disconnected",
+            api_available: true,
+            access_denied: false,
+        },
+    }
 }
 fn read_wifi() -> WifiStatus {
     let Some(handle) = open_wlan() else {
@@ -610,30 +652,10 @@ fn read_wifi() -> WifiStatus {
             signal_percent: None,
             state,
             api_available: true,
+            access_denied: false,
         };
     }
-    let Some(connection) = current_wifi_connection(&handle, &interface.InterfaceGuid)
-        .filter(|connection| connection.isState == wlan_interface_state_connected)
-    else {
-        return WifiStatus {
-            connected: false,
-            ssid: None,
-            signal_percent: None,
-            state: "disconnected",
-            api_available: true,
-        };
-    };
-    let association = connection.wlanAssociationAttributes;
-    WifiStatus {
-        connected: true,
-        ssid: ssid_text(
-            association.dot11Ssid.uSSIDLength,
-            &association.dot11Ssid.ucSSID,
-        ),
-        signal_percent: Some(signal_percent(association.wlanSignalQuality)),
-        state: "connected",
-        api_available: true,
-    }
+    wifi_from_query(current_wifi_connection(&handle, &interface.InterfaceGuid))
 }
 fn bluetooth_status() -> Value {
     // Radio::GetRadiosAsync and repeated Radio::State reads crash the process under
@@ -752,7 +774,7 @@ fn network() -> Result<Value, String> {
         json!({
             "downloadBytesPerSecond":download,"uploadBytesPerSecond":upload,"interfaces":names,
             "connectionType":connection_type,
-            "wifi":{"connected":wifi.connected,"ssid":wifi.ssid,"signalPercent":wifi.signal_percent,"state":wifi.state},
+            "wifi":{"connected":wifi.connected,"ssid":wifi.ssid,"signalPercent":wifi.signal_percent,"state":wifi.state,"accessDenied":wifi.access_denied},
             "ethernet":{"connected":ethernet_name.is_some(),"adapter":ethernet_name},
             "vpn":{"connected":vpn_name.is_some(),"adapter":vpn_name},
             "bluetooth":bluetooth
@@ -811,6 +833,10 @@ mod tests {
             assert_eq!(settings_uri(action_id), None);
             assert_eq!(action(action_id).unwrap_err(), "Unsupported widget action");
         }
+    }
+    #[test]
+    fn settings_location_has_the_exact_route() {
+        assert_eq!(settings_uri("settings:location"), Some("ms-settings:privacy-location"));
     }
     #[test]
     fn volume_scalar_and_actions_are_bounded() {
@@ -915,6 +941,25 @@ mod tests {
         assert_eq!(signal_percent(100), 100);
         assert_eq!(signal_percent(101), 100);
         assert_eq!(signal_percent(u32::MAX), 100);
+    }
+    #[test]
+    fn access_denied_query_reports_connected_without_a_name() {
+        let wifi = wifi_from_query(Err(5));
+        assert!(wifi.connected);
+        assert!(wifi.access_denied);
+        assert_eq!(wifi.ssid, None);
+        assert_eq!(wifi.signal_percent, None);
+        assert_eq!(wifi.state, "connected");
+        assert!(wifi.api_available);
+    }
+    #[test]
+    fn other_query_failures_stay_disconnected() {
+        for query in [Err(87), Ok(None), Ok(Some(WLAN_CONNECTION_ATTRIBUTES::default()))] {
+            let wifi = wifi_from_query(query);
+            assert!(!wifi.connected);
+            assert!(!wifi.access_denied);
+            assert_eq!(wifi.state, "disconnected");
+        }
     }
     #[test]
     fn ssid_decoding_uses_declared_length_and_ignores_padding() {

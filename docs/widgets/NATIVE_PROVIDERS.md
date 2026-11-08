@@ -377,3 +377,7 @@ Windows APIs: `SHGetKnownFolderPath`, `CoTaskMemFree`, `symlink_metadata` /
   `folder:open` from a path, only from one of the six IDs.
 - The files widget can call `invoke("known_folders_snapshot")` and read
   `data.folders` / `data.recent` after this native command is wired into the UI.
+
+## Wi-Fi access denied (2026-11-08)
+
+`network.wifi.accessDenied` is true when Windows withholds connection details for lack of precise-location consent; the dock then reports connected without a name. `settings:location` opens `ms-settings:privacy-location`. The same consent gates Wi-Fi scans and Geolocator.
