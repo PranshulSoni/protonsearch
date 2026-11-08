@@ -2,7 +2,6 @@
 use serde_json::{json, Value};
 use std::{
     io::Read,
-    path::Path,
     sync::{Mutex, OnceLock},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -286,16 +285,10 @@ fn snapshot_for(coordinates: (f64, f64)) -> Result<Value, String> {
     Ok(value)
 }
 
-/// Read the persisted, active profile's opt-in before any external request.
-pub fn snapshot(layout_path: &Path) -> Result<Value, String> {
-    let file = match std::fs::File::open(layout_path) {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(json!({"status":"disconnected","updatedAt":0}))
-        }
-        Err(_) => return Err("Cannot read weather settings".into()),
-    };
-    let Some(coordinates) = location(&bounded_json(file, 1_048_576)?)? else {
+/// Read the saved layout's active-profile opt-in before any external request. `Null` means nothing is saved.
+pub fn snapshot(layout: &Value) -> Result<Value, String> {
+    let coordinates = if layout.is_null() { None } else { location(layout)? };
+    let Some(coordinates) = coordinates else {
         return Ok(json!({"status":"disconnected","updatedAt":0}));
     };
     snapshot_for(coordinates)
@@ -491,5 +484,29 @@ mod tests {
         .unwrap();
         assert_eq!(other["status"], "error");
         assert!(other.get("data").is_none());
+    }
+
+    #[test]
+    fn snapshot_without_a_saved_layout_or_opt_in_is_disconnected_without_a_fetch() {
+        for saved in [Value::Null, layout(json!({})), layout(json!({"weatherEnabled":false}))] {
+            let result = snapshot(&saved).unwrap();
+            assert_eq!(result["status"], "disconnected");
+            assert_eq!(result["updatedAt"], 0);
+        }
+    }
+
+    #[test]
+    fn snapshot_rejects_an_invalid_layout_before_any_fetch() {
+        assert_eq!(
+            snapshot(&json!({"version":9,"profile":"daily"})).unwrap_err(),
+            "Invalid weather layout version"
+        );
+        assert_eq!(
+            snapshot(&layout(
+                json!({"weatherEnabled":true,"weatherLatitude":91,"weatherLongitude":0})
+            ))
+            .unwrap_err(),
+            "Invalid weather latitude"
+        );
     }
 }

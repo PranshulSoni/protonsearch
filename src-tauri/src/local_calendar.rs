@@ -88,10 +88,18 @@ fn profile_is_active(layout: Option<&Value>, profile: &str) -> Result<bool, Stri
         _ => Err("Native dock profile could not be validated".into()),
     }
 }
-fn active_profile(directory: &Path, profile: &str) -> Result<bool, String> {
+// The layout is loaded on every check on purpose: select_source and snapshot re-check after slow work, so a profile switch in between must be seen.
+fn active_profile(
+    load_layout: &dyn Fn() -> Result<Value, String>,
+    profile: &str,
+) -> Result<bool, String> {
     profile_name(profile)?;
-    let layout = bounded_json(&directory.join("protondock-layout.json"), 1024 * 1024)?;
-    profile_is_active(layout.as_ref(), profile)
+    let layout = load_layout().map_err(|_| "Native dock profile could not be validated")?;
+    profile_is_active((!layout.is_null()).then_some(&layout), profile)
+}
+#[cfg(test)]
+fn no_layout() -> Result<Value, String> {
+    Ok(Value::Null)
 }
 fn grants(directory: &Path) -> Result<Value, String> {
     let value = bounded_json(&directory.join("calendar-sources.json"), 65536)?
@@ -349,8 +357,9 @@ pub fn select_source(
     directory: PathBuf,
     profile: String,
     owner: isize,
+    load_layout: &dyn Fn() -> Result<Value, String>,
 ) -> Result<Option<Value>, String> {
-    if !active_profile(&directory, &profile)? {
+    if !active_profile(load_layout, &profile)? {
         return Err("Calendar profile changed; select the source again".into());
     }
     // A dedicated thread guarantees an STA rather than reusing media's MTA worker.
@@ -363,7 +372,7 @@ pub fn select_source(
     let (path, content) = read_calendar(&path)?;
     ics::parse(&content, chrono::Utc::now().timestamp_millis())?;
     let _lock = GRANTS.lock().map_err(|_| "Calendar source is busy")?;
-    if !active_profile(&directory, &profile)? {
+    if !active_profile(load_layout, &profile)? {
         return Err("Calendar profile changed; selected source was not saved".into());
     }
     let token = format!(
@@ -395,13 +404,18 @@ fn retain_source(directory: &Path, profile: &str, token: &str, path: &Path) -> R
         json!(path.to_str().ok_or("Calendar path is unsupported")?);
     save_grants(directory, &config)
 }
-pub fn snapshot(directory: &Path, profile: &str, token: &str) -> Result<Value, String> {
+pub fn snapshot(
+    directory: &Path,
+    profile: &str,
+    token: &str,
+    load_layout: &dyn Fn() -> Result<Value, String>,
+) -> Result<Value, String> {
     profile_name(profile)?;
     if !valid_token(token) {
         return Err("Invalid calendar source token".into());
     }
     let _lock = GRANTS.lock().map_err(|_| "Calendar source is busy")?;
-    if !active_profile(directory, profile)? {
+    if !active_profile(load_layout, profile)? {
         return Ok(denied());
     }
     let config = grants(directory)?;
@@ -417,7 +431,7 @@ pub fn snapshot(directory: &Path, profile: &str, token: &str) -> Result<Value, S
     let (path, content) = read_calendar(Path::new(path))?;
     let now = chrono::Utc::now().timestamp_millis();
     let events = ics::parse(&content, now)?;
-    if !active_profile(directory, profile)? {
+    if !active_profile(load_layout, profile)? {
         return Ok(denied());
     }
     let name: String = path
@@ -435,13 +449,18 @@ pub fn snapshot(directory: &Path, profile: &str, token: &str) -> Result<Value, S
 fn denied() -> Value {
     json!({"status":"permission-denied","data":null,"updatedAt":chrono::Utc::now().timestamp_millis(),"message":"Select a calendar source for the active profile"})
 }
-pub fn forget_source(directory: &Path, profile: &str, token: &str) -> Result<(), String> {
+pub fn forget_source(
+    directory: &Path,
+    profile: &str,
+    token: &str,
+    load_layout: &dyn Fn() -> Result<Value, String>,
+) -> Result<(), String> {
     profile_name(profile)?;
     if !valid_token(token) {
         return Err("Invalid calendar source token".into());
     }
     let _lock = GRANTS.lock().map_err(|_| "Calendar source is busy")?;
-    if !active_profile(directory, profile)? {
+    if !active_profile(load_layout, profile)? {
         return Err("Calendar profile changed; source was not removed".into());
     }
     let mut config = grants(directory)?;
@@ -506,20 +525,20 @@ mod tests {
         let fixture = Fixture::new();
         let path = fixture.calendar();
         let token = fixture.grant(&path);
-        let value = snapshot(&fixture.0, "daily", &token).unwrap();
+        let value = snapshot(&fixture.0, "daily", &token, &no_layout).unwrap();
         assert_eq!(value["status"], "live");
         assert_eq!(value["data"]["events"][0]["title"], "Fixture event");
         assert!(!value.to_string().contains(fixture.0.to_str().unwrap()));
         assert_eq!(
-            snapshot(&fixture.0, "founder", &token).unwrap()["status"],
+            snapshot(&fixture.0, "founder", &token, &no_layout).unwrap()["status"],
             "permission-denied"
         );
         assert_eq!(
-            snapshot(&fixture.0, "daily", "ffffffffffffffffffffffffffffffff").unwrap()["status"],
+            snapshot(&fixture.0, "daily", "ffffffffffffffffffffffffffffffff", &no_layout).unwrap()["status"],
             "permission-denied"
         );
-        assert!(forget_source(&fixture.0, "founder", &token).is_err());
-        forget_source(&fixture.0, "daily", &token).unwrap();
+        assert!(forget_source(&fixture.0, "founder", &token, &no_layout).is_err());
+        forget_source(&fixture.0, "daily", &token, &no_layout).unwrap();
         let saved = grants(&fixture.0).unwrap();
         assert_eq!(saved["future"]["preserve"], true);
         assert!(saved["profiles"].get("daily").is_none());
@@ -550,7 +569,7 @@ mod tests {
             )
             .is_err());
             assert!(
-                forget_source(&fixture.0, "daily", "0123456789abcdef0123456789abcdef").is_err()
+                forget_source(&fixture.0, "daily", "0123456789abcdef0123456789abcdef", &no_layout).is_err()
             );
             assert_eq!(std::fs::read_to_string(&path).unwrap(), content);
         }
@@ -563,20 +582,20 @@ mod tests {
         let selected = "ffffffffffffffffffffffffffffffff";
         retain_source(&fixture.0, "daily", selected, &path).unwrap();
         assert_eq!(
-            snapshot(&fixture.0, "daily", &old).unwrap()["status"],
+            snapshot(&fixture.0, "daily", &old, &no_layout).unwrap()["status"],
             "live"
         );
         assert_eq!(
-            snapshot(&fixture.0, "daily", selected).unwrap()["status"],
+            snapshot(&fixture.0, "daily", selected, &no_layout).unwrap()["status"],
             "live"
         );
-        forget_source(&fixture.0, "daily", selected).unwrap();
+        forget_source(&fixture.0, "daily", selected, &no_layout).unwrap();
         assert_eq!(
-            snapshot(&fixture.0, "daily", &old).unwrap()["status"],
+            snapshot(&fixture.0, "daily", &old, &no_layout).unwrap()["status"],
             "live"
         );
         assert_eq!(
-            snapshot(&fixture.0, "daily", selected).unwrap()["status"],
+            snapshot(&fixture.0, "daily", selected, &no_layout).unwrap()["status"],
             "permission-denied"
         );
     }
@@ -665,5 +684,27 @@ mod profile_tests {
         assert!(check_grants(json!({"version":1,"profiles":{"deep-work":{"sources":sources}}})).is_ok());
         assert!(check_grants(json!({"version":1,"profiles":{"Bad Key":{"sources":sources}}})).is_err());
         assert!(check_grants(json!({"version":1,"profiles":{"deep-work":{"token":"bad","path":42}}})).is_err());
+    }
+    #[test]
+    fn active_profile_reads_the_loader_on_every_call() {
+        let calls = std::cell::Cell::new(0);
+        let layout = || -> Result<Value, String> {
+            calls.set(calls.get() + 1);
+            let profile = if calls.get() == 1 { "daily" } else { "founder" };
+            Ok(json!({"version":1,"profile":profile}))
+        };
+        assert_eq!(active_profile(&layout, "daily"), Ok(true));
+        assert_eq!(active_profile(&layout, "daily"), Ok(false));
+        assert_eq!(calls.get(), 2);
+    }
+    #[test]
+    fn active_profile_treats_a_null_layout_as_daily_and_hides_load_errors() {
+        assert_eq!(active_profile(&no_layout, "daily"), Ok(true));
+        assert_eq!(active_profile(&no_layout, "founder"), Ok(false));
+        let broken = || -> Result<Value, String> { Err("os error 5 at secret path".into()) };
+        assert_eq!(
+            active_profile(&broken, "daily"),
+            Err("Native dock profile could not be validated".to_string())
+        );
     }
 }

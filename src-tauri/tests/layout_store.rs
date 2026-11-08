@@ -88,3 +88,22 @@ fn both_bad_returns_error_and_modifies_nothing() {
         b"{bad"
     );
 }
+
+#[test]
+fn weather_reads_the_backup_when_the_file_is_corrupt() {
+    let dir = fresh("weather_reads_the_backup_when_the_file_is_corrupt");
+    let layout = |settings: Value| {
+        json!({"version":1,"profile":"daily","profiles":{"daily":[{"id":"weather","settings":settings}]}})
+    };
+    layout_store::save(&dir, &layout(json!({"weatherEnabled":false}))).unwrap();
+    layout_store::save(
+        &dir,
+        &layout(json!({"weatherEnabled":true,"weatherLatitude":91,"weatherLongitude":0})),
+    )
+    .unwrap();
+    // FILE errors before any fetch; only BACKUP answers "disconnected".
+    let snapshot = || protonsearch::weather::snapshot(&layout_store::load(&dir).unwrap());
+    assert_eq!(snapshot().unwrap_err(), "Invalid weather latitude");
+    std::fs::write(dir.join(layout_store::FILE), "{trunc").unwrap();
+    assert_eq!(snapshot().unwrap()["status"], "disconnected");
+}

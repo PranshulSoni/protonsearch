@@ -631,7 +631,11 @@ async fn weather_snapshot(latitude: Option<f64>, longitude: Option<f64>) -> Resu
         Some((latitude, longitude)) => {
             protonsearch::weather::snapshot_coordinates(latitude, longitude)
         }
-        None => protonsearch::weather::snapshot(&data_dir()?.join("protondock-layout.json")),
+        None => {
+            let layout = layout_store::load(&data_dir()?)
+                .map_err(|_| "Cannot read weather settings".to_string())?;
+            protonsearch::weather::snapshot(&layout)
+        }
     })
     .await
     .map_err(|e| e.to_string())?
@@ -647,7 +651,9 @@ async fn calendar_select_source(
     let directory = data_dir()?;
     let owner = window.hwnd().map_err(|error| error.to_string())?.0 as isize;
     tauri::async_runtime::spawn_blocking(move || {
-        local_calendar::select_source(directory, profile, owner)
+        local_calendar::select_source(directory.clone(), profile, owner, &|| {
+            layout_store::load(&directory)
+        })
     })
     .await
     .map_err(|error| error.to_string())?
@@ -656,7 +662,7 @@ async fn calendar_select_source(
 async fn calendar_snapshot(profile: String, token: String) -> Result<Value, String> {
     let directory = data_dir()?;
     tauri::async_runtime::spawn_blocking(move || {
-        local_calendar::snapshot(&directory, &profile, &token)
+        local_calendar::snapshot(&directory, &profile, &token, &|| layout_store::load(&directory))
     })
     .await
     .map_err(|error| error.to_string())?
@@ -672,7 +678,9 @@ async fn calendar_forget_source(
     }
     let directory = data_dir()?;
     tauri::async_runtime::spawn_blocking(move || {
-        local_calendar::forget_source(&directory, &profile, &token)
+        local_calendar::forget_source(&directory, &profile, &token, &|| {
+            layout_store::load(&directory)
+        })
     })
     .await
     .map_err(|error| error.to_string())?
@@ -1066,8 +1074,13 @@ fn main() {
             for shortcut in providers::hotkey_status::hotkeys(
                 &protonsearch::settings::AppSettings::load().global_hotkey,
             ) {
-                let ok = app.global_shortcut().register(shortcut.as_str()).is_ok();
-                providers::hotkey_status::record(&shortcut, ok);
+                let result = app.global_shortcut().register(shortcut.as_str());
+                if let Err(error) = &result {
+                    protonsearch::applog::log(&format!(
+                        "Hotkey {shortcut} not registered: {error}"
+                    ));
+                }
+                providers::hotkey_status::record(&shortcut, result.is_ok());
             }
             // Initialize schema before the indexers acquire write transactions.
             let shared = app.state::<NativeState>();
