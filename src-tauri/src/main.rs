@@ -17,6 +17,7 @@ mod ai_usage;
 mod clipboard_widget;
 mod dock_lifecycle;
 mod known_folders;
+mod layout_store;
 mod local_calendar;
 mod providers;
 mod running_apps;
@@ -452,12 +453,7 @@ fn open_start() -> Result<(), String> {
 #[tauri::command]
 fn load_dock_settings(state: tauri::State<'_, NativeState>) -> Result<Value, String> {
     let _guard = state.persistence.lock().map_err(|e| e.to_string())?;
-    let path = data_dir()?.join("protondock-layout.json");
-    if !path.exists() {
-        return Ok(Value::Null);
-    }
-    serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())
+    layout_store::load(&data_dir()?)
 }
 #[tauri::command]
 fn save_dock_settings(
@@ -466,39 +462,7 @@ fn save_dock_settings(
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let _guard = state.persistence.lock().map_err(|e| e.to_string())?;
-    let bytes = serde_json::to_vec_pretty(&value).map_err(|e| e.to_string())?;
-    if !value.is_object() || bytes.len() > 1024 * 1024 {
-        return Err("Invalid layout".into());
-    }
-    let path = data_dir()?.join("protondock-layout.json");
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
-    unsafe {
-        use windows::{
-            core::PCWSTR,
-            Win32::Storage::FileSystem::{
-                MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
-            },
-        };
-        let from: Vec<u16> = tmp
-            .as_os_str()
-            .to_string_lossy()
-            .encode_utf16()
-            .chain(Some(0))
-            .collect();
-        let to: Vec<u16> = path
-            .as_os_str()
-            .to_string_lossy()
-            .encode_utf16()
-            .chain(Some(0))
-            .collect();
-        MoveFileExW(
-            PCWSTR(from.as_ptr()),
-            PCWSTR(to.as_ptr()),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-        .map_err(|e| e.to_string())?;
-    }
+    layout_store::save(&data_dir()?, &value)?;
     app.emit("settings-updated", ())
         .map_err(|e| e.to_string())?;
     Ok(())
