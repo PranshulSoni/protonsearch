@@ -2444,15 +2444,16 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 }
 
 /* ==========================================================================
-   TAHOE GLASS SEARCH SPOTLIGHT LAUNCHER & IN-PROCESS MATH ENGINE
+   HIGH-PERFORMANCE NAVIGATION LAUNCHER PALETTE (Minimalist Tahoe Glass)
+   Authoritative Reference: preview-tahoe-glass.html
    ========================================================================== */
 .ps-spotlight-backdrop {
   position: fixed;
   inset: 0;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   z-index: 1000;
-  background: rgba(6, 8, 12, 0.55);
-  backdrop-filter: blur(14px) saturate(120%);
-  -webkit-backdrop-filter: blur(14px) saturate(120%);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -2465,34 +2466,39 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   opacity: 1;
   pointer-events: auto;
 }
+
 .ps-spotlight-card {
-  width: 620px;
+  width: 660px;
   max-width: calc(100vw - 32px);
-  background: rgba(18, 22, 30, 0.94);
-  backdrop-filter: blur(48px) saturate(180%);
-  -webkit-backdrop-filter: blur(48px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--modal-card-bg, rgba(16, 22, 34, 0.94));
+  backdrop-filter: blur(48px) saturate(190%) contrast(104%);
+  -webkit-backdrop-filter: blur(48px) saturate(190%) contrast(104%);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.14));
   border-radius: 18px;
-  box-shadow:
-    0 32px 84px rgba(0, 0, 0, 0.75),
-    0 8px 24px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  box-shadow: 
+    0 36px 90px rgba(0, 0, 0, 0.70),
+    0 10px 24px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.20);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transform: scale(0.97) translateY(8px);
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 220ms var(--ease, cubic-bezier(0.16, 1, 0.3, 1)), opacity 180ms ease;
   position: relative;
 }
 .ps-spotlight-backdrop.is-open .ps-spotlight-card {
   transform: scale(1) translateY(0);
 }
+
+/* Toast Notification HUD */
 .ps-toast {
   position: absolute;
   top: 14px;
   right: 18px;
-  background: rgba(14, 18, 24, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 10.5px;
@@ -2501,6 +2507,7 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   display: flex;
   align-items: center;
   gap: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   opacity: 0;
   transform: translateY(-6px);
   transition: opacity 160ms ease, transform 160ms ease;
@@ -2518,93 +2525,152 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   background: #34d399;
   box-shadow: 0 0 6px #34d399;
 }
+
+/* Minimalist Search Header */
 .ps-search-top {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  position: relative;
 }
 .ps-search-ic {
-  color: var(--win-blue);
+  color: var(--win-blue, #60cdff);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
 }
 .ps-search-input {
   flex: 1;
   background: transparent;
-  border: 0;
+  border: none;
   outline: none;
-  font-family: var(--font-stack);
-  font-size: 16px;
+  font-family: inherit;
+  font-size: 15.5px;
   font-weight: 500;
-  color: #fff;
+  letter-spacing: -0.015em;
+  color: var(--text, #f8fafc);
+  min-width: 0;
   padding: 0;
 }
 .ps-search-input::placeholder {
-  color: var(--text-3);
-  font-size: 14px;
+  color: var(--text-3, #6b7280);
+  font-weight: 400;
 }
-.ps-search-esc-hint {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--text-3);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
+
+/* Category Filter Navigation Bar */
 .ps-nav-scope-bar {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(0, 0, 0, 0.15);
+  padding: 7px 18px;
+  background: rgba(0, 0, 0, 0.18);
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ps-nav-scope-bar::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
 }
 .nav-scope-pill {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 9px;
   border-radius: 999px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-2, #94a3b8);
+  font-size: 10px;
+  font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
   transition: all 120ms ease;
 }
 .nav-scope-pill:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text, #f8fafc);
 }
+.nav-scope-pill.active,
 .nav-scope-pill.is-active {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.20);
   color: #fff;
-  background: rgba(255, 255, 255, 0.12);
 }
+.nav-scope-count {
+  font-size: 8.5px;
+  padding: 1px 4.5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-2, #94a3b8);
+}
+
+.ps-match-hl {
+  color: #93c5fd;
+  font-weight: 700;
+  background: rgba(59, 130, 246, 0.15);
+  border-radius: 2px;
+  padding: 0 1.5px;
+}
+
+/* Body Layout & Results Column */
 .ps-search-body {
-  padding: 10px 14px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 380px;
-  overflow-y: auto;
+  min-height: 280px;
+  max-height: 420px;
+  position: relative;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.ps-search-body::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+.ps-results-column {
+  flex: 1;
+  padding: 8px 12px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), rgba(0, 0, 0, 0.92) calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), rgba(0, 0, 0, 0.92) calc(100% - 16px), transparent 100%);
+}
+.ps-results-column::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+/* Calculator Hero Card */
 .ps-calculator-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 11px 14px;
-  border-radius: 10px;
-  background: rgba(96, 205, 255, 0.08);
-  border: 1px solid rgba(96, 205, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
 }
 .ps-calculator-hero:hover {
-  background: rgba(96, 205, 255, 0.14);
-  border-color: rgba(96, 205, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 .ps-calc-main {
   display: flex;
@@ -2613,21 +2679,28 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   min-width: 0;
 }
 .ps-calc-tag {
-  font-size: 10px;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--win-blue);
+  letter-spacing: 0.04em;
+  color: #94a3b8;
 }
 .ps-calc-expr {
   font-size: 13.5px;
   color: #cbd5e1;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ps-calc-result {
   font-size: 19px;
   font-weight: 700;
-  color: #fff;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
 .ps-calc-action {
@@ -2636,8 +2709,8 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   gap: 5px;
   padding: 3px 8px;
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #cbd5e1;
   font-size: 10.5px;
   font-weight: 500;
@@ -2645,60 +2718,234 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 .ps-calc-action kbd {
   font-size: 10px;
   font-weight: 700;
-  color: #fff;
+  color: #f8fafc;
 }
-.ps-results-column {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
+
+/* Result Rows */
 .ps-result-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 7px 10px;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 11px;
   border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: background 110ms ease;
+  transition: background 100ms ease, border-color 100ms ease;
+  position: relative;
 }
-.ps-result-row:hover, .ps-result-row.is-selected {
-  background: rgba(255, 255, 255, 0.07);
+.ps-result-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
 }
-.ps-res-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.05);
+.ps-result-row.is-selected {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.ps-item-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
-.ps-res-info {
+.ps-item-copy {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1px;
   min-width: 0;
-  flex: 1;
+  gap: 1px;
 }
-.ps-res-title {
-  font-size: 12.5px;
+.ps-item-copy b {
+  font-size: 13px;
   font-weight: 600;
-  color: #fff;
-}
-.ps-res-sub {
-  font-size: 10.5px;
-  color: var(--text-3);
+  color: #f8fafc;
   white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
+  overflow: hidden;
+}
+.ps-item-copy small {
+  font-size: 10.5px;
+  color: #94a3b8;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 .ps-res-badge {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 600;
-  color: var(--text-2);
-  background: rgba(255, 255, 255, 0.06);
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 4px;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-2, #9ea5b0);
+  letter-spacing: 0.03em;
+}
+.ps-res-badge.is-ocr {
+  background: rgba(245, 156, 53, 0.14);
+  color: #f59c35;
+  border: 1px solid rgba(245, 156, 53, 0.28);
+}
+.ps-res-badge.is-content {
+  background: rgba(52, 211, 153, 0.14);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+}
+
+/* Quick Look Preview Drawer */
+.ps-quick-look-drawer {
+  position: absolute;
+  inset: 0;
+  background: var(--modal-card-bg, rgba(16, 22, 34, 0.98));
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  gap: 10px;
+  z-index: 20;
+}
+.ql-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+.ql-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ql-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  letter-spacing: 0.03em;
+}
+.ql-badge.is-ocr {
+  background: rgba(245, 156, 53, 0.18);
+  color: #f59c35;
+}
+.ql-badge.is-content {
+  background: rgba(52, 211, 153, 0.18);
+  color: #34d399;
+}
+.ql-filename {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ql-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-2, #9ea5b0);
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+}
+.ql-path {
+  font-size: 11px;
+  color: var(--text-3, #6b7280);
+  font-family: monospace;
+  word-break: break-all;
+}
+.ql-preview-box {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+  border-radius: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ql-meta-row {
+  font-size: 10.5px;
+  color: var(--text-2, #9ea5b0);
+}
+.ql-actions-row {
+  display: flex;
+  gap: 8px;
+}
+.ql-action-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.ql-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.ql-action-btn.primary {
+  background: #0a84ff;
+  border-color: #0a84ff;
+}
+.ql-action-btn.primary:hover {
+  background: #0070df;
+}
+
+/* Search Footer */
+.ps-search-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 18px;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 10px;
+  color: var(--text-2, #9ea5b0);
+}
+.ps-engine-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ps-engine-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+}
+.ps-nav-keys {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.key-cap {
+  display: flex;
+  align-items: center;
+  gap: 3.5px;
+  font-size: 9.5px;
+  color: var(--text-3, #6b7280);
+}
+.key-cap kbd {
+  padding: 1.5px 4.5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--text-2, #9ea5b0);
 }
 
 </style>
@@ -3343,82 +3590,120 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
   </div>
 </div>
 
-<div class="ps-spotlight-backdrop" id="searchModal">
-  <section class="ps-spotlight-card" id="launcherCard" role="dialog" aria-label="ProtonSearch Kensaku Spotlight">
+<div class="ps-spotlight-backdrop" id="searchModal" onclick="handleSearchBackdrop(event)">
+  <section class="ps-spotlight-card" id="launcherCard" role="dialog" aria-label="ProtonSearch Spotlight">
+    
+    <!-- Frosted Glass Toast Notification HUD -->
     <div class="ps-toast" id="psToast">
       <span class="ps-toast-dot"></span>
       <span id="psToastMsg">Action executed</span>
     </div>
 
+    <!-- Minimalist Search Header -->
     <div class="ps-search-top">
       <div class="ps-search-ic">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <svg class="icon" style="width:18px; height:18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       </div>
-      <input id="spotlightInput" class="ps-search-input" type="text" placeholder="Search files, full text (FTS), OCR screenshots, or calculate..." autocomplete="off" />
-      <div class="ps-kensaku-badge" title="Local & Private Search Engine (Rust + Tauri FTS5 & OCR)">
-        <span class="ps-engine-dot"></span>
-        <span>Kensaku Engine</span>
-      </div>
-      <span class="ps-search-esc-hint" title="Press Space on a result for Quick Look">Space: Preview · Esc</span>
+      <input 
+        id="spotlightInput"
+        class="ps-search-input" 
+        type="text" 
+        value=""
+        placeholder="Search apps, files, folders, or OCR text..."
+        autocomplete="off"
+        oninput="handleSearchInput(this.value)"
+      />
     </div>
 
+    <!-- Category Filter Navigation Bar -->
     <div class="ps-nav-scope-bar">
-      <div class="ps-scopes-wrap">
-        <div class="nav-scope-pill is-active" data-scope="all"><span>All</span></div>
-        <div class="nav-scope-pill" data-scope="files"><span>Files</span></div>
-        <div class="nav-scope-pill" data-scope="content"><span>Content (FTS)</span></div>
-        <div class="nav-scope-pill" data-scope="ocr"><span>OCR (Screenshots)</span></div>
-        <div class="nav-scope-pill" data-scope="apps"><span>Apps</span></div>
-        <div class="nav-scope-pill" data-scope="code"><span>Code</span></div>
+      <div class="nav-scope-pill active" data-scope="all" onclick="selectNavScope('all', this)">
+        <span>All</span>
+        <span class="nav-scope-count" id="count-all">14</span>
       </div>
-      <div class="ps-layout-toggle" role="group" aria-label="Search Results Layout">
-        <button class="ps-layout-btn is-active" id="layoutListBtn" data-layout="list" type="button" title="List View">
-          <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
-        </button>
-        <button class="ps-layout-btn" id="layoutGridBtn" data-layout="grid" type="button" title="Grid View">
-          <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.5"/></svg>
-        </button>
+      <div class="nav-scope-pill" data-scope="apps" onclick="selectNavScope('apps', this)">
+        <span>Apps</span>
+        <span class="nav-scope-count" id="count-apps">4</span>
+      </div>
+      <div class="nav-scope-pill" data-scope="files" onclick="selectNavScope('files', this)">
+        <span>Files</span>
+        <span class="nav-scope-count" id="count-files">4</span>
+      </div>
+      <div class="nav-scope-pill" data-scope="folders" onclick="selectNavScope('folders', this)">
+        <span>Folders</span>
+        <span class="nav-scope-count" id="count-folders">2</span>
+      </div>
+      <div class="nav-scope-pill" data-scope="ocr" onclick="selectNavScope('ocr', this)">
+        <span>OCR</span>
+        <span class="nav-scope-count" id="count-ocr">2</span>
+      </div>
+      <div class="nav-scope-pill" data-scope="git" onclick="selectNavScope('git', this)">
+        <span>Git & Tasks</span>
+        <span class="nav-scope-count" id="count-git">2</span>
       </div>
     </div>
 
+    <!-- Search Results Body -->
     <div class="ps-search-body">
-      <!-- In-Process Calculator Card (When math entered) -->
-      <div class="ps-calculator-hero" id="calculatorHeroContainer" style="display:none;" title="Click or press Enter to copy result">
-        <div class="ps-calc-main">
-          <span class="ps-calc-tag">Calculation</span>
-          <span class="ps-calc-expr" id="calcHeroExpr"></span>
-          <span class="ps-calc-result" id="calcHeroVal"></span>
+      <div class="ps-results-column" id="resultsList">
+        
+        <!-- In-Process Calculator Card (When math entered) -->
+        <div id="calculatorHeroContainer" style="display:none; margin-bottom: 6px;">
+          <div class="ps-calculator-hero" onclick="copyCalculatorResult()" title="Click or press Enter to copy result">
+            <div class="ps-calc-main">
+              <span class="ps-calc-tag">
+                <svg style="width:12px; height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="2" width="16" height="20" rx="3"/><path d="M8 6h8M8 11h2M14 11h2M8 15h2M14 15h2M8 19h2M14 19h2"/></svg>
+                Calculation
+              </span>
+              <span class="ps-calc-expr" id="calcHeroExpr">sqrt(144) + 15% of 200</span>
+              <span class="ps-calc-result" id="calcHeroVal">= 42</span>
+            </div>
+            <div class="ps-calc-action">
+              <kbd>↵</kbd>
+              <span>Copy</span>
+            </div>
+          </div>
         </div>
-        <div class="ps-calc-action">
-          <kbd>Enter</kbd>
-          <span>Copy</span>
-        </div>
+
+        <!-- Dynamic Results Container -->
+        <div id="resultsRowsContainer" style="display:flex; flex-direction:column; gap:2px;"></div>
+
       </div>
 
-      <!-- Search results column / grid -->
-      <div class="ps-results-column" id="resultsRowsContainer"></div>
-    </div>
-
-    <!-- Quick Look Preview Panel (Spacebar preview like Kensaku) -->
-    <div class="ps-quick-look-drawer" id="psQuickLookDrawer" style="display:none;">
-      <div class="ql-header">
-        <div class="ql-title-wrap">
-          <span class="ql-badge" id="qlBadge">FILE</span>
-          <span class="ql-filename" id="qlFilename">filename.pdf</span>
+      <!-- Quick Look Preview Panel (Spacebar preview like Kensaku) -->
+      <div class="ps-quick-look-drawer" id="psQuickLookDrawer" style="display:none;">
+        <div class="ql-header">
+          <div class="ql-title-wrap">
+            <span class="ql-badge" id="qlBadge">FILE</span>
+            <span class="ql-filename" id="qlFilename">filename.pdf</span>
+          </div>
+          <button class="ql-close-btn" id="qlCloseBtn" type="button" title="Close Preview (Space or Esc)">&times;</button>
         </div>
-        <button class="ql-close-btn" id="qlCloseBtn" type="button" title="Close Preview (Space or Esc)">&times;</button>
-      </div>
-      <div class="ql-body" id="qlBody">
         <div class="ql-path" id="qlPath">C:\Users\...</div>
         <div class="ql-preview-box" id="qlPreviewBox"></div>
         <div class="ql-meta-row" id="qlMetaRow"></div>
-      </div>
-      <div class="ql-footer">
-        <button class="ql-action-btn is-primary" id="qlOpenBtn" type="button">Open File</button>
-        <button class="ql-action-btn" id="qlFolderBtn" type="button">Reveal in Explorer</button>
-        <button class="ql-action-btn" id="qlCopyPathBtn" type="button">Copy Path</button>
+        <div class="ql-actions-row">
+          <button class="ql-action-btn primary" id="qlOpenBtn" type="button">Open File</button>
+          <button class="ql-action-btn" id="qlFolderBtn" type="button">Reveal in Explorer</button>
+          <button class="ql-action-btn" id="qlCopyPathBtn" type="button">Copy Path</button>
+        </div>
       </div>
     </div>
+
+    <!-- Search Footer -->
+    <div class="ps-search-footer">
+      <div class="ps-engine-badge">
+        <span class="ps-engine-dot"></span>
+        <span>Kensaku Local Engine</span>
+      </div>
+      <div class="ps-nav-keys">
+        <span class="key-cap"><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+        <span class="key-cap"><kbd>↵</kbd> Open</span>
+        <span class="key-cap"><kbd>Space</kbd> Quick Look</span>
+        <span class="key-cap"><kbd>Esc</kbd> Close</span>
+      </div>
+    </div>
+
   </section>
 </div>
 
@@ -5543,217 +5828,185 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     setTheme(savedTheme);
   } catch (e) {}
 
-  /* Layout Switcher (List vs Grid) */
-  function setLayout(layout) {
-    currentLayout = layout;
-    if (layoutListBtn) layoutListBtn.classList.toggle('is-active', layout === 'list');
-    if (layoutGridBtn) layoutGridBtn.classList.toggle('is-active', layout === 'grid');
-    if (resultsRowsContainer) resultsRowsContainer.classList.toggle('is-grid', layout === 'grid');
+  /* ==========================================================================
+     PROTONSEARCH LAUNCHER: DATABASE & IN-PROCESS MATH CALCULATOR (Tahoe Glass)
+     Authoritative Reference: preview-tahoe-glass.html
+     ========================================================================== */
+  var resultIcons = {
+    vscode: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="m18.5 2.5-10 8.5L3 7.5 1 9l5 4-5 4 2 1.5 5.5-3.5 10 8.5 4.5-2V4.5l-4.5-2z" fill="#007acc"/><path d="m18.5 2.5-8 7.5 8 7.5 4-2.5V5l-4-2.5z" fill="#1f9cf0"/></svg>',
+    spotify: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1db954"/><path d="M7 9c3.5-1 7.5-.5 10.5 1M7.5 12c3-.8 6.5-.4 9 1M8 15c2.5-.5 5-.3 7 1" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>',
+    terminal: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="4" fill="#0c1017"/><path d="m6 8 4 4-4 4M12 16h6" stroke="#4ade80" stroke-width="2" fill="none"/></svg>',
+    chrome: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285f4"/><path d="M12 2a10 10 0 0 1 8.66 5H12z" fill="#ea4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5z" fill="#fbbc05"/><path d="M12 22A10 10 0 0 1 3.34 7H12z" fill="#34a853"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>',
+    tsx: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="4" fill="#3178c6"/><text x="12" y="16" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="8.5" font-weight="700" fill="#ffffff">TSX</text></svg>',
+    cpp: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="4" fill="#00599c"/><text x="12" y="16" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="8.5" font-weight="700" fill="#ffffff">C++</text></svg>',
+    rust: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="4" fill="#b7410e"/><circle cx="12" cy="12" r="6.2" fill="none" stroke="#ffffff" stroke-width="1.5"/><path d="M12 5.8v1.3M12 16.9v1.3M5.8 12h1.3M16.9 12h1.3M7.6 7.6l.9.9M15.5 15.5l.9.9M16.4 7.6l-.9.9M8.5 15.5l-.9.9" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"/><text x="12" y="15" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="7.5" font-weight="700" fill="#ffffff">R</text></svg>',
+    file: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6z" fill="#e2e8f0"/><path d="M14 2v4h4" fill="#94a3b8"/><path d="M9 12h6M9 15.5h6M9 19h4" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    folder: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#f59e0b"/><path d="M3 9h18" stroke="#d97706" stroke-width="1.5"/></svg>',
+    ocr: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" stroke="#38bdf8" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M8 9h8M8 12h8M8 15h5" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    branch: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4" fill="none" stroke="#f59e0b" stroke-width="1.8"/><circle cx="6" cy="18" r="2.4" fill="none" stroke="#f59e0b" stroke-width="1.8"/><circle cx="18" cy="8" r="2.4" fill="none" stroke="#f59e0b" stroke-width="1.8"/><path d="M6 8.4v7.2M6 14c0-3 2.5-4 5.5-4H15" stroke="#f59e0b" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>',
+    commit: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="#a855f7"/><path d="M2 12h6M16 12h6" stroke="#a855f7" stroke-width="2" stroke-linecap="round"/></svg>',
+    gear: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="#94a3b8" stroke-width="1.8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    calculator: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="3" fill="none" stroke="#10b981" stroke-width="1.8"/><path d="M8 6h8M8 11h2M14 11h2M8 15h2M14 15h2M8 19h2M14 19h2" stroke="#10b981" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    app: '<svg style="width:20px; height:20px;" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="#cbd5e1" stroke-width="1.8"/><path d="M3 9h18" stroke="#cbd5e1" stroke-width="1.8"/></svg>'
+  };
+
+  function iconFor(item) {
+    return resultIcons[item.kind] || resultIcons.file;
   }
 
-  if (layoutListBtn) {
-    layoutListBtn.addEventListener('click', function () { setLayout('list'); });
-  }
-  if (layoutGridBtn) {
-    layoutGridBtn.addEventListener('click', function () { setLayout('grid'); });
-  }
-
-  /* Kensaku Search Dataset: Full-Text Content (FTS5), OCR Screenshots, Files, Apps, Code */
-  var SEARCH_ITEMS = [
-    {
+  var resultDatabase = {
+    vscode: {
+      id: 'vscode',
       title: 'Visual Studio Code',
-      sub: 'C:\\Users\\Pranshul\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe',
-      type: 'apps',
-      meta: 'Application · 186 MB · Last opened 10m ago',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24"><path d="m18.4 2.6-9.7 8.2L3.6 7.4 1.5 8.7l4.8 3.9-4.8 3.9 2.1 1.3 5.1-3.4 9.7 8.2 4.4-2V4.6z" fill="#0078d7"/><path d="m18.4 2.6-7.8 7.3 7.8 7.3 4.4-2.2V4.6z" fill="#29a8ff"/></svg>'
+      path: 'Applications · C:\\Users\\Pranshul\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe',
+      cat: 'apps',
+      kind: 'vscode',
+      type: 'APP',
+      meta: 'Application · 186 MB · Last opened 10m ago'
     },
-    {
+    spotify: {
+      id: 'spotify',
+      title: 'Spotify',
+      path: 'Audio Player · %APPDATA%\\Spotify\\Spotify.exe',
+      cat: 'apps',
+      kind: 'spotify',
+      type: 'APP',
+      meta: 'Audio Player · WebRTC Active'
+    },
+    terminal: {
+      id: 'terminal',
       title: 'Windows Terminal',
-      sub: 'C:\\Program Files\\WindowsApps\\Microsoft.WindowsTerminal_1.19.10573.0\\wt.exe',
-      type: 'apps',
-      meta: 'System Shell · x64 Native · Running',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="4" fill="#14181f"/><path d="m6.5 8 4 4-4 4M12.5 16H18" stroke="var(--terminal-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>'
+      path: 'System Shell · wt.exe (PowerShell 7.4.5)',
+      cat: 'apps',
+      kind: 'terminal',
+      type: 'APP',
+      meta: 'System Shell · x64 Native · Running'
     },
-    {
-      title: 'Spotify Music',
-      sub: 'C:\\Users\\Pranshul\\AppData\\Roaming\\Spotify\\Spotify.exe',
-      type: 'apps',
-      meta: 'Audio Player · WebRTC Active',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="var(--spotify-green)"/><path d="M7.5 9.4c3.2-1 6.8-.5 9.4 1.2M8 12.4c2.6-.7 5.4-.4 7.6 1M8.5 15.2c2-.5 4.1-.2 5.8.8" stroke="#0b1a11" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>'
-    },
-    {
+    chrome: {
+      id: 'chrome',
       title: 'Google Chrome',
-      sub: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      type: 'apps',
-      meta: 'Web Browser · 12 Tabs Active',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285f4"/><path d="M12 2a10 10 0 0 1 8.66 5H12z" fill="#ea4335"/><path d="M20.66 7A10 10 0 0 1 12 22l4.33-7.5z" fill="#fbbc05"/><path d="M12 22A10 10 0 0 1 3.34 7H12z" fill="#34a853"/><circle cx="12" cy="12" r="4.2" fill="#fff"/><circle cx="12" cy="12" r="3.2" fill="#1a73e8"/></svg>'
+      path: 'Web Browser · C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      cat: 'apps',
+      kind: 'chrome',
+      type: 'APP',
+      meta: 'Web Browser · 12 Tabs Active'
     },
-    {
-      title: 'Screenshot_2026-11-04_142205.png',
-      sub: 'C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot_2026-11-04_142205.png',
-      type: 'ocr',
-      snippet: 'Task Manager: protonsearch.exe memory footprint 18.2 MB, CPU 0.0% idle, GDI Objects 42',
-      meta: 'PNG Image · 1920x1080 · OCR Indexed via Windows.Media.Ocr',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59c35" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
+    sidebarBridge: {
+      id: 'sidebarBridge',
+      title: 'Sidebar-Bridge.tsx',
+      path: 'ProtonDock · src/components/dock/Sidebar-Bridge.tsx',
+      cat: 'files',
+      kind: 'tsx',
+      type: 'TSX',
+      meta: 'TypeScript JSX Component · 14 KB'
     },
-    {
-      title: 'Screenshot_Terminal_Commit.png',
-      sub: 'C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot_Terminal_Commit.png',
-      type: 'ocr',
-      snippet: 'git push origin dock [new branch] -> commit 4fa10b2 (clean working tree, verified)',
-      meta: 'PNG Image · 1440x900 · OCR Indexed via Windows.Media.Ocr',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59c35" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
+    mainCpp: {
+      id: 'mainCpp',
+      title: 'main.cpp',
+      path: 'ProtonDock · src/native/main.cpp',
+      cat: 'files',
+      kind: 'cpp',
+      type: 'C++',
+      meta: 'C++ Win32 Core · 28 KB'
     },
-    {
+    weatherEngine: {
+      id: 'weatherEngine',
+      title: 'weather.rs',
+      path: 'Native Rust Engine · protonsearch/src/weather.rs',
+      cat: 'files',
+      kind: 'rust',
+      type: 'Rust',
+      snippet: 'pub fn fetch_weather(city: &str) -> Result<WeatherData, WeatherError>',
+      meta: 'Rust Source File · 18 KB'
+    },
+    indexerRs: {
+      id: 'indexerRs',
       title: 'indexer.rs',
-      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\protonsearch\\src\\indexer.rs',
-      type: 'content',
+      path: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\protonsearch\\src\\indexer.rs',
+      cat: 'files',
+      kind: 'rust',
+      type: 'Rust',
       snippet: 'SELECT rowid, path, snippet(files_fts, 0, "<mark>", "</mark>", "...", 16) FROM files_fts WHERE files_fts MATCH ? ORDER BY rank;',
-      meta: 'Rust Source File · 34 KB · FTS5 Virtual Table Matcher',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'
+      meta: 'Rust Source File · 34 KB · FTS5 Virtual Table Matcher'
     },
-    {
+    creationPlaybook: {
+      id: 'creationPlaybook',
       title: 'CREATION_PLAYBOOK.md',
-      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\widgets\\CREATION_PLAYBOOK.md',
-      type: 'content',
+      path: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\widgets\\CREATION_PLAYBOOK.md',
+      cat: 'files',
+      kind: 'file',
+      type: 'DOC',
       snippet: 'Widget contract specifications: every widget must declare discrete bounds, adhere to locked 48px square height, and pass visual validation.',
-      meta: 'Markdown Document · 18 KB · Indexed via FTS5',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+      meta: 'Markdown Document · 18 KB · Indexed via FTS5'
     },
-    {
-      title: 'STATUS.md',
-      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\STATUS.md',
-      type: 'content',
-      snippet: 'Dock stability verification: locked 48px square height invariant verified across all test runs without layout shifts or memory leaks.',
-      meta: 'Markdown Document · 12 KB · Indexed via FTS5',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    protonSources: {
+      id: 'protonSources',
+      title: 'ProtonDock Sources',
+      path: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch',
+      cat: 'folders',
+      kind: 'folder',
+      type: 'FOLDER',
+      meta: 'Local Git Repository Directory'
     },
-    {
-      title: 'Q3_Financial_Review.pdf',
-      sub: 'C:\\Users\\Pranshul\\Documents\\Financials\\Q3_Financial_Review.pdf',
-      type: 'files',
-      meta: 'Adobe Acrobat PDF · 1.4 MB · Extracted via pdf-extract',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    screenshots: {
+      id: 'screenshots',
+      title: 'Screenshots',
+      path: 'C:\\Users\\Pranshul\\Pictures\\Screenshots',
+      cat: 'folders',
+      kind: 'folder',
+      type: 'FOLDER',
+      meta: 'User Screenshots Library'
     },
-    {
-      title: 'Architecture_Handoff.docx',
-      sub: 'C:\\Users\\Pranshul\\Documents\\Design\\Architecture_Handoff.docx',
-      type: 'files',
-      meta: 'Microsoft Word Document · 840 KB · Extracted via docx-lite',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    receipt: {
+      id: 'receipt',
+      title: 'receipt-2026-11-04.png',
+      path: 'OCR · "Whole Foods Market · Total 184.20"',
+      cat: 'ocr',
+      kind: 'ocr',
+      type: 'OCR',
+      snippet: 'Whole Foods Market - Total: $184.20 - Card ending in 4022',
+      meta: 'PNG Image · 1920x1080 · OCR Indexed via Windows.Media.Ocr'
     },
-    {
-      title: 'main.rs',
-      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\protonsearch\\src\\main.rs',
-      type: 'code',
-      meta: 'Rust Win32 Entrypoint · 48 KB · WindowProc Handler',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'
+    screenshotCommit: {
+      id: 'screenshotCommit',
+      title: 'Screenshot_Terminal_Commit.png',
+      path: 'C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot_Terminal_Commit.png',
+      cat: 'ocr',
+      kind: 'ocr',
+      type: 'OCR',
+      snippet: 'git push origin dock [new branch] -> commit 4fa10b2 (clean working tree, verified)',
+      meta: 'PNG Image · 1440x900 · OCR Indexed via Windows.Media.Ocr'
     },
-    {
-      title: 'dock-editable.html',
-      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\dock-editable.html',
-      type: 'code',
-      meta: 'HTML5 / CSS3 / ES6 · High-Fidelity Tahoe Glass Preview',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'
+    todoCache: {
+      id: 'todoCache',
+      title: 'TODO: Cache FTS5 token indexes',
+      path: 'Git Code Tasks · src-tauri/src/indexer.rs:142',
+      cat: 'git',
+      kind: 'branch',
+      type: 'TODO',
+      meta: 'Git Code Task · Line 142'
     },
-    {
-      title: 'spec.md',
-      sub: 'C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\antigravity\\spec.md',
-      type: 'code',
-      meta: 'Technical Architecture Specification · Comprehensive Contract',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    commitGanella: {
+      id: 'commitGanella',
+      title: 'feat(ui): Ganella slender glass rail',
+      path: 'Git Commit · dock branch (HEAD -> origin/dock)',
+      cat: 'git',
+      kind: 'commit',
+      type: 'COMMIT',
+      meta: 'Git Commit · dock branch'
+    },
+    systemSettings: {
+      id: 'systemSettings',
+      title: 'System Settings',
+      path: 'Quick Action · Windows Settings',
+      cat: 'apps',
+      kind: 'gear',
+      type: 'SYS',
+      meta: 'Control Panel & Modern Settings'
     }
-  ];
+  };
 
-  /* Quick Look Drawer Controller (Kensaku Spacebar Preview) */
-  function openQuickLook(item) {
-    if (!qlDrawer || !item) return;
-    if (qlBadge) {
-      qlBadge.textContent = item.type.toUpperCase();
-      qlBadge.className = 'ql-badge' + (item.type === 'ocr' ? ' is-ocr' : item.type === 'content' ? ' is-content' : '');
-    }
-    if (qlFilename) qlFilename.textContent = item.title;
-    if (qlPath) qlPath.textContent = item.sub;
-    if (qlPreviewBox) {
-      if (item.snippet) {
-        qlPreviewBox.innerHTML = '<div style="font-size:9.5px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin-bottom:4px;">' +
-          (item.type === 'ocr' ? 'OCR Extracted Text' : 'Full-Text FTS5 Match') + ':</div>' +
-          '<div style="color:var(--text);">' + escapeHtml(item.snippet) + '</div>';
-      } else {
-        qlPreviewBox.innerHTML = '<div style="color:var(--text-2);">' + escapeHtml(item.sub) + '<br><span style="color:var(--text-3);font-size:10px;">Ready to launch or reveal in Explorer.</span></div>';
-      }
-    }
-    if (qlMetaRow) {
-      qlMetaRow.textContent = item.meta || ('Type: ' + item.type.toUpperCase() + ' · Indexed via Kensaku Local Engine');
-    }
-
-    if (qlOpenBtn) {
-      qlOpenBtn.onclick = function () {
-        showToast('Opening ' + item.title + '...');
-        setTimeout(closeSearchLauncher, 300);
-      };
-    }
-    if (qlFolderBtn) {
-      qlFolderBtn.onclick = function () {
-        showToast('Revealing in Explorer: ' + item.title);
-        setTimeout(closeSearchLauncher, 300);
-      };
-    }
-    if (qlCopyPathBtn) {
-      qlCopyPathBtn.onclick = function () {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(item.sub);
-        }
-        showToast('Path copied to clipboard');
-      };
-    }
-
-    qlDrawer.style.display = 'flex';
-  }
-
-  function closeQuickLook() {
-    if (qlDrawer) qlDrawer.style.display = 'none';
-  }
-
-  if (qlCloseBtn) {
-    qlCloseBtn.addEventListener('click', closeQuickLook);
-  }
-
-  function openSearchLauncher() {
-    if (searchModal) {
-      searchModal.classList.add('is-open');
-      closeQuickLook();
-      if (spotlightInput) {
-        spotlightInput.value = '';
-        setTimeout(function () { spotlightInput.focus(); }, 60);
-      }
-      renderSearchResults('');
-    }
-  }
-
-  function closeSearchLauncher() {
-    if (searchModal) {
-      searchModal.classList.remove('is-open');
-      closeQuickLook();
-    }
-  }
-
-  if (searchModal) {
-    searchModal.addEventListener('click', function (e) {
-      if (e.target === searchModal) closeSearchLauncher();
-    });
-  }
-
-  searchScopePills.forEach(function (pill) {
-    pill.addEventListener('click', function () {
-      searchScopePills.forEach(function (p) { p.classList.remove('is-active'); });
-      pill.classList.add('is-active');
-      currentScope = pill.dataset.scope || 'all';
-      renderSearchResults(spotlightInput ? spotlightInput.value : '');
-    });
-  });
-
-  /* Recursive Descent Math Evaluator */
+  /* Full In-Process Math Evaluator mirroring native Rust engine */
   function tryCalculate(raw) {
     if (!raw || typeof raw !== 'string') return null;
     var text = raw.trim();
@@ -5829,14 +6082,23 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       while (tokens[pos] && (tokens[pos].type === 'STAR' || tokens[pos].type === 'SLASH' || tokens[pos].type === 'PERCENT')) {
         var op = tokens[pos].type;
         pos++;
-        var right = parsePower();
-        if (right === null) return null;
-        if (op === 'STAR') left *= right;
-        else if (op === 'SLASH') {
-          if (right === 0) return null;
-          left /= right;
-        } else if (op === 'PERCENT') {
-          left = left * (right / 100);
+        if (op === 'PERCENT') {
+          if (tokens[pos] && tokens[pos].type === 'IDENT' && tokens[pos].val === 'of') {
+            pos++;
+            var base = parsePower();
+            if (base === null) return null;
+            left = (left / 100) * base;
+          } else {
+            left = left / 100;
+          }
+        } else {
+          var right = parsePower();
+          if (right === null) return null;
+          if (op === 'STAR') left *= right;
+          else {
+            if (right === 0) return null;
+            left /= right;
+          }
         }
       }
       return left;
@@ -5847,9 +6109,9 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
       if (base === null) return null;
       if (tokens[pos] && tokens[pos].type === 'CARET') {
         pos++;
-        var exponent = parsePower();
-        if (exponent === null) return null;
-        return Math.pow(base, exponent);
+        var exp = parsePower();
+        if (exp === null) return null;
+        return Math.pow(base, exp);
       }
       return base;
     }
@@ -5868,185 +6130,401 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
     }
 
     function parsePrimary() {
-      var t = tokens[pos];
-      if (!t) return null;
-      if (t.type === 'NUM') {
+      var tok = tokens[pos];
+      if (!tok) return null;
+      if (tok.type === 'NUM') {
         pos++;
-        return t.val;
+        return tok.val;
       }
-      if (t.type === 'IDENT') {
-        var name = t.val;
+      if (tok.type === 'LPAREN') {
         pos++;
-        if (name === 'pi' || name === 'π') return Math.PI;
-        if (name === 'e') return Math.E;
+        var val = parseExpr();
+        if (val === null) return null;
+        if (tokens[pos] && tokens[pos].type === 'RPAREN') {
+          pos++;
+        }
+        return val;
+      }
+      if (tok.type === 'IDENT') {
+        var name = tok.val;
+        pos++;
         if (tokens[pos] && tokens[pos].type === 'LPAREN') {
           pos++;
           var arg = parseExpr();
           if (arg === null) return null;
-          if (!tokens[pos] || tokens[pos].type !== 'RPAREN') return null;
-          pos++;
-          if (name === 'sqrt') return Math.sqrt(arg);
-          if (name === 'sin') return Math.sin(arg);
-          if (name === 'cos') return Math.cos(arg);
-          if (name === 'tan') return Math.tan(arg);
-          if (name === 'abs') return Math.abs(arg);
-          if (name === 'log' || name === 'ln') return Math.log(arg);
+          if (tokens[pos] && tokens[pos].type === 'RPAREN') {
+            pos++;
+          }
+          switch (name) {
+            case 'sqrt': return arg < 0 ? null : Math.sqrt(arg);
+            case 'abs': return Math.abs(arg);
+            case 'round': return Math.round(arg);
+            case 'floor': return Math.floor(arg);
+            case 'ceil': return Math.ceil(arg);
+            case 'sin': return Math.sin((arg * Math.PI) / 180);
+            case 'cos': return Math.cos((arg * Math.PI) / 180);
+            case 'tan': return Math.tan((arg * Math.PI) / 180);
+            case 'log': return arg <= 0 ? null : Math.log10(arg);
+            case 'ln': return arg <= 0 ? null : Math.log(arg);
+            default: return null;
+          }
+        } else {
+          if (name === 'pi' || name === 'π') return Math.PI;
+          if (name === 'e') return Math.E;
           return null;
         }
-        return null;
-      }
-      if (t.type === 'LPAREN') {
-        pos++;
-        var inner = parseExpr();
-        if (inner === null) return null;
-        if (!tokens[pos] || tokens[pos].type !== 'RPAREN') return null;
-        pos++;
-        return inner;
       }
       return null;
     }
 
-    var result = parseExpr();
-    if (result === null || (tokens[pos] && tokens[pos].type !== 'EOF')) return null;
-    return result;
+    var res = parseExpr();
+    if (res === null || !isFinite(res)) return null;
+    return res;
   }
 
-  function updateSelectedRow() {
-    if (!resultsRowsContainer) return;
-    var rows = resultsRowsContainer.querySelectorAll('.ps-result-row');
-    rows.forEach(function (row, idx) {
-      row.classList.toggle('is-selected', idx === selectedIndex);
-    });
-    if (rows[selectedIndex]) {
-      rows[selectedIndex].scrollIntoView({ block: 'nearest' });
+  // Navigation State
+  var currentSearchQuery = '';
+  var selectedResultIndex = 0;
+  var filteredResults = [];
+
+  function toggleProtonSearch(forcedState) {
+    var willOpen = forcedState !== undefined ? forcedState : (searchModal && !searchModal.classList.contains('is-open'));
+    if (willOpen) {
+      openSearchLauncher();
+    } else {
+      closeSearchLauncher();
     }
   }
 
-  function renderSearchResults(query) {
-    if (!resultsRowsContainer) return;
-    var raw = (query || '').trim();
-    var lower = raw.toLowerCase();
-    var calcRes = tryCalculate(raw);
+  function openSearchLauncher() {
+    if (!searchModal) return;
+    searchModal.classList.add('is-open');
+    closeQuickLook();
+    if (spotlightInput) {
+      spotlightInput.focus();
+      spotlightInput.select();
+    }
+    renderResults();
+  }
 
-    if (calcRes !== null) {
-      lastCalculatedVal = calcRes;
-      if (calculatorHeroContainer) calculatorHeroContainer.style.display = 'flex';
-      if (calcHeroExpr) calcHeroExpr.textContent = raw;
-      if (calcHeroVal) calcHeroVal.textContent = '= ' + Number(calcRes.toPrecision(12));
+  function closeSearchLauncher() {
+    if (!searchModal) return;
+    searchModal.classList.remove('is-open');
+    closeQuickLook();
+  }
+
+  function handleSearchBackdrop(e) {
+    if (e.target === searchModal) {
+      closeSearchLauncher();
+    }
+  }
+
+  function selectNavScope(scope, pillEl) {
+    currentScope = scope;
+    document.querySelectorAll('.nav-scope-pill').forEach(function (p) { p.classList.remove('active'); p.classList.remove('is-active'); });
+    if (pillEl) {
+      pillEl.classList.add('active');
+    } else {
+      var matchPill = document.querySelector('.nav-scope-pill[data-scope="' + scope + '"]');
+      if (matchPill) matchPill.classList.add('active');
+    }
+    selectedResultIndex = 0;
+    renderResults();
+  }
+
+  function cycleNavScope() {
+    var scopes = ['all', 'apps', 'files', 'folders', 'ocr', 'git'];
+    var curIdx = scopes.indexOf(currentScope);
+    var nextScope = scopes[(curIdx + 1) % scopes.length];
+    var pill = document.querySelector('.nav-scope-pill[data-scope="' + nextScope + '"]');
+    selectNavScope(nextScope, pill);
+  }
+
+  function handleSearchInput(val) {
+    currentSearchQuery = (val || '').trim();
+    var lower = currentSearchQuery.toLowerCase();
+
+    var prefixes = {
+      'app:': 'apps',
+      'apps:': 'apps',
+      'file:': 'files',
+      'files:': 'files',
+      'folder:': 'folders',
+      'folders:': 'folders',
+      'ocr:': 'ocr',
+      'git:': 'git',
+      'todo:': 'git',
+      'todos:': 'git',
+      'commit:': 'git',
+      'tool:': 'apps',
+      'tools:': 'apps',
+      'math:': 'all'
+    };
+
+    for (var pfx in prefixes) {
+      if (lower.indexOf(pfx) === 0) {
+        var remainder = val.slice(pfx.length).trim();
+        if (spotlightInput) spotlightInput.value = remainder;
+        currentSearchQuery = remainder;
+        var scope = prefixes[pfx];
+        var pill = document.querySelector('.nav-scope-pill[data-scope="' + scope + '"]');
+        selectNavScope(scope, pill);
+        return;
+      }
+    }
+
+    selectedResultIndex = 0;
+    renderResults();
+  }
+
+  function renderResults() {
+    var query = currentSearchQuery.toLowerCase();
+    var allItems = Object.values(resultDatabase);
+
+    var scopeCounts = { all: allItems.length, apps: 0, files: 0, folders: 0, ocr: 0, git: 0 };
+    allItems.forEach(function (item) {
+      if (scopeCounts[item.cat] !== undefined) scopeCounts[item.cat]++;
+    });
+    Object.keys(scopeCounts).forEach(function (scope) {
+      var countEl = document.getElementById('count-' + scope);
+      if (countEl) countEl.textContent = scopeCounts[scope];
+    });
+
+    var calcResult = null;
+    if (query.length > 0) {
+      calcResult = tryCalculate(query);
+    }
+
+    if (calcResult !== null) {
+      lastCalculatedVal = calcResult;
+      if (calculatorHeroContainer) {
+        calculatorHeroContainer.style.display = 'block';
+        if (calcHeroExpr) calcHeroExpr.textContent = currentSearchQuery;
+        var displayCalc = Number(calcResult.toPrecision(12));
+        if (calcHeroVal) calcHeroVal.textContent = '= ' + displayCalc;
+      }
     } else {
       lastCalculatedVal = null;
       if (calculatorHeroContainer) calculatorHeroContainer.style.display = 'none';
     }
 
-    currentFilteredItems = SEARCH_ITEMS.filter(function (item) {
-      var scopeMatch = (currentScope === 'all' || item.type === currentScope);
-      var textMatch = !lower ||
-        item.title.toLowerCase().indexOf(lower) !== -1 ||
-        item.sub.toLowerCase().indexOf(lower) !== -1 ||
-        (item.snippet && item.snippet.toLowerCase().indexOf(lower) !== -1) ||
-        (item.meta && item.meta.toLowerCase().indexOf(lower) !== -1);
-      return scopeMatch && textMatch;
+    filteredResults = allItems.filter(function (item) {
+      if (currentScope !== 'all' && item.cat !== currentScope) return false;
+      if (!query) return true;
+      return item.title.toLowerCase().indexOf(query) !== -1 ||
+             item.path.toLowerCase().indexOf(query) !== -1 ||
+             (item.type && item.type.toLowerCase().indexOf(query) !== -1) ||
+             (item.snippet && item.snippet.toLowerCase().indexOf(query) !== -1) ||
+             (item.meta && item.meta.toLowerCase().indexOf(query) !== -1);
     });
 
-    selectedIndex = 0;
-    var html = '';
-    currentFilteredItems.forEach(function (item, idx) {
-      var badgeClass = item.type === 'ocr' ? ' is-ocr' : item.type === 'content' ? ' is-content' : '';
-      html += '<div class="ps-result-row' + (idx === 0 ? ' is-selected' : '') + '" data-idx="' + idx + '" data-title="' + escapeHtml(item.title) + '">' +
-        '<div class="ps-res-icon">' + item.icon + '</div>' +
-        '<div class="ps-res-info">' +
-          '<div class="ps-res-title">' + escapeHtml(item.title) + '</div>' +
-          '<div class="ps-res-sub">' + escapeHtml(item.sub) + '</div>' +
-          (item.snippet ? '<div class="ps-res-snippet">' + escapeHtml(item.snippet) + '</div>' : '') +
-        '</div>' +
-        '<span class="ps-res-badge' + badgeClass + '">' + item.type.toUpperCase() + '</span>' +
-      '</div>';
-    });
-
-    if (currentFilteredItems.length === 0 && calcRes === null) {
-      html = '<div style="padding:24px 0;text-align:center;font-size:12px;color:var(--text-3);">No matching results found in Kensaku index</div>';
+    if (selectedResultIndex >= filteredResults.length) {
+      selectedResultIndex = Math.max(0, filteredResults.length - 1);
     }
 
-    resultsRowsContainer.innerHTML = html;
+    if (!resultsRowsContainer) return;
+    resultsRowsContainer.innerHTML = '';
 
-    // Attach click events
-    var rows = resultsRowsContainer.querySelectorAll('.ps-result-row');
-    rows.forEach(function (row) {
-      row.addEventListener('click', function () {
-        var idx = parseInt(row.dataset.idx, 10);
-        selectedIndex = idx;
-        updateSelectedRow();
-        openQuickLook(currentFilteredItems[idx]);
-      });
-      row.addEventListener('dblclick', function () {
-        var idx = parseInt(row.dataset.idx, 10);
-        showToast('Launching ' + currentFilteredItems[idx].title);
-        setTimeout(closeSearchLauncher, 350);
-      });
+    if (filteredResults.length === 0 && calcResult === null) {
+      resultsRowsContainer.innerHTML =
+        '<div style="padding:40px 20px; text-align:center; color:var(--text-3);">' +
+          '<svg class="icon" style="width:32px; height:32px; margin-bottom:8px; opacity:0.4;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+          '<div style="font-size:13px; font-weight:600; color:var(--text-2);">No results found</div>' +
+          '<div style="font-size:11px; margin-top:2px;">Try broadening your query or switching categories</div>' +
+        '</div>';
+      return;
+    }
+
+    filteredResults.forEach(function (item, index) {
+      var isSelected = index === selectedResultIndex;
+      var row = document.createElement('div');
+      row.className = 'ps-result-row' + (isSelected ? ' is-selected' : '');
+      row.id = 'ps-row-' + index;
+      row.onclick = function () { selectResult(index); triggerPrimaryAction(); };
+      row.onmousemove = function () { if (selectedResultIndex !== index) selectResult(index, false); };
+
+      var displayTitle = escapeHtml(item.title);
+      var displayPath = escapeHtml(item.path);
+      if (query) {
+        var cleanQ = query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        var regex = new RegExp('(' + cleanQ + ')', 'gi');
+        displayTitle = displayTitle.replace(regex, '<span class="ps-match-hl">$1</span>');
+        displayPath = displayPath.replace(regex, '<span class="ps-match-hl">$1</span>');
+      }
+
+      var badgeClass = item.cat === 'ocr' ? ' is-ocr' : item.cat === 'files' ? ' is-content' : '';
+      row.innerHTML =
+        '<div class="ps-item-icon">' + iconFor(item) + '</div>' +
+        '<div class="ps-item-copy">' +
+          '<b>' + displayTitle + '</b>' +
+          '<small>' + displayPath + '</small>' +
+        '</div>' +
+        '<span class="ps-res-badge' + badgeClass + '">' + escapeHtml(item.type || item.cat).toUpperCase() + '</span>';
+      resultsRowsContainer.appendChild(row);
     });
   }
 
-  function copyCalculation() {
-    if (lastCalculatedVal !== null) {
-      var displayVal = String(Number(lastCalculatedVal.toPrecision(12)));
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(displayVal);
+  function selectResult(index, scrollIntoView) {
+    if (scrollIntoView === undefined) scrollIntoView = true;
+    if (index < 0 || index >= filteredResults.length) return;
+    selectedResultIndex = index;
+    document.querySelectorAll('.ps-result-row').forEach(function (r, idx) {
+      r.classList.toggle('is-selected', idx === selectedResultIndex);
+    });
+
+    if (scrollIntoView) {
+      var selectedEl = document.getElementById('ps-row-' + selectedResultIndex);
+      if (selectedEl) {
+        selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
-      showToast('Copied ' + displayVal + ' to clipboard');
-      setTimeout(closeSearchLauncher, 400);
     }
+  }
+
+  function navigateResults(delta) {
+    if (filteredResults.length === 0) return;
+    var newIdx = (selectedResultIndex + delta + filteredResults.length) % filteredResults.length;
+    selectResult(newIdx);
+    if (qlDrawer && qlDrawer.style.display !== 'none') {
+      openQuickLook(filteredResults[newIdx]);
+    }
+  }
+
+  function triggerPrimaryAction(targetId) {
+    var item = targetId ? resultDatabase[targetId] : filteredResults[selectedResultIndex];
+    if (!item) return;
+    showToast('Launched ' + item.title);
+    setTimeout(closeSearchLauncher, 350);
+  }
+
+  function triggerSecondaryAction(targetId) {
+    var item = targetId ? resultDatabase[targetId] : filteredResults[selectedResultIndex];
+    if (!item) return;
+    showToast('Revealed in Explorer: ' + item.title);
+    setTimeout(closeSearchLauncher, 350);
+  }
+
+  function copyCurrentPath() {
+    var item = filteredResults[selectedResultIndex];
+    if (!item) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(item.path).catch(function () {});
+    }
+    showToast('Copied path to clipboard');
+  }
+
+  function copyCalculatorResult() {
+    if (!calcHeroVal) return;
+    var val = calcHeroVal.textContent.replace('= ', '').trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).catch(function () {});
+    }
+    showToast('Copied "' + val + '" to clipboard');
+    if (spotlightInput) {
+      spotlightInput.value = val;
+      currentSearchQuery = val;
+      spotlightInput.focus();
+    }
+  }
+
+  /* Quick Look Drawer Controller (Kensaku Spacebar Preview) */
+  function openQuickLook(item) {
+    if (!qlDrawer) return;
+    var targetItem = item || filteredResults[selectedResultIndex];
+    if (!targetItem) return;
+    if (qlBadge) {
+      qlBadge.textContent = (targetItem.type || targetItem.cat).toUpperCase();
+      qlBadge.className = 'ql-badge' + (targetItem.cat === 'ocr' ? ' is-ocr' : targetItem.cat === 'files' ? ' is-content' : '');
+    }
+    if (qlFilename) qlFilename.textContent = targetItem.title;
+    if (qlPath) qlPath.textContent = targetItem.path;
+    if (qlPreviewBox) {
+      if (targetItem.snippet) {
+        qlPreviewBox.innerHTML = '<div style="font-size:9.5px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin-bottom:4px;">' +
+          (targetItem.cat === 'ocr' ? 'OCR Extracted Text' : 'Full-Text FTS5 Match') + ':</div>' +
+          '<div style="color:var(--text);">' + escapeHtml(targetItem.snippet) + '</div>';
+      } else {
+        qlPreviewBox.innerHTML = '<div style="color:var(--text-2);">' + escapeHtml(targetItem.path) + '<br><span style="color:var(--text-3);font-size:10px;">Ready to launch or reveal in Explorer.</span></div>';
+      }
+    }
+    if (qlMetaRow) {
+      qlMetaRow.textContent = targetItem.meta || ('Type: ' + (targetItem.type || targetItem.cat).toUpperCase() + ' · Indexed via Kensaku Local Engine');
+    }
+
+    if (qlOpenBtn) {
+      qlOpenBtn.onclick = function () {
+        showToast('Opening ' + targetItem.title + '...');
+        setTimeout(closeSearchLauncher, 300);
+      };
+    }
+    if (qlFolderBtn) {
+      qlFolderBtn.onclick = function () {
+        showToast('Revealing in Explorer: ' + targetItem.title);
+        setTimeout(closeSearchLauncher, 300);
+      };
+    }
+    if (qlCopyPathBtn) {
+      qlCopyPathBtn.onclick = function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(targetItem.path).catch(function () {});
+        }
+        showToast('Path copied to clipboard');
+      };
+    }
+
+    qlDrawer.style.display = 'flex';
+  }
+
+  function closeQuickLook() {
+    if (qlDrawer) qlDrawer.style.display = 'none';
+  }
+
+  if (qlCloseBtn) {
+    qlCloseBtn.addEventListener('click', closeQuickLook);
   }
 
   if (calculatorHeroContainer) {
-    calculatorHeroContainer.addEventListener('click', copyCalculation);
+    calculatorHeroContainer.addEventListener('click', copyCalculatorResult);
   }
 
   if (spotlightInput) {
     spotlightInput.addEventListener('input', function () {
-      renderSearchResults(spotlightInput.value);
+      handleSearchInput(spotlightInput.value);
     });
     spotlightInput.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (currentFilteredItems.length > 0) {
-          selectedIndex = (selectedIndex + 1) % currentFilteredItems.length;
-          updateSelectedRow();
-          if (qlDrawer && qlDrawer.style.display !== 'none') {
-            openQuickLook(currentFilteredItems[selectedIndex]);
-          }
-        }
+        navigateResults(1);
         return;
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (currentFilteredItems.length > 0) {
-          selectedIndex = (selectedIndex - 1 + currentFilteredItems.length) % currentFilteredItems.length;
-          updateSelectedRow();
-          if (qlDrawer && qlDrawer.style.display !== 'none') {
-            openQuickLook(currentFilteredItems[selectedIndex]);
-          }
-        }
+        navigateResults(-1);
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        cycleNavScope();
         return;
       }
       if (e.key === ' ' && spotlightInput.selectionStart === spotlightInput.selectionEnd && spotlightInput.value.trim() !== '') {
-        if (currentFilteredItems[selectedIndex]) {
+        if (filteredResults[selectedResultIndex]) {
           e.preventDefault();
           if (qlDrawer && qlDrawer.style.display !== 'none') {
             closeQuickLook();
           } else {
-            openQuickLook(currentFilteredItems[selectedIndex]);
+            openQuickLook(filteredResults[selectedResultIndex]);
           }
           return;
         }
       }
       if (e.key === 'Enter') {
-        if (lastCalculatedVal !== null) {
-          e.preventDefault();
-          copyCalculation();
-        } else if (currentFilteredItems[selectedIndex]) {
-          e.preventDefault();
-          showToast('Launching ' + currentFilteredItems[selectedIndex].title);
-          setTimeout(closeSearchLauncher, 350);
+        e.preventDefault();
+        if (calculatorHeroContainer && calculatorHeroContainer.style.display !== 'none' && currentSearchQuery.length > 0) {
+          copyCalculatorResult();
+        } else if (e.ctrlKey) {
+          triggerSecondaryAction();
+        } else {
+          triggerPrimaryAction();
         }
       }
     });
@@ -6082,6 +6560,10 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
         closeActivePopover();
         return;
       }
+      if (qlDrawer && qlDrawer.style.display !== 'none') {
+        closeQuickLook();
+        return;
+      }
       if (searchModal && searchModal.classList.contains('is-open')) {
         closeSearchLauncher();
         return;
@@ -6095,6 +6577,18 @@ body[data-display-style="line"] .dock-slot:not(:first-child)::before {
 
   /* Initial render */
   renderDock();
+
+  /* Expose navigation launcher methods for external tests and hooks */
+  window.toggleProtonSearch = toggleProtonSearch;
+  window.openSearchLauncher = openSearchLauncher;
+  window.closeSearchLauncher = closeSearchLauncher;
+  window.handleSearchInput = handleSearchInput;
+  window.selectNavScope = selectNavScope;
+  window.cycleNavScope = cycleNavScope;
+  window.copyCalculatorResult = copyCalculatorResult;
+  window.handleSearchBackdrop = handleSearchBackdrop;
+  window.openQuickLook = openQuickLook;
+  window.closeQuickLook = closeQuickLook;
 
 })();
 </script>
