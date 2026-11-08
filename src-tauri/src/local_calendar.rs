@@ -34,8 +34,14 @@ use windows::{
 
 const MAX_ICS: u64 = 1024 * 1024;
 static GRANTS: Mutex<()> = Mutex::new(());
+fn profile_id(profile: &str) -> bool {
+    let edge = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit();
+    (1..=24).contains(&profile.len())
+        && profile.starts_with(edge)
+        && profile.chars().all(|c| edge(c) || c == '-')
+}
 fn profile_name(profile: &str) -> Result<(), String> {
-    if ["daily", "founder"].contains(&profile) {
+    if profile_id(profile) {
         Ok(())
     } else {
         Err("Invalid calendar profile".into())
@@ -61,9 +67,7 @@ fn bounded_json(path: &Path, maximum: u64) -> Result<Option<Value>, String> {
         .map(Some)
         .map_err(|_| "Native calendar configuration is invalid".into())
 }
-fn active_profile(directory: &Path, profile: &str) -> Result<bool, String> {
-    profile_name(profile)?;
-    let layout = bounded_json(&directory.join("protondock-layout.json"), 1024 * 1024)?;
+fn profile_is_active(layout: Option<&Value>, profile: &str) -> Result<bool, String> {
     match layout {
         None => Ok(profile == "daily"),
         Some(layout)
@@ -74,19 +78,35 @@ fn active_profile(directory: &Path, profile: &str) -> Result<bool, String> {
         {
             Ok(layout["profile"] == profile)
         }
+        Some(layout)
+            if (layout["version"] == 2 || layout["version"] == 3)
+                && layout["profile"].as_str().is_some_and(profile_id)
+                && layout["profiles"].is_object() =>
+        {
+            Ok(layout["profile"] == profile && layout["profiles"].get(profile).is_some())
+        }
         _ => Err("Native dock profile could not be validated".into()),
     }
+}
+fn active_profile(directory: &Path, profile: &str) -> Result<bool, String> {
+    profile_name(profile)?;
+    let layout = bounded_json(&directory.join("protondock-layout.json"), 1024 * 1024)?;
+    profile_is_active(layout.as_ref(), profile)
 }
 fn grants(directory: &Path) -> Result<Value, String> {
     let value = bounded_json(&directory.join("calendar-sources.json"), 65536)?
         .unwrap_or_else(|| json!({"version":1,"profiles":{}}));
+    check_grants(value)
+}
+fn check_grants(value: Value) -> Result<Value, String> {
     if value["version"] != 1 || !value["profiles"].is_object() {
         return Err("Native calendar grants are invalid; existing grants were preserved".into());
     }
-    for profile in ["daily", "founder"] {
+    for profile in value["profiles"].as_object().into_iter().flat_map(|profiles| profiles.keys()) {
         if let Some(grant) = value["profiles"].get(profile) {
             let legacy = grant.get("token").is_some() || grant.get("path").is_some();
-            if !grant.is_object()
+            if !profile_id(profile)
+                || !grant.is_object()
                 || (legacy
                     && (!grant["token"].as_str().is_some_and(valid_token)
                         || !grant["path"].as_str().is_some_and(|path| !path.is_empty())))
@@ -606,5 +626,44 @@ mod tests {
         let result = read_calendar(&link.join("fixture.ics"));
         std::fs::remove_dir(&link).unwrap();
         assert!(result.unwrap_err().contains("reparse"));
+    }
+}
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+
+    #[test]
+    fn version_two_layout_activates_its_profile() {
+        let layout = json!({"version":2,"profile":"work","profiles":{"work":{}}});
+        assert_eq!(profile_is_active(Some(&layout), "work"), Ok(true));
+    }
+    #[test]
+    fn version_three_custom_profile_is_valid() {
+        let layout = json!({"version":3,"profile":"deep-work","profiles":{"deep-work":{}}});
+        assert_eq!(profile_is_active(Some(&layout), "deep-work"), Ok(true));
+    }
+    #[test]
+    fn inactive_profile_is_denied_not_an_error() {
+        let layout = json!({"version":3,"profile":"deep-work","profiles":{"deep-work":{},"daily":{}}});
+        assert_eq!(profile_is_active(Some(&layout), "daily"), Ok(false));
+    }
+    #[test]
+    fn unknown_layout_version_is_rejected() {
+        let version_four = json!({"version":4,"profile":"daily","profiles":{"daily":{}}});
+        assert!(profile_is_active(Some(&version_four), "daily").is_err());
+        let bad_name = json!({"version":2,"profile":"Bad Name","profiles":{"Bad Name":{}}});
+        assert!(profile_is_active(Some(&bad_name), "daily").is_err());
+    }
+    #[test]
+    fn missing_layout_keeps_daily_active() {
+        assert_eq!(profile_is_active(None, "daily"), Ok(true));
+        assert_eq!(profile_is_active(None, "founder"), Ok(false));
+    }
+    #[test]
+    fn grants_for_custom_profiles_are_validated() {
+        let sources = json!({"0123456789abcdef0123456789abcdef": "a.ics"});
+        assert!(check_grants(json!({"version":1,"profiles":{"deep-work":{"sources":sources}}})).is_ok());
+        assert!(check_grants(json!({"version":1,"profiles":{"Bad Key":{"sources":sources}}})).is_err());
+        assert!(check_grants(json!({"version":1,"profiles":{"deep-work":{"token":"bad","path":42}}})).is_err());
     }
 }
