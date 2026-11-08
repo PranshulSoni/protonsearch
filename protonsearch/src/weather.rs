@@ -17,14 +17,22 @@ fn allowed_profile(version: u64, profile: &str) -> bool {
     match version {
         1 => matches!(profile, "daily" | "founder"),
         2 => matches!(profile, "daily" | "work" | "founder" | "focus"),
+        3 => profile_id(profile),
         _ => false,
     }
+}
+
+fn profile_id(profile: &str) -> bool {
+    let edge = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit();
+    (1..=24).contains(&profile.len())
+        && profile.starts_with(edge)
+        && profile.chars().all(|c| edge(c) || c == '-')
 }
 
 fn location(layout: &Value) -> Result<Option<(f64, f64)>, String> {
     let version = layout["version"]
         .as_u64()
-        .filter(|version| matches!(version, 1 | 2))
+        .filter(|version| matches!(version, 1 | 2 | 3))
         .ok_or("Invalid weather layout version")?;
     let profile = layout["profile"]
         .as_str()
@@ -388,7 +396,21 @@ mod tests {
         assert_eq!(location(&layout_for(2, "focus", disabled)).unwrap(), None);
         assert!(location(&layout_for(2, "later", json!({}))).is_err());
         assert!(location(&layout_for(1, "work", json!({}))).is_err());
-        assert!(location(&layout_for(3, "daily", json!({}))).is_err());
+        assert!(location(&layout_for(4, "daily", json!({}))).is_err());
+    }
+
+    #[test]
+    fn weather_location_reads_version_three_and_custom_profiles() {
+        let settings = json!({"weatherEnabled":true,"weatherLatitude":1.0,"weatherLongitude":2.0});
+        assert_eq!(location(&layout_for(3, "deep-work", settings)).unwrap(), Some((1.0, 2.0)));
+    }
+
+    #[test]
+    fn weather_rejects_invalid_profile_ids() {
+        let long = "x".repeat(25);
+        for profile in ["", "Daily", "-x", "a_b", long.as_str()] {
+            assert!(location(&layout_for(3, profile, json!({}))).is_err());
+        }
     }
 
     #[test]
@@ -434,7 +456,7 @@ mod tests {
         assert!(bounded_json(b"not-json".as_slice(), 65_536).is_err());
         let mut value =
             layout(json!({"weatherEnabled":true,"weatherLatitude":0,"weatherLongitude":0}));
-        value["version"] = json!(3);
+        value["version"] = json!(4);
         assert!(location(&value).is_err());
     }
 

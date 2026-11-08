@@ -72,9 +72,11 @@ struct SearchResponse {
     results: Vec<ResultRow>,
     elapsed_ms: f64,
 }
-const WIDGET_CARD_IDS: [&str; 14] = [
-    "windows", "search", "apps", "spotify", "weather", "system", "claude", "chatgpt", "agent",
-    "files", "folders", "trash", "volume", "clock",
+const WIDGET_CARD_IDS: [&str; 30] = [
+    "start", "search", "running-apps", "pinned-apps", "system-stats", "calendar", "peripherals",
+    "music-player", "weather", "status-battery", "wifi", "bluetooth", "notifications",
+    "quick-notes", "claude", "codex", "assistant", "system-tray", "clock", "agent", "files",
+    "folders", "trash", "volume", "windows", "apps", "system", "spotify", "siri-ai", "chatgpt",
 ];
 const WIDGET_CARD_SIZES: [&str; 3] = ["compact", "standard", "wide"];
 const WIDGET_SETTINGS_LIMIT: usize = 64 * 1024;
@@ -1458,13 +1460,22 @@ mod tests {
             assert!(valid_widget_card_id(id));
         }
         assert!(!valid_widget_card_id(""));
-        assert!(!valid_widget_card_id("calendar"));
+        assert!(!valid_widget_card_id("calendar "));
         assert!(!valid_widget_card_id("../dock"));
         for size in WIDGET_CARD_SIZES {
             assert!(valid_widget_card_size(size));
         }
         assert!(!valid_widget_card_size("large"));
         assert!(!valid_widget_card_size(""));
+    }
+    #[test]
+    fn widget_card_ids_accept_canonical_and_alias_ids_only() {
+        for id in ["start", "codex", "assistant", "volume", "windows", "chatgpt"] {
+            assert!(valid_widget_card_id(id));
+        }
+        for id in ["", "Start", "siri", "../x", "calendar "] {
+            assert!(!valid_widget_card_id(id));
+        }
     }
     #[test]
     fn widget_card_settings_are_objects_under_the_size_cap() {
