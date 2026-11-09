@@ -532,8 +532,9 @@ is only for genuinely network-dependent content. Component anatomy and tokens: D
 - `.state--warn` (warning icon + `--ps-warning-pill-border`), `.state--error` (negative icon +
   `--ps-negative-pill-bg` border, **no red fill**), `.state--offline` (cloud-off icon, neutral border),
   `.state--empty` (neutral, optional icon, one action).
-- `.row-state` for one failing row/source: 16 px negative icon + 13/20 ink-2 sentence + "Try again" 13/600 accent;
-  no border or background.
+- `.row-state` for one **auto-retry / reconnectable** row failure (source read, network root): 16 px **warning** icon +
+  13/20 ink-2 sentence + "Try again" 13/600 accent; no border or background. Blocking row failures use `.state--error`
+  with the negative colour instead (severity rule: recovering = warn, blocked = error).
 - `.state-details`: native `<details>` with summary "Details" (12/600 ink-2); content 12/18 ink-2 = sanitized
   message + reference id only. Omit when there is nothing safe to show.
 - Existing primitives map: `Callout` → `.state` (tone attr), `EmptyState` → `.state--empty`; add

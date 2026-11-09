@@ -796,7 +796,7 @@ No raw exception text, no error codes, no stack traces, no absolute paths, no re
 | Informational | `.state` | `--ps-ink-2` icon + `--ps-line` border | same anatomy; used for alpha limitations, not errors |
 | Offline | `.state .state--offline` | neutral/cloud-off icon | title "You're offline.", one sentence, optional Try again; only network-dependent blocks |
 | Empty | `.state .state--empty` | neutral | optional 20 px icon · title 15/600 · one 14/21 sentence · one action; left-aligned in its panel |
-| Row-level failure | `.row-state` | inline | 16 px negative icon · 13/20 `--ps-ink-2` sentence · "Try again" 13/600 accent; no border or background |
+| Row-level failure (auto-retry / reconnectable only) | `.row-state` | inline | 16 px **warning** icon · 13/20 `--ps-ink-2` sentence · "Try again" 13/600 accent; no border or background. Blocking row failures use `.state--error` with the negative colour (recovering = warn, blocked = error). |
 
 Metrics: block padding **20 px 24 px**; icon 20 px; gap 12; title 15/600/ink; text 14/21 `--ps-ink-2` max 60 ch;
 action row margin-top 16, buttons 36 px (secondary) or text; details margin-top 12; radius 12; background

@@ -361,6 +361,8 @@ fn update_settings(
         .engine
         .update_settings(patch)
         .map_err(|e| e.to_string())?;
+    // The Pi launcher path may have changed; drop the cached probe.
+    ps_agent::clear_probe_cache();
     // Settings may change roots/depth/pause; restarting is idempotent.
     if !settings.indexing.paused {
         std::sync::Arc::clone(&state.engine).spawn_background();
@@ -456,6 +458,11 @@ fn show_main(app: AppHandle) {
 #[tauri::command]
 fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
     let _ = state.engine.index_command(IndexCommand::Shutdown);
+    if let Ok(mut slot) = state.pi_agent.lock() {
+        if let Some(client) = slot.take() {
+            client.shutdown();
+        }
+    }
     if let Ok(mut slot) = state.agent.lock() {
         if let Some(client) = slot.take() {
             client.shutdown();
@@ -494,8 +501,9 @@ fn set_hotkey(
 fn probe_agent_status(state: &AppState) -> AgentStatus {
     let settings = state.engine.settings();
     if settings.agent.runtime == AgentRuntime::Pi {
-        let probed =
-            ps_agent::probe_pi(settings.agent.pi_path.as_deref().map(std::path::Path::new));
+        let probed = ps_agent::probe_pi_cached(
+            settings.agent.pi_path.as_deref().map(std::path::Path::new),
+        );
         let running = state
             .pi_agent
             .lock()
@@ -511,12 +519,16 @@ fn probe_agent_status(state: &AppState) -> AgentStatus {
                 },
                 runtime: Some(format!("Pi {}", info.version)),
                 model: settings.agent.model.clone(),
-                detail: Some(if settings.agent.allow_writes {
-                    "Read-only tools plus edits and shell for this run."
-                } else {
-                    "Read-only tools for this run."
-                }
-                .to_string()),
+                detail: Some(format!(
+                    "Read-only tools. Launcher: {} ({}).",
+                    info.path.display(),
+                    match info.source {
+                        ps_agent::PiSource::Explicit => "explicit",
+                        ps_agent::PiSource::Env => "environment",
+                        ps_agent::PiSource::Managed => "managed install",
+                        ps_agent::PiSource::Path => "PATH (least trusted)",
+                    }
+                )),
             },
             None => AgentStatus {
                 state: AgentState::NotConfigured,
@@ -576,10 +588,15 @@ fn agent_start(
         return Err("Agent workflows are disabled in Preferences.".into());
     }
     if settings.agent.runtime == AgentRuntime::Pi {
-        let config = PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
+        let mut config =
+            PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
             "The Pi CLI agent is not available. Install it from pi.dev or set its path in Preferences."
                 .to_string()
-        })?;
+            })?;
+        // ALPHA SAFETY GATE (security re-review RR-02): Pi runs read-only until
+        // a server-side per-run consent token exists; persisted settings can
+        // never silently enable edits/shell.
+        config.allow_writes = false;
         let mut slot = state.pi_agent.lock().map_err(|e| e.to_string())?;
         if slot.is_none() {
             let handle = app.clone();

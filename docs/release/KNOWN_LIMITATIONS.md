@@ -56,12 +56,16 @@ limitation at the time of writing (2026-11-09); remove an entry only with eviden
   offered, not what the process can reach; writes are all-or-nothing opt-in; a prompt-injected
   model can read any readable file (and edit/run commands when writes are enabled). Container/VM/
   dedicated account is recommended for high assurance.
-- **Not yet wired into the Tauri shell at review time** (PI-SEC-10); Workflows UI enablement waits
-  for reviewed wiring + must-fixes.
-- **Pending must-fixes (PI_AGENT_SECURITY.md):** --no-mcp (MCP tools survive the allowlist),
-  --no-extensions/--no-skills/--no-prompt-templates (user extensions execute in-process),
-  --no-context-files (AGENTS.md/CLAUDE.md load despite --no-approve), final-Output redaction,
-  minimal child environment (unrelated credentials inherited), startup network/telemetry flags.
+- **Tauri shell wiring is implemented and reviewed** (PI-SEC-10): agent_status/start/cancel/stop
+  and exit cleanup exist and the shell compiles. Workflows UI: read-only GO conditional on
+  RR-01 copy fix; write-enabled NO-GO until RR-02 server-side consent.
+- **Hardening verified (2026-11-10):** PI-SEC-01..09, 14 and 15 are implemented and
+  independently verified (71 tests pass; argv/env/redaction/pi_path evidence in
+  docs/security/PI_AGENT_SECURITY.md section 7). Remaining conditions for the Workflows UI:
+  RR-01 truthful no-sandbox/workspace copy, RR-02 server-side per-run write consent, RR-03 cached
+  status probe, RR-04 explicit Pi shutdown in quit_app. Residuals: no Job Object (app-crash
+  orphan), PATH fallback, live inference with PI_OFFLINE unverified, provider vars forwarded
+  (including AWS static creds) when writes enabled.
 - **Sessions/logs:** --no-session is passed (no Pi session files); support files live under
   <data_dir>/agent. Pi's own auth store/caches (~/.pi/agent) are outside v2 data management and
   are neither read nor written by ProtonSearch.

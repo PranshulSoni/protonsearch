@@ -320,3 +320,137 @@ Accepted / documented residual risks:
   cargo test -p ps-agent
   cargo test -p ps-agent --test pi_e2e real_pi_version_probe -- --nocapture
   & 'C:\Users\Pranshul\.pi\agent\bin\pi.cmd' --version
+
+## 7. Re-review — task-17 (2026-11-10): hardening verification + Tauri wiring go/no-go
+
+### 7.1 Scope and method
+
+Re-reviewed the task-16 hardening in crates/ps-agent/** (commit b188f6f) and the working tree
+at review time (ui-app was still finishing WorkflowsAgentPanel.tsx, which was untracked then),
+the Tauri shell wiring in
+apps/desktop/src-tauri/src/main.rs (commit 06de495 + later working-tree changes), the bridge/UI
+flow (apps/desktop/src/app/views/WorkflowsAgentPanel.tsx, .../PreferencesView.tsx,
+apps/desktop/src/bridge/api.ts) and docs/agent/PI_INTEGRATION.md.
+
+Independent evidence (not just the implementer's report):
+- cargo test -p ps-agent -> 51 unit + 16 Pi E2E + 4 legacy = 71 passed, 0 failed, exit 0
+  (log .agents/notes/pi-rereview-tests.log).
+- cargo check -p protonsearch-v2 -> exit 0 (log .agents/notes/pi-rereview-check.log; only an
+  unrelated ps-content deprecation warning).
+- real probe: "real pi probe: version=1.5.0 path=C:\Users\Pranshul\.pi\agent\bin\pi.cmd
+  node_ok=true source=Managed" (log .agents/notes/pi-rereview-probe.log).
+- inspected the fake-Pi artifacts recorded during the test run:
+  target/pi e2e */workspace with space/ps_fake_pi_args.json and ps_fake_pi_env.json. The argv
+  artifacts show the exact flags for read-only and writes runs; the env dumps show only
+  allowlisted variables, PI_OFFLINE=1 / PI_SKIP_VERSION_CHECK=1 / PI_TELEMETRY=0, and
+  FAKE_SECRET_present=false.
+Limits: no real model/provider call (no credentials); the Workflows UI was not clicked through
+(shell/UI reviewed statically + offline tests); live Pi network behavior with PI_OFFLINE is
+UNVERIFIED; not a pen-test.
+
+### 7.2 Must-fix verification (PI-SEC-01..06 and related)
+
+| ID | Status | Evidence |
+|---|---|---|
+| PI-SEC-01 MCP off | **VERIFIED FIXED** | args.rs:94-102 adds --no-mcp and --exclude-tools mcp__* to both read-only and write runs; args.rs:204-208 asserts they are present; E2E command_line_uses_mode_json_no_session_allowlist_and_flags passed; recorded argv contains both. |
+| PI-SEC-02 extensions/skills/prompts off | **VERIFIED FIXED** | args.rs:100-102 (--no-extensions --no-skills --no-prompt-templates) in the common arg vector; E2E argv test; docs/agent/PI_INTEGRATION.md section 6. |
+| PI-SEC-03 context files off | **VERIFIED FIXED** | args.rs:98 --no-context-files; E2E argv test. |
+| PI-SEC-04 Output redaction | **VERIFIED FIXED** | events.rs:316-322 redacts the final assistant text before AgentEvent::Output; redact.rs broadened shapes (sk-/pk-, AIza, gsk_, hf_, ghp/gho/ghu/ghs/ghr, AKIA, xox*, Bearer/Basic, api_key=/token: forms); E2E final_output_redacts_planted_and_shaped_secrets passed (planted env secret + AIza + api_key value redacted, secret never on argv). |
+| PI-SEC-05 minimal child env | **VERIFIED FIXED** | env.rs:161-195 builds essentials + documented provider vars + PI config + PI_* + extra_env; client.rs:268 applies it with env_clear; probes use credential-free env.rs:199-210; E2E child_environment_is_minimal_and_pi_network_controls_are_set + recorded env dump show only allowlisted keys and FAKE_SECRET absent. Provider variables (including AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY for Bedrock) are deliberately forwarded; see residual risk. |
+| PI-SEC-06 offline/telemetry | **VERIFIED FIXED** | env.rs:136-140 sets PI_OFFLINE=1, PI_SKIP_VERSION_CHECK=1, PI_TELEMETRY=0 for runs and probes; recorded env dump confirms. |
+| PI-SEC-07 launcher validation | **VERIFIED FIXED** | probe.rs:95-173 requires an absolute, existing, "pi"-named launcher for explicit/env/managed/PATH candidates; PiInfo.source exposed; E2E probe_rejects_relative_and_arbitrary_paths passed. |
+| PI-SEC-08 probe cache/capture | **VERIFIED FIXED** | probe.rs:278 probe_pi_cached; MAX_CAPTURE_BYTES 64 KiB (probe.rs:37) with read_limited on both pipes; E2E probe_results_are_cached passed. |
+| PI-SEC-09 PID reuse | **MITIGATED** | try_wait checks before signaling (client.rs:93,540; probe.rs:312); the remaining race window is documented; a Windows Job Object is the complete fix (PI_INTEGRATION section 9.7). |
+| PI-SEC-14 prompt caps | **VERIFIED FIXED** | client.rs:376-400: max 32 context paths / 64 KiB prompt, truncation marker; unit tests in client.rs. |
+| PI-SEC-15 min Pi version | **VERIFIED FIXED** | probe.rs:34 MIN_PI_VERSION (1.5.0); probe.rs:227 compares; version-bearing probe tests. |
+
+### 7.3 Tauri shell wiring review
+
+| Command / area | Evidence and verdict |
+|---|---|
+| Runtime structs | main.rs:47-49 separate legacy AgentClient and PiAgentClient slots. |
+| agent_status | main.rs:494-566: Pi branch reports state/runtime/model and read-only/write detail; returns NotConfigured when Pi is missing. Verified. Finding RR-03: it calls uncached probe_pi (main.rs:498). |
+| agent_start | main.rs:568-621: gated on settings.agent.enabled (575-577); runtime dispatch; PiAgentConfig::from_settings (579); lazy client spawn (583-591); allow_writes comes only from persisted settings, no request field; generic sanitized errors; Busy mapped. Verified. |
+| agent_cancel | main.rs:623-639: Pi -> client.cancel() (tree kill); Pydantic unchanged; generic errors. Verified. |
+| agent_approve | main.rs:641-657: Pi explicitly returns "no per-tool approval" instead of pretending; Pydantic approval path unchanged. Verified. |
+| agent_stop | main.rs:659-671: shuts both Pi and Pydantic clients. Verified. |
+| Exit cleanup | main.rs:767-782: RunEvent::Exit shuts both clients. Verified. Finding RR-04: quit_app (456-465) shuts only the Pydantic client and relies on the exit hook for Pi. |
+| Handler registration / capabilities | main.rs:740-764 registers all six agent commands; capabilities remain core:default + global-shortcut:default and the CSP is unchanged (no network/shell plugin). Verified. |
+| Bridge/UI | api.ts:35-39,60-64 invoke agent_status/start/cancel/stop; WorkflowsAgentPanel.tsx implements enable toggle, status refresh, workspace editor, read-only default, per-run writes checkbox + confirm bar, run/cancel/stop, streamed log/final answer, terminal agentStop and cancel-on-unmount. Verified; copy findings RR-01/RR-07. |
+| Compilation | cargo check -p protonsearch-v2 exit 0. |
+
+### 7.4 New re-review findings
+
+**RR-01 MEDIUM (blocking; UI disclosure / PI-SEC-11).** WorkflowsAgentPanel.tsx (workspace-help
+copy; line numbers were correct at review time, but ui-app is still editing this file) says
+"Pi runs inside this folder. Files outside it are not exposed by the agent tools." — false.
+Pi docs (security.md:19,33) and our review: the workspace is the default location, not a
+sandbox; tools use OS permissions and can reach any readable path (and with writes enabled,
+modify/execute). The write-consent copy (419-425) also says "inside the workspace". There is no
+explicit "no per-tool approval / no OS sandbox" disclosure. Fix: state that Pi runs with the
+user's Windows permissions, that the workspace is the default working folder rather than a
+boundary, and that provider calls send prompt/context/tool output when a workflow runs.
+
+**RR-02 MEDIUM (blocking write-enabled UI; server-side consent).** The per-run write consent is
+persisted as settings.agent.allowWrites by the UI (WorkflowsAgentPanel.tsx:179-183), then the UI
+stops the client and starts a run (184-189). Tauri agent_start trusts the persisted setting
+(main.rs:574-599); there is no server-side per-run confirmation/nonce (contrast the V2-04
+destructive-action handshake). After one write-enabled run, persisted allow_writes remains true
+until a later non-write run, so any invoke path with UI/CDP access could start a write-enabled
+run without the checkbox. Fix: never persist write consent; add an explicit
+agent_start(..., confirm_writes) handshake with a short-lived engine-issued token (like
+confirm_native_action), or reset allow_writes immediately after the run starts and require the
+UI to set it just-in-time. Until then, expose only read-only workflows.
+
+**RR-03 LOW (non-blocking).** agent_status uses uncached ps_agent::probe_pi (main.rs:498) even
+though probe_pi_cached exists (ps-agent lib exports; probe.rs:278), so each status refresh spawns
+pi --version + node --version. Switch to the cached probe; clear it on path change/refresh.
+
+**RR-04 LOW.** quit_app shuts only the Pydantic client (main.rs:456-465); Pi shutdown relies on
+the RunEvent::Exit handler (main.rs:767-782). Verified present, but explicit Pi shutdown in
+quit_app is clearer and more robust.
+
+**RR-05 INFO.** agent_status displays "Pi {version}" but not the resolved launcher path/source;
+PI-SEC-07 recommends showing PiInfo.source/path (relevant because the PATH fallback is the least
+trusted source).
+
+**RR-06 INFO.** docs/agent/PI_INTEGRATION.md section 9.1 and 9.9 still claim ps-ipc
+AgentSettings has no workspace/thinking fields; ps-ipc now has both (ps-ipc:553,556). The
+integration doc should be corrected by its owner.
+
+**RR-07 INFO.** The workspace editor accepts any absolute path, which is fine for a user choice
+but reinforces RR-01: do not describe the workspace as a confinement boundary.
+
+**RR-08 INFO.** PiAgentClient captures its config at spawn. The UI stops the client before each
+run, so permissions are fresh in the shipping UI; update_settings does not invalidate the client
+server-side, so any future caller must stop/restart it on agent-setting changes (ties to RR-02).
+
+**Positive in the wiring:** no agent process is spawned during setup/search; the enabled gate is
+enforced server-side; allow_writes cannot be set per request; agent/cancel/stop errors are
+sanitized; events are emitted through agent:event; the UI cancels/stops on unmount and after
+terminal states; Pi has no approval path and agent_approve says so explicitly.
+
+### 7.5 Go/No-Go
+
+**CONDITIONAL GO.** The Pi backend hardening (PI-SEC-01..09, 14, 15) is verified, the Tauri shell
+wiring compiles and enforces the enabled gate, persisted read-only-by-default permissions, lazy
+spawn, event streaming, cancellation/stop and exit cleanup.
+
+- **GO** for enabling the Workflows UI in **read-only mode**, provided RR-01 (truthful
+  workspace/no-sandbox/permission disclosure) is fixed in the same change.
+- **NO-GO** for write-enabled workflows until RR-02 (server-side per-run write consent or
+  non-persistent/write-reset design) is implemented. Until then, keep the write-consent checkbox
+  hidden/disabled in the UI; the backend still supports writes for a later reviewed release.
+- **Should-fix before RC:** RR-03 (cached status probe), RR-04 (explicit Pi shutdown in
+  quit_app), RR-05 (show resolved path/source), RR-06 (integration-doc correction).
+- **Accepted residual risks:** no Windows Job Object (app-crash orphan), PATH fallback for Pi,
+  live inference with PI_OFFLINE unverified (no credentials), provider variables forwarded
+  (including AWS static credentials for Bedrock) so shell-enabled runs can read them, and Pi has
+  no per-tool approval or OS sandbox (disclose + container guidance).
+
+### 7.6 Evidence commands
+
+    cargo test -p ps-agent
+    cargo check -p protonsearch-v2
+    cargo test -p ps-agent --test pi_e2e real_pi_version_probe -- --nocapture
+    # inspected target/pi e2e */workspace with space/ps_fake_pi_args.json and ps_fake_pi_env.json

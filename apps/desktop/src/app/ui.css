@@ -635,13 +635,12 @@
   line-height: var(--ps-leading-small);
 }
 
-/* Row-level failures are warning-toned only because these rows are auto-retry
-   states (source read / reconnectable root). Blocking errors use .state--error
-   with the negative colour. Documented in VISUAL_AUDIT_APP §12 (REVIEW_2 nit). */
-/* Row-level failures are negative (auto-retry is already attempted). */
+/* Row-level failures are warning-toned deliberately: these rows are auto-retry
+   states (source read / reconnectable root). Blocking failures use
+   .state--error with the negative colour. DESIGN_SYSTEM §8.3 / SCREENS §3.7. */
 .row-state svg {
   flex: none;
-  color: var(--ps-negative);
+  color: var(--ps-warning);
 }
 
 .hotkey-control {

@@ -39,19 +39,26 @@ via stdin (never the command line), CREATE_NO_WINDOW, 4 MiB JSONL cap, idle 120 
 timeouts, taskkill /T tree cancellation, redacted stderr/tool previews, no API keys read by
 ProtonSearch.
 
-Must-fix before Pi is reachable from the Workflows UI or any public build (details and
-file:line in the review):
-1. PI-SEC-01 (HIGH): pass --no-mcp (and mcp__* exclusion); Pi keeps MCP tools otherwise, so the
-   read-only contract is currently incomplete on machines with MCP servers configured.
-2. PI-SEC-02: pass --no-extensions --no-skills --no-prompt-templates by default; user-level
-   extensions execute in-process with user permissions.
-3. PI-SEC-04: redact the final assistant Output (currently only previews/stderr/errors are
-   redacted) and broaden secret shapes.
-4. PI-SEC-05: inherit a minimal child environment (provider vars + system essentials) or
-   explicitly warn; unrelated credentials are currently inherited.
-5. PI-SEC-11: disclose in the UI that Pi has no per-tool approval and no OS sandbox; writes are
-   all-or-nothing opt-in; provider data leaves the machine when a workflow runs.
-6. PI-SEC-10: review the Tauri wiring when it lands and enforce persisted allow_writes only.
+Re-review status (task-17, 2026-11-10): PI-SEC-01 (MCP off), 02 (extensions/skills/
+prompt-templates off), 03 (context files off), 04 (final-Output redaction + broadened shapes),
+05 (minimal child env), 06 (offline/telemetry controls), 07 (launcher validation), 08 (cached/
+capped probe), 09 (pid-reuse narrowing), 14 (prompt caps) and 15 (minimum Pi version) are
+implemented and independently verified: cargo test -p ps-agent -> 71 passed (51 unit + 16 Pi E2E
++ 4 legacy), cargo check -p protonsearch-v2 -> exit 0, real probe 1.5.0 source=Managed.
+Full evidence: docs/security/PI_AGENT_SECURITY.md section 7.
+
+Remaining gate for enabling the Workflows UI:
+1. RR-01 (must): Workflows UI copy currently claims files outside the workspace are not exposed —
+   false (Pi has no sandbox). Fix the disclosure (no OS sandbox, no per-tool approval, workspace
+   is the default folder not a boundary, provider egress) in the same change.
+2. RR-02 (must before write-enabled workflows): per-run write consent is UI-only and persisted as
+   settings.agent.allow_writes; there is no server-side per-run confirmation token. Ship
+   read-only workflows now; add a confirm_writes handshake (like confirm_native_action) or
+   non-persistent write consent before exposing the write toggle.
+3. Should-fix before RC: RR-03 cached status probe, RR-04 explicit Pi shutdown in quit_app,
+   RR-05 show resolved Pi path/source, RR-06 integration-doc correction.
+Residuals: no Job Object (app-crash orphan), PATH fallback, live inference with PI_OFFLINE
+unverified, provider vars forwarded when writes enabled, no per-tool approval/no sandbox.
 
 Should-fix: PI-SEC-03 (--no-context-files), PI-SEC-06 (PI_OFFLINE/PI_SKIP_VERSION_CHECK/
 PI_TELEMETRY=0), PI-SEC-07 (launcher path policy), PI-SEC-08 (probe cache/capture cap),
