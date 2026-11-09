@@ -404,3 +404,34 @@ Engine-core's task-42 optimization (FTS5 `snippet()` removal; bounded 32 KB text
 **Acceptance: MET (<30 ms p95).** Raw: [v10-g3-content-quiet-official2-eb61b82-20261109T2122Z.json](./results/v10-g3-content-quiet-official2-eb61b82-20261109T2122Z.json).
 
 **Build-artifact caveat (important for reproducibility):** two earlier formal runs (mine at HEAD 0e4c9ec and engine-core's committed 'after' row v10-g3-content-after-enginecore-20261109T2116Z.json, p50 9.23 / p95 40.13) were produced by a `ps-bench` binary that still linked the **pre-optimization ps-content**. Evidence: the binary contained the old `snippet(documents_fts` SQL string; `cargo build -p ps-bench --release` reported the target up to date even after `cargo clean -p ps-content`, and only deleting `target/release/ps-bench.exe` plus all `*ps_content*`/`*ps_bench*` deps artifacts and rebuilding produced a binary without that string. The in-process A/B probe (28.66 ms p95) and this official single-process row (8.98 ms p95) agree once the artifact is fresh; the A/B number is higher because the probe shares the process with the old 128 KB-text path. Engine-core's stale 'after' JSON should not be cited. Rule recorded in METHODOLOGY §12: verify a distinctive binary string or purge artifacts before accepting a benchmark after a dependency change.
+
+### 14.4 G8b: mark-ordering verification + engine tail-fix end-to-end (task-48)
+
+App runs used the Lead's reordered perf hooks (mark emitted after win.show() and before set_focus). Release run: exe built 03:04:57 IST from tree at commit 562d751 (4 dirty files). Debug run: exe built 03:11:30 IST from commit 10beb90 (1 dirty file), data dir .devdata (131,199-entry real index), production JS, dpr 1.5. All app instances were stopped afterwards; none left running.
+
+**Release hotkey activation with strict new-window detection (30/30 trials, commit 562d751):**
+
+The earlier task-43 release row (window visible p95 9.1 ms) used any-visible-window detection and could count a pre-existing window. The helper now excludes windows already visible before the hotkey and measures only the newly-shown launcher. Superseding row:
+
+| Metric | p50 | p95 | p99 | min | max |
+|---|---:|---:|---:|---:|---:|
+| New window visible after hotkey | **12.115 ms** | **14.289 ms** | 19.786 ms | 10.701 ms | 19.786 ms |
+| New window foreground after hotkey | 24.697 ms | **28.790 ms** | 32.696 ms | 21.950 ms | 32.696 ms |
+| cold first summon visible / warm | 12.067 ms | 12.212 ms (warm p50) | - | - | - |
+
+**Perf marks in the same release run (30/30):** send -> Rust launcher-window-shown p50 **41** / p95 **56** ms; shown -> frontend launcher-first-paint (double rAF after perf:show, emitted before set_focus) p50 **13** / p95 **18** ms; send -> paint-mark p50 53 / p95 70 ms. The hook ordering fix is present in source and in the built binary, but the marks cannot yet pin **hotkey->first-pixel**: the hotkey-invoke epoch is carried in the `perf:show` payload but not persisted to JSONL, so send->shown still contains hotkey dispatch + show-path latency (`30 ms beyond the Win32-visible instant). Current honest bounds on hotkey->first-pixel: Win32-visible p95 is 14.3 ms and the marks' post-show paint is 70 ms p95; the true value is inside that range. One-line hook request: persist a `launcher-hotkey-invoke` mark at the global-shortcut handler (or write `invokeEpochMs` into the shown mark) to close it. Raw: [v10-g8c-release-activation-marks-562d751.json](./results/v10-g8c-release-activation-marks-562d751.json).
+
+**Debug end-to-end after the engine tail fix (commit 10beb90, .devdata 131,199 entries, n=20 + 3 warmups):**
+
+| Measurement | p50 | p95 | p99 | Verdict |
+|---|---:|---:|---:|---|
+| Input -> first-visible result | **11.0 ms** | **38.2 ms** | 40.0 ms | **NOT MET** vs 30 ms p95 (debug); p50 improved from 15.2 ms in the previous debug run, p95 unchanged (38.7 -> 38.2) |
+| Selection highlight (launcher-selection-painted mark) | **5 ms** | **6 ms** | 8 ms | **MET** under one frame; recheck stable (n=20/20) |
+| Hotkey -> window visible (debug, strict detection, n=10) | 13.923 ms | 32.831 ms | - | debug reference, high variance |
+| shown-mark -> first-paint (debug marks) | 9 ms | 12 ms | - | debug |
+
+Per-query input->visible samples are bimodal: fast shapes 4.2-12.8 ms (index/report/arch/proton/café once) and repeatable slow outliers 32.9-40.0 ms (readme, screenshot, zero-match shape, pdf, café once), so the remaining p95 is a UI/IPC path issue rather than a constant cost.
+
+**Engine/IPC/UI split: UNMEASURED in the same run.** The harness wrapped `window.__TAURI_INTERNALS__.invoke` (hook reported "installed"), but the app's search path captured the original invoke at module import, so no per-call engineWall/tookMs was recorded (all null). Directional inference only, not a same-run split: engine-core's debug probe reports engine p95 8.82 ms for the slow filename shapes, and input->visible p95 is 38.2 ms, so the remainder is IPC + React commit + paint; this must be measured by persisting the app's own search timing (e.g., a `results-committed` perf mark with the SearchResponse tookMs) rather than wrapping invoke. Honest status: split NOT MEASURED.
+
+Idle CPU/memory rows are unchanged from task-43 (window creation did not materially change): release idle tree **786.9 MiB -> NOT MET** vs the `150 MB investigation budget, idle CPU 0.19% machine / 3.78% one core over 60 s. Not re-run in this pass, per task scope. Raw files: [v10-g3b-app-debug-enginefix-10beb90.json](./results/v10-g3b-app-debug-enginefix-10beb90.json), [v10-g8c-release-activation-marks-562d751.json](./results/v10-g8c-release-activation-marks-562d751.json), content acceptance in §14.3.
