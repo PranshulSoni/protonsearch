@@ -128,12 +128,18 @@ def _apply_provider_environment(config: AgentConfig, model: str) -> None:
         os.environ[key_var] = api_key
 
 
-def build_model(config: AgentConfig, request_model: str | None, request_context_paths: tuple[str, ...], run_id: str):
+def build_model(
+    config: AgentConfig,
+    request_model: str | None,
+    prompt: str,
+    request_context_paths: tuple[str, ...],
+    run_id: str,
+):
     """Return (model_ref, label). Raises ModelNotConfigured without a model."""
     if config.test_model:
         from .test_model import build_scripted_test_model
 
-        return build_scripted_test_model(run_id, request_model or "", request_context_paths), TEST_MODEL_LABEL
+        return build_scripted_test_model(run_id, prompt, request_context_paths), TEST_MODEL_LABEL
 
     model_name = request_model or config.model
     if not model_name:

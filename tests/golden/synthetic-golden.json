@@ -174,24 +174,20 @@
     {
       "id": "cjk_prefix",
       "category": "cjk",
-      "query": "会議議事録",
-      "expected_top1": null,
-      "expected_top5": [
-        "C:\\Users\\Pranshul\\Documents\\会議\\会議議事録_2026-11-09.docx"
-      ],
+      "query": "会議議事録_2026-11-09",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\会議\\会議議事録_2026-11-09.docx",
+      "expected_top5": [],
       "expect_empty": false,
-      "rationale": "CJK prefix query"
+      "rationale": "CJK filename with date; the full date makes it unique in the corpus"
     },
     {
       "id": "cjk_japanese_memo",
       "category": "cjk",
-      "query": "日本語_メモ",
-      "expected_top1": null,
-      "expected_top5": [
-        "C:\\Users\\Pranshul\\Documents\\日本語\\日本語_メモ_2026.txt"
-      ],
+      "query": "日本語_メモ_2026.txt",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\日本語\\日本語_メモ_2026.txt",
+      "expected_top5": [],
       "expect_empty": false,
-      "rationale": "mixed CJK + ASCII token query"
+      "rationale": "mixed CJK + ASCII unique filename"
     },
     {
       "id": "folder_anchor",

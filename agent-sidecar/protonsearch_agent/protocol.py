@@ -25,6 +25,7 @@ does not kill the process.
 from __future__ import annotations
 
 import json
+import sys
 import threading
 from dataclasses import dataclass
 from typing import Any, Callable, TextIO
@@ -255,7 +256,7 @@ class EventWriter:
     """Thread-safe JSONL writer for stdout. Never writes non-protocol text."""
 
     def __init__(self, stream: TextIO | None = None) -> None:
-        self._stream = stream
+        self._stream = stream if stream is not None else sys.stdout
         self._lock = threading.Lock()
         self._broken = False
 
@@ -272,8 +273,6 @@ class EventWriter:
             if self._broken:
                 return
             stream = self._stream
-            if stream is None:
-                return
             try:
                 stream.write(line + "\n")
                 stream.flush()

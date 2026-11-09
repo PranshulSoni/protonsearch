@@ -1,0 +1,14 @@
+# ProtonSearch agent sidecar runtime dependencies (protocol v1).
+#
+# Evaluated version: pydantic-ai 2.66.0 (see docs/agent/AGENT_RUNTIME_EVALUATION.md).
+# Interpreter used and measured on this host:
+#   C:/Users/Pranshul/AppData/Local/Programs/Python/Python314/python.exe  (CPython 3.14.7, Windows x64)
+# The MSYS2 python on PATH cannot create venvs; do not use it.
+#
+# Create/refresh the virtualenv:
+#   C:/Users/Pranshul/AppData/Local/Programs/Python/Python314/python.exe -m venv agent-sidecar/.venv
+#   agent-sidecar/.venv/Scripts/python.exe -m pip install -r agent-sidecar/requirements.txt
+#
+# Agent-sidecar/.venv is gitignored and machine-local; the app must not depend
+# on a system-wide Python install at runtime.
+pydantic-ai==2.66.0

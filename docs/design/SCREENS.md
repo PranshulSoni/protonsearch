@@ -17,8 +17,8 @@ implementers do not reword it. Samples data must be replaced by live `ps-ipc` DT
 | Surface | Window | Chrome | Route / shell |
 |---|---|---|---|
 | Quick Launcher | frameless, floating, 820 px wide (clamps to work area), 256–480 px tall | none: no title bar, no min/max/close, no tabs | separate launcher window (Tauri), route `launcher` |
-| Desktop App | resizable standard window 1120×760 default, min 560×520, native Windows title bar "ProtonSearch" | native frame; in-window sidebar + workspace | app window, routes `/home`, `/search-indexes`, `/activity`, `/workflows`, `/preferences` |
-| Onboarding | resizable window 900×620 default, min 560×520, native title bar "Set up ProtonSearch" | native frame; no app sidebar | app window route `/onboarding` (modal route, hides shell) |
+| Desktop App | resizable standard window 1120×760 default, min 560×480, native Windows title bar "ProtonSearch" | native frame; in-window sidebar + workspace | app window, routes `/home`, `/search-indexes`, `/activity`, `/workflows`, `/preferences` |
+| Onboarding | resizable window 900×620 default, min 560×480, native title bar "Set up ProtonSearch" | native frame; no app sidebar | app window route `/onboarding` (modal route, hides shell) |
 | Confirm dialog | in-window modal, max 420 px | scrim + dialog | component |
 
 **Launcher must never render** a title bar, window controls, tabs, "Ctrl+K" hint, kbd pill inside the search field,
@@ -44,7 +44,7 @@ element of the search row (reference:30, 136).
 | UI display | Source |
 |---|---|
 | result title / path / trailing meta / icon / action | `SearchResult` from `search` |
-| match count, status word, progress, index counts | `EngineStatus` from `get_status` |
+| match count, status word, indexed counts | `EngineStatus` from `get_status` |
 | recent items, activity rows | `get_activity` (`ActivityItem`) |
 | roots, modes, exclusions, toggles, hotkey, theme, density, privacy, agent opt-in | `Settings` via `get_settings` / `update_settings` |
 | setup step, name, roots, modes, shortcut, agent opt-in, skipped/completed | `OnboardingState` via `onboarding` (get/complete) |
@@ -74,7 +74,8 @@ element of the search row (reference:30, 136).
 - Width `W = min(820, workArea.width − 32)`; min 480 px when DPI forces it. Preview side panel (§2.6) widens to
   `min(1180, workArea.width − 32)` only when `workArea.width ≥ 1200` (`--launcher-width-preview: 1180px` in the
   landed tokens).
-- Height `H = clamp(256, 72 + 23 + Σ(34 + rowH·n), 480)` where 23 px = results padding 10 top + 13 bottom; `rowH` 58
+- Height `H = clamp(256, 72 + 44 + 23 + Σ(34 + rowH·n), 480)` where 44 px is the footer and 23 px the results padding
+  (10 top + 13 bottom); `rowH` 58
   (comfortable) / 48 (compact); group label block 34 (30 compact). Height snaps to 2 px. Resize is instant and happens
   in the same frame as the content change (no animation, no white gap).
 - Results max-height = `min(365, H − 72 − 44)`; scrollbar thin, thumb `--ps-scrollbar-thumb`.
@@ -84,8 +85,8 @@ element of the search row (reference:30, 136).
 ### 2.2 Results model
 
 - The UI receives a ranked list, groups by `SourceKind`, and renders only non-empty groups in **fixed order**:
-  **APPLICATIONS · FILES · FOLDERS · DOCUMENTS · CLIPBOARD · WEB · CODE · ACTIONS** — except that an exact command /
-  calculator match pins ACTIONS to the top (engine marks the action result as exact). Group labels are the literal
+  **APPLICATIONS · FILES · FOLDERS · DOCUMENTS · CLIPBOARD · WEB · CODE · ACTIONS** in that fixed order. The exact-command / calculator ACTIONS pin is **CUT for v2.0 alpha** (§10): ACTIONS always
+renders last, even when a command or expression matches exactly. Group labels are the literal
   uppercase strings above (they are content labels, rendered with CSS caps; localised).
 - Row: 36 px icon slot · 12 px gap · title (13/680, ellipsis) · path (11 px `--ps-ink-2`, ellipsis, 4 px below) ·
   trailing meta 10–11 px `--ps-ink-3` (recency / size / item count / source). Path truncates at the end; title
@@ -111,7 +112,7 @@ element of the search row (reference:30, 136).
 | 1 match / many | grouped rows | count | status |
 | 0 matches | "No matches for “{query}”." + 11 px "Try a different spelling, or a prefix such as file:, history:, or code:." | count "No matches" | status |
 | Search error | inline block inside the results frame: "Search is unavailable right now." + text button "Retry" | count "Search unavailable" | dot negative + "Index unavailable" |
-| Indexing (results still served) | normal results | normal | dot warning + "Indexing · 42 %" (real value; indeterminate → "Indexing…") |
+| Indexing (results still served) | normal results | normal | dot warning + "Indexing" (alpha: the IPC has no percentage — §10) |
 | Index paused | normal results | normal | dot neutral + "Index paused" |
 | Offline (network) | no special state — local search is unaffected; unavailable network roots are simply absent | normal | normal |
 | Preview open | rows + side/drawer preview; selected row unchanged | normal | "Preview" hint |
@@ -127,8 +128,8 @@ element of the search row (reference:30, 136).
 ### 2.5 Footer
 
 - Left: 8 px status dot + status word + "·" + text button "Open ProtonSearch" (10 px/750, `#356d88`). Status is a
-  polite live region; colour always paired with words. Truthful mapping: ready / indexing n % / paused / starting /
-  unavailable. Never show "Index ready" before the engine reports ready.
+  polite live region; colour always paired with words. Truthful mapping: ready / indexing / paused / starting / unavailable (no
+  percentage in alpha — §10). Never show "Index ready" before the engine reports ready.
 - Right: at most three kbd hints, in priority order, contextual (reference:136 shows Navigate/Open/Clear):
 
 | Context | Hints |
@@ -137,10 +138,10 @@ element of the search row (reference:30, 136).
 | rows exist, query typed | `[↑↓] Navigate` · `[Enter] Open` · `[Esc] Clear` |
 | no rows, query typed | `[Esc] Clear` |
 | preview open | `[Ctrl+Space] Close preview` · `[Esc] Close` (preview closes first) |
-| multi-select active (clipboard) | `[Enter] Paste 3` · `[Esc] Clear selection` · `[Shift+Enter] Add` |
 | copy-path feedback | left status becomes "Path copied" for 2 s (role=status) |
 
-- Hints hide by priority (Copy/Paste → Preview → Navigate) below 900 px work width; never wrap above 900 px. Keep
+- Multi-select / Paste-N hints are **CUT for v2.0 alpha** (§10); the footer never shows a Paste-N hint. Hints hide by
+  priority (Copy → Preview → Navigate) below 900 px work width; never wrap above 900 px. Keep
   "Esc" semantics visible: Clear when a query exists, Close when empty (reference footer says "Esc Clear").
 - "Open ProtonSearch" opens the app on Home with the current query pre-filled into the app search where applicable;
   it is a button, not a link (no browser semantics).
@@ -153,23 +154,23 @@ element of the search row (reference:30, 136).
   240 px tall below the results otherwise (window height grows to fit, cap at `min(640, workArea.height − 24)`).
 - Panel anatomy: item title (13/680) · kind/type line (11 px) · path or URL (11 px, selectable) · preview body ·
   action row (Copy path, Open, Open containing folder — text buttons, only actions the ActionSpec declares).
-- Preview bodies: code/text = first 20 lines in mono 12 px with the match highlighted; image = thumbnail max
-  320×240 (no upscale, no letterbox background); PDF/Office = metadata card when rendering unavailable
-  ("Preview not available — press Enter to open."); clipboard = full text or image; web = URL + source; app/action =
-  summary card. Unknown kind: "No preview for this item."
+- Preview bodies (alpha: the IPC supplies metadata/snippet only — §10): code/text = first 20 lines in mono 12 px
+  with the match highlighted; metadata facts card; clipboard text; web URL + source; app/action summary card.
+  There is no thumbnail or document render in alpha: unavailable bodies say "Preview not available — press Enter to
+  open."; unknown kind says "No preview for this item."
 - Loading: flat skeleton at the real content size (no shimmer); error: one sentence + Retry if retryable.
 - Esc closes the preview first, then clears, then closes the window. Ctrl+Space toggles closed.
 - Focus: the preview scroll region is focusable (Tab reaches it) and scrolls with ↑↓/PageUp/PageDown when focused;
   Tab returns to the input.
 
-### 2.7 Multi-select (clipboard results only in v2)
+### 2.7 Multi-select — **CUT for v2.0 alpha**
 
-- Enter multi-select with Ctrl+Click, or Shift+Enter on the selected row (keyboard path). Shift+↑/↓ extends the
-  range; Ctrl+A selects all clipboard rows; Ctrl+Click toggles single rows.
-- Rows show a 16 px checkbox marker at the start (row height unchanged); footer shows "3 selected" in the left
-  status area and the multi-select hints. Enter pastes the selected items in list order (legacy clipboard
-  multi-select behaviour); Esc clears the selection before other Esc semantics.
-- Other sources declare multi-select in their `ActionSpec`; the UI hides the affordance when unsupported.
+Clipboard multi-select and Paste-N are postponed for the alpha, not merely unbuilt. Rationale: the feature needs a
+selection model layered over the active-row model, a text-paste aggregation path, and IPC/action support the alpha
+contract does not carry; shipping a stub (dead checkboxes, a disabled Paste-N) would break the truthful-UI rule.
+Alpha behaviour: every clipboard result is a single item — Enter pastes it, the context menu offers Paste/Copy/Pin/
+Remove, the footer never shows a selection count, and Shift+Enter / Shift+↑↓ / Ctrl+A are unbound. Re-entry point and
+post-alpha acceptance criteria are recorded in §10.
 
 ### 2.8 Context menu
 
@@ -189,7 +190,7 @@ element of the search row (reference:30, 136).
 
 ↑/↓ navigate (wrap) · Enter open · Esc preview→clear→close · Tab/Shift+Tab move between input, preview (when open),
 and the footer's "Open ProtonSearch" · Ctrl+Space preview toggle · Ctrl+C copy path (when the input has no text
-selection) · Shift+F10/Menu open context menu · Shift+Enter multi-select · Home/End/PageUp/PageDown in the list.
+selection) · Shift+F10/Menu open context menu · Home/End/PageUp/PageDown in the list.
 No other global chords; the summon hotkey is configured in Preferences/onboarding.
 
 ### 2.10 Launcher motion
@@ -208,8 +209,8 @@ Show/hide 0 ms. Selection colour 110 ms. Footer status changes are instant (text
   - brand block: 29 px mark + "ProtonSearch" 12/750/`-0.035em` (reference:54);
   - label "WORKSPACE" (10/750/+0.12em, `--ps-ink-3`) (reference:54);
   - nav: Home, Search & indexes, Activity, Workflows, Preferences — 16 px icon in 19 px slot + 12/600 label,
-    row 40 px, radius 7, hover `#e9eeea`, active `--ps-nav-active-bg` + `--ps-nav-active-ink` + weight 750, no left
-    bar (reference:55-58); icons are real SVGs, not `⌂ ⌕ ◷ ↗ ⚙` placeholders;
+    row 40 px, radius 7, hover `#e9eeea`, active `--ps-nav-active-bg` + `--ps-nav-active-ink` + weight 750 + a 2 px
+    inset `--ps-selected-bar` start bar (accessibility correction confirmed 2026-11-09; reference:55-58); icons are real SVGs, not `⌂ ⌕ ◷ ↗ ⚙` placeholders;
   - userfoot pinned bottom: avatar 30 px (initial of optional name) + first name 11 px; without a name: neutral
     person glyph + "This PC" (never infer identity — master prompt §V.B); static, not a control.
 - Workspace: padding 36/40 at ≥1100, 32/32 at 820–1099, 31/24 at 701–819, 31/18 at ≤700; content max-width 1040,
@@ -231,7 +232,8 @@ Show/hide 0 ms. Selection colour 110 ms. Footer status changes are instant (text
 | Big search | Button, 48 px tall, raised surface, 1 px border `#dce4db`, radius 8, 13 px placeholder-ink text "Find a file, open an app, or run an action…", search glyph left, ↗ right (reference:64, 140). Opens/summons the launcher. Accessible name = visible text. |
 | Columns | ≥1000: `1.25fr / 0.9fr`, gap 38 (reference:67); 820–999: same with 32 gap; ≤819: single column, 24 gap |
 | Recently accessed | h2 "Recently accessed" (11 caps 750) + up to 3 recent rows (icon 32, title 12/680, sub 11 `--ps-ink-2`, trailing arrow) + secondary button "Manage sources" (opens Search & indexes) (reference:69-71, 140) |
-| Your index | h2 "Your index" + stat 34/680 (real total, tabular) + sub "items indexed on this PC" + 4 px progress with label "Content enrichment · 42 %" (only when enrichment is running; otherwise "Index up to date" 11 px) + metric rows: Documents, Applications, Images & OCR, Other files (real counts, right-aligned, tabular) (reference:72-74, 140) |
+| Your index | h2 "Your index" + stat 34/680 (real total, tabular) + sub "items indexed on this PC" + state line ("Indexing" / "Index up to date"; alpha limitation: the IPC has no
+percentage, so no progress bar is rendered — §10) + metric rows: Documents, Applications, Images & OCR, Other files (real counts, right-aligned, tabular) (reference:72-74, 140) |
 | Notice slot | Above the columns, only when real: paused indexing / index error / incomplete setup. One line + action, no banners with illustrations. |
 
 **States**
@@ -244,8 +246,9 @@ Show/hide 0 ms. Selection colour 110 ms. Footer status changes are instant (text
 - Incomplete setup: notice "Setup is {n} of 7 steps done." + "Resume setup".
 - Error (status unavailable): the Your index block shows "Couldn't read the index status." + "Retry" text button;
   the rest of Home still works. Never a full-page error.
-- Indexing: progress truthful; "Pause" text action next to the label.
-- Offline: local Home unchanged; updater/agent blocks elsewhere may show offline copy.
+- Indexing: truthful state words and counts only; no percentage or progress bar in alpha (§10).
+- Offline: local Home unchanged; agent blocks may show offline copy. There is no updater in alpha (§10), so no
+  updater-offline state.
 - Dark: art-directed tokens; the stat and greeting keep the same hierarchy.
 
 ### 3.3 Search & indexes
@@ -258,19 +261,20 @@ style at ≥1000, stacked below):
 
 1. **LOCATIONS** — rows: root name (13/680) + path (11 px) · depth control (SegmentedControl: "Names only",
    "+ Content", "+ OCR") · status dot + word · item count (tabular) · overflow menu (Pause/Resume, Remove…).
-   Buttons: "Add location…" (opens folder picker). Footer note: "Filename search works everywhere. Content and OCR
+   Buttons: "Add location…" (alpha: a paste-path form; the native folder picker is an IPC/Tauri gap — §10). Footer note: "Filename search works everywhere. Content and OCR
    run in bounded background jobs and never block the launcher."
    Empty: panel with "No locations selected." + "Add location…" primary + "Locations you add stay on this PC."
    Remove confirm: "Remove {folder} from the index? Results from this folder stop appearing. Your files are not
    changed." Cancel / Remove.
-2. **INDEX STATUS** — progress bar (determinate with real % or indeterminate with phase text), "Last scan completed
-   {localized relative time}", "Index size 214 MB", "Files 89,813", "Documents 14,609", "OCR documents 0".
+2. **INDEX STATUS** — state line ("Indexing" / "Paused" / "Error"), "Last scan completed {localized relative time}",
+   "Files 89,813", "Documents 14,609", "OCR documents 0". Alpha limitations (§10): the IPC exposes no percentage and
+   no index-size field, so neither a progress bar nor "Index size" is rendered.
    Actions: "Pause indexing" / "Resume indexing"; "Rebuild index…" (confirm: "Rebuild the index? Search stays
    available while filenames are re-scanned. This can take a few minutes and uses more CPU." Cancel / Rebuild).
 3. **EXCLUSIONS** — list of excluded patterns with remove buttons; "Add pattern…" text field + button; note "These
    patterns are skipped for content and OCR." Empty: "No exclusions. Everything in your locations is indexed."
 4. **SOURCES** — per-source rows (Files, Documents, OCR, Browser history & bookmarks, Clipboard, Git, Apps & actions):
-   status dot + word, last updated, detail ("Re-indexing… 42 %"), Retry on error; error text is one sentence
+   status dot + word, last updated, detail ("Re-indexing…"; alpha: no percentage — §10), Retry on error; error text is one sentence
    (e.g. "Couldn't read Chrome history — the browser profile is locked. Retry."). Empty: "No sources configured."
 5. **CLOUD & REMOVABLE** (only when the engine reports such roots) — rows: root path, status ("Unavailable — network
    location disconnected"), Retry; note "Placeholders are indexed by name. Content is read only when available."
@@ -284,8 +288,9 @@ Retry; offline network roots shown as unavailable, never as a global error; dark
 **Question:** "What did I do recently, and is it private?" h1 "Your activity"; lead "A local history of recent
 searches, launches, and optional workflows." (reference:143)
 
-- Privacy strip: "Stored on this PC. Pause or clear at any time." + Toggle "Pause recording" + text button
-  "Clear history…".
+- Privacy strip: "Stored on this PC. Pause recording at any time." + Toggle "Pause recording". Alpha limitation (§10):
+  there is no clear-activity command, so the clear control is omitted and the panel says clearing is not available
+  in this build.
 - Filters (SegmentedControl): "All" · "Searches" · "Launches"; filters apply instantly and are reflected in the URL
   query (deep-linkable state).
 - List: date group labels "Today", "Yesterday", then localized dates; rows: 32 px icon · title 12/680 · sub 11 px
@@ -293,8 +298,8 @@ searches, launches, and optional workflows." (reference:143)
   item or repeats the search where applicable).
 - Empty: "No activity yet." + "Searches and launches appear here while recording is on."
 - Paused: notice "Activity recording is paused." + "Resume" text button; existing entries remain readable.
-- Clear confirm: "Clear all activity? This removes {n} recorded items from this PC. It can't be undone."
-  Cancel / Clear (negative).
+- Clear-history confirmation is **not rendered in v2.0 alpha** (no IPC command; §10). Re-add this confirm with the
+  command.
 - States: loading skeleton rows; read error inline with Retry; dark; filters with no matches → "No {searches} in this
   view." Keep the frame.
 
@@ -306,13 +311,16 @@ the Python agent sidecar is optional and starts only when needed." (reference:14
 - **NATIVE COMMANDS** panel: rows "Window management", "Clipboard actions", "System actions" with status word
   ("Available"/"Unavailable") and one-line description. No buttons that fake actions; actions live in the launcher.
 - **AGENT RUNTIME** panel: status row (dot + "Not set up" / "Not running" / "Running" / "Couldn't start"), copy
-  "Agent workflows are optional. The runtime starts only when you run one, then exits when idle." Actions:
-  "Set up agent…" (when not set up) / "Start" / "Stop"; provider row "No provider configured" + "Configure…".
+  "Agent workflows are optional. The runtime starts only when you run one, then exits when idle.", and an opt-in
+  toggle. Alpha limitation (§10): no runtime setup/start/stop or provider-config commands are in the IPC, so those
+  controls are omitted and the panel says setup is not available in this build.
   Off-state copy: "Agent workflows are off. ProtonSearch works fully without them." No permanent "Ask AI" affordance
   (master prompt §VI).
 - **PERMISSIONS** panel: "Files & folders — read only", "Clipboard", "Shell commands", "Network" with state
   "Ask every time" (default); note "Writes, deletes, shell commands, and network access always ask first." Link
   "Review approvals" once an approvals log exists; otherwise omit the link rather than ship a dead control.
+- **QUICKLINKS & SNIPPETS** — alpha limitation (§10): the IPC has no quicklinks list/CRUD command, so no editor or dead
+  control is shown; the panel reports migration status read-only where the engine exposes it.
 - Error: "The agent runtime couldn't start. Search is unaffected." + "Details" (opens log folder) + Retry.
 - States: loading, off, starting, running, failed, offline (provider unreachable: "Couldn't reach the provider. Your
   keys and settings are unchanged."), dark.
@@ -336,16 +344,17 @@ actions confirm):
    leaves your PC unless you opt into an agent provider."
 4. **INDEXING** — toggles "Background content indexing", "Pause indexing on battery"; link "Index health" → Search &
    indexes; link "Rebuild index…".
-5. **AGENT & MODELS** — toggle "Enable agent workflows" (default off); "Model cache 0 B" + "Manage…" (opens a panel
-   that lists cached models and offers "Clear cache"); note "No model is downloaded without asking."
-6. **UPDATES & DIAGNOSTICS** — version row ("ProtonSearch 2.0.0"); "Check for updates" button with result text
-   ("Up to date" / "Update available" / "Can't check right now — you're offline."); "Open logs folder" button;
-   "Export diagnostics…" only if a redacted export exists (else omit).
+5. **AGENT & MODELS** — toggle "Enable agent workflows" (default off); provider/model shown read-only. Alpha
+   limitation (§10): no model-cache command exists, so no cache size or "Manage…" control; note "No model is downloaded
+   without asking."
+6. **UPDATES & DIAGNOSTICS** — version/protocol/schema/platform rows plus a "Refresh diagnostics" action (read-only).
+   Alpha limitation (§10): no updater, log-folder, or diagnostics-export commands, so no update check, logs or export
+   controls are rendered.
 7. **ABOUT** — version, "Local-first. No account." and a licenses link.
 
 **States:** loading skeleton; settings read error block "Couldn't load settings." Retry; hotkey conflict inline
-`role="alert"`; updater offline notice; dark; disabled toggles (e.g. OCR off when no model) stay readable and
-explain why in 11 px helper text.
+`role="alert"`; dark; disabled toggles (e.g. OCR off when no model) stay readable and explain why in 11 px helper
+text. No updater-offline state exists in alpha (§10).
 
 ---
 
@@ -359,7 +368,8 @@ explain why in 11 px helper text.
 - Rail is position, not percent: numbers 1–7 with labels; current step filled `#295a70` white; completed steps accent
   ink; future steps muted. No fake progress bar.
 - Typography: eyebrow "Getting started / 0{n} of 07"; h1 32/600; lead 13 px max 420 px; content; footer: left
-  "Back" ghost + "Skip setup" text link, right primary. Rail hidden ≤700; eyebrow then carries the position.
+  "Back" ghost + "Skip setup" text link, right primary. Rail hidden ≤700 (final 2026-11-09; code currently 760 —
+  follow this doc); eyebrow then carries the position.
 - Primary labels: step 1 "Get started", steps 2–6 "Continue", step 7 "Start using ProtonSearch". Back is hidden on
   step 1. "Skip setup" is available on every step.
 - Focus moves to the step h1 on change; Enter activates the primary; Esc is a no-op (prevents accidental loss);
@@ -391,7 +401,7 @@ explain why in 11 px helper text.
 - lead "Pick folders to index. Filename search is instant; content and OCR enrich in the background."
 - Choices (label + description + checkbox, reference:150): Documents — "Notes and documents"; Desktop — "Files close
   at hand"; Downloads — "Recent downloads"; Pictures — "Screenshots and images". Plus "Add another folder…"
-  (secondary, folder picker; added roots appear in the list).
+  (secondary; alpha: paste-path form, the native picker is an IPC gap — §10; added roots appear in the list).
 - Note: "You can change these later in Search & indexes."
 - Defaults: the four suggested folders are listed **unchecked**; nothing is indexed without an explicit choice. If
   no location is selected, Continue is enabled (filenames simply have nothing to search) but the step shows the
@@ -444,7 +454,7 @@ explain why in 11 px helper text.
 - Note 11 px: "Indexing starts after you continue. You can keep using search while it runs."
 - Primary "Start using ProtonSearch" → app Home (focus h1). Secondary "Finish setup later" → app Home with the
   incomplete-setup banner; indexing still starts in the background if locations were chosen.
-- No fake percentage on this step; real progress appears on Home.
+- No fake percentage on this step; in alpha Home shows state words and counts only (no progress bar; §10).
 
 ### 4.9 Resumable / skippable / existing users
 
@@ -476,7 +486,7 @@ explain why in 11 px helper text.
 | 0 matches | empty state | §2.3 exact copy | no illustration |
 | loading first query | 3 skeletons | "Searching…" | flat bars |
 | search error | inline error + Retry | "Search is unavailable right now." | footer "Index unavailable" |
-| indexing | normal + footer progress | "Indexing · 42 %" | truthful |
+| indexing | normal + footer state | "Indexing" (no percentage in alpha — §10) | truthful |
 | paused | normal + footer | "Index paused" | — |
 | dark | all above | — | on-dark mark |
 | high contrast | system colours | — | §12.4 DESIGN_SYSTEM |
@@ -490,7 +500,7 @@ explain why in 11 px helper text.
 | Search & indexes | skeleton | no locations | per-source/root errors + Retry | network root unavailable | indexing, paused, rebuild |
 | Activity | skeleton rows | no activity | inline Retry | n/a | recording paused, filtered empty |
 | Workflows | skeleton | agent off | runtime/provider error | provider unreachable | starting/running/stopped |
-| Preferences | skeleton | n/a | settings read error | updater offline | hotkey conflict, disabled reasons |
+| Preferences | skeleton | n/a | settings read error | n/a (no updater in alpha) | hotkey conflict, disabled reasons |
 | Onboarding | n/a | no locations (step 4) | hotkey conflict | n/a | resumed, skipped, complete |
 
 ---
@@ -503,13 +513,17 @@ explain why in 11 px helper text.
 |---|---|---|---|
 | ≥1100 (1000–1280 measured) | 820 wide; side preview only if ≥1200 | sidebar 220; workspace 36/40; 2-col | rail 240; content 44/43 |
 | 820–1099 | 820 wide; preview bottom drawer | sidebar 190; workspace 32/32; 2-col; label column stacks | rail 240; content 32/32 |
-| 701–819 | `min(820, wa−32)`; drawer | sidebar 56 rail; workspace 31/24; 1-col | rail hidden; content full |
+| 701–819 | `min(820, wa−32)`; drawer | sidebar 56 rail; workspace 31/24; 1-col | rail 240; content 32/32 |
 | 560–700 (**700 breakpoint**) | `min(820, wa−32)`, search 61 px, input 16 px, row meta hidden, logo 26, footer may wrap | rail 56; workspace 31/18; single column; settings stack; recent meta hides | rail hidden; eyebrow "Step n of 7"; footer stacks if needed |
 | 560 (test width) | min supported; hints hide | min supported | min supported |
 
+Final window contract (2026-11-09): **main app window minimum 560×480** (onboarding uses that same window). The
+onboarding rail hides at **≤700**. Launcher/preview geometry is final at **1180 window / 360 side panel / ≥1200 work
+width**.
+
 At ≤700 exactly (reference:94-100): launcher search row 61 px, input 16 px, trailing meta hidden, results max 350,
 logo 26; app sidebar becomes 56 px with hidden labels (keep them sr-only), workspace 31/18, columns 1, onboarding
-rail hidden, setup content padding 32/22 with min-height 520.
+rail hidden, setup content padding 32/22, and the setup scrolls inside the 560×480 minimum window.
 
 ### 6.2 DPI (125 / 150 / 200 %)
 
@@ -575,7 +589,7 @@ animation anywhere.
 | Launcher 0-match | "No matches for “{query}”." / "Try a different spelling, or a prefix such as file:, history:, or code:." |
 | Launcher empty prompt | "Start typing to search files, apps, and actions." / "Try a file name, an app, or a command like “lock”." |
 | Launcher error | "Search is unavailable right now." · "Retry" |
-| Index status | "Index ready" · "Indexing · {n} %" · "Indexing…" · "Index paused" · "Index unavailable" |
+| Index status | "Index ready" · "Indexing" · "Index paused" · "Index unavailable" (no percentage in alpha — §10) |
 | Footer link | "Open ProtonSearch" |
 | Preview unavailable | "No preview for this item." |
 | Home no index | "Nothing indexed yet." · "Set up indexing" · "Resume setup" |
@@ -585,20 +599,57 @@ animation anywhere.
 | Rebuild confirm | "Rebuild the index? Search stays available while filenames are re-scanned. This can take a few minutes and uses more CPU." |
 | Activity empty | "No activity yet." · "Searches and launches appear here while recording is on." |
 | Activity paused | "Activity recording is paused." · "Resume" |
-| Clear activity confirm | "Clear all activity? This removes {n} recorded items from this PC. It can't be undone." |
+| Clear activity confirm (post-alpha) | "Clear all activity? This removes {n} recorded items from this PC. It can't be undone." |
 | Workflows agent off | "Agent workflows are off. ProtonSearch works fully without them." |
 | Workflows runtime error | "The agent runtime couldn't start. Search is unaffected." · "Retry" |
 | Preferences save | "Saved" (2 s stamp) |
 | Hotkey conflict | "That shortcut is already used by another app. Try another." |
-| Updates offline | "Can't check for updates right now — you're offline." |
+| Updates offline (post-alpha) | "Can't check for updates right now — you're offline." |
 | Onboarding saved | "Setup saved. You can close this window and continue later." |
 | Onboarding skip | "Finish setting up ProtonSearch" |
 
-## 10. Acceptance screenshots (must exist before G4 sign-off)
+Rows marked (post-alpha) are specified but not rendered in v2.0 alpha; the alpha UI says plainly that the capability
+is not available in this build (§10).
 
-Launcher: first summon, empty input, 0 matches, 1 match, many+selected, preview (side and drawer), loading, index
-error, indexing, dark, 560/820/1000/1280, 125/150/200 % DPI, high contrast, keyboard focus. App: Home (loaded,
-loading, empty, incomplete, error), Search & indexes (locations, depth, health, rebuild confirm), Activity (list,
-empty, paused), Workflows (off, running, error), Preferences (theme/density, hotkey capture, conflicts). Onboarding:
-all 7 steps, resumed state, narrow (560), dark. Reference comparison sheet: reference HTML vs production for launcher,
-Home, onboarding, light/dark (master prompt §XI.3).
+## 10. Alpha scope: CUTs and IPC limitations (v2.0 alpha)
+
+Truthful-UI rule (master prompt hard rule 5): when a capability is CUT or absent from the frozen IPC contract, the UI
+either omits the control or states plainly that it is not available in this build. It never ships a dead control, a
+fake percentage, sample data, or a teaser.
+
+### 10.1 CUT for v2.0 alpha (deferred, not broken)
+
+| CUT | Why | Post-alpha re-entry |
+|---|---|---|
+| Clipboard multi-select + Paste-N | Needs a selection model over the active-row model, a paste-aggregation path and IPC action support the alpha contract does not carry; a stub would be a dead affordance. | Shift+Enter toggle, Shift+↑↓ extend, Ctrl+A all, Enter paste N, `aria-multiselectable`, footer count, tests. |
+| Exact-command ACTIONS pin | Makes group order non-deterministic while tiers land (groups can reorder mid-query) and adds engine coupling; the fixed eight-group order is simpler to scan and test. Calculator/command rows still appear — ACTIONS simply renders last. | Only with a real relevance finding; would need an explicit `isExact` signal in `SearchResult`. |
+
+### 10.2 IPC capability gaps (alpha limitations)
+
+| Gap | Affected surface | Alpha behaviour (truthful UI) |
+|---|---|---|
+| No progress percentage/phase in `EngineStatus` | Launcher footer, Home index block, Search & indexes status, onboarding finish | State words + real counts only; no progress bar and no "· 42 %" anywhere. |
+| No clear-activity command | Activity | Clear control omitted; the panel states clearing is not available in this build. |
+| No quicklinks/snippets list or CRUD command | Workflows (launcher quicklink results only if the engine supplies them) | Read-only migration note; no editor, no dead button. |
+| No native folder-picker command | Search & indexes locations, onboarding locations | Validated paste-path form; helper states the picker is not available in this build. |
+| No updater / logs / diagnostics-export commands | Preferences -> Updates & diagnostics | Read-only version/protocol rows + Refresh diagnostics; no update check, logs or export controls. |
+| No preview payload (thumbnail, document render, preview kinds) in `SearchResult` | Launcher preview panel | Metadata/snippet previews only; otherwise "Preview not available — press Enter to open." No fake thumbnail. |
+
+### 10.3 UI-level alpha limitations
+
+Hotkey capture/conflict UX is still a code item tracked by REVIEW_1 M2; the contract in §3.6/§4.6 stands and must not
+be quietly downgraded. Anything else added to the alpha must be listed here before sign-off.
+
+---
+
+## 11. Acceptance screenshots (must exist before G4 sign-off)
+
+Launcher: first summon, empty input, 0 matches, 1 match, many+selected, preview (1180 window / 360 side panel; and
+bottom drawer below 1200 work width), loading, index error, indexing/paused, dark, 560/820/1000/1280, 125/150/200 %
+DPI, high contrast, keyboard focus. App: Home (loaded, loading, empty, error — no progress bar), Search & indexes
+(locations incl. paste-path form, depth, health, rebuild confirm, alpha-limit copy), Activity (list, empty, paused —
+no clear control), Workflows (off/on, alpha-limit copy, error), Preferences (theme/density, hotkey field/validation,
+alpha-limit diagnostics). Onboarding: all 7 steps, resumed state, 700 boundary (rail shown at 701, hidden at 700),
+dark. Alpha-limitations sheet: one capture per §10 item proving no dead control or fake percentage is rendered.
+Reference comparison sheet: reference HTML vs production for launcher, Home, onboarding, light/dark (master prompt
+§XI.3).

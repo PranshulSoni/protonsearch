@@ -395,19 +395,6 @@
   line-height: 1.6;
 }
 
-.hotkey-input-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.hotkey-input-row .field {
-  flex: 1;
-  max-width: 280px;
-  min-width: 180px;
-}
-
 .disclosure {
   margin-top: var(--space-4);
   padding: var(--space-3);
@@ -418,6 +405,9 @@
 }
 
 .disclosure summary {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
   color: var(--ps-ink);
   font-weight: var(--ps-fw-semibold);
   cursor: pointer;
@@ -512,7 +502,7 @@
   gap: var(--space-4);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 700px) {
   .onboarding {
     display: block;
     width: min(100%, 560px);

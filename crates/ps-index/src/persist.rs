@@ -25,7 +25,7 @@ use std::sync::OnceLock;
 use crate::{DirRec, EntryRec, FilenameIndex, KIND_TOMBSTONE};
 
 const MAGIC: [u8; 8] = *b"PSIDXv2\0";
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 const MAX_ENTRIES: u64 = 200_000_000;
 const MAX_DIRS: u64 = 50_000_000;
@@ -214,6 +214,9 @@ impl FilenameIndex {
                 w.u16(d.path_len)?;
                 w.u16(d.reserved)?;
             }
+            for &b in &self.dir_blooms {
+                w.u64(b)?;
+            }
             for &i in &live {
                 let r = &self.entries[i as usize];
                 w.u32(r.name_off)?;
@@ -313,6 +316,11 @@ impl FilenameIndex {
             });
         }
 
+        let mut dir_blooms: Vec<u64> = Vec::with_capacity(dir_count as usize);
+        for _ in 0..dir_count {
+            dir_blooms.push(r.u64()?);
+        }
+
         let mut entries: Vec<EntryRec> = Vec::with_capacity(entry_count as usize);
         for _ in 0..entry_count {
             let name_off = r.u32()?;
@@ -401,6 +409,7 @@ impl FilenameIndex {
             entries,
             blooms,
             dirs,
+            dir_blooms,
             sorted,
             roots,
             root_counts,

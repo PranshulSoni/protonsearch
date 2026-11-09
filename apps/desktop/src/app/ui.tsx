@@ -170,7 +170,7 @@ export function Icon({
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -233,7 +233,12 @@ export function Switch({
       disabled={disabled}
       onClick={() => onChange(!checked)}
     >
-      <span className="switch-thumb" aria-hidden="true" />
+      <span className="switch-track" aria-hidden="true">
+        <span className="switch-thumb" />
+      </span>
+      <span className="switch-state" aria-hidden="true">
+        {checked ? "On" : "Off"}
+      </span>
     </button>
   );
 }

@@ -5,6 +5,8 @@ import {
   EMPTY_SELECTION,
   MAX_LAUNCHER_HEIGHT,
   MIN_LAUNCHER_HEIGHT,
+  PREVIEW_SIDE_PANEL_WIDTH,
+  PREVIEW_WINDOW_WIDTH,
   buildFlatEntries,
   clampedIndex,
   commitSelection,
@@ -49,6 +51,7 @@ describe("computeLauncherMetrics", () => {
     });
     expect(metrics.baseHeight).toBe(MIN_LAUNCHER_HEIGHT);
     expect(metrics.totalHeight).toBe(MIN_LAUNCHER_HEIGHT);
+    expect(metrics.searchlineHeight).toBe(72);
     expect(metrics.listViewport).toBe(140);
   });
 
@@ -70,9 +73,9 @@ describe("computeLauncherMetrics", () => {
       previewOpen: false,
       workArea: WORK_AREA,
     });
-    // 72 + 23 + 2*34 + 3*58 = 337 -> snapped 338.
-    expect(taller.baseHeight).toBe(338);
-    expect(taller.listViewport).toBe(222);
+    // B2: the window includes the footer. 72 + 23 + 242 + 44 = 381 -> snapped 382.
+    expect(taller.baseHeight).toBe(382);
+    expect(taller.listViewport).toBe(266);
   });
 
   it("uses 48 px rows and 30 px labels in compact density", () => {
@@ -82,10 +85,11 @@ describe("computeLauncherMetrics", () => {
       previewOpen: false,
       workArea: WORK_AREA,
     });
-    // 72 + 23 + 2*30 + 3*48 = 299 -> snapped 300.
+    // 72 + 23 + 204 + 44 = 343 -> snapped 344.
     expect(metrics.rowHeight).toBe(48);
     expect(metrics.labelHeight).toBe(30);
-    expect(metrics.baseHeight).toBe(300);
+    expect(metrics.baseHeight).toBe(344);
+    expect(metrics.listViewport).toBe(228);
   });
 
   it("clamps the launcher to 480 px for long result lists", () => {
@@ -117,6 +121,40 @@ describe("computeLauncherMetrics", () => {
     });
     expect(drawer.previewMode).toBe("drawer");
     expect(drawer.totalHeight).toBe(drawer.baseHeight + 240);
+  });
+
+  it("uses the 1180/360/1200 preview contract boundaries", () => {
+    const boundary = computeLauncherMetrics({
+      groupRowCounts: [2],
+      density: "comfortable",
+      previewOpen: false,
+      workArea: { width: 1200, height: 900 },
+    });
+    expect(boundary.previewMode).toBe("side");
+
+    const below = computeLauncherMetrics({
+      groupRowCounts: [2],
+      density: "comfortable",
+      previewOpen: false,
+      workArea: { width: 1199, height: 900 },
+    });
+    expect(below.previewMode).toBe("drawer");
+    expect(PREVIEW_WINDOW_WIDTH).toBe(1180);
+    expect(PREVIEW_SIDE_PANEL_WIDTH).toBe(360);
+  });
+
+  it("shrinks the search row to 61 px on a ≤700 px surface (SCREENS §6.1)", () => {
+    const metrics = computeLauncherMetrics({
+      groupRowCounts: [2],
+      density: "comfortable",
+      previewOpen: false,
+      workArea: { width: 650, height: 600 },
+    });
+    expect(metrics.surfaceWidth).toBe(618);
+    expect(metrics.searchlineHeight).toBe(61);
+    // 61 + 23 + 150 + 44 = 278.
+    expect(metrics.baseHeight).toBe(278);
+    expect(metrics.listViewport).toBe(173);
   });
 });
 

@@ -38,46 +38,40 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Position a frameless launcher window near the top-center of the monitor the
-/// cursor/window is on, clamped into the work area.
-fn place_launcher(win: &WebviewWindow, width: f64, height: f64) {
-    let monitor = win.current_monitor().ok().flatten();
-    let (mx, my, mw, mh) = match monitor {
-        Some(m) => {
-            let size = m.size();
-            let pos = m.position();
-            let scale = m.scale_factor();
-            (
-                pos.x as f64 / scale,
-                pos.y as f64 / scale,
-                size.width as f64 / scale,
-                size.height as f64 / scale,
-            )
-        }
-        None => (0.0, 0.0, 1920.0, 1080.0),
-    };
-    let x = mx + ((mw - width) / 2.0).max(0.0);
-    let desired_y = my + (mh * 0.16).min(240.0).max(24.0);
-    // Keep the whole surface on screen even for tall preview layouts.
-    let y = desired_y.min(my + mh - height - 12.0).max(my + 8.0);
-    let _ = win.set_position(PhysicalPosition::new(
-        (x * monitor_scale(win)) as i32,
-        (y * monitor_scale(win)) as i32,
-    ));
-}
-
-fn monitor_scale(win: &WebviewWindow) -> f64 {
-    win.current_monitor()
+/// Position the frameless launcher near the top-center of the monitor under the
+/// cursor (multi-monitor correctness), clamped into that monitor's work area.
+fn place_launcher(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
+    let cursor = app.cursor_position().unwrap_or(tauri::PhysicalPosition::new(0.0, 0.0));
+    let monitor = app
+        .monitor_from_point(cursor.x, cursor.y)
         .ok()
         .flatten()
-        .map(|m| m.scale_factor())
-        .unwrap_or(1.0)
+        .or_else(|| win.current_monitor().ok().flatten());
+    let (mx, my, mw, mh, scale) = match monitor {
+        Some(m) => {
+            let pos = m.position();
+            let size = m.size();
+            (pos.x as f64, pos.y as f64, size.width as f64, size.height as f64, m.scale_factor())
+        }
+        None => (0.0, 0.0, 1920.0, 1080.0, 1.0),
+    };
+    let pw = width * scale;
+    let ph = height * scale;
+    let x = mx + ((mw - pw) / 2.0).max(12.0);
+    let desired_y = my + (mh * 0.16).min(260.0 * scale).max(24.0);
+    let y = desired_y.min(my + mh - ph - 12.0).max(my + 8.0);
+    let _ = win.set_position(PhysicalPosition::new(x as i32, y as i32));
 }
 
 fn show_launcher_window(app: &AppHandle) {
     let Some(win) = app.get_webview_window(LAUNCHER_LABEL) else {
         return;
     };
+    let size = win
+        .inner_size()
+        .map(|s| (s.width as f64 / win.scale_factor().unwrap_or(1.0), s.height as f64 / win.scale_factor().unwrap_or(1.0)))
+        .unwrap_or((LAUNCHER_WIDTH, LAUNCHER_DEFAULT_HEIGHT));
+    place_launcher(app, &win, size.0, size.1);
     let _ = win.show();
     let _ = win.set_focus();
     let _ = win.emit("launcher:summoned", ());
@@ -190,7 +184,7 @@ fn create_windows(app: &AppHandle) -> tauri::Result<()> {
         let mut main_builder = WebviewWindowBuilder::new(app, MAIN_LABEL, tauri::WebviewUrl::App("index.html".into()))
             .title("ProtonSearch")
             .inner_size(1180.0, 800.0)
-            .min_inner_size(720.0, 560.0)
+            .min_inner_size(560.0, 480.0)
             .visible(false)
             .center();
         if let Some(args) = &cdp {
@@ -233,7 +227,7 @@ fn create_windows(app: &AppHandle) -> tauri::Result<()> {
             launcher_builder = launcher_builder.data_directory(dir.clone());
         }
         let launcher = launcher_builder.build()?;
-        place_launcher(&launcher, LAUNCHER_WIDTH, LAUNCHER_DEFAULT_HEIGHT);
+        place_launcher(app, &launcher, LAUNCHER_WIDTH, LAUNCHER_DEFAULT_HEIGHT);
         let launcher_for_focus = launcher.clone();
         launcher.on_window_event(move |event| {
             if let tauri::WindowEvent::Focused(false) = event {
@@ -295,10 +289,15 @@ fn update_settings(
     state: tauri::State<'_, AppState>,
     patch: SettingsPatch,
 ) -> Result<Settings, String> {
-    state
+    let settings = state
         .engine
         .update_settings(patch)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // Settings may change roots/depth/pause; restarting is idempotent.
+    if !settings.indexing.paused {
+        std::sync::Arc::clone(&state.engine).spawn_background();
+    }
+    Ok(settings)
 }
 
 #[tauri::command]
@@ -323,19 +322,32 @@ fn complete_onboarding(
     state: tauri::State<'_, AppState>,
     input: OnboardingInput,
 ) -> Result<Settings, String> {
-    state
+    let settings = state
         .engine
         .complete_onboarding(input)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    std::sync::Arc::clone(&state.engine).spawn_background();
+    Ok(settings)
 }
 
 #[tauri::command]
 fn index_command(state: tauri::State<'_, AppState>, command: IndexCommand) -> Result<(), String> {
-    state.engine.index_command(command).map_err(|e| e.to_string())
+    state.engine.index_command(command).map_err(|e| e.to_string())?;
+    if matches!(
+        command,
+        IndexCommand::Resume
+            | IndexCommand::Rebuild
+            | IndexCommand::RebuildContent
+            | IndexCommand::RebuildOcr
+    ) {
+        std::sync::Arc::clone(&state.engine).spawn_background();
+    }
+    Ok(())
 }
 
 #[tauri::command]
 fn set_launcher_geometry(
+    app: AppHandle,
     window: WebviewWindow,
     height: f64,
     preview: bool,
@@ -345,7 +357,7 @@ fn set_launcher_geometry(
     window
         .set_size(tauri::LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
-    place_launcher(&window, width, height);
+    place_launcher(&app, &window, width, height);
     Ok(())
 }
 
@@ -368,6 +380,29 @@ fn show_main(app: AppHandle) {
 fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
     let _ = state.engine.index_command(IndexCommand::Shutdown);
     app.exit(0);
+}
+
+/// Validate and live-apply a new global shortcut. Restores the previous one if
+/// the new combination cannot be registered (e.g. another app owns it).
+#[tauri::command]
+fn set_hotkey(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    hotkey: String,
+) -> Result<Settings, String> {
+    let candidate = hotkey.trim().to_string();
+    if candidate.is_empty() || candidate.len() > 64 {
+        return Err("Enter a shortcut such as Alt+Space.".into());
+    }
+    let previous = state.engine.settings().hotkey;
+    let _ = app.global_shortcut().unregister_all();
+    if let Err(err) = app.global_shortcut().register(candidate.as_str()) {
+        let _ = app.global_shortcut().register(previous.as_str());
+        return Err(format!("That shortcut is unavailable: {err}"));
+    }
+    let mut patch = SettingsPatch::default();
+    patch.hotkey = Some(candidate);
+    state.engine.update_settings(patch).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -416,7 +451,9 @@ fn main() {
 
             step("hotkey: registering");
             let shortcut = app.state::<AppState>().engine.settings().hotkey;
-            let _ = app.global_shortcut().register(shortcut.as_str());
+            if let Err(err) = app.global_shortcut().register(shortcut.as_str()) {
+                eprintln!("[setup] global shortcut '{shortcut}' could not be registered: {err}");
+            }
             step("setup: complete");
 
             // Start scanners after windows exist so the launcher is usable while
@@ -445,6 +482,7 @@ fn main() {
             show_launcher,
             show_main,
             quit_app,
+            set_hotkey,
             app_info,
         ])
         .run(tauri::generate_context!())

@@ -79,10 +79,10 @@ jobs:
       - name: Install dependencies (locked)
         run: npm ci
 
-      # Gate 0: no vitest suites exist yet. --passWithNoTests keeps the skeleton green
-      # without faking coverage; drop the flag when the first suite lands (tracked G3).
-      - name: Unit tests
-        run: npm test -- --passWithNoTests
+      # Vitest suites are landing with the UI work (e.g. src/app/hotkey.test.ts,
+      # src/launcher/launcherLayout.test.ts). Failures here are real signals; do not skip.
+      - name: Unit tests (vitest)
+        run: npm test
 
       - name: Typecheck + production build
         run: npm run build

@@ -26,6 +26,7 @@ type Bridge = {
   getStatus(): Promise<EngineStatus>;
   getSettings(): Promise<Settings>;
   updateSettings(patch: SettingsPatch): Promise<Settings>;
+  setHotkey(hotkey: string): Promise<Settings>;
   getActivity(query?: ActivityQuery): Promise<ActivityItem[]>;
   getOnboarding(): Promise<OnboardingState>;
   completeOnboarding(input: OnboardingInput): Promise<Settings>;
@@ -44,6 +45,7 @@ const tauriBridge: Bridge = {
   getStatus: () => invoke<EngineStatus>("get_status"),
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (patch) => invoke<Settings>("update_settings", { patch }),
+  setHotkey: (hotkey) => invoke<Settings>("set_hotkey", { hotkey }),
   getActivity: (query) => invoke<ActivityItem[]>("get_activity", { query: query ?? null }),
   getOnboarding: () => invoke<OnboardingState>("get_onboarding"),
   completeOnboarding: (input) => invoke<Settings>("complete_onboarding", { input }),

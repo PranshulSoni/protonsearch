@@ -8,6 +8,7 @@
 
 pub(crate) mod clipboard;
 pub(crate) mod icons;
+pub(crate) mod native;
 pub(crate) mod shell;
 pub(crate) mod util;
 pub(crate) mod window;

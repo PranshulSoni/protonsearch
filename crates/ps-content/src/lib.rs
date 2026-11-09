@@ -5,12 +5,25 @@
 //!             size INTEGER, mtime INTEGER, content_hash TEXT, text TEXT,
 //!             truncated INTEGER, indexed_at INTEGER)
 //!   documents_fts USING fts5(path UNINDEXED, title, text, content='documents', content_rowid='id')
+//!   content_errors(path TEXT PK, error TEXT, at INTEGER)
 //!
 //! Extraction is bounded (max bytes, timeout) and runs in background jobs.
 //! Search never triggers extraction.
 
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+
+pub mod extract;
+pub mod index;
+pub mod legacy;
+
+pub use extract::{
+    detect_kind, extract_text, extract_text_with, is_supported, ExtractedDocument, ExtractOptions,
+    DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT,
+};
+pub use index::{
+    query_terms, sanitize_fts_query, ContentIndex, IndexBatchSummary,
+};
+pub use legacy::{import_legacy, LegacyImportSummary};
 
 /// Supported document families, used to bound extraction work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -28,62 +41,23 @@ pub enum DocKind {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ExtractedDocument {
-    pub kind: DocKind,
-    pub text: String,
-    pub truncated: bool,
-}
-
-/// Extract plain text from a supported file. Returns Ok(None) for unsupported
-/// formats and must never panic on malformed input.
-pub fn extract_text(_path: &Path, _max_bytes: usize) -> anyhow::Result<Option<ExtractedDocument>> {
-    Ok(None)
-}
-
 /// A search hit inside indexed document content.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContentHit {
     pub path: String,
     pub title: String,
     pub snippet: String,
+    /// 1-based line of the first query-term match, for "open at match".
     pub snippet_line: Option<u32>,
+    /// FTS5 bm25 score (more negative is better).
     pub bm25: f64,
 }
 
+/// Aggregate content-index counters.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ContentStats {
     pub documents: u64,
     pub errors: u64,
+    /// Sum of indexed extracted-text bytes across documents.
     pub bytes_indexed: u64,
-}
-
-/// Open (and migrate) the content index inside the shared v2 SQLite database.
-pub struct ContentIndex {
-    _private: (),
-}
-
-impl ContentIndex {
-    pub fn open(_db_path: &Path) -> anyhow::Result<Self> {
-        anyhow::bail!("not implemented yet")
-    }
-
-    pub fn stats(&self) -> ContentStats {
-        ContentStats::default()
-    }
-
-    /// Index one file if its content is supported and changed (mtime/hash).
-    /// Returns true when a row was written.
-    pub fn index_file(&self, _path: &Path, _max_bytes: usize) -> anyhow::Result<bool> {
-        anyhow::bail!("not implemented yet")
-    }
-
-    pub fn remove_file(&self, _path: &Path) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    /// BM25 full-text search. Query is user text, sanitised into FTS terms.
-    pub fn search(&self, _query: &str, _limit: usize) -> anyhow::Result<Vec<ContentHit>> {
-        Ok(Vec::new())
-    }
 }

@@ -2,7 +2,7 @@
 // and about. Autosave with a 2 s "Saved" stamp; every toggle persists through
 // update_settings and surfaces bridge errors instead of pretending success.
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../../App";
 import { api } from "../../bridge/api";
 import type {
@@ -15,13 +15,7 @@ import type {
 import { formatNumber } from "../../lib/format";
 import { relativeTime, stateLabel } from "../describe";
 import { errorMessage } from "../hooks";
-import {
-  DEFAULT_HOTKEY,
-  HOTKEY_CONFLICT_NOTE,
-  displayHotkey,
-  hotkeyCapTokens,
-  parseHotkey,
-} from "../hotkey";
+import { HotkeyCapture } from "../HotkeyInput";
 import { SECTION_EYEBROWS, type Section } from "../sections";
 import {
   Callout,
@@ -57,20 +51,8 @@ export default function PreferencesView({
   const { settings, status, updateSettings, refreshStatus } = useApp();
   const { savedKey, markSaved } = useSavedStamp();
   const [actionError, setActionError] = useState<string | null>(null);
-  const [hotkeyDraft, setHotkeyDraft] = useState(displayHotkey(settings.hotkey));
-  const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const [limitDraft, setLimitDraft] = useState(String(settings.resultLimit));
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
-  const hotkeyRef = useRef<HTMLInputElement>(null);
-
-  const parsedHotkey = parseHotkey(hotkeyDraft);
-  const currentHotkey = displayHotkey(settings.hotkey);
-  const hotkeyChanged = parsedHotkey.ok && parsedHotkey.accelerator !== settings.hotkey;
-  const caps = hotkeyCapTokens(parsedHotkey.ok ? parsedHotkey.accelerator : settings.hotkey);
-
-  useEffect(() => {
-    setHotkeyDraft(displayHotkey(settings.hotkey));
-  }, [settings.hotkey]);
 
   useEffect(() => {
     setLimitDraft(String(settings.resultLimit));
@@ -102,32 +84,16 @@ export default function PreferencesView({
     [updateSettings, markSaved],
   );
 
-  const saveHotkey = async (value = hotkeyDraft) => {
-    const validation = parseHotkey(value);
-    if (!validation.ok) {
-      setHotkeyError(validation.error);
-      hotkeyRef.current?.focus();
-      return;
-    }
-    setHotkeyError(null);
-    try {
-      await updateSettings({ hotkey: validation.accelerator });
+  // M2: re-register through the shell (api.setHotkey) so conflicts surface
+  // immediately, then pull the saved Settings back into app context.
+  const applyHotkey = useCallback(
+    async (accelerator: string) => {
+      await api.setHotkey(accelerator);
+      await updateSettings({});
       markSaved("hotkey");
-      setHotkeyDraft(validation.display);
-    } catch (err) {
-      setHotkeyError(errorMessage(err));
-    }
-  };
-
-  const submitHotkey = (event: FormEvent) => {
-    event.preventDefault();
-    void saveHotkey();
-  };
-
-  const resetHotkey = () => {
-    setHotkeyDraft(displayHotkey(DEFAULT_HOTKEY));
-    void saveHotkey(DEFAULT_HOTKEY);
-  };
+    },
+    [updateSettings, markSaved],
+  );
 
   const commitLimit = () => {
     const value = Number(limitDraft);
@@ -169,71 +135,11 @@ export default function PreferencesView({
             <SavedStamp show={savedKey === "hotkey"} />
           </div>
           <div className="panel">
-            <dl className="metric-list">
-              <div className="metric-row">
-                <dt>Current shortcut</dt>
-                <dd>
-                  <span className="kbd-row" aria-label={"Current shortcut " + currentHotkey}>
-                    {hotkeyCapTokens(settings.hotkey).map((cap, index) => (
-                      <span key={cap + index}>
-                        {index > 0 ? <span className="kbd-plus">+</span> : null}
-                        <kbd className="kbd">{cap}</kbd>
-                      </span>
-                    ))}
-                  </span>
-                </dd>
-              </div>
-            </dl>
-            <form className="hotkey-form" onSubmit={submitHotkey} noValidate>
-              <label className="field-label" htmlFor="prefs-hotkey-input">
-                Change shortcut
-              </label>
-              <div className="hotkey-input-row">
-                <input
-                  id="prefs-hotkey-input"
-                  ref={hotkeyRef}
-                  className="input input-sm"
-                  value={hotkeyDraft}
-                  spellCheck={false}
-                  autoComplete="off"
-                  aria-invalid={!parsedHotkey.ok ? true : undefined}
-                  aria-describedby="prefs-hotkey-help"
-                  onChange={(event) => {
-                    setHotkeyDraft(event.target.value);
-                    setHotkeyError(null);
-                  }}
-                />
-                <button type="submit" className="btn" disabled={!parsedHotkey.ok || !hotkeyChanged}>
-                  Save shortcut
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={resetHotkey}>
-                  Reset to Alt+Space
-                </button>
-              </div>
-              <div className="hotkey-preview" aria-hidden="true">
-                {caps.map((cap, index) => (
-                  <span key={cap + index}>
-                    {index > 0 ? <span className="kbd-plus">+</span> : null}
-                    <kbd className="kbd">{cap}</kbd>
-                  </span>
-                ))}
-              </div>
-              {!parsedHotkey.ok ? (
-                <p className="field-error" id="prefs-hotkey-help">
-                  {parsedHotkey.error}
-                </p>
-              ) : (
-                <p className="field-help" id="prefs-hotkey-help">
-                  Use at least one of Ctrl, Alt, Shift, or Win. Press Save shortcut to persist it.
-                </p>
-              )}
-              {hotkeyError ? (
-                <p className="field-error" role="alert">
-                  {hotkeyError}
-                </p>
-              ) : null}
-              <p className="field-help">{HOTKEY_CONFLICT_NOTE}</p>
-            </form>
+            <HotkeyCapture
+              value={settings.hotkey}
+              onCommit={applyHotkey}
+              help="Use at least one of Ctrl, Alt, Shift, or Win. The shortcut applies immediately; Windows rejects a combination another app already owns."
+            />
 
             <dl className="metric-list">
               <div className="metric-row">

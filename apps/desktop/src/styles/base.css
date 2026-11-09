@@ -49,8 +49,18 @@ button {
   outline-offset: 2px;
 }
 
-input:focus {
+/* Visible focus stays on inputs; only the pointer-focused state is quiet. */
+input:focus:not(:focus-visible) {
   outline: none;
+}
+
+.input:focus-visible,
+.field:focus-visible,
+input[type="text"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="search"]:focus-visible {
+  outline: var(--ps-focus-width) solid var(--focus);
+  outline-offset: var(--ps-focus-offset);
 }
 
 ::selection {

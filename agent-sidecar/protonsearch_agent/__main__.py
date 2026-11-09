@@ -7,6 +7,7 @@ Protocol v1 only: JSON Lines on stdin/stdout, diagnostics on stderr. The host
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 
@@ -28,12 +29,19 @@ def _bootstrap_error(exc: BaseException) -> int:
     return 1
 
 
+def _debug(message: str) -> None:
+    if os.environ.get("PROTONSEARCH_AGENT_DEBUG") == "1":
+        sys.stderr.write(f"protonsearch_agent[debug]: {message}\n")
+        sys.stderr.flush()
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
         from .runtime import Sidecar, describe_runtime
     except Exception as exc:  # pragma: no cover - exercised when deps are missing
         return _bootstrap_error(exc)
+    _debug("runtime imported")
 
     if "--describe" in argv:
         sys.stdout.write(json.dumps(describe_runtime(), separators=(",", ":")) + "\n")

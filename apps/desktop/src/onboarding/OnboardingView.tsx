@@ -7,7 +7,9 @@ import { useApp } from "../App";
 import type { RootConfig, RootMode } from "../bridge/types";
 import { formatNumber } from "../lib/format";
 import { Logo } from "../components/Logo";
-import { DEFAULT_HOTKEY, hotkeyCapTokens, parseHotkey } from "../app/hotkey";
+import { parseHotkey } from "../app/hotkey";
+import { HotkeyCapture } from "../app/HotkeyInput";
+import { api } from "../bridge/api";
 import { rootDisplayName, samePath, validateRootPath } from "../app/roots";
 import { Callout, Icon, SegmentedControl } from "../app/ui";
 import {
@@ -93,21 +95,17 @@ export default function OnboardingView() {
   const [stepIndex, setStepIndex] = useState(() => persisted?.stepIndex ?? 0);
   const [finishing, setFinishing] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [hotkeyFieldError, setHotkeyFieldError] = useState<string | null>(null);
   const [addingRoot, setAddingRoot] = useState(false);
   const [rootDraft, setRootDraft] = useState("");
   const [rootError, setRootError] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const hotkeyRef = useRef<HTMLInputElement>(null);
 
   const step = ONBOARDING_STEPS[stepIndex];
   const copy = STEP_COPY[step.id];
   const summary = useMemo(() => summarizeDraft(draft), [draft]);
-  const hotkeyValidation = useMemo(() => parseHotkey(draft.hotkey), [draft.hotkey]);
   const chosen = selectedRoots(draft.roots);
   const legacy = onboarding?.legacy;
   const legacyInfo = legacyDetails(legacy);
-  const caps = hotkeyCapTokens(hotkeyValidation.ok ? draft.hotkey : DEFAULT_HOTKEY);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -189,12 +187,10 @@ export default function OnboardingView() {
     event.preventDefault();
     if (finishing) return;
     setFormError(null);
-    if (step.id === "launcher" && !hotkeyValidation.ok) {
-      setHotkeyFieldError(hotkeyValidation.error);
-      hotkeyRef.current?.focus();
+    if (step.id === "launcher" && !parseHotkey(draft.hotkey).ok) {
+      setFormError("Choose a valid shortcut before continuing.");
       return;
     }
-    setHotkeyFieldError(null);
     if (step.id === "ready") {
       void finish(false);
       return;
@@ -204,7 +200,6 @@ export default function OnboardingView() {
 
   const goBack = () => {
     setFormError(null);
-    setHotkeyFieldError(null);
     setStepIndex((index) => Math.max(0, index - 1));
   };
 
@@ -419,58 +414,14 @@ export default function OnboardingView() {
       case "launcher":
         return (
           <>
-            <label className="field-label" htmlFor="onboarding-hotkey">
-              Global shortcut
-            </label>
-            <div className="hotkey-input-row">
-              <input
-                id="onboarding-hotkey"
-                ref={hotkeyRef}
-                className="field"
-                value={draft.hotkey}
-                spellCheck={false}
-                autoComplete="off"
-                aria-invalid={!hotkeyValidation.ok ? true : undefined}
-                aria-describedby="onboarding-hotkey-help"
-                onChange={(event) => {
-                  setHotkeyFieldError(null);
-                  patchDraft({ hotkey: event.target.value });
-                }}
-              />
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  setHotkeyFieldError(null);
-                  patchDraft({ hotkey: DEFAULT_HOTKEY });
-                }}
-              >
-                Reset to Alt+Space
-              </button>
-            </div>
-            <div className="hotkey-preview" aria-hidden="true">
-              {caps.map((cap, index) => (
-                <span key={cap + index}>
-                  {index > 0 ? <span className="kbd-plus">+</span> : null}
-                  <kbd className="kbd">{cap}</kbd>
-                </span>
-              ))}
-            </div>
-            {hotkeyValidation.ok ? (
-              <p className="field-help" id="onboarding-hotkey-help">
-                Use at least one of Ctrl, Alt, Shift, or Win. If another app already uses it,
-                Windows may refuse to register it. You can change it later in Preferences.
-              </p>
-            ) : (
-              <p className="field-error" id="onboarding-hotkey-help">
-                {hotkeyValidation.error}
-              </p>
-            )}
-            {hotkeyFieldError ? (
-              <p className="field-error" role="alert">
-                {hotkeyFieldError}
-              </p>
-            ) : null}
+            <HotkeyCapture
+              value={draft.hotkey}
+              help="Use at least one of Ctrl, Alt, Shift, or Win. The shortcut applies immediately; Windows rejects a combination another app already owns. You can change it later in Preferences."
+              onCommit={async (accelerator, display) => {
+                await api.setHotkey(accelerator);
+                setDraft((current) => ({ ...current, hotkey: display }));
+              }}
+            />
             <label className="choice choice-single">
               <input
                 type="checkbox"
@@ -589,7 +540,9 @@ export default function OnboardingView() {
       <div className="onboarding">
         <aside className="setup-rail">
           <div className="setup-brand">
-            <Logo size={28} />
+            <span aria-hidden="true">
+              <Logo size={28} />
+            </span>
             <span>ProtonSearch</span>
           </div>
           <nav aria-label="Setup steps">
@@ -618,7 +571,9 @@ export default function OnboardingView() {
               <br />
               Your files remain on your PC.
             </p>
-            <p className="setup-save-note">Choices are kept on this PC while you set up.</p>
+            <p className="setup-save-note">
+              Setup saved. You can close this window and continue later.
+            </p>
           </div>
         </aside>
 

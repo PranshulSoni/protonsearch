@@ -15,13 +15,26 @@ path = "src/main.rs"
 # NOTE: ps-core/ps-content/ps-ocr are added only when their v2 APIs are real.
 # This keeps the benchmark harness buildable while other crates are mid-flight,
 # and it makes the dependency direction obvious in review.
+[features]
+default = ["engine", "content"]
+# Enables the filename-index and relevance harness (requires ps-index).
+# Content/OCR/realfiles tooling builds without it, so the harness stays usable
+# while ps-index is being edited by its owner.
+engine = ["dep:ps-index"]
+# Enables the v2 content benchmark through ps-content.
+content = ["dep:ps-content"]
+
 [dependencies]
 ps-ipc = { path = "../ps-ipc" }
-ps-index = { path = "../ps-index" }
+ps-index = { path = "../ps-index", optional = true }
+ps-content = { path = "../ps-content", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 rusqlite = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = [

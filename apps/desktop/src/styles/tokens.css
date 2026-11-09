@@ -157,7 +157,7 @@
   --ink-strong: #16222a;
   --muted: var(--ps-ink-2);
   --quiet: var(--ps-ink-3);
-  --faint: #8a948e;
+  --faint: var(--ps-ink-3);
   --line: var(--ps-line);
   --line-strong: var(--ps-line-strong);
   --control-border: var(--ps-control-border);
@@ -315,7 +315,6 @@
 
   --hover: #232a2f;
   --ink-strong: #f4f6f1;
-  --faint: #7c857b;
 }
 
 :root[data-density="compact"] {

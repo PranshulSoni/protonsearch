@@ -10,6 +10,8 @@ import type { ResultGroup } from "../lib/results";
  */
 
 export const SEARCHLINE_HEIGHT = 72;
+/** SCREENS §6.1: the search row shrinks to 61 px on a narrow surface (≤700 px). */
+export const SEARCHLINE_HEIGHT_NARROW = 61;
 export const FOOTER_HEIGHT = 44;
 /** Results container padding: 10 px top + 13 px bottom (reference:34). */
 export const RESULTS_PADDING = 23;
@@ -22,7 +24,17 @@ export const MAX_LAUNCHER_HEIGHT = 480;
 export const MAX_RESULTS_VIEWPORT = 365;
 export const PREVIEW_DRAWER_HEIGHT = 240;
 export const PREVIEW_DRAWER_MAX_HEIGHT = 640;
-export const PREVIEW_SIDE_MIN_WORK_WIDTH = 1240;
+/** Shell window width for the side-preview state (LAUNCHER_PREVIEW_WIDTH = 1180). */
+export const PREVIEW_WINDOW_WIDTH = 1180;
+/** SCREENS §2.6: side panel 360 px. */
+export const PREVIEW_SIDE_PANEL_WIDTH = 360;
+/** SCREENS §2.6: side panel only when the work area is at least 1200 px wide. */
+export const PREVIEW_SIDE_MIN_WORK_WIDTH = 1200;
+/** Usual launcher surface width and the shell's horizontal work-area clamp. */
+export const SURFACE_MAX_WIDTH = 820;
+export const SURFACE_HORIZONTAL_CLAMP = 32;
+/** SCREENS §6.1 narrow breakpoint for the surface itself. */
+export const NARROW_SURFACE_MAX_WIDTH = 700;
 /** PageUp/PageDown move about one viewport (KEYBOARD_AND_A11Y §2). */
 export const PAGE_STEP = 6;
 /** Engine request limit and rendered-row bound; never render hundreds of rows. */
@@ -67,6 +79,10 @@ export interface LauncherMetricsInput {
 export interface LauncherMetrics {
   rowHeight: number;
   labelHeight: number;
+  /** Search row height: 72 px, or 61 px on a ≤700 px wide surface. */
+  searchlineHeight: number;
+  /** Width the launcher window will have for this work area. */
+  surfaceWidth: number;
   /** Height of search row + results + footer, before preview drawer growth. */
   baseHeight: number;
   /** Actual window height to request (includes a bottom preview drawer). */
@@ -83,11 +99,18 @@ function snapTo2(value: number): number {
 export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMetrics {
   const rowHeight = rowHeightFor(input.density);
   const labelHeight = labelHeightFor(input.density);
+  const surfaceWidth = Math.min(
+    SURFACE_MAX_WIDTH,
+    Math.max(480, input.workArea.width - SURFACE_HORIZONTAL_CLAMP),
+  );
+  const searchlineHeight =
+    surfaceWidth <= NARROW_SURFACE_MAX_WIDTH ? SEARCHLINE_HEIGHT_NARROW : SEARCHLINE_HEIGHT;
   const content = input.groupRowCounts.reduce(
     (sum, rows) => sum + labelHeight + rows * rowHeight,
     0,
   );
-  const raw = SEARCHLINE_HEIGHT + RESULTS_PADDING + content;
+  // The window height must include the footer (B2 / SCREENS §2.1).
+  const raw = searchlineHeight + RESULTS_PADDING + content + FOOTER_HEIGHT;
   const baseHeight = snapTo2(
     Math.min(MAX_LAUNCHER_HEIGHT, Math.max(MIN_LAUNCHER_HEIGHT, raw)),
   );
@@ -96,13 +119,24 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
   let totalHeight = baseHeight;
   if (input.previewOpen && previewMode === "drawer") {
     const cap = Math.min(PREVIEW_DRAWER_MAX_HEIGHT, input.workArea.height - 24);
-    totalHeight = snapTo2(Math.min(baseHeight + PREVIEW_DRAWER_HEIGHT, cap));
+    totalHeight = snapTo2(
+      Math.max(baseHeight, Math.min(baseHeight + PREVIEW_DRAWER_HEIGHT, cap)),
+    );
   }
   const listViewport = Math.max(
     0,
-    Math.min(MAX_RESULTS_VIEWPORT, baseHeight - SEARCHLINE_HEIGHT - FOOTER_HEIGHT),
+    Math.min(MAX_RESULTS_VIEWPORT, baseHeight - searchlineHeight - FOOTER_HEIGHT),
   );
-  return { rowHeight, labelHeight, baseHeight, totalHeight, listViewport, previewMode };
+  return {
+    rowHeight,
+    labelHeight,
+    searchlineHeight,
+    surfaceWidth,
+    baseHeight,
+    totalHeight,
+    listViewport,
+    previewMode,
+  };
 }
 
 export interface FlatEntry {

@@ -71,7 +71,7 @@ fills its window instead of sitting as a card on a stage (see REFERENCE_MAPPING.
 
 Hairline separators; 1 px component borders; a **quiet selected row** (tint + border + a 2 px state bar, §9.4);
 letter file-type badges (fallback, §10.2); small tracked-caps **labels** (not table headers); the two-tone P;
-a single 4 px progress hairline; graphite text on warm off-white; the left rail in onboarding; a native-feeling
+a single 4 px progress hairline (post-alpha; alpha shows state words only); graphite text on warm off-white; the left rail in onboarding; a native-feeling
 sidebar.
 
 ### 2.3 Conscious deviations from the installed skills' generic house style
@@ -222,6 +222,9 @@ action `#212a30`/`#b6c9d6`; neutral `#23291f`/`#b9c4b3`; image/media `#2a2430`/`
   focus ring, and at most one filled control per view. Never on headers, tabs, or every button.
 - **Selected row = fill + border + 2 px start bar.** Background tint alone is not a sufficient state cue
   (WCAG 1.4.11); the bar also survives forced-colours mode. On the dark theme the border itself is 3.22:1.
+- **Active sidebar item = neutral fill + 2 px start bar** (same `--ps-selected-bar`; confirmed 2026-11-09). The
+  reference's tint-only active row measures 1.13:1 against the sidebar — not a perceivable state cue (WCAG 1.4.11) —
+  so the bar, plus the ink/weight change, is the accessibility correction.
 - **Status is always word + colour.** Green/amber/red never carry meaning alone; the dot or pill is paired with
   text ("Index ready", "Paused", "Couldn't reach the network location").
 - **Zero is normal ink.** A real zero prints as "0" in text colour; a missing/not-applicable value is a grey
@@ -239,17 +242,25 @@ action `#212a30`/`#b6c9d6`; neutral `#23291f`/`#b9c4b3`; image/media `#2a2430`/`
 `apps/desktop/src/styles/tokens.css` (L0) already implements this palette with the `--ps-*` names. Deltas and
 decisions recorded here so docs and code cannot drift:
 
-- **Preview width:** L0 landed `--launcher-width-preview: 1180px`; the side preview panel is therefore **360 px**
-  (not the 380/1220 drafted earlier) and the side-preview threshold is `workArea.width ≥ 1200`. SCREENS §2.1/§2.6
-  were updated; the launcher default remains 820 px.
+- **Preview geometry (final, 2026-11-09):** `--launcher-width-preview: 1180px`, side panel **360 px**, threshold
+  `workArea.width ≥ 1200`; the launcher default remains 820 px. The launcher CSS/JS still says 1220/380/1240 — that
+  is code debt (REVIEW_1 §1.2); the docs are final.
+- **Selected-row and nav-active bar (final, 2026-11-09):** both use a 2 px inset `--ps-selected-bar` start bar. The
+  nav bar is confirmed (reference tint alone = 1.13:1; WCAG 1.4.11).
+- **CUT for v2.0 alpha:** clipboard multi-select/Paste-N and the exact-command ACTIONS pin. Rationale and re-entry
+  are in SCREENS §10; do not build stubs or teasers.
+- **Window contract (final):** main app window minimum **560×480**; onboarding rail hides at **≤700**.
+- **Alpha IPC gaps** (progress %, clear-activity, quicklinks CRUD, folder picker, updater, preview payload) with the
+  truthful-UI rule are listed in SCREENS §10.
 - **Image/media badge family:** added by L0, adopted: light `#eae8ef`/`#574f68` (6.35:1), dark
   `#2a2430`/`#c4b6d8` (7.92:1). It is the sixth file-type family (images, screenshots, scanned media) in §9.2.
 - **Spacing:** the global scale landed as `--space-1`…`--space-11` = 4/8/12/16/20/24/32/40/48/56/64 px. Use those
   for layout; component anatomy keeps the reference's local values (14/20 search padding, 11/13 results padding,
   8/12 row padding) as component CSS, not as new global tokens.
 - **`--faint` legacy alias:** light `#8a948e` = 3.04:1 and dark `#7c857b` = 4.4:1 — **fails AA for text**. Do not use
-  it for any word-bearing UI; use `--ps-ink-3` (surface-only) or `--ps-ink-2`. Flagged to L0; either retire the alias
-  or keep it decorative-only.
+  it for any word-bearing UI; use `--ps-ink-3` (surface-only) or `--ps-ink-2`. **Final decision (2026-11-09): keep it
+  unused/out of the contract (or delete); do not alias it to `--ps-ink-3`, which itself fails on soft (4.48:1) and
+  selected (4.20:1) surfaces.**
 - **Legacy type aliases `--text-md: 14px` / `--text-lg: 16px`** are outside this type scale. They exist for scaffold
   views; migrate any view that needs them to `--ps-text-small/body` rather than adding new 14/16 px roles.
 - **`--leading-tight: 1.16`** is a legacy alias. The route display h1 must render at **1.11** (reference:62); fix the
@@ -427,6 +438,9 @@ Resting cards: **no shadow**. No inset shadows, no glow, no glass, no blur.
 }
 ```
 
+Progress animations above are post-alpha only: v2.0 alpha renders no progress bar (no percentage in `EngineStatus` —
+SCREENS §10).
+
 ### 6.4 Frame budget and React rules
 
 60 Hz = 16.7 ms; 120 Hz = 8.3 ms (master prompt §V.D). Selection change must not re-render the whole result list:
@@ -474,24 +488,24 @@ below must implement all states that apply, including empty/loading/error at its
 | 5 | **ResultRow** | 36 px icon slot · 12 px gap · (title 13/680 · path 11 `--ps-ink-2`) · meta 10–11 px right | 58 px; 48 compact | rest transparent; hover `#f0f3f0`; selected `--ps-accent-soft` + 1 px `--ps-accent-border` + inset 2 px `--ps-selected-bar`; focus never replaces selection; disabled dimmed with reason tooltip |
 | 6 | **ResultIcon** | 35×37 slot radius 7; real shell icon 32 px **or** letter badge or command glyph | 32 px icon within 36 slot; 1×/2× source | loading neutral tile (no shimmer), missing icon → badge, never stretch/upscale; decorative for AT |
 | 7 | **PreviewPanel** | side panel 360 px when `workArea.width ≥ 1200`, otherwise bottom drawer: title, meta grid, snippet/thumbnail, actions row | side: 360 × content; drawer: 240 px | toggled by Ctrl+Space; `aria-label="Preview"`; loading/empty/error/no-preview states; Esc closes; focusable scroll region |
-| 8 | **LauncherFooter** | left: 8 px status dot + status text + · + "Open ProtonSearch" text button; right: 3 kbd hints max | 44 px; 9/16 padding | hints contextual (Navigate/Open/Clear→Close/Preview/Paste N); text 10 px; hidden by priority <900 px; status is live region |
+| 8 | **LauncherFooter** | left: 8 px status dot + status text + · + "Open ProtonSearch" text button; right: 3 kbd hints max | 44 px; 9/16 padding | hints contextual (Navigate/Open/Clear→Close/Preview/Copy path); Paste-N CUT for alpha; text 10 px; hidden by priority <900 px; status is live region |
 | 9 | **Kbd** | 10 px/650, 2 px 5 px padding, radius 4, bg `--ps-kbd-bg`, 1 px border | auto | non-interactive; `aria-hidden` when the hint text already names the key? No — keep text visible, hide the decorative keycap from AT via `aria-label` on the hint group |
 | 10 | **Button** | primary (fill `--ps-primary-bg`, radius 6, 10×14, 12/720) · secondary (white, 1 px `--ps-control-border`, ink `#365a69`) · ghost/text (10 px padding, ink accent) · danger-text (negative, confirm required) | sm 28 · md 32 · lg 38 | hover/active/disabled/loading (label + 12 px dot? no spinner: label + aria-busy); one filled primary per screen; icon-only needs aria-label |
 | 11 | **TextField / SearchField** | label above (11 px caps 740, 8–10 px gap), field 38 px, radius 7, 1 px `--ps-control-border`, 13 px ink, placeholder `#69746e` | 38 px (32 compact); big search 48 px | focus: 2 px `--ps-focus` ring offset 2 (not a border swap); invalid: negative border + inline error; disabled legible with reason; helper via aria-describedby |
 | 12 | **CheckboxRow / ChoiceRow** | 16 px checkbox + label 12/650 + description 10–11 px right or below; whole row is the hit target | 40–44 px | checked/unchecked/indeterminate? no; focus ring on row; disabled row keeps 4.5:1 text |
 | 13 | **SegmentedControl** | track `--ps-surface-soft`, 4 px padding, radius 9, buttons radius 5, 12/680 | 32 px | selected = white/raised fill + ink; keyboard roving tabindex; used for theme, density, activity filters, per-root depth mode |
 | 14 | **ToggleSwitch** | 28×16 track, 12 px thumb, label + status word | 32 px row | on = `--ps-accent` (not green); focus ring; disabled reason |
-| 15 | **ProgressBar** | 4 px track radius 3, fill `--ps-progress-fill`; label + "42 %" + detail line | 4 px bar; 3-line block | determinate (value 0–100 real), indeterminate (static 30 % + phase text), paused, error; `role="progressbar"`; never fake a number |
+| 15 | **ProgressBar** | 4 px track radius 3, fill `--ps-progress-fill`; label + "42 %" + detail line | 4 px bar; 3-line block | determinate (value 0–100 real), indeterminate (static 30 % + phase text), paused, error; `role="progressbar"`; never fake a number; **not rendered in v2.0 alpha** (IPC has no percentage — SCREENS §10) |
 | 16 | **Panel / Card** | 1 px `#e2e8df` or tone step, radius 8, padding 19×21 (reference:76); no shadow at rest | auto | used for grouped content; never a 3-up feature grid |
 | 17 | **SectionHeader** | eyebrow 10/770/.14em · h1 display · lead 13 px `--ps-ink-2` (max 54ch) · h2 section label 11/750/.10em | — | one h1 per route; eyebrow may be omitted before an h1 |
 | 18 | **MetricRow** | label 12 px `#5c6862` + value 12/700 ink right, 11 px vertical padding, 1 px row rule | 40 px | numbers tabular; last row no rule (reference:74) |
-| 19 | **StatBlock** | stat 34/680 + subline 11 px `--ps-ink-2` + 4 px progress + metrics | — | one per screen; the number is real |
+| 19 | **StatBlock** | stat 34/680 + subline 11 px `--ps-ink-2` + state line + metrics | — | one per screen; the number is real; no progress in alpha (SCREENS §10) |
 | 20 | **RecentRow** | 32×33 icon · title 12/680 · sub 11 `--ps-ink-3` · trailing arrow | 56 px | hover row tint; whole row is one button |
 | 21 | **EmptyState** | icon 20 px (optional) + one sentence 12–13 px `--ps-ink-2` + optional single action | min 140 px (launcher) / 96 px (app block) | empty ≠ error; keeps the frame; no illustration, no emoji |
 | 22 | **ErrorState / InlineNotice** | 1 px border tint + 12 px text + Retry text button | inline | errors live in the block that failed, never a full-screen banner; `role="alert"` for new errors |
 | 23 | **StatusDot** | 8 px dot + text label 11 px | — | colour + word; `aria-hidden` on dot; ready `#4f7d68`, indexing `#8a5a12`, paused `#68736d`, error `#a92a2f` (light) / equivalents dark |
 | 24 | **Badge / Pill** | 16–20 px tall, radius full, pale tint + dark ink, 11/650 | — | status only, inside rows/beside values; never above a heading; no count badges unless a real queue count |
-| 25 | **Sidebar** | brand block, "WORKSPACE" label, 5 nav items, userfoot at bottom | 220 / 190 / 56 rail | active = neutral tint + ink; no left bar, no coloured pill; rail keeps sr-only labels |
+| 25 | **Sidebar** | brand block, "WORKSPACE" label, 5 nav items, userfoot at bottom | 220 / 190 / 56 rail | active = neutral tint + ink + 2 px `--ps-selected-bar` start bar; no coloured pill; rail keeps sr-only labels |
 | 26 | **Avatar** | 30 px tile radius 8, initial 780 or person glyph when no name | — | optional name only; neutral fallback "This PC" |
 | 27 | **StepRail / StepIndicator** | 25 px numbered circle + label 12/620; current filled `#295a70` white; completed accent ink; future muted | 7 steps, 53 px pitch | rail hidden ≤700 px; current step announced; non-interactive |
 | 28 | **ContextMenu** | floating panel radius 8, 1 px border, popover shadow, 12 px items, 6 px vertical padding, shortcut column right | min 180 px | keyboard: focus moves into menu, Esc returns to row; destructive item last, in negative colour, confirm |
@@ -503,8 +517,8 @@ below must implement all states that apply, including empty/loading/error at its
 
 **ResultRow.** The row is one interactive target (a `button`-like option). Selected state is applied in the same
 frame as the arrow key; only the two affected rows change attributes. Hover on a non-selected row uses
-`#f0f3f0` (light) / `#242722` (dark); hover never overrides selection. Multi-select mode (clipboard only) adds a
-checked marker at the row start and a count in the footer; the row keeps the same height. Disabled rows (source
+`#f0f3f0` (light) / `#242722` (dark); hover never overrides selection. Multi-select is **CUT for v2.0 alpha** (SCREENS §10): one active row only — no check markers, no footer count;
+do not build a stub. Disabled rows (source
 unavailable) stay readable at 4.5:1 and explain why on hover/focus.
 
 **SearchRow.** The brand mark is 29 px and optically centred (reference:25,30); at ≤700 px it drops to 26 px. The
@@ -516,17 +530,18 @@ query).
 
 **PreviewPanel.** Opens only on demand or when the user has enabled "Preview on selection" in Preferences (default
 off). Side panel (360 px wide) when `workArea.width ≥ 1200` — the native window widens to the 1180 px preview
-token; otherwise a 240 px bottom drawer. Content variants: text/code snippet with
-match highlight (first 20 lines, mono 12 px), image thumbnail (max 320×240, no upscale), PDF/doc metadata card
-when rendering is unavailable, app/action summary card, clipboard full text/image, web URL summary. If no preview
-is available: quiet line "No preview for this item." Never claim a preview that is not loaded; show a flat
+token; otherwise a 240 px bottom drawer. Alpha content (metadata/snippet payload only — SCREENS §10): code/text snippet with match highlight (first 20
+lines, mono 12 px), metadata facts, clipboard text, web URL summary, app/action summary. No thumbnail or document
+render; unavailable bodies say "Preview not available — press Enter to open." If no preview is available: quiet
+line "No preview for this item." Never claim a preview that is not loaded; show a flat
 skeleton at its real size while decoding.
 
 **LauncherFooter.** Status (left) is a live region, colour + words, from `EngineStatus`: "Index ready",
-"Indexing · 42 %", "Index paused", "Index unavailable — Retry". "Open ProtonSearch" is a text button
+"Indexing", "Index paused", "Index unavailable — Retry". Alpha: the IPC has no percentage — SCREENS §10. "Open ProtonSearch" is a text button
 (10 px/750, `#356d88`) that opens the app with the current query. Hints (right) are max three, ordered by
-priority: Navigate → Open → Clear/Close → Preview → Copy path / Paste N. Hints are hidden by priority, never
-wrapped to a second line at ≥900 px; below 900 px the footer may use two rows (window grows by 20 px).
+priority: Navigate → Open → Clear/Close → Preview → Copy path. Multi-select/Paste-N hints are CUT for v2.0 alpha.
+Hints are hidden by priority, never wrapped to a second line at ≥900 px; below 900 px the footer may use two rows
+(window grows by 20 px).
 
 **Buttons.** One filled primary per screen. Secondary = white/raised with 1 px border and ink `#365a69`; hover
 `#f0f4ef`. Tertiary = text only, accent ink. Destructive = text/outlined negative with a confirmation that names
@@ -536,7 +551,8 @@ colour change only.
 **Progress bars.** Truthful values only. Determinate shows "42 %" text next to the bar and a detail line with real
 counts ("8,440 of 20,113 documents"). Indeterminate shows a static 30 % bar and phase text ("Preparing files…",
 "Reading documents…"); no shimmer. Paused: bar stays at the last value, label "Paused"; error: bar freezes,
-notice below with Retry. If the engine cannot report a percentage, do not invent one.
+notice below with Retry. If the engine cannot report a percentage, do not invent one. **v2.0 alpha renders no progress bar at all** (the IPC
+has no percentage — SCREENS §10); this spec is post-alpha.
 
 ---
 
@@ -631,6 +647,7 @@ the semantics.
   --ps-accent: #285975; --ps-accent-strong: #1e4158; --ps-accent-soft: #e7eef2;
   --ps-accent-border: #d6e2e9; --ps-selected-bar: #285975; --ps-focus: #5482a3;
   --ps-nav-active-bg: #e0eae8; --ps-nav-active-ink: #234759;
+  /* active nav item also carries a 2px inset var(--ps-selected-bar) bar */
   --ps-avatar-bg: #dae7e8; --ps-avatar-ink: #245168;
   --ps-primary-bg: #234a61; --ps-primary-ink: #ffffff; --ps-primary-hover: #335e75;
   --ps-positive: #247b50; --ps-warning: #8a5a12; --ps-negative: #a92a2f;
@@ -678,6 +695,7 @@ the semantics.
   --ps-accent: #8fb6cc; --ps-accent-strong: #a8c9db; --ps-accent-soft: #24333b;
   --ps-accent-border: #4f7183; --ps-selected-bar: #8fb6cc; --ps-focus: #7fb0c9;
   --ps-nav-active-bg: #2b3029; --ps-nav-active-ink: #f2f5ef;
+  /* active nav item also carries a 2px inset var(--ps-selected-bar) bar */
   --ps-avatar-bg: #223038; --ps-avatar-ink: #9ec5de;
   --ps-primary-bg: #2f637e; --ps-primary-ink: #f7f8f4; --ps-primary-hover: #3a708c;
   --ps-positive: #6fbf93; --ps-warning: #d9b171; --ps-negative: #e08a8a;

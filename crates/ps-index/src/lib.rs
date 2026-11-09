@@ -35,10 +35,54 @@ pub use scan::{
 };
 
 use matching::{
-    bloom_add, cmp_ci, eq_ci, find_ci, match_name, score_for_segment, segment_level, starts_with_ci,
-    to_utf16_ranges, QueryPlan, PATH_MAX_SCORE, SCORE_EXACT_NAME, SCORE_EXACT_STEM, SCORE_PREFIX,
-    SCORE_SCALE, SCORE_SPANNING,
+    bloom_add, cmp_ci, eq_ci, find_ci, match_name_into, score_for_segment, segment_level,
+    segment_level_multi, starts_with_ci, to_utf16_ranges, typo_only_match, QueryPlan, PATH_MAX_SCORE,
+    SCORE_PREFIX, SCORE_SCALE, SCORE_SPANNING, SCORE_TYPO,
 };
+
+/// Below this many entries the rayon wake-up cost dominates, so scans run
+/// serially. Measured on this host: a 10k-entry scan is ~10x faster serial.
+const SERIAL_SCAN_THRESHOLD: usize = 48_000;
+/// Directory-count threshold for the path phase.
+const SERIAL_DIR_THRESHOLD: usize = 32_000;
+const SCAN_CHUNK: usize = 16_384;
+
+/// Dedicated scan pool. A small pool (2..=8 threads) beats the global pool
+/// here: waking 20 threads costs hundreds of microseconds per query.
+fn scan_pool() -> &'static rayon::ThreadPool {
+    static POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
+    POOL.get_or_init(|| {
+        let threads = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            .clamp(2, 8);
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .thread_name(|i| format!("ps-index-scan-{i}"))
+            .build()
+            .unwrap_or_else(|_| {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(2)
+                    .build()
+                    .expect("ps-index scan pool")
+            })
+    })
+}
+
+/// Map chunk indices to results, serially for small inputs and on the
+/// dedicated pool otherwise.
+fn parallel_chunks<T, F>(n: usize, chunk: usize, f: F) -> Vec<T>
+where
+    T: Send,
+    F: Fn(usize) -> T + Sync + Send,
+{
+    let nchunks = n.div_ceil(chunk);
+    if nchunks <= 1 || n <= SERIAL_SCAN_THRESHOLD {
+        (0..nchunks).map(f).collect()
+    } else {
+        scan_pool().install(|| (0..nchunks).into_par_iter().map(f).collect())
+    }
+}
 
 /// One indexed filesystem entry, in owned form (scan output / external input).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -165,6 +209,9 @@ pub struct FilenameIndex {
     pub(crate) entries: Vec<EntryRec>,
     pub(crate) blooms: Vec<u64>,
     pub(crate) dirs: Vec<DirRec>,
+    /// Per-directory character bloom over the full directory path; keeps the
+    /// path-match phase cheap (most directories are rejected in ~2ns).
+    pub(crate) dir_blooms: Vec<u64>,
     pub(crate) sorted: Vec<u32>,
     pub(crate) roots: Vec<String>,
     pub(crate) root_counts: Vec<u64>,
@@ -275,6 +322,7 @@ pub(crate) struct IndexBuilder {
     pub(crate) entries: Vec<EntryRec>,
     pub(crate) blooms: Vec<u64>,
     pub(crate) dirs: Vec<DirRec>,
+    pub(crate) dir_blooms: Vec<u64>,
     pub(crate) dir_map: HashMap<String, u32>,
     pub(crate) roots: Vec<String>,
     pub(crate) root_counts: Vec<u64>,
@@ -304,6 +352,7 @@ impl IndexBuilder {
             path_len: len,
             reserved: 0,
         });
+        self.dir_blooms.push(matching::bloom_for_str(path));
         self.dir_map.insert(path.to_string(), id);
         id
     }
@@ -345,6 +394,7 @@ impl IndexBuilder {
             entries: std::mem::take(&mut self.entries),
             blooms: std::mem::take(&mut self.blooms),
             dirs: std::mem::take(&mut self.dirs),
+            dir_blooms: std::mem::take(&mut self.dir_blooms),
             sorted: Vec::new(),
             roots: std::mem::take(&mut self.roots),
             root_counts: std::mem::take(&mut self.root_counts),
@@ -425,6 +475,7 @@ impl FilenameIndex {
             + self.entries.len() * EntryRec::SIZE
             + self.blooms.len() * 8
             + self.dirs.len() * std::mem::size_of::<DirRec>()
+            + self.dir_blooms.len() * 8
             + self.sorted.len() * 4
             + self.roots.iter().map(|r| r.len() + 24).sum::<usize>()
             + self.dir_map.as_ref().map(|m| m.len() * 48).unwrap_or(0)
@@ -823,10 +874,12 @@ impl FilenameIndex {
         let cap = (limit.saturating_mul(8)).max(256).min(20_000);
         let mut top = TopK::new(self, limit);
         let mut seen = 0usize;
+        let mut scratch: Vec<(usize, usize)> = Vec::new();
+        let prefix_term = plan.terms.first().map(String::as_str).unwrap_or(q.as_str());
         for &idx in &sorted[lo..] {
             let i = idx as usize;
             let name = self.entry_name(i);
-            if !starts_with_ci(name, q) {
+            if !starts_with_ci(name, prefix_term) {
                 break;
             }
             seen += 1;
@@ -836,22 +889,17 @@ impl FilenameIndex {
             if !self.filter_pass(filter, i, under.as_deref()) {
                 continue;
             }
-            let score = if eq_ci(name, q) {
-                SCORE_EXACT_NAME
-            } else {
-                let stem = self.entry_stem(i);
-                if stem.len() != name.len() && eq_ci(stem, q) {
-                    SCORE_EXACT_STEM
-                } else {
-                    SCORE_PREFIX
-                }
+            let stem = self.entry_stem(i);
+            let Some(score) = match_name_into(name, stem, plan, false, &mut scratch) else {
+                continue;
             };
+            let ranges = to_utf16_ranges(name, &scratch);
             top.push(Candidate {
                 idx,
                 score: (score * SCORE_SCALE) as i64,
                 name_len: self.entries[i].name_len,
                 modified: self.entries[i].modified,
-                ranges: vec![(0, name.len())],
+                ranges,
             });
         }
         top.into_hits()
@@ -866,7 +914,18 @@ impl FilenameIndex {
         if plan.has_sep {
             return self.search_spanning(plan, limit, filter);
         }
-        let name_hits = self.scan_name_phase(plan, limit, filter);
+        let mut name_hits = self.scan_name_phase(plan, limit, filter, false);
+        // Typo matches are the lowest tier: only scan for them when the top-k
+        // is not already filled by stronger matches.
+        let need_typo = name_hits.len() < limit
+            || name_hits
+                .last()
+                .map(|h| h.score <= SCORE_TYPO + 1e-4)
+                .unwrap_or(true);
+        if need_typo {
+            let typo_hits = self.scan_typo_phase(plan, limit, filter);
+            name_hits = self.merge_hits(name_hits, typo_hits, limit);
+        }
         let need_path = name_hits.len() < limit
             || name_hits
                 .last()
@@ -876,6 +935,9 @@ impl FilenameIndex {
             return name_hits;
         }
         let levels = self.dir_levels(plan);
+        if levels.iter().all(|&l| l == 0) {
+            return name_hits;
+        }
         let path_hits = self.scan_path_phase(limit, filter, &levels);
         self.merge_hits(name_hits, path_hits, limit)
     }
@@ -885,6 +947,7 @@ impl FilenameIndex {
         plan: &QueryPlan,
         limit: usize,
         filter: &EntryFilter<'_>,
+        allow_typo: bool,
     ) -> Vec<FileHit> {
         let under = self.compute_under(filter);
         let n = self.entries.len();
@@ -894,6 +957,7 @@ impl FilenameIndex {
             .into_par_iter()
             .map(|c| {
                 let mut top = TopK::new(self, limit);
+                let mut scratch: Vec<(usize, usize)> = Vec::new();
                 let start = c * CHUNK;
                 let end = ((c + 1) * CHUNK).min(n);
                 for i in start..end {
@@ -904,20 +968,92 @@ impl FilenameIndex {
                     if !plan.bloom_pass(self.blooms[i]) {
                         continue;
                     }
-                    if !self.filter_pass(filter, i, under.as_deref()) {
+                    // A match needs at least one character per query char.
+                    if (r.name_len as usize) < plan.char_len {
                         continue;
                     }
                     let name = self.arena_str(r.name_off, r.name_len);
                     let stem = self.entry_stem(i);
-                    if let Some(m) = match_name(name, stem, plan) {
-                        top.push(Candidate {
-                            idx: i as u32,
-                            score: (m.score * SCORE_SCALE) as i64,
-                            name_len: r.name_len,
-                            modified: r.modified,
-                            ranges: to_utf16_ranges(name, &m.byte_ranges),
-                        });
+                    let Some(score) = match_name_into(name, stem, plan, allow_typo, &mut scratch)
+                    else {
+                        continue;
+                    };
+                    if !top.would_accept(score, r.name_len, r.modified, i as u32) {
+                        continue;
                     }
+                    if !self.filter_pass(filter, i, under.as_deref()) {
+                        continue;
+                    }
+                    let ranges = to_utf16_ranges(name, &scratch);
+                    top.push(Candidate {
+                        idx: i as u32,
+                        score: (score * SCORE_SCALE) as i64,
+                        name_len: r.name_len,
+                        modified: r.modified,
+                        ranges,
+                    });
+                }
+                top.items
+            })
+            .collect();
+        self.merge_candidates(partials, limit)
+    }
+
+    /// Dedicated typo pass: relaxed bloom plus the cheap bounded edit-distance
+    /// check only. Runs only when the stronger top-k is not already full.
+    fn scan_typo_phase(
+        &self,
+        plan: &QueryPlan,
+        limit: usize,
+        filter: &EntryFilter<'_>,
+    ) -> Vec<FileHit> {
+        let relaxed = plan.relaxed();
+        let under = self.compute_under(filter);
+        let n = self.entries.len();
+        const CHUNK: usize = 16_384;
+        let nchunks = n.div_ceil(CHUNK);
+        let partials: Vec<Vec<Candidate>> = (0..nchunks)
+            .into_par_iter()
+            .map(|c| {
+                let mut top = TopK::new(self, limit);
+                let mut scratch: Vec<(usize, usize)> = Vec::new();
+                let start = c * CHUNK;
+                let end = ((c + 1) * CHUNK).min(n);
+                for i in start..end {
+                    let r = &self.entries[i];
+                    if r.kind == KIND_TOMBSTONE {
+                        continue;
+                    }
+                    if !relaxed.bloom_pass(self.blooms[i]) {
+                        continue;
+                    }
+                    let name = self.arena_str(r.name_off, r.name_len);
+                    let stem = self.entry_stem(i);
+                    let score = if plan.multi {
+                        // Multi-term typo queries are rare; reuse the full
+                        // matcher (every term may be exact/fuzzy/typo).
+                        match match_name_into(name, stem, &relaxed, true, &mut scratch) {
+                            Some(score) => score,
+                            None => continue,
+                        }
+                    } else if typo_only_match(name, stem, plan) {
+                        SCORE_TYPO
+                    } else {
+                        continue;
+                    };
+                    if !top.would_accept(score, r.name_len, r.modified, i as u32) {
+                        continue;
+                    }
+                    if !self.filter_pass(filter, i, under.as_deref()) {
+                        continue;
+                    }
+                    top.push(Candidate {
+                        idx: i as u32,
+                        score: (score * SCORE_SCALE) as i64,
+                        name_len: r.name_len,
+                        modified: r.modified,
+                        ranges: Vec::new(),
+                    });
                 }
                 top.items
             })
@@ -926,9 +1062,25 @@ impl FilenameIndex {
     }
 
     fn dir_levels(&self, plan: &QueryPlan) -> Vec<u8> {
+        let qlen = plan.lower.len();
         (0..self.dirs.len())
             .into_par_iter()
-            .map(|d| segment_level(self.dir_path_slice(d), &plan.lower))
+            .map(|d| {
+                // Per-dir bloom rejects almost every directory in a couple of
+                // nanoseconds before the (much slower) substring scan.
+                if !plan.bloom_pass(self.dir_blooms[d]) {
+                    return 0;
+                }
+                let path = self.dir_path_slice(d);
+                if path.len() < qlen {
+                    return 0;
+                }
+                if plan.multi {
+                    segment_level_multi(path, &plan.terms)
+                } else {
+                    segment_level(path, &plan.lower)
+                }
+            })
             .collect()
     }
 
@@ -1060,6 +1212,7 @@ impl FilenameIndex {
             path_len: path.len().min(u16::MAX as usize) as u16,
             reserved: 0,
         });
+        self.dir_blooms.push(matching::bloom_for_str(path));
         self.dir_map.as_mut().unwrap().insert(path.to_string(), id);
         id
     }
@@ -1248,6 +1401,28 @@ impl<'a> TopK<'a> {
             index,
             limit,
             items: Vec::with_capacity(limit.min(64)),
+        }
+    }
+
+    /// Cheap eligibility check before allocating highlight ranges.
+    fn would_accept(&self, score: f32, name_len: u16, modified: i64, idx: u32) -> bool {
+        if self.limit == 0 {
+            return false;
+        }
+        if self.items.len() < self.limit {
+            return true;
+        }
+        let score = (score * SCORE_SCALE) as i64;
+        match self.items.last() {
+            Some(worst) => {
+                score > worst.score
+                    || (score == worst.score
+                        && (name_len < worst.name_len
+                            || (name_len == worst.name_len
+                                && (modified > worst.modified
+                                    || modified == worst.modified))))
+            }
+            None => true,
         }
     }
 

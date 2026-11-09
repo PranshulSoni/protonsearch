@@ -117,6 +117,17 @@ pub fn generate_queries(
 
     let mut ranked: Vec<(String, u32)> = df.into_iter().collect();
     ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    // Terms common enough to be realistic multi-term/phrase query words.
+    let common: HashSet<String> = ranked
+        .iter()
+        .filter(|(_, n)| *n >= 20)
+        .map(|(t, _)| t.clone())
+        .collect();
+    let plausible = |t: &str| -> bool {
+        keep_token(t)
+            && t.chars().all(|c| c.is_ascii_alphabetic())
+            && common.contains(t)
+    };
 
     let mut suite: Vec<ContentQuery> = Vec::new();
     let mut used: HashSet<String> = HashSet::new();
@@ -152,7 +163,7 @@ pub fn generate_queries(
         }
         let terms: Vec<String> = tokenize(content)
             .into_iter()
-            .filter(|t| keep_token(t))
+            .filter(|t| plausible(t))
             .collect();
         if terms.len() >= 6 {
             let a = terms[0].clone();
@@ -176,7 +187,7 @@ pub fn generate_queries(
         let mut found = None;
         for window in toks.windows(3) {
             let (a, b, c) = (&window[0], &window[1], &window[2]);
-            if keep_token(a) && keep_token(b) && keep_token(c) && a.len() > 3 && b.len() > 3 && c.len() > 3 {
+            if plausible(a) && plausible(b) && plausible(c) && a.len() > 3 && b.len() > 3 && c.len() > 3 {
                 found = Some(format!("\"{a} {b} {c}\""));
                 break;
             }
@@ -347,6 +358,8 @@ pub struct ColdReport {
     pub first_query_ms: Vec<f64>,
     pub per_query: Vec<ColdQuery>,
     pub wall_ms: Vec<f64>,
+    pub wall_raw_ms: Vec<f64>,
+    pub rss_probe_ms: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -480,6 +493,8 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         let mut open_ms_vec = Vec::new();
         let mut first_vec = Vec::new();
         let mut wall_vec = Vec::new();
+        let mut wall_raw_vec = Vec::new();
+        let mut probe_vec = Vec::new();
         let mut per_query: HashMap<String, Vec<f64>> = HashMap::new();
         let mut order: Vec<(String, String)> = Vec::new();
         for _ in 0..cold_restarts {
@@ -493,7 +508,10 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                 limit.to_string(),
             ];
             let outcome = childproc::run_child_json(&child_args)?;
-            wall_vec.push(outcome.wall_ms);
+            let probe_ms = outcome.value.get("rss_probe_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            wall_raw_vec.push(outcome.wall_ms);
+            wall_vec.push((outcome.wall_ms - probe_ms).max(0.0));
+            probe_vec.push(probe_ms);
             open_ms_vec.push(outcome.value.get("open_ms").and_then(|v| v.as_f64()).unwrap_or(0.0));
             let qs = outcome.value.get("queries").and_then(|v| v.as_array()).cloned().unwrap_or_default();
             let mut first = None;
@@ -525,6 +543,8 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             first_query_ms: first_vec,
             per_query: per_query_rows,
             wall_ms: wall_vec,
+            wall_raw_ms: wall_raw_vec,
+            rss_probe_ms: probe_vec,
         });
     }
 
@@ -606,8 +626,11 @@ pub fn cold_child(args: &Args) -> anyhow::Result<()> {
         while rows.next()?.is_some() {}
         out.push(json!({"id": q.id, "query": q.query, "ms": t.elapsed().as_secs_f64() * 1000.0}));
     }
+    let probe_start = Instant::now();
     let mem = self_memory();
+    let rss_probe_ms = probe_start.elapsed().as_secs_f64() * 1000.0;
     let payload = json!({
+        "rss_probe_ms": rss_probe_ms,
         "open_ms": open_ms,
         "queries": out,
         "memory": mem,

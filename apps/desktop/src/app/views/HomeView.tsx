@@ -146,6 +146,16 @@ export default function HomeView({
                 Retry
               </button>
             </Callout>
+          ) : counts.total === 0 ? (
+            <EmptyState
+              title="Nothing indexed yet."
+              body="Add a location to start building the index; it stays on this PC."
+              action={
+                <button type="button" className="btn" onClick={() => onNavigate("indexes")}>
+                  Set up indexing
+                </button>
+              }
+            />
           ) : (
             <>
               <p className="index-stat">{formatNumber(counts.total)}</p>
@@ -177,17 +187,6 @@ export default function HomeView({
               </dl>
             </>
           )}
-          {status !== null && counts.total === 0 ? (
-            <EmptyState
-              title="Nothing indexed yet."
-              body="Add a location to start building the index; it stays on this PC."
-              action={
-                <button type="button" className="btn" onClick={() => onNavigate("indexes")}>
-                  Set up indexing
-                </button>
-              }
-            />
-          ) : null}
         </section>
       </div>
 

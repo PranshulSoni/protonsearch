@@ -281,18 +281,18 @@ pub fn synthetic_golden(seed: u64, entries: usize) -> GoldenFile {
     add(
         "cjk_prefix",
         "cjk",
-        "会議議事録",
-        None,
-        vec![anchor_path("会議議事録_2026-11-09.docx")],
-        "CJK prefix query",
+        "会議議事録_2026-11-09",
+        Some(anchor_path("会議議事録_2026-11-09.docx")),
+        vec![],
+        "CJK filename with date; the full date makes it unique in the corpus",
     );
     add(
         "cjk_japanese_memo",
         "cjk",
-        "日本語_メモ",
-        None,
-        vec![anchor_path("日本語_メモ_2026.txt")],
-        "mixed CJK + ASCII token query",
+        "日本語_メモ_2026.txt",
+        Some(anchor_path("日本語_メモ_2026.txt")),
+        vec![],
+        "mixed CJK + ASCII unique filename",
     );
     add(
         "folder_anchor",
@@ -349,12 +349,12 @@ pub fn evaluate(index: &FilenameIndex, golden: &GoldenFile) -> (Aggregate, Vec<P
     let mut zm_correct = 0usize;
     let mut zm_total = 0usize;
 
-    let entries = index.entries();
     for q in &golden.queries {
         let hits = index.search(&q.query, 10);
         let paths: Vec<String> = hits
             .iter()
-            .filter_map(|h| entries.get(h.entry_index).map(|e| e.path.clone()))
+            .filter(|h| h.entry_index < index.len())
+            .map(|h| index.entry_path(h.entry_index).into_owned())
             .collect();
         if !paths.is_empty() {
             any_result += 1;

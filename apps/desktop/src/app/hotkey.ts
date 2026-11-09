@@ -22,9 +22,9 @@ export type HotkeyValidation =
 
 export const DEFAULT_HOTKEY = "Alt+Space";
 
-/** Shown next to hotkey fields: reserved combos, and how saving works today. */
+/** Shown next to hotkey capture controls: reserved combos and live behaviour. */
 export const HOTKEY_CONFLICT_NOTE =
-  "Windows reserves combinations such as Alt+Tab, Alt+F4 and Win+L. If another app already owns a shortcut, Windows may refuse to register it. The new shortcut is saved immediately and applied to the global hotkey when ProtonSearch restarts.";
+  "Windows reserves combinations such as Alt+Tab, Alt+F4 and Win+L. If another app already owns a shortcut, Windows rejects it and the previous shortcut stays active.";
 
 const MODIFIER_ALIASES: Record<string, "ctrl" | "alt" | "shift" | "win"> = {
   ctrl: "ctrl",
@@ -268,6 +268,90 @@ function buildDisplay(parts: HotkeyParts): string {
   if (parts.win) tokens.push(MODIFIER_DISPLAY.win);
   tokens.push(DISPLAY_KEY[parts.key] ?? parts.key);
   return tokens.join("+");
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* Capture-mode keyboard chords                                              */
+/* ------------------------------------------------------------------------- */
+
+export interface KeyboardChordEvent {
+  key: string;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  metaKey: boolean;
+}
+
+const MODIFIER_ONLY_KEYS = new Set([
+  "Control",
+  "Shift",
+  "Alt",
+  "Meta",
+  "AltGraph",
+  "CapsLock",
+  "NumLock",
+  "ScrollLock",
+  "Fn",
+  "OS",
+]);
+
+const NAMED_EVENT_KEYS: Record<string, string> = {
+  Escape: "Escape",
+  Enter: "Enter",
+  Backspace: "Backspace",
+  Delete: "Delete",
+  Insert: "Insert",
+  Home: "Home",
+  End: "End",
+  PageUp: "PageUp",
+  PageDown: "PageDown",
+  ArrowUp: "ArrowUp",
+  ArrowDown: "ArrowDown",
+  ArrowLeft: "ArrowLeft",
+  ArrowRight: "ArrowRight",
+  PrintScreen: "PrintScreen",
+  Pause: "Pause",
+};
+
+const PUNCTUATION_EVENT_KEYS = new Set(["-", "=", ",", ".", "/", ";", "'", "[", "]", "\\", "\`"]);
+
+function eventKeyToken(event: KeyboardChordEvent): string | null {
+  const key = event.key;
+  if (!key) return null;
+  if (key === " ") return "Space";
+  if (key === "Tab") return "Tab";
+  if (key.length === 1) {
+    if (/^[a-zA-Z]$/.test(key)) return key.toUpperCase();
+    if (/^[0-9]$/.test(key)) return key;
+    if (PUNCTUATION_EVENT_KEYS.has(key)) return key;
+    return null;
+  }
+  if (/^F([1-9]|1[0-2])$/.test(key)) return key;
+  return NAMED_EVENT_KEYS[key] ?? null;
+}
+
+/**
+ * Turns a browser keydown into a validated accelerator while a capture control
+ * is armed. Returns null for modifier-only presses (keep listening) and an
+ * error for keys that cannot be part of a global shortcut.
+ */
+export function chordFromKeyboardEvent(event: KeyboardChordEvent): HotkeyValidation | null {
+  if (MODIFIER_ONLY_KEYS.has(event.key)) return null;
+  const token = eventKeyToken(event);
+  if (!token) {
+    return {
+      ok: false,
+      error:
+        "That key can't be used. Use a letter, number, F1–F12, Space, Enter, Tab, an arrow key or punctuation.",
+    };
+  }
+  const modifiers: string[] = [];
+  if (event.ctrlKey) modifiers.push("Ctrl");
+  if (event.altKey) modifiers.push("Alt");
+  if (event.shiftKey) modifiers.push("Shift");
+  if (event.metaKey) modifiers.push("Win");
+  return parseHotkey([...modifiers, token].join("+"));
 }
 
 /** Convenience for build/save paths that only need the canonical string. */

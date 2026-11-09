@@ -87,15 +87,49 @@ if (!attachOnly) {
 }
 
 const browser = await connect();
-const pages = [];
-for (const context of browser.contexts()) {
-  for (const page of context.pages()) pages.push(page);
+// Tauri creates both webviews at startup; wait until both have loaded.
+async function collectPages() {
+  const found = [];
+  for (const context of browser.contexts()) {
+    for (const page of context.pages()) found.push(page);
+  }
+  return found;
+}
+let pages = [];
+const pageDeadline = Date.now() + 40000;
+while (Date.now() < pageDeadline) {
+  pages = await collectPages();
+  const ready = [];
+  for (const page of pages) {
+    try {
+      const windowKind = await page.evaluate(() => document.documentElement.dataset.window ?? null);
+      if (windowKind) ready.push(page);
+    } catch {
+      /* page still navigating */
+    }
+  }
+  if (ready.length >= 2) break;
+  await new Promise((r) => setTimeout(r, 500));
 }
 console.log(JSON.stringify({ connected: true, pages: pages.length, urls: pages.map((p) => p.url()) }));
 
-// Find the launcher page and the main app page by URL/visibility heuristics.
-const launcher = pages.find((p) => p.url().includes("view=launcher")) ?? pages[0];
-const main = pages.find((p) => p !== launcher) ?? pages[0];
+async function windowKind(page) {
+  try {
+    return await page.evaluate(() => document.documentElement.dataset.window ?? null);
+  } catch {
+    return null;
+  }
+}
+const kinds = await Promise.all(pages.map((page) => windowKind(page)));
+const launcher = pages[kinds.indexOf("launcher")] ?? pages[0];
+const main = pages[kinds.indexOf("main")] ?? pages.find((page) => page !== launcher) ?? pages[0];
+if (!launcher || !main) throw new Error("could not identify launcher/main webviews");
+// The launcher is pre-warmed hidden; make it visible through the shell so the
+// screenshots reflect the real summoned window.
+try {
+  await launcher.evaluate(() => window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke("show_launcher"));
+} catch { /* attach-only or browser build */ }
+await new Promise((r) => setTimeout(r, 700));
 
 async function shot(page, name) {
   try {
@@ -123,6 +157,7 @@ async function measureQuery(page, query, label) {
   const result = await page.evaluate(async (q) => {
     const input = document.querySelector("input.search-input") ?? document.querySelector("input");
     if (!input) return { error: "no input" };
+    const listSelector = '[role="option"], .result, [role="listbox"] [aria-selected]';
     input.focus();
     const start = performance.now();
     // Native setter + input event: exactly what a keystroke produces.
@@ -132,7 +167,7 @@ async function measureQuery(page, query, label) {
     const deadline = performance.now() + 3000;
     let visibleAt = null;
     while (performance.now() < deadline) {
-      const rows = document.querySelectorAll('[role="option"], .result');
+      const rows = document.querySelectorAll(listSelector);
       if (rows.length > 0) {
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         visibleAt = performance.now();
@@ -140,7 +175,7 @@ async function measureQuery(page, query, label) {
       }
       await new Promise((r) => setTimeout(r, 4));
     }
-    return { start, visibleAt, rows: document.querySelectorAll('[role="option"], .result').length, tookMs: visibleAt ? visibleAt - start : null };
+    return { start, visibleAt, rows: document.querySelectorAll(listSelector).length, tookMs: visibleAt ? visibleAt - start : null };
   }, query);
   measurements.push({ label, query, ...result });
   return result;

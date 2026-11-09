@@ -126,7 +126,7 @@ pub fn extract_text_with(
             MAX_INPUT_BYTES
         );
     }
-    let max_bytes = options.max_bytes.max(1024);
+    let max_bytes = options.max_bytes.max(1);
     let timeout = options.timeout.max(Duration::from_millis(250));
     match kind {
         // Cheap, bounded plain-text path: run inline.
@@ -207,9 +207,9 @@ fn extract_plain(
         .saturating_add(4)
         .min(MAX_INPUT_BYTES as usize);
     let bytes = read_prefix(path, read_cap)?;
-    let mut text = decode_text(&bytes);
-    let (text, truncated_text) = truncate_utf8(text, max_bytes);
-    text = sanitize_text(&text);
+    let decoded = decode_text(&bytes);
+    let (decoded, truncated_text) = truncate_utf8(decoded, max_bytes);
+    let text = sanitize_text(&decoded);
     let truncated = truncated_text || file_len > bytes.len() as u64;
     Ok(ExtractedDocument {
         kind,
@@ -343,14 +343,23 @@ fn read_zip_entry_lenient(
     Some(buffer)
 }
 
-fn zip_names(archive: &ZipArchive) -> Vec<String> {
-    (0..archive.len().min(MAX_ARCHIVE_ENTRIES))
-        .filter_map(|index| {
-            archive
-                .name_for_index(index)
-                .map(|name| name.to_string())
-        })
-        .collect()
+fn zip_names(archive: &mut ZipArchive) -> Vec<String> {
+    let count = archive.len().min(MAX_ARCHIVE_ENTRIES);
+    let mut names = Vec::with_capacity(count);
+    for index in 0..count {
+        if let Ok(entry) = archive.by_index(index) {
+            names.push(entry.name().to_string());
+        }
+    }
+    names
+}
+
+/// Decode XML character entities (text events carry raw/escaped content).
+fn unescape_text(raw: &str) -> String {
+    match quick_xml::escape::unescape(raw) {
+        Ok(value) => value.into_owned(),
+        Err(_) => raw.to_string(),
+    }
 }
 
 fn extract_docx(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocument> {
@@ -358,13 +367,7 @@ fn extract_docx(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocume
     let xml = read_zip_entry_lenient(&mut archive, "word/document.xml", MAX_ENTRY_BYTES)
         .ok_or_else(|| anyhow!("docx is missing word/document.xml"))?;
     let xml = String::from_utf8_lossy(&xml);
-    let text = extract_xml_text(
-        &xml,
-        &[b"t".as_slice()],
-        &[b"p".as_slice()],
-        &[b"tab".as_slice()],
-        &[b"instrText".as_slice(), b"delText".as_slice()],
-    );
+    let text = extract_xml_text(&xml, &["t"], &["p"], &["tab"], &["instrText", "delText"]);
     let text = sanitize_text(&text);
     let (text, truncated) = truncate_utf8(text, max_bytes);
     Ok(ExtractedDocument {
@@ -377,7 +380,7 @@ fn extract_docx(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocume
 fn extract_pptx(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocument> {
     let mut archive = open_zip(path)?;
     let mut slides: Vec<(u64, String)> = Vec::new();
-    for name in zip_names(&archive) {
+    for name in zip_names(&mut archive) {
         let lower = name.to_ascii_lowercase();
         if !(lower.starts_with("ppt/slides/slide") && lower.ends_with(".xml")) {
             continue;
@@ -401,13 +404,7 @@ fn extract_pptx(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocume
         };
         total += xml.len();
         let xml = String::from_utf8_lossy(&xml);
-        let slide = extract_xml_text(
-            &xml,
-            &[b"t".as_slice()],
-            &[b"p".as_slice()],
-            &[b"tab".as_slice()],
-            &[],
-        );
+        let slide = extract_xml_text(&xml, &["t"], &["p"], &["tab"], &[]);
         text.push_str(&slide);
         if !text.ends_with('\n') {
             text.push('\n');
@@ -431,7 +428,7 @@ fn extract_xlsx(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocume
         .map(|xml| parse_shared_strings(&String::from_utf8_lossy(&xml)))
         .unwrap_or_default();
     let mut sheets: Vec<(u64, String)> = Vec::new();
-    for name in zip_names(&archive) {
+    for name in zip_names(&mut archive) {
         let lower = name.to_ascii_lowercase();
         if lower.starts_with("xl/worksheets/sheet") && lower.ends_with(".xml") {
             let index = lower
@@ -483,20 +480,18 @@ fn parse_shared_strings(xml: &str) -> Vec<String> {
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) => {
-                if event.local_name().as_ref() == b"t" {
+                if event.local_name().as_ref() == "t" {
                     in_t = true;
                 }
             }
             Ok(Event::Text(text)) => {
                 if in_t {
-                    if let Ok(unescaped) = text.unescape() {
-                        current.push_str(&unescaped);
-                    }
+                    current.push_str(&unescape_text(&text.into_inner()));
                 }
             }
             Ok(Event::End(event)) => match event.local_name().as_ref() {
-                b"t" => in_t = false,
-                b"si" => {
+                "t" => in_t = false,
+                "si" => {
                     strings.push(std::mem::take(&mut current));
                 }
                 _ => {}
@@ -525,33 +520,31 @@ fn parse_xlsx_sheet(xml: &str, shared: &[String]) -> String {
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) => match event.local_name().as_ref() {
-                b"c" => {
+                "c" => {
                     cell_is_shared = false;
                     cell_is_inline = false;
                     for attribute in event.attributes().flatten() {
-                        if attribute.key.as_ref() == b"t" {
+                        if attribute.key.local_name().as_ref() == "t" {
                             let raw = attribute.unescape_value().unwrap_or_default();
                             cell_is_shared = raw == "s";
                             cell_is_inline = raw == "inlineStr";
                         }
                     }
                 }
-                b"v" => {
+                "v" => {
                     in_value = true;
                     value.clear();
                 }
-                b"t" if cell_is_inline => in_inline_text = true,
+                "t" if cell_is_inline => in_inline_text = true,
                 _ => {}
             },
             Ok(Event::Text(text)) => {
                 if in_value || in_inline_text {
-                    if let Ok(unescaped) = text.unescape() {
-                        value.push_str(&unescaped);
-                    }
+                    value.push_str(&unescape_text(&text.into_inner()));
                 }
             }
             Ok(Event::End(event)) => match event.local_name().as_ref() {
-                b"v" => {
+                "v" => {
                     in_value = false;
                     let decoded = if cell_is_shared {
                         value
@@ -570,8 +563,8 @@ fn parse_xlsx_sheet(xml: &str, shared: &[String]) -> String {
                         row.push_str(decoded.trim());
                     }
                 }
-                b"t" => in_inline_text = false,
-                b"c" => {
+                "t" => in_inline_text = false,
+                "c" => {
                     if cell_is_inline && !value.trim().is_empty() {
                         if !row.is_empty() {
                             row.push('\t');
@@ -580,7 +573,7 @@ fn parse_xlsx_sheet(xml: &str, shared: &[String]) -> String {
                     }
                     value.clear();
                 }
-                b"row" => {
+                "row" => {
                     out.push_str(&row);
                     out.push('\n');
                     row.clear();
@@ -598,7 +591,7 @@ fn parse_xlsx_sheet(xml: &str, shared: &[String]) -> String {
 
 fn extract_epub(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocument> {
     let mut archive = open_zip(path)?;
-    let mut entries: Vec<String> = zip_names(&archive)
+    let mut entries: Vec<String> = zip_names(&mut archive)
         .into_iter()
         .filter(|name| {
             let lower = name.to_ascii_lowercase();
@@ -617,13 +610,8 @@ fn extract_epub(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocume
         };
         total += bytes.len();
         let markup = String::from_utf8_lossy(&bytes);
-        let fragment = extract_xml_text(
-            &markup,
-            &[],
-            &[b"p".as_slice(), b"div".as_slice(), b"br".as_slice()],
-            &[],
-            &[b"script".as_slice(), b"style".as_slice()],
-        );
+        let fragment =
+            extract_xml_text(&markup, &[], &["p", "div", "br"], &[], &["script", "style"]);
         text.push_str(&fragment);
         if !text.ends_with('\n') {
             text.push('\n');
@@ -653,10 +641,10 @@ fn extract_epub(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocume
 /// - `skip_tags` subtrees that are ignored entirely.
 fn extract_xml_text(
     xml: &str,
-    text_tags: &[&[u8]],
-    newline_tags: &[&[u8]],
-    tab_tags: &[&[u8]],
-    skip_tags: &[&[u8]],
+    text_tags: &[&str],
+    newline_tags: &[&str],
+    tab_tags: &[&str],
+    skip_tags: &[&str],
 ) -> String {
     use quick_xml::events::Event;
     use quick_xml::Reader;
@@ -675,10 +663,10 @@ fn extract_xml_text(
                 let name = local.as_ref();
                 if skip_tags.iter().any(|tag| *tag == name) {
                     skip_depth += 1;
-                } else if capture_all || text_tags.iter().any(|tag| *tag == name) {
-                    if capture_depth.is_none() {
-                        capture_depth = Some(depth);
-                    }
+                } else if (capture_all || text_tags.iter().any(|tag| *tag == name))
+                    && capture_depth.is_none()
+                {
+                    capture_depth = Some(depth);
                 }
             }
             Ok(Event::Empty(event)) => {
@@ -692,14 +680,12 @@ fn extract_xml_text(
             }
             Ok(Event::Text(text)) => {
                 if skip_depth == 0 && capture_depth.is_some() {
-                    if let Ok(unescaped) = text.unescape() {
-                        out.push_str(&unescaped);
-                    }
+                    out.push_str(&unescape_text(&text.into_inner()));
                 }
             }
             Ok(Event::CData(data)) => {
                 if skip_depth == 0 && capture_depth.is_some() {
-                    out.push_str(&String::from_utf8_lossy(&data));
+                    out.push_str(&data.into_inner());
                 }
             }
             Ok(Event::End(event)) => {

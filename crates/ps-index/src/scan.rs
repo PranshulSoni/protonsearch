@@ -7,7 +7,6 @@
 //! unreadable directories, junk directories and user exclusions are skipped;
 //! cancellation is checked between bounded batches.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 

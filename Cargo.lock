@@ -3073,6 +3073,7 @@ dependencies = [
  "ps-ipc",
  "serde",
  "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3080,6 +3081,7 @@ name = "ps-bench"
 version = "2.0.0-alpha.1"
 dependencies = [
  "anyhow",
+ "ps-content",
  "ps-index",
  "ps-ipc",
  "rusqlite",
@@ -3118,6 +3120,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

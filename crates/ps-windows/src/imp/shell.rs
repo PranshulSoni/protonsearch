@@ -33,7 +33,7 @@ const PKEY_APP_USER_MODEL_ID: PROPERTYKEY = PROPERTYKEY {
 
 const SHELL_APPS_FOLDER: &str = "shell:AppsFolder";
 
-fn shell_execute(verb: &str, file: &str, params: Option<&str>) -> anyhow::Result<()> {
+pub(crate) fn shell_execute(verb: &str, file: &str, params: Option<&str>) -> anyhow::Result<()> {
     let op = hstr(verb);
     let file_h = hstr(file);
     let params_h = params.map(hstr);

@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>ProtonSearch</title>
+    <script>
+      // Pre-paint: decide the window surface and theme before any CSS is applied,
+      // so the launcher never flashes the desktop-app background (Gate 3).
+      (function () {
+        var param = new URLSearchParams(location.search).get("view");
+        var view = param === "launcher" || param === "main" ? param : null;
+        if (!view) {
+          try {
+            var meta = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.metadata;
+            var label = meta && meta.currentWindow && meta.currentWindow.label;
+            view = label === "launcher" ? "launcher" : "main";
+          } catch (e) {
+            view = "main";
+          }
+        }
+        document.documentElement.dataset.window = view;
+        var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        document.documentElement.dataset.density = "comfortable";
+        document.documentElement.dataset.motion = "full";
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   HOTKEY_CONFLICT_NOTE,
+  chordFromKeyboardEvent,
   displayHotkey,
   normalizeHotkey,
   parseHotkey,
@@ -131,5 +132,51 @@ describe("normalizeHotkey and displayHotkey", () => {
 
   it("documents the registration conflict behaviour", () => {
     expect(HOTKEY_CONFLICT_NOTE).toMatch(/Win\+L/);
+  });
+});
+
+describe("chordFromKeyboardEvent", () => {
+  const base = { ctrlKey: false, altKey: false, shiftKey: false, metaKey: false };
+
+  it("builds the canonical accelerator from a modified keydown", () => {
+    const result = chordFromKeyboardEvent({ ...base, key: "K", ctrlKey: true, shiftKey: true });
+    expect(result).toEqual(
+      expect.objectContaining({ ok: true, accelerator: "Ctrl+Shift+K" }),
+    );
+  });
+
+  it("maps the Windows key, space and arrow keys", () => {
+    expect(chordFromKeyboardEvent({ ...base, key: " ", altKey: true, metaKey: true })).toEqual(
+      expect.objectContaining({ ok: true, accelerator: "Alt+Super+Space" }),
+    );
+    expect(chordFromKeyboardEvent({ ...base, key: "ArrowUp", ctrlKey: true })).toEqual(
+      expect.objectContaining({ ok: true, accelerator: "Ctrl+ArrowUp" }),
+    );
+    expect(chordFromKeyboardEvent({ ...base, key: "F5" })).toEqual(
+      expect.objectContaining({ ok: true, accelerator: "F5" }),
+    );
+  });
+
+  it("ignores modifier-only presses while capture stays armed", () => {
+    expect(chordFromKeyboardEvent({ ...base, key: "Control", ctrlKey: true })).toBeNull();
+    expect(chordFromKeyboardEvent({ ...base, key: "Meta", metaKey: true })).toBeNull();
+  });
+
+  it("returns an actionable validation error for a bare key", () => {
+    const result = chordFromKeyboardEvent({ ...base, key: "K" });
+    expect(result).not.toBeNull();
+    expect(result && !result.ok && result.error).toMatch(/modifier/);
+  });
+
+  it("rejects keys that cannot be shortcuts", () => {
+    const result = chordFromKeyboardEvent({ ...base, key: "Dead" });
+    expect(result).not.toBeNull();
+    expect(result && !result.ok && result.error).toMatch(/can't be used/);
+  });
+
+  it("reports Windows-reserved combinations from capture", () => {
+    const result = chordFromKeyboardEvent({ ...base, key: "Tab", altKey: true });
+    expect(result).not.toBeNull();
+    expect(result && !result.ok && result.error).toMatch(/reserved by Windows/);
   });
 });

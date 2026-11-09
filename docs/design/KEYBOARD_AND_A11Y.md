@@ -43,7 +43,6 @@ Bindings below are the contract. "Selected row" means the option referenced by `
 | **Summon hotkey** (default **Alt+Space**, user-configurable) | anywhere | Show launcher with empty query and focused input; press again while visible → hide | Global; default preserved from legacy (`protonsearch/src/settings.rs:149-150`); conflict detection `hotkey.rs:67-88`. Never hard-code the chord in UI copy beyond the footer's "Alt + Space" where it is the configured value. |
 | **Esc** | context menu open | Close menu, return focus to input, selection unchanged | first in the chain |
 | **Esc** | preview open (no menu) | Close preview, keep query and selection | |
-| **Esc** | multi-select active | Clear multi-selection, keep query/results | |
 | **Esc** | query non-empty | Clear query and selection, keep window open, focus input | reference footer: "Esc Clear" (reference:136) |
 | **Esc** | query empty | Hide launcher | "Esc Close" when empty |
 | **↑ / ↓** | input focused, results exist | Move selection to previous/next row; wraps at both ends | reference:137; never moves the caret |
@@ -55,11 +54,9 @@ Bindings below are the contract. "Selected row" means the option referenced by `
 | **Ctrl+← / →** | input focused | Move caret by word (native) | |
 | **Enter** | results visible | Open the selected result via its `ActionSpec`; launcher hides **before** the action runs | must validate current query epoch + result id (§4); no-op if the selected id is stale/absent |
 | **Enter** | 0 results / error | no-op | no fallback action, no "search the web" surprise |
-| **Shift+Enter** | clipboard results | Toggle multi-select for the selected row; enter multi-select mode if not active | keyboard path for multi-select (§5) |
-| **Shift+↑ / Shift+↓** | multi-select active | Extend the selection range | |
-| **Ctrl+A** | multi-select active | Select all rows in the current list | does **not** select the query text while multi-select is active |
 | **Ctrl+Space** | any row selected | Toggle preview for the selected row | no-op with no selection; closes preview first if open |
-| **Ctrl+C** | input has **no text selection** and a row is selected | Copy the full path (files/folders), URL (web), or text (clipboard) of the selected row; footer announces "Path copied" | if input text is selected, native copy wins; if multi-select is active, copy all selected paths, one per line |
+| **Shift+Enter / Shift+↑↓ / Ctrl+A** | clipboard results | **Unbound — clipboard multi-select is CUT for v2.0 alpha** (SCREENS §10) | Do not render a teaser or disabled markers |
+| **Ctrl+C** | input has **no text selection** and a row is selected | Copy the full path (files/folders), URL (web), or text (clipboard) of the selected row; footer announces "Path copied" | if input text is selected, native copy wins |
 | **Ctrl+C** | input text selected | Native copy of the selection | |
 | **Menu key / Shift+F10** | row selected | Open the row's context menu, focus first item | |
 | **Tab** | launcher | Move focus: input → preview scroll region (if open) → preview action buttons (if any) → "Open ProtonSearch" → input | stops are never the result rows (combobox pattern) |
@@ -76,12 +73,12 @@ shortcut. Shortcut education lives only in the footer and Preferences.
 ```text
 if (menuOpen)            closeMenu();            return
 if (previewOpen)         closePreview();         return
-if (multiSelectActive)   clearMultiSelect();     return
 if (query.length > 0)    clearQuery();           return
                          hideLauncher()
 ```
 
-Every branch keeps focus on the input except "hide". No branch triggers an action.
+Every branch keeps focus on the input except "hide". No branch triggers an action. The multi-select branch is CUT
+for v2.0 alpha (SCREENS §10); the chain is menu → preview → clear query → hide.
 
 ### 2.2 Caret vs list keys
 
@@ -143,21 +140,19 @@ The engine returns results asynchronously in tiers. The UI must make it impossib
 
 ---
 
-## 5. Multi-select (clipboard results only in v2)
+## 5. Multi-select — **CUT for v2.0 alpha**
 
-Keyboard model:
+Clipboard multi-select and Paste-N are postponed for v2.0 alpha (rationale in SCREENS §10; decision log in REVIEW_1
+§0.1). Alpha contract:
 
-- **Shift+Enter** toggles multi-select for the active row and switches the list to multi-select mode.
-- **Shift+↑ / Shift+↓** extend the selection range; **Ctrl+A** selects every row in the list.
-- **Enter** pastes all selected items in list order; **Esc** clears multi-select (first Esc in the chain).
-- The active row keeps the normal selection styling; selected rows show a 16 px check marker and the footer
-  announces "3 selected" (`aria-live` polite).
+- Shift+Enter, Shift+↑/↓ and the multi-select Ctrl+A are **unbound**; no check markers, no footer count, no
+  `aria-multiselectable` — the launcher listbox is always single-select.
+- Enter opens/pastes the single selected clipboard row; Esc follows the normal chain (menu → preview → clear → hide).
+- The UI must not render disabled checkboxes, a Paste-N teaser, or a selection count.
+- Tests must assert the feature is *absent*, not half-built.
 
-ARIA: when multi-select is active the listbox gets `aria-multiselectable="true"`; `aria-selected` marks the chosen
-items; `aria-activedescendant` keeps marking the keyboard-active row. In single-select mode `aria-selected="true"`
-marks the active row (standard combobox behaviour). Never both meanings on one row.
-
----
+Post-alpha re-entry: Shift+Enter toggle, Shift+↑↓ extend, Ctrl+A all, Enter paste N, footer count,
+`aria-multiselectable="true"` only in multi-select mode, plus the tests listed in SCREENS §10.
 
 ## 6. Onboarding — key map and focus order
 
@@ -200,7 +195,7 @@ navigable); it is an ordered list with `aria-current="step"`.
 |---|---|---|
 | Root | `role="dialog"`, `aria-modal="true"`, `aria-label="ProtonSearch"` | focus trap per §1; no focusable window chrome |
 | Input | `role="combobox"`, `aria-expanded` ("true" when options exist, "false" when empty/0 results/error), `aria-controls="ps-results"`, `aria-autocomplete="list"`, `aria-activedescendant="ps-opt-<id>"` (only while a row is active), `aria-label="Search files, apps, and actions"`, `autocomplete="off"`, `spellcheck="false"` | the visible placeholder is **not** the label |
-| Listbox | `role="listbox"`, `aria-label="Results"`; `aria-multiselectable="true"` only in multi-select mode | one listbox; virtualisation keeps option ids stable |
+| Listbox | `role="listbox"`, `aria-label="Results"`; **single-select only in alpha** (multi-select CUT — §5), so no `aria-multiselectable` | one listbox; virtualisation keeps option ids stable |
 | Group | `role="group"` + `aria-labelledby` to the visible caps label | label element is `role="presentation"`, the group name carries it |
 | Option | `role="option"`, id from the stable result id, `aria-selected` as in §5, `aria-describedby` pointing to path/meta text | accessible name = item title only; description = path + trailing meta; disabled option `aria-disabled="true"` with the reason in the description |
 | Count | `role="status"` `aria-live="polite"` `aria-atomic="true"` | throttle to ≤1 update/300 ms; announce "No matches" once |
@@ -222,7 +217,7 @@ navigable); it is an ordered list with `aria-current="step"`.
 | Route | `<main id="main">` with one `<h1 tabindex="-1">`; `document.title` = "{Route} — ProtonSearch"; on route change focus the h1 and announce the route once (polite) |
 | Sections | `<section aria-labelledby="{id}">` + caps h2; settings rows use `<dl>` for label/value pairs |
 | Metric rows | `<dl><div><dt>Documents</dt><dd>42,018</dd></div></dl>` with tabular numerals |
-| Progress | `role="progressbar"` + `aria-valuemin="0"` `aria-valuemax="100"` `aria-valuenow="{n}"` `aria-valuetext="{n}% — {phase}"`; indeterminate: omit `aria-valuenow`, give `aria-valuetext` ("Extracting text") |
+| Progress | Post-alpha spec: `role="progressbar"` + `aria-valuemin`/`aria-valuemax`/`aria-valuenow`/`aria-valuetext`; indeterminate omits `aria-valuenow`. **Not rendered in v2.0 alpha** — the IPC has no percentage (SCREENS §10); do not fake one. |
 | Segmented control (theme/density/filters) | `role="radiogroup"` + `role="radio"` + `aria-checked` (theme/density/depth) OR `role="group"` + `aria-pressed` buttons for filters; never mix |
 | Switch | `<button role="switch" aria-checked="true|false">` + visible label |
 | Checkbox choice rows | native `<input type="checkbox">` inside the label; the whole row toggles |
@@ -266,8 +261,8 @@ navigable); it is an ordered list with `aria-current="step"`.
 `prefers-reduced-motion: reduce` (Windows "Animation effects" off):
 - all durations collapse to ~0; no transform travel; selection/hover still change colour instantly (state must remain
   perceivable);
-- indeterminate progress becomes a static 30 % bar with the phase text; determinate values update without
-  interpolation;
+- any future progress component becomes static (v2.0 alpha renders no progress bar — SCREENS §10); determinate values
+  update without interpolation;
 - onboarding step content and preview content appear instantly;
 - scrolling is immediate (`scroll-behavior: auto`), no parallax/scroll effects exist anyway;
 - nothing is hidden: every state that animates also has a static appearance.
@@ -302,7 +297,7 @@ navigable); it is an ordered list with `aria-current="step"`.
 ### 9.4 DPI / zoom
 
 - CSS px are DPI-independent; Windows scaling 125/150/200 % must be tested on the launcher (clamped to work area)
-  and the app (min 560×520 CSS px, so at 200 % on a 1366-wide laptop the app may exceed the work area — the window
+  and the app (min 560×480 CSS px, so at 200 % on a 1366-wide laptop the app may exceed the work area — the window
   manager clamps; content stays usable via internal scrolling, no horizontal page scroll).
 - Do not implement custom browser zoom in v2; rely on OS scaling. If L0 enables WebView2 zoom, it must be listed as a
   supported path here and re-verified at 200 %.
@@ -336,7 +331,7 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 |---|---|
 | Tab from window start | "Skip to main content, link"; Enter jumps to main and focuses the route h1 |
 | Sidebar | "Main, navigation"; items read "Home, button, current page" etc.; arrows move focus; Enter navigates and announces the new route heading |
-| Home | h1 "Good afternoon."; stat announced as text with its label; progress "Content enrichment, progress bar, 42 percent" |
+| Home | h1 "Good afternoon."; stat announced as text with its label; index state line announced (no progress bar in alpha — SCREENS §10) |
 | Preferences toggle | "Record activity, switch, off"; Space → "on"; "Saved" announced politely |
 | Destructive confirm | dialog announced with title; initial focus on Cancel; Esc returns focus to the trigger |
 | Route change | focus lands on the h1; only one polite route announcement |
@@ -360,8 +355,10 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
    the correct epoch; Enter never opens a stale id (unit test + manual).
 5. Rapid-typing test: 10 keys in <500 ms, then Enter — the opend item matches the visible selection; no queued
    animation lag.
-6. Multi-select keyboard-only test on clipboard rows: Shift+Enter, Shift+↓, Enter pastes N items, Esc clears.
-7. Reduced-motion: all motion static; no state disappears; progress still truthful.
+6. **N/A — CUT for v2.0 alpha**: verify no multi-select affordance renders (Shift+Enter / Shift+↑↓ / Ctrl+A do
+   nothing), single clipboard paste works, and `aria-multiselectable` is absent (SCREENS §10).
+7. Reduced-motion: all motion static; no state disappears; in alpha no progress bar exists (no IPC percentage —
+   SCREENS §10), so verify the state words are truthful.
 8. Forced colours: selected row Highlight, focus Highlight, status words present, brand mono.
 9. Target-size audit (24 px minimum; 44 px rows).
 10. SR scripts §10 with both Narrator and NVDA recorded (screen recording or transcript); no unannounced state
@@ -375,9 +372,8 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 1. **Narrator/NVDA are not in CI.** Scripts are manual; evidence must be a recording or transcript in `docs/qa/`.
 2. **`aria-activedescendant` + virtualisation**: option ids must be stable and present in the DOM; windowing must
    keep the active option rendered (overscan ≥ 2 rows). If a virtualiser removes it, keyboard announcements break.
-3. **Multi-select semantics**: §5 uses `aria-selected` for chosen items and `aria-activedescendant` for the active
-   row; some older readers announce the active row as "not selected". Verify with the actual readers; the visual
-   check marker and footer count remain the fallback cues.
+3. **Multi-select is CUT for v2.0 alpha** (SCREENS §10): §5 documents the post-alpha model; alpha tests assert the
+   feature is absent. Re-open the SR risk note only when the post-alpha model is implemented.
 4. **Live-region chatter** from counts/status is the most likely a11y defect in review; throttle hard and never
    announce per keystroke.
 5. **Hotkey capture** is keyboard-only by nature; Users who cannot press modifier chords must be able to use the

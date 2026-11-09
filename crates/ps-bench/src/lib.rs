@@ -10,12 +10,16 @@
 pub mod args;
 pub mod childproc;
 pub mod contentbench;
+#[cfg(feature = "content")]
+pub mod contentv2;
 pub mod dataset;
 pub mod env;
+#[cfg(feature = "engine")]
 pub mod filenamebench;
 pub mod ocrbench;
 pub mod queries;
 pub mod realfiles;
+#[cfg(feature = "engine")]
 pub mod relevance;
 pub mod stats;
 

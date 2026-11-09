@@ -62,6 +62,7 @@ pub struct BuildReport {
     pub total_ms: f64,
     pub memory_before: Option<ProcessMemory>,
     pub memory_after_build: Option<ProcessMemory>,
+    pub engine_memory_bytes: u64,
     pub rss_delta_bytes: i64,
     pub rss_bytes_per_entry: f64,
 }
@@ -103,6 +104,8 @@ pub struct ColdRestart {
     pub parse_ms: f64,
     pub load_mode: String,
     pub rss_bytes: u64,
+    pub rss_probe_ms: f64,
+    pub wall_raw_ms: f64,
     pub first_query_ms: Vec<f64>,
     pub per_query: Vec<(String, f64)>,
 }
@@ -131,9 +134,12 @@ fn now_utc() -> String {
     format!("unix:{secs}")
 }
 
-/// Map a hit to a path without cloning the whole entry list where possible.
+/// Map a hit to a path through the arena accessor; never materializes entries().
 fn hit_path(index: &FilenameIndex, hit_index: usize) -> Option<String> {
-    index.entries().get(hit_index).map(|e| e.path.clone())
+    if hit_index >= index.len() {
+        return None;
+    }
+    Some(index.entry_path(hit_index).into_owned())
 }
 
 fn run_queries(index: &FilenameIndex, suite: &[QueryDef], iters: usize, limit: usize) -> WarmReport {
@@ -229,9 +235,10 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     let entry_count = entries.len();
 
     let build_start = Instant::now();
-    let mut index = FilenameIndex::new();
-    index.replace_all(entries);
+    // from_entries is the engine's production construction path (arena build).
+    let index = FilenameIndex::from_entries(entries);
     let build_ms = build_start.elapsed().as_secs_f64() * 1000.0;
+    let index_memory_bytes = index.memory_bytes();
     let memory_after_build = self_memory();
     let rss_delta = match (&memory_before, &memory_after_build) {
         (Some(a), Some(b)) => b.working_set_bytes as i64 - a.working_set_bytes as i64,
@@ -295,8 +302,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             })
             .unwrap_or_default();
         let first_query_ms: Vec<f64> = per_query.iter().take(1).map(|(_, ms)| *ms).collect();
+        let probe_ms = v.get("rss_probe_ms").and_then(|x| x.as_f64()).unwrap_or(0.0);
         cold.push(ColdRestart {
-            wall_ms: outcome.wall_ms,
+            wall_ms: (outcome.wall_ms - probe_ms).max(0.0),
+            wall_raw_ms: outcome.wall_ms,
+            rss_probe_ms: probe_ms,
             load_ms: v.get("load_ms").and_then(|x| x.as_f64()).unwrap_or(0.0),
             build_ms: v.get("build_ms").and_then(|x| x.as_f64()).unwrap_or(0.0),
             parse_ms: v.get("parse_ms").and_then(|x| x.as_f64()).unwrap_or(0.0),
@@ -323,7 +333,7 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         host: host_info().clone(),
         generated_at_utc: now_utc(),
         command: command.clone(),
-        engine: format!("ps-index {} (ps-bench contract: replace_all + search + save/load)", env!("CARGO_PKG_VERSION")),
+        engine: format!("ps-index {} (from_entries + search + save/load + memory_bytes)", env!("CARGO_PKG_VERSION")),
         build: BuildReport {
             dataset_path: dataset_path.display().to_string(),
             dataset_bytes,
@@ -334,6 +344,7 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             total_ms: parse_ms + build_ms,
             memory_before: memory_before.clone(),
             memory_after_build,
+            engine_memory_bytes: index_memory_bytes as u64,
             rss_delta_bytes: rss_delta,
             rss_bytes_per_entry: if entry_count > 0 { rss_delta as f64 / entry_count as f64 } else { 0.0 },
         },
@@ -342,7 +353,7 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         save: save_status,
         notes: vec![
             "engine-only time: parse/build measured in-process; process startup excluded from warm search".to_string(),
-            "ps-index search stub returns empty results during early Gate 2; status=engine_not_ready means do NOT cite search numbers".to_string(),
+            "status=engine_not_ready means the engine returned no results for the suite; search numbers must not be cited".to_string(),
             "RSS delta is working-set based and includes allocator slack; peak RSS is reported for context".to_string(),
             "cold restarts measure process spawn + dataset/index load + first queries; wall_ms includes OS process creation cost".to_string(),
         ],
@@ -353,7 +364,7 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     println!("ps-bench filename: dataset={} entries={} status={}", dataset_path.display(), entry_count, status);
     println!("  dataset: {} bytes fnv1a64={:016x} parse_ms={:.1} build_ms={:.1} total_ms={:.1}", dataset_bytes, fnv, report.build.parse_ms, report.build.build_ms, report.build.total_ms);
     if let (Some(a), Some(b)) = (&memory_before, &report.build.memory_after_build) {
-        println!("  rss: before={} MB after_build={} MB peak={} MB delta={:.1} MB ({:.1} B/entry)", a.working_set_bytes / 1_000_000, b.working_set_bytes / 1_000_000, b.peak_working_set_bytes / 1_000_000, report.build.rss_delta_bytes as f64 / 1e6, report.build.rss_bytes_per_entry);
+        println!("  rss: before={} MB after_build={} MB peak={} MB delta={:.1} MB ({:.1} B/entry); engine.memory_bytes={:.1} MB", a.working_set_bytes / 1_000_000, b.working_set_bytes / 1_000_000, b.peak_working_set_bytes / 1_000_000, report.build.rss_delta_bytes as f64 / 1e6, report.build.rss_bytes_per_entry, report.build.engine_memory_bytes as f64 / 1e6);
     }
     println!("  warm search ({} iters/query, {} queries, limit {}):", iters, suite.len(), limit);
     print_summary("  overall", &report.warm.overall);
@@ -420,8 +431,7 @@ pub fn cold_child(args: &Args) -> anyhow::Result<()> {
                 let entries = load_index_entries(&dataset_path)?;
                 parse_ms = start.elapsed().as_secs_f64() * 1000.0;
                 let start = Instant::now();
-                index = FilenameIndex::new();
-                index.replace_all(entries);
+                index = FilenameIndex::from_entries(entries);
                 build_ms = start.elapsed().as_secs_f64() * 1000.0;
             }
         }
@@ -430,8 +440,7 @@ pub fn cold_child(args: &Args) -> anyhow::Result<()> {
         let entries = load_index_entries(&dataset_path)?;
         parse_ms = start.elapsed().as_secs_f64() * 1000.0;
         let start = Instant::now();
-        index = FilenameIndex::new();
-        index.replace_all(entries);
+        index = FilenameIndex::from_entries(entries);
         build_ms = start.elapsed().as_secs_f64() * 1000.0;
     }
 
@@ -446,8 +455,11 @@ pub fn cold_child(args: &Args) -> anyhow::Result<()> {
             "results": hits.len(),
         }));
     }
+    let probe_start = Instant::now();
     let mem = self_memory();
+    let rss_probe_ms = probe_start.elapsed().as_secs_f64() * 1000.0;
     let payload = json!({
+        "rss_probe_ms": rss_probe_ms,
         "load_ms": load_ms,
         "parse_ms": parse_ms,
         "build_ms": build_ms,

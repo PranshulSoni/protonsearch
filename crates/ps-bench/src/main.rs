@@ -5,11 +5,15 @@ use std::path::PathBuf;
 
 use ps_bench::args::Args;
 use ps_bench::contentbench;
+#[cfg(feature = "content")]
+use ps_bench::contentv2;
 use ps_bench::dataset::{self, DEFAULT_SEED};
+#[cfg(feature = "engine")]
 use ps_bench::filenamebench;
 use ps_bench::ocrbench;
 use ps_bench::queries;
 use ps_bench::realfiles;
+#[cfg(feature = "engine")]
 use ps_bench::relevance;
 
 fn main() {
@@ -34,10 +38,19 @@ fn run(cmd: &str, args: &Args) -> anyhow::Result<()> {
         "content-queries" => cmd_content_queries(args),
         "content" => contentbench::run(args),
         "content-cold-child" => contentbench::cold_child(args),
+        #[cfg(feature = "content")]
+        "content-v2" => contentv2::run(args),
+        #[cfg(feature = "content")]
+        "content-v2-cold-child" => contentv2::cold_child(args),
+        #[cfg(feature = "engine")]
         "filename" => filenamebench::run(args),
+        #[cfg(feature = "engine")]
         "filename-cold-child" => filenamebench::cold_child(args),
+        #[cfg(feature = "engine")]
         "relevance" => relevance::run(args),
+        #[cfg(feature = "engine")]
         "golden-synth" => cmd_golden_synth(args),
+        #[cfg(feature = "engine")]
         "golden-real" => cmd_golden_real(args),
         "env" => {
             println!("{}", serde_json::to_string_pretty(ps_bench::env::host_info())?);
@@ -162,6 +175,7 @@ fn cmd_content_queries(args: &Args) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "engine")]
 fn cmd_golden_synth(args: &Args) -> anyhow::Result<()> {
     let out = PathBuf::from(args.get("--out").unwrap_or("tests/golden/synthetic-golden.json"));
     let seed = args.u64_or("--seed", DEFAULT_SEED)?;
@@ -177,6 +191,7 @@ fn cmd_golden_synth(args: &Args) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "engine")]
 fn cmd_golden_real(args: &Args) -> anyhow::Result<()> {
     let paths = PathBuf::from(args.get("--paths").unwrap_or(".bench/real-paths.jsonl"));
     let out = PathBuf::from(args.get("--out").unwrap_or("tests/golden/real-corpus-golden.json"));

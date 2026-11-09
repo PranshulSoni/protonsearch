@@ -554,11 +554,12 @@ describe("preview pane", () => {
     expect(panel?.textContent).toContain("The filename arena keeps warm queries under a millisecond.");
     expect(panel?.textContent).toContain("180 KB");
     expect(hintTexts(harness)).toEqual(["Ctrl+Space Close preview", "Esc Close"]);
-    expect(harness.onGeometry).toHaveBeenLastCalledWith(280, true);
+    // B2 geometry: search 72 + padding 23 + 2*(label 34 + rows 116) + footer 44 = 323 -> 324.
+    expect(harness.onGeometry).toHaveBeenLastCalledWith(324, true);
 
     await press(input, " ", { ctrlKey: true });
     expect(harness.container.querySelector('[data-testid="preview-panel"]')).toBeNull();
-    expect(harness.onGeometry).toHaveBeenLastCalledWith(280, false);
+    expect(harness.onGeometry).toHaveBeenLastCalledWith(324, false);
   });
 
   it("grows the window for a bottom drawer on narrow work areas", async () => {

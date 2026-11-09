@@ -24,7 +24,8 @@ import { Highlight } from "../components/Highlight";
 import { Kbd } from "../components/Kbd";
 import { Logo } from "../components/Logo";
 import { groupResults } from "../lib/results";
-import { formatBytes, formatNumber, timeAgo } from "../lib/format";
+import { formatBytes, formatNumber } from "../lib/format";
+import { formatRecency } from "./launcherFormat";
 import { ResultIcon } from "./ResultIcon";
 import { ResultPreview } from "./ResultPreview";
 import { ResultActions, buildMenuActions, type MenuAction, type MenuModel } from "./ResultActions";
@@ -152,7 +153,7 @@ function metaText(result: SearchResult): string {
   const meta = result.meta;
   if (!meta) return "";
   if (meta.label) return meta.label;
-  if (meta.modified) return timeAgo(meta.modified);
+  if (meta.modified) return formatRecency(meta.modified);
   if (meta.line != null) return "Line " + meta.line;
   if (meta.itemCount != null) return meta.itemCount.toLocaleString() + " items";
   if (meta.size != null) return formatBytes(meta.size);
@@ -562,9 +563,11 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       const selected = selectionRef.current.resultId;
       const result = committedRef.current?.results.find((item) => item.id === selected);
       if (!result) return;
-      const declared = (result.actions ?? []).find(
+      const copyActions = (result.actions ?? []).filter(
         (item) => !item.destructive && item.action.type === "copy_text",
       );
+      const declared =
+        copyActions.find((item) => /path/i.test(item.id + " " + item.label)) ?? copyActions[0];
       let action: ActionSpec | null = declared ? declared.action : null;
       if (!action) {
         if (result.kind === "browser_history" || result.kind === "bookmark") {
@@ -763,7 +766,6 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         aria-keyshortcuts="ArrowUp ArrowDown Enter Escape Control+Space"
         onKeyDown={onRootKeyDown}
         onMouseDown={onRootMouseDown}
-        onContextMenu={(event) => event.preventDefault()}
         data-testid="launcher"
       >
         <div className="searchline">

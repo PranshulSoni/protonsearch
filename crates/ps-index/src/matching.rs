@@ -35,27 +35,16 @@ fn char_eq_ci(a: char, b: char) -> bool {
     al.next() == bl.next() && al.next().is_none() && bl.next().is_none()
 }
 
-#[inline]
-fn char_fold(c: char) -> char {
-    if c.is_ascii() {
-        c.to_ascii_lowercase()
-    } else {
-        c.to_lowercase().next().unwrap_or(c)
-    }
-}
-
-/// Case-insensitive equality of two UTF-8 strings (ASCII folded, non-ASCII
-/// folded char-by-char).
+/// Case-insensitive equality of two UTF-8 strings.
 pub(crate) fn eq_ci(a: &str, b: &str) -> bool {
     if a == b {
         return true;
     }
-    if a.len() != b.len() {
-        // Byte lengths can differ only through non-ASCII folds; fall through to
-        // the char comparison in that (rare) case.
-        if a.is_ascii() || b.is_ascii() {
-            return false;
-        }
+    if a.is_ascii() && b.is_ascii() {
+        return a.eq_ignore_ascii_case(b);
+    }
+    if a.len() != b.len() && (a.is_ascii() || b.is_ascii()) {
+        return false;
     }
     let mut ai = a.chars();
     let mut bi = b.chars();
@@ -83,11 +72,9 @@ pub(crate) fn starts_with_ci(hay: &str, needle: &str) -> bool {
         return false;
     }
     let hb = &hay.as_bytes()[..needle.len()];
-    let nb = needle.as_bytes();
-    if eq_ci_bytes(hb, nb) {
+    if eq_ci_bytes(hb, needle.as_bytes()) {
         return true;
     }
-    // Non-ASCII case fold can change byte lengths; fall back to char walk.
     if !hay.is_ascii() || !needle.is_ascii() {
         let mut hc = hay.chars();
         for nc in needle.chars() {
@@ -102,8 +89,6 @@ pub(crate) fn starts_with_ci(hay: &str, needle: &str) -> bool {
 }
 
 /// Find needle (expected lower-case) inside hay, case-insensitively.
-/// Returns the byte range in hay. ASCII fast path uses memchr on the first
-/// byte; a char-fold fallback handles non-ASCII case differences.
 pub(crate) fn find_ci(hay: &str, needle: &str) -> Option<(usize, usize)> {
     find_ci_from(hay, needle, 0)
 }
@@ -139,7 +124,6 @@ pub(crate) fn find_ci_from(hay: &str, needle: &str, from: usize) -> Option<(usiz
         }
         start = pos + 1;
     }
-    // Only non-ASCII case differences can still match here.
     if !needle.is_ascii() && !hay.is_ascii() {
         return unicode_ci_find(hay, needle, from);
     }
@@ -220,6 +204,15 @@ pub(crate) fn bloom_add(bloom: &mut u64, c: char) {
     }
 }
 
+/// Bloom word for a whole string (entry names and directory paths).
+pub(crate) fn bloom_for_str(s: &str) -> u64 {
+    let mut bloom = 0u64;
+    for c in s.chars() {
+        bloom_add(&mut bloom, c);
+    }
+    bloom
+}
+
 #[inline]
 fn char_hash(c: char) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325u64 ^ (c as u32 as u64);
@@ -231,30 +224,39 @@ fn char_hash(c: char) -> u64 {
 /// A parsed, precomputed query used by the scan path.
 #[derive(Debug, Clone)]
 pub(crate) struct QueryPlan {
-    /// Lower-cased query text (used for every comparison).
+    /// Lower-cased, trimmed full query text.
     pub lower: String,
-    /// Lower-cased query characters (fuzzy matching).
-    pub chars: Vec<char>,
-    /// Bits required from ASCII letters/digits (one bit per distinct char).
+    /// Lower-cased whitespace-separated terms. Multi-term queries require all
+    /// terms to match (token matching, like fzf multi-token mode).
+    pub terms: Vec<String>,
+    /// Characters of each term, used by the fuzzy matcher.
+    pub terms_chars: Vec<Vec<char>>,
+    /// Bits required from ASCII letters/digits across all terms.
     pub bloom_exact: u64,
-    /// Bits required from hashed non-alphanumeric characters.
+    /// Bits required from hashed non-alphanumeric characters across all terms.
     pub bloom_hash: u64,
-    /// How many exact bits may be missing (allows single-char typos in fuzzy
-    /// queries without losing recall for normal queries).
+    /// How many exact bits may be missing (only relaxed in the typo pass).
     pub allowed_missing: u32,
     /// Query contains a path separator -> spanning-path mode.
     pub has_sep: bool,
+    /// More than one whitespace-separated term.
+    pub multi: bool,
+    /// Character count of the (single) query; cheap length prefilter.
+    pub char_len: usize,
 }
 
 impl QueryPlan {
     pub fn new(raw: &str) -> Self {
         let trimmed = raw.trim();
         let lower = trimmed.to_lowercase();
+        let terms: Vec<String> = lower.split_whitespace().map(str::to_string).collect();
+        let terms_chars: Vec<Vec<char>> = terms.iter().map(|t| t.chars().collect()).collect();
         let mut bloom_exact = 0u64;
         let mut bloom_hash = 0u64;
-        let chars: Vec<char> = lower.chars().collect();
         let mut seen = std::collections::HashSet::new();
-        for c in lower.chars() {
+        // Whitespace is not required to appear in the name: multi-token matches
+        // may be separated by underscores, dots or case boundaries.
+        for c in lower.chars().filter(|c| !c.is_whitespace()) {
             if !seen.insert(c) {
                 continue;
             }
@@ -272,16 +274,23 @@ impl QueryPlan {
                 bloom_hash |= 1u64 << (36 + ((h >> 8) % 28) as u32);
             }
         }
-        let n = chars.len();
-        let allowed_missing = if n >= 5 { 1 } else { 0 };
         let has_sep = lower.contains('/') || lower.contains('\\');
+        let multi = terms.len() > 1;
+        let char_len = if multi {
+            terms.iter().map(|t| t.chars().count()).min().unwrap_or(0)
+        } else {
+            lower.chars().count()
+        };
         Self {
             lower,
-            chars,
+            terms,
+            terms_chars,
             bloom_exact,
             bloom_hash,
-            allowed_missing,
+            allowed_missing: 0,
             has_sep,
+            multi,
+            char_len,
         }
     }
 
@@ -289,10 +298,17 @@ impl QueryPlan {
         self.lower.is_empty()
     }
 
+    /// Relaxed copy that tolerates one missing character. Used only by the
+    /// typo fallback pass so the primary scan keeps a strict (strong) filter.
+    pub fn relaxed(&self) -> Self {
+        let mut clone = self.clone();
+        clone.allowed_missing = 1;
+        clone
+    }
+
     /// Cheap candidate prefilter. Never produces false negatives for
     /// substring/subsequence matches (ASCII chars are exact bits; other chars
-    /// use a 2-bit hash bloom); allowed_missing relaxes it by at most one
-    /// character to keep single-typo fuzzy recall.
+    /// use a 2-bit hash bloom).
     #[inline]
     pub fn bloom_pass(&self, bloom: u64) -> bool {
         if bloom & self.bloom_hash != self.bloom_hash {
@@ -326,6 +342,7 @@ pub(crate) const SCORE_TYPO: f32 = 0.55;
 /// phase already filled the top-k above this value.
 pub(crate) const PATH_MAX_SCORE: f32 = SCORE_PATH_SEGMENT;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct NameMatch {
     pub score: f32,
@@ -390,6 +407,24 @@ pub(crate) fn segment_level(path: &str, needle: &str) -> u8 {
     best
 }
 
+/// Multi-term path classification: every term must appear; the weakest match
+/// determines the level.
+pub(crate) fn segment_level_multi(path: &str, terms: &[String]) -> u8 {
+    let mut best = 3u8;
+    for term in terms {
+        let level = segment_level(path, term);
+        if level == 0 {
+            return 0;
+        }
+        best = best.min(level);
+    }
+    if terms.is_empty() {
+        0
+    } else {
+        best
+    }
+}
+
 pub(crate) fn score_for_segment(level: u8) -> f32 {
     match level {
         3 => SCORE_PATH_SEGMENT,
@@ -399,34 +434,75 @@ pub(crate) fn score_for_segment(level: u8) -> f32 {
     }
 }
 
-/// Full name match evaluation. Returns the best match class and its byte
-/// ranges (inside name). stem is the name without its extension.
+/// Full name match evaluation (compatibility wrapper; used by tests).
+#[allow(dead_code)]
 pub(crate) fn match_name(name: &str, stem: &str, plan: &QueryPlan) -> Option<NameMatch> {
-    let q = &plan.lower;
-    if q.is_empty() || name.is_empty() {
+    let mut ranges = Vec::new();
+    let score = match_name_into(name, stem, plan, true, &mut ranges)?;
+    Some(NameMatch {
+        score,
+        byte_ranges: ranges,
+    })
+}
+
+/// Allocation-free name match evaluation. allow_typo is only set for the
+/// dedicated typo pass. Multi-term queries require every term to match; the
+/// score is the weakest term's score so ordering stays deterministic.
+pub(crate) fn match_name_into(
+    name: &str,
+    stem: &str,
+    plan: &QueryPlan,
+    allow_typo: bool,
+    ranges: &mut Vec<(usize, usize)>,
+) -> Option<f32> {
+    ranges.clear();
+    if plan.lower.is_empty() || name.is_empty() {
         return None;
     }
+    if !plan.multi {
+        return match_token(
+            name,
+            stem,
+            &plan.lower,
+            &plan.terms_chars[0],
+            allow_typo,
+            ranges,
+        );
+    }
+    let mut worst = f32::MAX;
+    let mut scratch = Vec::new();
+    for (i, term) in plan.terms.iter().enumerate() {
+        let score = match_token(name, stem, term, &plan.terms_chars[i], allow_typo, &mut scratch)?;
+        worst = worst.min(score);
+        ranges.extend_from_slice(&scratch);
+    }
+    Some(worst)
+}
+
+fn match_token(
+    name: &str,
+    stem: &str,
+    q: &str,
+    qchars: &[char],
+    allow_typo: bool,
+    ranges: &mut Vec<(usize, usize)>,
+) -> Option<f32> {
+    ranges.clear();
     // 1. exact name
     if eq_ci(name, q) {
-        return Some(NameMatch {
-            score: SCORE_EXACT_NAME,
-            byte_ranges: vec![(0, name.len())],
-        });
+        ranges.push((0, name.len()));
+        return Some(SCORE_EXACT_NAME);
     }
     // 2. exact stem (only when the entry actually has an extension)
     if stem.len() != name.len() && eq_ci(stem, q) {
-        return Some(NameMatch {
-            score: SCORE_EXACT_STEM,
-            byte_ranges: vec![(0, stem.len())],
-        });
+        ranges.push((0, stem.len()));
+        return Some(SCORE_EXACT_STEM);
     }
     // 3. prefix
     if starts_with_ci(name, q) {
         let end = prefix_match_len(name, q);
-        return Some(NameMatch {
-            score: SCORE_PREFIX,
-            byte_ranges: vec![(0, end)],
-        });
+        ranges.push((0, end));
+        return Some(SCORE_PREFIX);
     }
     // 4/5. substring; prefer a word-boundary occurrence when one exists.
     let mut from = 0usize;
@@ -448,31 +524,26 @@ pub(crate) fn match_name(name: &str, stem: &str, plan: &QueryPlan) -> Option<Nam
         from = start + 1;
     }
     if let Some((start, end, boundary)) = found {
-        return Some(NameMatch {
-            score: if boundary { SCORE_WORD_PREFIX } else { SCORE_SUBSTRING },
-            byte_ranges: vec![(start, end)],
+        ranges.push((start, end));
+        return Some(if boundary {
+            SCORE_WORD_PREFIX
+        } else {
+            SCORE_SUBSTRING
         });
     }
     // 6. fuzzy subsequence
-    if let Some((score, ranges)) = fuzzy_match(name, &plan.chars) {
-        return Some(NameMatch {
-            score,
-            byte_ranges: ranges,
-        });
+    if let Some((score, byte_ranges)) = fuzzy_match(name, qchars) {
+        *ranges = byte_ranges;
+        return Some(score);
     }
     // 7. single-typo (Damerau-Levenshtein distance <= 1) against stem/name
-    if typo_match(name, stem, plan) {
-        return Some(NameMatch {
-            score: SCORE_TYPO,
-            byte_ranges: Vec::new(),
-        });
+    if allow_typo && typo_match(name, stem, qchars) {
+        return Some(SCORE_TYPO);
     }
     None
 }
 
 fn prefix_match_len(name: &str, q: &str) -> usize {
-    // For ASCII-folded matches the byte length is the query byte length. For
-    // non-ASCII folds walk chars to get the true end offset.
     if eq_ci_bytes(&name.as_bytes()[..q.len().min(name.len())], q.as_bytes()) {
         return q.len();
     }
@@ -492,6 +563,9 @@ fn prefix_match_len(name: &str, q: &str) -> usize {
 pub(crate) fn fuzzy_match(name: &str, q: &[char]) -> Option<(f32, Vec<(usize, usize)>)> {
     if q.is_empty() {
         return None;
+    }
+    if name.is_ascii() && q.iter().all(|c| c.is_ascii()) {
+        return fuzzy_match_ascii(name, q);
     }
     let mut qi = 0usize;
     let mut first: Option<usize> = None;
@@ -527,12 +601,48 @@ pub(crate) fn fuzzy_match(name: &str, q: &[char]) -> Option<(f32, Vec<(usize, us
     Some((SCORE_FUZZY_BASE + SCORE_FUZZY_SPAN * quality, ranges))
 }
 
+/// ASCII fast path for the subsequence matcher (no char decoding).
+fn fuzzy_match_ascii(name: &str, q: &[char]) -> Option<(f32, Vec<(usize, usize)>)> {
+    let bytes = name.as_bytes();
+    let mut qi = 0usize;
+    let mut first: Option<usize> = None;
+    let mut last_end = 0usize;
+    let mut prev_end: Option<usize> = None;
+    let mut consecutive = 0usize;
+    let mut ranges: Vec<(usize, usize)> = Vec::with_capacity(q.len());
+    for (bi, &b) in bytes.iter().enumerate() {
+        if qi < q.len() && fold_byte(b) == q[qi] as u8 {
+            if first.is_none() {
+                first = Some(bi);
+            }
+            if prev_end == Some(bi) {
+                consecutive += 1;
+            }
+            prev_end = Some(bi + 1);
+            last_end = bi + 1;
+            ranges.push((bi, bi + 1));
+            qi += 1;
+            if qi == q.len() {
+                break;
+            }
+        }
+    }
+    if qi < q.len() {
+        return None;
+    }
+    let first = first?;
+    let span_chars = last_end - first;
+    let span_quality = (q.len() as f32 / span_chars.max(1) as f32).clamp(0.0, 1.0);
+    let run_quality = (consecutive as f32 / q.len() as f32).clamp(0.0, 1.0);
+    let quality = 0.5 * span_quality + 0.5 * run_quality;
+    Some((SCORE_FUZZY_BASE + SCORE_FUZZY_SPAN * quality, ranges))
+}
+
 /// Bounded Damerau-Levenshtein <= 1 check on folded characters.
 pub(crate) fn damerau_le1(a: &[char], b: &[char]) -> bool {
     let (long, short) = if a.len() >= b.len() { (a, b) } else { (b, a) };
     match long.len().checked_sub(short.len()) {
         Some(0) => {
-            // equal length: one substitution or one adjacent transposition
             let mut diff: Vec<usize> = Vec::new();
             for i in 0..long.len() {
                 if long[i] != short[i] {
@@ -552,7 +662,6 @@ pub(crate) fn damerau_le1(a: &[char], b: &[char]) -> bool {
             }
         }
         Some(1) => {
-            // one insertion/deletion
             let mut i = 0usize;
             let mut j = 0usize;
             let mut skipped = false;
@@ -573,36 +682,101 @@ pub(crate) fn damerau_le1(a: &[char], b: &[char]) -> bool {
     }
 }
 
-fn typo_match(name: &str, stem: &str, plan: &QueryPlan) -> bool {
-    let q = &plan.chars;
-    if q.len() < 4 {
+fn typo_match(name: &str, stem: &str, qchars: &[char]) -> bool {
+    if qchars.len() < 4 || qchars.len() > 96 {
         return false;
     }
-    let first = q[0];
+    let first = qchars[0];
     let candidates: [&str; 2] = if stem.len() == name.len() {
         [stem, ""]
     } else {
         [stem, name]
     };
+    let q_ascii = qchars.iter().all(|c| c.is_ascii());
     for cand in candidates {
         if cand.is_empty() {
             continue;
         }
-        let cand_chars: Vec<char> = cand.chars().map(char_fold).collect();
-        if cand_chars.len() + 2 < q.len() || cand_chars.len() > q.len() + 2 {
-            continue;
+        if q_ascii && cand.is_ascii() {
+            let bytes = cand.as_bytes();
+            let len = bytes.len();
+            if len + 2 < qchars.len() || len > qchars.len() + 2 {
+                continue;
+            }
+            if fold_byte(bytes[0]) != first as u8 {
+                continue;
+            }
+            let mut folded = [0u8; 96];
+            for (i, &b) in bytes.iter().enumerate() {
+                folded[i] = fold_byte(b);
+            }
+            if damerau_le1_ascii(&folded[..len], qchars) {
+                return true;
+            }
         }
-        let Some(&c0) = cand_chars.first() else {
-            continue;
-        };
-        if c0 != first {
-            continue;
-        }
-        if damerau_le1(&cand_chars, q) {
-            return true;
-        }
+        // Non-ASCII candidates are not typo-matched: keeping this path
+        // allocation-free matters more than rare accented-typo recall.
     }
     false
+}
+
+/// Damerau-Levenshtein <= 1 over ASCII bytes vs lower-case query chars.
+fn damerau_le1_ascii(a: &[u8], q: &[char]) -> bool {
+    let mut qb = [0u8; 96];
+    for (i, c) in q.iter().enumerate() {
+        qb[i] = *c as u8;
+    }
+    let qb = &qb[..q.len()];
+    let (long, short) = if a.len() >= qb.len() { (a, qb) } else { (qb, a) };
+    match long.len().checked_sub(short.len()) {
+        Some(0) => {
+            let mut diff: [usize; 2] = [0, 0];
+            let mut n = 0usize;
+            for i in 0..long.len() {
+                if long[i] != short[i] {
+                    if n == 2 {
+                        return false;
+                    }
+                    diff[n] = i;
+                    n += 1;
+                }
+            }
+            match n {
+                0 | 1 => true,
+                2 => {
+                    let (i, j) = (diff[0], diff[1]);
+                    j == i + 1 && long[i] == short[j] && long[j] == short[i]
+                }
+                _ => false,
+            }
+        }
+        Some(1) => {
+            let mut i = 0usize;
+            let mut j = 0usize;
+            let mut skipped = false;
+            while i < long.len() && j < short.len() {
+                if long[i] == short[j] {
+                    i += 1;
+                    j += 1;
+                } else if skipped {
+                    return false;
+                } else {
+                    skipped = true;
+                    i += 1;
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+/// Typo-only check used by the dedicated typo pass.
+pub(crate) fn typo_only_match(name: &str, stem: &str, plan: &QueryPlan) -> bool {
+    if plan.multi {
+        return false;
+    }
+    typo_match(name, stem, &plan.terms_chars[0])
 }
 
 /// Convert byte ranges inside name into UTF-16 code-unit ranges (the UI's
@@ -646,16 +820,12 @@ mod tests {
 
     #[test]
     fn bloom_never_rejects_contained_chars() {
-        let mut b = 0u64;
-        for c in "Report-2024_最终版.pdf".chars() {
-            bloom_add(&mut b, c);
-        }
-        let plan = QueryPlan::new("report");
-        assert!(plan.bloom_pass(b));
-        let plan = QueryPlan::new("最终");
-        assert!(plan.bloom_pass(b));
-        let plan = QueryPlan::new("xyzq");
-        assert!(!plan.bloom_pass(b));
+        let b = bloom_for_str("Report-2024_最终版.pdf");
+        assert!(QueryPlan::new("report").bloom_pass(b));
+        assert!(QueryPlan::new("最终").bloom_pass(b));
+        assert!(!QueryPlan::new("xyzq").bloom_pass(b));
+        // Multi-term: whitespace is not required in the name.
+        assert!(QueryPlan::new("report 最终").bloom_pass(b));
     }
 
     #[test]
@@ -686,19 +856,27 @@ mod tests {
     #[test]
     fn fuzzy_and_typo_matching() {
         let p = QueryPlan::new("rprt");
-        assert!(fuzzy_match("report", &p.chars).is_some());
-        // Transposition typo is caught by the bounded edit-distance fallback.
+        assert!(fuzzy_match("report", &p.terms_chars[0]).is_some());
         let p = QueryPlan::new("reprot");
         let m = match_name("report.txt", "report", &p).unwrap();
-        assert_eq!(m.score, SCORE_TYPO);
-        let p = QueryPlan::new("recieve");
-        let m = match_name("receive.txt", "receive", &p).unwrap();
         assert_eq!(m.score, SCORE_TYPO);
     }
 
     #[test]
+    fn multi_term_requires_every_term() {
+        let p = QueryPlan::new("quarterly report final");
+        let m = match_name("quarterly_report_final.pdf", "quarterly_report_final", &p).unwrap();
+        assert!(m.score >= SCORE_WORD_PREFIX - 1e-6, "score {}", m.score);
+        assert!(!m.byte_ranges.is_empty());
+        // Missing one term -> no match.
+        assert!(match_name("quarterly_report.pdf", "quarterly_report", &p).is_none());
+        // Fuzzy multi-token typo: each token may be a near-miss.
+        let p = QueryPlan::new("quaterly report");
+        assert!(match_name("quarterly_report.pdf", "quarterly_report", &p).is_some());
+    }
+
+    #[test]
     fn utf16_ranges_account_for_surrogates_and_cjk() {
-        // A 4-byte emoji is 2 UTF-16 code units; a 3-byte CJK char is 1.
         let name = "😀report.txt";
         let ranges = to_utf16_ranges(name, &[(4, 10)]);
         assert_eq!(ranges, vec![(2, 8)]);

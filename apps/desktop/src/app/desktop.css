@@ -90,6 +90,7 @@
 
 .navbtn[aria-current="page"] {
   background: var(--ps-nav-active-bg);
+  box-shadow: inset var(--ps-selected-bar-width) 0 0 var(--ps-selected-bar);
   color: var(--ps-nav-active-ink);
   font-weight: var(--ps-fw-label);
 }

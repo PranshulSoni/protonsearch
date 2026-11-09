@@ -26,7 +26,7 @@ import pydantic_ai
 
 from . import protocol
 from .approvals import ApprovalBroker
-from .models import AgentConfig, ModelNotConfigured, build_model, load_config
+from .models import AgentConfig, ModelNotConfigured, TEST_MODEL_LABEL, build_model, load_config
 from .tools import NATIVE_COMMANDS, TOOL_ALLOWLIST, RunDeps, register_tools
 
 RUNTIME_NAME = f"pydantic-ai {pydantic_ai.__version__}"
@@ -82,6 +82,12 @@ _SECRET_ENV_VARS = (
 _SECRET_PATTERN = re.compile(r"\b(?:sk|pk|api)[-_][A-Za-z0-9_-]{8,}\b")
 
 
+def _debug(message: str) -> None:
+    if os.environ.get("PROTONSEARCH_AGENT_DEBUG") == "1":
+        sys.stderr.write(f"protonsearch_agent[debug]: {message}\n")
+        sys.stderr.flush()
+
+
 def _sanitize_error(exc: BaseException) -> str:
     message = f"{type(exc).__name__}: {exc}"
     for name in _SECRET_ENV_VARS:
@@ -132,6 +138,7 @@ class Sidecar:
         self.broker = ApprovalBroker(self.loop)
         self._install_signal_handlers()
         self._start_stdin_reader()
+        _debug("serve loop entered; stdin reader started")
         try:
             while not self._shutdown:
                 message = await self.inbox.get()
@@ -178,6 +185,7 @@ class Sidecar:
                         self._deliver(protocol.ProtocolErrorMessage(str(exc)))
                         continue
                     if message is not None:
+                        _debug(f"stdin message {type(message).__name__}")
                         self._deliver(message)
             except (OSError, ValueError):
                 pass
@@ -226,6 +234,7 @@ class Sidecar:
     # -- run control --------------------------------------------------------
 
     def _on_run_request(self, request: protocol.RunRequest) -> None:
+        _debug(f"run request {request.run_id}")
         if self._current_task is not None and not self._current_task.done():
             if self._pending_run is None:
                 self._pending_run = request
@@ -278,33 +287,38 @@ class Sidecar:
     # -- the run ------------------------------------------------------------
 
     async def _run(self, request: protocol.RunRequest) -> None:
+        _debug(f"run {request.run_id} starting (test_model={self.config.test_model})")
         started_ns = time.perf_counter()
 
         def duration_ms() -> int:
             return int((time.perf_counter() - started_ns) * 1000)
 
-        label = protocol.TEST_MODEL_LABEL if self.config.test_model else (request.model or self.config.model or "unconfigured")
-        self.writer.emit(protocol.started(request.run_id, RUNTIME_NAME, label))
-        self.writer.emit(
-            protocol.plan(
-                [
-                    "Interpret the request",
-                    "Use approved host calls to search or preview what is needed",
-                    "Report what the host approved and what remains",
-                ]
-            )
-        )
-
-        assert self.broker is not None
-        deps = RunDeps(
-            run_id=request.run_id,
-            emit=self.writer.emit,
-            broker=self.broker,
-            max_steps=max(1, min(request.max_steps, self.config.max_steps)),
-        )
+        # Everything after this point is inside the error boundary: a run must
+        # always end with exactly one error/finished pair, never a dangling task.
         try:
+            label = TEST_MODEL_LABEL if self.config.test_model else (
+                request.model or self.config.model or "unconfigured"
+            )
+            self.writer.emit(protocol.started(request.run_id, RUNTIME_NAME, label))
+            self.writer.emit(
+                protocol.plan(
+                    [
+                        "Interpret the request",
+                        "Use approved host calls to search or preview what is needed",
+                        "Report what the host approved and what remains",
+                    ]
+                )
+            )
+
+            assert self.broker is not None
+            deps = RunDeps(
+                run_id=request.run_id,
+                emit=self.writer.emit,
+                broker=self.broker,
+                max_steps=max(1, min(request.max_steps, self.config.max_steps)),
+            )
             model_ref, _model_label = build_model(
-                self.config, request.model, request.context_paths, request.run_id
+                self.config, request.model, request.prompt, request.context_paths, request.run_id
             )
             agent = self._build_agent(model_ref)
             result = await asyncio.wait_for(

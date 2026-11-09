@@ -19,7 +19,8 @@
 }
 
 .launcher--preview-side {
-  width: min(1220px, 96vw);
+  /* Shell contract: LAUNCHER_PREVIEW_WIDTH = 1180 (820 + 360 side panel). */
+  width: min(var(--launcher-width-preview), 96vw);
 }
 
 .launcher-body {
@@ -144,9 +145,9 @@
   cursor: pointer;
   /* Selection feedback is colour only, <= 110 ms; never animate travel. */
   transition:
-    background-color var(--ps-dur-base) var(--ps-ease-linear),
-    border-color var(--ps-dur-base) var(--ps-ease-linear),
-    box-shadow var(--ps-dur-base) var(--ps-ease-linear);
+    background-color var(--ps-dur-base) var(--ps-ease-standard),
+    border-color var(--ps-dur-base) var(--ps-ease-standard),
+    box-shadow var(--ps-dur-base) var(--ps-ease-standard);
 }
 
 .result:hover {
@@ -201,6 +202,13 @@
   color: var(--ps-ink-3);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+/* M5.1: on the selected fill, tertiary ink is only 4.20:1 — step up to ink-2
+   (≥4.5:1) for the path/meta text inside the selected row. */
+.result[aria-selected="true"] .result-meta,
+.result[aria-selected="true"] .filepath {
+  color: var(--ps-ink-2);
 }
 
 /* ---------- Result icons ---------- */
@@ -384,7 +392,7 @@
 }
 
 .launcher--preview-side .preview {
-  width: 380px;
+  width: 360px;
   border-left: 1px solid var(--ps-line);
 }
 
@@ -732,14 +740,20 @@
 /* ---------- Responsive / DPI ---------- */
 
 @media (max-width: 700px) {
+  /* SCREENS §6.1: 61 px search row with a 16 px input on a narrow surface. */
   .searchline {
+    height: 61px;
     gap: 10px;
-    padding: 14px 14px;
+    padding: 11px 13px;
   }
 
   .searchline .logo {
     width: 26px;
     height: 26px;
+  }
+
+  .results {
+    max-height: min(365px, calc(100vh - 105px));
   }
 
   .search-input {
@@ -812,5 +826,10 @@
   .inline-retry,
   .preview-action {
     color: LinkText;
+  }
+
+  .launcher :focus-visible {
+    outline: var(--ps-focus-width) solid Highlight;
+    outline-offset: var(--ps-focus-offset);
   }
 }

@@ -310,6 +310,10 @@ export const mockBridge = {
     return settings;
   },
   async indexCommand(_command: IndexCommand): Promise<void> {},
+  async setHotkey(hotkey: string): Promise<Settings> {
+    settings = { ...settings, hotkey };
+    return settings;
+  },
   async setLauncherGeometry(_height: number, _preview: boolean): Promise<void> {},
   async hideLauncher(): Promise<void> {},
   async showLauncher(): Promise<void> {},

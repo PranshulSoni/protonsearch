@@ -274,3 +274,126 @@ pub fn get_clipboard_image_png() -> Option<Vec<u8>> {
         None
     }
 }
+// ---------------------------------------------------------------------------
+// Reviewed native commands (destructive ones are confirmed by the UI/engine)
+// ---------------------------------------------------------------------------
+
+/// Lock the workstation.
+pub fn lock_workstation() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::lock_workstation()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}
+
+/// Suspend (sleep) the machine.
+pub fn sleep_pc() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::sleep_pc()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}
+
+/// Shut down the machine (caller must have confirmed the destructive action).
+pub fn shutdown_pc() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::shutdown_pc()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}
+
+/// Restart the machine (caller must have confirmed the destructive action).
+pub fn restart_pc() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::restart_pc()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}
+
+/// Empty the recycle bin (caller must have confirmed the destructive action).
+pub fn empty_recycle_bin() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::empty_recycle_bin()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}
+
+/// Open the Windows Settings app (fixed target, no user input).
+pub fn open_settings() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::open_settings()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}
+
+/// Open Task Manager.
+pub fn open_task_manager() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::open_task_manager()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}
+
+/// Open Windows Terminal, falling back to PowerShell.
+pub fn open_terminal() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::open_terminal()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}
+
+/// Broadcast WM_SETTINGCHANGE after a user setting (theme) change.
+pub fn broadcast_setting_change() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::native::broadcast_setting_change()
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(())
+    }
+}
+
+/// Toggle the Windows app theme (HKCU Personalize) and notify the shell.
+pub fn toggle_dark_mode() -> anyhow::Result<bool> {
+    #[cfg(windows)]
+    {
+        imp::native_toggle_dark_mode()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("not supported on this platform")
+    }
+}

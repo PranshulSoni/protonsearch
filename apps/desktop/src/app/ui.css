@@ -78,13 +78,13 @@
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  border: var(--ps-border) solid var(--ps-line);
+  border: var(--ps-border) solid var(--ps-ink-3);
   border-radius: var(--ps-radius-segment);
   background: var(--ps-surface-soft);
 }
 
 .seg {
-  min-height: 24px;
+  min-height: 28px;
   padding: 5px 9px;
   border: 0;
   border-radius: var(--ps-radius-control);
@@ -99,8 +99,11 @@
   color: var(--ps-ink);
 }
 
+/* Checked state is fill + 1 px boundary + ink weight, never colour alone
+   (REVIEW_1 M5.2). */
 .seg[aria-checked="true"] {
   background: var(--ps-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--ps-control-border);
   color: var(--ps-ink);
   font-weight: var(--ps-fw-strong);
 }
@@ -114,13 +117,13 @@
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  border: var(--ps-border) solid var(--ps-line);
+  border: var(--ps-border) solid var(--ps-ink-3);
   border-radius: var(--ps-radius-segment);
   background: var(--ps-surface-soft);
 }
 
 .filter-btn {
-  min-height: 24px;
+  min-height: 28px;
   padding: 5px 9px;
   border: 0;
   border-radius: var(--ps-radius-control);
@@ -132,17 +135,32 @@
 
 .filter-btn[aria-pressed="true"] {
   background: var(--ps-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--ps-control-border);
   color: var(--ps-ink);
   font-weight: var(--ps-fw-strong);
 }
 
+/* Switch: 32 px hit area, 20 px visual track, visible On/Off word (REVIEW_1
+   M5.3/M6). Track and knob use --ps-ink-3 boundaries so the ≥3:1 boundary
+   holds in both themes; --ps-control-border alone is 1.37:1 in light. */
 .switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ps-radius-control);
+  background: transparent;
+}
+
+.switch-track {
   position: relative;
   flex: none;
   width: 36px;
   height: 20px;
-  padding: 0;
-  border: var(--ps-border) solid var(--ps-line-strong);
+  border: var(--ps-border) solid var(--ps-ink-3);
   border-radius: var(--ps-radius-full);
   background: var(--ps-surface-soft);
 }
@@ -153,13 +171,13 @@
   left: 2px;
   width: 14px;
   height: 14px;
-  border: var(--ps-border) solid var(--ps-line-strong);
+  border: var(--ps-border) solid var(--ps-ink-3);
   border-radius: var(--ps-radius-full);
   background: var(--ps-surface-raised);
   transition: transform var(--ps-dur-base) var(--ps-ease-out);
 }
 
-.switch.is-on {
+.switch.is-on .switch-track {
   border-color: var(--ps-accent);
   background: var(--ps-accent);
 }
@@ -167,6 +185,19 @@
 .switch.is-on .switch-thumb {
   border-color: var(--ps-accent);
   transform: translateX(16px);
+}
+
+.switch-state {
+  min-width: 18px;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-micro);
+  font-weight: var(--ps-fw-label);
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+
+.switch.is-on .switch-state {
+  color: var(--ps-ink);
 }
 
 .switch:disabled {
@@ -237,9 +268,12 @@
 }
 
 .linkbtn {
-  padding: 2px 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 6px;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--ps-radius-control);
   background: transparent;
   color: var(--ps-accent);
   font-size: var(--ps-text-meta);
@@ -424,16 +458,11 @@
   color: var(--ps-positive);
 }
 
-.kbd-row,
-.hotkey-preview {
+.kbd-row {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-1);
-}
-
-.hotkey-preview {
-  margin-top: var(--space-2);
 }
 
 .kbd-plus {
@@ -496,12 +525,59 @@
   color: var(--ps-ink-2);
 }
 
+.hotkey-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hotkey-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--ps-control-height);
+}
+
+.hotkey-label {
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+}
+
+.hotkey-value {
+  color: var(--ps-ink);
+  font-size: var(--ps-text-small);
+  font-weight: var(--ps-fw-semibold);
+}
+
+.hotkey-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.hotkey-control .inline-note,
+.hotkey-control .field-error,
+.hotkey-control .field-help {
+  margin: 0;
+}
+
 @media (forced-colors: active) {
   .dot {
     border: 1px solid CanvasText;
   }
 
   .navbtn[aria-current="page"] {
+    border: 1px solid CanvasText;
+  }
+
+  .seg[aria-checked="true"],
+  .filter-btn[aria-pressed="true"] {
+    border: 1px solid CanvasText;
+  }
+
+  .switch-track,
+  .switch-thumb {
     border: 1px solid CanvasText;
   }
 }

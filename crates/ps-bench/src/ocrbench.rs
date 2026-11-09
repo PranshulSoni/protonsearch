@@ -36,6 +36,7 @@ pub struct ManifestEntry {
 
 pub fn load_manifest(path: &Path) -> anyhow::Result<Vec<ManifestEntry>> {
     let text = std::fs::read_to_string(path)?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
     let mut out = Vec::new();
     for (i, line) in text.lines().enumerate() {
         if line.trim().is_empty() {
@@ -134,10 +135,9 @@ fn levenshtein(a: &[char], b: &[char]) -> usize {
 mod winrt_ocr {
     use std::path::Path;
 
-    use windows::core::HSTRING;
     use windows::Graphics::Imaging::BitmapDecoder;
     use windows::Media::Ocr::OcrEngine;
-    use windows::Storage::{FileAccessMode, StorageFile};
+    use windows::Storage::Streams::{DataWriter, InMemoryRandomAccessStream};
 
     fn to_anyhow(err: windows::core::Error) -> anyhow::Error {
         anyhow::anyhow!("Windows.Media.Ocr: {err}")
@@ -163,9 +163,17 @@ mod winrt_ocr {
         }
 
         pub fn recognize(&self, path: &Path) -> anyhow::Result<String> {
-            let h = HSTRING::from(path.to_string_lossy().as_ref());
-            let file = StorageFile::GetFileFromPathAsync(&h).map_err(to_anyhow)?.get().map_err(to_anyhow)?;
-            let stream = file.OpenAsync(FileAccessMode::Read).map_err(to_anyhow)?.get().map_err(to_anyhow)?;
+            // Read bytes with std::fs and decode from an in-memory WinRT stream.
+            // StorageFile::GetFileFromPathAsync goes through the Storage broker and
+            // is denied for processes launched by the agent harness; an in-process
+            // in-memory stream has no such ACL dependency.
+            let bytes = std::fs::read(path)
+                .map_err(|e| anyhow::anyhow!("read image {}: {e}", path.display()))?;
+            let stream = InMemoryRandomAccessStream::new().map_err(to_anyhow)?;
+            let writer = DataWriter::CreateDataWriter(&stream).map_err(to_anyhow)?;
+            writer.WriteBytes(&bytes).map_err(to_anyhow)?;
+            writer.StoreAsync().map_err(to_anyhow)?.get().map_err(to_anyhow)?;
+            stream.Seek(0).map_err(to_anyhow)?;
             let decoder = BitmapDecoder::CreateAsync(&stream).map_err(to_anyhow)?.get().map_err(to_anyhow)?;
             let bitmap = decoder.GetSoftwareBitmapAsync().map_err(to_anyhow)?.get().map_err(to_anyhow)?;
             let result = self.engine.RecognizeAsync(&bitmap).map_err(to_anyhow)?.get().map_err(to_anyhow)?;
@@ -258,6 +266,7 @@ pub struct PassReport {
     pub exact_rate: f64,
     pub total_chars: usize,
     pub total_errors: usize,
+    pub image_errors: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -272,7 +281,6 @@ pub struct OcrReport {
     pub engine: String,
     pub languages: Vec<String>,
     pub session_open_ms: f64,
-    pub capacity_words: usize,
     pub passes: Vec<PassReport>,
     pub by_scenario: Vec<ScenarioRow>,
     pub per_image: Vec<ImageResult>,
@@ -303,6 +311,7 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     let subset: Vec<&ManifestEntry> = if limit > 0 { manifest.iter().take(limit).collect() } else { manifest.iter().collect() };
 
     let languages = winrt_ocr::available_languages();
+    let session_open_start = Instant::now();
     let session = match winrt_ocr::Session::open() {
         Ok(session) => session,
         Err(err) => {
@@ -317,7 +326,6 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                 engine: "windows.media.ocr".to_string(),
                 languages,
                 session_open_ms: 0.0,
-                capacity_words: 0,
                 passes: Vec::new(),
                 by_scenario: Vec::new(),
                 per_image: Vec::new(),
@@ -330,10 +338,12 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             return Ok(());
         }
     };
+    let session_open_ms = session_open_start.elapsed().as_secs_f64() * 1000.0;
     let language = session.language();
 
     let mut per_image: Vec<ImageResult> = Vec::new();
     let mut pass_reports: Vec<PassReport> = Vec::new();
+    let mut first_error = String::new();
     for pass in 1..=passes {
         let wall_start = Instant::now();
         let mut latencies: Vec<f64> = Vec::new();
@@ -341,12 +351,17 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         let mut exact = 0usize;
         let mut chars = 0usize;
         let mut errors = 0usize;
+        let mut image_errors = 0usize;
         for entry in &subset {
             let path = base_dir.join(&entry.file);
             let start = Instant::now();
             let recognized = match session.recognize(&path) {
                 Ok(text) => text,
                 Err(err) => {
+                    if first_error.is_empty() {
+                        first_error = format!("{err}");
+                    }
+                    image_errors += 1;
                     per_image.push(ImageResult {
                         file: entry.file.clone(),
                         scenario: entry.scenario.clone(),
@@ -402,8 +417,12 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             exact_rate: if latencies.is_empty() { 0.0 } else { exact as f64 / latencies.len() as f64 },
             total_chars: chars,
             total_errors: errors,
+            image_errors,
         });
     }
+
+    let recognized_any = per_image.iter().any(|r| r.pass == 1 && !r.recognized.starts_with("ERROR:"));
+    let failed = !recognized_any;
 
     // Aggregation uses the last pass (warm) for scenarios; per-image rows keep all passes.
     let warm: Vec<&ImageResult> = per_image.iter().filter(|r| r.pass == passes).collect();
@@ -428,19 +447,21 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         })
         .collect();
 
-    let session_open_ms = 0.0; // session creation is included in the first pass wall time
     let report = OcrReport {
         schema: RESULT_SCHEMA.to_string(),
         kind: "ocr-benchmark".to_string(),
-        status: "ok".to_string(),
-        reason: format!("Windows.Media.Ocr session opened, language={language}"),
+        status: if failed { "failed".to_string() } else { "ok".to_string() },
+        reason: if failed {
+            format!("Windows.Media.Ocr session opened (language={language}) but every image failed: {first_error}")
+        } else {
+            format!("Windows.Media.Ocr session opened, language={language}")
+        },
         host: host_info().clone(),
         generated_at_utc: now_utc(),
         command: format!("ps-bench ocr --manifest {} --passes {} --out {}", manifest_path.display(), passes, out.display()),
         engine: "windows.media.ocr".to_string(),
         languages,
         session_open_ms,
-        capacity_words: 0,
         passes: pass_reports,
         by_scenario,
         per_image,
@@ -454,18 +475,24 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     };
     write_json(&out, &report)?;
 
-    println!("ps-bench ocr: status=ok engine=windows.media.ocr language={language}");
+    println!("ps-bench ocr: status={} engine=windows.media.ocr language={language} session_open_ms={session_open_ms:.1}", report.status);
+    if failed {
+        println!("  FAILED: every image failed; error: {first_error}");
+        println!("  results: {}", out.display());
+        return Ok(());
+    }
     println!("  languages available: {:?}", report.languages);
     for p in &report.passes {
         println!(
-            "  pass {}: {} images in {:.0} ms = {:.1} img/s; per-image p50={:.1} p95={:.1} p99={:.1} ms",
-            p.pass, p.images, p.wall_ms, p.images_per_sec, p.latency.p50, p.latency.p95, p.latency.p99
+            "  pass {}: {} ok / {} failed in {:.0} ms = {:.1} img/s; per-image p50={:.1} p95={:.1} p99={:.1} ms",
+            p.pass, p.images, p.image_errors, p.wall_ms, p.images_per_sec, p.latency.p50, p.latency.p95, p.latency.p99
         );
         println!(
-            "           accuracy: mean CER={:.4} median CER={:.4} exact={:.1}% ({}/{} chars, {} errors)",
+            "           accuracy: mean CER={:.4} median CER={:.4} image-exact={:.1}% char-accuracy={:.1}% ({}/{} chars, {} errors)",
             p.mean_cer,
             p.median_cer,
             p.exact_rate * 100.0,
+            if p.total_chars > 0 { (p.total_chars - p.total_errors) as f64 / p.total_chars as f64 * 100.0 } else { 0.0 },
             p.total_chars - p.total_errors,
             p.total_chars,
             p.total_errors

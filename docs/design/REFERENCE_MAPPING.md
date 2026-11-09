@@ -107,7 +107,7 @@ L0's scaffold may rename files; ownership and component contracts do not change.
 | D13 | Onboarding sample name "Alex" | Optional name; neutral fallback; never inferred | Master prompt §V.B (identity only with consent). |
 | D14 | Static footer hints "↑↓ Navigate / Enter Open / Esc Clear" | Contextual hints (max 3) + truthful status | Master prompt §V.A: hints only in the footer and relevant; "Esc Close" when empty. |
 | D15 | No preview | Ctrl+Space preview (side panel/drawer) + optional auto-preview | Master prompt §V.A: previews only when useful; expanded exploration. |
-| D16 | No context menu / multi-select | Context menu (key/right-click) + clipboard multi-select | Master prompt §V.A: result context menus, multi-select where appropriate. |
+| D16 | No context menu / multi-select | Context menu (key/right-click); clipboard multi-select is **CUT for v2.0 alpha** (SCREENS §10) | Master prompt §V.A requires result context menus and multi-select "where appropriate"; the context menu ships, multi-select is deferred with recorded rationale. |
 | D17 | Dark theme absent | Art-directed warm-graphite dark palette | Master prompt §V.D: dark mode separately art-directed; reference is light-only. |
 | D18 | 10 px meta inside `.resultmeta`/footer | 10 px only for caps/kbd/footer; meta 11 px | Generic house floor 11 px; kept the reference's 10 px roles where they are tracked caps or keycaps, sentence-case meta raised to 11 px. |
 | D19 | App sidebar 190 px fixed; no rail | 220 / 190 / 56 rail at breakpoints | Reference only shows one width; the app must work down to 560 px. |
@@ -136,7 +136,7 @@ the reference-to-contract mapping above still governs the anatomy **inside** tho
 | Window shell | `apps/desktop/src-tauri/**` (L0-owned) | launcher frameless/instant show, app native frame, DPI clamps (§6 SCREENS) |
 
 Reconciliation items already logged to L0: brand-variant switch in `Logo`, 29 px desktop mark (currently 27), preview
-width 1180/360, `--faint` failing AA for text, and the 4→7 onboarding step expansion.
+width 1180/360 (now final), `--faint` retired from the contract, the 4→7 onboarding step expansion, and the v2.0 alpha CUTs/limitations in SCREENS §10.
 
 
 - Every reference class in §2–§3 has exactly one production component, and no production component invents chrome the

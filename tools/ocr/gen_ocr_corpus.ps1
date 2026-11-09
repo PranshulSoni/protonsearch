@@ -1,4 +1,4 @@
-# Ground-truth OCR corpus generator (GDI+ / System.Drawing, built into Windows).
+﻿# Ground-truth OCR corpus generator (GDI+ / System.Drawing, built into Windows).
 # OWNER: perf-bench. Read-only helper: writes only under -OutDir (default .bench/ocr-corpus).
 #
 # Produces synthetic images with exactly known text so recognition accuracy can
@@ -17,6 +17,7 @@ Add-Type -AssemblyName System.Drawing
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $manifestPath = Join-Path $OutDir "manifest.jsonl"
 if (Test-Path $manifestPath) { Remove-Item $manifestPath -Force }
+$manifestLines = New-Object System.Collections.Generic.List[string]
 
 # 9 scenarios covering common ProtonSearch screenshot/document shapes.
 $scenarios = @(
@@ -92,11 +93,14 @@ foreach ($sc in $scenarios) {
             width    = [int]$sc.W
             height   = [int]$sc.H
         }
-        ($obj | ConvertTo-Json -Compress) | Add-Content -Path $manifestPath -Encoding UTF8
+        $manifestLines.Add(($obj | ConvertTo-Json -Compress))
         $i++
     }
     if ($Count -gt 0 -and $i -ge $Count) { break }
 }
+
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllLines($manifestPath, $manifestLines, $utf8NoBom)
 
 Write-Output ("generated {0} images -> {1}" -f $i, $OutDir)
 Write-Output ("manifest: {0}" -f $manifestPath)

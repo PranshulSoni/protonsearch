@@ -1,5 +1,6 @@
 import type { SearchResult } from "../bridge/types";
-import { formatBytes, timeAgo } from "../lib/format";
+import { formatBytes } from "../lib/format";
+import { formatFullDate, formatRecency } from "./launcherFormat";
 import { ResultIcon } from "./ResultIcon";
 import type { MenuAction, MenuModel } from "./ResultActions";
 
@@ -36,11 +37,6 @@ const KIND_LABELS: Record<string, string> = {
 
 function kindLabel(result: SearchResult): string {
   return KIND_LABELS[result.kind] ?? result.kind;
-}
-
-function fullDate(timestamp: number | null | undefined): string | undefined {
-  if (!timestamp) return undefined;
-  return new Date(timestamp).toLocaleString();
 }
 
 function previewBody(result: SearchResult) {
@@ -117,10 +113,12 @@ export function ResultPreview({ result, model, onRun }: ResultPreviewProps) {
 
   const meta = result.meta;
   const size = formatBytes(meta?.size);
-  const modified = timeAgo(meta?.modified);
+  const modified = formatRecency(meta?.modified);
   const facts: { label: string; value: string; title?: string }[] = [];
   if (size) facts.push({ label: "Size", value: size });
-  if (modified) facts.push({ label: "Modified", value: modified, title: fullDate(meta?.modified) });
+  if (modified) {
+    facts.push({ label: "Modified", value: modified, title: formatFullDate(meta?.modified) });
+  }
   if (meta?.itemCount != null) {
     facts.push({ label: "Contents", value: meta.itemCount.toLocaleString() + " items" });
   }

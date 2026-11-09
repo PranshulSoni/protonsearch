@@ -1,8 +1,15 @@
 //! ProtonSearch v2 engine facade: query coordination, ranking, persistence.
-//! OWNER: engine-core (L1-A). The public `Engine` API below is consumed by the
-//! Tauri shell and the benchmark harness; keep it stable (L0 approval to change).
+//!
+//! Ownership:
+//! - engine.rs / db.rs / catalog.rs / settings.rs / paths.rs: L0 integration layer
+//! - query.rs / rank.rs: engine-core
+//!
+//! The public Engine API below is consumed by the Tauri shell and benchmarks.
 
+pub mod catalog;
+pub mod db;
 pub mod engine;
+pub mod migration;
 pub mod paths;
 pub mod query;
 pub mod rank;

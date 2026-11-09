@@ -81,7 +81,9 @@ export default function DesktopApp() {
 
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <Logo size={29} />
+          <span aria-hidden="true">
+            <Logo size={29} />
+          </span>
           <span className="brand-name">ProtonSearch</span>
         </div>
         <nav aria-label="Main">
