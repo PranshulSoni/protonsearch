@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ProtonSearch — Dynamic Island Card Carousel v9 — UI Polish</title>
+<style>
+:root{font-family:Inter,'Segoe UI Variable','Segoe UI',system-ui,sans-serif;color-scheme:light;--bg:#e6e8e5;--panel:#090a0c;--panelBorder:#202326;--text:#f6f7f8;--muted:#9ba3ae;--accent:#98bbdb;--ease:cubic-bezier(.22,1,.36,1)}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#eff1ee}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:2px solid #9abedd;outline-offset:2px}
+#pv8{font:13px Inter,'Segoe UI Variable','Segoe UI',system-ui,sans-serif;letter-spacing:-.015em}.bar{min-height:51px;padding:10px 16px;background:#f6f7f4;border:1px solid #d8ddd8;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.bar .kicker{font-size:10px;letter-spacing:.105em;font-weight:800;color:#687774}.bar .actions{display:flex;gap:7px}.uiBtn{padding:9px 12px;border-radius:7px;background:white;border:1px solid #ccd5cf;color:#33484c;font-weight:700;font-size:11px}.uiBtn.primary{background:#263f50;color:white;border-color:#263f50}
+.stage{height:590px;background:#e3e7e2;position:relative;overflow:hidden;isolation:isolate;border:1px solid #d8ddd8;border-top:0;border-radius:0 0 13px 13px}.decor{position:absolute;inset:0;pointer-events:none}.decor i{position:absolute;top:300px;left:22%;width:105%;height:345px;border:1px solid #ccd4cc;border-radius:50%;transform:rotate(-16deg)}.decor i:nth-child(2){top:342px;left:13%;border-color:#c3cfc6}.decor i:nth-child(3){top:381px;left:10%}.osbar{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:#f8faf6c9;border:1px solid #d2d9d0;border-radius:12px;padding:7px 10px;display:flex;gap:8px}.osbar span{height:24px;width:24px;display:grid;place-items:center;background:#e2e7e2;border:1px solid #cad5cf;border-radius:6px;color:#779088;font-size:12px}.osbar span:first-child{background:#204e75;color:#fff;font-weight:800}.startHint{position:absolute;top:38%;left:50%;width:85%;transform:translate(-50%,-50%);text-align:center;color:#58706e;transition:opacity .2s;pointer-events:none}.startHint b{font-size:17px;letter-spacing:-.04em;font-weight:650}.startHint p{font-size:12px;color:#9aa7a1}.stageFoot{position:absolute;left:22px;bottom:20px;color:#a2aea5;font-size:9px;font-weight:750;letter-spacing:.1em;line-height:1.8}
+.island{--w:520px;--h:66px;width:min(var(--w),calc(100% - 18px));height:var(--h);position:absolute;top:22px;left:50%;z-index:3;transform:translateX(-50%);border-radius:34px;background:var(--panel);border:1px solid var(--panelBorder);color:var(--text);overflow:hidden;box-shadow:0 26px 54px #14202840,0 3px 8px #1b202026;opacity:1;transition:width .55s var(--ease),height .55s var(--ease),border-radius .5s var(--ease),transform .45s var(--ease),opacity .22s,visibility 0s}.island.off{opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,-110px) scale(.88);transition:width .55s var(--ease),height .55s var(--ease),border-radius .5s var(--ease),transform .45s var(--ease),opacity .2s,visibility 0s .45s}.island.compact{border-radius:999px}.island.mediacard{border-radius:41px}.island .inner{height:100%;width:100%;transition:opacity .14s ease,transform .19s ease;opacity:1;transform:translateY(0)}.island .inner.out{opacity:0;transform:translateY(-11px)}.island .inner.in{animation:cardin .25s ease both}@keyframes cardin{from{opacity:0;transform:translateY(11px)}to{opacity:1;transform:translateY(0)}}
+.searchRow{height:65px;display:flex;align-items:center;gap:12px;padding:0 18px}.brandMark{height:27px;width:27px;flex:none}.searchRow input{flex:1;min-width:0;background:none;border:0;outline:none!important;color:var(--text);font-size:16px;letter-spacing:-.035em}.searchRow input::placeholder{color:#9ba0a4}.searchLoupe{color:#b8c2c9;width:20px;height:20px}.context{display:flex;align-items:center;justify-content:space-between;padding:10px 15px 4px;color:#aab4b8;font-size:10px}.context em{font-style:normal;letter-spacing:.09em;text-transform:uppercase;font-weight:760}.context span{color:#7d878d}.searchExpanded{border-top:1px solid #24282b}.filters{display:flex;gap:5px;padding:8px 12px;border-bottom:1px solid #252a2d}.filter{border:0;background:none;color:#a5adb0;padding:7px 10px;border-radius:6px;font-size:11px}.filter.chosen{background:#263b49;color:#e3f0f7}.scrollarea{overflow:auto;scrollbar-width:thin;scrollbar-color:#3e454a transparent}.results{max-height:242px;padding:7px 11px}.itemRow{width:100%;text-align:left;display:flex;align-items:center;gap:10px;min-height:53px;padding:8px 10px;background:none;border:1px solid transparent;border-radius:8px;color:#e8ebee}.itemRow:hover,.itemRow.active{background:#202d35}.itemRow.active{border-color:#334b5b}.itemIcon{width:32px;height:34px;border-radius:7px;background:#253744;display:grid;place-items:center;flex:none;color:#c9dce9;font-size:10px;font-weight:800}.itemText{min-width:0;flex:1}.itemText strong{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.itemText small{display:block;font-size:10px;color:#99a6ad;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta{font-size:10px;color:#88969c}.resultFoot{padding:8px 15px 9px;border-top:1px solid #2c3034;color:#87979c;font-size:10px;display:flex;justify-content:space-between;gap:8px}.resultFoot kbd{font:inherit;color:#d2dce1;border:1px solid #36424a;border-radius:4px;padding:2px 5px}
+.cardBody{height:100%;padding:18px 23px 17px}.cardTop{display:flex;align-items:center;gap:12px}.cardTop .bigIcon{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:#1c2931;color:#bad2df;flex:none}.cardTop .bigIcon svg{width:22px;height:22px}.cardTop h2{font-size:17px;letter-spacing:-.04em;line-height:1.25;margin:0;font-weight:720}.cardTop p{font-size:11px;color:#9ba7ae;margin:5px 0 0}.cardCounter{font-size:10px;letter-spacing:.04em;color:#758087;margin-left:auto;white-space:nowrap}.divider{height:1px;background:#262b30;margin:15px 0}.inlineNav{display:flex;gap:5px;overflow:auto;scrollbar-width:none;padding:0 0 9px}.inlineNav button{border:1px solid transparent;background:none;color:#9daab0;border-radius:7px;padding:6px 9px;font-size:10px;white-space:nowrap}.inlineNav button.active{background:#1c303c;border-color:#304958;color:#d4e8f4}
+.musicBody{padding:20px 25px 22px;height:100%;display:flex;flex-direction:column;justify-content:space-between}.musicTop{display:flex;align-items:center;gap:14px}.cover{width:78px;height:78px;border-radius:14px;background:#294d6a;position:relative;overflow:hidden;flex:none}.cover:before{content:'NO.';position:absolute;top:11px;left:12px;font-size:10px;letter-spacing:.15em;color:#9ebbd0}.cover:after{content:'';position:absolute;top:35px;left:21px;width:86px;height:86px;border:1px solid #bad0da;border-radius:50%}.songText{min-width:0;flex:1}.songText b{font-size:20px;letter-spacing:-.04em;display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.songText span{font-size:12px;color:#9eb7d1;margin-top:6px;display:block}.soundBars{color:#9ebfe1;margin-left:auto;flex:none}.seek{display:flex;align-items:center;gap:11px;margin-top:21px;color:#a9b4c3;font:11px ui-monospace,Consolas,monospace}.seek input{flex:1;min-width:0;accent-color:#f1f3f3}.transport{display:flex;justify-content:space-between;align-items:center;margin-top:15px;gap:7px}.transport button{height:37px;min-width:37px;display:grid;place-items:center;border:0;border-radius:8px;background:none;color:#f3f4f6}.transport button:hover{background:#25292e}.transport button.active{color:#a4c4e0}.transport button svg{width:21px;height:21px}.transport button.primary svg{width:27px;height:27px}.transport .outputButton{min-width:49px}.chooseRow{display:flex;align-items:center;gap:11px;width:100%;padding:12px 5px;background:none;color:#e9edf1;border:0;border-bottom:1px solid #282d32;text-align:left}.chooseRow span{flex:1;font-size:12px}.chooseRow small{color:#8ea0a9;font-size:10px}.chooseRow svg{height:18px;width:18px;color:#b4ccdd}.chooseRow:hover{background:#141c22}.back{background:#172128;color:#c4d6de;border:1px solid #344249;border-radius:7px;padding:8px 10px;margin-bottom:10px;font-size:10px}
+.clipRow{width:100%;display:flex;align-items:center;gap:9px;background:none;color:#eef1f3;border:1px solid transparent;border-radius:8px;text-align:left;padding:9px 9px;min-height:48px}.clipRow:hover,.clipRow.active{background:#1d2b34;border-color:#334a56}.clipRow b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.clipRow small{font-size:10px;color:#8a9aa4}.snippet{background:#101518;border:1px solid #29363c;padding:12px;border-radius:8px;font:11px/1.55 ui-monospace,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:112px;overflow-y:auto;color:#b8cbd4}
+.settingGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.settingTile{display:flex;gap:9px;align-items:center;min-width:0;min-height:57px;background:#171e23;color:#d6e0e3;border:1px solid #303b41;border-radius:10px;text-align:left;padding:9px 10px}.settingTile.on{background:#21394a;border-color:#395870}.settingTile svg{width:19px;height:19px;flex:none}.settingTile span{flex:1;min-width:0}.settingTile b{font-size:11px;display:block;white-space:nowrap}.settingTile small{font-size:10px;color:#8fa2ab;margin-top:4px;display:block}.settingTile .more{font-size:17px;color:#a7becd;padding:0 3px}.settingTile:hover{border-color:#688396}.sliders{display:grid;gap:11px;margin-top:14px}.sliderLine{display:flex;gap:11px;align-items:center;font-size:11px;color:#afbbc0}.sliderLine label{width:68px}.sliderLine input{flex:1;min-width:0;accent-color:#a5c4d8}.sliderLine output{width:34px;text-align:right;color:#89969f;font-size:10px}
+.agentRow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #252c30}.agentRow b{font-size:12px;display:block}.agentRow small{font-size:10px;color:#9eabb1;display:block;margin-top:5px}.agentProgress{height:4px;border-radius:4px;background:#27343d;margin-top:9px;overflow:hidden}.agentProgress i{display:block;height:100%;background:#a6c7d8}.agentBtn{border:1px solid #364952;border-radius:7px;background:#1c303b;color:#d7e8ee;padding:8px 11px;font-size:11px}.agentBtn:hover{background:#294354}.smallNote{font-size:10px;color:#86969d;line-height:1.5}.toast{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);border-radius:8px;background:#fdfefe;border:1px solid #d2ded9;padding:9px 14px;font-size:11px;color:#315569;box-shadow:0 8px 20px #25372a1c;opacity:0;transition:opacity .2s;white-space:nowrap;pointer-events:none}.toast.show{opacity:1}.instruction{position:absolute;top:440px;left:50%;transform:translateX(-50%);color:#647b73;font-size:11px;text-align:center;white-space:nowrap;max-width:90%}
+.ico{height:19px;width:19px;fill:none;stroke:currentColor;stroke-width:1.85;stroke-linejoin:round;stroke-linecap:round}.ico.big{height:22px;width:22px}
+@media(max-width:520px){.stage{height:600px}.musicBody{padding:18px 16px}.musicTop{gap:10px}.cover{height:62px;width:62px}.songText b{font-size:16px}.songText span{font-size:11px}.cardBody{padding:16px}.searchRow{padding:0 12px;gap:9px}.searchRow input{font-size:13px}.cardTop h2{font-size:15px}.settingTile{padding:7px}.settingTile b{font-size:10px}.instruction{font-size:10px}.bar .kicker{display:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* V9: systematic component and responsive geometry refinements */
+#pv8{--icon-size:19px;--control-height:38px}
+#pv8 .instruction{max-width:min(90%,520px);white-space:normal;width:max-content;line-height:1.55}
+#pv8 .island{background:#0d1012;border-color:#2e3538}
+#pv8 .island .inner{height:calc(100% - 31px);min-height:0}
+#pv8 .island.compact .inner{height:100%}
+#pv8 .island .inner{overflow:hidden}
+#pv8 .pageDots{height:31px;position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;gap:5px;border-top:1px solid #262c30;background:#101416;z-index:4}
+#pv8 .pageDot{position:relative;border:0;background:transparent;padding:9px 3px;min-width:14px;min-height:30px;display:grid;place-items:center;border-radius:5px}
+#pv8 .pageDot i{width:5px;height:5px;display:block;border-radius:999px;background:#657176;transition:background .2s,width .3s var(--ease),transform .22s}
+#pv8 .pageDot:hover i{background:#d6e6ec;transform:scale(1.12)}
+#pv8 .pageDot.active i{width:16px;background:#c7dce7}
+#pv8 .pageDot:focus-visible{outline-offset:-3px;outline:2px solid #92bcd0}
+#pv8 .island.compact .pageDots{height:38px;left:auto;right:15px;top:14px;bottom:auto;background:transparent;border:0;gap:1px}
+#pv8 .island.compact .pageDot{min-width:10px;width:11px;padding:11px 0;min-height:37px}
+#pv8 .island.compact .pageDot i{width:4px;height:4px}
+#pv8 .island.compact .pageDot.active i{width:6px;height:6px}
+#pv8 .island.compact .searchRow{padding-right:124px}
+#pv8 .island.compact .searchLoupe{display:none}
+#pv8 .ico{width:19px;height:19px;min-width:19px;min-height:19px;max-width:19px;max-height:19px;flex:0 0 19px;fill:none;stroke:currentColor;stroke-width:1.85;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+#pv8 .ico.big{width:23px;height:23px;min-width:23px;min-height:23px;max-width:23px;max-height:23px;flex-basis:23px}
+#pv8 .itemIcon .ico,#pv8 .resultIcon .ico{width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;max-width:18px!important;max-height:18px!important;flex-basis:18px!important}
+#pv8 .itemIcon{width:34px;height:34px;min-width:34px;max-width:34px;min-height:34px;max-height:34px;display:grid;place-items:center;overflow:hidden}
+#pv8 .cardCounter{display:none}
+#pv8 .cardBody{height:100%;min-height:0;padding:17px 22px 14px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#3c474a transparent}
+#pv8 .cardTop{min-height:42px;gap:11px}
+#pv8 .cardTop .bigIcon{width:40px;height:40px;min-width:40px;border-radius:12px}
+#pv8 .cardTop h2{font-size:16px;font-weight:700;line-height:1.2}
+#pv8 .cardTop p{font-size:11px;line-height:1.45;margin-top:4px}
+#pv8 .divider{margin:13px 0}
+#pv8 .inlineNav{gap:4px;scrollbar-width:none;padding-bottom:9px}
+#pv8 .inlineNav button{padding:7px 9px;border-radius:7px;min-height:29px}
+#pv8 .scrollarea{overscroll-behavior:contain}
+#pv8 .scrollarea.results{max-height:215px}
+#pv8 .searchRow{gap:12px}
+#pv8 .searchExpanded{height:calc(100% - 65px);display:flex;flex-direction:column}
+#pv8 .searchExpanded .results{flex:1;max-height:none;min-height:0}
+#pv8 .resultFoot{min-height:33px;flex:none;align-items:center}
+#pv8 .filters{flex:none;white-space:nowrap;gap:3px;padding:7px 10px;overflow-x:auto;scrollbar-width:none}
+#pv8 .filter{padding:7px 8px;min-height:29px}
+#pv8 .itemRow{min-height:50px}
+#pv8 .itemText{min-width:0}
+#pv8 .musicBody{padding:20px 23px 15px;min-height:0;height:100%;gap:8px;display:flex;flex-direction:column;justify-content:space-between}
+#pv8 .musicTop{min-height:70px;gap:14px}
+#pv8 .cover{height:73px;width:73px;min-width:73px;border-radius:13px}
+#pv8 .songText b{font-size:19px;line-height:1.2}
+#pv8 .songText span{font-size:11px}
+#pv8 .soundBars{min-width:22px;width:22px;display:flex;align-items:center;gap:3px;height:28px}
+#pv8 .soundBars i{width:3px;height:7px;border-radius:3px;background:#a4c8da;display:block;animation:pv9wave .9s ease-in-out infinite alternate}
+#pv8 .soundBars i:nth-child(2){height:19px;animation-delay:.2s}
+#pv8 .soundBars i:nth-child(3){height:12px;animation-delay:.4s}
+#pv8 .soundBars i:nth-child(4){height:9px;animation-delay:.15s}
+#pv8 .soundBars.paused i{animation-play-state:paused}
+@keyframes pv9wave{to{height:4px}}
+#pv8 .seek{margin-top:7px;gap:10px;line-height:1.4;font-variant-numeric:tabular-nums}
+#pv8 .seek input{min-width:0;width:100%;height:16px}
+#pv8 .transport{gap:4px;margin-top:4px;min-height:44px}
+#pv8 .transport button{height:42px;width:42px;min-width:36px;flex:1;display:flex;align-items:center;justify-content:center;padding:0;transition:background .15s,color .15s}
+#pv8 .transport .primary{flex:1.15}
+#pv8 .transport button .ico{width:20px;height:20px}
+#pv8 .transport button.primary .ico{width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px}
+#pv8 .transport button.outputButton{flex:1.16;min-width:38px;gap:1px}
+#pv8 .transport button.outputButton .ico:last-child{width:11px;height:11px;min-width:11px;min-height:11px;max-width:11px;max-height:11px;flex-basis:11px}
+#pv8 .chooseRow{min-height:47px;padding:9px 8px;gap:12px;border-radius:6px}
+#pv8 .chooseRow > .ico{flex-shrink:0}
+#pv8 .chooseRow > .choiceText{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:9px}
+#pv8 .choiceText .choiceTitle{font-size:12px;font-weight:570;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pv8 .choiceText .choiceMeta{font-size:10px;color:#8b9aa3;text-align:right;white-space:nowrap;flex:none}
+#pv8 .chooseRow > .choiceTail{margin-left:auto;flex:none;display:grid;place-items:center;width:22px;height:22px;color:#a8c6d7}
+#pv8 .choiceTail .ico{width:16px;height:16px;min-width:16px;min-height:16px;max-width:16px;max-height:16px}
+#pv8 .back{display:inline-flex;gap:7px;align-items:center;margin-bottom:7px;min-height:31px}
+#pv8 .back .ico{width:14px;height:14px;min-width:14px;min-height:14px;max-width:14px;max-height:14px}
+#pv8 .clipRow{min-height:48px;height:48px;padding:7px 8px;gap:10px;scroll-snap-align:start}
+#pv8 .clipRow .clipText{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
+#pv8 .clipRow .clipText b{width:100%;font-size:11.5px;min-width:0}
+#pv8 .clipRow .clipText small{font-size:10px}
+#pv8 .clipRow .itemIcon{background:#1e2c35}
+#pv8 .snippet{max-height:95px;min-height:48px;margin-top:8px;padding:10px 12px;width:100%;overflow-x:auto;line-height:1.55;font-size:10.5px}
+#pv8 .settingGrid{gap:9px;grid-template-columns:repeat(2,minmax(0,1fr))}
+#pv8 .settingTile{display:flex;min-width:0;min-height:61px;height:61px;align-items:stretch;padding:0;overflow:hidden;border:1px solid #34434a;border-radius:10px;background:#171e23;gap:0}
+#pv8 .settingTile.on{background:#223a49;border-color:#416178}
+#pv8 .settingToggle{background:none;border:0;color:#e3ecef;flex:1;min-width:0;text-align:left;display:flex;align-items:center;gap:9px;padding:9px 11px}
+#pv8 .settingToggle:hover{background:#ffffff08}
+#pv8 .settingToggle .ico{width:19px;height:19px;flex:0 0 19px;color:#c5d9e3}
+#pv8 .settingToggle .tileLabel{flex:1;min-width:0}
+#pv8 .settingToggle b{font-size:11px;line-height:1.2;display:block;overflow:hidden;text-overflow:ellipsis}
+#pv8 .settingToggle small{font-size:10px;color:#a5b5be;line-height:1.3;display:block;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pv8 .settingExpand{display:grid;place-items:center;background:#ffffff09;color:#c1d4df;width:36px;min-width:36px;height:100%;border:0;border-left:1px solid #4b606c;padding:0}
+#pv8 .settingExpand:hover{background:#ffffff16}
+#pv8 .settingExpand .ico{width:16px;height:16px;min-width:16px;min-height:16px;max-width:16px;max-height:16px;flex-basis:16px}
+#pv8 .sliders{margin-top:17px;gap:12px}
+#pv8 .sliderLine{gap:9px;min-height:25px}
+#pv8 .sliderLine label{width:68px;flex:none}
+#pv8 .sliderLine output{width:34px;flex:none;font-variant-numeric:tabular-nums}
+#pv8 .agentRow{min-width:0}
+#pv8 .agentBtn{white-space:nowrap;min-height:33px;display:inline-flex;align-items:center;justify-content:center;gap:5px}
+#pv8 .agentBtn .ico{width:14px;height:14px;min-width:14px;min-height:14px;max-width:14px;max-height:14px}
+#pv8 .agentList{max-height:150px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3b4d53 transparent}
+#pv8 .agentStatus{margin-left:auto;border:1px solid #354c59;border-radius:5px;font-size:9px;color:#b9cdd6;padding:4px 7px;white-space:nowrap;flex:none}
+#pv8 .agentActions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
+#pv8 .notifications .chooseRow{align-items:flex-start}
+#pv8 .notificationText{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+#pv8 .notificationText b{font-size:12px}
+#pv8 .notificationText small{font-size:10px;line-height:1.4;color:#97a6ae;white-space:normal}
+#pv8 .notificationDismiss{flex:none;margin-left:auto;display:grid;place-items:center;border:0;background:transparent;color:#a0b6c4;border-radius:6px;width:30px;height:30px}
+#pv8 .notificationDismiss:hover{background:#293941}
+#pv8 .notificationDismiss .ico{width:15px;height:15px;min-width:15px;min-height:15px;max-width:15px;max-height:15px}
+#pv8 .smallNote{line-height:1.5}
+@media(max-width:520px){
+ #pv8 .cardBody{padding:15px 15px 12px}
+ #pv8 .cardTop h2{font-size:15px}
+ #pv8 .cardTop .bigIcon{width:36px;height:36px;min-width:36px}
+ #pv8 .musicBody{padding:16px 18px 12px}
+ #pv8 .musicTop{gap:11px}
+ #pv8 .cover{height:60px;width:60px;min-width:60px}
+ #pv8 .songText b{font-size:16px}
+ #pv8 .settingTile{min-height:58px;height:58px}
+ #pv8 .settingToggle{padding:8px 8px;gap:7px}
+ #pv8 .settingExpand{width:27px;min-width:27px}
+ #pv8 .settingToggle b{font-size:10px}
+ #pv8 .searchRow{padding-left:12px}
+ #pv8 .island.compact .searchRow{padding-right:112px}
+ #pv8 .island.compact .pageDots{right:11px}
+ #pv8 .resultFoot span:nth-child(2){display:none}
+ #pv8 .chooseRow .choiceMeta{max-width:78px;overflow:hidden;text-overflow:ellipsis}
+}
+@media(max-width:380px){
+ #pv8 .cardBody{padding:14px 13px 11px}
+ #pv8 .inlineNav{flex-wrap:wrap;overflow:visible;row-gap:4px}
+ #pv8 .inlineNav button{flex:0 0 auto;padding:6px 8px}
+ #pv8 .clipRow{scroll-snap-align:start}
+ #pv8 .settingGrid{grid-template-columns:1fr;gap:6px}
+ #pv8 .settingTile{height:50px;min-height:50px}
+ #pv8 .settingToggle{padding:7px 12px}
+ #pv8 .settingToggle b{font-size:11px}
+ #pv8 .sliders{margin-top:13px}
+ #pv8 .musicBody{padding:14px 13px 10px}
+ #pv8 .transport{gap:0}
+ #pv8 .transport button{min-width:32px}
+ #pv8 .searchRow input{font-size:12px}
+ #pv8 .island.compact .searchRow{padding-right:112px}
+}
+@media(prefers-reduced-motion:reduce){#pv8 *,#pv8 *::before,#pv8 *::after{transition:none!important;animation:none!important}}
+</style></head><body>
+<div id="pv8"><div class="bar"><span class="kicker">PROTONSEARCH / DYNAMIC ISLAND — REFINED</span><div class="actions"><button class="uiBtn" id="nextDemo">Next card</button><button class="uiBtn primary" id="summon">Simulate Alt + Space</button></div></div><div class="stage" id="stage"><div class="decor"><i></i><i></i><i></i></div><div class="startHint" id="startHint"><b>A different kind of island.</b><p>Summon it, then scroll over the card to switch features.</p></div><div class="island off compact" id="island" role="region" aria-label="ProtonSearch island"><div class="inner" id="panel"></div><nav class="pageDots" id="pageDots" aria-label="Jump to island card"></nav><div class="toast" id="toast"></div></div><div class="instruction" id="instruction">Scroll to switch cards · Or choose a dot below · Swipe on touch screens</div><div class="stageFoot">PROTONSEARCH · V9 DESIGN SYSTEM<br>ONE ISLAND · SCROLLABLE FEATURES</div><div class="osbar"><span>P</span><span>▤</span><span>◈</span><span>⌘</span></div></div></div>
+<script>
+(()=>{
+const root=document.getElementById('pv8');if(!root||root.dataset.active)return;root.dataset.active='yes';const $=q=>root.querySelector(q),$$=q=>[...root.querySelectorAll(q)],esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icons={search:'<circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>',clipboard:'<rect x="5" y="5" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="6" rx="1"/>',media:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',agent:'<rect x="8" y="2" width="8" height="7" rx="2"/><rect x="2" y="16" width="7" height="6" rx="2"/><rect x="15" y="16" width="7" height="6" rx="2"/><path d="M12 9v4M5.5 16v-3h13v3"/>',controls:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="16" cy="17" r="2"/>',browser:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18M12 3c-5 5-5 13 0 18"/>',git:'<circle cx="7" cy="5" r="2"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="14" r="2"/><path d="M7 7v10M7 10c0 4 10-1 10 2"/>',bell:'<path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>',wifi:'<path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r="1"/>',bluetooth:'<path d="M7 7 17 17l-5 4V3l5 4L7 17"/>',battery:'<rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 10v4M12 9l-3 4h4l-2 3"/>',plane:'<path d="m2 16 20-8-9-1-3-5-2 1 2 6-7 4z"/>',play:'<path d="m8 5 12 7-12 7z" fill="currentColor" stroke="none"/>',pause:'<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',skipBack:'<path d="M5 5v14m13-14L7 12l11 7z" fill="currentColor" stroke="none"/>',skipNext:'<path d="M19 5v14M6 5l11 7-11 7z" fill="currentColor" stroke="none"/>',shuffle:'<path d="M18 14 22 18l-4 4M18 2l4 4-4 4M2 18h3c3 0 4-3 6-6l2-3c2-3 3-3 6-3h3M2 6h3c3 0 4 3 6 6l2 3c2 3 3 3 6 3h3"/>',repeat:'<path d="m17 2 4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/>',output:'<rect x="4" y="4" width="16" height="14" rx="2"/><path d="M12 18v3M8 21h8"/>',more:'<path d="m9 18 6-6-6-6"/>',check:'<path d="m5 12 4 4L19 6"/>',back:'<path d="m14 18-6-6 6-6"/>',close:'<path d="M18 6 6 18M6 6l12 12"/>'};
+
+icons.skipBack='<path d="M5 5v14"/><path d="m19 5-11 7 11 7V5Z" fill="currentColor" stroke="none"/>';
+icons.skipNext='<path d="M19 5v14"/><path d="m5 5 11 7-11 7V5Z" fill="currentColor" stroke="none"/>';
+icons.shuffle='<path d="M18 14l4 4-4 4M18 2l4 4-4 4M2 18h3c6 0 6-12 13-12h4M2 6h3c6 0 6 12 13 12h4"/>';
+icons.headphones='<path d="M3 14v-2a9 9 0 0 1 18 0v2M3 14h4v7H5a2 2 0 0 1-2-2v-5ZM21 14h-4v7h2a2 2 0 0 0 2-2v-5Z"/>';
+icons.speaker='<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="14" r="3"/><path d="M12 7h.01"/>';
+icons.monitor='<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 22h8M12 18v4"/>';
+icons.chevronDown='<path d="m6 9 6 6 6-6"/>';
+icons.text='<path d="M5 6h14M5 11h14M5 16h10M5 21h7"/>';
+icons.code='<path d="m8 8-4 4 4 4m8-8 4 4-4 4m-3-12-2 20"/>';
+icons.image='<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m4 18 6-6 4 4 3-3 4 5"/>';
+icons.link='<path d="M10 13a5 5 0 0 0 7 .2l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7-.2l-3 3a5 5 0 0 0 7 7l2-2"/>';
+icons.pin='<path d="m16 3 5 5-4 1-3 4-1 8-2-7-5-5L2 8l5-5 3 4 6-4Z"/>';
+icons.file='<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7Z"/><path d="M13 2v7h7"/>';
+icons.close='<path d="M18 6 6 18M6 6l12 12"/>';
+icons.sun='<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2m0-14-2 2M7 17l-2 2"/>';
+icons.volume='<path d="M11 5 6 9H3v6h3l5 4V5ZM15 9a5 5 0 0 1 0 6M18 6a9 9 0 0 1 0 12"/>';
+icons.output='<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 22h8M12 18v4"/>';
+
+const icon=(k,big=false)=>`<svg class="ico ${big?'big':''}" viewBox="0 0 24 24" aria-hidden="true">${icons[k]||icons.search}</svg>`;
+const logo=`<svg class="brandMark" viewBox="0 0 50 54" aria-hidden="true"><path d="M17 3H34C47 3 52 14 47 27C44 36 37 38 25 38H21L17 49C15 55 2 56 4 47L14 10C15 6 16 3 17 3Z" fill="#102e55"/><path d="M17 3H34C43 3 49 8 49 18C38 17 29 19 22 23L17 39L4 48L14 10C15 6 16 3 17 3Z" fill="#3173a8"/><path d="M28 13H34C40 13 40 19 38 22C36 25 33 26 25 26L28 13Z" fill="#dbe6ed"/></svg>`;
+const cards=[['search','Search'],['media','Media'],['clipboard','Clipboard'],['agent','Agents'],['controls','Quick Settings'],['browser','Browser'],['git','Git'],['bell','Notifications']];
+const fileResults=[['Architecture notes.docx','DOC','Documents / Nova / Product','Files'],['search-architecture.md','MD','Projects / ProtonSearch','Files'],['Architecture','DIR','Projects / Research','Folders'],['Visual Studio Code','APP','Installed application','Apps'],['Open project workspace','RUN','Quick action','Actions']];
+let s={visible:false,mode:0,query:'',filter:'All',selected:0,media:0,playing:true,seconds:22,shuffle:false,repeat:false,output:'Laptop speakers',detail:'',clip:'All',clipSelected:0,agentSelected:0,agents:[{name:'Orchestrator',task:'Delegating tasks and reviewing results',status:'Running',progress:67},{name:'Search Profiler',task:'Measuring lookup latency',status:'Running',progress:45},{name:'UI Reviewer',task:'Verifying window animation',status:'Queued',progress:0}],settings:[['Wi-Fi','wifi',true],['Bluetooth','bluetooth',true],['Airplane mode','plane',false],['Energy saver','battery',false]],brightness:70,volume:50,notifications:[['Index updated','Your recent files are searchable.'],['Agent review ready','Search profiler completed one task.'],['Clipboard saved','Recent snippet added to history.']]};
+const music=[['Strawberry Milkshakes','Arlo',198],['The Quiet Hour','Field Notes',227]];const clips=[['Text','Release notes','ProtonSearch v2 — refined indexing'],['Code','query_fast()','fn query_fast(q: &str) {\n  search.indexed(q)\n}'],['Images','design-review.png','Image 1920 × 1080'],['Links','ProtonSearch repository','https://github.com/PranshulSoni/protonsearch'],['Files','Release-plan.pdf','Documents / ProtonSearch / Release-plan.pdf']];
+let switching=false,wheelAccum=0,lastWheel=0,touchStart=null,toastTimer;
+const format=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');const mode=()=>cards[s.mode][0];const matches=()=>fileResults.filter(x=>(s.filter==='All'||x[3]===s.filter)&&s.query.toLowerCase().trim().split(/\s+/).filter(Boolean).every(t=>(x[0]+' '+x[2]).toLowerCase().includes(t)));
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),1600)}
+function cardDims(){
+ const small=window.matchMedia('(max-width:520px)').matches;
+ const narrow=window.matchMedia('(max-width:380px)').matches;
+ switch(mode()){
+ case 'search':return s.query.trim()?[550,Math.min(460,185+Math.min(matches().length,5)*53)]:[520,66];
+ case 'media':return [490,s.detail==='output'?(small?365:342):(small?286:286)];
+ case 'clipboard':return [510,narrow?446:small?416:391];
+ case 'agent':return [520,small?445:411];
+ case 'controls':return [515,s.detail?(small?418:366):(narrow?483:small?400:376)];
+ case 'browser':return [500,small?408:361];
+ case 'git':return [505,small?355:330];
+ default:return [500,small?385:345];
+ }
+}
+function dimensions(){const [w,h]=cardDims();const i=$('#island');i.style.setProperty('--w',w+'px');i.style.setProperty('--h',h+'px');i.classList.toggle('compact',mode()==='search'&&!s.query.trim());i.classList.toggle('mediacard',mode()==='media')}
+function head(name,sub){
+ return `<div class="cardTop"><span class="bigIcon">${icon(s.detail==='wifi'?'wifi':s.detail==='bluetooth'?'bluetooth':s.detail==='output'?'speaker':mode(),true)}</span><div style="min-width:0;flex:1"><h2>${esc(name)}</h2><p>${esc(sub)}</p></div></div>`
+}
+function searchMarkup(){
+ const x=matches();s.selected=Math.max(0,Math.min(x.length-1,s.selected));
+ return `<div class="searchRow">${logo}<input id="searchBox" aria-label="Search" placeholder="${window.matchMedia('(max-width:380px)').matches?'Search…':'Search files, folders, apps and actions…'}" value="${esc(s.query)}" autocomplete="off"/>${icon('search')}</div>${s.query.trim()?`<div class="searchExpanded"><div class="filters">${['All','Files','Folders','Apps','Actions'].map(f=>`<button class="filter ${s.filter===f?'chosen':''}" data-filter="${f}">${f}</button>`).join('')}</div><div class="scrollarea results">${x.map((r,i)=>`<button class="itemRow ${s.selected===i?'active':''}" data-result="${i}"><span class="itemIcon">${r[1]==='DIR'?icon('file'):r[1]==='APP'?icon('controls'):icon('file')}</span><span class="itemText"><strong>${esc(r[0])}</strong><small>${esc(r[2])}</small></span></button>`).join('')||'<div class="smallNote" style="padding:22px">No matching sample results.</div>'}</div><div class="resultFoot"><span>${x.length} local results</span><span><kbd>↑↓</kbd> Navigate · <kbd>Enter</kbd> Open</span></div></div>`:''}`
+}
+function mediaMarkup(){
+ if(s.detail==='output'){
+ const devs=[['Laptop speakers','speaker','Built-in output'],['Wireless headphones','headphones','Bluetooth audio'],['External display','monitor','Display audio']];
+ return `<div class="cardBody">${head('Audio output','Choose your playback device')}<div class="divider"></div><button class="back" data-detail="">${icon('back')} Back to player</button>${devs.map(([name,ic,sub])=>`<button class="chooseRow" data-output="${name}">${icon(ic)}<span class="choiceText"><span class="choiceTitle">${name}</span><span class="choiceMeta">${sub}</span></span><span class="choiceTail">${icon(s.output===name?'check':'more')}</span></button>`).join('')}</div>`
+ }
+ const t=music[s.media];
+ return `<div class="musicBody"><div class="musicTop"><div class="cover"></div><div class="songText"><b>${esc(t[0])}</b><span>${esc(t[1])}</span></div><span class="soundBars ${s.playing?'':'paused'}" aria-label="${s.playing?'Now playing':'Paused'}"><i></i><i></i><i></i><i></i></span></div><div class="seek"><span id="timeUsed">${format(s.seconds)}</span><input type="range" id="seek" min="0" max="${t[2]}" value="${s.seconds}" aria-label="Playback position"/><span id="timeLeft">−${format(t[2]-s.seconds)}</span></div><div class="transport"><button aria-label="Shuffle" aria-pressed="${s.shuffle}" title="Shuffle" data-media="shuffle" class="${s.shuffle?'active':''}">${icon('shuffle')}</button><button aria-label="Previous track" title="Previous" data-media="previous">${icon('skipBack')}</button><button class="primary" aria-label="${s.playing?'Pause':'Play'}" title="${s.playing?'Pause':'Play'}" data-media="play">${icon(s.playing?'pause':'play')}</button><button aria-label="Next track" title="Next" data-media="next">${icon('skipNext')}</button><button aria-label="Repeat" aria-pressed="${s.repeat}" title="Repeat" data-media="repeat" class="${s.repeat?'active':''}">${icon('repeat')}</button><button class="outputButton" aria-label="Select audio output" title="Audio output" data-media="output">${icon(s.output==='Wireless headphones'?'headphones':'output')}${icon('chevronDown')}</button></div></div>`
+}
+function clipboardMarkup(){
+ const types=['All','Text','Images','Links','Code','Files','Pinned'];
+ const list=clips.filter(c=>s.clip==='All'||c[0]===s.clip||(s.clip==='Pinned'&&c[0]==='Code'));
+ const iconFor={Text:'text',Code:'code',Images:'image',Links:'link',Files:'file'};
+ s.clipSelected=Math.max(0,Math.min(s.clipSelected,list.length-1));
+ return `<div class="cardBody">${head('Clipboard','Your recent copies')}<div class="divider" style="margin:12px 0 7px"></div><div class="inlineNav" aria-label="Clipboard categories">${types.map(t=>`<button data-cliptype="${t}" aria-pressed="${s.clip===t}" class="${s.clip===t?'active':''}">${t}</button>`).join('')}</div><div class="scrollarea" style="max-height:144px;scroll-snap-type:y proximity">${list.map((c,i)=>`<button class="clipRow ${s.clipSelected===i?'active':''}" data-clipitem="${i}"><span class="itemIcon">${icon(iconFor[c[0]]||'clipboard')}</span><span class="clipText"><b>${esc(c[1])}</b><small>${esc(c[0])} · Local clip</small></span>${s.clipSelected===i?icon('check'):''}</button>`).join('')||'<div class="smallNote" style="padding:14px">Nothing in this category</div>'}</div><div class="snippet">${esc(list[s.clipSelected]?.[2]||'Select a clip')}</div></div>`
+}
+function agentMarkup(){
+ const a=s.agents[s.agentSelected]||s.agents[0];
+ return `<div class="cardBody">${head('Your agents','Tasks and active subagents')}<div class="divider" style="margin:11px 0"></div><div style="display:flex;justify-content:space-between;align-items:center;gap:9px;margin-bottom:5px"><span class="smallNote">CURRENT WORKSPACE · ${s.agents.length} AGENTS</span><button class="agentBtn" data-agentaction="spawn">${icon('agent')} Subagent</button></div><div class="agentList">${s.agents.map((ag,i)=>`<button class="clipRow ${s.agentSelected===i?'active':''}" data-agent="${i}"><span class="itemIcon">${icon('agent')}</span><span class="clipText"><b>${esc(ag.name)}</b><small>${esc(ag.task)}</small></span><span class="agentStatus">${esc(ag.status)}</span></button>`).join('')}</div><div class="agentActions"><button class="agentBtn" data-agentaction="pause">${icon(a.status==='Paused'?'play':'pause')} ${a.status==='Paused'?'Resume':'Pause'}</button><button class="agentBtn" data-agentaction="details">${icon('file')} Details</button><span class="smallNote" style="margin-left:auto;align-self:center">${a.progress}%</span></div><div class="agentProgress"><i style="width:${a.progress}%"></i></div></div>`
+}
+function settingsMarkup(){
+ if(s.detail==='wifi'||s.detail==='bluetooth'){
+ const iswifi=s.detail==='wifi';
+ return `<div class="cardBody">${head(iswifi?'Wi-Fi networks':'Bluetooth devices','Choose a device to connect')}<div class="divider"></div><button class="back" data-detail="">${icon('back')} Back to Quick Settings</button>${(iswifi?['Home Network','Studio Wi-Fi','Guest Network']:['Wireless headphones','Bluetooth mouse','Phone']).map((d,i)=>`<button class="chooseRow" data-connect="${d}">${icon(iswifi?'wifi':i===0?'headphones':'bluetooth')}<span class="choiceText"><span class="choiceTitle">${d}</span><span class="choiceMeta">${i===0?'Saved':'Available'}</span></span><span class="choiceTail">${icon('more')}</span></button>`).join('')}</div>`
+ }
+ return `<div class="cardBody">${head('Quick Settings','Your PC, one gesture away')}<div class="divider" style="margin:12px 0"></div><div class="settingGrid">${s.settings.map((q,i)=>`<div class="settingTile ${q[2]?'on':''}"><button class="settingToggle" data-setting="${i}" aria-label="Turn ${q[0]} ${q[2]?'off':'on'}" aria-pressed="${q[2]}">${icon(q[1])}<span class="tileLabel"><b>${q[0]}</b><small>${q[2]?'On':'Off'}</small></span></button>${i<2?`<button class="settingExpand" data-expand="${q[1]}" aria-label="Show ${q[0]} connections" title="Show ${q[0]} connections">${icon('more')}</button>`:''}</div>`).join('')}</div><div class="sliders"><div class="sliderLine">${icon('sun')}<label for="bright">Brightness</label><input id="bright" type="range" min="0" max="100" value="${s.brightness}"/><output>${s.brightness}%</output></div><div class="sliderLine">${icon('volume')}<label for="vol">Volume</label><input id="vol" type="range" min="0" max="100" value="${s.volume}"/><output>${s.volume}%</output></div></div></div>`
+}
+function browserMarkup(){
+ return `<div class="cardBody">${head('Browser','Bookmarks & history')}<div class="divider"></div><div class="context"><em>BOOKMARKS</em><span>Saved pages</span></div>${[['GitHub — ProtonSearch','github.com'],['Rust documentation','doc.rust-lang.org']].map(x=>`<button class="chooseRow" data-link="${x[0]}">${icon('browser')}<span class="choiceText"><span class="choiceTitle">${x[0]}</span><span class="choiceMeta">${x[1]}</span></span><span class="choiceTail">${icon('more')}</span></button>`).join('')}<div class="context" style="margin-top:7px"><em>RECENT HISTORY</em><span>Local</span></div><button class="chooseRow" data-link="Recently visited">${icon('browser')}<span class="choiceText"><span class="choiceTitle">Recently visited sites</span></span><span class="choiceTail">${icon('more')}</span></button></div>`
+}
+function gitMarkup(){
+ return `<div class="cardBody">${head('Git Activity','Recent commits · ProtonSearch')}<div class="divider"></div>${[['Optimize metadata search','2 hours ago'],['Improve OCR scheduling','Yesterday'],['Refine window animations','Monday']].map(x=>`<button class="chooseRow" data-link="${x[0]}">${icon('git')}<span class="choiceText"><span class="choiceTitle">${x[0]}</span><span class="choiceMeta">${x[1]}</span></span><span class="choiceTail">${icon('more')}</span></button>`).join('')}</div>`
+}
+function notificationMarkup(){
+ return `<div class="cardBody notifications">${head('Notifications','Recent activity')}<div class="divider"></div>${s.notifications.map((x,i)=>`<div class="chooseRow">${icon('bell')}<span class="notificationText"><b>${esc(x[0])}</b><small>${esc(x[1])}</small></span><button type="button" class="notificationDismiss" data-notification="${i}" aria-label="Dismiss ${esc(x[0])}" title="Dismiss notification">${icon('close')}</button></div>`).join('')||'<div class="smallNote" style="text-align:center;margin-top:25px">All caught up</div>'}</div>`
+}
+function markup(){switch(mode()){case'search':return searchMarkup();case'media':return mediaMarkup();case'clipboard':return clipboardMarkup();case'agent':return agentMarkup();case'controls':return settingsMarkup();case'browser':return browserMarkup();case'git':return gitMarkup();default:return notificationMarkup()}}
+let paintVersion=0;
+function paintDots(){
+ $('#pageDots').innerHTML=cards.map((c,i)=>`<button type="button" class="pageDot ${i===s.mode?'active':''}" data-page="${i}" title="${c[1]}" aria-label="Go to ${c[1]} card" ${i===s.mode?'aria-current="page"':''}><i></i></button>`).join('');
+ $$('[data-page]').forEach(btn=>btn.onclick=e=>{e.stopPropagation();goCard(Number(btn.dataset.page))});
+}
+function render(animate=false){
+ const version=++paintVersion;dimensions();paintDots();
+ const area=$('#panel');
+ const put=()=>{if(version!==paintVersion)return;area.classList.remove('out');area.innerHTML=markup();if(animate){area.classList.remove('in');void area.offsetWidth;area.classList.add('in')}bind()};
+ if(animate){area.classList.add('out');setTimeout(put,120)}else put();
+}
+function goCard(index){
+ if(index<0||index>=cards.length||(!s.detail&&index===s.mode))return;
+ s.mode=index;s.detail='';render(true);
+}
+function switchCard(delta){if(!s.visible||switching)return;switching=true;goCard((s.mode+delta+cards.length)%cards.length);setTimeout(()=>switching=false,350)}
+function show(){s.visible=true;s.mode=0;s.detail='';render();$('#island').classList.remove('off');$('#startHint').style.opacity=0;$('#summon').textContent='Hide island';setTimeout(()=>$('#searchBox')?.focus(),190)}
+function hide(){s.visible=false;$('#island').classList.add('off');$('#startHint').style.opacity=1;$('#summon').textContent='Simulate Alt + Space'}
+function bind(){const input=$('#searchBox');if(input){input.oninput=e=>{s.query=e.target.value;s.selected=0;const caret=e.target.selectionStart;render();const q=$('#searchBox');q.focus();q.setSelectionRange(caret,caret)};input.onkeydown=e=>{if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();const h=matches();if(h.length){s.selected=(s.selected+(e.key==='ArrowDown'?1:-1)+h.length)%h.length;render();$('#searchBox').focus()}}else if(e.key==='Enter'){const h=matches();if(h[s.selected])toast('Demo: '+h[s.selected][0])}}}
+$$('[data-filter]').forEach(b=>b.onclick=()=>{s.filter=b.dataset.filter;s.selected=0;render()});$$('[data-result]').forEach(b=>b.onclick=()=>{s.selected=Number(b.dataset.result);render()});
+$$('[data-media]').forEach(b=>b.onclick=()=>{let a=b.dataset.media;if(a==='play')s.playing=!s.playing;else if(a==='previous'){s.media=(s.media+music.length-1)%music.length;s.seconds=0}else if(a==='next'){s.media=(s.media+1)%music.length;s.seconds=0}else if(a==='shuffle')s.shuffle=!s.shuffle;else if(a==='repeat')s.repeat=!s.repeat;else if(a==='output')s.detail='output';render()});
+if($('#seek'))$('#seek').oninput=e=>{s.seconds=Number(e.target.value);$('#timeUsed').textContent=format(s.seconds);$('#timeLeft').textContent='−'+format(music[s.media][2]-s.seconds)};
+$$('[data-output]').forEach(b=>b.onclick=()=>{s.output=b.dataset.output;s.detail='';render();toast('Output: '+s.output)});
+$$('[data-cliptype]').forEach(b=>b.onclick=()=>{s.clip=b.dataset.cliptype;s.clipSelected=0;render()});$$('[data-clipitem]').forEach(b=>b.onclick=()=>{s.clipSelected=Number(b.dataset.clipitem);render()});
+$$('[data-agent]').forEach(b=>b.onclick=()=>{s.agentSelected=Number(b.dataset.agent);render()});$$('[data-agentaction]').forEach(b=>b.onclick=()=>{const a=b.dataset.agentaction;if(a==='spawn'){s.agents.push({name:'Review Worker '+(s.agents.length-1),task:'Reviewing current results',status:'Queued',progress:0});toast('Demo subagent created')}else if(a==='pause'){const ag=s.agents[s.agentSelected];ag.status=ag.status==='Paused'?'Running':'Paused'}else toast(s.agents[s.agentSelected].task);render()});
+$$('[data-setting]').forEach(b=>b.onclick=()=>{const index=Number(b.dataset.setting);s.settings[index][2]=!s.settings[index][2];render()});$$('[data-expand]').forEach(b=>b.onclick=e=>{e.stopPropagation();s.detail=b.dataset.expand;render()});$$('[data-detail]').forEach(b=>b.onclick=()=>{s.detail=b.dataset.detail;render()});$$('[data-connect]').forEach(b=>b.onclick=()=>{toast('Simulated connection: '+b.dataset.connect);s.detail='';render()});
+if($('#bright'))$('#bright').oninput=e=>{s.brightness=Number(e.target.value);e.target.nextElementSibling.textContent=s.brightness+'%'};if($('#vol'))$('#vol').oninput=e=>{s.volume=Number(e.target.value);e.target.nextElementSibling.textContent=s.volume+'%'};
+$$('[data-link]').forEach(b=>b.onclick=()=>toast('Demo: '+b.dataset.link));$$('[data-notification]').forEach(b=>b.onclick=()=>{s.notifications.splice(Number(b.dataset.notification),1);render()})}
+$('#summon').onclick=()=>s.visible?hide():show();$('#nextDemo').onclick=()=>{if(!s.visible)show();else switchCard(1)};
+$('#island').addEventListener('wheel',e=>{if(!s.visible||e.ctrlKey||e.target.closest('input[type="range"], .pageDots, button, .inlineNav'))return;const sc=e.target.closest('.scrollarea');if(sc){const canDown=sc.scrollTop+sc.clientHeight<sc.scrollHeight-2,canUp=sc.scrollTop>2;if((e.deltaY>0&&canDown)||(e.deltaY<0&&canUp))return}e.preventDefault();if(performance.now()-lastWheel<500)return;wheelAccum+=e.deltaY;if(Math.abs(wheelAccum)>48){lastWheel=performance.now();switchCard(wheelAccum>0?1:-1);wheelAccum=0}},{passive:false});
+$('#island').addEventListener('touchstart',e=>{if(e.target.closest('input'))return;touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY}},{passive:true});$('#island').addEventListener('touchend',e=>{if(!touchStart)return;const dx=e.changedTouches[0].clientX-touchStart.x,dy=e.changedTouches[0].clientY-touchStart.y;touchStart=null;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy))switchCard(dx<0?1:-1)},{passive:true});
+window.addEventListener('keydown',e=>{if(e.altKey&&e.code==='Space'){e.preventDefault();s.visible?hide():show()}else if(e.key==='Escape'&&s.visible){if(s.detail){s.detail='';render()}else hide()}else if(s.visible&&e.ctrlKey&&['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();switchCard(e.key==='ArrowDown'?1:-1)}});
+const timer=setInterval(()=>{if(!document.body.contains(root)){clearInterval(timer);return}if(s.playing){s.seconds++;const dur=music[s.media][2];if(s.seconds>=dur){s.seconds=0;s.media=(s.media+1)%music.length}if(mode()==='media'&&!s.detail&&s.visible){const seek=$('#seek');if(seek){seek.value=s.seconds;$('#timeUsed').textContent=format(s.seconds);$('#timeLeft').textContent='−'+format(dur-s.seconds)}}}},1000);
+render();
+})();
+</script></body></html>
