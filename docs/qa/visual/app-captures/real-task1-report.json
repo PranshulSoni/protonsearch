@@ -1,0 +1,486 @@
+{
+ "capturedAt": "2026-11-09T17:51:58.968Z",
+ "states": [
+  {
+   "name": "real-padded-empty",
+   "input": "",
+   "count": "",
+   "options": 0,
+   "labels": [],
+   "chips": [
+    {
+     "label": "ALL",
+     "checked": "true"
+    },
+    {
+     "label": "FILES",
+     "checked": "false"
+    },
+    {
+     "label": "FOLDERS",
+     "checked": "false"
+    },
+    {
+     "label": "DOCUMENTS",
+     "checked": "false"
+    },
+    {
+     "label": "APPS",
+     "checked": "false"
+    },
+    {
+     "label": "CLIPBOARD",
+     "checked": "false"
+    },
+    {
+     "label": "WEB",
+     "checked": "false"
+    },
+    {
+     "label": "GIT",
+     "checked": "false"
+    },
+    {
+     "label": "ACTIONS",
+     "checked": "false"
+    }
+   ],
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close",
+   "phase": "visible",
+   "card": {
+    "top": 28,
+    "left": 28,
+    "width": 820,
+    "height": 292.3333435058594
+   },
+   "win": {
+    "width": 876,
+    "height": 352
+   },
+   "shadow": "rgba(36, 60, 43, 0.14) 0px 16px 40px 0px, rgba(21, 44, 24, 0.06) 0px 2px 6px 0px, rgba(20, 43, 49, 0.05) 0px 0px 0px 1px",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-padded-empty.png"
+  },
+  {
+   "name": "real-padded-results",
+   "input": "arch",
+   "count": "50 matches",
+   "options": 50,
+   "labels": [
+    "ARCHITECTURE.md",
+    "archive-admission.js",
+    "archived-session-gate.js",
+    "archive-admission.js",
+    "architecture.md",
+    "ARCHITECTURE-091877e3.json"
+   ],
+   "chips": [
+    {
+     "label": "ALL",
+     "checked": "true"
+    },
+    {
+     "label": "FILES",
+     "checked": "false"
+    },
+    {
+     "label": "FOLDERS",
+     "checked": "false"
+    },
+    {
+     "label": "DOCUMENTS",
+     "checked": "false"
+    },
+    {
+     "label": "APPS",
+     "checked": "false"
+    },
+    {
+     "label": "CLIPBOARD",
+     "checked": "false"
+    },
+    {
+     "label": "WEB",
+     "checked": "false"
+    },
+    {
+     "label": "GIT",
+     "checked": "false"
+    },
+    {
+     "label": "ACTIONS",
+     "checked": "false"
+    }
+   ],
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
+   "phase": "visible",
+   "card": {
+    "top": 28,
+    "left": 28,
+    "width": 820,
+    "height": 479.3333435058594
+   },
+   "win": {
+    "width": 876,
+    "height": 536
+   },
+   "shadow": "rgba(36, 60, 43, 0.14) 0px 16px 40px 0px, rgba(21, 44, 24, 0.06) 0px 2px 6px 0px, rgba(20, 43, 49, 0.05) 0px 0px 0px 1px",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-padded-results.png"
+  },
+  {
+   "name": "real-padded-filter-files",
+   "input": "a",
+   "count": "50 matches",
+   "options": 50,
+   "labels": [
+    "a",
+    "a.exe",
+    "a.exe",
+    "a.exe",
+    "a.exe",
+    "a.exe"
+   ],
+   "chips": [
+    {
+     "label": "ALL",
+     "checked": "false"
+    },
+    {
+     "label": "FILES",
+     "checked": "true"
+    },
+    {
+     "label": "FOLDERS",
+     "checked": "false"
+    },
+    {
+     "label": "DOCUMENTS",
+     "checked": "false"
+    },
+    {
+     "label": "APPS",
+     "checked": "false"
+    },
+    {
+     "label": "CLIPBOARD",
+     "checked": "false"
+    },
+    {
+     "label": "WEB",
+     "checked": "false"
+    },
+    {
+     "label": "GIT",
+     "checked": "false"
+    },
+    {
+     "label": "ACTIONS",
+     "checked": "false"
+    }
+   ],
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
+   "phase": "visible",
+   "card": {
+    "top": 28,
+    "left": 28,
+    "width": 820,
+    "height": 479.3333435058594
+   },
+   "win": {
+    "width": 876,
+    "height": 536
+   },
+   "shadow": "rgba(36, 60, 43, 0.14) 0px 16px 40px 0px, rgba(21, 44, 24, 0.06) 0px 2px 6px 0px, rgba(20, 43, 49, 0.05) 0px 0px 0px 1px",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-padded-filter-files.png"
+  },
+  {
+   "name": "real-padded-zero",
+   "input": "zzzzzz-no-such-file",
+   "count": "No matches",
+   "options": 0,
+   "labels": [],
+   "chips": [
+    {
+     "label": "ALL",
+     "checked": "false"
+    },
+    {
+     "label": "FILES",
+     "checked": "true"
+    },
+    {
+     "label": "FOLDERS",
+     "checked": "false"
+    },
+    {
+     "label": "DOCUMENTS",
+     "checked": "false"
+    },
+    {
+     "label": "APPS",
+     "checked": "false"
+    },
+    {
+     "label": "CLIPBOARD",
+     "checked": "false"
+    },
+    {
+     "label": "WEB",
+     "checked": "false"
+    },
+    {
+     "label": "GIT",
+     "checked": "false"
+    },
+    {
+     "label": "ACTIONS",
+     "checked": "false"
+    }
+   ],
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearchEsc Clear",
+   "phase": "visible",
+   "card": {
+    "top": 28,
+    "left": 28,
+    "width": 820,
+    "height": 292.3333435058594
+   },
+   "win": {
+    "width": 876,
+    "height": 352
+   },
+   "shadow": "rgba(36, 60, 43, 0.14) 0px 16px 40px 0px, rgba(21, 44, 24, 0.06) 0px 2px 6px 0px, rgba(20, 43, 49, 0.05) 0px 0px 0px 1px",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-padded-zero.png"
+  }
+ ],
+ "motion": {
+  "summonMid": {
+   "input": "",
+   "count": "",
+   "options": 0,
+   "labels": [],
+   "chips": [
+    {
+     "label": "ALL",
+     "checked": "false"
+    },
+    {
+     "label": "FILES",
+     "checked": "true"
+    },
+    {
+     "label": "FOLDERS",
+     "checked": "false"
+    },
+    {
+     "label": "DOCUMENTS",
+     "checked": "false"
+    },
+    {
+     "label": "APPS",
+     "checked": "false"
+    },
+    {
+     "label": "CLIPBOARD",
+     "checked": "false"
+    },
+    {
+     "label": "WEB",
+     "checked": "false"
+    },
+    {
+     "label": "GIT",
+     "checked": "false"
+    },
+    {
+     "label": "ACTIONS",
+     "checked": "false"
+    }
+   ],
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close",
+   "phase": "visible",
+   "card": {
+    "top": 28,
+    "left": 29.67329978942871,
+    "width": 816.6533203125,
+    "height": 291.1402587890625
+   },
+   "win": {
+    "width": 876,
+    "height": 352
+   },
+   "shadow": "rgba(36, 60, 43, 0.14) 0px 16px 40px 0px, rgba(21, 44, 24, 0.06) 0px 2px 6px 0px, rgba(20, 43, 49, 0.05) 0px 0px 0px 1px"
+  },
+  "summonSettled": {
+   "input": "",
+   "count": "",
+   "options": 0,
+   "labels": [],
+   "chips": [
+    {
+     "label": "ALL",
+     "checked": "false"
+    },
+    {
+     "label": "FILES",
+     "checked": "true"
+    },
+    {
+     "label": "FOLDERS",
+     "checked": "false"
+    },
+    {
+     "label": "DOCUMENTS",
+     "checked": "false"
+    },
+    {
+     "label": "APPS",
+     "checked": "false"
+    },
+    {
+     "label": "CLIPBOARD",
+     "checked": "false"
+    },
+    {
+     "label": "WEB",
+     "checked": "false"
+    },
+    {
+     "label": "GIT",
+     "checked": "false"
+    },
+    {
+     "label": "ACTIONS",
+     "checked": "false"
+    }
+   ],
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close",
+   "phase": "visible",
+   "card": {
+    "top": 28,
+    "left": 28,
+    "width": 820,
+    "height": 292.3333435058594
+   },
+   "win": {
+    "width": 876,
+    "height": 352
+   },
+   "shadow": "rgba(36, 60, 43, 0.14) 0px 16px 40px 0px, rgba(21, 44, 24, 0.06) 0px 2px 6px 0px, rgba(20, 43, 49, 0.05) 0px 0px 0px 1px"
+  },
+  "dismissMid": {
+   "input": "",
+   "count": "",
+   "options": 0,
+   "labels": [],
+   "chips": [
+    {
+     "label": "ALL",
+     "checked": "false"
+    },
+    {
+     "label": "FILES",
+     "checked": "true"
+    },
+    {
+     "label": "FOLDERS",
+     "checked": "false"
+    },
+    {
+     "label": "DOCUMENTS",
+     "checked": "false"
+    },
+    {
+     "label": "APPS",
+     "checked": "false"
+    },
+    {
+     "label": "CLIPBOARD",
+     "checked": "false"
+    },
+    {
+     "label": "WEB",
+     "checked": "false"
+    },
+    {
+     "label": "GIT",
+     "checked": "false"
+    },
+    {
+     "label": "ACTIONS",
+     "checked": "false"
+    }
+   ],
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close",
+   "phase": "closing",
+   "card": {
+    "top": 28,
+    "left": 28.719158172607422,
+    "width": 818.5617065429688,
+    "height": 291.8205871582031
+   },
+   "win": {
+    "width": 876,
+    "height": 352
+   },
+   "shadow": "rgba(36, 60, 43, 0.14) 0px 16px 40px 0px, rgba(21, 44, 24, 0.06) 0px 2px 6px 0px, rgba(20, 43, 49, 0.05) 0px 0px 0px 1px"
+  },
+  "dismissSettled": {
+   "input": "",
+   "count": "",
+   "options": 0,
+   "labels": [],
+   "chips": [
+    {
+     "label": "ALL",
+     "checked": "false"
+    },
+    {
+     "label": "FILES",
+     "checked": "true"
+    },
+    {
+     "label": "FOLDERS",
+     "checked": "false"
+    },
+    {
+     "label": "DOCUMENTS",
+     "checked": "false"
+    },
+    {
+     "label": "APPS",
+     "checked": "false"
+    },
+    {
+     "label": "CLIPBOARD",
+     "checked": "false"
+    },
+    {
+     "label": "WEB",
+     "checked": "false"
+    },
+    {
+     "label": "GIT",
+     "checked": "false"
+    },
+    {
+     "label": "ACTIONS",
+     "checked": "false"
+    }
+   ],
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close",
+   "phase": "closed",
+   "card": {
+    "top": 28,
+    "left": 28,
+    "width": 820,
+    "height": 292.3333435058594
+   },
+   "win": {
+    "width": 876,
+    "height": 352
+   },
+   "shadow": "rgba(36, 60, 43, 0.14) 0px 16px 40px 0px, rgba(21, 44, 24, 0.06) 0px 2px 6px 0px, rgba(20, 43, 49, 0.05) 0px 0px 0px 1px"
+  }
+ },
+ "notes": []
+}

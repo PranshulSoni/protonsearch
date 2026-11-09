@@ -15,7 +15,7 @@ the search field) — `PROTONSEARCH_V2_MASTER_PROMPT_ALL_IN_ONE.md:169-199`, har
 
 | Surface | Focus model | Trap | Return |
 |---|---|---|---|
-| Quick Launcher | dialog window; input owns focus; list uses `aria-activedescendant` (focus never leaves the input while navigating rows) | Tab cycles input ↔ preview scroll region (when open) ↔ preview actions (when present) ↔ footer "Open ProtonSearch" | On hide, OS returns focus to the previous app (Tauri must not steal it); on show, input is focused before paint |
+| Quick Launcher | dialog window; input owns focus; list uses `aria-activedescendant` (focus never leaves the input while navigating rows) | Tab cycles input ↔ filter strip (selected chip) ↔ preview scroll region (when open) ↔ preview actions (when present) ↔ footer "Open ProtonSearch" | On hide, OS returns focus to the previous app (Tauri must not steal it); on show, input is focused before paint |
 | Context menu | roving focus inside `role="menu"` | Tab/Shift+Tab closes the menu | Esc/activation returns focus to the input with the row still selected |
 | Confirm dialog | focus trapped in dialog; initial focus on **Cancel** (safe default) | Tab cycles dialog controls only | Esc/cancel returns focus to the triggering control |
 | Desktop app | document order; sidebar nav is a roving-tabindex list; route h1 is a programmatic focus target | no trap | route changes move focus to the h1; back navigation returns to the previously focused nav item |
@@ -43,6 +43,7 @@ Bindings below are the contract. "Selected row" means the option referenced by `
 | **Summon hotkey** (default **Alt+Space**, user-configurable) | anywhere | Show launcher with empty query and focused input; press again while visible → hide | Global; default preserved from legacy (`protonsearch/src/settings.rs:149-150`); conflict detection `hotkey.rs:67-88`. Never hard-code the chord in UI copy beyond the footer's "Alt + Space" where it is the configured value. |
 | **Esc** | context menu open | Close menu, return focus to input, selection unchanged | first in the chain |
 | **Esc** | preview open (no menu) | Close preview, keep query and selection | |
+| **Esc** | filter active (no menu/preview) | Clear filter to All, keep query/results, focus input | before clearing the query |
 | **Esc** | query non-empty | Clear query and selection, keep window open, focus input | reference footer: "Esc Clear" (reference:136) |
 | **Esc** | query empty | Hide launcher | "Esc Close" when empty |
 | **↑ / ↓** | input focused, results exist | Move selection to previous/next row; wraps at both ends | reference:137; never moves the caret |
@@ -55,11 +56,15 @@ Bindings below are the contract. "Selected row" means the option referenced by `
 | **Enter** | results visible | Open the selected result via its `ActionSpec`; launcher hides **before** the action runs | must validate current query epoch + result id (§4); no-op if the selected id is stale/absent |
 | **Enter** | 0 results / error | no-op | no fallback action, no "search the web" surprise |
 | **Ctrl+Space** | any row selected | Toggle preview for the selected row | no-op with no selection; closes preview first if open |
+| **Tab into filter strip** | launcher | Focus the **selected** filter chip (one roving tab stop) | Tab again leaves the strip for preview/footer |
+| **← / →** | filter strip focused | Change the filter immediately (radiogroup) and keep focus on the chip | filter dispatches a new scoped search instantly |
+| **Home / End** | filter strip focused | Select All / last filter | same |
+| **Space / Enter** | filter strip focused | Re-apply the focused chip (no-op if already selected) | |
 | **Shift+Enter / Shift+↑↓ / Ctrl+A** | clipboard results | **Unbound — clipboard multi-select is CUT for v2.0 alpha** (SCREENS §10) | Do not render a teaser or disabled markers |
 | **Ctrl+C** | input has **no text selection** and a row is selected | Copy the full path (files/folders), URL (web), or text (clipboard) of the selected row; footer announces "Path copied" | if input text is selected, native copy wins |
 | **Ctrl+C** | input text selected | Native copy of the selection | |
 | **Menu key / Shift+F10** | row selected | Open the row's context menu, focus first item | |
-| **Tab** | launcher | Move focus: input → preview scroll region (if open) → preview action buttons (if any) → "Open ProtonSearch" → input | stops are never the result rows (combobox pattern) |
+| **Tab** | launcher | Move focus: input → filter strip (selected chip) → preview scroll region (if open) → preview action buttons (if any) → "Open ProtonSearch" → input | stops are never the result rows (combobox pattern) |
 | **Shift+Tab** | launcher | Reverse of Tab | |
 | **Typing / Backspace / Delete / Ctrl+A/C/X/V/Z** | input focused | Native text editing; typing always goes to the query | selection resets to row 0 on any query change |
 | **Alt+F4** | launcher | OS close (hide) | native behaviour allowed |
@@ -73,12 +78,13 @@ shortcut. Shortcut education lives only in the footer and Preferences.
 ```text
 if (menuOpen)            closeMenu();            return
 if (previewOpen)         closePreview();         return
+if (filterActive)        clearFilter();           return
 if (query.length > 0)    clearQuery();           return
                          hideLauncher()
 ```
 
-Every branch keeps focus on the input except "hide". No branch triggers an action. The multi-select branch is CUT
-for v2.0 alpha (SCREENS §10); the chain is menu → preview → clear query → hide.
+Every branch keeps focus on the input except "hide". No branch triggers an action. The chain is menu → preview →
+clear filter → clear query → hide (multi-select is CUT for v2.0 alpha, SCREENS §10).
 
 ### 2.2 Caret vs list keys
 
@@ -91,8 +97,8 @@ Because the input mirrors a command palette, arrow-key ownership is split:
 ### 2.3 Focus and the count/status regions
 
 The match count and the footer status are **not** tab stops and never take focus. They announce changes through
-live regions (§7). The footer "Open ProtonSearch" is a real button and is the only Tab stop outside the input (plus
-preview when open).
+live regions (§7). Outside the input, the Tab stops are the filter strip (one selected-chip stop, SCREENS §2.11), the
+preview scroll region/actions when open, and the footer "Open ProtonSearch" button.
 
 ---
 
@@ -196,6 +202,7 @@ navigable); it is an ordered list with `aria-current="step"`.
 | Root | `role="dialog"`, `aria-modal="true"`, `aria-label="ProtonSearch"` | focus trap per §1; no focusable window chrome |
 | Input | `role="combobox"`, `aria-expanded` ("true" when options exist, "false" when empty/0 results/error), `aria-controls="ps-results"`, `aria-autocomplete="list"`, `aria-activedescendant="ps-opt-<id>"` (only while a row is active), `aria-label="Search files, apps, and actions"`, `autocomplete="off"`, `spellcheck="false"` | the visible placeholder is **not** the label |
 | Listbox | `role="listbox"`, `aria-label="Results"`; **single-select only in alpha** (multi-select CUT — §5), so no `aria-multiselectable` | one listbox; virtualisation keeps option ids stable |
+| Filter strip | `role="radiogroup"` + `aria-label="Filter results"`; each chip `role="radio"` + `aria-checked`, one roving tab stop (selected chip only) | never `role="tab"`; selecting swaps the scoped result set in the same listbox; labels localised, no counts in chips (SCREENS §2.11) |
 | Group | `role="group"` + `aria-labelledby` to the visible caps label | label element is `role="presentation"`, the group name carries it |
 | Option | `role="option"`, id from the stable result id, `aria-selected` as in §5, `aria-describedby` pointing to path/meta text | accessible name = item title only; description = path + trailing meta; disabled option `aria-disabled="true"` with the reason in the description |
 | Count | `role="status"` `aria-live="polite"` `aria-atomic="true"` | throttle to ≤1 update/300 ms; announce "No matches" once |
@@ -261,6 +268,8 @@ navigable); it is an ordered list with `aria-current="step"`.
 `prefers-reduced-motion: reduce` (Windows "Animation effects" off):
 - all durations collapse to ~0; no transform travel; selection/hover still change colour instantly (state must remain
   perceivable);
+- launcher open/close is instant: window shows with the card fully opaque, dismiss hides on the next frame (no 150/110 ms
+  transform, no scale);
 - any future progress component becomes static (v2.0 alpha renders no progress bar — SCREENS §10); determinate values
   update without interpolation;
 - onboarding step content and preview content appear instantly;
@@ -319,6 +328,7 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 | 2 | Type "arch" | one polite announcement of the result count ("3 matches"); no per-keystroke chatter |
 | 3 | ArrowDown | active option announced: "Architecture notes.docx, option, selected, Documents / Projects / Nova · Yesterday" |
 | 4 | ArrowDown again | next option announced; the group change announces "FOLDERS, group" |
+| 5 | Tab | focus moves to the filter strip; selected chip announced "All, radio button, checked"; ArrowRight announces the new filter and the updated result count |
 | 5 | Ctrl+Space | "Preview opened" (polite); Tab reaches the preview region, announced "Preview, {title}, region" |
 | 6 | Esc | "Preview closed" |
 | 7 | Shift+F10 | "Actions, menu"; ArrowDown reads items; Esc returns to the input |
@@ -348,7 +358,8 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 
 ## 11. Verification checklist (blocking for G3/G4 sign-off)
 
-1. Keyboard-only pass of all journeys in `SCREENS.md` §8 — no mouse needed.
+1. Keyboard-only pass of all journeys in `SCREENS.md` §8 — no mouse needed, including the filter strip (Tab, arrows,
+   Home/End, Esc-to-input).
 2. Every focus stop has a visible focus ring at 100/125/150/200 % and in HC Black/White.
 3. Focus trap tests: launcher Tab cycle, dialog Tab cycle, menu Tab-closes; focus never lands on a hidden element.
 4. Stale-selection test: simulate tier-1 results arriving after a new keystroke (late request) — selection stays on
@@ -364,6 +375,9 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 10. SR scripts §10 with both Narrator and NVDA recorded (screen recording or transcript); no unannounced state
     changes on the critical path.
 11. Contrast audit re-run with `.agents/notes/contrast_final.py`; any fails fixed in tokens, not components.
+12. **Filter strip:** selected chip keeps its 2 px bar at 560/820 widths; Tab lands on the selected chip only; ←/→
+    dispatches a scoped search and keeps focus; Home/End reach All/last; Esc clears to All and returns focus to the
+    input; overflow scrolls the focused chip into view; no truncation with a long localised label.
 
 ---
 

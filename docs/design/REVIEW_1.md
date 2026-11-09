@@ -386,6 +386,11 @@ control or plain "not available in this build" copy), never a dead control.
 | 34 | Comparisons + alpha sheet | reference HTML vs production (launcher, Home, onboarding; light + dark); plus one capture per SCREENS §10 item proving no dead control/fake percentage | 1280 | 100 | both | master prompt §XI.3 |
 | 35 | Motion | reduced-motion on: launcher selection, preview, onboarding step | — | 100 | light | video/GIF or before/after pair |
 
+User-visual pass (2026-11-09) adds these captures beyond the 35: launcher shadow on a light and a dark wallpaper at
+100 % and 150 % (four images, no cut-off edge); launcher open and close frames mid-animation (two images or a short
+clip) plus the reduced-motion instant; filter strip at rest/selected/focus at 560 and 820, light + dark, plus the
+scoped 0-match copy and a long localised label proving no truncation.
+
 Mandatory master-prompt §V.D states are covered by rows 1–15/16–33 (first summon, empty, 0, 1, many, selected, preview,
 loading, index-error, dark, each onboarding step, Home, settings, narrow width, 125/150/200 %, high contrast, keyboard
 focus). Clipboard multi-select is intentionally **not** in the manifest — row 5 exists to prove its absence.
@@ -419,3 +424,39 @@ about closing contract gaps, not redesigning.
 are closed in the docs (final preview geometry, 560×480 / ≤700 window contract, alpha limitations) and remain code
 tasks where noted. The blockers B1/B2 and majors M2/M5/M6/M7/M8/M10 are unchanged code work. With those fixed, the
 Gate 3 launcher is acceptable against this review.
+
+---
+
+## 8. Live-capture review — user screenshots (2026-11-09)
+
+**Evidence:** `docs/qa/visual/app-captures-release/live-now.png` and `live-1-1195x837.png` (both 1195×837 desktop
+captures), plus zoomed crops and pixel sampling (scratch: `.agents/notes/crops/`). The user-reported issues are
+addressed by the design changes above; the remaining observations are listed here so L0/ux-qa can verify them on a real
+screen.
+
+### 8.1 User-reported issues → resolution
+
+| Report | Root cause | Resolution |
+|---|---|---|
+| "That shadow behind it doesn't look proper" | The launcher token was a single `0 24px 56px` layer: extent ≈108 px inside a 28 px transparent window pad, so the native window clipped it into a hard square edge; the card read as flat, especially on dark. | New layered 4-stop token with extent ≤24 px inside the 28 px pad, plus a 1 px rim on dark (DESIGN_SYSTEM §5.4). CSS + layout contract specified; ui-launcher replaces the token/usage. |
+| Open/close motion needs art direction | There was no launcher motion at all: CSS said show/hide instant, Rust emitted `launcher:dismiss` but no frontend listener existed, and the only close was a 400 ms safety hide. | Open 150 ms `cubic-bezier(0.16,1,0.3,1)` (fade + 8 px rise + scale .985→1); close 110 ms `cubic-bezier(0.4,0,0.2,1)` (fade + 4 px rise + scale 1→.99); input/selection/results stay instant. Exact CSS + shell/JS contract in DESIGN_SYSTEM §6.3/§6.4, SCREENS §2.10. |
+| Horizontal category/filter strip must be specified | No filter UI existed in the launcher. | Full spec added: SCREENS §2.11 (40 px block, 26 px chips, 9 filters, All first, selected = pale fill + 2 px accent bar, radiogroup keyboard model, overflow scrolling, localisation rules, scope mapping) + DESIGN_SYSTEM §8 FilterStrip + REFERENCE_MAPPING `.segments` → FilterStrip. Geometry formula updated to include the 40 px strip. |
+
+### 8.2 Further defects found in the captures
+
+| ID | Severity | Finding | Evidence | Exact fix |
+|---|---|---|---|---|
+| L1 | **High** | **Stale legacy app icon.** The native title bar shows the old silver/red "S" swirl, not the ProtonSearch P. The same asset is checked in for the app icon. | `titlebar-now-3x.png`; `apps/desktop/src-tauri/icons/32x32.png` is the legacy swirl (matches the crop). | Generate `icon.ico` + 16/20/24/32/48/64/128/256 PNGs and tray/notification sizes from the brand assets (`assets/brand/protonsearch-mark*.svg`). Use the primary two-tone on light and the on-dark variant when the app theme is dark (regenerate via `window_icon()` on theme change); never ship the legacy "S". Verify 16–32 px on light and dark title bars + taskbar. |
+| L2 | **High** | **Launcher shadow clips** (user report). Token extent ≈108 px vs 28 px pad → hard-cut shadow; no visible ambient falloff. | DESIGN_SYSTEM §5.4 math; legacy token still in `tokens.css:104` (light) / `:293` (dark). | Replace with the layered token in §5.4; keep `LAUNCHER_SHADOW_PAD = 28`; root padding 28 + card `height:100%`; no native shadow; verify on a light and a dark wallpaper at 100/150 %. |
+| L3 | **High** | **Launcher open/close is unimplemented.** `launcher.css:18` still says show/hide instant; no frontend listener for `launcher:dismiss` (grep of `apps/desktop/src`); only Rust's 400 ms safety hide closes. | Code evidence above. | Implement DESIGN_SYSTEM §6.4 (`data-state` opening/closing + 150/110 ms), listen for `launcher:dismiss`, hide on `animationend` + 200 ms fallback; re-summon cancels close. Rust safety hide must be generation-cancellable (L0). |
+| L4 | **High** | **Filter strip missing** in the shipped launcher (no chips/category UI). | `LauncherSurface.tsx` has no filter/scope UI; `lib/results.ts` only groups results. | Build SCREENS §2.11: component + `scope` on `SearchRequest`, geometry +40 px, keyboard/ARIA, localised labels. |
+| L5 | **Medium** | **App window can exceed/overflow the captured work area.** Both live captures show the window's right and bottom edges (caption buttons, onboarding step 7, h1 tail) outside the 1195×837 frame. The window is fixed 1180×800 with `.center()` only — no work-area clamp. If the capture is a desktop grab (not a crop), ~15–20 % of the window is unreachable. | `main.rs:221-224`; both screenshots; pixel scan shows the window frame at x≈190 with content continuing past 1195. | Clamp initial and restored size to the monitor work area: `w = min(1180, wa.w − 48)`, `h = min(800, wa.h − 48)`, centre within it, `min_inner_size 560×480`; re-verify after a DPI change. If the capture is a crop, record that and re-capture full-window evidence. |
+| L6 | **Medium** | **Dark window/card elevation is missing.** Onboarding card `#1c1e1a` on ground `#141513` = 1.09:1 with no shadow/border; ~120 px empty bands above/below the card make it read as a hole in a black window. | `live-now.png` (card at y≈305, large void), `live-1`; pixel sampling (20,21,19) ground vs card. | Onboarding stage: `padding: 24px`; card gets `border: 1px solid var(--ps-line)` and a clipped-safe card shadow `0 2px 6px rgba(0,0,0,.30), 0 8px 16px rgba(0,0,0,.28)` (extent 24 ≤ stage padding 26), and `min-height: min(620px, calc(100vh − 48px))` so it fills the window instead of floating in a void. Light theme uses `0 2px 6px rgba(36,60,43,.08), 0 8px 16px rgba(36,60,43,.06)`. No gradient. |
+| L7 | **Low** | Title-bar caption text is OS grey and the icon nearly disappears on the dark title bar; it reads disabled. | `titlebar-live1-3x.png`. | Native frame keeps OS styling; the icon fix (L1) is the actionable part. If a branded caption is wanted, it requires custom decorations — out of scope for this pass. |
+| L8 | **Low** | Onboarding h1/text clipping at the right edge in the captures is a consequence of L5 (or of the capture crop); re-verify after the clamp. | `right-clip-now-3x.png`. | No separate fix; verify with a full-window capture at 1195×837 and 150 % DPI. |
+
+**Not defects:** the browser window overlapping ProtonSearch in `live-1` is another app; the white strip above the
+frame in `live-now` is the app behind; the in-app brand mark and the launcher card itself look correct at this scale.
+
+**Status:** L2/L3/L4 are specified in DESIGN_SYSTEM §5.4/§6 and SCREENS §2.10/§2.11 (ui-launcher can implement
+directly); L1 and L5/L6 need L0/ux-qa action (assets + Rust window clamp) and are recorded against this review.

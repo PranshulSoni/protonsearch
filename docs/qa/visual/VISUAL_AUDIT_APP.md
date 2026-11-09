@@ -193,3 +193,147 @@ The audit harness is a temporary Playwright script (browser mock, preview server
 is not checked in. Recommended permanent command after the tooling fix in VQA-01:
 `node tools/visual-qa/shots.mjs --out docs/qa/visual/screenshots` (all app routes + 7-step
 onboarding, light/dark, all viewports). Real-window captures are produced separately by L0/ux-qa.
+
+---
+
+## 8. Task-2 follow-up — window-open motion and count truthfulness (2026-11-09)
+
+**Implemented**
+
+- **App open (task-2 §1):** `app/transition.ts` + `DesktopApp` apply
+  `.app-shell.is-opening` with `opacity 0→1 + translateY(4px→0)` over
+  `var(--ps-dur-panel)` (160 ms, inside the 140–180 ms brief). It plays on first mount
+  (app start / onboarding → app) and when the document becomes visible again (tray
+  “Open ProtonSearch” / launcher footer), never on route changes (the shell does not remount).
+- **Onboarding → app:** real 160 ms root crossfade through the View Transition API in
+  `OnboardingView`; the app shell skips its own mount animation when the crossfade is active
+  (no double fade). Falls back to the shell fade when the API or motion setting disallows it.
+- **Reduced motion:** `prefers-reduced-motion` and `data-motion="reduced"` collapse
+  `--ps-dur-panel` to 0 ms (plus base.css animation overrides); no View Transition is started.
+- **Count truthfulness (task-2 §2):** `app/describe.ts` helpers
+  `hasIndexCount / indexCountText / sourceStatusText / rootStatusText`;
+  Home, Search & indexes, and Preferences diagnostics all read
+  `EngineStatus.filenameEntries`. “Starting…” is shown only before the first count; a numeric 0 is
+  shown once the engine reports 0; a starting source/root no longer prints “0 items” while the
+  engine reports entries.
+
+**Evidence** (Playwright, browser mock, 1180×800; `docs/qa/visual/screenshots/`):
+
+| Check | Result |
+|---|---|
+| First paint animation class + computed style | `is-opening` present; `animationName: app-window-in`; `animationDuration: 0.16s`; keyframes and rule present |
+| Home indexed count (light/dark) | `124,318` from mock `EngineStatus.filenameEntries`; source rows `126 items · Ready` (no transient 0) |
+| Reduced motion | `matchMedia(reduce) = true`, `data-motion="reduced"`, `--ps-dur-panel = 0s`, shell `animationDuration = 0s` |
+| Onboarding → app crossfade | `startViewTransition` called once; app shell mounts without its own `is-opening` class |
+| Reduced-motion crossfade fallback | 0 View Transition calls; app still reaches Home |
+| Route changes | shell animation class not re-added (unit/smoke test) |
+
+Screenshots: `task2-app-open-light.png`, `task2-app-open-dark.png`,
+`task2-app-open-light-reduced-motion.png`, `task2-onboarding-to-app.png`.
+Tests: `transition.test.ts` (flag consumption, reduced-motion detection, support probe),
+`describe.test.ts` (count truthfulness), `smoke.test.tsx` (one-shot open animation, no
+animation on route changes, filename count not 0).
+
+**Not verified:** tray/launcher-footer window-show path in a real Tauri window (the browser mock
+cannot emit native window visibility; `visibilitychange` is the replay hook, needs a real
+WebView2 check); OS-level reduced-motion with the real setting; animation frame pacing on WebView2.
+The app is unaffected by the launcher's padded window — no shared layout code.
+
+---
+
+## 9. Task-5 — onboarding dark-mode elevation (design review L6)
+
+**Fix (onboarding.css only; exact REVIEW_1 §8.2 / L6 values)**
+
+- Stage padding 26 → **24 px**.
+- Card min-height 560 → `min(620px, calc(100vh - 48px))` so it fills the window instead of floating in a void.
+- Card border → **1 px `var(--ps-line)`** (was line-strong).
+- Layered clip-safe shadow, light: `0 2px 6px rgba(36,60,43,.08), 0 8px 16px rgba(36,60,43,.06)`;
+  dark: `0 2px 6px rgba(0,0,0,.30), 0 8px 16px rgba(0,0,0,.28)`. The previous single
+  `var(--ps-shadow-app) 0 18px 45px` was invisible against the dark ground and read as a flat rectangle.
+- Short-window media override no longer zeroes the min-height.
+
+**Before / after probes** (Playwright, browser mock, computed styles):
+
+| Viewport / theme | Before | After |
+|---|---|---|
+| 900×660 dark | min-height 560, padding 26, card top 50, single 18/45 shadow | min-height **612** (fills 24+612+24), padding 24, border `rgb(46,50,44)`, layered dark shadow, card top 24 |
+| 1180×800 dark | min-height 560, card top 120 | min-height **620**, top 90, layered dark shadow |
+| 900×660 light | single 18/45 shadow | layered light-green shadow, min-height 612 |
+| 1180×800 light | min-height 560 | min-height 620 |
+
+Screenshots: `task5-before-{900x660,1180x800}-{light,dark}.png`,
+`task5-after-{900x660,1180x800}-{light,dark}.png`.
+
+**Not verified:** real WebView2 dark window at 150 % DPI (the layered shadow/DAU contrast should be confirmed on
+the real desktop; the browser renderer shows the elevation correctly).
+
+---
+
+## 10. Task-6 — Preferences: default web-search engine + toggle
+
+New **Search** settings section (after Launcher shortcut): switch “Offer web search results”
+(`webSearchEnabled`), segmented engine control **Google / Bing / DuckDuckGo / YouTube** mapped to
+`google / bing / duck_duck_go / you_tube` (`webSearchEngine`), and the required helper copy
+“Opens the result in your browser; nothing is sent until you choose it.” Autosave via
+`updateSettings({ webSearchEnabled } / { webSearchEngine })` with the standard 2 s “Saved” stamp.
+
+Evidence (Playwright, 1180×800 light/dark and 900×660 light): section present with 4 radios
+[Google, Bing, DuckDuckGo, YouTube]; switching “Offer web search results” off persists and disables the engine
+radios; switching it back on re-enables them. Screenshots:
+`task6-preferences-websearch-{1180x800,900x660}-{light,dark}.png`.
+The launcher’s “Search the web for …” result row itself is launcher scope and not changed here.
+
+---
+
+## 11. Task-7 — professional typography, alignment grid, quiet error states (2026-11-09)
+
+**Evidence class:** browser-mock captures (real React UI, mock data) + computed-style/canary probes. Build/test green
+(10 files / 167 tests). Launcher untouched; `tokens.css` not edited.
+
+### 11.1 Type scale (final task-8 values; TEMP block pending L0 tokens)
+New `apps/desktop/src/app/app-scale.css` scoped to `html[data-window="main"]` (TEMP comment; covers app + onboarding, launcher untouched):
+display clamp(28,3.6vw,44)/1.08 · setup h1 34/1.16 · stat 36/1.0 650 · lead 15/24 · body 14/21 · strong/row title 14/20 ·
+small/nav 13/20 · meta 12/18 · micro/caps 11/16 · section 12/16 caps · kbd 11/14 · control 13/20; sidebar 232/200/64,
+row nav 44 / list 68 / metric 44 / control 36 / field 40, compact density overrides included. Probes at 1180×800:
+lead 15 px, nav 13 px, metric value 14 px.
+
+### 11.2 Alignment grid
+Workspace `max-width: calc(1120 + 2 × margin); padding margin (24–40 per band) + 64 bottom`; 12-col-equivalent
+composition: Home 7/5 gap 24, stacked ≤819; Settings 280 px label + 24 gap, stacked ≤1023; card padding 24; section
+gap 32 / panel gap 24; page-header rhythm eyebrow 8 / h1 12 / lead 32, lead max 60 ch; Home search 52 px; nav row 44;
+list row 68; metric row 44; buttons/controls 36; inline icons 16, state icons 20, file tiles 32; nav icon slot 20.
+Fixed inconsistent label-column/panel alignment, double spacing above first panels, notice/strip rhythm, and
+notice-after-search spacing. No overflow at 560/720/820/1000/1180.
+
+### 11.3 Quiet state components and copy (SCREENS §3.7)
+New `StateNotice` (`.state/.state--warn/.state--error/.state--offline`, 20 px icon, title 15/600, body 14/21 max 60 ch,
+native `Details` disclosure, one action) and `.row-state` for one failing row/source. Raw `err.message`/engine
+warning strings are no longer rendered anywhere in app views (grep-verified); `errorMessage` helper removed.
+Copy map implemented: index-status load failure, engine warnings, indexer stopped, settings save failure (retry keeps
+the failed patch), hotkey invalid/unavailable, activity load/open, agent unavailable/off, source read failure,
+network root, onboarding finish failure, and empty states (Home no index/no recents, Search & indexes no
+locations/exclusions/sources, Activity empty/filtered with “Show all”, Workflows agent off, onboarding no locations).
+Aria: load failures `role=status`, action-triggered `role=alert`, details native disclosure.
+
+**Engine warning aggregation (lead request):** many engine warning strings (e.g. malformed PDFs) now render as one
+`Index needs attention.` notice with the canonical body and a sanitized Details line (count only, no paths/raw strings);
+engine can keep capping/aggregating upstream — UI never prints individual warning strings.
+
+### 11.4 Canary and coverage
+- **Canary 560×480 @200 % DPI, all five routes:** no horizontal scroll, minimum rendered text = 11 px, zero elements
+  below 11 px.
+- Route captures: `task7-{home,indexes,activity,workflows,preferences}-{light,dark}-1180x800.png`,
+  `task7-{route}-light-{720x560,560x480}.png`, `task7-canary-{route}-560x480-dpi2.png`.
+- Error captures: `task7-error-{home,indexes}-{light,dark}.png`.
+- Onboarding: `task7-onboarding-{light,dark}-900x660.png` (34 px h1, 15 px lead, body 14, no overflow; L6 card still fills).
+
+### 11.5 Known limits / not verified
+- `App.tsx` fatal bootstrap/settings-load screen is L0-owned and still prints a raw message (“ProtonSearch could
+  not start” + detail). The settings-load error copy in §3.7 needs an App.tsx change by L0; out of this task’s scope.
+- No IPC command for agent “Try again”, per-source retry, or network-root retry: those rows state automatic retry
+  instead of a dead control.
+- Real WebView2 125/150/200 % DPI, Windows high-contrast and screen-reader sessions are not captured here (browser
+  renderer canary only).
+- Task-13 (Pi agent panel) could not be claimed: blocked by task-11 and the shared task board rejects claiming an
+  unready task. Ready when the Pi backend lands.

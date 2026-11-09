@@ -174,3 +174,95 @@ node tools/visual-qa/shots.mjs
 **Verdict:** launcher states, geometry, keyboard/focus behaviour and the new destructive-action confirmation are
 verified against real engine data at 150 % DPI, with dark/DPI/narrow coverage from the browser mock. Remaining
 gaps are listed in §8 and are environment/harness limitations, not launcher code defects at this snapshot.
+
+---
+
+# Addendum — task-1 (filters / motion / shadow) and task-10 (app icons)
+
+**Date:** 2026-11-09 late session. **Scope:** `apps/desktop/src/launcher/**` only.
+
+## A1. Category / filter strip (task-1.1)
+
+- 40 px strip between the 72 px search row and the results: chips **ALL · FILES · FOLDERS · DOCUMENTS · APPS ·
+  CLIPBOARD · WEB · GIT · ACTIONS** (10 px caps, hairline bottom rule, selected = `--ps-accent-soft` tint +
+  2 px inset bottom accent bar; no gradients/pills).
+- Wired to `SearchRequest.scope`: all / files / folders / content / apps / clipboard / browser / git / actions.
+  A filter change sends a new request id **and bumps the query epoch**, so the committed response resets selection
+  to row 0. Scope is remembered per session (`sessionStorage: protonsearch.launcher.scope`).
+- Keyboard: **Ctrl+1..9** from the search input (focus never leaves the input); chips are a single roving-tab stop
+  (`role=radiogroup`, `role=radio`, `aria-checked`, `aria-keyshortcuts`); Arrow/Home/End inside the strip moves
+  the selection and searches; clicking a chip refocuses the input. Wheel/drag scrolls the strip; chips are
+  `flex: none` so they never wrap. Chips are not hovered into the Tab path while typing and never steal focus.
+- Evidence (browser mock, real React UI, 860×640 and 560×640, light+dark):
+  `screenshots/launcher-860-filter-{all,files,folders,content,apps,clipboard,browser,git,actions}-light.png`,
+  `launcher-860-filter-content-dark.png`, `launcher-860-results-dark.png`, `launcher-560-all-light.png`,
+  `launcher-560-filter-files-light.png`, `launcher-560-filter-files-dark.png`. All captures report
+  `scrollWidth === clientWidth` (no horizontal overflow) at 860, 560 and 1280.
+- Real engine evidence: `app-captures/real-padded-results.png` (ALL, 50 matches),
+  `real-padded-filter-files.png` (FILES selected, 50 file-only results), `real-padded-zero.png`.
+  Footer item count fallback verified in the same captures: "Indexing… · 1,31,199 items" while the engine
+  SearchStatus counter is 0/absent. The footer word now prefers the fresher `SearchResponse.status` (ready/indexing)
+  over the boot-time EngineStatus snapshot, so it flips to "Index ready" once the engine reports ready instead of
+  staying on "Indexing…" (real captures show "Index ready · 1,31,199 items").
+
+## A2. Open / close motion (task-1.2, task-10 handshake)
+
+- Enter: 150 ms `opacity 0→1` + `scale(0.985→1)` on the card (ease-out). Exit: 110 ms `opacity 1→0` +
+  `scale(1→0.99)` (ease-in-out) **before** hiding. Selection/typing/results stay instant (colour transition only).
+- Shell handshake consumed: `launcher:dismiss` → `surface.dismiss()` → 110 ms animation → `api.hideLauncher()`
+  (0 ms when `data-motion=reduced` or `prefers-reduced-motion`). `launcher:summoned` restarts the enter animation;
+  a pending dismiss timer is cancelled on re-summon; the shell's 400 ms safety hide is generation-guarded; the
+  wrapper also ignores a stale `launcher:hidden` that arrives after a newer summon.
+- Real measurements (CDP, 150 % DPI): summon mid-frame opacity **0.919**; dismiss mid-frame opacity **0.824**,
+  transform `scale(0.998)`; phases visible → closing → closed. Re-summon during the dismissal window ends with
+  `data-phase="visible"`, window visible, input focused (stale-hide guard). Screenshots:
+  `app-captures/real-launcher-summon-mid.png`, `real-launcher-dismiss-mid.png`.
+- Unit tests: exit hides under reduced motion; reduced-motion immediate hide; re-summon cancels the pending close.
+
+## A3. Shadow-safe chrome (task-1.3)
+
+- Native window (`main.rs`) = card + 28 px logical padding on every side, including height. CSS adds nothing to the
+  window size; `#root` uses the shell padding and the card keeps its own content height (820 px / 1180 px preview,
+  centred), so the card is 820×content at x=28 in an 876-wide window.
+- Refined layered shadow (Lead-supplied design values, local launcher variables pending token promotion):
+  light `0 16px 40px rgba(36,60,43,.14), 0 2px 6px rgba(21,44,24,.06), 0 0 0 1px rgba(20,43,49,.05)`;
+  dark `0 16px 40px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04)`.
+  Radius 14 px with `overflow:hidden`; no filter/clip. Real captures (transparent PNG):
+  `real-padded-empty.png` (window 876×352 CSS, card 820×~292 at 28/28), `real-padded-results.png`
+  (876×536, card 820×479), `real-padded-zero.png`; computed box-shadow matches the values above exactly.
+- Observed sub-pixel note: on the empty/zero states the card's intrinsic content height is ~3.7 px less than the
+  shell's content box (font metrics in the empty state), leaving a slightly larger transparent tail below the card;
+  no clipping, no fringe. Recommend the shell/card height estimate converge (or a 1 px tolerance) if pixel-perfect
+  centring is required.
+
+## A4. Real app icons via `IconRef.app_icon_data` (task-10)
+
+- `ResultIcon` now accepts `{ type: "app_icon_data", data }`: only `data:image/(png|jpeg|webp|gif|svg+xml);base64,`
+  URLs longer than 64 chars are passed to `<img>` inside the fixed 36 px tile (28 px image, 32 px large),
+  `object-fit: contain`, `decoding="async"`, alt="" (decorative, row label names the app). Invalid/unsafe data,
+  decode errors and missing data fall back to the deterministic monogram badge — no broken-image glyph, no layout
+  shift (fixed tile). Legacy `app_icon` path stays supported via `convertFileSrc` in Tauri.
+- Unit tests: data URL renders with `data-icon-source="data"`; `data:text/html` is rejected → monogram "VS";
+  firing `error` removes the img → monogram "NO". (3 tests, launcher suite now 63.)
+- **Real icons verified after sources-content task-9** (engine-ready app index: 383/383 apps, icon cache under
+  `PROTONSEARCH_DATA_DIR`): live captures show real `data:image/png;base64` icons in the launcher tiles:
+  `app-captures/real-app-icon-chrome.png` (two Google Chrome app rows, real Chrome icon),
+  `real-app-icon-vscode.png` (Visual Studio Code), `real-app-icon-notepad.png` (Notepad),
+  `real-app-icons.png` and `real-app-icons-apps.png` (APPS filter, 5 app rows all `img:data`).
+  DOM check per capture: `iconImages > 0`, all `data-icon-source="data"`, monogram fallback still used for
+  non-app rows. Report: `app-captures/real-task10-report.json`.
+  Captured against exe 23:40 (task-9 engine) and dist 23:46 (footer-status fix) at 150 % DPI; the footer now reads
+  "Index ready · 1,31,199 items" in these captures instead of the stale boot "Indexing…".
+  Engine-side observations to pass to sources-content (not launcher defects — the UI renders the IPC data it gets):
+  some app rows carry mismatched cached images (e.g. "AMD Software" shows a blank document icon, "About iTunes"
+  shows Word/screenshot icons) and the app list currently contains duplicate entries (Antigravity ×2,
+  Google Chrome ×2, About iTunes ×2). Icon fallback/error behaviour remains covered by unit tests.
+
+## A5. Build / test evidence for this addendum
+
+- `npm run build` → exit 0 (tsc --noEmit + vite, ~0.3 s)
+- `npm test` → **10 files / 165 tests passed**; launcher suite **63 tests** (task-1 filter/motion + task-10 icon and
+  dismiss tests included); tsc clean.
+- Browser captures: 26 launcher task-1 files (plus the full 62-shot harness run including the 7×3×2 onboarding
+  matrix); all at 860×640 / 560×640 / 1280×800, light+dark, DPI 1.25/1.5/2, reduced-motion path unit-tested.
+- Harness leftovers were cleaned (no ProtonSearch/vite-preview processes left after runs).

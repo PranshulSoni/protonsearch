@@ -29,7 +29,8 @@ L0's scaffold may rename files; ownership and component contracts do not change.
 
 | Reference | Lines | Production component (planned path) | Keep / adapt / replace |
 |---|---|---|---|
-| `.launcher` surface | 27–29 | `LauncherWindow` (`apps/desktop/src/launcher/LauncherWindow.tsx`) | **Keep** radius 14, 1 px `#cdd5ce` border, light shadow token; **adapt**: height is content-driven 256–480 px (SCREENS §2.1), window is frameless with no OS title bar; DWM rounding/shadow may replace the CSS shadow when the window is opaque. |
+| `.launcher` surface | 27–29 | `LauncherWindow` (`apps/desktop/src/launcher/LauncherWindow.tsx`) | **Keep** radius 14, 1 px `#cdd5ce` border; **adapt** the reference's single drop shadow into a layered, clipped-safe token that fits the 28 px transparent window pad (extent ≤24 px; DESIGN_SYSTEM §5.4), and use the content height formula with a 40 px filter strip (SCREENS §2.1). Frameless; no OS title bar; native window shadow off. |
+| `.segments` (demo segmented row) | 22–24 | `FilterStrip` (`apps/desktop/src/launcher/FilterStrip.tsx`) | **Adapt, not copy**: keep the reference's muted language — pale selected fill, 5–6 px radius, 4–6 px gaps, 11–12 px/650 sentence case, no colour on chrome — but drop the outer track (nine filters + scroll would read as a second toolbar) and add a 2 px accent bar for the selected state (fill alone fails WCAG 1.4.11). New strip is a radiogroup, 40 px block, 26 px chips, horizontal overflow. Spec: SCREENS §2.11. |
 | `.searchline` | 30 | `SearchRow` (`launcher/SearchRow.tsx`) | **Keep** 72 px height, 14/20 px padding, 14 px gap, 1 px bottom hairline. Explicit comment at line 29 is a requirement: no title bar, no window controls. |
 | `.searchline input` | 31 | `SearchInput` inside `SearchRow` | **Keep** 21 px/430/`-0.04em`, transparent, no visible border; **adapt** placeholder ink to `#69746e` (reference `#b4bfba` = 1.84:1, fails); add combobox ARIA. |
 | `.count` | 32 | `MatchCount` | **Keep** 11 px right-aligned; **adapt**: live-region status, pluralisation, "Searching…", accessible ink. |
@@ -112,10 +113,15 @@ L0's scaffold may rename files; ownership and component contracts do not change.
 | D18 | 10 px meta inside `.resultmeta`/footer | 10 px only for caps/kbd/footer; meta 11 px | Generic house floor 11 px; kept the reference's 10 px roles where they are tracked caps or keycaps, sentence-case meta raised to 11 px. |
 | D19 | App sidebar 190 px fixed; no rail | 220 / 190 / 56 rail at breakpoints | Reference only shows one width; the app must work down to 560 px. |
 | D20 | Missing brand files referenced by master prompt | Reconstructed `assets/brand/*.svg` documented as reconstructions | Files confirmed absent (`WORK_BREAKDOWN.md:104`); the inline SVG is the visual source. |
+| D21 | Launcher shadow drawn as a single large drop shadow (`0 24px 56px`) on a page mock | Layered 4-stop clipped-safe shadow inside a 28 px transparent window pad (extent ≤24 px) + 1 px rim on dark | The old blur (extent ≈108 px) was hard-clipped by the native window edge — the reported "shadow doesn't look proper". The pad is a real window constraint (Rust `LAUNCHER_SHADOW_PAD = 28`). |
+| D22 | No open/close motion in the reference | Launcher card open 150 ms / close 110 ms; app shell reveal 160 ms; input/selection/results instant | A palette summoned hundreds of times/day must not delay typing: only the card fades/moves; the window, focus and search dispatch are immediate. Reduced motion removes the transform and duration. |
+| D23 | No filter/category strip in the reference | Horizontal filter strip above the results (All + 8 categories), adapted from the reference's segment language | Needed for scope control on a 50-result list; without it users rely on remembered prefixes. Language borrowed, not the demo chrome. |
+| D24 | Launcher was a card on a page stage | Floating frameless window with 28 px transparent shadow pad; clicks in the pad dismiss | The card must have real elevation without clipping; the pad is part of the launcher surface, not a click-through frame. |
 
 ---
 
 ## 5. Traceability checklist for reviewers
+
 ---
 
 ## 6. Current scaffold mapping (2026-11-09)

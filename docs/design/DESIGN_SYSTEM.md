@@ -59,6 +59,7 @@ fills its window instead of sitting as a card on a stage (see REFERENCE_MAPPING.
 | `transition: all`; animating layout props (width/height/margin/padding) | Explicit `background-color`, `border-color`, `opacity`, `transform` only. |
 | A title bar, min/max/close buttons on the launcher; "Ctrl+K" hint or a kbd pill inside the search field | Frameless surface, logo at the start of the search row, hints in the footer only (master prompt §V.A). |
 | Fake badges, fake "AI" dot, fake "ready" green, fake percentages, sample counts presented as real | Real `EngineStatus`; text labels; hidden until known. |
+| Raw exception text, error codes, stack traces, absolute paths, or `err.message` on the surface | One human sentence + optional action; sanitized technical detail only inside a collapsed "Details" disclosure (DESIGN_SYSTEM §8.3). |
 | Giant tiles, three-up feature cards, KPI cards with icons in tinted circles, sparklines on KPIs | One divided strip or plain type (app-screens house rules). |
 | Zebra tables, header bands, uppercase tracked table headers | Row rules + sentence-case 12 px headers. |
 | Emoji anywhere in product chrome, greetings, labels, empty states | Words. |
@@ -252,6 +253,12 @@ decisions recorded here so docs and code cannot drift:
 - **Window contract (final):** main app window minimum **560×480**; onboarding rail hides at **≤700**.
 - **Alpha IPC gaps** (progress %, clear-activity, quicklinks CRUD, folder picker, updater, preview payload) with the
   truthful-UI rule are listed in SCREENS §10.
+- **User visual pass (2026-11-09):** launcher shadow retuned to layered tokens that fit the 28 px pad (§5.4); launcher
+  open/close motion 150/110 ms (§6.3/§6.4); horizontal filter strip added (SCREENS §2.11); stale app/title-bar icon is
+  a defect (REVIEW_1 §8).
+- **App readability pass (2026-11-09):** app/onboarding type scale raised one step (§4.2b, main-window tokens only);
+  12-column alignment grid and rhythm added (§5.5); quiet error/empty/offline state family added (§8.3, copy map
+  SCREENS §3.7); launcher tokens and specs unchanged/final.
 - **Image/media badge family:** added by L0, adopted: light `#eae8ef`/`#574f68` (6.35:1), dark
   `#2a2430`/`#c4b6d8` (7.92:1). It is the sixth file-type family (images, screenshots, scanned media) in §9.2.
 - **Spacing:** the global scale landed as `--space-1`…`--space-11` = 4/8/12/16/20/24/32/40/48/56/64 px. Use those
@@ -308,6 +315,82 @@ Rules: 4 sizes do the visible work (micro/meta/body/display); input and stat are
 sizes per screen maximum; do not invent intermediate sizes. Sentence case everywhere except the tracked caps
 labels and the brand name.
 
+### 4.2b App + onboarding type scale — main window only (FINAL 2026-11-09)
+
+User feedback: the app text is too small for comfortable reading. The app/onboarding surfaces take **one deliberate step
+up at every role**; the launcher keeps its current scale (launcher specs are final and its density is intentional).
+Rationale: 14 px body with 21 px leading is the Windows desktop baseline; 12 px meta and 11 px caps keep three clear
+levels without a fourth tiny tier; display grows to 28–44 px so the h1 stays dominant after the body grows. Nothing
+shrinks below 11 px in the app.
+
+| Role | Token | Size / line-height | Weight | Tracking |
+|---|---|---|---|---|
+| Page title (h1) | `--ps-text-display` | `clamp(28px, 3.6vw, 44px)` / 1.08 | 600 | `-0.04em` |
+| Setup h1 | `--ps-text-h1-setup` | 34 px / 1.16 | 600 | `-0.04em` |
+| Stat | `--ps-text-stat` | 36 px / 1.0 | 650 | `-0.05em` |
+| Page lead | `--ps-text-lead` | 15 px / 24 px | 400 | `-0.006em` |
+| Body | `--ps-text-body` | 14 px / 21 px | 400 | `-0.006em` |
+| Row title / strong | `--ps-text-strong` | 14 px / 20 px | 600 | `-0.006em` |
+| Small / nav | `--ps-text-small` | 13 px / 20 px | 400–600 (nav 600, active 700) | `-0.004em` |
+| Meta | `--ps-text-meta` | 12 px / 18 px | 400–600 | 0 |
+| Micro / caps labels | `--ps-text-micro` | 11 px / 16 px | 650–750 + uppercase | `+0.06em` |
+| Section label | `--ps-text-section` | 12 px / 16 px | 750 + uppercase | `+0.08em` |
+| Keycap | `--ps-text-kbd` | 11 px / 14 px | 650 | `+0.02em` |
+| Control / button | `--ps-text-control` | 13 px / 20 px | 700 | `-0.004em` |
+| Field label | `--ps-text-micro` | 11 px caps / 16 | 700 | `+0.06em` |
+| Launcher query | `--ps-text-input` | 21 px (unchanged; launcher only) | 430 | `-0.04em` |
+
+Exact token override (L0 lands in `tokens.css`; ui-app may temporarily keep it in an app CSS file scoped to the window,
+marked TEMP — do not scope to `.app-shell` only, because onboarding is in the same main window):
+
+```css
+html[data-window="main"] {
+  --ps-text-display: clamp(28px, 3.6vw, 44px);
+  --ps-text-h1-setup: 34px;
+  --ps-text-stat: 36px;
+  --ps-text-lead: 15px;
+  --ps-text-body: 14px;
+  --ps-text-strong: 14px;
+  --ps-text-small: 13px;
+  --ps-text-meta: 12px;
+  --ps-text-micro: 11px;
+  --ps-text-section: 12px;
+  --ps-text-kbd: 11px;
+  --ps-text-control: 13px;
+  --ps-leading-display: 1.08;
+  --ps-leading-setup: 1.16;
+  --ps-leading-lead: 24px;
+  --ps-leading-body: 21px;
+  --ps-leading-small: 20px;
+  --ps-leading-meta: 18px;
+  --ps-leading-micro: 16px;
+  --ps-content-max: 1120px;
+  --ps-app-margin: 40px;
+  --ps-app-gutter: 24px;
+  --ps-app-card-pad: 24px;
+  --ps-app-section-gap: 32px;
+  --ps-app-label-col: 280px;
+  --ps-app-sidebar: 232px;
+  --ps-row-nav: 44px;
+  --ps-row-list: 68px;
+  --ps-control-height: 36px;
+  --ps-field-height: 40px;
+  --ps-app-metric-row: 44px;
+}
+@media (max-width: 1099px) { html[data-window="main"] { --ps-app-margin: 32px; --ps-app-sidebar: 200px; } }
+@media (max-width: 819px)  { html[data-window="main"] { --ps-app-margin: 24px; --ps-app-gutter: 16px; --ps-app-sidebar: 64px; } }
+@media (max-width: 700px)  { html[data-window="main"] { --ps-app-margin: 20px; } }
+html[data-window="main"][data-density="compact"] {
+  --ps-row-nav: 38px; --ps-row-list: 60px; --ps-control-height: 32px; --ps-field-height: 36px;
+}
+```
+
+Density impact: cards and rows grow with the type — nav 44 px, list 68, metric 44, control 36, field 40, card padding 24.
+At 560 px window width the app content is ~472 px wide (64 rail + 24 margins): body 14 / meta 12 still fit at 40–55 ch;
+label columns stack.
+DPI: sizes are CSS px; at 125/150/200 % they render 1.25/1.5/2× physical. Verify the 44 px display at 200 % and the 11 px
+caps at 100 %; never add a size below 11 px to fit narrow layouts — wrap or stack instead.
+
 ### 4.3 Weight map (reference → token)
 
 | Reference weights | Token | Fallback (Segoe UI Variable) |
@@ -324,14 +407,14 @@ labels and the brand name.
 - **Truncation:** single-line ellipsis for names/paths; every truncation container needs `min-width: 0` and a
   `title`/accessible full value. Paths truncate from the **middle** (drive + ellipsis + leaf) when a full path is
   shown; the result row path truncates at the **end** (reference behaviour: start of hierarchy is more useful).
-- **Measure:** paragraphs 45–75 ch; the route lead is capped at `max-width: 54ch`; no full-width one-line leads.
+- **Measure:** paragraphs 45–75 ch; the route lead is capped at `max-width: 60ch`; no full-width one-line leads.
 - **Case & punctuation:** sentence case for headings/buttons; numerals for counts ("8 results", not "eight");
   typographic `…` not `...`; curly quotes in prose copy; no exclamation marks in product copy; `&` only where
   the reference uses it ("Search & indexes").
 - **Locale:** all dates/times/numbers via `Intl.DateTimeFormat` / `Intl.NumberFormat`; never hard-code
   "Yesterday" — use relative formatting or the localized string.
-- **Minimum sizes:** body ≥13 px; sentence-case meta ≥11 px; 10 px only for tracked caps/kbd/footer. Nothing
-  below 10 px at 100 % DPI.
+- **Minimum sizes:** app/onboarding body ≥14 px, sentence-case meta ≥12 px, caps/kbd ≥11 px; launcher keeps its
+  final 13/11/10 scale. Nothing below 10 px anywhere at 100 % DPI.
 - **DPI:** font sizes are CSS px; at 125/150/200 % the WebView renders them at 1.25/1.5/2× physical size. Verify
   the 10 px caps at 100 % (the riskiest) and the 41 px display at 200 % (the largest).
 
@@ -353,12 +436,14 @@ Reference-derived metrics to preserve:
 | Launcher results | padding 10 px 11 px 13 px; max-height 365 px (reference:33) |
 | Result row | 8 px 12 px padding, min-height 58 px, 12 px gap, radius 8 (reference:35-36) |
 | Launcher footer | min-height 44 px, 9 px 16 px padding (reference:45-46) |
-| App sidebar | 190 px wide (reference:52); production 220 / 190 / 56 rail; padding 21 px 13 px |
-| App workspace | 36 px 40 px (reference:61); 32/32 at 820–1099; 31/18 ≤700 |
+| Launcher native window | card + **28 px transparent pad** on every side; window = card + 56 (876 / 1236 wide); min window 560×352 |
+| Launcher filter strip | 40 px block (36 compact): 7 px 16 px padding, 26 px chips, 6 px gap, 1 px bottom hairline |
+| App sidebar | reference 190 px; production **232 / 200 / 64 rail** (§5.5); padding 24 px 12 px |
+| App workspace | reference 36/40; production margins **40 / 32 / 24 / 20** at the four bands, content max 1120, 12-col grid gutter 24/16 (§5.5) |
 | Onboarding rail | 240 px wide, 32 px 25 px padding (reference:82-83) |
 | Onboarding content | 44 px 43 px (reference:87) |
-| Two-column layout | `minmax(0,1.25fr) minmax(0,0.9fr)`, gap 38 px (reference:67) |
-| Section rhythm | 24 px between sections (reference:75); 32–40 px between settings sections |
+| Two-column layout | reference 1.25/0.9; production **7/5 of 12 columns**, gap 24 px (§5.5) |
+| Section rhythm | launcher 24 px; **app: 32 px between sections, 24 px between panels, 24 px card padding** (§5.5) |
 
 ### 5.2 Radii
 
@@ -374,17 +459,92 @@ square is not used on interactive controls; the file-type badge is 7 px.
 A surface uses **either** a 1 px border **or** a tone step, never both; shadows only for floating surfaces.
 Hairlines must be exactly 1 CSS px (never 0.5 px) so they survive DPI rounding.
 
-### 5.4 Shadows (floating surfaces only)
+### 5.4 Shadows (floating surfaces only) — launcher shadow FINAL 2026-11-09
 
 | Token | Value | Used on |
 |---|---|---|
-| `--ps-shadow-launcher` | `0 24px 56px rgba(36,60,43,0.11), 0 2px 5px rgba(21,44,24,0.04)` (reference:28) | launcher window (light) |
-| `--ps-shadow-app` | `0 18px 45px rgba(33,59,40,0.08)` (reference:52) | onboarding window |
+| `--ps-shadow-launcher` (light) | `0 1px 2px rgba(21,44,24,0.10), 0 3px 6px rgba(36,60,43,0.08), 0 6px 12px rgba(36,60,43,0.10), 0 0 0 1px rgba(20,43,49,0.05)` | launcher card (light) |
+| `--ps-shadow-launcher` (dark) | `0 1px 3px rgba(0,0,0,0.50), 0 3px 8px rgba(0,0,0,0.40), 0 6px 12px rgba(0,0,0,0.45), 0 0 0 1px rgba(236,239,232,0.08)` | launcher card (dark) |
+| `--ps-shadow-app` | `0 18px 45px rgba(33,59,40,0.08)` | app/onboarding window (native shadow preferred) |
 | `--ps-shadow-popover` | `0 8px 24px rgba(32,43,49,0.14), 0 1px 3px rgba(32,43,49,0.06)` | context menu, tooltip |
 | `--ps-shadow-dialog` | `0 24px 64px rgba(32,43,49,0.20)` | confirm dialog |
-| dark equivalents | launcher `0 24px 56px rgba(0,0,0,0.55), 0 2px 5px rgba(0,0,0,0.35)`; popover `0 8px 24px rgba(0,0,0,0.45)` | |
+| dark popover/dialog | `0 8px 24px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.35)` / `0 24px 64px rgba(0,0,0,0.55)` | |
+| `--ps-launcher-shadow-pad` | `28px` | transparent room around the launcher card |
 
-Resting cards: **no shadow**. No inset shadows, no glow, no glass, no blur.
+Resting cards: **no shadow**. No inset shadows, no glow, no glass, no backdrop blur.
+
+#### Launcher shadow clipping contract
+
+The launcher window is transparent and padded by `--ps-launcher-shadow-pad: 28px` on every side (Rust
+`LAUNCHER_SHADOW_PAD = 28.0`). Any shadow extent larger than 28 px is hard-clipped by the native window edge — the
+"shadow doesn't look proper" defect. The old value `0 24px 56px` has extent `24 + 1.5×56 ≈ 108 px` and was cut at
+28 px, so its corner/tail vanished into a straight edge.
+
+- **Extent budget:** for every layer, `|offsetY| + 1.5 × blur ≤ 24 px` (4 px headroom for the 1 px border and AA).
+  No spread radius on the launcher.
+- **Extents:** contact 4–5.5 px, mid 12–15 px, ambient **24 px**, rim 1 px. Top extent ≤ 12 px, sides ≤ 12 px.
+- **Card:** `border: 1 px solid var(--ps-line-strong); border-radius: 14px; overflow: hidden`. The shadow is drawn
+  from the card, so the radius reads correctly; never move the shadow to the native window.
+- **Dark theme:** black ambient is nearly invisible on a dark desktop; the 1 px `rgba(236,239,232,0.08)` rim plus
+  the `#3d423a` border is what makes the edge legible without a glow.
+- **Layout:** `html[data-window="launcher"] #root { padding: 28px; display:flex; align-items:stretch;
+  justify-content:center; background:transparent }`; `.launcher { width: min(820px, calc(100vw - 56px));
+  height: 100%; max-height: none; margin: 0 }` (preview: `min(1180px, calc(100vw - 56px))`). The card must not touch
+  the window edge.
+- **Hit testing:** the 28 px pad belongs to the launcher window; a primary-button press there dismisses the launcher
+  (same as outside-click) rather than reaching the app behind. No whole-window click-through.
+- **DPI:** pad and shadow are CSS px and scale together; verify 125/150/200 % has no straight cut-off line.
+
+### 5.5 Application alignment grid (app + onboarding, FINAL 2026-11-09)
+
+One grid for every app route; components snap to it. Base unit **4 px**, vertical rhythm **4/8 px** (every padding, gap
+and height is a multiple of 4).
+
+| Token / metric | Value |
+|---|---|
+| `--ps-content-max` | 1120 px content (excluding window padding) |
+| `--ps-app-margin` | 40 px ≥1100 · 32 px 820–1099 · 24 px 700–819 · 20 px ≤700 |
+| `--ps-app-gutter` | 24 px ≥820 · 16 px ≤819 |
+| Grid | **12 columns**, `grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--ps-app-gutter)` |
+| Sidebar | 232 / 200 / 64 rail |
+| Home columns | left **7**, right **5** (gap 24), stacked ≤819 |
+| Settings / Indexes | label column **280 px** + 24 gap + panel (label col 3-ish columns); stacked ≤1023 |
+| Card / panel padding | **24 px** (was 20); compact 16 |
+| Section gap | **32 px**; panel gap 24; page-header → content 32 |
+| Row heights | nav 44 · list 68 · metric 44 · control 36 · field 40 · buttons 28/36/40 |
+| Icon sizes | 16 inline/nav · 20 state/panel · 32 file/app |
+| Page header rhythm | eyebrow → 8 → h1 → 12 → lead (max 60 ch) → 32 → content; route bottom padding 64 |
+
+Rules:
+- **One left edge and one right edge.** Eyebrow, h1, lead, search entry, first panel and section labels all start on
+  column 1; the last card/panel ends on column 12. No element stops 1–2 px short of the grid; no centred cards.
+- **Panels span columns, not magic widths.** Home: 7/5. Settings: label 280 + panel to the right edge. Indexes: full
+  12. Lists/tables fill their panel; only icon and trailing columns are fixed.
+- **Numbers:** right-aligned, `font-variant-numeric: tabular-nums`; label left `--ps-text-small`/ink-2, value right
+  `--ps-text-body`/600/ink; units in `--ps-text-meta`/ink-2; zero prints "0", unavailable prints "—" (never a
+  large dash); deltas carry an explicit sign and are never colour-only.
+- **Vertical rhythm:** section headings sit on the same baseline grid; a panel's first line is 24 px from the top
+  edge; row text is vertically centred in a 4 px-multiple row; no 3/5/7/9/13/15 px gaps.
+- **All type comes from tokens** (`--ps-text-*` / `--ps-leading-*`). Hard-coded `font-size: 12px` in a view is a
+  violation (current offenders: `styles/base.css:113`, `styles/shell.css:12,17`, `onboarding/onboarding.css:582`).
+
+**Violations to fix in the current code** (audit checklist for ui-app):
+1. `desktop.css:24` sidebar 220 and `:897` 190 / `:920` 56 → 232 / 200 / 64 with the window token.
+2. `desktop.css:172` workspace `36px 40px 64px` → margin token + 24 grid gutter; `:901` 32/32; `:963` 31/24;
+   `:983` 31/18 → 40/32/24/20 margins; no 31 px.
+3. `desktop.css:252-253` Home `1.25fr/.9fr gap 38` → 7/5 of 12 with 24 gap (and 16 gap ≤819).
+4. `desktop.css:813` settings `200px` label → 280 + 24 gap; stack ≤1023.
+5. `ui.css:36` panel `padding: var(--space-5)` (20) → `--ps-app-card-pad` (24); `radius 12` stays.
+6. Row heights: nav/list/metric/control/field tokens currently 40/64/—/32/38 → 44/68/44/36/40.
+7. `base.css:113` button `font-size: 12px` literal and `:98-99` padding 9/14 → `--ps-text-control` (13) and
+   padding 8/16 (md 36 high).
+8. Page-header rhythm is currently loose (lead margin ~25 px, header → content 37 px) → 8/12/32 exact.
+9. Icon sizes mix 15/16/18/19 → 16 inline/nav, 20 state, 32 file/app.
+10. Raw error text rendered directly at `IndexesView.tsx:275`, `HomeView.tsx:122`, `ActivityView.tsx:155,204`,
+    `WorkflowsView.tsx:151`, `PreferencesView.tsx:132` → §8.3 + SCREENS §3.7 (human sentence, Details collapsed).
+11. Mixed radii 8/12 on panels and controls → panel 12, control 6, row 8, field 7; no new radii.
+12. Centred/left-aligned state blocks: app empty/error blocks must be **left-aligned to the grid** (no centred
+    full-width copy, no illustration).
 
 ---
 
@@ -394,8 +554,9 @@ Resting cards: **no shadow**. No inset shadows, no glow, no glass, no blur.
 
 1. **Input beats animation.** Selection updates paint in the same frame as the key press; no animation may gate
    state, focus, or the Enter action.
-2. **Motion only where the OS would expect it.** Launcher show/hide, list selection, and Enter are instant.
-   Preview, menus, onboarding steps, and progress are the only animated surfaces.
+2. **Motion only where it explains a change.** The launcher card opens/closes (150/110 ms, §6.3); the app shell reveals
+   at 160 ms. Input, list selection, results, Enter and window resizes stay instant. Preview, menus, onboarding steps
+   and progress are the only other animated surfaces.
 3. **Transform + opacity only** (never width/height/margin/padding/top/left). If a transition can cause layout,
    it is not used.
 4. **No bounce, no spring overshoot, no hover lift.** Easing is ease-out or standard; nothing leaves the frame.
@@ -405,22 +566,28 @@ Resting cards: **no shadow**. No inset shadows, no glow, no glass, no blur.
 
 | Token | Value | Use |
 |---|---|---|
-| `--ps-dur-0` | 0 ms | launcher show/hide, keyboard list selection, focus ring, theme switch |
+| `--ps-dur-0` | 0 ms | keyboard list selection, focus ring, window resize, theme switch |
 | `--ps-dur-fast` | 90 ms | button press, context-menu fade, inline status |
 | `--ps-dur-base` | 110 ms | hover/selection colour, nav hover |
 | `--ps-dur-panel` | 160 ms | preview panel content, onboarding step content, popover scale |
 | `--ps-dur-progress` | 240 ms | determinate progress interpolation |
 | `--ps-dur-loop` | 1200 ms | indeterminate progress sweep |
+| `--ps-dur-launcher-in` | 150 ms | launcher card open |
+| `--ps-dur-launcher-out` | 110 ms | launcher card close |
 | `--ps-ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | default; UI state changes |
 | `--ps-ease-out` | `cubic-bezier(0.23, 1, 0.32, 1)` | entering elements |
 | `--ps-ease-in-out` | `cubic-bezier(0.77, 0, 0.175, 1)` | on-screen movement (preview content) |
 | `--ps-ease-linear` | `linear` | progress only |
+| `--ps-ease-out-expo` | `cubic-bezier(0.16, 1, 0.3, 1)` | launcher open, app shell entry |
+| `--ps-ease-launcher-out` | `cubic-bezier(0.4, 0, 0.2, 1)` | launcher close |
 
 ### 6.3 Recipes and reduced motion
 
 | Surface | Motion | Reduced motion |
 |---|---|---|
-| Launcher window show/hide | none (0 ms); focus lands in input immediately | same |
+| Launcher open (summon) | card: opacity 0→1 + translateY(-8px→0) + scale(0.985→1), 150 ms ease-out-expo; focus + typing immediate | instant show, no transform |
+| Launcher close (Esc/outside/open) | card: opacity 1→0 + translateY(0→-4px) + scale(1→0.99), 110 ms ease-launcher-out; the action runs immediately | instant hide, 0 ms |
+| App window reveal | shell only: opacity 0→1 + translateY(4px→0), 160 ms ease-out; window painted first, route changes instant | 0 ms |
 | Result selection (↑/↓) | `background-color`, `border-color`, `box-shadow inset` 110 ms standard; no transform; retargets on rapid presses (CSS transition, no queue) | 0 ms |
 | Hover on row/button | `background-color` 110 ms | 0 ms |
 | Focus ring | none (appears instantly) | same |
@@ -441,7 +608,54 @@ Resting cards: **no shadow**. No inset shadows, no glow, no glass, no blur.
 Progress animations above are post-alpha only: v2.0 alpha renders no progress bar (no percentage in `EngineStatus` —
 SCREENS §10).
 
-### 6.4 Frame budget and React rules
+### 6.4 Exact launcher open/close CSS (copy into launcher.css) — FINAL 2026-11-09
+
+```css
+.launcher { opacity: 1; transform: none; }
+.launcher[data-state="opening"] {
+  animation: ps-launcher-in var(--ps-dur-launcher-in) var(--ps-ease-out-expo) both;
+  will-change: opacity, transform;
+}
+.launcher[data-state="closing"] {
+  animation: ps-launcher-out var(--ps-dur-launcher-out) var(--ps-ease-launcher-out) both;
+  will-change: opacity, transform;
+  pointer-events: none;
+}
+@keyframes ps-launcher-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ps-launcher-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-4px) scale(0.99); }
+}
+:root[data-motion="reduced"] .launcher[data-state] {
+  animation: none !important; opacity: 1; transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .launcher[data-state] { animation: none !important; opacity: 1; transform: none; }
+}
+```
+
+Shell/JS contract (ui-launcher, with L0 for the Rust safety timer):
+1. Summon: show window, focus input **now**, set `data-state="opening"`, on `animationend` set
+   `data-state="open"`. Typing and search dispatch are never delayed.
+2. Dismiss: run the action immediately; set `data-state="closing"`; hide on `animationend` or a 200 ms fallback
+   timer (reduced motion: hide next frame, timer 0). Copy actions never close.
+3. Re-summon while closing: cancel the hide timer, set `data-state="opening"` again, do **not** hide. Rust's
+   `dismiss_launcher` safety hide (currently 400 ms) must be cancellable with a generation token — L0 task.
+4. The shadow never animates; window height/width changes are instant (never transitioned).
+5. App shell reveal stays as today (`.app-shell.is-opening`, 160 ms, 4 px), fires only when the window becomes visible;
+   route changes never animate; reduced motion shows instantly.
+
+### 6.5 What must stay instant (regression list)
+
+Typing/caret/IME, search dispatch, result-list replacement and count text, selection change (110 ms colour only), Enter
+and the resulting action, focus changes, window resize/geometry, preview side/drawer resize, filter application (the
+search dispatches immediately; only the chip colour transitions), footer status text, scrolling (no smooth scroll), and
+everything under reduced motion.
+
+### 6.6 Frame budget and React rules
 
 60 Hz = 16.7 ms; 120 Hz = 8.3 ms (master prompt §V.D). Selection change must not re-render the whole result list:
 key rows by stable result id, memoize row components, toggle a single `data-selected` attribute, keep
@@ -457,11 +671,12 @@ load; use WAAPI only for interruptible progress if needed).
 |---|---|---|
 | Launcher result row | 58 px min-height, 8/12 px padding | 48 px, 6/10 px |
 | Launcher group label | 34 px block (14 px top / 8 px bottom + 14 px line) | 30 px (10/6) |
-| App nav row | 40 px | 34 px |
-| App list/table row | 64 px | 52 px |
-| Button height | 32 px (sm 28 / lg 38) | 28 px (sm 24) |
-| Field height | 38 px | 32 px |
-| Panel padding | 20 px | 16 px |
+| App nav row | **44 px** | **38 px** |
+| App list/table row | **68 px** | **60 px** |
+| App metric row | **44 px** | 40 px |
+| Button height | **36 px** (sm 28 / lg 40) | **32 px** (sm 28) |
+| Field height | **40 px** | **36 px** |
+| Panel padding | **24 px** | 16 px |
 | Stack gap | 16 px | 12 px |
 
 Density is a user preference (Preferences → Appearance → Density) applied with `[data-density]` on the app root;
@@ -481,7 +696,7 @@ below must implement all states that apply, including empty/loading/error at its
 
 | # | Component | Anatomy | Sizes | Key states / notes |
 |---|---|---|---|---|
-| 1 | **LauncherWindow** | frameless floating surface, radius 14, 1 px `--ps-line-strong` border, `--ps-shadow-launcher`; column: SearchRow / ResultsViewport / Footer | 820 px wide; 256–480 px tall (SCREENS §2) | no title bar, no window buttons, no drag strip over controls; instant show/hide |
+| 1 | **LauncherWindow** | frameless floating surface, radius 14, 1 px `--ps-line-strong` border, layered `--ps-shadow-launcher`, 28 px transparent shadow pad; column: SearchRow / FilterStrip / ResultsViewport / Footer | card 820 (preview 1180) wide; card 296–544 px tall (window = card + 56) | no title bar, no window buttons, no drag strip over controls; open 150 ms / close 110 ms (§6); resize instant |
 | 2 | **SearchRow** | 29 px brand mark (light/dark variant) · 14 px gap · input · match count (11 px `--ps-ink-3`) | 72 px tall (61 px narrow), 20/14 px padding | input 21 px/430; placeholder `#69746e`; no Ctrl+K pill, no clear button, no fake badge |
 | 3 | **ResultsViewport** | scroll container, 140–365 px, thin scrollbar | padding 10/11/13 | loading skeletons on first query, 0-match empty state, inline error; virtualize >40 rows |
 | 4 | **ResultGroup** | tracked caps 10 px/750/+0.12em, `--ps-ink-3`, 14/13/8 px padding | block 34 px | label is a real element (`role="group"` + `aria-label`); no count, no rule |
@@ -490,28 +705,31 @@ below must implement all states that apply, including empty/loading/error at its
 | 7 | **PreviewPanel** | side panel 360 px when `workArea.width ≥ 1200`, otherwise bottom drawer: title, meta grid, snippet/thumbnail, actions row | side: 360 × content; drawer: 240 px | toggled by Ctrl+Space; `aria-label="Preview"`; loading/empty/error/no-preview states; Esc closes; focusable scroll region |
 | 8 | **LauncherFooter** | left: 8 px status dot + status text + · + "Open ProtonSearch" text button; right: 3 kbd hints max | 44 px; 9/16 padding | hints contextual (Navigate/Open/Clear→Close/Preview/Copy path); Paste-N CUT for alpha; text 10 px; hidden by priority <900 px; status is live region |
 | 9 | **Kbd** | 10 px/650, 2 px 5 px padding, radius 4, bg `--ps-kbd-bg`, 1 px border | auto | non-interactive; `aria-hidden` when the hint text already names the key? No — keep text visible, hide the decorative keycap from AT via `aria-label` on the hint group |
-| 10 | **Button** | primary (fill `--ps-primary-bg`, radius 6, 10×14, 12/720) · secondary (white, 1 px `--ps-control-border`, ink `#365a69`) · ghost/text (10 px padding, ink accent) · danger-text (negative, confirm required) | sm 28 · md 32 · lg 38 | hover/active/disabled/loading (label + 12 px dot? no spinner: label + aria-busy); one filled primary per screen; icon-only needs aria-label |
-| 11 | **TextField / SearchField** | label above (11 px caps 740, 8–10 px gap), field 38 px, radius 7, 1 px `--ps-control-border`, 13 px ink, placeholder `#69746e` | 38 px (32 compact); big search 48 px | focus: 2 px `--ps-focus` ring offset 2 (not a border swap); invalid: negative border + inline error; disabled legible with reason; helper via aria-describedby |
-| 12 | **CheckboxRow / ChoiceRow** | 16 px checkbox + label 12/650 + description 10–11 px right or below; whole row is the hit target | 40–44 px | checked/unchecked/indeterminate? no; focus ring on row; disabled row keeps 4.5:1 text |
-| 13 | **SegmentedControl** | track `--ps-surface-soft`, 4 px padding, radius 9, buttons radius 5, 12/680 | 32 px | selected = white/raised fill + ink; keyboard roving tabindex; used for theme, density, activity filters, per-root depth mode |
-| 14 | **ToggleSwitch** | 28×16 track, 12 px thumb, label + status word | 32 px row | on = `--ps-accent` (not green); focus ring; disabled reason |
+| 10 | **Button** | primary (fill `--ps-primary-bg`, radius 6, padding 8/16, **13/700**) · secondary (white, 1 px `--ps-control-border`, ink `#365a69`) · ghost/text (ink accent) · danger-text (negative, confirm required) | sm 28 · md **36** · lg **40** | hover/active/disabled/loading (label + 12 px dot? no spinner: label + aria-busy); one filled primary per screen; icon-only needs aria-label |
+| 11 | **TextField / SearchField** | label above (**11 px caps 700**, 8–10 px gap), field **40 px**, radius 7, 1 px `--ps-control-border`, **14 px** ink, placeholder `#69746e` | **40 px** (36 compact); big search **52 px** | focus: 2 px `--ps-focus` ring offset 2 (not a border swap); invalid: negative border + inline error; disabled legible with reason; helper via aria-describedby |
+| 12 | **CheckboxRow / ChoiceRow** | 16 px checkbox + label **14/600** + description **12 px** right or below; whole row is the hit target | **44–48 px** | checked/unchecked/indeterminate? no; focus ring on row; disabled row keeps 4.5:1 text |
+| 13 | **SegmentedControl** | track `--ps-surface-soft`, 4 px padding, radius 9, buttons radius 6, **13/600** | **36 px** | selected = white/raised fill + ink; keyboard roving tabindex; used for theme, density, activity filters, per-root depth mode |
+| 14 | **ToggleSwitch** | 28×16 track, 12 px thumb, label + status word | **44 px row** | on = `--ps-accent` (not green); focus ring; disabled reason |
 | 15 | **ProgressBar** | 4 px track radius 3, fill `--ps-progress-fill`; label + "42 %" + detail line | 4 px bar; 3-line block | determinate (value 0–100 real), indeterminate (static 30 % + phase text), paused, error; `role="progressbar"`; never fake a number; **not rendered in v2.0 alpha** (IPC has no percentage — SCREENS §10) |
-| 16 | **Panel / Card** | 1 px `#e2e8df` or tone step, radius 8, padding 19×21 (reference:76); no shadow at rest | auto | used for grouped content; never a 3-up feature grid |
-| 17 | **SectionHeader** | eyebrow 10/770/.14em · h1 display · lead 13 px `--ps-ink-2` (max 54ch) · h2 section label 11/750/.10em | — | one h1 per route; eyebrow may be omitted before an h1 |
-| 18 | **MetricRow** | label 12 px `#5c6862` + value 12/700 ink right, 11 px vertical padding, 1 px row rule | 40 px | numbers tabular; last row no rule (reference:74) |
-| 19 | **StatBlock** | stat 34/680 + subline 11 px `--ps-ink-2` + state line + metrics | — | one per screen; the number is real; no progress in alpha (SCREENS §10) |
-| 20 | **RecentRow** | 32×33 icon · title 12/680 · sub 11 `--ps-ink-3` · trailing arrow | 56 px | hover row tint; whole row is one button |
-| 21 | **EmptyState** | icon 20 px (optional) + one sentence 12–13 px `--ps-ink-2` + optional single action | min 140 px (launcher) / 96 px (app block) | empty ≠ error; keeps the frame; no illustration, no emoji |
-| 22 | **ErrorState / InlineNotice** | 1 px border tint + 12 px text + Retry text button | inline | errors live in the block that failed, never a full-screen banner; `role="alert"` for new errors |
+| 16 | **Panel / Card** | 1 px `--ps-line` or tone step, radius **12**, padding **24** (reference:76); no shadow at rest | auto | used for grouped content; never a 3-up feature grid |
+| 17 | **SectionHeader** | eyebrow **11/750/+0.14em** · h1 display · lead **15/24** `--ps-ink-2` (max 60ch) · h2 section label **12/750/+0.08em** | — | one h1 per route; eyebrow may be omitted before an h1 |
+| 18 | **MetricRow** | label **13 px** `#5c6862` + value **14/600** ink right, 10 px vertical padding, 1 px row rule | **44 px** | numbers tabular; last row no rule (reference:74) |
+| 19 | **StatBlock** | stat **36/650** + subline **12 px** `--ps-ink-2` + state line + metrics | — | one per screen; the number is real; no progress in alpha (SCREENS §10) |
+| 20 | **RecentRow** | 32×32 icon · title **14/600** · sub **12** `--ps-ink-3` · trailing arrow | **68 px** | hover row tint; whole row is one button |
+| 21 | **EmptyState** | app: left-aligned block, optional 20 px outline icon, title 15/600, one 14/21 `--ps-ink-2` sentence (max 60 ch), one action; launcher keeps its centred 13 px empty copy | app block min-height 120 px; launcher 140 px | empty ≠ error; keeps the frame; no illustration, no emoji; copy in SCREENS §3.7 |
+| 22 | **ErrorState / InlineNotice** | quiet `.state` block (§8.3): surface bg, 1 px line border, 20 px semantic icon, title 15/600, one 14/21 sentence, one action, optional collapsed Details | padding 20/24; radius 12 | errors live in the block that failed, never a full-screen banner; no red fill; `role="alert"` only for newly triggered failures, `role="status"` for load failures |
 | 23 | **StatusDot** | 8 px dot + text label 11 px | — | colour + word; `aria-hidden` on dot; ready `#4f7d68`, indexing `#8a5a12`, paused `#68736d`, error `#a92a2f` (light) / equivalents dark |
 | 24 | **Badge / Pill** | 16–20 px tall, radius full, pale tint + dark ink, 11/650 | — | status only, inside rows/beside values; never above a heading; no count badges unless a real queue count |
-| 25 | **Sidebar** | brand block, "WORKSPACE" label, 5 nav items, userfoot at bottom | 220 / 190 / 56 rail | active = neutral tint + ink + 2 px `--ps-selected-bar` start bar; no coloured pill; rail keeps sr-only labels |
-| 26 | **Avatar** | 30 px tile radius 8, initial 780 or person glyph when no name | — | optional name only; neutral fallback "This PC" |
-| 27 | **StepRail / StepIndicator** | 25 px numbered circle + label 12/620; current filled `#295a70` white; completed accent ink; future muted | 7 steps, 53 px pitch | rail hidden ≤700 px; current step announced; non-interactive |
+| 25 | **Sidebar** | brand block, "WORKSPACE" label, 5 nav items, userfoot at bottom | **232 / 200 / 64 rail** | active = neutral tint + ink + 2 px `--ps-selected-bar` start bar; no coloured pill; rail keeps sr-only labels |
+| 26 | **Avatar** | **32 px** tile radius 8, initial 700 or person glyph when no name | — | optional name only; neutral fallback "This PC" |
+| 27 | **StepRail / StepIndicator** | **28 px** numbered circle + label **13/600**; current filled `#295a70` white; completed accent ink; future muted | 7 steps, **56 px** pitch | rail hidden ≤700 px; current step announced; non-interactive |
 | 28 | **ContextMenu** | floating panel radius 8, 1 px border, popover shadow, 12 px items, 6 px vertical padding, shortcut column right | min 180 px | keyboard: focus moves into menu, Esc returns to row; destructive item last, in negative colour, confirm |
 | 29 | **Tooltip** | dark-ink surface 11 px, radius 4, 4×8 padding, 400 ms delay after first, none on subsequent | — | only for icon-only controls or truncated text; never for hints already in the footer |
 | 30 | **Skeleton** | flat grey bar at real size, radius 4, no shimmer/no gradient | — | layout identical to loaded state; no CLS |
 | 31 | **InlineStatus** | footer/inline confirmation text ("Path copied"), 10–11 px, auto-clears 2 s | — | `role="status"`; not a toast |
+| 32 | **FilterStrip** | horizontal category chips: `role="radiogroup"`, one roving tab stop; selected = `--ps-accent-soft` fill + 1 px `--ps-accent-border` + 2 px inset bottom `--ps-selected-bar`; 11/600 sentence case | block 40 px (36 compact); chip 26 px (24 compact); gap 6; inline pad 16 | scrolls horizontally when overflowing (no wrap/fade); Tab enters the selected chip, ←/→/Home/End change filter, Esc clears to All; labels localised, never truncated; spec SCREENS §2.11 |
+| 33 | **OfflineNotice** | `.state.state--offline` variant: cloud-off icon, title "You're offline.", one sentence, optional Try again | same block metrics as ErrorState | only for genuinely network-dependent content; local search/indexing never shows it; `role="status"` |
+| 34 | **DetailsDisclosure** | native `<details>`: summary "Details" 12/600 `--ps-ink-2`; content 12/18 `--ps-ink-2` — sanitized message + reference id only | — | collapsed by default; no stack traces, no paths, no raw `err.message`; omit entirely if there is nothing safe to show |
 
 ### 8.2 Complex-component rules
 
@@ -543,6 +761,18 @@ priority: Navigate → Open → Clear/Close → Preview → Copy path. Multi-sel
 Hints are hidden by priority, never wrapped to a second line at ≥900 px; below 900 px the footer may use two rows
 (window grows by 20 px).
 
+**Launcher window & shadow.** The card floats inside a transparent 28 px window pad; every shadow layer must fit
+`|offsetY| + 1.5×blur ≤ 24 px` (§5.4). The card fills the pad (do not centre a shorter card vertically); a press in the
+pad dismisses the launcher. Native window shadow stays off.
+
+**FilterStrip.** A scrolling chip row between the search row and the results list, inside the results column so the
+preview panel keeps full body height. Radio-group semantics, not tabs: ←/→ changes the filter immediately and keeps
+focus on the selected chip; Tab lands on the selected chip, Tab again leaves the strip; Home/End jump to All/last.
+Selected state uses the same 2 px accent bar as result rows (fill alone is 1.14:1 and fails WCAG 1.4.11). Overflow is
+horizontal scroll only (`overflow-x:auto`, hidden scrollbar); the selected chip scrolls into view on focus/keyboard
+change; no gradient/fade edges. Labels are sentence case and localised; no counts inside chips. Full spec: SCREENS
+§2.11.
+
 **Buttons.** One filled primary per screen. Secondary = white/raised with 1 px border and ink `#365a69`; hover
 `#f0f4ef`. Tertiary = text only, accent ink. Destructive = text/outlined negative with a confirmation that names
 the object ("Remove Documents from the index?"). Buttons never use gradients, never scale on hover, press is a
@@ -553,6 +783,34 @@ counts ("8,440 of 20,113 documents"). Indeterminate shows a static 30 % bar and 
 "Reading documents…"); no shimmer. Paused: bar stays at the last value, label "Paused"; error: bar freezes,
 notice below with Retry. If the engine cannot report a percentage, do not invent one. **v2.0 alpha renders no progress bar at all** (the IPC
 has no percentage — SCREENS §10); this spec is post-alpha.
+
+### 8.3 Quiet state presentation — error / empty / offline (FINAL 2026-11-09)
+
+One small family of state blocks. The user sees a **human sentence first**; technical detail is collapsed and optional.
+No raw exception text, no error codes, no stack traces, no absolute paths, no red-washed panels.
+
+| State | Class | Tone | Anatomy |
+|---|---|---|---|
+| Blocked / failed | `.state .state--error` | negative icon + 1 px `--ps-negative-pill-bg` border (no fill) | 20 px outline icon · title 15/600 ink · one 14/21 `--ps-ink-2` sentence (max 60 ch) · one action · optional Details |
+| Needs attention | `.state .state--warn` | warning icon + 1 px `--ps-warning-pill-border` border | same anatomy; used for degraded/partial, not failure |
+| Informational | `.state` | `--ps-ink-2` icon + `--ps-line` border | same anatomy; used for alpha limitations, not errors |
+| Offline | `.state .state--offline` | neutral/cloud-off icon | title "You're offline.", one sentence, optional Try again; only network-dependent blocks |
+| Empty | `.state .state--empty` | neutral | optional 20 px icon · title 15/600 · one 14/21 sentence · one action; left-aligned in its panel |
+| Row-level failure | `.row-state` | inline | 16 px negative icon · 13/20 `--ps-ink-2` sentence · "Try again" 13/600 accent; no border or background |
+
+Metrics: block padding **20 px 24 px**; icon 20 px; gap 12; title 15/600/ink; text 14/21 `--ps-ink-2` max 60 ch;
+action row margin-top 16, buttons 36 px (secondary) or text; details margin-top 12; radius 12; background
+`--ps-surface`; one border. Never stack two negative blocks in one view; degrade to warn. Empty states keep their
+frame, are left-aligned to the grid, and never use centred copy or illustration in the app.
+
+Copy rules (canonical strings and the per-path map are in SCREENS §3.7): title ≤ 6 words in sentence case, ends with a
+period; body ≤ 2 sentences, active voice, second person, says **what happened** and **what to do next**; never "Oops",
+"Error", "Something went wrong", codes, paths, stack traces or exclamation marks; the action is specific ("Try again",
+"Open Search & indexes", "Add location", "Show all"). Details disclosure: native `<details>`, summary "Details"
+12/600 `--ps-ink-2`, content 12/18 `--ps-ink-2`, sanitized message + reference id only. Screen readers: load-time
+failures use `role="status"` (polite, announced once); failures triggered by an action use `role="alert"` (assertive,
+once); offline transitions use `role="status"`; never re-announce the same message on re-render. "Try again" keeps focus
+on itself; on success the block is removed and the updated content is not announced twice.
 
 ---
 
@@ -669,21 +927,30 @@ the semantics.
   --ps-radius-segment: 9px; --ps-radius-window: 12px; --ps-radius-launcher: 14px; --ps-radius-full: 999px;
   --ps-border: 1px; --ps-focus-width: 2px; --ps-focus-offset: 2px; --ps-selected-bar-width: 2px;
 
-  --ps-shadow-launcher: 0 24px 56px rgba(36, 60, 43, 0.11), 0 2px 5px rgba(21, 44, 24, 0.04);
+  --ps-launcher-shadow-pad: 28px;
+  --ps-shadow-launcher: 0 1px 2px rgba(21, 44, 24, 0.10), 0 3px 6px rgba(36, 60, 43, 0.08),
+    0 6px 12px rgba(36, 60, 43, 0.10), 0 0 0 1px rgba(20, 43, 49, 0.05);
   --ps-shadow-app: 0 18px 45px rgba(33, 59, 40, 0.08);
   --ps-shadow-popover: 0 8px 24px rgba(32, 43, 49, 0.14), 0 1px 3px rgba(32, 43, 49, 0.06);
   --ps-shadow-dialog: 0 24px 64px rgba(32, 43, 49, 0.20);
 
   --ps-dur-0: 0ms; --ps-dur-fast: 90ms; --ps-dur-base: 110ms; --ps-dur-panel: 160ms;
   --ps-dur-progress: 240ms; --ps-dur-loop: 1200ms;
+  --ps-dur-launcher-in: 150ms; --ps-dur-launcher-out: 110ms;
   --ps-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ps-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ps-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ps-ease-linear: linear;
+  --ps-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ps-ease-launcher-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   --ps-row-launcher: 58px; --ps-row-list: 64px; --ps-row-nav: 40px;
   --ps-control-height: 32px; --ps-field-height: 38px;
   --ps-content-max: 1040px;
+
+  /* Launcher filter strip */
+  --ps-strip-height: 40px; --ps-chip-height: 26px; --ps-chip-gap: 6px;
+  --ps-chip-pad-x: 10px; --ps-chip-radius: 6px; --ps-strip-pad-x: 16px;
 }
 
 :root[data-theme="dark"] {
@@ -711,7 +978,8 @@ the semantics.
   --ps-badge-action-bg: #212a30; --ps-badge-action-ink: #b6c9d6;
   --ps-badge-image-bg: #2a2430; --ps-badge-image-ink: #c4b6d8;
   --ps-badge-neutral-bg: #23291f; --ps-badge-neutral-ink: #b9c4b3;
-  --ps-shadow-launcher: 0 24px 56px rgba(0, 0, 0, 0.55), 0 2px 5px rgba(0, 0, 0, 0.35);
+  --ps-shadow-launcher: 0 1px 3px rgba(0, 0, 0, 0.50), 0 3px 8px rgba(0, 0, 0, 0.40),
+    0 6px 12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(236, 239, 232, 0.08);
   --ps-shadow-app: 0 18px 45px rgba(0, 0, 0, 0.45);
   --ps-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
   --ps-shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55);
@@ -720,6 +988,48 @@ the semantics.
 :root[data-density="compact"] {
   --ps-row-launcher: 48px; --ps-row-list: 52px; --ps-row-nav: 34px;
   --ps-control-height: 28px; --ps-field-height: 32px;
+  --ps-strip-height: 36px; --ps-chip-height: 24px; --ps-chip-gap: 5px;
+  --ps-chip-pad-x: 8px; --ps-strip-pad-x: 12px;
+}
+
+html[data-window="main"] {
+  --ps-text-display: clamp(28px, 3.6vw, 44px);
+  --ps-text-h1-setup: 34px;
+  --ps-text-stat: 36px;
+  --ps-text-lead: 15px;
+  --ps-text-body: 14px;
+  --ps-text-strong: 14px;
+  --ps-text-small: 13px;
+  --ps-text-meta: 12px;
+  --ps-text-micro: 11px;
+  --ps-text-section: 12px;
+  --ps-text-kbd: 11px;
+  --ps-text-control: 13px;
+  --ps-leading-display: 1.08;
+  --ps-leading-setup: 1.16;
+  --ps-leading-lead: 24px;
+  --ps-leading-body: 21px;
+  --ps-leading-small: 20px;
+  --ps-leading-meta: 18px;
+  --ps-leading-micro: 16px;
+  --ps-content-max: 1120px;
+  --ps-app-margin: 40px;
+  --ps-app-gutter: 24px;
+  --ps-app-card-pad: 24px;
+  --ps-app-section-gap: 32px;
+  --ps-app-label-col: 280px;
+  --ps-app-sidebar: 232px;
+  --ps-row-nav: 44px;
+  --ps-row-list: 68px;
+  --ps-control-height: 36px;
+  --ps-field-height: 40px;
+  --ps-app-metric-row: 44px;
+}
+@media (max-width: 1099px) { html[data-window="main"] { --ps-app-margin: 32px; --ps-app-sidebar: 200px; } }
+@media (max-width: 819px)  { html[data-window="main"] { --ps-app-margin: 24px; --ps-app-gutter: 16px; --ps-app-sidebar: 64px; } }
+@media (max-width: 700px)  { html[data-window="main"] { --ps-app-margin: 20px; } }
+html[data-window="main"][data-density="compact"] {
+  --ps-row-nav: 38px; --ps-row-list: 60px; --ps-control-height: 32px; --ps-field-height: 36px;
 }
 ```
 
