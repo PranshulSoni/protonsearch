@@ -57,3 +57,6 @@ tray_debug.log
 # External projects
 Flow.Launcher-dev/
 icons/preview-images/demo.mp4
+
+# Agent design scratch
+.agents/design/
