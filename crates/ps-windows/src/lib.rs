@@ -457,3 +457,278 @@ pub fn broadcast_setting_change() -> anyhow::Result<()> {
         Ok(())
     }
 }
+// ---------------------------------------------------------------------------
+// Native adapter layer (task-35): capabilities, Core Audio, brightness,
+// notifications. Every API is user-level, bounded and honest about support.
+// ---------------------------------------------------------------------------
+
+/// Result of one capability probe.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Capability {
+    pub supported: bool,
+    /// Why the capability is unavailable (None when supported unless a note).
+    pub reason: Option<String>,
+}
+
+impl Capability {
+    pub fn supported() -> Self {
+        Self {
+            supported: true,
+            reason: None,
+        }
+    }
+
+    pub fn unsupported(reason: impl Into<String>) -> Self {
+        Self {
+            supported: false,
+            reason: Some(reason.into()),
+        }
+    }
+
+    pub fn is_supported(&self) -> bool {
+        self.supported
+    }
+}
+
+/// Capability matrix for the native integrations surfaced in Settings/cards.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct NativeCapabilities {
+    pub media_sessions: Capability,
+    pub audio_output: Capability,
+    pub audio_volume: Capability,
+    pub audio_output_switch: Capability,
+    pub wifi: Capability,
+    pub bluetooth: Capability,
+    pub brightness: Capability,
+    pub local_notifications: Capability,
+    pub toast_notifications: Capability,
+    pub airplane_mode: Capability,
+    pub energy_saver: Capability,
+    pub hotspot: Capability,
+    pub cast: Capability,
+    pub night_light: Capability,
+}
+
+impl NativeCapabilities {
+    /// Probe every integration. Bounded (per-probe timeout) and side-effect free;
+    /// call from a background thread if the caller cannot tolerate up to a few
+    /// hundred milliseconds of first-call latency.
+    pub fn probe() -> Self {
+        #[cfg(windows)]
+        {
+            imp::capabilities::probe_all()
+        }
+        #[cfg(not(windows))]
+        {
+            let unsupported = || Capability::unsupported("native adapters are only supported on Windows");
+            NativeCapabilities {
+                media_sessions: unsupported(),
+                audio_output: unsupported(),
+                audio_volume: unsupported(),
+                audio_output_switch: unsupported(),
+                wifi: unsupported(),
+                bluetooth: unsupported(),
+                brightness: unsupported(),
+                local_notifications: unsupported(),
+                toast_notifications: unsupported(),
+                airplane_mode: unsupported(),
+                energy_saver: unsupported(),
+                hotspot: unsupported(),
+                cast: unsupported(),
+                night_light: unsupported(),
+            }
+        }
+    }
+}
+
+/// One render (output) audio endpoint.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct AudioOutputDevice {
+    pub id: String,
+    pub name: String,
+    pub is_default: bool,
+}
+
+/// Master volume/mute state of the default render endpoint.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AudioState {
+    /// 0.0 ..= 1.0
+    pub volume: f32,
+    pub muted: bool,
+}
+
+/// Probe the native capability matrix (see NativeCapabilities::probe).
+pub fn native_capabilities() -> NativeCapabilities {
+    NativeCapabilities::probe()
+}
+
+/// Enumerate active output endpoints (friendly name + id + default marker).
+pub fn list_audio_outputs() -> anyhow::Result<Vec<AudioOutputDevice>> {
+    #[cfg(windows)]
+    {
+        imp::audio::list_output_devices()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("audio adapters are only supported on Windows")
+    }
+}
+
+/// Current default output endpoint.
+pub fn default_audio_output() -> anyhow::Result<AudioOutputDevice> {
+    #[cfg(windows)]
+    {
+        imp::audio::default_output_device()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("audio adapters are only supported on Windows")
+    }
+}
+
+/// Switch the default output endpoint (may be unsupported on some builds; the
+/// error message tells the UI to open Windows sound settings).
+pub fn set_audio_output(device_id: &str) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::audio::set_default_output(device_id)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = device_id;
+        anyhow::bail!("audio adapters are only supported on Windows")
+    }
+}
+
+pub fn get_audio_volume() -> anyhow::Result<f32> {
+    #[cfg(windows)]
+    {
+        imp::audio::get_volume()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("audio adapters are only supported on Windows")
+    }
+}
+
+/// Set master volume of the default output endpoint (clamped 0.0..=1.0).
+pub fn set_audio_volume(volume: f32) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::audio::set_volume(volume)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = volume;
+        anyhow::bail!("audio adapters are only supported on Windows")
+    }
+}
+
+pub fn get_audio_mute() -> anyhow::Result<bool> {
+    #[cfg(windows)]
+    {
+        imp::audio::get_mute()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("audio adapters are only supported on Windows")
+    }
+}
+
+pub fn set_audio_mute(muted: bool) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::audio::set_mute(muted)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = muted;
+        anyhow::bail!("audio adapters are only supported on Windows")
+    }
+}
+
+/// Volume + mute snapshot of the default output endpoint.
+pub fn audio_state() -> anyhow::Result<AudioState> {
+    #[cfg(windows)]
+    {
+        imp::audio::state()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("audio adapters are only supported on Windows")
+    }
+}
+
+/// True when at least one monitor exposes user-level brightness control.
+pub fn brightness_supported() -> bool {
+    #[cfg(windows)]
+    {
+        imp::brightness::supported()
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+/// Descriptions of monitors that expose brightness control.
+pub fn brightness_monitors() -> Vec<String> {
+    #[cfg(windows)]
+    {
+        imp::brightness::monitors()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// Current brightness (0..=100) of the first brightness-capable monitor.
+pub fn get_brightness() -> anyhow::Result<u8> {
+    #[cfg(windows)]
+    {
+        imp::brightness::get_brightness()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("brightness is only supported on Windows")
+    }
+}
+
+/// Set brightness (0..=100) on every brightness-capable monitor.
+pub fn set_brightness(percent: u8) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::brightness::set_brightness(percent)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = percent;
+        anyhow::bail!("brightness is only supported on Windows")
+    }
+}
+
+/// True when Windows accepts ProtonSearch app toasts on this OS/identity.
+pub fn toast_supported() -> bool {
+    #[cfg(windows)]
+    {
+        imp::toast::supported()
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+/// Show a local ProtonSearch toast (never reads other apps' notifications).
+pub fn show_toast(title: &str, body: &str) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::toast::show(title, body)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (title, body);
+        anyhow::bail!("toast notifications are only supported on Windows")
+    }
+}

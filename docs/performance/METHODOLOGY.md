@@ -185,6 +185,7 @@ An opt-in instrumented build adds `window.__PS_PERF__` ring buffer + `performanc
 - The legacy DB is WAL-mode with an un-checkpointed WAL; immutable reads intentionally skip it (documented in each export meta).
 - Rust debug builds are not representative; published numbers come from the release profile named in the result JSON.
 - Timing resolution: `Instant` on Windows is QPC-backed (~100 ns), so microsecond differences at 1M scale are noise-dominated; distributions, not single runs, are reported.
+- **Stale build artifacts:** a dependency change is not always reflected in a workspace binary. We caught `ps-bench` linking pre-optimization `ps-content` after `cargo clean -p ps-content`: the binary still contained the old FTS `snippet(` SQL string and reported 40 ms p95 while a freshly-built probe of the same function measured 9-11 ms. Before accepting a benchmark after a dependency change, verify a distinctive string/symbol in the binary, or delete `target/release/<bin>.exe` plus `*<crate>*` deps artifacts and rebuild; record the binary mtime in the result JSON (done by tools/benchmark harnesses).
 
 ## 13. What we did NOT measure (this pass)
 

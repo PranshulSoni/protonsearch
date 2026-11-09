@@ -57,15 +57,17 @@ integration evidence.
 | Song / artist | 19 / 11 | 400 | #f6f7f8 / #9eb7d1 |
 
 Essential status text at 9 px must not ship unreadable in production: keep the visual badge but raise essential status or
-pair word+shape; document the deviation. Dots are visual 5/4 px inside 14×30 or 11×37 buttons, so add hit area to
-≥24×24 without changing the dot.
+pair word+shape; document the deviation. Dots are visual 5/4 px; expanded buttons keep the V9 **14×30 layout + 5 px gap**
+with a centred invisible **24×30 hit pseudo-element**; compact keeps **11×37** (documented WCAG deviation, because 24 px
+would overlap the input at 315 px). Keyboard/wheel/swipe alternatives and a showDots opt-out exist.
 
 ### 1.3 Radii, border, shadow
 
 Radius: **34** default, **999** compact search, **41** media, 12 big icon tile, 10 setting tile, 8 row, 7 small
 controls. Border 1 px `#2e3538`. Shadow union:
-`0 26px 54px rgba(20,32,40,.25), 0 3px 8px rgba(27,32,32,.15)`. The native host must expose a transparent shadow
-margin or native shadow; the current island window hugs the surface and would clip it.
+`0 26px 54px rgba(20,32,40,.25), 0 3px 8px rgba(27,32,32,.15)`. Shadow extent max is **107 px**; the native host now
+uses `ISLAND_SHADOW_PAD = 112` (`src-tauri/src/main.rs:34`), so the shadow fits with 5 px headroom on every side.
+Surface geometry is unchanged and the window adds the transparent margin.
 
 ### 1.4 Icons
 
@@ -80,7 +82,7 @@ Bounded inline SVG 0 0 24 24, `fill:none`, stroke currentColor, **stroke-width 1
 | Zone height | 31 px footer | 38 px overlay |
 | Dot | 5 px; active 16×5 | 4 px; active 6×4 |
 | Gap | 5 | 1 |
-| Button | min 14×30, padding 9 3 | 11×37, min-width 10, padding 11 0 |
+| Button | layout 14×30 (padding 9 3) + invisible 24×30 hit pseudo | 11×37, min-width 10, padding 11 0 (documented a11y deviation) |
 | Nav | bottom 0, full width, bg #101416, top border #262c30 | top 14, right 15 (11 ≤520), transparent |
 | Active colour | #c7dce7; idle #657176 | same |
 
@@ -173,16 +175,19 @@ icon 18, title 12, meta 10, tail check/more; selecting returns. Real media/outpu
 
 **Clipboard:** 510×391 (416 ≤520, 446 ≤380). Head; divider margin 12 0 7; inline nav 7 tabs **All/Text/Images/Links/
 Code/Files/Pinned**, gap 4, buttons min-height 29 padding 7 9 radius 7, active bg #1c303c border #304958 ink #d4e8f4;
-wraps at ≤380. List max-height 144; clip row 48 fixed, padding 7 8 gap 10, icon 34, title 11.5/700, sub 10
-"Type · Local clip"; selected check. Snippet max-height 95 min 48, margin-top 8, padding 10 12 radius 8, mono 10.5/1.55,
-pre-wrap/break-anywhere, scroll. Sample Text/Code/Images/Links/Files. Pinned is a hard-coded alias to Code — production
-must use real pinning. Real Win32 formats/thumbnails/previews.
+no tab counts; wraps at ≤380. List max-height 144; clip row 48 fixed, padding 7 8 gap 10, icon 34, title 11.5/700, sub 10
+neutral sentence-case "Type · {relative time}"; selected check. Image rows use a real 34 px `meta.thumbnailDataUrl`
+thumbnail (object-cover) when present. Snippet max-height 95 min 48, margin-top 8, padding 10 12 radius 8, mono 10.5/1.55,
+pre-wrap/break-anywhere, scroll. Pinned tab is **disabled honestly** until pinning IPC lands; no fake pin state. Real Win32
+formats/thumbnails/previews.
 
 **Agents:** 520×411 (445 ≤520). Head; divider margin 11; workspace row caps 10 "CURRENT WORKSPACE · n AGENTS" +
 Subagent button 33 high padding 8 11 radius 7 icon 14; list max-height 150 scroll; rows 48 with agent icon 34, name 12,
 task 10 ellipsis, status badge 9 (border #354c59, padding 4 7 radius 5); selected row like clip active. Actions margin-
-top 10 gap 7: Pause/Resume + Details (icon 14), progress % right; track 4 bg #27343d fill #a6c7d8. Spawn appends row;
-list scrolls; actions use selected; real hierarchy/status/logs; no fake %.
+top 10 gap 7: Pause/Resume + Details (icon 14); actions are gated by `task.controls` (a disabled action must read as
+disabled); progress % right when determinate; track 4 bg #27343d fill #a6c7d8. Implemented v1: flat Pi tasks from
+`api.agentTasks(50)` with real state/progress/permissions/log summary, no fabricated tree; hierarchy/agent-task-tree and
+log IPC remain gaps. Pluralise counts ("1 TASK", "1 permission"); never show both Pause and Resume as enabled.
 
 **Controls:** 515×376 (400 ≤520, 483 ≤380); drill-down 515×366 (418 ≤520). Head; divider margin 12; grid 2 col gap 9;
 tile 61 (58 ≤520, 50 ≤380) radius 10 bg #171e23 border #34434a; on bg #223a49 border #416178. Left toggle flex 1,
@@ -227,14 +232,14 @@ wheel/swipe switches cards. Reduced motion: all transitions/animations 0; state 
 | Fixed card W/H | Keep visual target; derive from content, clamp to work area |
 | Sample tabs/results/counts | Real sources and counts; no fake data |
 | Fake media/duration/artwork | Real Windows media sessions and output endpoints |
-| Clipboard sample rows + Pinned=Code alias | Real formats/thumbnails/categories/pinning |
-| Agent sample statuses/%/spawn | Real hierarchy/status/logs; indeterminate when unknown |
+| Clipboard sample rows + Pinned=Code alias | Real formats/thumbnails/categories/pinning; v1 uses real rows/thumbnailDataUrl and an honest disabled Pinned tab |
+| Agent sample statuses/%/spawn | Real hierarchy/status/logs; indeterminate when unknown; v1 flat Pi tasks + honest disabled hierarchy/log controls |
 | Simulated Wi-Fi/Bluetooth | Real APIs, permissions, unsupported states, split toggle/chevron |
 | Browser/Git/notification samples | Real adapters, honest availability |
 | Always 8 dots | Render enabled cards in saved order; dots reflect order |
 | V9 stage bar/background | Not product chrome; only surface binds |
 | CSS width/height animation | Keep visual timing; profile layout; latest input wins |
-| Tiny dot hit areas | Expand hit target to ≥24×24 without visual change |
+| Tiny dot hit areas | Expanded: 24×30 hit pseudo behind 14 px layout; compact: 11×37 documented deviation |
 | Shadow clipped at stage | Native window transparent margin/native shadow; surface bbox unchanged |
 
 ## 7. Accessibility
@@ -261,6 +266,20 @@ Enter/Space, Esc, Ctrl+↑/↓, Home/End where applicable.
 
 ## 9. Gap list
 
-See `docs/design/ISLAND_V9_GAP_LIST.md` (P0/P1/P2, current code evidence, owners). Highest: placeholder renderer only
-(`IslandView.tsx`), missing tokens/motion/components/dots, native shadow margin, no placement/card-manager UI,
-real data adapters.
+See `docs/design/ISLAND_V9_GAP_LIST.md` (updated post-task-41). Renderer v1 now exists in `apps/desktop/src/island/**`
+with all eight cards, real search/clipboard/browser/git, flat agent tasks, dots/motion and the 112 px shadow pad; the
+remaining gaps are native Media/Quick Settings/Notifications adapters (task-35), agent task-tree/log IPC, clipboard
+pinning IPC, compact 11 px dot WCAG deviation, real Windows/DPI/frame-pacing evidence, and the copy nits in §10.
+
+## 10. Implementation status — task-41 renderer v1 (2026-11-10)
+
+**Landed:** V9 graphite surface/cards/dots, all card dimensions/radii from §2, tokens/type/icons, motion tokens and
+reduced-motion swap; search real results/filters (All/Files/Folders/Apps/Actions) with borderless input and row-only
+path; clipboard real categories/snippets/images with disabled Pinned; agents flat real Pi tasks with gated actions;
+browser/git real scoped sources; Media/Quick Settings/Notifications honest disabled states; shadow pad 112.
+**Design-review deltas resolved:** dots 14+5 pitch with 24×30 hit, input box removed, placeholder/Actions/recency, clipboard
+counts/copy/thumbnail, V9 card subtitles, browser two-end context/chevron.
+**Remaining honest gaps:** native Media/Quick Settings/Notifications adapters; agent task-tree/logs; clipboard pinning;
+compact 11 px dot target (documented); zero-results/reduced-motion/drilldown capture evidence; real Windows/DPI/frame
+pacing; agent copy pluralisation ("1 TASK"/"1 permission") and disabled-action visual state; preview error detail must be
+sanitized (tracked in REVIEW_3).

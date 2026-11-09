@@ -460,3 +460,14 @@ frame in `live-now` is the app behind; the in-app brand mark and the launcher ca
 
 **Status:** L2/L3/L4 are specified in DESIGN_SYSTEM §5.4/§6 and SCREENS §2.10/§2.11 (ui-launcher can implement
 directly); L1 and L5/L6 need L0/ux-qa action (assets + Rust window clamp) and are recorded against this review.
+
+## 9. G4/G5 spec-sync status (task-47, 2026-11-10)
+
+The UI specification has been re-synced to the implemented, user-approved v10 reality; no code changes in this sync.
+Normal Launcher now has four visible chips (ALL/FILES/FOLDERS/APPS) with all other scopes via prefixes and quick
+destinations; §2.6 preview is the real G2 IPC payload; §2.11/§2.4 carry exact metrics/copy and the Dynamic Island spec
+records the 112 px shadow pad, resolved renderer deltas and honest remaining gaps. The G4/G5 conditional sign-off is
+recorded in `REVIEW_3_G4_G5_SPEC_SYNC.md`; original findings in this review stay closed as recorded, and the
+light/dark quiet-state work remains approved. Re-sign may proceed with that doc's conditions (native adapters/evidence,
+compact dot a11y deviation, preview raw-error/pulse fixes).
+

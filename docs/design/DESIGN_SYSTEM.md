@@ -256,9 +256,10 @@ decisions recorded here so docs and code cannot drift:
 - **User visual pass (2026-11-09):** launcher shadow retuned to layered tokens that fit the 28 px pad (§5.4); launcher
   open/close motion 150/110 ms (§6.3/§6.4); horizontal filter strip added (SCREENS §2.11); stale app/title-bar icon is
   a defect (REVIEW_1 §8).
-- **Filter/clipboard/agents pass (2026-11-10):** filter strip final seven chips ALL/FILES/FOLDERS/APPS/CLIPBOARD/WEB/
-  ACTIONS with Ctrl+1–7; DOCUMENTS/GIT removed but prefixes kept; strict FILES/FOLDERS rows; clipboard category **sections**
-  inside the results viewport (no chip row/tags; task-26); Workflows Agents section.
+- **Filter/clipboard/agents pass (2026-11-10):** filter strip now **four chips ALL/FILES/FOLDERS/APPS** with Ctrl+1–4
+  (v10, task-47); every other scope via prefixes/quick destinations; strict FILES/FOLDERS rows; clipboard category
+  sections when clipboard scope is active (no chip row/tags); Workflows Agents section; preview is now the real G2 IPC
+  payload (text/image/OCR/highlight/fields), quick destinations replace the empty prompt.
 - **App readability pass (2026-11-09):** app/onboarding type scale raised one step (§4.2b, main-window tokens only);
   12-column alignment grid and rhythm added (§5.5); quiet error/empty/offline state family added (§8.3, copy map
   SCREENS §3.7); launcher tokens and specs unchanged/final.
@@ -705,7 +706,7 @@ below must implement all states that apply, including empty/loading/error at its
 | 4 | **ResultGroup** | tracked caps 10 px/750/+0.12em, `--ps-ink-3`, 14/13/8 px padding | block 34 px | label is a real element (`role="group"` + `aria-label`); no count, no rule |
 | 5 | **ResultRow** | 36 px icon slot · 12 px gap · (title 13/680 · path 11 `--ps-ink-2`) · meta 10–11 px right | 58 px; 48 compact | rest transparent; hover `#f0f3f0`; selected `--ps-accent-soft` + 1 px `--ps-accent-border` + inset 2 px `--ps-selected-bar`; focus never replaces selection; disabled dimmed with reason tooltip |
 | 6 | **ResultIcon** | 35×37 slot radius 7; real shell icon 32 px **or** letter badge or command glyph | 32 px icon within 36 slot; 1×/2× source | loading neutral tile (no shimmer), missing icon → badge, never stretch/upscale; decorative for AT |
-| 7 | **PreviewPanel** | side panel 360 px when `workArea.width ≥ 1200`, otherwise bottom drawer: title, meta grid, snippet/thumbnail, actions row | side: 360 × content; drawer: 240 px | toggled by Ctrl+Space; `aria-label="Preview"`; loading/empty/error/no-preview states; Esc closes; focusable scroll region |
+| 7 | **PreviewPanel** | side panel 360 px when `workArea.width ≥ 1200`, otherwise bottom drawer: head (icon/title/format/path), real `PreviewPayload` body (text/code with highlight, image max 300, OCR, facts), actions row; 160 ms/6 px fade | side: 360 × content; drawer: 240 px; image max-height 300; text max-height 300 | toggled by Ctrl+Space; `aria-label="Preview"`; loading flat skeleton / unsupported / error + Retry; debounce 120 ms + late-token guard; Esc closes; focusable scroll region; real IPC only, no fake body |
 | 8 | **LauncherFooter** | left: 8 px status dot + status text + · + "Open ProtonSearch" text button; right: 3 kbd hints max | 44 px; 9/16 padding | hints contextual (Navigate/Open/Clear→Close/Preview/Copy path); Paste-N CUT for alpha; text 10 px; hidden by priority <900 px; status is live region |
 | 9 | **Kbd** | 10 px/650, 2 px 5 px padding, radius 4, bg `--ps-kbd-bg`, 1 px border | auto | non-interactive; `aria-hidden` when the hint text already names the key? No — keep text visible, hide the decorative keycap from AT via `aria-label` on the hint group |
 | 10 | **Button** | primary (fill `--ps-primary-bg`, radius 6, padding 8/16, **13/700**) · secondary (white, 1 px `--ps-control-border`, ink `#365a69`) · ghost/text (ink accent) · danger-text (negative, confirm required) | sm 28 · md **36** · lg **40** | hover/active/disabled/loading (label + 12 px dot? no spinner: label + aria-busy); one filled primary per screen; icon-only needs aria-label |
@@ -730,7 +731,8 @@ below must implement all states that apply, including empty/loading/error at its
 | 29 | **Tooltip** | dark-ink surface 11 px, radius 4, 4×8 padding, 400 ms delay after first, none on subsequent | — | only for icon-only controls or truncated text; never for hints already in the footer |
 | 30 | **Skeleton** | flat grey bar at real size, radius 4, no shimmer/no gradient | — | layout identical to loaded state; no CLS |
 | 31 | **InlineStatus** | footer/inline confirmation text ("Path copied"), 10–11 px, auto-clears 2 s | — | `role="status"`; not a toast |
-| 32 | **FilterStrip** | horizontal category chips: `role="radiogroup"`, one roving tab stop; selected = `--ps-accent-soft` fill + 1 px `--ps-accent-border` + 2 px inset bottom `--ps-selected-bar`; 11/600 uppercase | block 40 px (36 compact); chip 26 px (24 compact); gap 6; inline pad 16 | **final seven chips: ALL · FILES · FOLDERS · APPS · CLIPBOARD · WEB · ACTIONS** with Ctrl+1–7 from the input; FILES/FOLDERS exact object types; scrolls horizontally (no wrap/fade); Tab enters selected chip, ←/→/Home/End change, Esc clears to All; spec SCREENS §2.11 |
+| 32 | **FilterStrip** | four chips only: `role="radiogroup"`, one roving tab stop; selected = `--ps-accent-soft` fill + 1 px `--ps-accent-border` + 2 px inset bottom `--ps-selected-bar`; 11/600 uppercase | block 40 px (36 compact); chip 26 px (24 compact); gap 6; inline pad 16 | **ALL · FILES · FOLDERS · APPS** with Ctrl+1–4 from the input; all other scopes via prefixes/quick destinations; FILES/FOLDERS exact object types; horizontal scroll (no wrap/fade); spec SCREENS §2.11 |
+| 39 | **QuickDestinations** | empty-state 2×2 destination grid + secondary pills: Browser Bookmarks, Browser History, Clipboard History, Agents; secondary Git history, Agent History; no fake destinations | primary tile min-height 54, padding 9 12, radius 9, gap 8/12; secondary pill padding 5 9 radius 6; heading 10/750 +.12em ink-3 | listbox options, real EngineStatus text/counts only; ↑/↓+Enter from input; prefixes written for search destinations; main app for Agents/history; quick height 248/224; spec SCREENS §2.4 |
 | 33 | **OfflineNotice** | `.state.state--offline` variant: cloud-off icon, title "You're offline.", one sentence, optional Try again | same block metrics as ErrorState | only for genuinely network-dependent content; local search/indexing never shows it; `role="status"` |
 | 34 | **DetailsDisclosure** | native `<details>`: summary "Details" 12/600 `--ps-ink-2`; content 12/18 `--ps-ink-2` — sanitized message + reference id only | — | collapsed by default; no stack traces, no paths, no raw `err.message`; omit entirely if there is nothing safe to show |
 | 35 | **ClipboardCategorySection** | quiet section inside the results viewport for CLIPBOARD only: caps label + its rows, `role="group"` + `aria-labelledby`; label 10/700 `+0.10em` `--ps-ink-3`, no count/icon/control; no chip row, no row tags, no filtering controls | label block **28 px** (24 compact = 8 top + 14 line + 6 bottom), inline pad 14; **6 px** between sections; rows 58/48 | fixed order **LINKS · EMAILS · PATHS · CODE · TEXT · IMAGES**, only non-empty; flattened keyboard traversal (labels are not stops); standard card height (no +36 px); spec SCREENS §2.12 |
@@ -752,13 +754,7 @@ results" and never a pill). The input has no visible chrome: the search row is t
 `aria-live="polite"` throttled to 300 ms; previous rows stay visible (no flicker, no skeleton after the first
 query).
 
-**PreviewPanel.** Opens only on demand or when the user has enabled "Preview on selection" in Preferences (default
-off). Side panel (360 px wide) when `workArea.width ≥ 1200` — the native window widens to the 1180 px preview
-token; otherwise a 240 px bottom drawer. Alpha content (metadata/snippet payload only — SCREENS §10): code/text snippet with match highlight (first 20
-lines, mono 12 px), metadata facts, clipboard text, web URL summary, app/action summary. No thumbnail or document
-render; unavailable bodies say "Preview not available — press Enter to open." If no preview is available: quiet
-line "No preview for this item." Never claim a preview that is not loaded; show a flat
-skeleton at its real size while decoding.
+**PreviewPanel.** Opens only on demand or when the user has enabled "Preview on selection" in Preferences (default off). Side panel (360 px) when `workArea.width ≥ 1200` — window widens to the 1180 px preview token; otherwise a 240 px drawer. Renders the real `PreviewPayload`: title/format/path head; text/code with real highlight ranges (mono 11/1.55, max 300 px), image (object-contain max 300, bordered wrap), OCR section ("Text found in image", dashed top border), engine fields, truncated note ("Showing the first {n} characters…"), unsupported reason or "No preview for this item."; error shows "Preview is unavailable right now." + sanitized detail + Retry. Loading = flat 3-line skeleton at real size (no layout shift; pulse gradient is a current code deviation to remove). Debounce 120 ms, cache by result id+max chars, late-token guard. No fake thumbnail/body; preview actions only from the engine ActionSpec.
 
 **LauncherFooter.** Status (left) is a live region, colour + words, from `EngineStatus`: "Index ready",
 "Indexing", "Index paused", "Index unavailable — Retry". Alpha: the IPC has no percentage — SCREENS §10. "Open ProtonSearch" is a text button
@@ -771,20 +767,13 @@ Hints are hidden by priority, never wrapped to a second line at ≥900 px; below
 `|offsetY| + 1.5×blur ≤ 24 px` (§5.4). The card fills the pad (do not centre a shorter card vertically); a press in the
 pad dismisses the launcher. Native window shadow stays off.
 
-**FilterStrip.** A scrolling chip row between the search row and the results list, inside the results column so the
-preview panel keeps full body height. **Final order: ALL · FILES · FOLDERS · APPS · CLIPBOARD · WEB · ACTIONS**, selected
-with Ctrl+1–7 from the input (Ctrl+8/9 unbound). FILES/FOLDERS are exact object types: FILES never renders folder rows,
-FOLDERS never renders file rows; DOCUMENTS/CODE groups stay in ALL and use the `content:`/`git:` prefixes. The
-removed DOCUMENTS/GIT chips are never rendered as ghosts. Radio-group semantics, not tabs: ←/→ changes the filter
-immediately and keeps focus; Tab lands on the selected chip and then leaves for the preview or footer; Home/End jump
-to first/last. Selected state uses the same 2 px accent bar as result rows
-(fill alone is 1.14:1 and fails WCAG 1.4.11). Overflow is horizontal scroll only (`overflow-x:auto`, hidden scrollbar);
-the selected chip scrolls into view on focus/keyboard change; no gradient/fade edges. Labels are uppercase and
-localised; no counts inside chips. Full spec: SCREENS §2.11.
+**FilterStrip.** A scrolling chip row between the search row and the results list, inside the results column so the preview panel keeps full body height. **Final order: ALL · FILES · FOLDERS · APPS only**, selected with Ctrl+1–4 from the input (Ctrl+5+ unbound). Clipboard, web, documents/OCR, git and actions stay in ALL and are reached with prefixes/quick destinations; no ghost chips. FILES/FOLDERS are exact: FILES never renders folders, FOLDERS never renders files. Radio-group semantics, not tabs: ←/→ changes immediately and keeps focus; Tab lands on the selected chip then leaves for preview/footer; Home/End first/last. Selected state uses the 2 px accent bar (fill alone fails WCAG 1.4.11). Overflow scrolls horizontally; selected chip scrolls into view; no gradient/fade edges. Labels uppercase/localised; no counts. Full spec: SCREENS §2.11.
 
-**ClipboardCategorySection.** Inside the results viewport, clipboard results are grouped into quiet sections under the
-CLIPBOARD chip only: LINKS · EMAILS · PATHS · CODE · TEXT · IMAGES (fixed order, only non-empty; alpha has no image rows,
-so IMAGES is omitted). There is **no second chip row, no filtering control and no per-row tag** — the user already chose
+**QuickDestinations.** Empty query + ALL + no recents/results shows real destinations only: primary 2×2 grid (Browser Bookmarks, Browser History, Clipboard History, Agents) and secondary pills (Git history, Agent History). Heading 10/750/+0.12em ink-3; tiles min-height 54, padding 9 12, border 1 line, radius 9, raised; selected accent-soft/accent-border; labels 13/680, subtitles 10 ink-2 (off = ink-3). Search destinations write bookmarks:/history:/clipboard:/git: into the input; Agents/history open the main app. Counts/agent state from EngineStatus only; no fake destinations. Height 248/224; one-column ≤700. Listbox options, ↑/↓+Enter from input. Full spec SCREENS §2.4.
+
+**ClipboardCategorySection.** Inside the results viewport, clipboard results are grouped into quiet sections when the
+clipboard scope is active (typed `clipboard:`/`clip:` or Clipboard History quick destination), not a chip:
+LINKS · EMAILS · PATHS · CODE · TEXT · IMAGES (fixed order, only non-empty; IMAGES only with real image rows). There is **no second chip row, no filtering control and no per-row tag** — the user already chose
 Clipboard once; grouping is presentation, not another filter. Section label: 10/700 caps +0.10em, ink-3, 28 px block
 (8/14/6), 14 px inline pad, 6 px between sections; each section is a `role="group"` labelled by its visible label; labels
 are not tab stops and the listbox traversal stays flat across sections. Card height/window math is the normal launcher

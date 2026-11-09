@@ -319,7 +319,7 @@ Conditions: engine rows are release-profile `crates/ps-bench` on the working tre
 | Filename 100k warm | p50 0.515 / p95 **1.153** / p99 1.817 ms (n=660; contended build 253 ms) | **MET** (<5 ms p95) | v10-g0-filename-100k-0e4c9ec-20261109T2037Z.json |
 | Filename 1M warm (first Gate-0 run) | p50 2.962 / p95 **9.310** / p99 9.941 ms (n=660; build 5.4 s -> contended) | **MET** (<15 ms p95) | v10-g0-filename-1m-0e4c9ec-20261109T2037Z.json |
 | Filename 1M warm (lower-contention re-run) | p50 **2.680** / p95 **7.504** / p99 8.210 ms (max 9.108, n=660; build 4.27 s, CPU avg 23.2% at start; 20/22 queries with results, deterministic) | **MET** (<15 ms p95); cold binary load 449.5 / 583.9 ms, first query 3.94 / 4.15 ms | v10-g0b-filename-1m-quiet-4c93d21-20261109T2100Z.json |
-| Content v2 (ps-content FTS5) | p50 11.788 / p95 **59.129** / p99 161.206 ms with snippet (n=960); import 26.9 s contended | **NOT MET** (<30 ms p95); earlier quiet 43.0 ms also NOT MET | v10-g0-content-v2-0e4c9ec-20261109T2037Z.json |
+| Content v2 (ps-content FTS5) | Gate 0 pre-optimization: p50 11.788 / p95 **59.129** / p99 161.206 ms (n=960, contended); **task-42 optimized, official quiet**: p50 **1.140** / p95 **8.984** / p99 9.399 ms, max 10.294 (n=960) | **MET** (<30 ms p95) after optimization (was NOT MET: Gate 0 59.1 ms contended / 43.0 ms quiet) | v10-g0-content-v2-0e4c9ec-20261109T2037Z.json; v10-g3-content-quiet-official2-eb61b82-20261109T2122Z.json |
 | OCR extraction (ps-ocr, 90 synthetic images) | cold 92 img/s (p50 9.9 ms), warm 115 img/s; English char accuracy 92.4%, CJK 61.1% (en-GB/en-US only) | baseline recorded; no product bar claimed on synthetic renders | v10-g0-ocr-baseline-03633c7-20261109T2041Z.json |
 | Indexed OCR retrieval (OcrIndex FTS5) | p50 0.042 / p95 **0.072** / p99 0.081 ms (17 queries x 30 iterations); cold open 0.94 ms, first query 0.37 ms; 81 docs / 2910 text bytes + 1.79 MB WAL | **MET** on the defined small corpus (<30 ms p95); scale and real-screenshot quality unproven | v10-g0-ocr-baseline-03633c7-20261109T2041Z.json |
 | Launcher activation (DEBUG, hotkey Alt+Space) | window visible p50 7.215 / p95 **9.612** / p99 10.818 ms; foreground p50 21.266 / p95 30.384 ms (n=20) | release row **PENDING** (build blocked); debug is not a release claim | v10-g0-app-debug-4c93d21.json |
@@ -331,7 +331,7 @@ Conditions: engine rows are release-profile `crates/ps-bench` on the working tre
 
 ### 14.1 Earlier gaps: status confirmation
 
-1. **Content retrieval p95:** still the top performance gap - 59.1 ms Gate 0 contended / 43.0 ms quiet on v2 vs the 30 ms target; legacy v1 FTS5 baseline is 6.07 ms p95. Not a v10 improvement yet.
+1. **Content retrieval p95:** **now MET** after task-42 (engine-core) - official quiet run **p50 1.140 / p95 8.984 / p99 9.399 ms** (n=960, limit 20, iters 30) vs the 30 ms target; pre-optimization Gate-0 rows were 59.1 ms (contended) / 43.0 ms (quiet). Caveats: 32 KB text-prefix limitation (matches past 32 KB lose line/text-head snippet; regression-tested), and the committed formal 'after' row from engine-core (p95 40.13) is a stale-artifact row that must not be cited - see §14.3. Legacy v1 FTS5 baseline 6.07 ms p95 remains the comparison anchor.
 2. **OCR search:** now measured end-to-end (ps-ocr extraction -> OcrIndex FTS5); retrieval latency is far below target on the defined 90-image corpus, but the real gap is corpus scale and real-screenshot accuracy (English synthetic char accuracy 92.4%, below a 95% product bar; CJK unverified because only en-GB/en-US recognizers exist here).
 3. **Launcher activation:** debug window-visible p95 9.6 ms; foreground p95 30.4 ms; release black-box number pending due to the build blocker. These are debug-build numbers only.
 4. **UI input latency:** debug p95 38.5 ms -> NOT MET vs 30 ms; repeatable slow shapes rather than one-off jitter. Needs release-build confirmation and a fix owner (ui-launcher + engine-core).
@@ -382,3 +382,25 @@ Selection mark latency uses same-clock `Date.now()` marks (captured in-page imme
 **Quiet-window 1M filename re-run (release ps-bench, commit 4c93d21 working tree):** p50 **2.680 ms**, p95 **7.504 ms**, p99 8.210 ms (max 9.108, n=660, 20/22 queries with results, deterministic); from_entries build 4.27 s with machine CPU at 23.2% at start (lower-contention, not fully idle); cold binary load 449.5 / 583.9 ms, first query 3.94 / 4.15 ms. **T2 target p95 <= 15 ms: MET.** Raw: [v10-g0b-filename-1m-quiet-4c93d21-20261109T2100Z.json](./results/v10-g0b-filename-1m-quiet-4c93d21-20261109T2100Z.json).
 
 Read together: filename and hotkey-activation targets are met on release; selection highlight is met in debug; input->first-visible is NOT met in debug (p95 38.7 ms); idle memory misses budget; content p95 remains task-42/engine-core; multi-monitor and hotkey->first-pixel remain unmeasured (single monitor; hook ordering).
+
+### 14.3 G8 content optimization acceptance (task-42) - official quiet row
+
+Engine-core's task-42 optimization (FTS5 `snippet()` removal; bounded 32 KB text prefix fetched; Rust snippet + first-match line scan; engine content lock released before search) was accepted with a formal ps-bench content-v2 run on a quiet machine (CPU avg 14.6% at start), same DB/queries/limit/iters as the engine team's own command:
+
+    target/release/ps-bench.exe content-v2 --v2-db .bench/v2-content.db --queries .bench/queries-content.jsonl --iters 30 --limit 20 --keep-db --no-import --cold-restarts 0 --out docs/performance/results/v10-g3-content-quiet-official2-<sha>-<ts>.json
+
+| Metric | Measured |
+|---|---:|
+| Warm search overall | **p50 1.140 ms / p95 8.984 ms / p99 9.399 ms / max 10.294 ms** (n=960) |
+| single_high_df | p50 7.081 / p95 9.336 / p99 9.768 ms |
+| single_medium_df | p50 1.197 / p95 2.776 / p99 3.056 ms |
+| prefix | p50 0.040 / p95 4.597 / p99 5.048 ms |
+| multi_term_and | p50 0.516 / p95 1.604 / p99 1.629 ms |
+| phrase | p50 0.406 / p95 0.557 / p99 0.571 ms |
+| cjk | p50 0.020 / p95 0.161 / p99 0.191 ms |
+| zero_match | p50 0.019 / p95 0.020 / p99 0.031 ms |
+| Index facts (unchanged) | 13,296 docs / 72,072,254 text bytes / est. FTS 25,302,350 bytes; open 0.92 ms |
+
+**Acceptance: MET (<30 ms p95).** Raw: [v10-g3-content-quiet-official2-eb61b82-20261109T2122Z.json](./results/v10-g3-content-quiet-official2-eb61b82-20261109T2122Z.json).
+
+**Build-artifact caveat (important for reproducibility):** two earlier formal runs (mine at HEAD 0e4c9ec and engine-core's committed 'after' row v10-g3-content-after-enginecore-20261109T2116Z.json, p50 9.23 / p95 40.13) were produced by a `ps-bench` binary that still linked the **pre-optimization ps-content**. Evidence: the binary contained the old `snippet(documents_fts` SQL string; `cargo build -p ps-bench --release` reported the target up to date even after `cargo clean -p ps-content`, and only deleting `target/release/ps-bench.exe` plus all `*ps_content*`/`*ps_bench*` deps artifacts and rebuilding produced a binary without that string. The in-process A/B probe (28.66 ms p95) and this official single-process row (8.98 ms p95) agree once the artifact is fresh; the A/B number is higher because the probe shares the process with the old 128 KB-text path. Engine-core's stale 'after' JSON should not be cited. Rule recorded in METHODOLOGY §12: verify a distinctive binary string or purge artifacts before accepting a benchmark after a dependency change.

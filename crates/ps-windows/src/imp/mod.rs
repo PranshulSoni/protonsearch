@@ -10,6 +10,8 @@ pub(crate) mod audio;
 pub(crate) mod brightness;
 pub(crate) mod capabilities;
 pub(crate) mod clipboard;
+pub(crate) mod toast;
+pub(crate) mod winrt;
 pub(crate) mod icons;
 pub(crate) mod native;
 pub(crate) mod shell;

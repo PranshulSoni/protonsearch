@@ -1,0 +1,801 @@
+{
+  "schema": "ps-release-activation/1",
+  "kind": "release-launcher-activation",
+  "status": "ok",
+  "capturedAt": "2026-11-09T21:29:01.571Z",
+  "host": {
+    "hostname": "PranshulAsus",
+    "platform": "win32"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe",
+    "exeBytes": 20327424,
+    "exeMtime": "2026-11-09T21:26:33.163Z",
+    "frontendDistMtime": "2026-11-09T21:24:18.700Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "trials": 30,
+    "idleSeconds": 5,
+    "gitHead": "eb61b8271334e916b7103fd4207a8e4e86d3c923",
+    "gitDirty": 65,
+    "display": {
+      "screenCount": 1,
+      "primaryBounds": {
+        "height": 1200,
+        "width": 1920
+      },
+      "allScreens": [
+        {
+          "workingArea": "{X=0,Y=0,Width=1920,Height=1152}",
+          "primary": true,
+          "bounds": "{X=0,Y=0,Width=1920,Height=1200}"
+        }
+      ],
+      "gpu": {
+        "Name": "AMD Radeon(TM) 880M Graphics",
+        "CurrentHorizontalResolution": 2880,
+        "CurrentVerticalResolution": 1800,
+        "CurrentRefreshRate": 120
+      },
+      "systemDpi": 96,
+      "scalePercent": 100
+    },
+    "appPid": 38652
+  },
+  "measurements": {
+    "probe": {
+      "pid": 38652,
+      "mode": "probe",
+      "sendAtUtc": 1794259748596,
+      "visibleMs": null,
+      "focusedMs": null,
+      "hwnd": null,
+      "title": null,
+      "rect": null,
+      "timedOut": true,
+      "visibleBefore": false
+    },
+    "activation": {
+      "trials": 30,
+      "measuredVisible": 30,
+      "measuredFocused": 30,
+      "visibleMs": {
+        "count": 30,
+        "p50": 7.156,
+        "p95": 9.583,
+        "p99": 10.04,
+        "min": 5.85,
+        "max": 10.04,
+        "mean": 7.534
+      },
+      "focusedMs": {
+        "count": 30,
+        "p50": 21.676,
+        "p95": 29.304,
+        "p99": 31.035,
+        "min": 19.025,
+        "max": 31.035,
+        "mean": 23.389
+      },
+      "cold": {
+        "visibleMs": {
+          "count": 1,
+          "p50": 5.85,
+          "p95": 5.85,
+          "p99": 5.85,
+          "min": 5.85,
+          "max": 5.85,
+          "mean": 5.85
+        },
+        "focusedMs": {
+          "count": 1,
+          "p50": 19.544,
+          "p95": 19.544,
+          "p99": 19.544,
+          "min": 19.544,
+          "max": 19.544,
+          "mean": 19.544
+        }
+      },
+      "warm": {
+        "visibleMs": {
+          "count": 29,
+          "p50": 7.545,
+          "p95": 9.583,
+          "p99": 10.04,
+          "min": 6.21,
+          "max": 10.04,
+          "mean": 7.592
+        },
+        "focusedMs": {
+          "count": 29,
+          "p50": 21.693,
+          "p95": 29.304,
+          "p99": 31.035,
+          "min": 19.025,
+          "max": 31.035,
+          "mean": 23.521
+        }
+      },
+      "samples": [
+        {
+          "take": 0,
+          "cold": true,
+          "visibleMs": 5.85,
+          "focusedMs": 19.544,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 23,
+            "shownToPaintMs": 9,
+            "sendToPaintMs": 32,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 1,
+          "cold": false,
+          "visibleMs": 6.851,
+          "focusedMs": 21.28,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 42,
+            "shownToPaintMs": 5,
+            "sendToPaintMs": 47,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 2,
+          "cold": false,
+          "visibleMs": 7.599,
+          "focusedMs": 23.796,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 52,
+            "shownToPaintMs": 14,
+            "sendToPaintMs": 66,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 3,
+          "cold": false,
+          "visibleMs": 7.545,
+          "focusedMs": 24.244,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 49,
+            "shownToPaintMs": 17,
+            "sendToPaintMs": 66,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 4,
+          "cold": false,
+          "visibleMs": 8.162,
+          "focusedMs": 25.148,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 49,
+            "shownToPaintMs": 20,
+            "sendToPaintMs": 69,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 5,
+          "cold": false,
+          "visibleMs": 6.31,
+          "focusedMs": 21.451,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 49,
+            "shownToPaintMs": 7,
+            "sendToPaintMs": 56,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 6,
+          "cold": false,
+          "visibleMs": 10.04,
+          "focusedMs": 31.035,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 72,
+            "shownToPaintMs": 16,
+            "sendToPaintMs": 88,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 7,
+          "cold": false,
+          "visibleMs": 7.626,
+          "focusedMs": 27.151,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 59,
+            "shownToPaintMs": 13,
+            "sendToPaintMs": 72,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 8,
+          "cold": false,
+          "visibleMs": 9.583,
+          "focusedMs": 27.39,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 49,
+            "shownToPaintMs": 7,
+            "sendToPaintMs": 56,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 9,
+          "cold": false,
+          "visibleMs": 6.397,
+          "focusedMs": 20.645,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 44,
+            "shownToPaintMs": 4,
+            "sendToPaintMs": 48,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 10,
+          "cold": false,
+          "visibleMs": 6.544,
+          "focusedMs": 19.025,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 54,
+            "shownToPaintMs": 7,
+            "sendToPaintMs": 61,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 11,
+          "cold": false,
+          "visibleMs": 7.624,
+          "focusedMs": 21.676,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 42,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 48,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 12,
+          "cold": false,
+          "visibleMs": 6.756,
+          "focusedMs": 21.025,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 44,
+            "shownToPaintMs": 17,
+            "sendToPaintMs": 61,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 13,
+          "cold": false,
+          "visibleMs": 6.486,
+          "focusedMs": 20.726,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 45,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 51,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 14,
+          "cold": false,
+          "visibleMs": 7.156,
+          "focusedMs": 21.135,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 51,
+            "shownToPaintMs": 10,
+            "sendToPaintMs": 61,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 15,
+          "cold": false,
+          "visibleMs": 6.972,
+          "focusedMs": 21.29,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 51,
+            "shownToPaintMs": 4,
+            "sendToPaintMs": 55,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 16,
+          "cold": false,
+          "visibleMs": 7.972,
+          "focusedMs": 24.547,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 51,
+            "shownToPaintMs": 7,
+            "sendToPaintMs": 58,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 17,
+          "cold": false,
+          "visibleMs": 8.892,
+          "focusedMs": 27.847,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 57,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 63,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 18,
+          "cold": false,
+          "visibleMs": 9.463,
+          "focusedMs": 28.753,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 61,
+            "shownToPaintMs": 18,
+            "sendToPaintMs": 79,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 19,
+          "cold": false,
+          "visibleMs": 7.575,
+          "focusedMs": 23.728,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 54,
+            "shownToPaintMs": 11,
+            "sendToPaintMs": 65,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 20,
+          "cold": false,
+          "visibleMs": 9.43,
+          "focusedMs": 29.304,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 55,
+            "shownToPaintMs": 5,
+            "sendToPaintMs": 60,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 21,
+          "cold": false,
+          "visibleMs": 6.21,
+          "focusedMs": 19.735,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 46,
+            "shownToPaintMs": 5,
+            "sendToPaintMs": 51,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 22,
+          "cold": false,
+          "visibleMs": 8.299,
+          "focusedMs": 22.749,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 42,
+            "shownToPaintMs": 9,
+            "sendToPaintMs": 51,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 23,
+          "cold": false,
+          "visibleMs": 8.284,
+          "focusedMs": 26.637,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 57,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 63,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 24,
+          "cold": false,
+          "visibleMs": 6.879,
+          "focusedMs": 20.88,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 43,
+            "shownToPaintMs": 13,
+            "sendToPaintMs": 56,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 25,
+          "cold": false,
+          "visibleMs": 7.075,
+          "focusedMs": 21.693,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 42,
+            "shownToPaintMs": 9,
+            "sendToPaintMs": 51,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 26,
+          "cold": false,
+          "visibleMs": 6.657,
+          "focusedMs": 20.775,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 40,
+            "shownToPaintMs": 15,
+            "sendToPaintMs": 55,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 27,
+          "cold": false,
+          "visibleMs": 7.038,
+          "focusedMs": 21.032,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 40,
+            "shownToPaintMs": 14,
+            "sendToPaintMs": 54,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 28,
+          "cold": false,
+          "visibleMs": 6.694,
+          "focusedMs": 20.842,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 42,
+            "shownToPaintMs": 17,
+            "sendToPaintMs": 59,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        },
+        {
+          "take": 29,
+          "cold": false,
+          "visibleMs": 8.044,
+          "focusedMs": 26.573,
+          "timedOut": false,
+          "title": "ProtonSearch",
+          "markDeltas": {
+            "sendToShownMs": 56,
+            "shownToPaintMs": 9,
+            "sendToPaintMs": 65,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "error": null
+        }
+      ]
+    },
+    "activationMarks": {
+      "measuredSendToShown": 30,
+      "measuredShownToPaint": 30,
+      "measuredSendToPaint": 30,
+      "sendToShownMs": {
+        "count": 30,
+        "p50": 49,
+        "p95": 61,
+        "p99": 72,
+        "min": 23,
+        "max": 72,
+        "mean": 48.7
+      },
+      "shownToPaintMs": {
+        "count": 30,
+        "p50": 9,
+        "p95": 18,
+        "p99": 20,
+        "min": 4,
+        "max": 20,
+        "mean": 10.2
+      },
+      "sendToPaintMs": {
+        "count": 30,
+        "p50": 58,
+        "p95": 79,
+        "p99": 88,
+        "min": 32,
+        "max": 88,
+        "mean": 58.9
+      },
+      "note": "Rust perf hooks: launcher-window-shown is SystemTime epoch at show; launcher-first-paint is the frontend double-rAF mark after the perf:show event. Harness SendInput time is the t0 reference on the same wall clock (ms resolution). Hotkey invoke epoch is carried in the perf:show event payload but not persisted to JSONL."
+    },
+    "memoryIdle": {
+      "mode": "memory",
+      "rootPid": 38652,
+      "capturedAtUtc": 1794259792956,
+      "processCount": 9,
+      "totalWorkingSetBytes": 803176448,
+      "totalPrivateBytes": 483274752,
+      "processes": [
+        {
+          "pid": 38652,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 70418432
+        },
+        {
+          "pid": 19104,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 142979072
+        },
+        {
+          "pid": 22572,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 22675456
+        },
+        {
+          "pid": 11808,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 240005120
+        },
+        {
+          "pid": 36388,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 45572096
+        },
+        {
+          "pid": 41872,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23281664
+        },
+        {
+          "pid": 26944,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 82923520
+        },
+        {
+          "pid": 9988,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 103116800
+        },
+        {
+          "pid": 12228,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 72204288
+        }
+      ],
+      "cpuSecondsTotal": 16.062,
+      "totalWorkingSetMiB": 766,
+      "totalPrivateMiB": 460.9
+    },
+    "idleCpu": {
+      "mode": "cpu",
+      "rootPid": 38652,
+      "sampleSeconds": 5.005,
+      "processCount": 9,
+      "cpuSecondsDelta": 0.172,
+      "logicalCores": 20,
+      "cpuPctOfOneCore": 3.43,
+      "cpuPctOfMachine": 0.17
+    }
+  },
+  "blocked": [],
+  "limitations": [
+    "Release build: CDP is debug-only by design, so no page paint / IPC timing is claimed. Only the user-visible hotkey->visible+foreground path is measured.",
+    "Single 120 Hz / 150% DPI internal display (2880x1800 panel, 1920x1200 logical), no second monitor: multi-monitor placement is unmeasured.",
+    "Window is pre-created hidden, so cold (first summon after process start) and warm summons are expected to be close; both are reported honestly.",
+    "SendInput injection via PowerShell helper; Win32 EnumWindows polling at ~1ms resolution; other agents may be active on the machine."
+  ]
+}

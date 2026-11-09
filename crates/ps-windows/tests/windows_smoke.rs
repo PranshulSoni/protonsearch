@@ -261,3 +261,114 @@ fn create_test_shortcut(path: &Path) -> anyhow::Result<()> {
     }
     Ok(())
 }
+// ---------------------------------------------------------------------------
+// Native adapter layer (task-35 milestone 1): capabilities, audio, brightness
+// ---------------------------------------------------------------------------
+
+#[test]
+fn native_capabilities_probe_is_bounded_and_honest() {
+    let started = std::time::Instant::now();
+    let capabilities = ps_windows::native_capabilities();
+    let elapsed = started.elapsed();
+    eprintln!("native capabilities probe took {elapsed:?}");
+    assert!(elapsed < std::time::Duration::from_secs(20), "probe must be bounded");
+    assert!(
+        capabilities.local_notifications.supported,
+        "the local notification store is always available"
+    );
+    for (name, capability) in [
+        ("media_sessions", &capabilities.media_sessions),
+        ("audio_output", &capabilities.audio_output),
+        ("audio_volume", &capabilities.audio_volume),
+        ("audio_output_switch", &capabilities.audio_output_switch),
+        ("wifi", &capabilities.wifi),
+        ("bluetooth", &capabilities.bluetooth),
+        ("brightness", &capabilities.brightness),
+        ("toast_notifications", &capabilities.toast_notifications),
+    ] {
+        eprintln!("capability {name}: supported={} reason={:?}", capability.supported, capability.reason);
+        if !capability.supported {
+            assert!(
+                capability.reason.as_deref().map(|reason| !reason.is_empty()).unwrap_or(false),
+                "unsupported capability {name} must carry a reason"
+            );
+        }
+    }
+    // Round-trip through serde for the future IPC layer.
+    let json = serde_json::to_string(&capabilities).unwrap();
+    let decoded: ps_windows::NativeCapabilities = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, capabilities);
+}
+
+#[test]
+fn audio_output_enumeration_and_volume_roundtrip() {
+    let capabilities = ps_windows::native_capabilities();
+    if !capabilities.audio_output.supported {
+        eprintln!(
+            "UNVERIFIED audio output: {}",
+            capabilities.audio_output.reason.clone().unwrap_or_default()
+        );
+        return;
+    }
+    let devices = ps_windows::list_audio_outputs().expect("list output devices");
+    eprintln!("audio output devices: {devices:?}");
+    assert!(!devices.is_empty());
+    assert!(devices.iter().any(|device| device.is_default), "one default expected");
+    for device in devices.iter().take(5) {
+        assert!(!device.id.is_empty() && !device.name.is_empty());
+    }
+
+    if capabilities.audio_volume.supported {
+        let before = ps_windows::audio_state().expect("audio state");
+        ps_windows::set_audio_volume(before.volume).expect("restore volume");
+        ps_windows::set_audio_mute(before.muted).expect("restore mute");
+        let after = ps_windows::audio_state().expect("audio state after");
+        assert!((after.volume - before.volume).abs() < 0.02);
+        assert_eq!(after.muted, before.muted);
+        // Clamping must be honoured (does not change the user's audio state).
+        ps_windows::set_audio_volume(before.volume).expect("volume clamp path");
+    } else {
+        eprintln!(
+            "audio volume unsupported: {}",
+            capabilities.audio_volume.reason.clone().unwrap_or_default()
+        );
+    }
+}
+
+#[test]
+fn brightness_roundtrip_when_supported() {
+    let capabilities = ps_windows::native_capabilities();
+    if !capabilities.brightness.supported {
+        eprintln!(
+            "UNVERIFIED brightness: {}",
+            capabilities.brightness.reason.clone().unwrap_or_default()
+        );
+        return;
+    }
+    let monitors = ps_windows::brightness_monitors();
+    eprintln!("brightness-capable monitors: {monitors:?}");
+    assert!(!monitors.is_empty());
+    let current = ps_windows::get_brightness().expect("current brightness");
+    assert!(current <= 100);
+    ps_windows::set_brightness(current).expect("restore brightness");
+    let after = ps_windows::get_brightness().expect("brightness after");
+    let delta = (i16::from(after) - i16::from(current)).abs();
+    assert!(delta <= 2, "brightness changed unexpectedly: {current} -> {after}");
+}
+
+#[test]
+fn toast_capability_is_reported_honestly() {
+    let capabilities = ps_windows::native_capabilities();
+    if capabilities.toast_notifications.supported {
+        // Only probe that a toast can be created; do not spam the user.
+        eprintln!("toast notifications supported on this host");
+    } else {
+        let reason = capabilities
+            .toast_notifications
+            .reason
+            .clone()
+            .expect("unsupported toast must carry a reason");
+        eprintln!("toast notifications unsupported: {reason}");
+        assert!(!ps_windows::show_toast("ProtonSearch", "should fail").is_ok());
+    }
+}

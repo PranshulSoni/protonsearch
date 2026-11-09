@@ -9,6 +9,12 @@ import {
   SearchCard,
   UnsupportedCard,
 } from "./IslandCards";
+import {
+  ControlsCard,
+  MediaCard,
+  NotificationsCard,
+} from "./NativeCards";
+import { useIslandControls } from "./islandNativeCards";
 import { IslandPageDots } from "./IslandPageDots";
 import {
   useIslandBootstrap,
@@ -31,30 +37,13 @@ import "./island.css";
 
 type Phase = "idle" | "out" | "in";
 
-const HIDDEN_CARDS: Record<string, { title: string; subtitle: string; reason: string }> = {
-  media: {
-    title: "Media",
-    subtitle: "Now playing",
-    reason: "Media sessions and output endpoints need the native Windows adapter, which isn't wired yet.",
-  },
-  controls: {
-    title: "Quick Settings",
-    subtitle: "Your PC, one gesture away",
-    reason: "Wi-Fi, Bluetooth, brightness and volume need the native adapter and permissions.",
-  },
-  bell: {
-    title: "Notifications",
-    subtitle: "Recent activity",
-    reason: "Notification sources need the native Windows adapter, which isn't wired yet.",
-  },
-};
-
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 export default function IslandView() {
   const bootstrap = useIslandBootstrap();
+  const controls = useIslandControls();
   const settings = bootstrap.settings?.launcher?.island ?? null;
   const cards = useMemo(() => visibleIslandCards(settings), [settings]);
   const defaultCard: IslandCardId = useMemo(() => {
@@ -408,17 +397,42 @@ export default function IslandView() {
             onOpen={openResult}
           />
         );
-      default: {
-        const hidden = HIDDEN_CARDS[activeCard];
+      case "media":
+        return (
+          <MediaCard
+            status={controls.status}
+            pending={controls.pending}
+            error={controls.error}
+            refresh={controls.refresh}
+          />
+        );
+      case "controls":
+        return (
+          <ControlsCard
+            status={controls.status}
+            pending={controls.pending}
+            error={controls.error}
+            refresh={controls.refresh}
+          />
+        );
+      case "bell":
+        return (
+          <NotificationsCard
+            status={controls.status}
+            pending={controls.pending}
+            error={controls.error}
+            refresh={controls.refresh}
+          />
+        );
+      default:
         return (
           <UnsupportedCard
             card={activeCard}
-            title={hidden?.title ?? islandCardLabel(activeCard)}
-            subtitle={hidden?.subtitle ?? "Not wired yet"}
-            reason={hidden?.reason ?? "This card has no native data adapter yet."}
+            title={islandCardLabel(activeCard)}
+            subtitle="Not wired yet"
+            reason="This card has no native data adapter yet."
           />
         );
-      }
     }
   })();
 

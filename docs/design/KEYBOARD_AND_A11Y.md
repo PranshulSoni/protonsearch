@@ -58,14 +58,14 @@ Bindings below are the contract. "Selected row" means the option referenced by `
 | **Ctrl+Space** | any row selected | Toggle preview for the selected row | no-op with no selection; closes preview first if open |
 | **Tab into filter strip** | launcher | Focus the **selected** filter chip (one roving tab stop) | Tab again leaves the strip for preview/footer |
 | **← / →** | filter strip focused | Change the filter immediately (radiogroup) and keep focus on the chip | filter dispatches a new scoped search instantly |
-| **Home / End** | filter strip focused | Select All / last filter | same |
+| **Home / End** | filter strip focused | Select ALL / APPS | same |
 | **Space / Enter** | filter strip focused | Re-apply the focused chip (no-op if already selected) | |
-| **Ctrl+1 … Ctrl+7** | input focused | Select ALL / FILES / FOLDERS / APPS / CLIPBOARD / WEB / ACTIONS in order; input keeps focus; results re-scope instantly | Ctrl+8/Ctrl+9 unbound — do not capture them |
+| **Ctrl+1 … Ctrl+4** | input focused | Select ALL / FILES / FOLDERS / APPS in order; input keeps focus; results re-scope instantly | Ctrl+5 and above unbound — do not capture them; all other scopes via prefixes/quick destinations |
 | **Shift+Enter / Shift+↑↓ / Ctrl+A** | clipboard results | **Unbound — clipboard multi-select is CUT for v2.0 alpha** (SCREENS §10) | Do not render a teaser or disabled markers |
 | **Ctrl+C** | input has **no text selection** and a row is selected | Copy the full path (files/folders), URL (web), or text (clipboard) of the selected row; footer announces "Path copied" | if input text is selected, native copy wins |
 | **Ctrl+C** | input text selected | Native copy of the selection | |
 | **Menu key / Shift+F10** | row selected | Open the row's context menu, focus first item | |
-| **Tab** | launcher | Move focus: input → filter strip (selected chip) → preview scroll region (if open) → preview action buttons (if any) → "Open ProtonSearch" → input | stops are never the result rows (combobox pattern; clipboard sections add no tab stops) |
+| **Tab** | launcher | Move focus: input → filter strip (selected chip) → preview scroll region (if open) → preview action buttons (if any) → "Open ProtonSearch" → input | stops are never the result rows (combobox pattern; quick destinations/clipboard sections add no tab stops) |
 | **Shift+Tab** | launcher | Reverse of Tab | |
 | **Typing / Backspace / Delete / Ctrl+A/C/X/V/Z** | input focused | Native text editing; typing always goes to the query | selection resets to row 0 on any query change |
 | **Alt+F4** | launcher | OS close (hide) | native behaviour allowed |
@@ -204,7 +204,8 @@ navigable); it is an ordered list with `aria-current="step"`.
 | Root | `role="dialog"`, `aria-modal="true"`, `aria-label="ProtonSearch"` | focus trap per §1; no focusable window chrome |
 | Input | `role="combobox"`, `aria-expanded` ("true" when options exist, "false" when empty/0 results/error), `aria-controls="ps-results"`, `aria-autocomplete="list"`, `aria-activedescendant="ps-opt-<id>"` (only while a row is active), `aria-label="Search files, apps, and actions"`, `autocomplete="off"`, `spellcheck="false"` | the visible placeholder is **not** the label |
 | Listbox | `role="listbox"`, `aria-label="Results"`; **single-select only in alpha** (multi-select CUT — §5), so no `aria-multiselectable` | one listbox; virtualisation keeps option ids stable |
-| Filter strip | `role="radiogroup"` + `aria-label="Filter results"`; each of the seven chips `role="radio"` + `aria-checked`, one roving tab stop (selected chip only); Ctrl+1–7 are shortcuts, not tab stops | never `role="tab"`; selecting swaps the scoped result set in the same listbox; labels localised, no counts in chips (SCREENS §2.11) |
+| Filter strip | `role="radiogroup"` + `aria-label="Filter results"`; four chips ALL/FILES/FOLDERS/APPS with `role="radio"` + `aria-checked`, one roving tab stop; Ctrl+1–4 are shortcuts, not tab stops | never `role="tab"`; selecting swaps the scoped result set in the same listbox; other scopes via prefixes/quick destinations (SCREENS §2.11) |
+| Quick destinations | empty-input listbox labelled "Quick destinations" (secondary group "More destinations"); options `role="option"` + `aria-selected`, no tab stops; ↑/↓ from input traverse primary then secondary, Enter activates | search destinations write a prefix; Agents/Agent History open the main app; no fake destinations (SCREENS §2.4) |
 | Clipboard sections | under CLIPBOARD only, clipboard options are wrapped in `role="group"` sections labelled by visible caps labels (LINKS/EMAILS/PATHS/CODE/TEXT/IMAGES); labels are `role="presentation"` and not options | labels are never tab stops or controls; `aria-activedescendant` stays flat across sections so ↑/↓ crosses boundaries; the section label announces when the active option enters it (SCREENS §2.12) |
 | Group | `role="group"` + `aria-labelledby` to the visible caps label | label element is `role="presentation"`, the group name carries it |
 | Option | `role="option"`, id from the stable result id, `aria-selected` as in §5, `aria-describedby` pointing to path/meta text | accessible name = item title only; description = path + trailing meta; disabled option `aria-disabled="true"` with the reason in the description |
@@ -212,7 +213,7 @@ navigable); it is an ordered list with `aria-current="step"`.
 | Footer status | `role="status"` `aria-live="polite"` | announce state transitions only (ready→indexing→paused), not every percent tick |
 | Hints | plain text, not live | kbd text is readable; the keycap glyphs are decorative spans (`aria-hidden="true"`) so a reader hears "Navigate", "Open", "Clear" |
 | Empty/error/loading | `role="status"` (empty/loading), `role="alert"` (new error) | never inside the listbox as a fake option |
-| Preview | `<aside aria-label="Preview">`; scroll region `tabindex="0"` when scrollable | toggling announces "Preview opened"/"Preview closed" (polite, one line); pressing buttons inside does not move the launcher's selection |
+| Preview | `<aside aria-label="Preview">`; scroll region `tabindex="0"`; real PreviewPayload with text/image/OCR/highlight/truncated/facts, loading skeleton, unsupported/error states | toggling announces "Preview opened"/"Preview closed" (polite, once); error is `role="alert"` with Retry; actions only from ActionSpec; no raw error detail |
 | Context menu | `role="menu"` + `role="menuitem"` (+ `aria-haspopup` on the launcher row is **not** used; the menu is opened by key/right-click) | focus moves into the menu; Tab closes; Esc returns to the input with the row selected |
 | Buttons | real `<button>`; icon-only buttons get `aria-label`; "Open ProtonSearch" is a button (navigation within the app) | no `<div onClick>` |
 
@@ -332,7 +333,7 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 | 2 | Type "arch" | one polite announcement of the result count ("3 matches"); no per-keystroke chatter |
 | 3 | ArrowDown | active option announced: "Architecture notes.docx, option, selected, Documents / Projects / Nova · Yesterday" |
 | 4 | ArrowDown again | next option announced; the group change announces "FOLDERS, group" |
-| 5 | Tab | focus moves to the filter strip; selected chip announced "All, radio button, checked"; ArrowRight announces the new filter and the updated result count; Ctrl+1–7 from the input re-scope without losing focus, Ctrl+8/9 do nothing |
+| 5 | Tab | focus moves to the filter strip; selected chip announced "All, radio button, checked"; ArrowRight announces the new filter and the updated result count; Ctrl+1–4 from the input re-scope without losing focus, Ctrl+5+ do nothing |
 | 5 | Ctrl+Space | "Preview opened" (polite); Tab reaches the preview region, announced "Preview, {title}, region" |
 | 6 | Esc | "Preview closed" |
 | 7 | Shift+F10 | "Actions, menu"; ArrowDown reads items; Esc returns to the input |
@@ -380,7 +381,7 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 10. SR scripts §10 with both Narrator and NVDA recorded (screen recording or transcript); no unannounced state
     changes on the critical path.
 11. Contrast audit re-run with `.agents/notes/contrast_final.py`; any fails fixed in tokens, not components.
-12. **Filter strip:** seven chips in final order, Ctrl+1–7 from the input (Ctrl+8/9 unbound), FILES/FOLDERS exact rows;
+12. **Filter strip:** four chips ALL/FILES/FOLDERS/APPS, Ctrl+1–4 from the input (Ctrl+5+ unbound), FILES/FOLDERS exact rows;
     selected chip keeps its 2 px bar at 560/820 widths; Tab lands on the selected chip only; ←/→ dispatches a scoped
     search and keeps focus; Home/End reach ALL/ACTIONS; Esc clears to ALL and returns focus to the
 13. **Clipboard sections:** under CLIPBOARD only, ↑/↓ cross section boundaries without stopping on labels, labels

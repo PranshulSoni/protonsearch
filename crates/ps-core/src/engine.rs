@@ -488,7 +488,7 @@ impl Engine {
                     ranked.push(Ranked {
                         tier,
                         priority,
-                        score: hit.score,
+                        score: result.score,
                         result,
                     });
                     hits += 1;
@@ -502,12 +502,27 @@ impl Engine {
             });
         }
 
+        // Tier budget: a tier can only change the response while fewer than
+        // `limit` results are already strictly better than that tier's ceiling.
+        // This is an exact optimization (finalize orders by tier then score), so
+        // skipping a tier here cannot change the returned results.
+        let count_above = |ceiling: f32| {
+            ranked
+                .iter()
+                .filter(|entry| entry.tier <= 1 && entry.score > ceiling)
+                .count()
+        };
+        let content_worth_it = count_above(500.0) < limit;
+        let sources_worth_it = count_above(400.0) < limit;
+        let ocr_worth_it = count_above(300.0) < limit;
+
         // Tier 1: indexed content, clipboard, browser, git.
-        if settings.indexing.content_enabled && content_scope_allows(scope) {
+        if content_worth_it && settings.indexing.content_enabled && content_scope_allows(scope) {
             let tier_start = Instant::now();
             let mut hits = 0usize;
             if let Some(content) = self.content_handle() {
-                let result = content.search(intent_text.as_ref(), 12);
+                let remaining = limit.saturating_sub(ranked.len()).clamp(4, 12);
+                let result = content.search(intent_text.as_ref(), remaining);
                 match result {
                     Ok(content_hits) => {
                         for hit in content_hits {
@@ -535,7 +550,7 @@ impl Engine {
         let mut source_hits = 0usize;
         // Clipboard results are read live from the v2 database: the in-memory
         // sources snapshot is loaded once at startup and would be stale.
-        if settings.privacy.clipboard_history && scope_allows(scope, SourceKind::Clipboard) {
+        if sources_worth_it && settings.privacy.clipboard_history && scope_allows(scope, SourceKind::Clipboard) {
             let db_path = self.clipboard_db_path();
             let query = if terms.is_empty() {
                 ""
@@ -556,7 +571,7 @@ impl Engine {
             }
         }
         let sources = self.sources.read().unwrap();
-        if scope_allows(scope, SourceKind::BrowserHistory) {
+        if sources_worth_it && scope_allows(scope, SourceKind::BrowserHistory) {
             for entry in match_browser(&sources.browser, &terms).into_iter().take(4) {
                 ranked.push(Ranked {
                     tier: 1,
@@ -567,7 +582,7 @@ impl Engine {
                 source_hits += 1;
             }
         }
-        if scope_allows(scope, SourceKind::GitCommit) {
+        if sources_worth_it && scope_allows(scope, SourceKind::GitCommit) {
             for entry in match_git(&sources.git, &terms).into_iter().take(4) {
                 ranked.push(Ranked {
                     tier: 1,
@@ -589,7 +604,7 @@ impl Engine {
         }
 
         // Tier 2: OCR text (already extracted; never run OCR during a query).
-        if settings.indexing.ocr_enabled && scope_allows(scope, SourceKind::OcrText) {
+        if ocr_worth_it && settings.indexing.ocr_enabled && scope_allows(scope, SourceKind::OcrText) {
             let tier_start = Instant::now();
             let mut hits = 0usize;
             match self.db.ocr_search(&query_text, 5) {
@@ -1931,16 +1946,63 @@ fn match_browser<'a>(
     items: &'a [ps_sources::BrowserEntry],
     terms: &[String],
 ) -> Vec<&'a ps_sources::BrowserEntry> {
+    // Allocation-free matching: the previous version lowercased + formatted a
+    // "title url" haystack for every one of the thousands of browser rows on
+    // every query, which showed up as a ~10 ms tail in debug builds.
     let mut hits: Vec<(&ps_sources::BrowserEntry, i64)> = items
         .iter()
         .filter(|item| {
-            let haystack = format!("{} {}", item.title.to_lowercase(), item.url.to_lowercase());
-            terms.iter().all(|term| haystack.contains(term))
+            terms
+                .iter()
+                .all(|term| contains_ci(&item.title, term) || contains_ci(&item.url, term))
         })
         .map(|item| (item, item.last_visit_ms))
         .collect();
     hits.sort_by(|a, b| b.1.cmp(&a.1));
     hits.into_iter().map(|(item, _)| item).collect()
+}
+
+/// Case-insensitive substring test (ASCII folded, non-ASCII bytes exact) without
+/// allocating a lowercased copy. The needle is expected lower-case.
+fn contains_ci(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let hay = haystack.as_bytes();
+    let needle = needle.as_bytes();
+    if needle.len() > hay.len() {
+        return false;
+    }
+    let first = needle[0];
+    let first_upper = first.to_ascii_uppercase();
+    let mut start = 0usize;
+    while start + needle.len() <= hay.len() {
+        let mut offset = start;
+        let mut found = None;
+        while offset < hay.len() {
+            let byte = hay[offset].to_ascii_lowercase();
+            if byte == first || byte == first_upper {
+                found = Some(offset);
+                break;
+            }
+            offset += 1;
+        }
+        let Some(position) = found else {
+            return false;
+        };
+        if position + needle.len() > hay.len() {
+            return false;
+        }
+        if hay[position..position + needle.len()]
+            .iter()
+            .zip(needle.iter())
+            .all(|(left, right)| left.to_ascii_lowercase() == *right)
+        {
+            return true;
+        }
+        start = position + 1;
+    }
+    false
 }
 
 fn match_git<'a>(
@@ -2100,7 +2162,11 @@ fn file_result(
             shortcut: Some("Ctrl+C".into()),
         },
     ];
-    let tier = if hit.score >= 900.0 { 0 } else { 1 };
+    // ps-index scores are normalized 0..1; the coordinator uses a 0..1000
+    // scale (content 500, sources 400, OCR 300). Scale once here and derive the
+    // tier so exact/prefix filename matches really are tier 0.
+    let scaled_score = hit.score * 1000.0;
+    let tier = if scaled_score >= 900.0 { 0 } else { 1 };
     Some((
         SearchResult {
             id: format!("file:{}", path.to_lowercase()),
@@ -2109,7 +2175,7 @@ fn file_result(
             subtitle: display_path(&path, settings),
             path: Some(path.clone()),
             icon,
-            score: hit.score,
+            score: scaled_score,
             match_ranges: hit
                 .ranges
                 .iter()
@@ -3602,6 +3668,132 @@ mod tests {
             .unwrap_or("")
             .contains("IMAGE-OCR-PROBE-2026"));
         assert_eq!(result.meta.line, Some(1));
+    }
+
+    #[test]
+    fn file_results_use_scaled_scores_and_tiers() {
+        let index = FilenameIndex::from_entries(vec![ps_index::IndexEntry {
+            path: r"C:\docs\report.pdf".into(),
+            name: "report.pdf".into(),
+            ext: "pdf".into(),
+            kind: EntryKind::File,
+            size: 1,
+            modified: 1,
+        }]);
+        let settings = Settings::default();
+        let exact = ps_index::FileHit {
+            entry_index: 0,
+            score: 0.94,
+            ranges: Vec::new(),
+        };
+        let (result, tier) = file_result(&index, &exact, &settings).unwrap();
+        assert_eq!(tier, 0, "prefix/exact filename matches are tier 0");
+        assert!((result.score - 940.0).abs() < 0.01, "score scaled to 0..1000");
+        let fuzzy = ps_index::FileHit {
+            entry_index: 0,
+            score: 0.55,
+            ranges: Vec::new(),
+        };
+        let (result, tier) = file_result(&index, &fuzzy, &settings).unwrap();
+        assert_eq!(tier, 1);
+        assert!((result.score - 550.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn search_skips_content_tier_when_top_limit_is_already_full() {
+        let dir = scratch_dir("perf-tier-budget");
+        // Content document for the second half of the test.
+        {
+            let content = ps_content::ContentIndex::open(&dir.join("index.db")).unwrap();
+            let fixture = fixture("report.pdf");
+            content
+                .index_file(&fixture, ps_content::DEFAULT_MAX_BYTES)
+                .unwrap();
+        }
+        let engine = make_engine(&dir, None);
+        let mut indexing = engine.settings().indexing;
+        indexing.content_enabled = true;
+        engine
+            .update_settings(SettingsPatch {
+                indexing: Some(indexing),
+                ..Default::default()
+            })
+            .unwrap();
+        // 40 filename entries that fill a 30-result page at tier 0.
+        let entries: Vec<ps_index::IndexEntry> = (0..40)
+            .map(|i| ps_index::IndexEntry {
+                path: format!(r"C:\docs\readme_{i}.txt"),
+                name: format!("readme_{i}.txt"),
+                ext: "txt".into(),
+                kind: EntryKind::File,
+                size: 1,
+                modified: i as i64,
+            })
+            .collect();
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(entries);
+        engine.sync_filename_entries();
+
+        let response = engine.search(&SearchRequest::new(1, "readme"));
+        assert_eq!(response.results.len(), 30);
+        assert!(
+            response
+                .results
+                .iter()
+                .all(|result| result.kind == SourceKind::File),
+            "a full tier-0 page must not be diluted by lower tiers"
+        );
+        assert!(
+            !response
+                .timings
+                .iter()
+                .any(|timing| timing.label == "indexed content"),
+            "content tier must be skipped when the page is already full"
+        );
+
+        // A query with no filename matches still reaches the content tier.
+        let response = engine.search(&SearchRequest::new(2, "WALRUS-PDF-2026"));
+        assert!(
+            response
+                .results
+                .iter()
+                .any(|result| result.kind == SourceKind::ContentMatch),
+            "content results must still appear when filename results are sparse"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn browser_matcher_is_case_insensitive_without_allocating() {
+        let entries = vec![
+            ps_sources::BrowserEntry {
+                url: "https://doc.rust-lang.org/book/".into(),
+                title: "Rust Programming Language".into(),
+                source: "chrome".into(),
+                visit_count: 3,
+                last_visit_ms: 10,
+                bookmark: false,
+            },
+            ps_sources::BrowserEntry {
+                url: "https://example.com/".into(),
+                title: "Example Domain".into(),
+                source: "chrome".into(),
+                visit_count: 1,
+                last_visit_ms: 5,
+                bookmark: false,
+            },
+        ];
+        let terms = vec!["rust".to_string(), "programming".to_string()];
+        let hits = match_browser(&entries, &terms);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].title, "Rust Programming Language");
+        // Matcher terms are lower-cased by the query parser; haystacks fold ASCII case.
+        let terms = vec!["example".to_string()];
+        let hits = match_browser(&entries, &terms);
+        assert_eq!(hits.len(), 1);
+        assert!(contains_ci("Rust Programming Language", "programming"));
+        assert!(contains_ci("Rust Programming Language", "rust"));
+        assert!(contains_ci("Rust Programming Language", "PROGRAMMING".to_lowercase().as_str()));
+        assert!(!contains_ci("Example Domain", "rust"));
     }
 
     #[test]

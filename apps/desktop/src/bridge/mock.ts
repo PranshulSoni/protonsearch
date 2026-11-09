@@ -401,6 +401,50 @@ export const mockBridge = {
   async hideIsland(): Promise<void> {},
   async setIslandGeometry(): Promise<void> {},
 
+  async getControlsStatus(): Promise<import("./types").ControlsStatus> {
+    return {
+      mediaCapability: { supported: false, reason: "Media session adapter isn't wired in this build." },
+      media: null,
+      audioOutputs: [{ id: "default", name: "Laptop speakers", isDefault: true }],
+      defaultAudioId: "default",
+      volumePercent: 62,
+      muted: false,
+      brightnessCapability: { supported: true, reason: null },
+      brightnessPercent: 80,
+      wifi: { supported: true, reason: null },
+      wifiEnabled: true,
+      wifiNetworks: [],
+      bluetooth: { supported: true, reason: null },
+      bluetoothEnabled: false,
+      bluetoothDevices: [],
+      airplaneMode: { supported: false, reason: "Not exposed by this Windows build." },
+      nightLight: { supported: false, reason: "Not exposed by this Windows build." },
+      energySaver: { supported: true, reason: null },
+      notifications: { supported: true, reason: null },
+      toastCapability: { supported: false, reason: "Windows toast notifications need an app identity." },
+      notificationUnread: 1,
+      notificationItems: [
+        {
+          id: "1",
+          title: "ProtonSearch is ready",
+          body: "Your index is warm. Press Alt+Space to search.",
+          source: "ProtonSearch",
+          createdAt: Date.now(),
+          read: false,
+        },
+      ],
+    };
+  },
+
+  async setVolume(): Promise<void> {},
+  async setMuted(): Promise<void> {},
+  async setBrightness(): Promise<void> {},
+  async setAudioOutput(): Promise<void> {},
+  async mediaCommand(): Promise<void> {},
+  async showLocalToast(): Promise<void> {},
+  async notificationsDismiss(): Promise<void> {},
+  async notificationsClear(): Promise<void> {},
+
   async getPreview(resultId: string): Promise<import("./types").PreviewPayload> {
     return {
       resultId,

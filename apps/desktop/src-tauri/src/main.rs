@@ -1166,6 +1166,149 @@ fn agent_stop(state: tauri::State<'_, AppState>) {
     }
 }
 
+fn map_capability(capability: &ps_windows::Capability) -> ps_ipc::ControlCapability {
+    ps_ipc::ControlCapability {
+        supported: capability.supported,
+        reason: capability.reason.clone(),
+    }
+}
+
+/// Capability-gated snapshot of the native integrations the island/settings
+/// cards render. Honest: unavailable features carry a reason, never fake state.
+#[tauri::command]
+fn get_controls_status(state: tauri::State<'_, AppState>) -> ps_ipc::ControlsStatus {
+    let caps = ps_windows::native_capabilities();
+    let outputs = ps_windows::list_audio_outputs().unwrap_or_default();
+    let default_output = ps_windows::default_audio_output().ok();
+    let audio = ps_windows::audio_state().ok();
+    let brightness = ps_windows::get_brightness().ok();
+    let db_path = state.data_dir.join("index.db");
+    let notification_items: Vec<ps_ipc::AppNotification> =
+        ps_sources::notifications::list(&db_path, 20, false)
+            .into_iter()
+            .map(|entry| ps_ipc::AppNotification {
+                id: entry.id.to_string(),
+                title: entry.title,
+                body: entry.body,
+                source: entry.source,
+                created_at: entry.timestamp_ms,
+                read: entry.read,
+            })
+            .collect();
+    let notification_unread = ps_sources::notifications::unread_count(&db_path);
+    ps_ipc::ControlsStatus {
+        // Milestone 2 (GSMTC transport) is not wired yet: keep the honest false
+        // even though the OS manager probe succeeds.
+        media_capability: ps_ipc::ControlCapability::unsupported(
+            "Media session control is not wired in this build yet.",
+        ),
+        media: None,
+        audio_outputs: outputs
+            .into_iter()
+            .map(|device| ps_ipc::AudioDeviceInfo {
+                id: device.id,
+                name: device.name,
+                is_default: device.is_default,
+            })
+            .collect(),
+        default_audio_id: default_output.map(|device| device.id),
+        volume_percent: audio.map(|state| (state.volume * 100.0).round().clamp(0.0, 100.0) as u8),
+        muted: audio.map(|state| state.muted),
+        brightness_capability: map_capability(&caps.brightness),
+        brightness_percent: brightness,
+        wifi: map_capability(&caps.wifi),
+        wifi_enabled: None,
+        wifi_networks: Vec::new(),
+        bluetooth: map_capability(&caps.bluetooth),
+        bluetooth_enabled: None,
+        bluetooth_devices: Vec::new(),
+        airplane_mode: map_capability(&caps.airplane_mode),
+        night_light: map_capability(&caps.night_light),
+        energy_saver: map_capability(&caps.energy_saver),
+        notifications: map_capability(&caps.local_notifications),
+        toast_capability: map_capability(&caps.toast_notifications),
+        notification_unread,
+        notification_items,
+    }
+}
+
+#[tauri::command]
+fn control_set_volume(percent: u8) -> Result<(), String> {
+    ps_windows::set_audio_volume((percent.min(100) as f32) / 100.0)
+        .map_err(|_| "Couldn't change the system volume.".to_string())
+}
+
+#[tauri::command]
+fn control_set_muted(muted: bool) -> Result<(), String> {
+    ps_windows::set_audio_mute(muted).map_err(|_| "Couldn't change the system mute state.".to_string())
+}
+
+#[tauri::command]
+fn control_set_brightness(percent: u8) -> Result<(), String> {
+    ps_windows::set_brightness(percent.min(100))
+        .map_err(|_| "Couldn't change the display brightness on this monitor.".to_string())
+}
+
+#[tauri::command]
+fn control_set_audio_output(device_id: String) -> Result<(), String> {
+    ps_windows::set_audio_output(&device_id)
+        .map_err(|_| "Couldn't switch the audio output device.".to_string())
+}
+
+#[tauri::command]
+fn control_media(action: ps_ipc::MediaAction) -> Result<(), String> {
+    let caps = ps_windows::native_capabilities();
+    Err(caps
+        .media_sessions
+        .reason
+        .unwrap_or_else(|| "Media session control is not available in this build.".to_string()))?
+}
+
+#[tauri::command]
+fn show_local_toast(
+    state: tauri::State<'_, AppState>,
+    title: String,
+    body: String,
+) -> Result<(), String> {
+    let db_path = state.data_dir.join("index.db");
+    ps_sources::notifications::add_and_maybe_toast(&db_path, &title, &body, "ProtonSearch", "local")
+        .map(|_| ())
+        .map_err(|_| "Couldn't store the notification.".to_string())
+}
+
+#[tauri::command]
+fn notifications_list(state: tauri::State<'_, AppState>) -> Vec<ps_ipc::AppNotification> {
+    let db_path = state.data_dir.join("index.db");
+    ps_sources::notifications::list(&db_path, 50, false)
+        .into_iter()
+        .map(|entry| ps_ipc::AppNotification {
+            id: entry.id.to_string(),
+            title: entry.title,
+            body: entry.body,
+            source: entry.source,
+            created_at: entry.timestamp_ms,
+            read: entry.read,
+        })
+        .collect()
+}
+
+#[tauri::command]
+fn notifications_dismiss(state: tauri::State<'_, AppState>, notification_id: String) -> Result<(), String> {
+    let id: i64 = notification_id
+        .parse()
+        .map_err(|_| "Unknown notification.".to_string())?;
+    let db_path = state.data_dir.join("index.db");
+    let _ = ps_sources::notifications::dismiss(&db_path, id);
+    Ok(())
+}
+
+#[tauri::command]
+fn notifications_clear(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let db_path = state.data_dir.join("index.db");
+    let _ = ps_sources::notifications::clear(&db_path);
+    Ok(())
+}
+
 #[tauri::command]
 fn get_preview(
     state: tauri::State<'_, AppState>,
@@ -1393,6 +1536,16 @@ fn main() {
             agent_stop,
             perf_mark,
             get_preview,
+            get_controls_status,
+            control_set_volume,
+            control_set_muted,
+            control_set_brightness,
+            control_set_audio_output,
+            control_media,
+            show_local_toast,
+            notifications_list,
+            notifications_dismiss,
+            notifications_clear,
             app_info,
         ])
         .build(tauri::generate_context!())

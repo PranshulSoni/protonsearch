@@ -5,7 +5,12 @@
 //! transactional so search/status reads are never blocked for long.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+
+/// Counts activity writes so retention pruning + WAL checkpoints are amortized
+/// instead of running on every search.
+static ACTIVITY_WRITES: AtomicU64 = AtomicU64::new(0);
 use std::time::Duration;
 
 use anyhow::Context;
@@ -77,6 +82,10 @@ impl EngineDb {
         conn.busy_timeout(Duration::from_millis(5000))?;
         conn.pragma_update(None, "journal_mode", "WAL").ok();
         conn.pragma_update(None, "synchronous", "NORMAL").ok();
+        // WAL maintenance is explicit (see checkpoint()): a large uncheckpointed
+        // WAL otherwise makes EVERY commit attempt a checkpoint, which showed up
+        // as ~10 ms stalls on the search path (activity logging commits).
+        conn.pragma_update(None, "wal_autocheckpoint", 0).ok();
         conn.execute_batch(SCHEMA)
             .context("creating engine tables")?;
         Ok(Self { conn: Mutex::new(conn) })
@@ -106,12 +115,28 @@ impl EngineDb {
                 path
             ],
         )?;
-        // Keep local history bounded (privacy default: 20k rows).
-        conn.execute(
-            "DELETE FROM activity WHERE id NOT IN (SELECT id FROM activity ORDER BY id DESC LIMIT 20000)",
-            [],
-        )
-        .ok();
+        // Keep local history bounded (privacy default: 20k rows), but do not
+        // scan/delete on every keystroke-search: prune every 64 writes and
+        // checkpoint explicitly so the search path never pays WAL maintenance.
+        let writes = ACTIVITY_WRITES.fetch_add(1, Ordering::Relaxed) + 1;
+        if writes % 64 == 0 {
+            conn.execute(
+                "DELETE FROM activity WHERE id NOT IN (SELECT id FROM activity ORDER BY id DESC LIMIT 20000)",
+                [],
+            )
+            .ok();
+            let _ = conn.query_row("PRAGMA wal_checkpoint(PASSIVE)", [], |_| Ok(()));
+        }
+        Ok(())
+    }
+
+    /// Fold the WAL back into the database without blocking readers. Called from
+    /// the background indexer after batches (auto-checkpoint is disabled so
+    /// commits on the search path stay cheap).
+    pub fn checkpoint(&self) -> anyhow::Result<()> {
+        let conn = self.lock()?;
+        conn.query_row("PRAGMA wal_checkpoint(PASSIVE)", [], |_| Ok(()))
+            .ok();
         Ok(())
     }
 

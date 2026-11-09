@@ -41,10 +41,12 @@ windows = { workspace = true, features = [
 [dependencies]
 anyhow = { workspace = true }
 image = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 image = { workspace = true }
+serde_json = { workspace = true }
 
 [target.'cfg(windows)'.dev-dependencies]
 windows = { workspace = true, features = [

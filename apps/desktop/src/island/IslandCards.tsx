@@ -70,7 +70,7 @@ export function CardHead({
   );
 }
 
-function EmptyState({ title, hint }: { title: string; hint: string }) {
+export function EmptyState({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="island-empty" role="status">
       <strong>{title}</strong>
@@ -398,7 +398,10 @@ export function AgentsCard({
       ) : (
         <>
           <div className="island-context-caps">
-            {"CURRENT WORKSPACE · " + tasks.length + " TASKS"}
+            {"CURRENT WORKSPACE · " +
+              tasks.length +
+              " " +
+              (tasks.length === 1 ? "TASK" : "TASKS")}
           </div>
           <div className="island-agent-list">
             {tasks.length === 0 ? (
@@ -445,37 +448,40 @@ export function AgentsCard({
             </div>
           ) : null}
           <div className="island-agent-actions">
-            <button
-              type="button"
-              className="island-agent-button"
-              disabled={!selected?.controls.canPause}
-              title={
-                selected?.controls.canPause
-                  ? "Pause this task"
-                  : "This task can't be paused from the island."
-              }
-              onClick={() => selected && onPause(selected.id)}
-            >
-              <IslandIcon name="pause" size={14} /> Pause
-            </button>
-            <button
-              type="button"
-              className="island-agent-button"
-              disabled={!selected?.controls.canResume}
-              title={
-                selected?.controls.canResume
-                  ? "Resume this task"
-                  : "This task can't be resumed from the island."
-              }
-              onClick={() => selected && onResume(selected.id)}
-            >
-              <IslandIcon name="play" size={14} /> Resume
-            </button>
+            {selected?.controls.canPause ? (
+              <button
+                type="button"
+                className="island-agent-button"
+                title="Pause this task"
+                onClick={() => selected && onPause(selected.id)}
+              >
+                <IslandIcon name="pause" size={14} /> Pause
+              </button>
+            ) : null}
+            {selected?.controls.canResume ? (
+              <button
+                type="button"
+                className="island-agent-button"
+                title="Resume this task"
+                onClick={() => selected && onResume(selected.id)}
+              >
+                <IslandIcon name="play" size={14} /> Resume
+              </button>
+            ) : null}
+            {!selected?.controls.canPause && !selected?.controls.canResume ? (
+              <span className="island-agent-note">
+                No pause or resume action is available for this task.
+              </span>
+            ) : null}
           </div>
           {selected?.permissions ? (
             <p className="island-honest-note">
               {selected.writeAccess ? "Write access" : "Read-only"}
-              {" · " + selected.permissions.granted.length + " permissions granted"}
+              {" · " +
+                selected.permissions.granted.length +
+                " " +
+                (selected.permissions.granted.length === 1 ? "permission" : "permissions") +
+                " granted"}
               {selected.log.length > 0 ? " · " + selected.log[selected.log.length - 1].message : ""}
             </p>
           ) : null}

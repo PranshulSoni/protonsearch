@@ -9,6 +9,7 @@ import type {
   AgentTaskNode,
   AgentPermissionState,
   DetectedAgent,
+  ControlsStatus,
   MonitorInfo,
   PreviewPayload,
   ActivityItem,
@@ -62,6 +63,15 @@ type Bridge = {
   indexCommand(command: IndexCommand): Promise<void>;
   setLauncherGeometry(height: number, preview: boolean): Promise<void>;
   getPreview(resultId: string, maxChars?: number): Promise<PreviewPayload>;
+  getControlsStatus(): Promise<ControlsStatus>;
+  setVolume(percent: number): Promise<void>;
+  setMuted(muted: boolean): Promise<void>;
+  setBrightness(percent: number): Promise<void>;
+  setAudioOutput(deviceId: string): Promise<void>;
+  mediaCommand(action: string): Promise<void>;
+  showLocalToast(title: string, body: string): Promise<void>;
+  notificationsDismiss(notificationId: string): Promise<void>;
+  notificationsClear(): Promise<void>;
   hideLauncher(): Promise<void>;
   showLauncher(): Promise<void>;
   showMain(): Promise<void>;
@@ -87,6 +97,16 @@ const tauriBridge: Bridge = {
     invoke<PreviewPayload>("get_preview", {
       req: { resultId, maxChars: maxChars ?? null },
     }),
+  getControlsStatus: () => invoke<ControlsStatus>("get_controls_status"),
+  setVolume: (percent) => invoke<void>("control_set_volume", { percent }),
+  setMuted: (muted) => invoke<void>("control_set_muted", { muted }),
+  setBrightness: (percent) => invoke<void>("control_set_brightness", { percent }),
+  setAudioOutput: (deviceId) => invoke<void>("control_set_audio_output", { deviceId }),
+  mediaCommand: (action) => invoke<void>("control_media", { action }),
+  showLocalToast: (title, body) => invoke<void>("show_local_toast", { title, body }),
+  notificationsDismiss: (notificationId) =>
+    invoke<void>("notifications_dismiss", { notificationId }),
+  notificationsClear: () => invoke<void>("notifications_clear"),
   perfMark: (label, epochMs) => invoke<void>("perf_mark", { label, epochMs }),
   agentStart: (request) => invoke<void>("agent_start", { request }),
   agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),

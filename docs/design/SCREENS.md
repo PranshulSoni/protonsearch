@@ -61,7 +61,7 @@ element of the search row (reference:30, 136).
 ┌──────────────────────────────────────────────────────────────┐  radius 14, 1px --ps-line-strong
 │ [P 29px]  query input (21px)                     3 matches    │  search row: 72px, pad 14/20, gap 14
 ├──────────────────────────────────────────────────────────────┤  1px --ps-line
-│ [ALL] [FILES] [FOLDERS] [APPS] [CLIPBOARD] [WEB] [ACTIONS]     │  filter strip 40px, chips 26px, gap 6
+│ [ALL] [FILES] [FOLDERS] [APPS]                                 │  filter strip 40px, chips 26px, gap 6
 ├──────────────────────────────────────────────────────────────┤
 │ DOCUMENTS                                                    │  group label: 34px block, 10px caps
 │ [icon] Architecture notes.docx                        Yesterday│  row: 58px, pad 8/12, radius 8
@@ -94,10 +94,11 @@ element of the search row (reference:30, 136).
   **APPLICATIONS · FILES · FOLDERS · DOCUMENTS · CLIPBOARD · WEB · CODE · ACTIONS**. Group labels are the literal
   uppercase strings above (content labels, rendered with CSS caps; localised). The exact-command / calculator ACTIONS
   pin is **CUT for v2.0 alpha** (§10): ACTIONS always renders last, even when a command or expression matches exactly.
-  Filter chips (§2.11) expose only ALL/FILES/FOLDERS/APPS/CLIPBOARD/WEB/ACTIONS; DOCUMENTS and CODE stay in **ALL** and
-  remain reachable with the `content:` / `git:` prefixes. Chips are exact: FILES never shows folder rows and FOLDERS
-  never shows file rows (§2.11). Under the CLIPBOARD chip only, clipboard rows are grouped into category sections
-  (§2.12); in ALL they stay in the single CLIPBOARD group.
+  Filter chips (§2.11) expose only **ALL/FILES/FOLDERS/APPS**; every other source (clipboard, web, documents/OCR, git,
+  actions) stays in **ALL** and is reachable with query prefixes or the empty-state quick destinations (§2.4). Chips are
+  exact: FILES never shows folder rows and FOLDERS never shows file rows (§2.11). When the clipboard scope is active via
+  its `clipboard:` prefix (or the Clipboard History quick destination), clipboard rows are grouped into category
+  sections (§2.12); in ALL they stay in the single CLIPBOARD group.
 - Row: 36 px icon slot · 12 px gap · title (13/680, ellipsis) · path (11 px `--ps-ink-2`, ellipsis, 4 px below) ·
   trailing meta 10–11 px `--ps-ink-3` (recency / size / item count / source). Path truncates at the end; title
   truncates with ellipsis; both keep a `title` tooltip and the accessible description carries the full path.
@@ -126,17 +127,45 @@ element of the search row (reference:30, 136).
 | Index paused | normal results | normal | dot neutral + "Index paused" |
 | Offline (network) | no special state — local search is unaffected; unavailable network roots are simply absent | normal | normal |
 | Preview open | rows + side/drawer preview; selected row unchanged | normal | "Preview" hint |
-| Filter active | results scoped to the chip's category; strip shows the selected chip; FILES/FOLDERS are exact object types | count reflects the scoped set | unchanged |
+| Filter active | one of the four chips is selected; results are scoped; FILES/FOLDERS are exact object types; all other scopes require a typed prefix/quick destination | count reflects the scoped set | unchanged |
+| Empty input, no recents | QUICK DESTINATIONS panel replaces the empty prompt (see §2.4); no fake rows | placeholder normal | status |
+| Preview loading/ready | preview pane shows skeleton, then the real IPC payload (text/image/OCR/fields/highlight/truncated); unsupported/error are explicit | normal | "Preview" hint |
 
 Filter-chip states, copy and keyboard behaviour are in §2.11. Chips stay interactive while a search is in flight; an empty scoped result uses "No matches in {label}." + "Try another category, or press Esc to clear the filter."
 
 ### 2.4 Empty-input content rules
 
-- Recent group rows use the same anatomy as result rows, source-agnostic (file, app, clipboard, search). Enter opens
-  the item; the list is keyboard-navigable exactly like results.
-- If recents are disabled by privacy settings, show the no-recents empty state — no explanation banner in the
-  launcher (privacy is explained in Preferences).
-- No fake "suggested commands", no tiles, no tips carousel.
+**Quick destinations (v10).** When the query is empty, the scope is ALL, there are no recents/results (or recents are
+disabled), and no request is pending/erroring, the results area shows **QUICK DESTINATIONS** instead of an empty prompt.
+It is a listbox of real destinations, not fake suggested commands. Counts/state come only from `EngineStatus`; never
+invent data.
+
+- Heading: "QUICK DESTINATIONS" — 10 px/750, +0.12em, `--ps-ink-3`; padding 4 14 8 (inside the results column).
+- Primary grid: **2 columns**, gap **8**, inline padding 12; four destinations in this order: **Browser Bookmarks,
+  Browser History, Clipboard History, Agents**. Each tile: min-height **54**, padding **9 12**, 1 px line border, radius
+  **9**, raised surface; selected = `--ps-accent-soft` fill + `--ps-accent-border`; label 13/680, subtitle 10/ink-2
+  single-line ellipsis; off state subtitle ink-3.
+- Secondary row: **Git history** and **Agent History**, quiet pills (flex wrap, gap 6, padding 8 12 0; button
+  padding 5 9, radius 6, transparent, row layout); label 13/680, subtitle 10.
+- Subtitle copy (exact templates): Browser Bookmarks "Search saved bookmarks" / off "Off — enable in Preferences";
+  Browser History and Clipboard History real count ("{n} items" longform; "No items indexed yet"; "Search this source"
+  fallback; off copy); Agents "Agent runtime running" / "stopped" / "needs attention" / "No agent configured";
+  Git history same count/off pattern; Agent History "Open Workflows history".
+- Actions: Bookmarks/History/Clipboard/Git **write their prefix into the query** (`bookmarks:`, `history:`,
+  `clipboard:`, `git:`) and run the search; Agents/Agent History open the main app Workflows history. An off
+  destination opens the main app (Preferences) instead of faking a search.
+- Syntax hint below the list: 10/`--ps-ink-3`, margin 8 14 0, line-height 1.4:
+  "Prefixes: bookmarks:, history:, clipboard:, git:, ocr:, content:, calc:".
+- Keyboard: the destinations are listbox options in DOM order (2×2 primary, then secondary); ↑/↓ from the input move
+  through them, Enter activates; hover selects; no extra Tab stops. The listbox is labelled "Quick destinations"; the
+  secondary group is "More destinations". The result-count live region does not update for this static state.
+- Geometry: quick destinations reserve **248 px** (comfortable) / **224 px** (compact) of extra content height; the
+  launcher window grows within the normal max/height clamp. At ≤700 the grid becomes one column and heading/secondary/
+  hint use 8 px inline padding.
+- Recents still win when present: empty input + recent items renders the RECENT group (not quick destinations). When
+  recents are disabled, quick destinations render; no privacy explanation banner.
+
+- No fake "suggested commands", no tiles, no tips carousel beyond these real destinations.
 
 ### 2.5 Footer
 
@@ -159,22 +188,35 @@ Filter-chip states, copy and keyboard behaviour are in §2.11. Chips stay intera
 - "Open ProtonSearch" opens the app on Home with the current query pre-filled into the app search where applicable;
   it is a button, not a link (no browser semantics).
 
-### 2.6 Preview (Ctrl+Space)
+### 2.6 Preview (Ctrl+Space) — real IPC payload (G2, task-47)
 
 - Toggle only when a row is selected. Default **off**; Preferences may enable "Preview the selected result".
-- Placement: side panel 360 px wide at `workArea.width ≥ 1200` (card grows to 1180 px, window to 1236 px, height
-  unchanged); bottom drawer
-  240 px tall below the results otherwise (window height grows to fit, cap at `min(640, workArea.height − 24)`).
-- Panel anatomy: item title (13/680) · kind/type line (11 px) · path or URL (11 px, selectable) · preview body ·
-  action row (Copy path, Open, Open containing folder — text buttons, only actions the ActionSpec declares).
-- Preview bodies (alpha: the IPC supplies metadata/snippet only — §10): code/text = first 20 lines in mono 12 px
-  with the match highlighted; metadata facts card; clipboard text; web URL + source; app/action summary card.
-  There is no thumbnail or document render in alpha: unavailable bodies say "Preview not available — press Enter to
-  open."; unknown kind says "No preview for this item."
-- Loading: flat skeleton at the real content size (no shimmer); error: one sentence + Retry if retryable.
-- Esc closes the preview first, then clears, then closes the window. Ctrl+Space toggles closed.
-- Focus: the preview scroll region is focusable (Tab reaches it) and scrolls with ↑↓/PageUp/PageDown when focused;
-  Tab returns to the input.
+- Placement (unchanged): side panel **360 px** at `workArea.width >= 1200` (card 1180, window 1236, height unchanged);
+  bottom drawer **240 px** tall otherwise (window grows, cap min(640, workArea.height−24)). Panel animates in 160 ms,
+  opacity + 6 px, reduced motion instant; the window resize never animates.
+- Head: result icon + title 13/680 + format/source line 11 ink-2 + path/URL 11 selectable/ellipsis.
+- The panel now renders the real engine `PreviewPayload`; no placeholder body:
+  - **Loading:** flat 3-line skeleton at the real body size (no shimmer, no layout shift); late/pending requests are
+    token-guarded and debounced 120 ms.
+  - **Text/code:** `payload.text ?? payload.snippet` in mono **11/1.55**, max-height **300**, pre-wrap/break-anywhere,
+    with real `highlightRanges` rendered as `mark` (accent-soft, 3 px radius). Label is "{FORMAT} preview" or
+    "Preview". Truncation: "Showing the first {n} characters. Press Enter to open the full item."
+  - **Image:** real `imageDataUrl` in a bordered wrap (padding 8, radius 8, surface-soft); image max-width 100% /
+    max-height 300, object-contain, radius 6, alt "Preview of {title}".
+  - **OCR:** separate "Text found in image" section under a dashed top border; mono 11/1.55, max-height 300.
+  - **Metadata:** `payload.fields` rendered as a definition list; path/URL stays selectable.
+  - **Unsupported:** `payload.unsupportedReason` or "No preview for this item."; no fake render, no dead controls.
+  - **Error:** "Preview is unavailable right now." + quiet detail + **Retry** (reloads that result); error detail must be
+    sanitized (no raw exception text/paths). **Known code gap:** the current preview error detail can surface the
+    bridge message; fix before release (recorded in REVIEW_3/G4-G5 sync).
+  - **Empty body (status ok):** "No preview body for this item."
+  - **No selection:** "Select a result to preview it."
+- Action row: only actions the engine's `ActionSpec` declares (Copy path, Open, Open containing folder, etc.), max one
+  row; preview actions do not move the launcher's active row.
+- Loading skeleton must be flat grey (no gradient/pulse); current implementation uses a subtle pulse gradient — flagged
+  for correction in the G4/G5 sync, not part of the binding visual.
+- Esc closes the preview first, then clears, then hides. Ctrl+Space toggles closed. Focus: scroll region tabbable,
+  ↑↓/PageUp/PageDown scroll when focused; Tab returns to the input.
 
 ### 2.7 Multi-select — **CUT for v2.0 alpha**
 
@@ -223,10 +265,11 @@ close. Re-summon during close cancels the close and restarts open (Rust safety h
 status text, window resize, preview geometry, filter application (search dispatches immediately), scrolling. Reduced
 motion: 0 ms, no transform, window hides next frame. No shadow animation, no height animation, no bounce.
 
-### 2.11 Filter strip — FINAL 2026-11-10 (task-23)
+### 2.11 Filter strip — FINAL 2026-11-10 (task-47, four-chip normal launcher)
 
-A horizontal category strip between the search row and the results. It is the reference's segmented-control language
-applied to a scrolling filter row (SCREENS §2.1 diagram; REFERENCE_MAPPING §2).
+A horizontal filter strip between the search row and the results. It is the reference's segmented-control language
+applied to a scrolling filter row. The v10 Normal Launcher exposes **four chips only**; every other source is reached by
+the query syntax or the empty-state quick destinations.
 
 **Placement and geometry (unchanged).** Inside the results column, directly under the search row's hairline and above the
 results: block **40 px** (36 compact) = 7 px top + 26 px chip + 7 px bottom + 1 px bottom hairline; inline padding **16 px**
@@ -235,101 +278,81 @@ results: block **40 px** (36 compact) = 7 px top + 26 px chip + 7 px bottom + 1 
 Tokens: `--ps-strip-height/--ps-strip-height-compact`, `--ps-chip-height/-compact`, `--ps-chip-gap`,
 `--ps-chip-pad-x`, `--ps-chip-radius`, `--ps-strip-pad-x`.
 
-**Chips and order (FINAL).** Seven chips only, fixed order:
-**ALL · FILES · FOLDERS · APPS · CLIPBOARD · WEB · ACTIONS.** Labels are uppercase, localised, 11 px/600,
-`--ps-ink-2` at rest; no counts, no icons, no truncation — a chip grows to its localised label (guideline ≤ 20 chars).
-DOCUMENTS and GIT chips were removed on 2026-11-10; their result groups stay in ALL and their scopes remain reachable by
-prefix (below). Never render a ghost/disabled chip for a removed scope.
+**Chips and order (FINAL).** Exactly four chips, fixed order:
+**ALL · FILES · FOLDERS · APPS.** Labels are uppercase, localised, 11/600, `--ps-ink-2` at rest; no counts, no icons, no
+truncation. Do **not** render chips for CLIPBOARD, WEB, ACTIONS, DOCUMENTS/OCR or GIT: those scopes stay in ALL and are
+reachable via prefixes/quick destinations. Never render a ghost/disabled chip.
 
-**Shortcuts.** From the search input, **Ctrl+1 … Ctrl+7** select ALL/FILES/FOLDERS/APPS/CLIPBOARD/WEB/ACTIONS in that
-order, without moving focus out of the input (the input remains the primary focus target). Ctrl+8 and Ctrl+9 are
-**unbound**; do not capture them. The shortcut is a selection, not a separate focus mode; the radiogroup state and the
-result-count live region announce the change. Chips show no shortcut hint; the footer hint unchanged.
+**Shortcuts.** From the search input, **Ctrl+1 … Ctrl+4** select ALL/FILES/FOLDERS/APPS in that order, without moving
+focus out of the input. **Ctrl+5 and above are unbound** — do not capture them. The radiogroup state and result-count live
+region announce the change; chips show no shortcut hint.
 
-**Scopes and prefixes.** Selecting a chip dispatches a new search with `scope` and resets the selection to row 0 (new
-query epoch). A typed prefix is still supported and does **not** select a chip: the strip stays on ALL and the query text
-is the only indicator; choosing any chip clears the prefix. Removed scopes remain reachable exactly as before:
+**Scopes and prefixes.** Selecting a chip dispatches a new search with `scope` and resets the selection to row 0. Typed
+prefixes do **not** select a chip (the strip stays on ALL; the query text is the only indicator); choosing any chip clears
+the leading prefix. Everything outside the four chips remains reachable:
 
-| Chip | `scope` | Query prefixes |
+| Chip / scope | `scope` | Query prefixes |
 |---|---|---|
 | ALL | `all` | (none) |
 | FILES | `files` | `file:` `files:` |
 | FOLDERS | `folders` | `folder:` `folders:` |
 | APPS | `apps` | `app:` `apps:` |
-| CLIPBOARD | `clipboard` | `clip:` `clipboard:` |
-| WEB | `browser` | `web:` `history:` `bookmarks:` `google:` |
-| ACTIONS | `actions` | `calc:` `command:` |
-| *(removed)* DOCUMENTS | `content` | `content:` `ocr:` |
-| *(removed)* CODE | `git` | `git:` `commits:` `todos:` |
+| *(no chip)* CLIPBOARD | `clipboard` | `clip:` `clipboard:` |
+| *(no chip)* WEB | `browser` | `web:` `history:` `bookmarks:` `google:` |
+| *(no chip)* DOCUMENTS / OCR | `content` | `content:` `ocr:` |
+| *(no chip)* CODE / GIT | `git` | `git:` `commits:` `todos:` |
+| *(no chip)* ACTIONS | `actions` | `calc:` `command:` |
 
-Filter choice is **not** persisted across summons (default ALL).
+Filter choice is **not** persisted across summons (default ALL). Quick destinations (§2.4) write the bookmark/history/
+clipboard/git prefixes; other scopes are typed directly.
 
-**Strict FILES vs FOLDERS (FINAL).** The two chips are exact; they never mix object types:
-- **FILES** = file-backed rows only: `SourceKind::File`, `content_match` and `ocr_text` (their normal DOCUMENTS/FILES
-  group labels stay). A folder row must never appear under FILES.
-- **FOLDERS** = `SourceKind::Folder` rows only. A file/document row must never appear under FOLDERS.
-- **ALL** keeps the fixed groups separate (FILES, FOLDERS, DOCUMENTS are distinct headings; a folder row is never
-  rendered inside FILES and a file row never inside FOLDERS).
-- Backend dependency: `ps-core` currently maps FILES to `File | Folder` (`crates/ps-core/src/engine.rs:1517-1519`).
-  That must become `File | ContentMatch | OcrText` (folder removed) before the chip ships; until the engine change
-  lands, ui-launcher filters folder rows out of FILES as a guard and records it as alpha debt.
+**Strict FILES vs FOLDERS (FINAL).** Exact object types; never mixed:
+- **FILES** = file-backed rows only: `SourceKind::File`, `content_match` and `ocr_text`. A folder row never appears.
+- **FOLDERS** = `SourceKind::Folder` only. A file/document row never appears.
+- **ALL** keeps the fixed groups separate (FILES, FOLDERS, DOCUMENTS distinct; no mixing inside a group).
+- Backend debt: `ps-core` still maps FILES to `File | Folder` (`crates/ps-core/src/engine.rs:1517-1519`); the
+  launcher filters folder rows out of FILES (`guardScopeResults`) until the engine change lands.
 
 **Row anatomy.**
 
 | Scope | Row anatomy |
 |---|---|
-| FILES row | 36 px icon slot · 12 px gap · real shell/file-type icon 32 px **or** extension badge (2–4 chars, 10/650, caps, 35×37, radius 7, `--ps-badge-*`) · filename 13/680 ellipsis · path 11 `--ps-ink-2` below (4 px gap, ellipsis) · trailing recency 10–11 + size when real. Content-match rows keep the same file row and open the file at the match. |
-| FOLDERS row | 36 px icon slot · 12 px gap · folder glyph 20 px tinted `--ps-badge-folder-bg/ink` (never a file icon or extension badge) · folder name 13/680 ellipsis · full path 11 `--ps-ink-2` below · trailing `{n} items` only when `meta.itemCount` is real (tabular), otherwise nothing. |
-| Mixed ALL | The two row types keep their own group headings; no visual mixing inside one group. |
+| FILES row | 36 px icon slot · 12 px gap · real shell/file-type icon 32 px **or** extension badge (2–4 chars, 10/650, caps, 35×37, radius 7, `--ps-badge-*`) · filename 13/680 ellipsis · path 11 `--ps-ink-2` below (4 px gap, ellipsis) · trailing recency 10–11 + size when real. Content-match rows keep the file row and open at the match. |
+| FOLDERS row | 36 px icon slot · 12 px gap · folder glyph 20 px tinted `--ps-badge-folder-bg/ink` (never a file icon/extension badge) · folder name 13/680 ellipsis · full path 11 `--ps-ink-2` below · trailing "{n} items" only when `meta.itemCount` is real, otherwise nothing. |
+| Mixed ALL | Row types keep their group headings; no visual mixing inside a group. |
 
-**States.** Unchanged:
+**States.** Unchanged: rest transparent/ink-2; hover `--ps-surface-soft`/ink; selected `--ps-accent-soft` + 1 px
+`--ps-accent-border` + **2 px inset bottom bar** `--ps-selected-bar` + ink 650 (bar = 6.45:1 light / 6.04:1 dark);
+focus-visible 2 px `--ps-focus` ring offset 2; pressed surface-soft; no disabled state while a query is pending.
 
-| State | Visual |
-|---|---|
-| rest | transparent bg, 1 px transparent border, `--ps-ink-2` |
-| hover | `--ps-surface-soft` bg, `--ps-ink` text |
-| selected | `--ps-accent-soft` bg + 1 px `--ps-accent-border` + **2 px inset bottom bar** `--ps-selected-bar`; `--ps-ink` 650. The bar is the state cue (fill alone is 1.14:1; bar = 6.45:1 light / 6.04:1 dark). |
-| focus-visible | 2 px `--ps-focus` ring, offset 2 (ring drawn inside the strip's block padding) |
-| pressed | `--ps-surface-soft` bg; no transform |
-| dark | unselected `--ps-ink-2` (8.47:1), selected fill `--ps-accent-soft`, bar `--ps-selected-bar` |
-| disabled | none — chips stay usable while a search is pending |
+**Keyboard and focus.** One roving tab stop: Tab from the search input lands on the selected chip; Tab again leaves the
+strip for the preview/footer. ←/→ change the filter immediately and keep focus; Home/End go to ALL/APPS; Space/Enter
+re-applies; Esc clears to ALL and returns focus to input before the normal query-clear/close chain. Ctrl+1–4 select from
+the input. Overflow scrolls the focused/selected chip into view (`scrollIntoView({inline:'nearest',block:'nearest'})`,
+no smooth behaviour). Pointer click only.
 
-**Keyboard and focus.** One roving tab stop: Tab from the search input lands on the **selected** chip; Tab again leaves
-the strip for the preview or the footer. ←/→ change the filter
-immediately (radiogroup semantics) and keep focus; Home/End go to ALL/ACTIONS; Space/Enter re-applies the focused chip
-(no-op if already selected). Esc clears the filter to ALL and returns focus to the input **before** the normal
-query-clear/close chain. Ctrl+1–7 select from the input as above. When the strip overflows, the focused/selected chip is scrolled into view
-(`scrollIntoView({inline:'nearest', block:'nearest'})`, no smooth behaviour). Pointer: click selects; no drag.
+**0 results.** "No matches in {label}." + "Try another category, or press Esc to clear the filter." Count reflects the
+scoped set.
 
-**0 results.** "No matches in {label}." + "Try another category, or press Esc to clear the filter." The count text reflects
-the scoped result set.
+**Overflow/localisation.** Horizontal scroll only, hidden scrollbar, no fades; labels from `filter.all`,
+`filter.files`, `filter.folders`, `filter.apps` only (no unused chip keys); never truncate; logical properties for RTL.
+`aria-label="Filter results"`; chip accessible names localised; one result-count live region, no extra live region.
 
-**Overflow and localisation.** `overflow-x:auto; overflow-y:hidden; white-space:nowrap; scrollbar-width:none`, hidden
-WebKit scrollbar, `overscroll-behavior-x:contain`, `scroll-padding-inline` = strip inline padding. No edge fades or
-gradient masks (banned device); chips clip at the edge. Labels come from i18n keys `filter.all`, `filter.files`,
-`filter.folders`, `filter.apps`, `filter.clipboard`, `filter.web`, `filter.actions`; receive no truncation; the
-row uses logical properties (`padding-inline`, `gap`) so RTL scrolls from the right. The strip's `aria-label`
-("Filter results") and chip accessible names are localised; a change is announced through the chip's radio state and the
-existing result-count live region (no extra live region).
+**Accessibility.** `role="radiogroup"`; each chip `role="radio"` + `aria-checked`; roving tabindex; never tabs or
+aria-pressed. Ctrl+1–4 are shortcuts, not tab stops. Motion: background/border/box-shadow 110 ms; reduced motion 0 ms.
 
-**Accessibility.** `role="radiogroup"` with `aria-label="Filter results"`; each chip is a `role="radio"` with
-`aria-checked`; roving tabindex (only the selected chip is in the tab order). Never `role="tab"` — the strip filters
-the same result list rather than swapping panels. Ctrl+1–7 are shortcuts, not extra tab stops; the input keeps focus.
+### 2.12 Clipboard categories — grouped sections (FINAL 2026-11-10, task-47)
 
-**Motion.** Background/border/box-shadow 110 ms `--ps-ease-standard`; no transform, no layout animation; reduced
-motion 0 ms.
-
-### 2.12 Clipboard categories — grouped sections (FINAL 2026-11-10, task-26)
-
-When the **CLIPBOARD** chip is selected, the returned clipboard rows are grouped into quiet category sections **inside the
-results viewport**. There is **no second chip row, no category filter controls, and no duplicated filtering**: the main
-filter strip selects Clipboard; the results themselves are sectioned.
+When the **clipboard scope** is active — via the `clipboard:` / `clip:` prefix or the Clipboard History quick
+destination — the returned clipboard rows are grouped into quiet category sections **inside the results viewport**. There
+is no Clipboard chip and no second chip row: the main strip stays on ALL, and the prefix/quick destination is the scope.
+No category filter controls and no duplicated filtering.
 
 **Order and visibility.** Fixed order **LINKS · EMAILS · PATHS · CODE · TEXT · IMAGES**; only non-empty sections render,
-each exactly once. Classification uses the rules below; TEXT is the fallback for everything that is not a link, email,
-path, code or image. IMAGES renders only when the engine returns real image rows (alpha: absent — no fake section). Section
-order never changes with query, score or pinned state. In **ALL**, clipboard rows are not sectioned; they stay in the
-single CLIPBOARD ResultGroup in engine order (no section labels).
+each exactly once. Classification uses the rules below; TEXT is the fallback. IMAGES renders only when the engine returns
+real image rows (alpha: images currently depend on the G2 image IPC; no fake section). Section order never changes with
+query, score or pinned state. When the clipboard scope is not active (ALL), clipboard rows stay in the single CLIPBOARD
+ResultGroup in engine order and are not sectioned.
 
 **Section labels (subordinate to ResultGroup).**
 - Uppercase **10 px/700**, letter-spacing **+0.10em**, colour `--ps-ink-3`; line-height **14 px**; block **28 px**
@@ -1027,7 +1050,14 @@ transform and all durations.
 | Launcher error | "Search is unavailable right now." · "Retry" |
 | Index status | "Index ready" · "Indexing" · "Index paused" · "Index unavailable" (no percentage in alpha — §10) |
 | Footer link | "Open ProtonSearch" |
-| Preview unavailable | "No preview for this item." |
+| Preview unavailable | "No preview for this item." · "Preview is unavailable right now." · Retry |
+| Preview truncated | "Showing the first {n} characters. Press Enter to open the full item." |
+| Quick destination — Bookmarks | "Browser Bookmarks" · "Search saved bookmarks" / "Off — enable in Preferences" |
+| Quick destination — History | "Browser History" · "{n} items" / "No items indexed yet" / "Off — enable in Preferences" |
+| Quick destination — Clipboard | "Clipboard History" · real count / off copy |
+| Quick destination — Agents | "Agents" · "Agent runtime running"/"stopped"/"needs attention"/"No agent configured" |
+| Quick destinations — secondary | "Git history" · "Agent History" · "Open Workflows history" |
+| Quick destinations syntax | "Prefixes: bookmarks:, history:, clipboard:, git:, ocr:, content:, calc:" |
 | Home no index | "Nothing indexed yet." · "Add a folder to start building the index. It stays on this PC." · "Add location" |
 | Home incomplete | "Setup is {n} of 7 steps done." · "Resume setup" |
 | Search & indexes no roots | "No locations yet." · "Add a folder so ProtonSearch can find your files." · "Add location" |
@@ -1078,7 +1108,6 @@ fake percentage, sample data, or a teaser.
 | No quicklinks/snippets list or CRUD command | Workflows (launcher quicklink results only if the engine supplies them) | Read-only migration note; no editor, no dead button. |
 | No native folder-picker command | Search & indexes locations, onboarding locations | Validated paste-path form; helper states the picker is not available in this build. |
 | No updater / logs / diagnostics-export commands | Preferences -> Updates & diagnostics | Read-only version/protocol rows + Refresh diagnostics; no update check, logs or export controls. |
-| No preview payload (thumbnail, document render, preview kinds) in `SearchResult` | Launcher preview panel | Metadata/snippet previews only; otherwise "Preview not available — press Enter to open." No fake thumbnail. |
 | Clipboard images are stored but not exposed as search rows (`ClipboardEntry` has no image/OCR fields; search excludes `is_image`) | Launcher Clipboard sectioned results | The IMAGES section is omitted entirely while no image rows exist; never render a fake/empty IMAGES section or a category control. Text sections and capture copy are unaffected. |
 | No Windows clipboard-history import/backfill (capture is live-only) | Launcher Clipboard empty states, Preferences clipboard toggle | Copy states capture starts now; never promise or imply pre-install history. Preference helper says previous Windows clipboard history is not imported. |
 | `detect_agents` may return CLIs that are not wired to a run panel (Codex/OpenCode/Cline/Antigravity) | Workflows Agents list | Show them as detected with "Detected · not wired in this build" and no Run/Use control; only Pi is runnable. Never invent rows. |
@@ -1098,9 +1127,9 @@ Launcher: first summon, empty input, 0 matches, 1 match, many+selected, preview 
 drawer below 1200 work width), loading, index error, indexing/paused, dark, 560/820/1000/1280, 125/150/200 % DPI, high
 contrast, keyboard focus. **Shadow proof:** light/dark cards on a light and a dark wallpaper at 100 % and 150 % (no
 straight cut-off edge on any side; corner radius reads). **Motion proof:** open and close captured mid-animation (or a
-short clip) plus reduced-motion instant. **Filter strip:** all seven chips in final order with Ctrl+1–7, selected state, keyboard focus, hover, both themes,
+short clip) plus reduced-motion instant. **Filter strip:** all four chips ALL/FILES/FOLDERS/APPS in final order with Ctrl+1–4, selected state, keyboard focus, hover, both themes,
 FILES/FOLDERS exact rows (no mixed types), scoped 0-match copy, overflow at 560/820 with the selected chip scrolled into
-view, and a long localised label (German) proving no truncation. **Clipboard sections:** only under CLIPBOARD, grouped labels in fixed order (LINKS/EMAILS/PATHS/CODE/TEXT; IMAGES absent in
+view, and a long localised label (German) proving no truncation. **Quick destinations:** empty query, all six real destinations (counts/off/agent states), 2×2 grid + secondary pills, syntax hint, keyboard traversal and prefix insertion, both themes, 560/820 widths. **Preview:** real payload states (text with highlight, image, OCR, truncated, metadata, unsupported, error+Retry, loading skeleton), side 360 and drawer, keyboard, both themes. **Clipboard sections:** only under CLIPBOARD, grouped labels in fixed order (LINKS/EMAILS/PATHS/CODE/TEXT; IMAGES absent in
 alpha), no chip row/tags/tabs, section label metrics and 6 px gap, flattened ↑/↓ across section boundaries, empty
 history/0-match states, standard card height (no +36 px), 560/820 and 125/150/200 % proof, both themes. **Agents:** detected list with
 available/unavailable + real path/version, no fake rows, Pi Use→In use and panel focus, empty/loading/load-error, recent

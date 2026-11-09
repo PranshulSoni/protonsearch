@@ -149,3 +149,11 @@ Reviewed the new captures: `task15-state-error-home-light.png`, `task15-state-wa
 **Re-check verdict:** every REVIEW_2 item (F1–F9, row-state tone, L0 F8, TEMP token block) is closed; the quiet-state
 family is consistent (error/warn/offline/empty, same anatomy, correct severity colour, no raw detail paths). Task-7 is
 **approved and fully closed**; only the alpha-only offline call site remains reserved.
+
+## 6. G4/G5 spec-sync status (task-47, 2026-11-10)
+
+REVIEW_2's UI-owned items remain closed (F1–F9, row-state tone, L0 F8, token-block TEMP). The Normal Launcher and
+Dynamic Island specs were separately synced to v10/task-41: four filter chips ALL/FILES/FOLDERS/APPS with prefixes/quick
+destinations, real preview payload, island renderer v1 and honest remaining gaps. See `REVIEW_3_G4_G5_SPEC_SYNC.md`
+for the G4/G5 conditional sign-off and conditions; no change to the app type/grid/quiet-state approval.
+

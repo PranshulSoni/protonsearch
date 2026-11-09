@@ -310,6 +310,80 @@ export interface ClipboardSettings {
   clearOnExit: boolean;
 }
 
+export interface ControlCapability {
+  supported: boolean;
+  reason: string | null;
+}
+
+export interface MediaSessionInfo {
+  title: string;
+  artist: string;
+  album: string | null;
+  artworkDataUrl: string | null;
+  playing: boolean;
+  positionMs: number | null;
+  durationMs: number | null;
+  canSeek: boolean;
+  canShuffle: boolean;
+  shuffle: boolean;
+  canRepeat: boolean;
+  repeat: boolean;
+  appId: string | null;
+}
+
+export interface AudioDeviceInfo {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
+
+export interface WifiNetworkInfo {
+  ssid: string;
+  signal: number;
+  secure: boolean;
+  connected: boolean;
+}
+
+export interface BluetoothDeviceInfo {
+  id: string;
+  name: string;
+  connected: boolean;
+  paired: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  source: string;
+  createdAt: number;
+  read: boolean;
+}
+
+export interface ControlsStatus {
+  mediaCapability: ControlCapability;
+  media: MediaSessionInfo | null;
+  audioOutputs: AudioDeviceInfo[];
+  defaultAudioId: string | null;
+  volumePercent: number | null;
+  muted: boolean | null;
+  brightnessCapability: ControlCapability;
+  brightnessPercent: number | null;
+  wifi: ControlCapability;
+  wifiEnabled: boolean | null;
+  wifiNetworks: WifiNetworkInfo[];
+  bluetooth: ControlCapability;
+  bluetoothEnabled: boolean | null;
+  bluetoothDevices: BluetoothDeviceInfo[];
+  airplaneMode: ControlCapability;
+  nightLight: ControlCapability;
+  energySaver: ControlCapability;
+  notifications: ControlCapability;
+  toastCapability: ControlCapability;
+  notificationUnread: number;
+  notificationItems: AppNotification[];
+}
+
 export interface MonitorInfo {
   id: string;
   name: string;

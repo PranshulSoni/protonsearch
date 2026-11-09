@@ -1016,6 +1016,8 @@ pub struct AppNotification {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ControlsStatus {
+    /// Whether this build can enumerate/control real media sessions.
+    pub media_capability: ControlCapability,
     #[serde(default)]
     pub media: Option<MediaSessionInfo>,
     #[serde(default)]
@@ -1026,6 +1028,7 @@ pub struct ControlsStatus {
     pub volume_percent: Option<u8>,
     #[serde(default)]
     pub muted: Option<bool>,
+    pub brightness_capability: ControlCapability,
     #[serde(default)]
     pub brightness_percent: Option<u8>,
     pub wifi: ControlCapability,
@@ -1042,6 +1045,9 @@ pub struct ControlsStatus {
     pub night_light: ControlCapability,
     pub energy_saver: ControlCapability,
     pub notifications: ControlCapability,
+    pub toast_capability: ControlCapability,
+    #[serde(default)]
+    pub notification_unread: u64,
     #[serde(default)]
     pub notification_items: Vec<AppNotification>,
 }

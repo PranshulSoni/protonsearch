@@ -10,6 +10,7 @@ pub mod browser;
 pub mod calc;
 pub mod clipboard;
 pub mod git;
+pub mod notifications;
 pub mod quicklinks;
 pub mod recent;
 

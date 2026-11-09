@@ -1,0 +1,132 @@
+{
+  "capturedAt": "2026-11-09T21:28:58.923Z",
+  "engine": {
+    "state": "ready",
+    "entries": 11,
+    "clipboardCount": 1
+  },
+  "api": [
+    {
+      "query": "report",
+      "first": {
+        "id": "web-search:google",
+        "kind": "action",
+        "title": "Search the web for \"report\"",
+        "path": null,
+        "hasSnippet": false
+      },
+      "preview": {
+        "status": "ok",
+        "format": "action",
+        "textLen": 25,
+        "snippetLen": 0,
+        "fields": 1,
+        "highlights": 0,
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "diagram",
+      "first": {
+        "id": "web-search:google",
+        "kind": "action",
+        "title": "Search the web for \"diagram\"",
+        "path": null,
+        "hasSnippet": false
+      },
+      "preview": {
+        "status": "ok",
+        "format": "action",
+        "textLen": 25,
+        "snippetLen": 0,
+        "fields": 1,
+        "highlights": 0,
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "blob",
+      "first": {
+        "id": "web-search:google",
+        "kind": "action",
+        "title": "Search the web for \"blob\"",
+        "path": null,
+        "hasSnippet": false
+      },
+      "preview": {
+        "status": "ok",
+        "format": "action",
+        "textLen": 25,
+        "snippetLen": 0,
+        "fields": 1,
+        "highlights": 0,
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "large",
+      "first": {
+        "id": "web-search:google",
+        "kind": "action",
+        "title": "Search the web for \"large\"",
+        "path": null,
+        "hasSnippet": false
+      },
+      "preview": {
+        "status": "ok",
+        "format": "action",
+        "textLen": 25,
+        "snippetLen": 0,
+        "fields": 1,
+        "highlights": 0,
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    }
+  ],
+  "ui": [
+    {
+      "query": "report",
+      "rows": 5,
+      "panel": {
+        "text": "DOC\nreport.docx\nDOCX\nC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx\nDOCX PREVIEW\nPreview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.\nSize\n35.8 KB\nModified\n2026-11-09 20:32 UTC\nLines\n3\nWords\n17\nOpen\nReveal in Explorer\nCopy path",
+        "html": "<div class=\"preview-scroll\" tabindex=\"0\" aria-label=\"Preview of report.docx\"><div class=\"preview-head\"><span class=\"fileicon fileicon--word\" data-testid=\"result-icon\" aria-hidden=\"true\"><span class=\"fileicon-text\">DOC</span></span><div class=\"preview-heading\"><div class=\"preview-title\">report.docx</div><div class=\"preview-kind\">DOCX</div></div></div><div class=\"preview-path\" title=\"C:\\Users\\Pransh",
+        "imgs": [],
+        "testid": "preview-panel"
+      },
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-report.png"
+    },
+    {
+      "query": "diagram",
+      "rows": 2,
+      "panel": null,
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-diagram.png"
+    },
+    {
+      "query": "blob",
+      "rows": 2,
+      "panel": {
+        "text": "BIN\nblob.bin\nBIN\nC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin\n\nPreview is not available for .bin files.\n\nSize\n4.0 KB\nModified\n2026-11-09 20:32 UTC\nOpen\nReveal in Explorer\nCopy path",
+        "html": "<div class=\"preview-scroll\" tabindex=\"0\" aria-label=\"Preview of blob.bin\"><div class=\"preview-head\"><span class=\"fileicon fileicon--neutral\" data-testid=\"result-icon\" aria-hidden=\"true\"><span class=\"fileicon-text\">BIN</span></span><div class=\"preview-heading\"><div class=\"preview-title\">blob.bin</div><div class=\"preview-kind\">BIN</div></div></div><div class=\"preview-path\" title=\"C:\\Users\\Pranshul\\D",
+        "imgs": [],
+        "testid": "preview-panel"
+      },
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-blob.png"
+    }
+  ]
+}

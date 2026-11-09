@@ -3058,6 +3058,7 @@ dependencies = [
  "ps-core",
  "ps-ipc",
  "ps-sources",
+ "ps-windows",
  "serde",
  "serde_json",
  "tauri",
@@ -3182,6 +3183,8 @@ version = "2.0.0-alpha.1"
 dependencies = [
  "anyhow",
  "image 0.24.9",
+ "serde",
+ "serde_json",
  "windows 0.58.0",
 ]
 
