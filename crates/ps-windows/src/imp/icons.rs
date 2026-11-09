@@ -22,8 +22,7 @@ use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
 use windows::Win32::System::Com::IBindCtx;
 use windows::Win32::UI::Shell::{
     ExtractIconExW, IShellItemImageFactory, SHCreateItemFromParsingName, SHGetFileInfoW,
-    SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY,
-    SIIGBF_RESIZETOFIT,
+    SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SIIGBF_BIGGERSIZEOK, SIIGBF_RESIZETOFIT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON, ICONINFO};
 
@@ -39,8 +38,30 @@ fn fnv1a(bytes: &[u8]) -> u64 {
     hash
 }
 
+/// Stable identity of the icon source. Never derived from the display name.
+///
+/// - shell namespace entries are identified by their AppsFolder AUMID;
+/// - filesystem sources are canonicalised (symlinks, 8.3 names and case map to
+///   one identity) so one icon file is reused for the same underlying source.
+fn source_identity(source: &Path) -> String {
+    let display = source.to_string_lossy();
+    if display.starts_with("shell:") {
+        return format!("shell:{}", display["shell:".len()..].to_lowercase());
+    }
+    match std::fs::canonicalize(source) {
+        Ok(canonical) => {
+            let text = canonical.to_string_lossy();
+            let text = text.strip_prefix(r"\\?\").unwrap_or(&text);
+            text.replace('/', "\\").to_lowercase()
+        }
+        Err(_) => display.replace('/', "\\").to_lowercase(),
+    }
+}
+
 fn cache_path(cache_dir: &Path, source: &Path, size: u32) -> PathBuf {
-    let key = format!("{}#{}", source.to_string_lossy().to_lowercase(), size);
+    // Key = icon-source identity + rendered size. Two different sources with the
+    // same display name always get different files; the same source is reused.
+    let key = format!("{}#{}", source_identity(source), size);
     let hash = fnv1a(key.as_bytes());
     cache_dir.join(format!("{hash:016x}-{size}.png"))
 }
@@ -88,6 +109,20 @@ pub(crate) fn extract_icon_png(
 
 /// Render a shell namespace item (e.g. a packaged app AUMID) to RGBA.
 fn shell_item_image(display: &str, size: u32) -> anyhow::Result<image::RgbaImage> {
+    // Note: do NOT pass SIIGBF_ICONONLY here. Packaged apps expose their logo as
+    // a thumbnail-style image; ICONONLY makes the shell fall back to the generic
+    // document icon for packages that only register VisualElements logos (this
+    // was the "AMD Software shows a blank document" defect). ICONONLY is fine for
+    // classic shell items, but logos are what the launcher wants for apps.
+    shell_item_image_with_flags(display, size, SIIGBF_RESIZETOFIT | SIIGBF_BIGGERSIZEOK)
+}
+
+/// Same as shell_item_image with explicit IShellItemImageFactory flags.
+fn shell_item_image_with_flags(
+    display: &str,
+    size: u32,
+    flags: windows::Win32::UI::Shell::SIIGBF,
+) -> anyhow::Result<image::RgbaImage> {
     let _com = ComGuard::new();
     let item: IShellItemImageFactory = unsafe {
         SHCreateItemFromParsingName(&hstr(display), None::<&IBindCtx>)
@@ -99,7 +134,7 @@ fn shell_item_image(display: &str, size: u32) -> anyhow::Result<image::RgbaImage
                 cx: size as i32,
                 cy: size as i32,
             },
-            SIIGBF_RESIZETOFIT | SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK,
+            flags,
         )
         .with_context(|| format!("IShellItemImageFactory::GetImage({display})"))?
     };
@@ -280,7 +315,7 @@ fn raw_to_rgba(mut raw: RawBitmap, target: u32, un_premultiply: bool) -> image::
     }
 }
 
-fn hicon_to_rgba(icon: HICON, target: u32) -> anyhow::Result<image::RgbaImage> {
+pub(crate) fn hicon_to_rgba(icon: HICON, target: u32) -> anyhow::Result<image::RgbaImage> {
     let mut icon_info = ICONINFO::default();
     unsafe { GetIconInfo(icon, &mut icon_info) }.map_err(|e| anyhow!("GetIconInfo: {e}"))?;
     let guard = IconInfoGuard(icon_info);
@@ -355,4 +390,13 @@ impl Drop for IconInfoGuard {
             }
         }
     }
+}
+/// Test-only hook: render a shell item with explicit factory flags.
+#[cfg(test)]
+pub(crate) fn shell_item_image_for_test(
+    display: &str,
+    size: u32,
+    flags: windows::Win32::UI::Shell::SIIGBF,
+) -> anyhow::Result<image::RgbaImage> {
+    shell_item_image_with_flags(display, size, flags)
 }

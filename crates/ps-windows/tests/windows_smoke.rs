@@ -127,6 +127,75 @@ fn extracts_icon_for_packaged_app_via_shell_item_factory() {
     eprintln!("packaged app icon: {} (aumid {})", out.display(), entry.aumid);
 }
 
+
+#[test]
+fn icon_cache_is_keyed_by_source_identity() {
+    let cache = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("ps-windows-icon-identity");
+    let a = Path::new(r"C:\Windows\System32\notepad.exe");
+    let b = Path::new(r"C:\Windows\System32\cmd.exe");
+    if !a.is_file() || !b.is_file() {
+        eprintln!("SKIP: system executables unavailable");
+        return;
+    }
+    let a32 = ps_windows::extract_icon_png(a, 32, &cache).expect("notepad icon");
+    let b32 = ps_windows::extract_icon_png(b, 32, &cache).expect("cmd icon");
+    assert_ne!(
+        a32, b32,
+        "two different icon sources must not share one cache file"
+    );
+
+    // Same source: cache reuse (one file).
+    let a32_again = ps_windows::extract_icon_png(a, 32, &cache).expect("notepad icon again");
+    assert_eq!(a32, a32_again, "same source must reuse the same cache file");
+
+    // Case/path normalization is part of the identity (Windows paths are
+    // case-insensitive), so an upper-case spelling reuses the same file.
+    let upper = std::path::PathBuf::from(a.to_string_lossy().to_uppercase());
+    let upper32 = ps_windows::extract_icon_png(&upper, 32, &cache).expect("upper-case icon");
+    assert_eq!(
+        a32, upper32,
+        "case variants of the same source must share one cache file"
+    );
+
+    // Rendered size is part of the cache key.
+    let a64 = ps_windows::extract_icon_png(a, 64, &cache).expect("notepad 64 icon");
+    assert_ne!(a32, a64, "different icon sizes must use different cache files");
+}
+
+#[test]
+fn packaged_app_icons_render_the_app_logo_not_a_generic_document() {
+    let Ok(entries) = ps_windows::list_appsfolder() else {
+        eprintln!("SKIP: AppsFolder enumeration unavailable");
+        return;
+    };
+    let Some(amd) = entries.iter().find(|entry| entry.name == "AMD Software") else {
+        eprintln!("SKIP: AMD Software is not installed on this host");
+        return;
+    };
+    let shell_path = format!("shell:AppsFolder\\{}", amd.aumid);
+    let cache = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("ps-windows-packaged-logo");
+    let out = ps_windows::extract_icon_png(std::path::Path::new(&shell_path), 32, &cache)
+        .expect("AMD Software icon");
+    let image = image::open(&out).expect("decode AMD icon").to_rgba8();
+    // The AMD Radeon logo is a saturated red square; the generic document icon
+    // is greyscale. This regression catches SIIGBF_ICONONLY forcing the generic
+    // fallback for packages that register only VisualElements logos.
+    let has_colour = image.pixels().any(|pixel| {
+        if pixel[3] < 16 {
+            return false;
+        }
+        let r = pixel[0] as i32;
+        let g = pixel[1] as i32;
+        let b = pixel[2] as i32;
+        r.max(g).max(b) - r.min(g).min(b) > 30
+    });
+    assert!(
+        has_colour,
+        "packaged app icon is greyscale/generic (blank document): {}",
+        out.display()
+    );
+}
+
 #[test]
 fn resolves_a_generated_shortcut() {
     let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("ps-windows-test-lnk");

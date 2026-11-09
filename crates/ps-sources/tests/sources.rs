@@ -426,6 +426,90 @@ fn icon_cache_honours_portable_data_dir_and_populates_icons() {
     assert!(png_files > 0, "no PNGs were written to the icon cache");
 }
 
+
+/// Normalized display name for duplicate detection.
+fn normalized_name(name: &str) -> String {
+    name.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+}
+
+/// Extensions the application index accepts for classic Start-Menu targets.
+fn is_application_extension(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    let extension = lower.rsplit('.').next().unwrap_or("");
+    ["exe", "com", "bat", "cmd", "ps1", "psm1", "msc", "cpl", "scr", "appref-ms", "jar", "hta", "lnk"]
+        .contains(&extension)
+}
+
+#[test]
+fn app_index_has_no_duplicates_or_document_shortcuts() {
+    let dir = workdir("app-index-hygiene");
+    let cache = dir.join("icons");
+    let (apps, warnings) = ps_sources::apps::scan_with_icons(&cache);
+    eprintln!(
+        "app index hygiene: apps={} warnings={}",
+        apps.len(),
+        warnings.len()
+    );
+    assert!(!apps.is_empty(), "expected installed apps on this host");
+
+    // 1) One row per normalized display name (classic beats packaged).
+    let mut names = std::collections::HashSet::new();
+    for app in &apps {
+        assert!(
+            names.insert(normalized_name(&app.name)),
+            "duplicate application row for {:?}",
+            app.name
+        );
+    }
+
+    // 2) No documentation/file shortcuts in the application index: classic
+    // targets must be launchable, packaged targets must be shell AUMIDs.
+    let mut packaged = 0usize;
+    let mut classic = 0usize;
+    for app in &apps {
+        if app.target.starts_with("shell:") {
+            packaged += 1;
+        } else {
+            classic += 1;
+            assert!(
+                is_application_extension(&app.target),
+                "non-application target leaked into app index: {:?} ({})",
+                app.name,
+                app.target
+            );
+        }
+    }
+    eprintln!("app index composition: classic={classic} packaged={packaged}");
+    assert!(classic > 0, "expected classic Start-Menu apps on this host");
+
+    // 3) Icon cache is keyed by source identity: one icon file may only be
+    // shared by entries that resolve to the same target.
+    let mut icon_sources: std::collections::HashMap<&str, std::collections::HashSet<String>> =
+        std::collections::HashMap::new();
+    for app in &apps {
+        if let Some(icon) = app.icon_path.as_deref() {
+            icon_sources
+                .entry(icon)
+                .or_default()
+                .insert(app.target.to_lowercase());
+        }
+    }
+    for (icon, sources) in &icon_sources {
+        assert_eq!(
+            sources.len(),
+            1,
+            "icon {:?} maps to multiple distinct sources: {:?}",
+            icon,
+            sources
+        );
+    }
+    eprintln!(
+        "app index icons: entries_with_icon={} unique_icon_files={}",
+        apps.iter().filter(|app| app.icon_path.is_some()).count(),
+        icon_sources.len()
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
