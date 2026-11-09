@@ -6,6 +6,7 @@ import type {
   AgentRunRequest,
   AgentStatus,
   DetectedAgent,
+  MonitorInfo,
   ActivityItem,
   ActivityQuery,
   AppInfo,
@@ -35,6 +36,10 @@ type Bridge = {
   confirmNativeAction(command: NativeCommand): Promise<OpenOutcome>;
   agentStatus(): Promise<AgentStatus>;
   detectAgents(): Promise<DetectedAgent[]>;
+  listMonitors(): Promise<MonitorInfo[]>;
+  showIsland(): Promise<void>;
+  hideIsland(): Promise<void>;
+  setIslandGeometry(width: number, height: number): Promise<void>;
   agentStart(request: AgentRunRequest): Promise<void>;
   agentCancel(runId?: string | null): Promise<void>;
   agentApprove(response: AgentApprovalResponse): Promise<void>;
@@ -61,6 +66,10 @@ const tauriBridge: Bridge = {
   confirmNativeAction: (command) => invoke<OpenOutcome>("confirm_native_action", { command }),
   agentStatus: () => invoke<AgentStatus>("agent_status"),
   detectAgents: () => invoke<DetectedAgent[]>("detect_agents"),
+  listMonitors: () => invoke<MonitorInfo[]>("list_monitors"),
+  showIsland: () => invoke<void>("show_island"),
+  hideIsland: () => invoke<void>("hide_island"),
+  setIslandGeometry: (width, height) => invoke<void>("set_island_geometry", { width, height }),
   agentStart: (request) => invoke<void>("agent_start", { request }),
   agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),
   agentApprove: (response) => invoke<void>("agent_approve", { response }),

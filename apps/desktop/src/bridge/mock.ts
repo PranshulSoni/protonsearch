@@ -56,6 +56,44 @@ let settings: Settings = {
     telemetry: false,
   },
   agent: { enabled: false, runtime: "pi", piPath: null, allowWrites: false, workspace: null, thinking: null, provider: null, model: null, sidecarPath: null },
+  launcher: {
+    primaryMode: "normal",
+    island: {
+      enabled: true,
+      placement: {
+        monitor: null,
+        anchor: "top_center",
+        offsetX: 0,
+        offsetY: 22,
+        keepInWorkArea: true,
+        autoFlipExpanded: true,
+      },
+      cards: [
+        { id: "search", enabled: true },
+        { id: "media", enabled: true },
+        { id: "clipboard", enabled: true },
+        { id: "agent", enabled: true },
+        { id: "controls", enabled: true },
+        { id: "browser", enabled: true },
+        { id: "git", enabled: true },
+        { id: "bell", enabled: true },
+      ],
+      defaultCard: "search",
+      showDots: true,
+      hideOnFocusLoss: true,
+      skipDisabled: true,
+      returnToSearch: true,
+    },
+  },
+  clipboard: {
+    captureText: true,
+    captureImages: true,
+    retentionDays: 30,
+    maxItems: 500,
+    pause: false,
+    excludeApps: [],
+    clearOnExit: false,
+  },
   semantic: { enabled: false, model: null },
   webSearchEnabled: true,
   webSearchEngine: "google",
@@ -320,6 +358,16 @@ export const mockBridge = {
   async confirmNativeAction(): Promise<OpenOutcome> {
     return { ok: false, message: "Browser preview: system actions are disabled." };
   },
+  async listMonitors(): Promise<import("./types").MonitorInfo[]> {
+    return [
+      { id: "\\\\.\\DISPLAY1", name: "Built-in display", primary: true, x: 0, y: 0, width: 2560, height: 1600, workX: 0, workY: 0, workWidth: 2560, workHeight: 1560, scaleFactor: 1.5 },
+    ];
+  },
+
+  async showIsland(): Promise<void> {},
+  async hideIsland(): Promise<void> {},
+  async setIslandGeometry(): Promise<void> {},
+
   async detectAgents(): Promise<import("./types").DetectedAgent[]> {
     const pi = {
       id: "pi",

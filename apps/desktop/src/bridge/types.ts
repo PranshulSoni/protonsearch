@@ -243,6 +243,108 @@ export interface SemanticSettings {
 
 export type WebSearchEngine = "google" | "bing" | "duck_duck_go" | "you_tube";
 
+export type LauncherMode = "normal" | "dynamic_island";
+
+export type IslandCardId =
+  | "search"
+  | "media"
+  | "clipboard"
+  | "agent"
+  | "controls"
+  | "browser"
+  | "git"
+  | "bell";
+
+export interface IslandCardConfig {
+  id: IslandCardId;
+  enabled: boolean;
+}
+
+export type IslandAnchor =
+  | "top_left"
+  | "top_center"
+  | "top_right"
+  | "center_left"
+  | "center"
+  | "center_right"
+  | "bottom_left"
+  | "bottom_center"
+  | "bottom_right";
+
+export interface IslandPlacement {
+  monitor: string | null;
+  anchor: IslandAnchor;
+  offsetX: number;
+  offsetY: number;
+  keepInWorkArea: boolean;
+  autoFlipExpanded: boolean;
+}
+
+export interface IslandSettings {
+  enabled: boolean;
+  placement: IslandPlacement;
+  cards: IslandCardConfig[];
+  defaultCard: IslandCardId;
+  showDots: boolean;
+  hideOnFocusLoss: boolean;
+  skipDisabled: boolean;
+  returnToSearch: boolean;
+}
+
+export interface LauncherSettings {
+  primaryMode: LauncherMode;
+  island: IslandSettings;
+}
+
+export interface ClipboardSettings {
+  captureText: boolean;
+  captureImages: boolean;
+  retentionDays: number;
+  maxItems: number;
+  pause: boolean;
+  excludeApps: string[];
+  clearOnExit: boolean;
+}
+
+export interface MonitorInfo {
+  id: string;
+  name: string;
+  primary: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  workX: number;
+  workY: number;
+  workWidth: number;
+  workHeight: number;
+  scaleFactor: number;
+}
+
+export interface PreviewField {
+  label: string;
+  value: string;
+}
+
+export interface PreviewRange {
+  start: number;
+  end: number;
+}
+
+export interface PreviewPayload {
+  resultId: string;
+  title: string;
+  subtitle: string;
+  format: string;
+  text: string | null;
+  snippet: string | null;
+  highlightRanges: PreviewRange[];
+  imageDataUrl: string | null;
+  ocrText: string | null;
+  fields: PreviewField[];
+  unsupportedReason: string | null;
+}
+
 export interface Settings {
   schemaVersion: number;
   userName?: string | null;
@@ -255,6 +357,8 @@ export interface Settings {
   privacy: PrivacySettings;
   agent: AgentSettings;
   semantic: SemanticSettings;
+  launcher: LauncherSettings;
+  clipboard: ClipboardSettings;
   webSearchEnabled: boolean;
   webSearchEngine: WebSearchEngine;
   onboardingComplete: boolean;
@@ -273,6 +377,8 @@ export interface SettingsPatch {
   privacy?: PrivacySettings;
   agent?: AgentSettings;
   semantic?: SemanticSettings;
+  launcher?: LauncherSettings;
+  clipboard?: ClipboardSettings;
   webSearchEnabled?: boolean;
   webSearchEngine?: WebSearchEngine;
   resultLimit?: number;

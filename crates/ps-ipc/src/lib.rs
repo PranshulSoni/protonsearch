@@ -632,6 +632,272 @@ pub struct SemanticSettings {
     pub model: Option<String>,
 }
 
+// ---------------------------------------------------------------------------
+// v10 launcher / Dynamic Island configuration
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LauncherMode {
+    #[default]
+    Normal,
+    DynamicIsland,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum IslandCardId {
+    #[default]
+    Search,
+    Media,
+    Clipboard,
+    Agent,
+    Controls,
+    Browser,
+    Git,
+    Bell,
+}
+
+impl IslandCardId {
+    pub fn label(self) -> &'static str {
+        match self {
+            IslandCardId::Search => "Search",
+            IslandCardId::Media => "Media",
+            IslandCardId::Clipboard => "Clipboard",
+            IslandCardId::Agent => "Agents",
+            IslandCardId::Controls => "Quick Settings",
+            IslandCardId::Browser => "Browser",
+            IslandCardId::Git => "Git",
+            IslandCardId::Bell => "Notifications",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandCardConfig {
+    pub id: IslandCardId,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum IslandAnchor {
+    TopLeft,
+    #[default]
+    TopCenter,
+    TopRight,
+    CenterLeft,
+    Center,
+    CenterRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandPlacement {
+    #[serde(default)]
+    pub monitor: Option<String>,
+    #[serde(default)]
+    pub anchor: IslandAnchor,
+    #[serde(default = "default_island_offset_x")]
+    pub offset_x: i32,
+    #[serde(default = "default_island_offset_y")]
+    pub offset_y: i32,
+    #[serde(default = "default_true")]
+    pub keep_in_work_area: bool,
+    #[serde(default = "default_true")]
+    pub auto_flip_expanded: bool,
+}
+
+fn default_island_offset_x() -> i32 {
+    0
+}
+
+fn default_island_offset_y() -> i32 {
+    22
+}
+
+impl Default for IslandPlacement {
+    fn default() -> Self {
+        Self {
+            monitor: None,
+            anchor: IslandAnchor::TopCenter,
+            offset_x: default_island_offset_x(),
+            offset_y: default_island_offset_y(),
+            keep_in_work_area: true,
+            auto_flip_expanded: true,
+        }
+    }
+}
+
+fn default_island_cards() -> Vec<IslandCardConfig> {
+    [
+        IslandCardId::Search,
+        IslandCardId::Media,
+        IslandCardId::Clipboard,
+        IslandCardId::Agent,
+        IslandCardId::Controls,
+        IslandCardId::Browser,
+        IslandCardId::Git,
+        IslandCardId::Bell,
+    ]
+    .into_iter()
+    .map(|id| IslandCardConfig { id, enabled: true })
+    .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandSettings {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub placement: IslandPlacement,
+    #[serde(default = "default_island_cards")]
+    pub cards: Vec<IslandCardConfig>,
+    #[serde(default)]
+    pub default_card: IslandCardId,
+    #[serde(default = "default_true")]
+    pub show_dots: bool,
+    #[serde(default = "default_true")]
+    pub hide_on_focus_loss: bool,
+    #[serde(default = "default_true")]
+    pub skip_disabled: bool,
+    #[serde(default = "default_true")]
+    pub return_to_search: bool,
+}
+
+impl Default for IslandSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            placement: IslandPlacement::default(),
+            cards: default_island_cards(),
+            default_card: IslandCardId::Search,
+            show_dots: true,
+            hide_on_focus_loss: true,
+            skip_disabled: true,
+            return_to_search: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LauncherSettings {
+    #[serde(default)]
+    pub primary_mode: LauncherMode,
+    #[serde(default)]
+    pub island: IslandSettings,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipboardSettings {
+    #[serde(default = "default_true")]
+    pub capture_text: bool,
+    #[serde(default = "default_true")]
+    pub capture_images: bool,
+    #[serde(default = "default_clipboard_retention_days")]
+    pub retention_days: u32,
+    #[serde(default = "default_clipboard_max_items")]
+    pub max_items: u32,
+    #[serde(default)]
+    pub pause: bool,
+    #[serde(default)]
+    pub exclude_apps: Vec<String>,
+    #[serde(default)]
+    pub clear_on_exit: bool,
+}
+
+fn default_clipboard_retention_days() -> u32 {
+    30
+}
+
+fn default_clipboard_max_items() -> u32 {
+    500
+}
+
+impl Default for ClipboardSettings {
+    fn default() -> Self {
+        Self {
+            capture_text: true,
+            capture_images: true,
+            retention_days: default_clipboard_retention_days(),
+            max_items: default_clipboard_max_items(),
+            pause: false,
+            exclude_apps: Vec::new(),
+            clear_on_exit: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonitorInfo {
+    pub id: String,
+    pub name: String,
+    pub primary: bool,
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub work_x: i32,
+    pub work_y: i32,
+    pub work_width: u32,
+    pub work_height: u32,
+    pub scale_factor: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewRequest {
+    pub result_id: String,
+    #[serde(default)]
+    pub max_chars: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewField {
+    pub label: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewPayload {
+    pub result_id: String,
+    pub title: String,
+    pub subtitle: String,
+    pub format: String,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub snippet: Option<String>,
+    #[serde(default)]
+    pub highlight_ranges: Vec<PreviewRange>,
+    #[serde(default)]
+    pub image_data_url: Option<String>,
+    #[serde(default)]
+    pub ocr_text: Option<String>,
+    #[serde(default)]
+    pub fields: Vec<PreviewField>,
+    #[serde(default)]
+    pub unsupported_reason: Option<String>,
+}
+
 /// Persisted user settings (v2). Stored as JSON in %APPDATA%/protonsearch/v2/settings.json.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -648,6 +914,10 @@ pub struct Settings {
     pub privacy: PrivacySettings,
     pub agent: AgentSettings,
     pub semantic: SemanticSettings,
+    #[serde(default)]
+    pub launcher: LauncherSettings,
+    #[serde(default)]
+    pub clipboard: ClipboardSettings,
     /// "Search the web for ..." offer in the launcher (default on).
     #[serde(default = "default_true")]
     pub web_search_enabled: bool,
@@ -679,6 +949,8 @@ impl Default for Settings {
             privacy: PrivacySettings::default(),
             agent: AgentSettings::default(),
             semantic: SemanticSettings::default(),
+            launcher: LauncherSettings::default(),
+            clipboard: ClipboardSettings::default(),
             web_search_enabled: true,
             web_search_engine: WebSearchEngine::default(),
             onboarding_complete: false,
@@ -712,6 +984,10 @@ pub struct SettingsPatch {
     pub agent: Option<AgentSettings>,
     #[serde(default)]
     pub semantic: Option<SemanticSettings>,
+    #[serde(default)]
+    pub launcher: Option<LauncherSettings>,
+    #[serde(default)]
+    pub clipboard: Option<ClipboardSettings>,
     #[serde(default)]
     pub web_search_enabled: Option<bool>,
     #[serde(default)]
@@ -753,6 +1029,12 @@ impl Settings {
         }
         if let Some(v) = &patch.semantic {
             self.semantic = v.clone();
+        }
+        if let Some(v) = &patch.launcher {
+            self.launcher = v.clone();
+        }
+        if let Some(v) = &patch.clipboard {
+            self.clipboard = v.clone();
         }
         if let Some(v) = patch.web_search_enabled {
             self.web_search_enabled = v;

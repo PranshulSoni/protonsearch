@@ -22,11 +22,12 @@ import type {
   SettingsPatch,
 } from "./bridge/types";
 import LauncherView from "./launcher/LauncherView";
+import IslandView from "./island/IslandView";
 import DesktopApp from "./app/DesktopApp";
 import OnboardingView from "./onboarding/OnboardingView";
 import { Logo } from "./components/Logo";
 
-export type ViewKind = "launcher" | "main";
+export type ViewKind = "launcher" | "main" | "island";
 
 export interface AppContextValue {
   view: ViewKind;
@@ -254,7 +255,7 @@ export default function App({ view }: { view: ViewKind }) {
   }
 
   if (!value) {
-    if (view === "launcher") return null;
+    if (view === "launcher" || view === "island") return null;
     return <BootScreen />;
   }
 
@@ -264,6 +265,8 @@ export default function App({ view }: { view: ViewKind }) {
     <AppContext.Provider value={value}>
       {view === "launcher" ? (
         <LauncherView />
+      ) : view === "island" ? (
+        <IslandView />
       ) : showOnboarding ? (
         <OnboardingView />
       ) : (

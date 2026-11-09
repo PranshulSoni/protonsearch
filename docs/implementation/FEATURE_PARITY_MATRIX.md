@@ -6,6 +6,8 @@ Status values: **LEGACY-WORKING** (verified by code + tests/DB), **LEGACY-PARTIA
 
 **v2 status snapshot:** verified 2026-11-09 against commit 3906836/5f7522a plus working tree. V2-DONE requires a code path plus test/measured evidence; V2-WIP means code landed but no E2E acceptance yet. Evidence index in Appendix B.
 
+**v10 phase note (2026-11-10):** the v10 handoff starts a new program phase (gates G0-G9). Rows 1-39 below describe the current v2 tree; Appendix C adds the v10-specific features and marks them honestly as NOT STARTED / PARTIAL / BROKEN where applicable. See docs/implementation/V10_GATE0_AUDIT.md and WORK_BREAKDOWN.md.
+
 | # | Capability | Legacy state (v1.1.1) | Legacy evidence (file:line) | v2 target | v2 status |
 |---|---|---|---|---|---|
 | 1 | Global hotkey launcher (Alt+Space) | **LEGACY-WORKING** (RegisterHotKey + validation; unit tests) | `hotkey.rs:92-113,314-399`; `main.rs:1439-1449,1829` | Preserved + configurable | V2-DONE |
@@ -25,7 +27,7 @@ Status values: **LEGACY-WORKING** (verified by code + tests/DB), **LEGACY-PARTIA
 | 15 | Quicklinks & snippets | **LEGACY-WORKING** (4 / 1 rows; keyword triggers) | `search.rs:776-820,10271-10301,10591-10649` | Preserved | V2-WIP |
 | 16 | Web search / Google Lens circle-to-search | **LEGACY-PARTIAL** — code exists, 0 tests; uploads screenshot to Google Lens via temp HTML | `circle_to_search.rs:410-448`; `main.rs:6537` | Preserved (explicit user action only; add egress consent) | PLANNED-V2 |
 | 17 | Window controls (snap/move/resize/virtual desktops via winvd) | **LEGACY-WORKING (code only, 0 tests)** | `launcher.rs:752-830`; snap catalog `search.rs:8450-8545` | Preserved subset with safe API | PLANNED-V2 |
-| 18 | AI agent runtime (legacy Hermes; Pi in v2) | **LEGACY-PARTIAL / UNVERIFIED end-to-end** — Hermes client + gateway code; external hermes binary present on host, but baseline DB has **no api_key row** | ai.rs:139-264,345-480,548-622,703-1070; settings_ui.rs:1093-1163; DB ai_settings §Gate-0 | **Hermes dropped; Pi coding-agent CLI is the v2 runtime** — read-only tools by default, writes/shell opt-in (hardened: MCP/extensions/skills/context off, minimal env, redacted output); write-enabled UI pending server-side consent (RR-02) | V2-WIP | docs/security/PI_AGENT_SECURITY.md (§7 re-review); crates/ps-agent/src/pi/**; docs/agent/PI_INTEGRATION.md |
+| 18 | AI agent runtime (legacy Hermes; Pi in v2) | **LEGACY-PARTIAL / UNVERIFIED end-to-end** - Hermes client + gateway code; external hermes binary present on host, but baseline DB has **no api_key row** | ai.rs:139-264,345-480,548-622,703-1070; settings_ui.rs:1093-1163; DB ai_settings Gate-0 | **Hermes dropped; Pi coding-agent CLI is the v2 runtime** - read-only tools by default, writes/shell opt-in (hardened: MCP/extensions/skills/context off, minimal env, redacted output); write-enabled UI pending server-side consent (RR-02) | V2-WIP |
 | 19 | Voice input | **NOT-PRESENT** — Cargo feature `Media_SpeechRecognition` enabled (`Cargo.toml:48`) but no implementation in `src/` | grep SpeechRecognizer|Media_Speech|voice → no matches in `protonsearch/src/*.rs` | Defer/cut unless evidence + real test | CUT (recommended) |
 | 20 | Notes (create/edit/search) | **LEGACY-PARTIAL** — code exists, `notes/` dir empty (0 notes) | `main.rs:13016-13068`; `search.rs:10650-10700` | Preserved | PLANNED-V2 |
 | 21 | Steam library games | **LEGACY-BROKEN/PARTIAL** — only 3 hardcoded `steamapps` paths; no `libraryfolders.vdf` parsing; 0 tests | `search.rs:10481-10545` | Preserved or CUT; if kept, parse `libraryfolders.vdf` | PLANNED-V2 |
@@ -116,3 +118,31 @@ repo-relative; line numbers move as agents edit, so file-level references are us
 **Status honesty notes:** V2-DONE means implemented and verified by code/tests/measured artifacts,
 not release-accepted (that is G7). V2-WIP rows have code in the tree but no E2E/acceptance
 evidence yet; treat them as in-progress in the progress ledger.
+
+## Appendix C — v10 program rows (snapshot 2026-11-10, tag pre-v10-handoff / HEAD 0e4c9ec)
+
+Status values: NOT STARTED = no implementation in tree; PARTIAL = some v2 code exists but v10
+behavior/acceptance absent; BROKEN = user-reported P0 (reproduction in progress); PLANNED = scheduled.
+This appendix does not replace rows 1-39; it records the v10-specific product contract.
+
+| ID | Capability | v10 requirement (master prompt) | Current status | Evidence / next step | Gate |
+|---|---|---|---|---|---|
+| 40 | Dynamic Island launcher mode | V9 visual/motion reference binding: hidden capsule, Alt+Space, compact Search, morphing cards, 8 dots, wheel/swipe, clipping fixes | NOT STARTED | no island code in tree; V9 extraction task-28; G5 | G5 |
+| 41 | Island Search card | real sources, typed filters, preview, keyboard results, no fake counts | NOT STARTED | shared search core exists; card UI absent | G5 |
+| 42 | Island Media card | real GSMTC session/metadata/artwork/transport/output device, honest capability | NOT STARTED | no media adapter/card; G7 | G5/G7 |
+| 43 | Island Clipboard card | real text/code/link/image/file rows/categories, thumbnails, pin/delete/copy | NOT STARTED (data sources partial; P0-2 blocks image rows) | ps-sources clipboard exists; card UI absent | G5 |
+| 44 | Island Agents card | real Pi task state/hierarchy/logs/controls, honest pause/cancel semantics | NOT STARTED (Pi backend hardened; Workflows UI partial) | crates/ps-agent Pi runtime; card absent | G5/G7 |
+| 45 | Island Quick Settings card | split Wi-Fi/Bluetooth toggles vs chevrons, airplane/energy/hotspot/cast/night light/brightness/volume, capability gates | NOT STARTED | no device adapters/card; G7 | G5/G7 |
+| 46 | Island Browser card | real bookmarks/history, source filtering, open actions | NOT STARTED (source adapters exist) | ps-sources browser; card absent | G5 |
+| 47 | Island Git card | real commits/repo info + navigation | NOT STARTED (source adapter exists) | ps-sources git; card absent | G5 |
+| 48 | Island Notifications card | local notifications + supported sources, dismiss/clear/read, 0/1/many | NOT STARTED | no notification service/card; G7 | G5/G7 |
+| 49 | Normal Launcher mode and filters | centered work-area window, visible All/Files/Folders/Apps, quick destinations, previews, keyboard-first | PARTIAL | v2 launcher exists; v10 filter row/quick destinations/acceptance absent; G4 | G4 |
+| 50 | Graphical island placement editor | monitor preview with work area/taskbar, draggable V9 ghost, anchor presets, X/Y offsets, apply/cancel/test/reset, safe recovery, all 8 card shapes, keyboard/a11y | NOT STARTED | v2 settings app only; settings concept HTML is reference; G6 | G6 |
+| 51 | Card manager | ordered 8-card list, enable/pin/default, move up/down/drag, live dots preview, reset/undo, persistence | NOT STARTED | settings concept HTML reference; G6 | G6 |
+| 52 | Clipboard image capture (P0-2) | real CF_DIB/CF_DIBV5/CF_BITMAP/PNG capture, thumbnails, persistence, re-paste, categories, privacy | BROKEN (user report; reproduction task-30 in progress) | code exists (ps-windows decode/ps-sources record) but user reports missing images; BUG_LEDGER | G2 |
+| 53 | Preview pipeline (P0-1) | real previews for TXT/code/MD/HTML/JSON/CSV/PDF/DOCX/image/OCR with matched highlight, fallbacks, cancellation, safety | BROKEN (user report; reproduction task-29 in progress) | v2 ResultPreview exists but production path reported broken; BUG_LEDGER | G2 |
+| 54 | Native media/output-device integration | real Windows media sessions, audio endpoint switching, honest capability states | NOT STARTED | no adapter; G7 | G7 |
+| 55 | Native device controls | Wi-Fi/Bluetooth/brightness/volume/airplane/energy/hotspot/cast/night light with capability probes | NOT STARTED | no adapter; G7 | G7 |
+| 56 | Launcher primary-mode onboarding | explicit first-run choice of Normal vs Island, switchable later without index rebuild | NOT STARTED | v2 onboarding exists without mode choice; G6 | G6 |
+| 57 | v10 performance acceptance | hotkey->visible p95 <=50 ms, input->first result p95 <=30 ms, 60/120 fps frame pacing measured | NOT MEASURED | plan in docs/performance/BENCHMARK_PLAN.md; baseline status in BENCHMARKS | G4/G5/G8 |
+| 58 | v10 release packaging | installer/update/migration/rollback/uninstall, signed if certificate available else explicit unsigned, recordings of 8 cards + placement editor | PARTIAL | v2 unsigned NSIS artifact exists; v10 acceptance not started | G9 |

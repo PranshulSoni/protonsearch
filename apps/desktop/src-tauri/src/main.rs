@@ -9,19 +9,25 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+mod monitors;
+
 use ps_agent::{AgentClient, AgentEvent, PiAgentClient, PiAgentConfig};
 use ps_core::{Engine, EngineConfig};
 use ps_ipc::{
     ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentRuntime, AgentState,
-    AgentStatus, EngineStatus, IndexCommand, NativeCommand, OnboardingInput, OnboardingState,
+    AgentStatus, EngineStatus, IndexCommand, LauncherMode, MonitorInfo, NativeCommand, OnboardingInput,
+    OnboardingState,
     OpenOutcome, SearchRequest, SearchResponse, Settings, SettingsPatch,
 };
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 const LAUNCHER_LABEL: &str = "launcher";
+const ISLAND_LABEL: &str = "island";
+const ISLAND_DEFAULT_WIDTH: f64 = 520.0;
+const ISLAND_DEFAULT_HEIGHT: f64 = 66.0;
 /// Incremented on every summon/dismiss; a pending safety-hide only runs when the
 /// generation is unchanged (design: re-summon must never be hidden mid-open).
 static LAUNCHER_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -128,6 +134,110 @@ fn toggle_launcher(app: &AppHandle) {
         } else {
             show_launcher_window(app);
         }
+    }
+}
+
+fn place_island(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
+    let settings = app.state::<AppState>().engine.settings();
+    let placement = settings.launcher.island.placement.clone();
+    let monitors = monitors::enumerate();
+    let monitor = monitors
+        .iter()
+        .find(|m| placement.monitor.as_deref() == Some(m.id.as_str()))
+        .or_else(|| monitors.iter().find(|m| m.primary))
+        .or_else(|| monitors.first());
+    let (mx, my, mw, mh, scale) = match monitor {
+        Some(m) => (
+            m.work_x as f64,
+            m.work_y as f64,
+            m.work_width as f64,
+            m.work_height as f64,
+            m.scale_factor,
+        ),
+        None => {
+            let cursor = app.cursor_position().unwrap_or(PhysicalPosition::new(0.0, 0.0));
+            (0.0, 0.0, cursor.x.max(1920.0), (cursor.y + 1080.0).max(1080.0), 1.0)
+        }
+    };
+    let pw = width * scale;
+    let ph = height * scale;
+    let (fx, fy) = match placement.anchor {
+        ps_ipc::IslandAnchor::TopLeft => (0.0, 0.0),
+        ps_ipc::IslandAnchor::TopCenter => (0.5, 0.0),
+        ps_ipc::IslandAnchor::TopRight => (1.0, 0.0),
+        ps_ipc::IslandAnchor::CenterLeft => (0.0, 0.5),
+        ps_ipc::IslandAnchor::Center => (0.5, 0.5),
+        ps_ipc::IslandAnchor::CenterRight => (1.0, 0.5),
+        ps_ipc::IslandAnchor::BottomLeft => (0.0, 1.0),
+        ps_ipc::IslandAnchor::BottomCenter => (0.5, 1.0),
+        ps_ipc::IslandAnchor::BottomRight => (1.0, 1.0),
+    };
+    let off_x = placement.offset_x as f64 * scale;
+    let off_y = placement.offset_y as f64 * scale;
+    let mut x = mx + ((mw - pw) * fx) + off_x;
+    let mut y = my + ((mh - ph) * fy) + off_y;
+    if placement.keep_in_work_area {
+        let min_x = mx + 8.0;
+        let max_x = (mx + mw - pw - 8.0).max(min_x);
+        let min_y = my + 8.0;
+        let max_y = (my + mh - ph - 8.0).max(min_y);
+        x = x.clamp(min_x, max_x);
+        y = y.clamp(min_y, max_y);
+    }
+    let _ = win.set_size(LogicalSize::new(width, height));
+    let _ = win.set_position(PhysicalPosition::new(x as i32, y as i32));
+}
+
+fn hide_island_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(ISLAND_LABEL) {
+        let _ = win.hide();
+        let _ = win.emit("island:hidden", ());
+    }
+}
+
+fn show_island_window(app: &AppHandle) {
+    let Some(win) = app.get_webview_window(ISLAND_LABEL) else {
+        return;
+    };
+    hide_launcher_window(app);
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let size = win
+        .inner_size()
+        .map(|s| (s.width as f64 / scale, s.height as f64 / scale))
+        .unwrap_or((ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT));
+    place_island(app, &win, size.0, size.1);
+    let _ = win.show();
+    let _ = win.set_focus();
+    let _ = win.emit("island:shown", ());
+}
+
+fn toggle_island(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(ISLAND_LABEL) {
+        let visible = win.is_visible().unwrap_or(false);
+        let focused = win.is_focused().unwrap_or(false);
+        if visible && focused {
+            // Frontend plays the exit animation then calls hide_island.
+            let _ = win.emit("island:dismiss", ());
+            let handle = win.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(320));
+                let _ = handle.hide();
+                let _ = handle.emit("island:hidden", ());
+            });
+        } else {
+            show_island_window(app);
+        }
+    }
+}
+
+fn toggle_primary_launcher(app: &AppHandle) {
+    let settings = app.state::<AppState>().engine.settings();
+    if settings.launcher.primary_mode == LauncherMode::DynamicIsland
+        && settings.launcher.island.enabled
+    {
+        toggle_island(app);
+    } else {
+        toggle_launcher(app);
     }
 }
 
@@ -297,6 +407,47 @@ fn create_windows(app: &AppHandle) -> tauri::Result<()> {
         });
     }
 
+    if app.get_webview_window(ISLAND_LABEL).is_none() {
+        let mut island_builder = WebviewWindowBuilder::new(
+            app,
+            ISLAND_LABEL,
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("ProtonSearch Island")
+        .inner_size(ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .visible(false)
+        .focused(false);
+        if let Some(args) = &cdp {
+            island_builder = island_builder.additional_browser_args(args);
+        }
+        if let Some(dir) = &webview_dir {
+            island_builder = island_builder.data_directory(dir.clone());
+        }
+        let island = island_builder.build()?;
+        let _ = island.set_icon(window_icon()?);
+        place_island(app, &island, ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT);
+        let app_for_focus = app.clone();
+        let island_for_focus = island.clone();
+        island.on_window_event(move |event| {
+            if let tauri::WindowEvent::Focused(false) = event {
+                let hide = app_for_focus
+                    .try_state::<AppState>()
+                    .map(|state| state.engine.settings().launcher.island.hide_on_focus_loss)
+                    .unwrap_or(true);
+                if hide {
+                    let _ = island_for_focus.hide();
+                    let _ = island_for_focus.emit("island:hidden", ());
+                }
+            }
+        });
+    }
+
     Ok(())
 }
 
@@ -356,9 +507,11 @@ fn get_settings(state: tauri::State<'_, AppState>) -> Settings {
 
 #[tauri::command]
 fn update_settings(
+    app: AppHandle,
     state: tauri::State<'_, AppState>,
     patch: SettingsPatch,
 ) -> Result<Settings, String> {
+    let previous = state.engine.settings();
     let settings = state
         .engine
         .update_settings(patch)
@@ -371,6 +524,21 @@ fn update_settings(
     // Settings may change roots/depth/pause; restarting is idempotent.
     if !settings.indexing.paused {
         std::sync::Arc::clone(&state.engine).spawn_background();
+    }
+    // Launcher mode / island placement changes take effect without a restart.
+    if previous.launcher != settings.launcher {
+        if let Some(win) = app.get_webview_window(ISLAND_LABEL) {
+            let scale = win.scale_factor().unwrap_or(1.0);
+            let size = win
+                .inner_size()
+                .map(|s| (s.width as f64 / scale, s.height as f64 / scale))
+                .unwrap_or((ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT));
+            place_island(&app, &win, size.0, size.1);
+        }
+        if settings.launcher.primary_mode != previous.launcher.primary_mode {
+            hide_launcher_window(&app);
+            hide_island_window(&app);
+        }
     }
     Ok(settings)
 }
@@ -847,6 +1015,34 @@ fn agent_stop(state: tauri::State<'_, AppState>) {
 }
 
 #[tauri::command]
+fn list_monitors() -> Vec<MonitorInfo> {
+    monitors::enumerate()
+}
+
+#[tauri::command]
+fn show_island(app: AppHandle) {
+    show_island_window(&app);
+}
+
+#[tauri::command]
+fn hide_island(app: AppHandle) {
+    hide_island_window(&app);
+}
+
+#[tauri::command]
+fn set_island_geometry(
+    app: AppHandle,
+    window: WebviewWindow,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let width = width.clamp(240.0, 900.0);
+    let height = height.clamp(40.0, 760.0);
+    place_island(&app, &window, width, height);
+    Ok(())
+}
+
+#[tauri::command]
 fn app_info() -> serde_json::Value {
     serde_json::json!({
         "name": "ProtonSearch",
@@ -867,7 +1063,7 @@ fn main() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
-                        toggle_launcher(app);
+                        toggle_primary_launcher(app);
                     }
                 })
                 .build(),
@@ -926,6 +1122,10 @@ fn main() {
             complete_onboarding,
             index_command,
             set_launcher_geometry,
+            list_monitors,
+            show_island,
+            hide_island,
+            set_island_geometry,
             hide_launcher,
             launcher_hidden,
             show_launcher,

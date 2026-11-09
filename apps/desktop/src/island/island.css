@@ -1,0 +1,46 @@
+html[data-window="island"],
+html[data-window="island"] body,
+html[data-window="island"] #root {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.island-host {
+  display: inline-flex;
+  padding: 0;
+  background: transparent;
+}
+
+/* Placeholder shell only; the V9 card surface replaces this. */
+.island-surface--placeholder {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 520px;
+  height: 66px;
+  padding: 0 18px;
+  border-radius: 34px;
+  background: #0d1012;
+  border: 1px solid #2e3538;
+  color: #f6f7f8;
+  box-sizing: border-box;
+}
+
+.island-brand {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
+  background: #143356;
+  color: #dbe9f6;
+  font-weight: 750;
+  font-size: 15px;
+}
+
+.island-placeholder-text {
+  color: #9ba3ae;
+  font-size: 14px;
+}

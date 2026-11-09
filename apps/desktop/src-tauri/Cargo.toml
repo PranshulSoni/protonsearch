@@ -23,3 +23,9 @@ ps-ipc = { path = "../../../crates/ps-ipc" }
 ps-core = { path = "../../../crates/ps-core" }
 ps-sources = { path = "../../../crates/ps-sources" }
 ps-agent = { path = "../../../crates/ps-agent" }
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_HiDpi",
+] }

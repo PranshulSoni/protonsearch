@@ -6,17 +6,18 @@ import { isTauriRuntime } from "./bridge/api";
 import "./styles/base.css";
 import "./styles/shell.css";
 
-export type ViewKind = "launcher" | "main";
+export type ViewKind = "launcher" | "main" | "island";
 
 function resolveView(): ViewKind {
   const param = new URLSearchParams(window.location.search).get("view");
-  if (param === "launcher" || param === "main") return param;
+  if (param === "launcher" || param === "main" || param === "island") return param;
   // In the real app the window label is authoritative.
   if (isTauriRuntime()) {
     try {
       const label = (window as unknown as { __TAURI_INTERNALS__?: { metadata?: { currentWindow?: { label?: string } } } })
         .__TAURI_INTERNALS__?.metadata?.currentWindow?.label;
       if (label === "launcher") return "launcher";
+      if (label === "island") return "island";
     } catch {
       /* fall through */
     }
