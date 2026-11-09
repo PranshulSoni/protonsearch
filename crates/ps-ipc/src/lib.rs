@@ -1235,6 +1235,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn legacy_settings_without_v10_fields_parse_with_defaults() {
+        let legacy = r#"{
+            "schemaVersion": 1,
+            "userName": null,
+            "hotkey": "Alt+Space",
+            "theme": "system",
+            "density": "comfortable",
+            "motion": "system",
+            "launchAtLogin": false,
+            "indexing": {"roots": [], "excludedPaths": [], "contentEnabled": false, "ocrEnabled": false, "respectPowerState": true, "paused": false},
+            "privacy": {"activityHistory": true, "clipboardHistory": false, "browserHistory": false, "gitIndexing": false, "telemetry": false},
+            "agent": {"enabled": false, "runtime": "pi", "piPath": null, "allowWrites": false, "workspace": null, "thinking": null, "provider": null, "model": null, "sidecarPath": null},
+            "semantic": {"enabled": false, "model": null},
+            "onboardingComplete": true,
+            "legacyMigrated": true,
+            "resultLimit": 30
+        }"#;
+        let settings: Settings = serde_json::from_str(legacy).unwrap();
+        assert_eq!(settings.launcher.primary_mode, LauncherMode::Normal);
+        assert!(settings.launcher.island.enabled);
+        assert_eq!(settings.launcher.island.cards.len(), 8);
+        assert_eq!(settings.launcher.island.default_card, IslandCardId::Search);
+        assert!(settings.clipboard.capture_images);
+        assert_eq!(settings.clipboard.retention_days, 30);
+    }
+
+    #[test]
     fn search_request_roundtrip_is_camel_case() {
         let req = SearchRequest::new(7, "quarterly report");
         let json = serde_json::to_string(&req).unwrap();

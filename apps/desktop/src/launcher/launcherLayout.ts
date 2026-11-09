@@ -88,6 +88,8 @@ export interface LauncherMetricsInput {
   previewOpen: boolean;
   /** The inline confirm bar is visible and consumes a row above the footer. */
   confirmOpen?: boolean;
+  /** Extra empty-state content (e.g. quick destinations grid) inside results. */
+  extraContentHeight?: number;
 
   workArea: WorkAreaSize;
 }
@@ -140,6 +142,7 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     filterStripHeight +
     RESULTS_PADDING +
     content +
+    Math.max(0, input.extraContentHeight ?? 0) +
     FOOTER_HEIGHT +
     confirmHeight +
     WINDOW_BORDER;

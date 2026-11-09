@@ -28,6 +28,9 @@ const LAUNCHER_LABEL: &str = "launcher";
 const ISLAND_LABEL: &str = "island";
 const ISLAND_DEFAULT_WIDTH: f64 = 520.0;
 const ISLAND_DEFAULT_HEIGHT: f64 = 66.0;
+/// Transparent room around the island surface so the V9 layered shadow is not
+/// clipped by native window edges (design G0-B gap: L0).
+const ISLAND_SHADOW_PAD: f64 = 96.0;
 /// Incremented on every summon/dismiss; a pending safety-hide only runs when the
 /// generation is unchanged (design: re-summon must never be hidden mid-open).
 static LAUNCHER_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -55,6 +58,8 @@ struct AppState {
     pi_agent: Mutex<Option<PiAgentClient>>,
     /// Cached agent discovery for the Workflows Agents section.
     agents: Mutex<Option<Vec<DetectedAgent>>>,
+    /// Persisted runtime-agnostic agent task history/state (Agents card).
+    agent_tasks: Arc<ps_agent::AgentTaskService>,
 }
 
 /// Position the frameless launcher near the top-center of the monitor under the
@@ -159,8 +164,13 @@ fn place_island(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
             (0.0, 0.0, cursor.x.max(1920.0), (cursor.y + 1080.0).max(1080.0), 1.0)
         }
     };
-    let pw = width * scale;
-    let ph = height * scale;
+    let pad = ISLAND_SHADOW_PAD;
+    // The surface keeps its V9 size; the native window adds transparent padding
+    // around it so the shadow renders instead of being cut at the window edge.
+    let surface_w = width;
+    let surface_h = height;
+    let pw = surface_w * scale;
+    let ph = surface_h * scale;
     let (fx, fy) = match placement.anchor {
         ps_ipc::IslandAnchor::TopLeft => (0.0, 0.0),
         ps_ipc::IslandAnchor::TopCenter => (0.5, 0.0),
@@ -174,18 +184,24 @@ fn place_island(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
     };
     let off_x = placement.offset_x as f64 * scale;
     let off_y = placement.offset_y as f64 * scale;
-    let mut x = mx + ((mw - pw) * fx) + off_x;
-    let mut y = my + ((mh - ph) * fy) + off_y;
+    let mut surface_x = mx + ((mw - pw) * fx) + off_x;
+    let mut surface_y = my + ((mh - ph) * fy) + off_y;
     if placement.keep_in_work_area {
         let min_x = mx + 8.0;
         let max_x = (mx + mw - pw - 8.0).max(min_x);
         let min_y = my + 8.0;
         let max_y = (my + mh - ph - 8.0).max(min_y);
-        x = x.clamp(min_x, max_x);
-        y = y.clamp(min_y, max_y);
+        surface_x = surface_x.clamp(min_x, max_x);
+        surface_y = surface_y.clamp(min_y, max_y);
     }
-    let _ = win.set_size(LogicalSize::new(width, height));
-    let _ = win.set_position(PhysicalPosition::new(x as i32, y as i32));
+    let pad_px = pad * scale;
+    let window_w = surface_w + pad * 2.0;
+    let window_h = surface_h + pad * 2.0;
+    let _ = win.set_size(LogicalSize::new(window_w, window_h));
+    let _ = win.set_position(PhysicalPosition::new(
+        (surface_x - pad_px) as i32,
+        (surface_y - pad_px) as i32,
+    ));
 }
 
 fn hide_island_window(app: &AppHandle) {
@@ -201,11 +217,19 @@ fn show_island_window(app: &AppHandle) {
     };
     hide_launcher_window(app);
     let scale = win.scale_factor().unwrap_or(1.0);
-    let size = win
+    let window_size = win
         .inner_size()
         .map(|s| (s.width as f64 / scale, s.height as f64 / scale))
-        .unwrap_or((ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT));
-    place_island(app, &win, size.0, size.1);
+        .unwrap_or((
+            ISLAND_DEFAULT_WIDTH + ISLAND_SHADOW_PAD * 2.0,
+            ISLAND_DEFAULT_HEIGHT + ISLAND_SHADOW_PAD * 2.0,
+        ));
+    place_island(
+        app,
+        &win,
+        (window_size.0 - ISLAND_SHADOW_PAD * 2.0).max(240.0),
+        (window_size.1 - ISLAND_SHADOW_PAD * 2.0).max(40.0),
+    );
     let _ = win.show();
     let _ = win.set_focus();
     let _ = win.emit("island:shown", ());
@@ -414,7 +438,10 @@ fn create_windows(app: &AppHandle) -> tauri::Result<()> {
             tauri::WebviewUrl::App("index.html".into()),
         )
         .title("ProtonSearch Island")
-        .inner_size(ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT)
+        .inner_size(
+            ISLAND_DEFAULT_WIDTH + ISLAND_SHADOW_PAD * 2.0,
+            ISLAND_DEFAULT_HEIGHT + ISLAND_SHADOW_PAD * 2.0,
+        )
         .decorations(false)
         .transparent(true)
         .shadow(false)
@@ -532,8 +559,16 @@ fn update_settings(
             let size = win
                 .inner_size()
                 .map(|s| (s.width as f64 / scale, s.height as f64 / scale))
-                .unwrap_or((ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT));
-            place_island(&app, &win, size.0, size.1);
+                .unwrap_or((
+                    ISLAND_DEFAULT_WIDTH + ISLAND_SHADOW_PAD * 2.0,
+                    ISLAND_DEFAULT_HEIGHT + ISLAND_SHADOW_PAD * 2.0,
+                ));
+            place_island(
+                &app,
+                &win,
+                (size.0 - ISLAND_SHADOW_PAD * 2.0).max(240.0),
+                (size.1 - ISLAND_SHADOW_PAD * 2.0).max(40.0),
+            );
         }
         if settings.launcher.primary_mode != previous.launcher.primary_mode {
             hide_launcher_window(&app);
@@ -631,6 +666,7 @@ fn show_main(app: AppHandle) {
 #[tauri::command]
 fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
     let _ = state.engine.index_command(IndexCommand::Shutdown);
+    let _ = state.agent_tasks.stop_all("app quit");
     if let Ok(mut slot) = state.pi_agent.lock() {
         if let Some(client) = slot.take() {
             client.shutdown();
@@ -924,10 +960,26 @@ fn agent_start(
         // a server-side per-run consent token exists; persisted settings can
         // never silently enable edits/shell.
         config.allow_writes = false;
+        let task = state
+            .agent_tasks
+            .begin_pi(
+                &request,
+                &config.pi,
+                settings.agent.model.clone(),
+                config.allow_writes,
+                None,
+            )
+            .map_err(|_| "The workflow could not be recorded.".to_string())?;
+        // The canonical task id becomes the runtime run id so events map 1:1.
+        let mut run_request = request.clone();
+        run_request.run_id = task.id.clone();
         let mut slot = state.pi_agent.lock().map_err(|e| e.to_string())?;
         if slot.is_none() {
             let handle = app.clone();
+            let tasks = Arc::clone(&state.agent_tasks);
+            let task_id = task.id.clone();
             let client = PiAgentClient::spawn(config, move |event: &AgentEvent| {
+                let _ = tasks.apply_event(&task_id, event);
                 let _ = handle.emit("agent:event", event);
             })
             .map_err(|_| "The Pi CLI agent could not be started.".to_string())?;
@@ -936,7 +988,7 @@ fn agent_start(
         return slot
             .as_ref()
             .ok_or_else(|| "The Pi CLI agent is unavailable.".to_string())?
-            .send_run(&request)
+            .send_run(&run_request)
             .map_err(|err| match err {
                 ps_agent::AgentError::Busy => "A workflow is already running.".to_string(),
                 _ => "The Pi workflow could not be started.".to_string(),
@@ -967,6 +1019,11 @@ fn agent_start(
 #[tauri::command]
 fn agent_cancel(state: tauri::State<'_, AppState>, run_id: Option<String>) -> Result<(), String> {
     if state.engine.settings().agent.runtime == AgentRuntime::Pi {
+        for task in state.agent_tasks.tasks(10) {
+            if !task.state.is_terminal() {
+                let _ = state.agent_tasks.cancel(&task.id, "user cancelled");
+            }
+        }
         let slot = state.pi_agent.lock().map_err(|e| e.to_string())?;
         return match slot.as_ref() {
             Some(client) => client
@@ -1012,6 +1069,65 @@ fn agent_stop(state: tauri::State<'_, AppState>) {
             client.shutdown();
         }
     }
+}
+
+#[tauri::command]
+fn agent_tasks(
+    state: tauri::State<'_, AppState>,
+    limit: Option<usize>,
+) -> Vec<ps_agent::AgentTask> {
+    state.agent_tasks.tasks(limit.unwrap_or(50).min(200))
+}
+
+#[tauri::command]
+fn agent_task_tree(
+    state: tauri::State<'_, AppState>,
+    limit: Option<usize>,
+) -> Vec<ps_agent::AgentTaskNode> {
+    state.agent_tasks.tree(limit.unwrap_or(50).min(200))
+}
+
+#[tauri::command]
+fn agent_task(
+    state: tauri::State<'_, AppState>,
+    task_id: String,
+) -> Option<ps_agent::AgentTask> {
+    state.agent_tasks.task(&task_id)
+}
+
+#[tauri::command]
+fn agent_permissions(
+    state: tauri::State<'_, AppState>,
+    task_id: String,
+) -> Option<ps_agent::AgentPermissionState> {
+    state.agent_tasks.permissions(&task_id)
+}
+
+#[tauri::command]
+fn agent_stop_all(state: tauri::State<'_, AppState>) -> Vec<ps_agent::AgentTask> {
+    let tasks = state.agent_tasks.stop_all("user stopped all");
+    if let Ok(mut slot) = state.pi_agent.lock() {
+        if let Some(client) = slot.take() {
+            client.shutdown();
+        }
+    }
+    tasks
+}
+
+#[tauri::command]
+fn agent_pause(state: tauri::State<'_, AppState>, task_id: String) -> Result<(), String> {
+    state
+        .agent_tasks
+        .pause(&task_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn agent_resume(state: tauri::State<'_, AppState>, task_id: String) -> Result<(), String> {
+    state
+        .agent_tasks
+        .resume(&task_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1079,12 +1195,21 @@ fn main() {
             let data_dir = ps_core::paths::v2_data_dir();
             let config = engine_config(data_dir.clone());
             let engine = Arc::new(Engine::open(config).map_err(|e| format!("engine init: {e}"))?);
+            let agent_task_app = app.handle().clone();
+            let agent_tasks = Arc::new(
+                ps_agent::AgentTaskService::open(&data_dir, Vec::new())
+                    .map_err(|e| format!("agent task store: {e}"))?
+                    .with_listener(Arc::new(move |task: &ps_agent::AgentTask| {
+                        let _ = agent_task_app.emit("agent:task", task);
+                    })),
+            );
             app.manage(AppState {
                 engine: engine.clone(),
                 data_dir,
                 agent: Mutex::new(None),
                 pi_agent: Mutex::new(None),
                 agents: Mutex::new(None),
+                agent_tasks,
             });
 
             step("windows: creating");
@@ -1134,6 +1259,13 @@ fn main() {
             set_hotkey,
             agent_status,
             detect_agents,
+            agent_tasks,
+            agent_task_tree,
+            agent_task,
+            agent_permissions,
+            agent_stop_all,
+            agent_pause,
+            agent_resume,
             agent_start,
             agent_cancel,
             agent_approve,

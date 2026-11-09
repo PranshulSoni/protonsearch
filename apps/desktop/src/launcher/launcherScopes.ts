@@ -14,14 +14,13 @@ export interface ScopeChip {
   shortcut: string;
 }
 
+// v10 normal launcher: only four visible filters (PROTONSEARCH_V2_FINAL_MASTER
+// §5). Every other source stays reachable through prefixes/quick destinations.
 const BASE_SCOPES: Array<{ id: string; label: string; scope: SearchScope }> = [
   { id: "all", label: "ALL", scope: "all" },
   { id: "files", label: "FILES", scope: "files" },
   { id: "folders", label: "FOLDERS", scope: "folders" },
   { id: "apps", label: "APPS", scope: "apps" },
-  { id: "clipboard", label: "CLIPBOARD", scope: "clipboard" },
-  { id: "browser", label: "WEB", scope: "browser" },
-  { id: "actions", label: "ACTIONS", scope: "actions" },
 ];
 
 export const SCOPE_CHIPS: readonly ScopeChip[] = BASE_SCOPES.map((chip, index) => ({
@@ -67,6 +66,48 @@ export function stripScopePrefix(query: string): string {
     }
   }
   return query;
+}
+
+/**
+ * Effective scope for rendering/guarding when the user typed a scope prefix.
+ * The visible chip does not move (v10 normal launcher); the prefix is the only
+ * indicator for the additional sources.
+ */
+export function prefixScope(query: string): SearchScope | null {
+  const trimmed = query.replace(/^\s+/, "");
+  const lower = trimmed.toLowerCase();
+  for (const { prefix, scope } of PREFIXES) {
+    if (lower.startsWith(prefix)) return scope;
+  }
+  return null;
+}
+
+/** Footer/empty-state syntax examples kept in sync with the engine prefixes. */
+export const PREFIX_EXAMPLES = [
+  "bookmarks:",
+  "history:",
+  "clipboard:",
+  "git:",
+  "ocr:",
+] as const;
+
+const SCOPE_LABELS: Readonly<Record<string, string>> = {
+  all: "ALL",
+  files: "FILES",
+  folders: "FOLDERS",
+  apps: "APPS",
+  clipboard: "CLIPBOARD",
+  browser: "WEB",
+  git: "GIT",
+  actions: "ACTIONS",
+  commands: "COMMANDS",
+  content: "DOCUMENTS",
+  settings: "SETTINGS",
+  agent: "AGENTS",
+};
+
+export function scopeLabel(scope: SearchScope): string {
+  return SCOPE_LABELS[scope] ?? "ALL";
 }
 
 export function scopeIndex(scope: SearchScope): number {

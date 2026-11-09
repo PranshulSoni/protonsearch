@@ -37,6 +37,8 @@ use ps_ipc::AgentSettings;
 
 use crate::error::AgentError;
 
+pub(crate) use redact::redact_text;
+
 pub use args::{
     build_pi_run_args, pi_safety_preamble, pi_tool_allowlist, PiRunArgsSpec, READ_ONLY_TOOLS,
     THINKING_LEVELS, WRITE_TOOLS,

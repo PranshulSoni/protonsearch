@@ -141,6 +141,109 @@ html[data-window="launcher"] body #root {
   outline-offset: var(--ps-focus-offset);
 }
 
+/* Empty-state quick destinations (v10 Normal Launcher §5). */
+.quick-heading {
+  padding: 4px 14px 8px;
+  font-size: var(--ps-text-micro);
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ps-ink-3);
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.quick-destination {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-height: 54px;
+  padding: 9px 12px;
+  border: 1px solid var(--ps-line);
+  border-radius: var(--ps-radius-segment);
+  background: var(--ps-surface-raised);
+  color: var(--ps-ink);
+  text-align: left;
+  transition:
+    background-color var(--ps-dur-base) var(--ps-ease-standard),
+    border-color var(--ps-dur-base) var(--ps-ease-standard);
+}
+
+.quick-destination:hover {
+  background: var(--hover);
+}
+
+.quick-destination[aria-selected="true"] {
+  background: var(--ps-accent-soft);
+  border-color: var(--ps-accent-border);
+}
+
+.quick-destination-label {
+  font-size: var(--ps-text-base);
+  font-weight: var(--ps-fw-strong);
+}
+
+.quick-destination-subtitle {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ps-text-micro);
+  color: var(--ps-ink-2);
+}
+
+.quick-destination--off .quick-destination-subtitle {
+  color: var(--ps-ink-3);
+}
+
+.quick-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 0;
+}
+
+.quick-secondary .quick-destination {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 5px 9px;
+  border-radius: var(--ps-radius-control);
+  background: transparent;
+}
+
+.quick-secondary .quick-destination-subtitle {
+  font-size: var(--ps-text-micro);
+}
+
+.quick-syntax {
+  margin: 8px 14px 0;
+  font-size: var(--ps-text-micro);
+  color: var(--ps-ink-3);
+  line-height: 1.4;
+}
+
+@media (max-width: 700px) {
+  .quick-grid {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 8px;
+  }
+
+  .quick-heading,
+  .quick-secondary,
+  .quick-syntax {
+    margin-inline: 8px;
+    padding-inline: 0;
+  }
+}
+
 .launcher-body {
   display: flex;
   min-height: 0;

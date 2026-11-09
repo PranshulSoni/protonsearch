@@ -7,9 +7,10 @@ html[data-window="island"] #root {
   overflow: hidden;
 }
 
+/* Matches ISLAND_SHADOW_PAD in apps/desktop/src-tauri/src/main.rs. */
 .island-host {
   display: inline-flex;
-  padding: 0;
+  padding: 96px;
   background: transparent;
 }
 

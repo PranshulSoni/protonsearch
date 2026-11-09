@@ -326,3 +326,66 @@ chip-row draft (user rejected "filters on filters"); SCREENS §2.11/§2.12 are w
 - Remaining risk: real-engine screenshot of strict FILES/FOLDERS and grouped clipboard awaits task-19/24 builds;
   the UI guard and sectioning are engine-agnostic. `--ps-strip-*` tokens are still local fallbacks until L0 promotes
   them to tokens.css.
+
+---
+
+# Addendum — task-32 Normal Launcher v2 (v10 program)
+
+**Date:** 2026-11-10. **Spec:** PROTONSEARCH_V2_FINAL_MASTER_IMPLEMENTATION_PROMPT §5 + existing SCREENS §2
+(frozen until design-spec's Normal Launcher micro-spec lands). **Scope:** apps/desktop/src/launcher/**.
+
+## C1. Visible filters — All / Files / Folders / Apps only
+
+- The normal launcher top row is now exactly **ALL · FILES · FOLDERS · APPS**; CLIPBOARD/WEB/ACTIONS/GIT chips are
+  gone and no second tab row exists. Ctrl+1..4 select them from the input (focus stays); Ctrl+5..9 are unbound.
+- Removing a chip never removes a source: every other source is reachable through the engine's query prefixes
+  (bookmarks:, history:, clipboard:, git:/commits:/todos:, content:/ocr:, calc:/command:, …). A typed prefix does
+  **not** move the strip (the prefix text is the only indicator); choosing a chip strips a leading prefix. Prefixes
+  are documented in the empty-state syntax line.
+- Effective source handling: the leading prefix drives rendering/guard. The strict FILES/FOLDERS client guard remains
+  as alpha debt until engine task-19's fallback is no longer needed; clipboard results reached via clipboard: still
+  render as the v10 grouped sections.
+
+## C2. Empty state — real quick destinations
+
+- When the query is empty and there are truly zero results, the launcher shows a quiet **QUICK DESTINATIONS** panel:
+  a 2×2 grid — **Browser Bookmarks · Browser History · Clipboard History · Agents** — plus a secondary row
+  **Git history · Agent History** and a one-line prefix syntax hint.
+- Only real data appears: item counts come from EngineStatus.sources (browser/clipboard/git), enabled/off state is
+  honest ("Off — enable in Preferences"), and Agents reads the real agent runtime state ("No agent configured" in the
+  current build). No fake counts, no invented agents/media/devices. If a source is off, activating its destination
+  opens ProtonSearch (Preferences) instead of pretending to search it.
+- Search destinations write their real engine prefix (bookmarks:, history:, clipboard:, git:) into the input; Agents
+  and Agent History open the desktop Workflows surface (showMain), which owns agent history. User-customisable recents
+  are not implemented in this slice (documented, not faked).
+- Keyboard/ARIA: input keeps focus; up/down wrap through the six destinations (the listbox is labelled "Quick
+  destinations"), Enter activates, aria-activedescendant tracks the highlighted option; tab order stays
+  input -> selected filter chip -> preview/footer. Empty-state panel height is reserved in the geometry
+  (extraContentHeight) so nothing clips or double-scrolls. Loading keeps the standard 3 skeleton rows.
+
+## C3. Preview seam (Gate 2 ready)
+
+- Preview rendering now consumes PreviewPayload from **launcher/previewClient.ts**. useLauncherPreview(result,
+  enabled) owns the request/selection plumbing (cancellation, stale protection, loading/unavailable states), and
+  setPreviewProvider() is the single wiring point for the Gate-2 preview IPC. The default provider exposes only what
+  SearchResult already carries (metadata + snippet/line); unsupported bodies keep the honest
+  "Preview not available — press Enter to open." copy. No placeholder preview text.
+- Preview panel keeps Ctrl+Space toggle, side panel >=1200 work width / bottom drawer below, Esc-closes-preview-first,
+  focusable scroll region and existing V2-04 confirmation plumbing.
+
+## C4. Evidence
+
+- npm run build exit 0; npm test -> **14 files / 211 tests passed**; launcher suite **80 tests** (four chips,
+  Ctrl+1..4, prefix-effective scope + strict FILES/FOLDERS guard, quick-destination labels/real counts/off states,
+  arrow-wrap + Enter activation, prefix-writing destinations, preview payload/provider cases, grouped clipboard
+  sections and all prior keyboard/selection/confirm/motion tests).
+- Screenshots (browser mock, real React build; 1180×800 and 860×640, light+dark):
+  screenshots/launcher-task32-1180-results-{light,dark}.png, ...-quick-..., ...-preview-... and the same trio at
+  launcher-task32-860-.... Empty-state captures use a capture-time fixture returning zero results for the empty query
+  so the quick-destination state is visible; counts/agent state are the mock bridge's real EngineStatus values.
+- Limitations/risks: (1) quick destinations only replace the empty state when the engine returns zero recents — if the
+  final Normal Launcher micro-spec wants destinations alongside recents, that is a follow-up composition change;
+  (2) agents/agent-history destinations deep-link to Workflows because the frozen bridge has no agent-history query;
+  (3) the Gate-2 preview IPC is not wired yet — the provider seam is in place.
+- **Dynamic Island:** ISLAND_V9_SPEC.md + reference manifest have landed; renderer work is next and deliberately not
+  started in this slice. Current island remains the 520×66 placeholder until that task is claimed.

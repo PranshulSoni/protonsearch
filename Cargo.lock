@@ -3064,6 +3064,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-global-shortcut",
  "tauri-plugin-single-instance",
+ "windows 0.58.0",
 ]
 
 [[package]]
@@ -3085,6 +3086,7 @@ dependencies = [
  "ps-content",
  "ps-index",
  "ps-ipc",
+ "ps-ocr",
  "rusqlite",
  "serde",
  "serde_json",

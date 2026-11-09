@@ -38,9 +38,19 @@ import {
   flattenClipboardSections,
   groupClipboardSections,
   guardScopeResults,
+  prefixScope,
   scopeIndex,
+  scopeLabel as scopeLabelText,
   stripScopePrefix,
 } from "./launcherScopes";
+import {
+  QUICK_DESTINATIONS_HEIGHT,
+  QUICK_DESTINATIONS_HEIGHT_COMPACT,
+  SEARCH_SYNTAX_HINT,
+  buildQuickDestinations,
+  quickDestinationDomId,
+} from "./launcherQuickDestinations";
+import { QuickDestinationOptions } from "./QuickDestinations";
 import { ResultIcon } from "./ResultIcon";
 import { ResultPreview } from "./ResultPreview";
 import { ResultActions, buildMenuActions, type MenuAction, type MenuModel } from "./ResultActions";
@@ -49,7 +59,6 @@ import {
   MAX_RENDERED_ROWS,
   PAGE_STEP,
   SEARCH_LIMIT,
-  buildFlatEntries,
   clampedIndex,
   commitSelection,
   computeLauncherMetrics,
@@ -308,6 +317,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const [announcement, setAnnouncement] = useState("");
     const [listScrollTop, setListScrollTop] = useState(0);
     const [scope, setScope] = useState<SearchScope>("all");
+    const [quickIndex, setQuickIndex] = useState(0);
     const [motionPhase, setMotionPhase] = useState<"closed" | "entering" | "visible" | "closing">(
       () => (isTauriRuntime() ? "closed" : "visible"),
     );
@@ -357,23 +367,27 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       () => (response ? response.results.slice(0, MAX_RENDERED_ROWS) : []),
       [response],
     );
+    // A typed prefix is the only indicator for the additional sources; the
+    // visible chip stays on the four filters (v10 Normal Launcher).
+    const prefixedScope = prefixScope(query);
+    const activeScope = prefixedScope ?? scope;
     // Strict FILES/FOLDERS guard until ps-core task-19 lands (alpha debt).
     const results = useMemo(
-      () => guardScopeResults(rawResults, scope),
-      [rawResults, scope],
+      () => guardScopeResults(rawResults, activeScope),
+      [rawResults, activeScope],
     );
     const groups = useMemo(
-      () => (scope === "clipboard" ? [] : groupResults(results)),
-      [results, scope],
+      () => (activeScope === "clipboard" ? [] : groupResults(results)),
+      [results, activeScope],
     );
     // CLIPBOARD results render as clean category sections (task-25); keyboard
     // order is the flattened visual order of those sections.
     const clipboardSections = useMemo(
-      () => (scope === "clipboard" ? groupClipboardSections(results) : []),
-      [results, scope],
+      () => (activeScope === "clipboard" ? groupClipboardSections(results) : []),
+      [results, activeScope],
     );
     const displaySections = useMemo(() => {
-      if (scope === "clipboard") {
+      if (activeScope === "clipboard") {
         return clipboardSections.map((section) => ({
           key: "clipboard:" + section.id,
           label: section.label,
@@ -389,7 +403,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         items: group.items.map((item) => item.result),
         subgroup: false,
       }));
-    }, [scope, clipboardSections, groups]);
+    }, [activeScope, clipboardSections, groups]);
     const orderedResults = useMemo(
       () => displaySections.flatMap((section) => section.items),
       [displaySections],
@@ -416,6 +430,15 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
 
     const selectedResult = activeIndex >= 0 ? orderedResults[activeIndex] : null;
 
+    const quickDestinations = useMemo(() => buildQuickDestinations(status), [status]);
+    const quickActive =
+      query.length === 0 &&
+      activeScope === "all" &&
+      results.length === 0 &&
+      (response?.total ?? 0) === 0 &&
+      quickDestinations.length > 0 &&
+      searchError === null &&
+      !(pending && response === null);
     const metrics = useMemo<LauncherMetrics>(
       () =>
         computeLauncherMetrics({
@@ -423,15 +446,61 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
           density,
           previewOpen,
           confirmOpen: pendingConfirmation !== null,
+          extraContentHeight: quickActive
+            ? density === "compact"
+              ? QUICK_DESTINATIONS_HEIGHT_COMPACT
+              : QUICK_DESTINATIONS_HEIGHT
+            : 0,
           workArea,
         }),
-      [groupRowCounts, density, previewOpen, pendingConfirmation, workArea],
+      [
+        groupRowCounts,
+        density,
+        previewOpen,
+        pendingConfirmation,
+        quickActive,
+        workArea,
+      ],
     );
 
-    const flatEntries = useMemo(
-      () => buildFlatEntries(groups, metrics.rowHeight, metrics.labelHeight),
-      [groups, metrics.rowHeight, metrics.labelHeight],
-    );
+    // Fixed-height display entries for scroll-into-view, including clipboard
+    // sections and empty-state quick destinations (no rows).
+    const flatEntries = useMemo(() => {
+      const entries: Array<{
+        type: "group" | "row";
+        key: string;
+        label?: string;
+        result?: SearchResult;
+        index?: number;
+        top: number;
+        height: number;
+      }> = [];
+      let top = 10;
+      let visualIndex = 0;
+      for (const section of displaySections) {
+        entries.push({
+          type: "group",
+          key: "group:" + section.key,
+          label: section.label,
+          top,
+          height: metrics.labelHeight,
+        });
+        top += metrics.labelHeight;
+        for (const item of section.items) {
+          entries.push({
+            type: "row",
+            key: "row:" + item.id,
+            result: item,
+            index: visualIndex,
+            top,
+            height: metrics.rowHeight,
+          });
+          visualIndex += 1;
+          top += metrics.rowHeight;
+        }
+      }
+      return { entries, contentHeight: top - 10 };
+    }, [displaySections, metrics.rowHeight, metrics.labelHeight]);
 
     const menuModel: MenuModel | null = useMemo(
       () => (selectedResult ? buildMenuActions(selectedResult) : null),
@@ -479,9 +548,10 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       const nextResults = next.results.slice(0, MAX_RENDERED_ROWS);
       // Selection is tracked against the visible rows; the committed guard keeps
       // the full engine set so a category change never invalidates the epoch.
-      const guarded = guardScopeResults(nextResults, scopeRef.current);
+      const orderedScope = prefixScope(next.query) ?? scopeRef.current;
+      const guarded = guardScopeResults(nextResults, orderedScope);
       const ordered =
-        scopeRef.current === "clipboard"
+        orderedScope === "clipboard"
           ? flattenClipboardSections(groupClipboardSections(guarded))
           : groupResults(guarded).flatMap((group) =>
               group.items.map((item) => item.result),
@@ -931,6 +1001,30 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       }
     }, [scope]);
 
+    useEffect(() => {
+      if (!quickActive) return;
+      setQuickIndex((current) =>
+        Math.min(current, Math.max(0, quickDestinations.length - 1)),
+      );
+    }, [quickActive, quickDestinations.length]);
+
+    const activateQuickDestination = useCallback(
+      (index: number) => {
+        const destination = quickDestinations[index];
+        if (!destination) return;
+        if (destination.action.type === "main") {
+          props.showMain();
+          dismiss();
+          return;
+        }
+        const prefix = destination.action.prefix;
+        setQuery(prefix);
+        focusInput();
+        void runSearch(prefix, scopeRef.current);
+      },
+      [dismiss, focusInput, props.showMain, quickDestinations, runSearch],
+    );
+
     const togglePreview = useCallback(() => {
       if (!selectionRef.current.resultId) return;
       const next = !previewOpenRef.current;
@@ -949,6 +1043,26 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
           if (index < SCOPE_CHIPS.length) {
             event.preventDefault();
             applyScope(SCOPE_CHIPS[index].scope, "input");
+            return;
+          }
+        }
+        if (quickActive) {
+          if (key === "ArrowDown") {
+            event.preventDefault();
+            setQuickIndex((current) => (current + 1) % quickDestinations.length);
+            return;
+          }
+          if (key === "ArrowUp") {
+            event.preventDefault();
+            setQuickIndex(
+              (current) =>
+                (current - 1 + quickDestinations.length) % quickDestinations.length,
+            );
+            return;
+          }
+          if (key === "Enter" && !event.ctrlKey && !event.shiftKey) {
+            event.preventDefault();
+            activateQuickDestination(quickIndex);
             return;
           }
         }
@@ -1032,12 +1146,16 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         }
       },
       [
+        activateQuickDestination,
         applyScope,
         copySelected,
         currentIndex,
         move,
         openActive,
         openMenu,
+        quickActive,
+        quickDestinations.length,
+        quickIndex,
         selectIndex,
         togglePreview,
       ],
@@ -1145,7 +1263,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     }, [menuOpen, activeIndex, flatEntries, listScrollTop, metrics]);
 
     const footerStatus = deriveFooterStatus(status, response, searchError);
-    const scopedGuardActive = scope === "files" || scope === "folders";
+    const scopedGuardActive = activeScope === "files" || activeScope === "folders";
     const countOverride = scopedGuardActive ? results.length : undefined;
     const liveCount = useThrottledLiveText(
       countTextFor(pending, response, searchError, query, countOverride),
@@ -1155,14 +1273,18 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const countText = countTextFor(pending, response, searchError, query, countOverride);
     const showSkeleton = pending && response === null && !searchError;
     const queryText = query.trim();
-    const scopeLabel = SCOPE_CHIPS.find((chip) => chip.scope === scope)?.label ?? "ALL";
+    const effectiveQueryText = stripScopePrefix(query).trim();
+    const activeScopeText = scopeLabelText(activeScope);
     let emptyStrong = "";
     let emptyHint = "";
-    if (scope === "clipboard") {
+    if (quickActive) {
+      emptyStrong = "";
+      emptyHint = "";
+    } else if (activeScope === "clipboard") {
       if (!clipboardHistoryEnabled) {
         emptyStrong = "Clipboard history is off.";
         emptyHint = "Turn it on in ProtonSearch → Preferences to keep copied text on this PC.";
-      } else if (queryText.length > 0) {
+      } else if (effectiveQueryText.length > 0) {
         emptyStrong = "No matches in Clipboard.";
         emptyHint = "Try different words, or press Esc to clear the filter.";
       } else {
@@ -1170,8 +1292,8 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         emptyHint =
           "Copied text and images will appear here from now on. Only copies made while ProtonSearch is running are captured.";
       }
-    } else if (scope !== "all") {
-      emptyStrong = "No matches in " + scopeLabel + ".";
+    } else if (activeScope !== "all") {
+      emptyStrong = "No matches in " + activeScopeText + ".";
       emptyHint = "Try another category, or press Esc to clear the filter.";
     } else if (queryText.length > 0) {
       emptyStrong = "No matches for “" + queryText + "”.";
@@ -1219,11 +1341,17 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
             }}
             placeholder="Search files, apps, and actions…"
             role="combobox"
-            aria-expanded={results.length > 0}
+            aria-expanded={results.length > 0 || quickActive}
             aria-controls={LISTBOX_ID}
             aria-autocomplete="list"
             aria-activedescendant={
-              activeIndex >= 0 ? optionDomId(orderedResults[activeIndex].id) : undefined
+              quickActive
+                ? quickDestinationDomId(
+                    quickDestinations[Math.min(quickIndex, quickDestinations.length - 1)].id,
+                  )
+                : activeIndex >= 0
+                  ? optionDomId(orderedResults[activeIndex].id)
+                  : undefined
             }
             aria-label="Search files, apps, and actions"
             autoComplete="off"
@@ -1278,13 +1406,26 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
 
         <div className="launcher-body">
           <div className="results" ref={listRef} onScroll={onListScroll}>
+            {quickActive ? (
+              <div className="quick-heading" role="presentation">
+                QUICK DESTINATIONS
+              </div>
+            ) : null}
             <div
               id={LISTBOX_ID}
               role="listbox"
-              aria-label="Results"
+              aria-label={quickActive ? "Quick destinations" : "Results"}
+              data-testid={quickActive ? "quick-destinations" : "results-listbox"}
               aria-busy={pending || undefined}
             >
-              {displaySections.map((section) => (
+              {quickActive ? (
+                <QuickDestinationOptions
+                  destinations={quickDestinations}
+                  selectedIndex={quickIndex}
+                  onSelect={setQuickIndex}
+                  onActivate={activateQuickDestination}
+                />
+              ) : displaySections.map((section) => (
                 <div
                   key={section.key}
                   className={"result-group" + (section.subgroup ? " result-subgroup" : "")}
@@ -1358,6 +1499,10 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
               ))}
             </div>
 
+            {quickActive ? (
+              <p className="quick-syntax">{SEARCH_SYNTAX_HINT}</p>
+            ) : null}
+
             {showSkeleton ? (
               <div className="launcher-skeleton" aria-hidden="true">
                 {[0, 1, 2].map((row) => (
@@ -1386,7 +1531,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
               </div>
             ) : null}
 
-            {!showSkeleton && !searchError && results.length === 0 ? (
+            {!showSkeleton && !searchError && results.length === 0 && !quickActive ? (
               <div className="launcher-state" role="status" data-testid="empty-state">
                 <strong>{emptyStrong}</strong>
                 <span>{emptyHint}</span>

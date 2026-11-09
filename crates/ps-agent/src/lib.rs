@@ -18,6 +18,7 @@ pub mod config;
 mod error;
 pub mod pi;
 mod protocol;
+pub mod task;
 
 pub use client::{AgentClient, EventCallback, MAX_RESTARTS, SHUTDOWN_GRACE};
 pub use config::{
@@ -32,6 +33,12 @@ pub use pi::{
     MAX_CAPTURE_BYTES, MIN_PI_VERSION,
 };
 pub use ps_ipc::{AgentApprovalResponse, AgentEvent, AgentRunRequest};
+pub use task::{
+    AgentPermissionState, AgentTask, AgentTaskActivity, AgentTaskControls, AgentTaskErrorInfo,
+    AgentTaskLaunch, AgentTaskListener, AgentTaskLogEntry, AgentTaskLogLevel, AgentTaskNode,
+    AgentTaskProgress, AgentTaskProgressKind, AgentTaskRestart, AgentTaskRuntime, AgentTaskService,
+    AgentTaskState, AgentTaskStore, MAX_LOG_ENTRIES, MAX_PERSISTED_TASKS,
+};
 
 /// Agent protocol version spoken by the sidecar (frozen ps-ipc version).
 pub const PROTOCOL_VERSION: u32 = ps_ipc::PROTOCOL_VERSION;

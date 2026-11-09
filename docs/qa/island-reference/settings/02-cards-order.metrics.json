@@ -1,0 +1,405 @@
+{
+  "label": "02-cards-order",
+  "viewport": {
+    "w": 1240,
+    "h": 980
+  },
+  "frame": {
+    "box": {
+      "x": 35,
+      "y": 0,
+      "w": 1170,
+      "h": 952.4
+    },
+    "style": {
+      "max-width": "1170px",
+      "border-radius": "15px",
+      "grid-template-columns": "218px 950px",
+      "min-height": "748px",
+      "box-shadow": "rgba(50, 70, 60, 0.075) 0px 22px 60px 0px",
+      "background-color": "rgb(251, 252, 249)",
+      "border-color": "rgb(209, 217, 210)"
+    }
+  },
+  "side": {
+    "box": {
+      "x": 36,
+      "y": 1,
+      "w": 218,
+      "h": 950.4
+    },
+    "style": {
+      "padding": "26px 13px",
+      "gap": "20px",
+      "background-color": "rgb(245, 246, 242)",
+      "border-right": "1px solid rgb(220, 226, 219)"
+    }
+  },
+  "main": {
+    "box": {
+      "x": 254,
+      "y": 1,
+      "w": 950,
+      "h": 950.4
+    },
+    "style": {
+      "padding": "31px 37px 25px",
+      "min-width": "0px"
+    }
+  },
+  "h1": {
+    "font-size": "31px",
+    "font-weight": "650",
+    "letter-spacing": "-1.86px",
+    "margin": "10px 0px 5px"
+  },
+  "lead": {
+    "font-size": "12px",
+    "line-height": "19.8px",
+    "color": "rgb(135, 146, 141)",
+    "margin": "0px 0px 26px"
+  },
+  "eyebrow": {
+    "font-size": "10px",
+    "font-weight": "800",
+    "letter-spacing": "1.1px",
+    "color": "rgb(140, 153, 147)"
+  },
+  "tabs": {
+    "padding": "12px 16px",
+    "font-size": "12px",
+    "font-weight": "690",
+    "border-bottom-color": "rgb(49, 95, 119)",
+    "color": "rgb(36, 79, 101)"
+  },
+  "monitorarea": {
+    "box": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "style": {
+      "padding": "22px",
+      "min-height": "296px",
+      "border-radius": "11px",
+      "background-color": "rgb(229, 234, 229)",
+      "border-color": "rgb(210, 220, 212)"
+    }
+  },
+  "screen": {
+    "box": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "style": {
+      "width": "min(100%, 524px)",
+      "aspect-ratio": "1.85 / 1",
+      "border": "7px solid rgb(51, 61, 63)",
+      "border-radius": "11px",
+      "box-shadow": "rgb(124, 135, 128) 0px 4px 0px 0px, rgba(36, 51, 38, 0.106) 0px 15px 23px 0px",
+      "background-color": "rgb(217, 224, 218)"
+    }
+  },
+  "ghost": {
+    "box": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "style": {
+      "width": "154px",
+      "height": "30px",
+      "border-radius": "40px",
+      "background-color": "rgb(23, 31, 35)",
+      "border-color": "rgb(60, 81, 87)",
+      "padding": "0px 10px",
+      "gap": "8px",
+      "box-shadow": "rgba(22, 38, 38, 0.28) 0px 9px 20px 0px"
+    }
+  },
+  "anchors": [
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": false,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(245, 247, 243)",
+        "border-color": "rgb(208, 217, 209)"
+      }
+    },
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": true,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(225, 234, 240)",
+        "border-color": "rgb(115, 147, 165)"
+      }
+    },
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": false,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(245, 247, 243)",
+        "border-color": "rgb(208, 217, 209)"
+      }
+    },
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": false,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(245, 247, 243)",
+        "border-color": "rgb(208, 217, 209)"
+      }
+    },
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": false,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(245, 247, 243)",
+        "border-color": "rgb(208, 217, 209)"
+      }
+    },
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": false,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(245, 247, 243)",
+        "border-color": "rgb(208, 217, 209)"
+      }
+    },
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": false,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(245, 247, 243)",
+        "border-color": "rgb(208, 217, 209)"
+      }
+    },
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": false,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(245, 247, 243)",
+        "border-color": "rgb(208, 217, 209)"
+      }
+    },
+    {
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "active": false,
+      "style": {
+        "height": "34px",
+        "border-radius": "7px",
+        "background-color": "rgb(245, 247, 243)",
+        "border-color": "rgb(208, 217, 209)"
+      }
+    }
+  ],
+  "fields": [
+    {
+      "tag": "SELECT",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "style": {
+        "width": "100%",
+        "padding": "10px 11px",
+        "font-size": "12px",
+        "border-radius": "7px",
+        "border-color": "rgb(212, 220, 213)"
+      }
+    },
+    {
+      "tag": "INPUT",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "style": {
+        "width": "100%",
+        "padding": "10px 11px",
+        "font-size": "12px",
+        "border-radius": "7px",
+        "border-color": "rgb(212, 220, 213)"
+      }
+    },
+    {
+      "tag": "INPUT",
+      "box": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "style": {
+        "width": "100%",
+        "padding": "10px 11px",
+        "font-size": "12px",
+        "border-radius": "7px",
+        "border-color": "rgb(212, 220, 213)"
+      }
+    }
+  ],
+  "sectionrow": {
+    "font-size": "13px",
+    "font-weight": "700"
+  },
+  "cardrow": {
+    "box": {
+      "x": 292,
+      "y": 299.4,
+      "w": 874,
+      "h": 50
+    },
+    "style": {
+      "min-height": "50px",
+      "padding": "8px 12px",
+      "gap": "10px",
+      "border-bottom": "1px solid rgb(236, 240, 235)"
+    }
+  },
+  "ctitle": {
+    "font-size": "12px",
+    "font-weight": "670"
+  },
+  "tag": {
+    "font-size": "9px",
+    "padding": "4px 7px",
+    "border-radius": "5px"
+  },
+  "miniisl": {
+    "box": {
+      "x": 305,
+      "y": 732.4,
+      "w": 848,
+      "h": 70
+    },
+    "style": {
+      "height": "70px",
+      "border-radius": "17px",
+      "background-color": "rgb(26, 34, 39)",
+      "border-color": "rgb(52, 70, 79)"
+    }
+  },
+  "dot": {
+    "width": "22px",
+    "height": "6px",
+    "border-radius": "5px",
+    "background-color": "rgb(61, 111, 132)"
+  },
+  "dotActive": {
+    "width": "22px",
+    "height": "6px",
+    "border-radius": "5px",
+    "background-color": "rgb(61, 111, 132)"
+  },
+  "buttons": [
+    {
+      "text": "Revert",
+      "style": {
+        "padding": "10px 14px",
+        "font-size": "11px",
+        "border-radius": "7px",
+        "background-color": "rgb(255, 255, 255)",
+        "border-color": "rgb(215, 222, 216)",
+        "color": "rgb(65, 90, 96)"
+      }
+    },
+    {
+      "text": "Test placement",
+      "style": {
+        "padding": "10px 14px",
+        "font-size": "11px",
+        "border-radius": "7px",
+        "background-color": "rgb(255, 255, 255)",
+        "border-color": "rgb(215, 222, 216)",
+        "color": "rgb(65, 90, 96)"
+      }
+    },
+    {
+      "text": "Apply changes",
+      "style": {
+        "padding": "10px 14px",
+        "font-size": "11px",
+        "border-radius": "7px",
+        "background-color": "rgb(37, 76, 98)",
+        "border-color": "rgb(37, 76, 98)",
+        "color": "rgb(255, 255, 255)"
+      }
+    }
+  ],
+  "cardlist": {
+    "x": 291,
+    "y": 298.4,
+    "w": 876,
+    "h": 402
+  }
+}

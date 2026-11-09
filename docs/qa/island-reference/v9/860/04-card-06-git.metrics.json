@@ -1,0 +1,158 @@
+{
+  "label": "04-card-06-git",
+  "extra": {},
+  "viewport": {
+    "w": 860,
+    "h": 700,
+    "dpr": 1
+  },
+  "island": {
+    "box": {
+      "x": 177.5,
+      "y": 79,
+      "w": 505,
+      "h": 330
+    },
+    "classes": "island",
+    "style": {
+      "width": "505px",
+      "height": "330px",
+      "border-radius": "34px",
+      "background-color": "rgb(13, 16, 18)",
+      "border-color": "rgb(46, 53, 56)",
+      "border-width": "1px",
+      "box-shadow": "rgba(20, 32, 40, 0.25) 0px 26px 54px 0px, rgba(27, 32, 32, 0.15) 0px 3px 8px 0px",
+      "top": "22px",
+      "left": "429px",
+      "transform": "matrix(1, 0, 0, 1, -252.5, 0)",
+      "transition": "width 0.55s cubic-bezier(0.22, 1, 0.36, 1), height 0.55s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.5s cubic-bezier(0.22, 1, 0.36, 1), transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s, visibility",
+      "opacity": "1",
+      "visibility": "visible"
+    }
+  },
+  "inner": {
+    "box": {
+      "x": 178.5,
+      "y": 80,
+      "w": 503,
+      "h": 297
+    },
+    "style": {
+      "height": "297px",
+      "overflow-y": "hidden",
+      "transform": "matrix(1, 0, 0, 1, 0, 0)",
+      "opacity": "1"
+    }
+  },
+  "dots": {
+    "count": 8,
+    "navBox": {
+      "x": 178.5,
+      "y": 377,
+      "w": 503,
+      "h": 31
+    },
+    "navStyle": {
+      "height": "31px",
+      "top": "297px",
+      "right": "0px",
+      "left": "0px",
+      "bottom": "0px",
+      "gap": "5px",
+      "background-color": "rgb(16, 20, 22)",
+      "border-top": "1px solid rgb(38, 44, 48)",
+      "position": "absolute"
+    },
+    "active": "Go to Git card",
+    "samples": [
+      {
+        "box": {
+          "x": 352.5,
+          "y": 378,
+          "w": 14,
+          "h": 30
+        },
+        "dot": {
+          "x": 357,
+          "y": 390.5,
+          "w": 5,
+          "h": 5
+        },
+        "dotStyle": {
+          "width": "5px",
+          "height": "5px",
+          "border-radius": "999px",
+          "background-color": "rgb(101, 113, 118)",
+          "transition": "background 0.2s, width 0.3s cubic-bezier(0.22, 1, 0.36, 1), transform 0.22s"
+        }
+      },
+      {
+        "box": {
+          "x": 371.5,
+          "y": 378,
+          "w": 14,
+          "h": 30
+        },
+        "dot": {
+          "x": 376,
+          "y": 390.5,
+          "w": 5,
+          "h": 5
+        },
+        "dotStyle": {
+          "width": "5px",
+          "height": "5px",
+          "border-radius": "999px",
+          "background-color": "rgb(101, 113, 118)",
+          "transition": "background 0.2s, width 0.3s cubic-bezier(0.22, 1, 0.36, 1), transform 0.22s"
+        }
+      }
+    ]
+  },
+  "fonts": {
+    "searchInput": null,
+    "cardH2": {
+      "font-size": "16px",
+      "font-weight": "700",
+      "letter-spacing": "-0.64px",
+      "line-height": "19.2px",
+      "color": "rgb(246, 247, 248)"
+    },
+    "cardP": {
+      "font-size": "11px",
+      "line-height": "15.95px",
+      "color": "rgb(155, 167, 174)"
+    },
+    "itemStrong": null,
+    "itemSmall": null,
+    "filter": null,
+    "resultFoot": null,
+    "inlineNav": null,
+    "clipTitle": null,
+    "clipSmall": null,
+    "snippet": null,
+    "chooseTitle": {
+      "font-size": "12px",
+      "font-weight": "570"
+    },
+    "chooseMeta": {
+      "font-size": "10px",
+      "color": "rgb(139, 154, 163)"
+    },
+    "settingTile": null,
+    "settingToggle": null,
+    "settingExpand": null,
+    "agentStatus": null,
+    "agentBtn": null,
+    "notificationTitle": null,
+    "notificationBody": null
+  },
+  "counts": {
+    "results": 0,
+    "filters": 0,
+    "clipRows": 0,
+    "agents": 0,
+    "settings": 0,
+    "notifications": 0
+  }
+}

@@ -24,6 +24,14 @@ pub enum AgentError {
     #[error("pi runtime error: {0}")]
     Pi(String),
 
+    /// A persisted agent task id does not exist (or its parent does not).
+    #[error("agent task not found: {0}")]
+    TaskNotFound(String),
+
+    /// The requested control is not supported by any current runtime.
+    #[error("unsupported agent control: {0}")]
+    Unsupported(String),
+
     /// A protocol frame would exceed the hard line bound.
     #[error("protocol frame is {actual} bytes; the limit is {limit} bytes")]
     LineTooLong { actual: usize, limit: usize },

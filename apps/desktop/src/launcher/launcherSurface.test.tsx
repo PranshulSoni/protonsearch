@@ -324,16 +324,16 @@ describe("LauncherSurface structure and grouping", () => {
     expect(harness.container.querySelectorAll('[role="option"]').length).toBe(6);
   });
 
-  it("shows the exact empty-input and 0-match copy", async () => {
+  it("shows quick destinations for empty input and the precise 0-match copy", async () => {
     const harness = setup();
     await resolveSearch(harness, 0, []);
-    // Empty query with no recents is a quiet placeholder, not "No matches".
+    // Empty query with no recents is the quick-destinations state.
     expect(harness.container.querySelector('[data-testid="launcher-count"]')?.textContent).toBe("");
-    const empty = harness.container.querySelector('[data-testid="empty-state"]');
-    expect(empty?.textContent).toContain("Start typing to search files, apps, and actions.");
-    expect(empty?.textContent).toContain(
-      "Try a file name, an app, or a command like “lock”.",
-    );
+    const quick = harness.container.querySelector('[data-testid="quick-destinations"]');
+    expect(quick).not.toBeNull();
+    expect(quick?.textContent).toContain("Browser Bookmarks");
+    expect(quick?.textContent).toContain("Clipboard History");
+    expect(quick?.textContent).toContain("Agents");
 
     setInputValue(harness, "zzz");
     await resolveSearch(harness, 1, []);
@@ -924,22 +924,19 @@ describe("category filter strip", () => {
       (element) => element.textContent === label,
     ) ?? null;
 
-  it("renders seven chips, defaults to All and sends scope on the initial search", async () => {
+  it("renders four chips, defaults to All and sends scope on the initial search", async () => {
     const harness = setup();
     await resolveSearch(harness, 0, THREE);
     const chips = [...harness.container.querySelectorAll('[data-testid="filter-chip"]')];
-    expect(chips.length).toBe(7);
+    expect(chips.length).toBe(4);
     expect(chips.map((element) => element.textContent)).toEqual([
       "ALL",
       "FILES",
       "FOLDERS",
       "APPS",
-      "CLIPBOARD",
-      "WEB",
-      "ACTIONS",
     ]);
     expect(chips[0].getAttribute("aria-checked")).toBe("true");
-    expect(chips[4].getAttribute("aria-keyshortcuts")).toBe("Control+5");
+    expect(chips[3].getAttribute("aria-keyshortcuts")).toBe("Control+4");
     expect(
       harness.container.querySelector('[role="radiogroup"][aria-label="Filter results"]'),
     ).not.toBeNull();
@@ -970,7 +967,7 @@ describe("category filter strip", () => {
     expect(chip(harness, "ALL")?.getAttribute("aria-checked")).toBe("false");
   });
 
-  it("supports Ctrl+1..7 from the input without moving focus", async () => {
+  it("supports Ctrl+1..4 from the input without moving focus", async () => {
     const harness = setup();
     await resolveSearch(harness, 0, THREE);
     const input = inputOf(harness);
@@ -981,16 +978,12 @@ describe("category filter strip", () => {
     await resolveSearch(harness, 1, THREE);
     expect(chip(harness, "APPS")?.getAttribute("aria-checked")).toBe("true");
 
+    // Ctrl+5 is unbound: no request and no text insertion.
     await press(input, "5", { ctrlKey: true });
-    expect(harness.pending[2].request.scope).toBe("clipboard");
-    await resolveSearch(harness, 2, THREE);
-
-    // Ctrl+8/9 no longer map to a removed chip.
-    await press(input, "8", { ctrlKey: true });
-    expect(harness.pending.length).toBe(3);
+    expect(harness.pending.length).toBe(2);
 
     await press(input, "1", { ctrlKey: true });
-    expect(harness.pending[3].request.scope).toBe("all");
+    expect(harness.pending[2].request.scope).toBe("all");
     expect(document.activeElement).toBe(input);
   });
 
@@ -1247,21 +1240,11 @@ describe("clipboard grouped sections", () => {
   const openClipboard = async (
     harness: Harness,
     rows: SearchResult[],
-    query = "",
+    query = "clipboard:",
   ): Promise<void> => {
     await resolveSearch(harness, 0, THREE);
-    if (query) {
-      setInputValue(harness, query);
-      await resolveSearch(harness, 1, THREE);
-    }
-    const clipboardChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
-      (element) => element.textContent === "CLIPBOARD",
-    );
-    await act(async () => {
-      clipboardChip?.click();
-      await Promise.resolve();
-    });
-    await resolveSearch(harness, harness.pending.length - 1, rows);
+    setInputValue(harness, query);
+    await resolveSearch(harness, 1, rows);
   };
   const sectionLabels = (harness: Harness): (string | null)[] =>
     [...harness.container.querySelectorAll('[data-testid="result-group"]')].map(
@@ -1333,7 +1316,7 @@ describe("clipboard grouped sections", () => {
 
   it("uses the query empty copy when a clipboard query has no matches", async () => {
     const harness = setup();
-    await openClipboard(harness, [], "zzz nothing");
+    await openClipboard(harness, [], "clipboard: zzz nothing");
     const empty = harness.container.querySelector('[data-testid="empty-state"]');
     expect(empty?.textContent).toContain("No matches in Clipboard.");
     expect(empty?.textContent).toContain("Try different words, or press Esc to clear the filter.");
@@ -1342,13 +1325,7 @@ describe("clipboard grouped sections", () => {
   it("explains clipboard history being off", async () => {
     const harness = setup({ clipboardHistoryEnabled: false });
     await resolveSearch(harness, 0, THREE);
-    const clipboardChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
-      (element) => element.textContent === "CLIPBOARD",
-    );
-    await act(async () => {
-      clipboardChip?.click();
-      await Promise.resolve();
-    });
+    setInputValue(harness, "clipboard:");
     await resolveSearch(harness, 1, []);
     const empty = harness.container.querySelector('[data-testid="empty-state"]');
     expect(empty?.textContent).toContain("Clipboard history is off.");
@@ -1410,5 +1387,86 @@ describe("scoped empty copy", () => {
     const empty = harness.container.querySelector('[data-testid="empty-state"]');
     expect(empty?.textContent).toContain("No matches in APPS.");
     expect(empty?.textContent).toContain("Try another category, or press Esc to clear the filter.");
+  });
+});
+
+describe("v10 quick destinations", () => {
+  const destination = (harness: Harness, id: string): HTMLButtonElement | null =>
+    harness.container.querySelector<HTMLButtonElement>(
+      '[data-testid="quick-destination"][data-destination-id="' + id + '"]',
+    );
+
+  it("shows real quick destinations in the empty state without fake counts", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, []);
+    const quick = harness.container.querySelector('[data-testid="quick-destinations"]');
+    expect(quick).not.toBeNull();
+    const labels = [...harness.container.querySelectorAll('[data-testid="quick-destination"]')].map(
+      (element) => element.querySelector(".quick-destination-label")?.textContent,
+    );
+    expect(labels).toEqual([
+      "Browser Bookmarks",
+      "Browser History",
+      "Clipboard History",
+      "Agents",
+      "Git history",
+      "Agent History",
+    ]);
+    // READY fixture has no sources -> honest off state, never a fabricated count.
+    expect(quick?.textContent).toContain("Off — enable in Preferences");
+    expect(harness.container.querySelector(".quick-syntax")?.textContent).toContain(
+      "bookmarks:",
+    );
+  });
+
+  it("navigates destinations with arrows and activates with Enter", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, []);
+    const input = inputOf(harness);
+    expect(input.getAttribute("aria-activedescendant")).toBe("ps-quick-bookmarks");
+    await press(input, "ArrowDown");
+    expect(input.getAttribute("aria-activedescendant")).toBe("ps-quick-history");
+    await press(input, "ArrowDown");
+    await press(input, "ArrowDown");
+    expect(input.getAttribute("aria-activedescendant")).toBe("ps-quick-agents");
+    await press(input, "Enter");
+    expect(harness.showMain).toHaveBeenCalled();
+  });
+
+  it("activates a search destination by writing its prefix", async () => {
+    const harness = setup({
+      status: {
+        ...READY,
+        sources: [
+          { id: "browser", label: "Browser", enabled: true, itemCount: 42, state: "ready" },
+        ],
+      },
+    });
+    await resolveSearch(harness, 0, []);
+    const history = destination(harness, "history");
+    await act(async () => {
+      history?.click();
+      await Promise.resolve();
+    });
+    expect(inputOf(harness).value).toBe("history:");
+    expect(harness.pending[1].request.query).toBe("history:");
+  });
+
+  it("shows real source counts from EngineStatus when available", async () => {
+    const harness = setup({
+      status: {
+        ...READY,
+        sources: [
+          { id: "browser", label: "Browser", enabled: true, itemCount: 4523, state: "ready" },
+          { id: "clipboard", label: "Clipboard", enabled: true, itemCount: 12, state: "ready" },
+          { id: "git", label: "Git", enabled: true, itemCount: 15, state: "ready" },
+        ],
+      },
+    });
+    await resolveSearch(harness, 0, []);
+    const quick = harness.container.querySelector('[data-testid="quick-destinations"]');
+    expect(quick?.textContent).toContain((4523).toLocaleString() + " items");
+    expect(quick?.textContent).toContain("12 items");
+    expect(quick?.textContent).toContain("15 items");
   });
 });

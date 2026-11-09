@@ -1,96 +1,49 @@
 import type { SearchResult } from "../bridge/types";
-import { formatBytes } from "../lib/format";
-import { formatFullDate, formatRecency } from "./launcherFormat";
 import { ResultIcon } from "./ResultIcon";
+import { useLauncherPreview, type PreviewBody } from "./previewClient";
 import type { MenuAction, MenuModel } from "./ResultActions";
 
 /**
- * On-demand preview pane (Ctrl+Space). Default off; no always-on preview.
- * Honest about what the frozen IPC contract can supply: snippet/line for
- * content + OCR matches, otherwise metadata only. Binding: SCREENS §2.6.
+ * On-demand preview pane (Ctrl+Space). Default off. Rendering consumes the
+ * PreviewPayload from previewClient — the Gate-2 preview IPC only replaces the
+ * provider there; this panel's request/selection plumbing stays unchanged.
  */
 
-const KIND_LABELS: Record<string, string> = {
-  application: "Application",
-  file: "File",
-  folder: "Folder",
-  document: "Document",
-  content_match: "Match in document",
-  ocr_text: "Match in screenshot text",
-  clipboard: "Clipboard",
-  browser_history: "Browser history",
-  bookmark: "Bookmark",
-  recent: "Recent item",
-  action: "Action",
-  command: "Command",
-  calculator: "Calculator",
-  quicklink: "Workflow",
-  snippet: "Snippet",
-  git_commit: "Git commit",
-  git_repository: "Git repository",
-  git_todo: "Git TODO",
-  setting: "Setting",
-  window: "Window",
-  agent: "Agent",
-  system: "System",
-};
-
-function kindLabel(result: SearchResult): string {
-  return KIND_LABELS[result.kind] ?? result.kind;
-}
-
-function previewBody(result: SearchResult) {
-  const meta = result.meta;
-  if (meta?.snippet) {
-    return (
-      <blockquote className="preview-snippet">
-        {meta.line != null ? <span className="preview-snippet-line">Line {meta.line}</span> : null}
-        <p>{meta.snippet}</p>
-      </blockquote>
-    );
-  }
-  switch (result.kind) {
-    case "clipboard":
+function Body({ body }: { body: PreviewBody }) {
+  switch (body.kind) {
     case "snippet":
       return (
+        <blockquote className="preview-snippet">
+          {body.line != null ? (
+            <span className="preview-snippet-line">Line {body.line}</span>
+          ) : null}
+          <p>{body.text}</p>
+        </blockquote>
+      );
+    case "text":
+      return (
         <div className="preview-text">
-          <span className="preview-label">Text</span>
-          <p>{result.title}</p>
+          <span className="preview-label">{body.label}</span>
+          <p>{body.text}</p>
         </div>
       );
-    case "browser_history":
-    case "bookmark":
+    case "url":
       return (
         <div className="preview-text">
           <span className="preview-label">URL</span>
-          <p className="preview-url">{result.path ?? result.subtitle}</p>
+          <p className="preview-url">{body.text}</p>
         </div>
       );
-    case "application":
-    case "action":
-    case "command":
-    case "calculator":
-    case "window":
-    case "setting":
-    case "agent":
+    case "summary":
       return (
         <div className="preview-text">
-          <span className="preview-label">{kindLabel(result)}</span>
-          <p>{result.subtitle || result.title}</p>
+          <span className="preview-label">{body.label}</span>
+          <p>{body.text}</p>
         </div>
       );
-    case "content_match":
-    case "ocr_text":
-    case "document":
-    case "file":
-    case "recent":
-    case "folder":
-    case "git_commit":
-    case "git_repository":
-    case "git_todo":
-      return <p className="preview-note">Preview not available — press Enter to open.</p>;
+    case "note":
     default:
-      return <p className="preview-note">No preview for this item.</p>;
+      return <p className="preview-note">{body.text}</p>;
   }
 }
 
@@ -101,6 +54,8 @@ export interface ResultPreviewProps {
 }
 
 export function ResultPreview({ result, model, onRun }: ResultPreviewProps) {
+  const preview = useLauncherPreview(result, result !== null);
+
   if (!result) {
     return (
       <aside className="preview" aria-label="Preview" data-testid="preview-panel">
@@ -111,20 +66,8 @@ export function ResultPreview({ result, model, onRun }: ResultPreviewProps) {
     );
   }
 
-  const meta = result.meta;
-  const size = formatBytes(meta?.size);
-  const modified = formatRecency(meta?.modified);
-  const facts: { label: string; value: string; title?: string }[] = [];
-  if (size) facts.push({ label: "Size", value: size });
-  if (modified) {
-    facts.push({ label: "Modified", value: modified, title: formatFullDate(meta?.modified) });
-  }
-  if (meta?.itemCount != null) {
-    facts.push({ label: "Contents", value: meta.itemCount.toLocaleString() + " items" });
-  }
-  if (meta?.line != null) facts.push({ label: "Line", value: String(meta.line) });
-
   const actions = model?.actions ?? [];
+  const payload = preview.payload;
 
   return (
     <aside className="preview" aria-label="Preview" data-testid="preview-panel">
@@ -132,31 +75,37 @@ export function ResultPreview({ result, model, onRun }: ResultPreviewProps) {
         <div className="preview-head">
           <ResultIcon result={result} />
           <div className="preview-heading">
-            <div className="preview-title">{result.title}</div>
+            <div className="preview-title">{payload?.title ?? result.title}</div>
             <div className="preview-kind">
-              {kindLabel(result)}
-              {meta?.sourceLabel ? " · " + meta.sourceLabel : ""}
+              {payload?.kindLabel ?? result.kind.replace(/_/g, " ")}
+              {result.meta?.sourceLabel ? " · " + result.meta.sourceLabel : ""}
             </div>
           </div>
         </div>
-        {result.path ? (
-          <div className="preview-path" title={result.path}>
-            {result.path}
-          </div>
+        <div className="preview-path" title={payload?.path ?? result.path ?? result.subtitle}>
+          {payload?.path ?? result.subtitle}
+        </div>
+        {preview.status === "loading" ? (
+          <p className="preview-note" role="status">
+            Loading preview…
+          </p>
+        ) : preview.status === "unavailable" || !payload ? (
+          <p className="preview-note">Preview unavailable.</p>
         ) : (
-          <div className="preview-path">{result.subtitle}</div>
+          <>
+            <Body body={payload.body} />
+            {payload.facts.length > 0 ? (
+              <dl className="preview-facts">
+                {payload.facts.map((fact) => (
+                  <div className="preview-fact" key={fact.label}>
+                    <dt>{fact.label}</dt>
+                    <dd title={fact.title}>{fact.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </>
         )}
-        {previewBody(result)}
-        {facts.length > 0 ? (
-          <dl className="preview-facts">
-            {facts.map((fact) => (
-              <div className="preview-fact" key={fact.label}>
-                <dt>{fact.label}</dt>
-                <dd title={fact.title}>{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : null}
       </div>
       {actions.length > 0 ? (
         <div className="preview-actions">

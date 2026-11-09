@@ -49,7 +49,9 @@ runs, and nothing runs on the search path.
 Module layout:
 `crates/ps-agent/src/pi/{mod,probe,args,env,events,client,process,redact}.rs`;
 offline test helper `crates/ps-agent/src/bin/ps_agent_fake_pi.rs` (never used by
-the app, must not be shipped by the installer).
+the app, must not be shipped by the installer). Durable task state for the V9
+Agents card is implemented separately in `crates/ps-agent/src/task/**` and
+contract-documented in [`AGENT_CARD_API.md`](AGENT_CARD_API.md).
 
 **Security hardening status (rel-recon PI-SEC review, 2026-11-10):** PI-SEC-01
 (MCP off), PI-SEC-02 (user extensions/skills/prompt templates off), PI-SEC-03
