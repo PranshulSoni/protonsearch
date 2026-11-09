@@ -17,6 +17,12 @@ const MAX_PER_PROFILE: usize = 2000;
 const MAX_TOTAL: usize = 8000;
 
 pub fn scan() -> (Vec<BrowserEntry>, Vec<String>) {
+    scan_with_cache(&crate::default_cache_dir())
+}
+
+/// Scan all browsers, storing temporary database snapshots under cache_root.
+/// An injected cache root keeps tests (and sandboxed callers) off %APPDATA%.
+pub fn scan_with_cache(cache_root: &Path) -> (Vec<BrowserEntry>, Vec<String>) {
     let mut entries = Vec::new();
     let mut warnings = Vec::new();
 
@@ -25,7 +31,8 @@ pub fn scan() -> (Vec<BrowserEntry>, Vec<String>) {
             continue;
         }
         for profile in chromium_profiles(&root) {
-            let (mut found, mut profile_warnings) = scan_chromium_profile(&profile, source);
+            let (mut found, mut profile_warnings) =
+                scan_chromium_profile_with_cache(&profile, source, cache_root);
             entries.append(&mut found);
             warnings.append(&mut profile_warnings);
             if entries.len() >= MAX_TOTAL {
@@ -36,7 +43,8 @@ pub fn scan() -> (Vec<BrowserEntry>, Vec<String>) {
 
     if let Some(profiles_root) = firefox_profiles_root() {
         for profile in firefox_profiles(&profiles_root) {
-            let (mut found, mut profile_warnings) = scan_firefox_profile(&profile);
+            let (mut found, mut profile_warnings) =
+                scan_firefox_profile_with_cache(&profile, cache_root);
             entries.append(&mut found);
             warnings.append(&mut profile_warnings);
             if entries.len() >= MAX_TOTAL {
@@ -141,11 +149,20 @@ pub fn scan_chromium_profile(
     profile: &Path,
     source: &str,
 ) -> (Vec<BrowserEntry>, Vec<String>) {
+    scan_chromium_profile_with_cache(profile, source, &crate::default_cache_dir())
+}
+
+/// Cache-injectable variant of scan_chromium_profile (used by tests).
+pub fn scan_chromium_profile_with_cache(
+    profile: &Path,
+    source: &str,
+    cache_root: &Path,
+) -> (Vec<BrowserEntry>, Vec<String>) {
     let mut entries = Vec::new();
     let mut warnings = Vec::new();
     let history = profile.join("History");
     if history.is_file() {
-        match read_chromium_history(&history, source) {
+        match read_chromium_history(&history, source, cache_root) {
             Ok(mut found) => entries.append(&mut found),
             Err(error) => warnings.push(format!("{source}: history unavailable: {error}")),
         }
@@ -163,8 +180,9 @@ pub fn scan_chromium_profile(
 fn read_chromium_history(
     history: &Path,
     source: &str,
+    cache_root: &Path,
 ) -> anyhow::Result<Vec<BrowserEntry>> {
-    let snapshot = copy_database(history)?;
+    let snapshot = copy_database(history, cache_root)?;
     let result = (|| -> anyhow::Result<Vec<BrowserEntry>> {
         let conn = rusqlite::Connection::open_with_flags(
             snapshot.path(),
@@ -287,13 +305,21 @@ fn firefox_profiles(root: &Path) -> Vec<PathBuf> {
 
 /// Scan one Firefox profile directory (places.sqlite history + bookmarks).
 pub fn scan_firefox_profile(profile: &Path) -> (Vec<BrowserEntry>, Vec<String>) {
+    scan_firefox_profile_with_cache(profile, &crate::default_cache_dir())
+}
+
+/// Cache-injectable variant of scan_firefox_profile (used by tests).
+pub fn scan_firefox_profile_with_cache(
+    profile: &Path,
+    cache_root: &Path,
+) -> (Vec<BrowserEntry>, Vec<String>) {
     let mut entries = Vec::new();
     let mut warnings = Vec::new();
     let places = profile.join("places.sqlite");
     if !places.is_file() {
         return (entries, warnings);
     }
-    let snapshot = match copy_database(&places) {
+    let snapshot = match copy_database(&places, cache_root) {
         Ok(snapshot) => snapshot,
         Err(error) => {
             warnings.push(format!("Firefox: could not snapshot places.sqlite: {error}"));
@@ -395,8 +421,8 @@ impl Drop for DatabaseSnapshot {
     }
 }
 
-fn copy_database(source: &Path) -> anyhow::Result<DatabaseSnapshot> {
-    let cache = crate::default_cache_dir().join("browser-snapshots");
+fn copy_database(source: &Path, cache_root: &Path) -> anyhow::Result<DatabaseSnapshot> {
+    let cache = cache_root.join("browser-snapshots");
     std::fs::create_dir_all(&cache)?;
     let unique = format!(
         "{}-{}-{}",

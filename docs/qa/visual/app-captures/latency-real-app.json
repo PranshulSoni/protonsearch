@@ -5,35 +5,35 @@
     {
       "label": "architecture",
       "query": "arch",
-      "start": 1694,
-      "visibleAt": 1726.3000000044703,
+      "start": 2517.6999999955297,
+      "visibleAt": 2521.5999999940395,
       "rows": 50,
-      "tookMs": 32.30000000447035
+      "tookMs": 3.899999998509884
     },
     {
       "label": "recent-exact",
       "query": "readme",
-      "start": 2222.3000000044703,
-      "visibleAt": 2227.2000000029802,
+      "start": 2983.0999999940395,
+      "visibleAt": 2988.89999999851,
       "rows": 50,
-      "tookMs": 4.899999998509884
+      "tookMs": 5.800000004470348
     },
     {
       "label": "typo",
       "query": "protonserch",
-      "start": 2719.10000000149,
-      "visibleAt": 2726.4000000059605,
+      "start": 3480.39999999851,
+      "visibleAt": 3488.1999999955297,
       "rows": 50,
-      "tookMs": 7.300000004470348
+      "tookMs": 7.799999997019768
     },
     {
       "label": "zero",
       "query": "zzzzzz-no-such-file",
-      "start": 3198.3000000044703,
-      "visibleAt": 3202.10000000149,
-      "rows": 19,
-      "tookMs": 3.7999999970197678
+      "start": 3981.89999999851,
+      "visibleAt": 3989.0999999940395,
+      "rows": 0,
+      "tookMs": 7.199999995529652
     }
   ],
-  "capturedAt": "2026-11-09T11:50:58.070Z"
+  "capturedAt": "2026-11-09T12:00:46.438Z"
 }

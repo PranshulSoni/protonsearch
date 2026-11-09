@@ -1,7 +1,7 @@
 # ProtonSearch v2 — Performance & Relevance Benchmark Methodology
 
 - **Owner:** L1-C Performance & Search Quality (perf-bench)
-- **Status:** living document; measured numbers live in [BENCHMARKS.md](./BENCHMARKS.md), raw JSON in [results/](./results/)
+- **Status:** living document; measured numbers live in [BENCHMARKS.md](./BENCHMARKS.md), raw JSON in [results/](./results/). Filename numbers in that report were measured on committed engine hash 3906836c492f6bb3f3b5e07c9af08874cad69b2e.
 - **Rule of record:** no number appears in project documentation unless a command in this repository printed it on this machine. Targets are not claims.
 
 ## 1. Purpose and rules
@@ -21,7 +21,8 @@
 | Index persist / load | `ps-bench filename --save-index` + cold child | binary save + fresh-process load |
 | Filename warm search | `ps-bench filename` | in-process, 2 warmup + N timed iterations per query |
 | Filename cold | child process restart | spawn + load + first queries; startup reported separately |
-| FTS5 content warm retrieval | `ps-bench content` | prepared statement, snippet path and rank-only path measured separately |
+| FTS5 content warm retrieval (legacy v1) | `ps-bench content` | prepared statement, snippet path and rank-only path measured separately |
+| v2 content warm retrieval | `ps-bench content-v2` | `ps_content::ContentIndex::search` (snippet + snippet_line included by the API), after a read-only legacy import |
 | FTS5 cold retrieval | child process restart | DB open + first query |
 | OCR speed | `ps-bench ocr` | session open, per-image ms, images/sec, cold pass 1 vs warm pass 2 |
 | OCR accuracy | `ps-bench ocr` | character error rate + normalized exact match against known text |
@@ -39,6 +40,7 @@ The CLI is `ps-bench` (crate `crates/ps-bench`). All paths are relative to the r
 | `ps-bench real-export --out .bench/real-paths.jsonl` | read-only export of the legacy corpus |
 | `ps-bench content-queries --out .bench/queries-content.jsonl` | fixed FTS5 suite derived from real content |
 | `ps-bench content --queries .bench/queries-content.jsonl --iters 30 --cold-restarts 3 --out (R)` | legacy FTS5 latency baseline |
+| `ps-bench content-v2 --queries .bench/queries-content.jsonl --iters 30 --cold-restarts 2 --out (R)` | v2 ps-content FTS5 benchmark (imports the same 14,609-doc corpus read-only) |
 | `ps-bench filename --dataset .bench/dataset-100k.jsonl --queries .bench/queries.jsonl --iters 30 --cold-restarts 3 --out (R)` | filename engine benchmark |
 | `ps-bench relevance --dataset .bench/real-paths.jsonl --golden tests/golden/real-corpus-golden.json --out (R)` | golden relevance evaluation |
 | `ps-bench golden-synth` / `ps-bench golden-real` | regenerate golden fixtures |
@@ -53,13 +55,15 @@ Build and run from source:
 
 Published engine numbers use the **release** profile (workspace `[profile.release] opt-level 3`). Debug runs are exploratory only and must say so.
 
+Cargo features: `engine` (default, needs `ps-index`) gates the filename/relevance commands; `content` (default, needs `ps-content`) gates `content-v2`. Content/OCR-only work can be built with `--no-default-features` while another crate is mid-edit.
+
 ## 4. Deterministic filename datasets
 
 Generator: `crates/ps-bench/src/dataset.rs`.
 
 - Deterministic splitmix64 PRNG, seed `20261109`; same `(seed, count)` produces byte-identical JSONL on any machine.
 - "Now" for mtimes is frozen at `2026-11-09T00:00:00Z` (unix ms 1794182400000) so wall-clock time cannot leak into the corpus.
-- Composition: weighted realistic roots (Documents/Downloads/Desktop/Pictures/Projects/OneDrive/Program Files/network share), 1-8+ directory depth, weighted common extensions, CJK and accented unicode names, hidden files, duplicate filenames, 200+ character long paths, `8% folder entries.
+- Composition: weighted realistic roots (Documents/Downloads/Desktop/Pictures/Projects/OneDrive/Program Files/network share), 1-8+ directory depth, weighted common extensions, CJK and accented unicode names, hidden files, duplicate filenames, 200+ character long paths, ~8% folder entries.
 - **Planted anchors** exist at every size so the fixed suite and the synthetic golden fixture apply to 10k/100k/1M equally: unique exact names (`Project Phoenix Budget 2026.xlsx`, `quarterly_report_final_v2.pdf`, CJK `会議議事録_2026-11-09.docx`, `日本語_メモ_2026.txt`, accented `café_résumé_naïve.md`, `.env`, a 200+ char path), a planted folder, and three `index.js` duplicates.
 - Corpus meta (byte count, FNV-1a 64, SHA-256 via certutil, category counts, top extensions) is written next to each dataset as `<dataset>.meta.json`.
 
@@ -92,7 +96,7 @@ The real legacy corpus is `%APPDATA%\protonsearch\file_index.db` (149,372,928 by
 - Percentiles are **nearest-rank** over raw samples: `idx = ceil(p/100 * n) - 1` for p in {50,90,95,99}. `stats.rs` is the only implementation.
 - Warm filename/content runs: 2 untimed warm-up executions per query, then `--iters` (default 30) timed executions. Overall percentiles pool all per-query samples; per-category percentiles pool within category.
 - Cold runs: `--cold-restarts` fresh child processes (`filename-cold-child` / `content-cold-child`). The child reports its load/open time, first-query latency and its own RSS; wall time (process spawn included) is measured by the parent. Default is 3 restarts.
-- The RSS snapshot in a child costs an external PowerShell call; children report ``rss_probe_ms` and the parent subtracts it from `wall_ms` (raw wall is kept as `wall_raw_ms`) so process-startup claims are not inflated.
+- The RSS snapshot in a child costs an external PowerShell call; children report `rss_probe_ms` and the parent subtracts it from `wall_ms` (raw wall is kept as `wall_raw_ms`) so process-startup claims are not inflated.
 - Reports always include `n` (sample count). A p95 with n=30 is the 29th value ordered sample; treat it as an estimate, not an asymptotic quantile.
 
 ## 7. Memory
@@ -108,7 +112,7 @@ The real legacy corpus is `%APPDATA%\protonsearch\file_index.db` (149,372,928 by
 - Query suite is derived from the corpus: frequent single terms (high/medium document frequency), prefix queries, two-term implicit AND, 3-token phrases, CJK terms when present, and 0-match tokens. Generation is deterministic (seed) and stored as `.bench/queries-content.jsonl` with hit counts.
 - Two statement shapes are timed separately: retrieval **with** `snippet()` (highlight cost included) and **rank-only** (no snippet), so highlighting overhead is not hidden.
 - Index facts: FTS shadow-table byte estimates (`files_fts_data` blocks, `_idx` term bytes, `_content`, `_docsize`) plus whole-DB file size and page size/count. This is an estimate of index bytes, not full page accounting (no `dbstat`).
-- The v2 content benchmark reuses the same harness against `ps-content::ContentIndex` once its API is real; it will be a separate row with its own scope label.
+- The v2 benchmark is `ps-bench content-v2`: it imports the legacy 14,609-doc content corpus read-only via `ps_content::import_legacy` into a v2 SQLite DB under `.bench/` (never `%APPDATA%`, because the agent harness cannot write there), then times `ps_content::ContentIndex::search`, which includes snippet and snippet_line generation. Its scope label is "v2 ps-content FTS5 (current schema/query path)"; import wall time, DB size, FTS shadow-byte estimate, open time and cold-process first-query latency are recorded alongside warm percentiles.
 
 ## 9. OCR: speed and accuracy are separate results
 
@@ -117,6 +121,7 @@ The real legacy corpus is `%APPDATA%\protonsearch\file_index.db` (149,372,928 by
 - **Speed:** session open ms; per-image ms p50/p95/p99; pass 1 (cold session) vs pass 2 (warm) images/sec; wall time per pass.
 - **Accuracy:** character error rate (Levenshtein over normalized text: lowercase, whitespace collapsed) and normalized exact-match rate, per scenario. Accuracy and throughput are never mixed into one claim.
 - Recorded limitations: synthetic rendered text (not photographs/scans), fonts available on this host, language-pack dependence, recognized text truncated to 400 chars in evidence JSON.
+- Measured on this host: Windows.Media.Ocr exposes en-GB/en-US only. English text is measured; CJK text is reported as a language-pack limitation, not as an engine capability claim. Images are read with `std::fs` and decoded through an in-memory WinRT stream because `StorageFile::GetFileFromPathAsync` is denied to processes launched by the agent harness.
 
 ## 10. UI / end-to-end latency methodology (not yet measured)
 
@@ -141,7 +146,12 @@ Derived metrics:
 - **decomposition**: engine = `tookMs`; IPC + Tauri dispatch = `ps:ipc-resolved - ps:ipc-sent - tookMs`; React commit = `ps:results-committed - ps:ipc-resolved`; paint = `ps:first-paint - ps:results-committed`. Each part is reported separately; a single end-to-end number must never stand in for engine performance.
 - p50/p95/p99 over at least 30 keystroke events across the fixed query suite plus 10 initial summons; the display refresh rate (60/120 Hz) is recorded because it sets the paint quantum.
 
-### 10.2 Method A — CDP harness without app changes (read-only)
+### 10.2 Harnesses and ownership
+
+- **Harness of record for real-app E2E latency: `tools/visual-qa/e2e-drive.mjs`** (Owner: Lead/UX-QA). It launches the Tauri debug binary with WebView2 CDP, serves the production frontend, types real queries, captures screenshots, and records `performance.now()` before the input event plus double-rAF after the first result row. All published real-app UI numbers must come from it.
+- **Auxiliary page-mark collector: `tools/ui-latency/cdp-latency.mjs`** (Owner: perf-bench). It does not launch/drive the app; it attaches to an already-running CDP-enabled page and collects page-internal marks for decomposition. It is not a second E2E harness and must not produce competing published numbers.
+
+### 10.3 Method A — page-mark collector (read-only)
 
 1. Launch the Tauri app with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` (environment variable only, no code change, not enabled in shipped builds).
 2. `tools/ui-latency/cdp-latency.mjs` connects to the DevTools endpoint, attaches to the launcher page, and installs capture listeners via `Runtime.evaluate` (no app edits): `keydown` marks, a `MutationObserver` on the results container, double-rAF paint. It types the query with real `Input.dispatchKeyEvent` events.
@@ -174,13 +184,13 @@ An opt-in instrumented build adds `window.__PS_PERF__` ring buffer + `performanc
 - CPU frequency scaling/power plan and background Windows services are not controlled.
 - The legacy DB is WAL-mode with an un-checkpointed WAL; immutable reads intentionally skip it (documented in each export meta).
 - Rust debug builds are not representative; published numbers come from the release profile named in the result JSON.
-- Timing resolution: `Instant` on Windows is QPC-backed (`100 ns), so microsecond differences at 1M scale are noise-dominated; distributions, not single runs, are reported.
+- Timing resolution: `Instant` on Windows is QPC-backed (~100 ns), so microsecond differences at 1M scale are noise-dominated; distributions, not single runs, are reported.
 
 ## 13. What we did NOT measure (this pass)
 
-- v2 content retrieval through `ps-content` (stub at measurement time); only the legacy v1 FTS5 baseline exists.
+- (superseded) v2 content retrieval is now measured via `ps-bench content-v2`; see BENCHMARKS.md section 4.1.
 - v2 Tauri app: hotkey -> visible, input -> first result, WebView2 memory, FPS, idle CPU. No UI numbers are published or inferred.
-- Real scanned documents or real screenshots for OCR; only synthetic GDI+ text (and Windows OCR availability is reported honestly).
+- (superseded) OCR availability is now measured via `ps-bench ocr` on this host (en-GB/en-US recognizers); synthetic corpus only, CJK unverified.
 - NTFS scan throughput, USN-journal catch-up, incremental updates, rename handling, removable/network roots.
 - Battery/power impact.
 - Competitor query latency: installed, but no scriptable query interface without changing competitor settings (see BENCHMARKS.md section on competitors for the exact reasons).
@@ -199,6 +209,7 @@ From the repository root (Windows PowerShell, release profile):
     cargo run -p ps-bench --release -- real-export --out .bench/real-paths.jsonl
     cargo run -p ps-bench --release -- content-queries --out .bench/queries-content.jsonl
     cargo run -p ps-bench --release -- content --queries .bench/queries-content.jsonl --iters 30 --cold-restarts 3 --out docs/performance/results/content-legacy-fts5.json
+    cargo run -p ps-bench --release -- content-v2 --queries .bench/queries-content.jsonl --iters 30 --cold-restarts 2 --out docs/performance/results/content-v2-pscontent.json
     cargo run -p ps-bench --release -- filename --dataset .bench/dataset-100k.jsonl --queries .bench/queries.jsonl --iters 30 --cold-restarts 3 --save-index .bench/index-100k.bin --out docs/performance/results/filename-100k.json
     cargo run -p ps-bench --release -- golden-synth
     cargo run -p ps-bench --release -- golden-real --paths .bench/real-paths.jsonl

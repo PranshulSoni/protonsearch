@@ -594,26 +594,31 @@ fn parse_conversion(query: &str) -> Option<(f64, String, String)> {
     // Normalise "->" separators to " to ".
     let text = text.replace("->", " to ");
     let tokens: Vec<&str> = text.split_whitespace().collect();
-    if tokens.len() < 4 {
-        // Support "5km to mi" (no space between value and unit).
-        if tokens.len() == 3 {
-            let (value, from) = split_value_unit(tokens[0])?;
-            let to = tokens[2];
-            if !matches!(tokens[1].to_ascii_lowercase().as_str(), "to" | "in" | "into" | "as") {
-                return None;
-            }
-            return Some((value, from, to.to_string()));
-        }
+    if tokens.len() < 2 {
         return None;
     }
-    let (value, from) = split_value_unit(tokens[0])?;
-    let separator = tokens[1].to_ascii_lowercase();
-    // tokens[1] may be the unit when value and unit are glued, e.g. "5km to mi".
-    let (from, to) = if matches!(separator.as_str(), "to" | "in" | "into" | "as" | "=") {
-        (from, tokens[2..].join(" "))
-    } else {
-        (tokens[1].to_string(), tokens[3..].join(" "))
-    };
+    // Prefer unambiguous separators; "in" is also a unit, so only fall back to
+    // it when no other separator token is present.
+    let separator_index = tokens
+        .iter()
+        .position(|token| {
+            matches!(
+                token.to_ascii_lowercase().as_str(),
+                "to" | "into" | "as" | "="
+            )
+        })
+        .or_else(|| {
+            tokens
+                .iter()
+                .position(|token| token.eq_ignore_ascii_case("in"))
+        })?;
+    if separator_index == 0 || separator_index + 1 >= tokens.len() {
+        return None;
+    }
+    // The value (and possibly its unit) is everything left of the separator.
+    let left = tokens[..separator_index].join(" ");
+    let (value, from) = split_value_unit(&left)?;
+    let to = tokens[separator_index + 1..].join(" ");
     Some((value, from, to))
 }
 

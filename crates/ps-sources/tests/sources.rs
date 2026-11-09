@@ -1,7 +1,6 @@
 //! Integration tests for ps-sources against real Windows data and synthetic
 //! browser/git/database fixtures created on this machine.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -171,7 +170,9 @@ fn chromium_profile_history_and_bookmarks_are_read() {
     )
     .unwrap();
 
-    let (entries, warnings) = browser::scan_chromium_profile(&profile, "Chrome");
+    let cache = dir.join("cache");
+    let (entries, warnings) =
+        browser::scan_chromium_profile_with_cache(&profile, "Chrome", &cache);
     assert!(warnings.is_empty(), "warnings={warnings:?}");
     let history = entries
         .iter()
@@ -214,7 +215,8 @@ fn firefox_profile_history_and_bookmarks_are_read() {
     .unwrap();
     drop(conn);
 
-    let (entries, warnings) = browser::scan_firefox_profile(&profile);
+    let cache = dir.join("cache");
+    let (entries, warnings) = browser::scan_firefox_profile_with_cache(&profile, &cache);
     assert!(warnings.is_empty(), "warnings={warnings:?}");
     assert!(entries.iter().any(|entry| {
         entry.url == "https://mozilla.org" && entry.title == "Mozilla" && entry.visit_count == 3

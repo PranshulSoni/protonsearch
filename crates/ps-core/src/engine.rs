@@ -349,7 +349,7 @@ impl Engine {
                                 tier: 1,
                                 priority: 3,
                                 score: 500.0,
-                                result: content_result(hit),
+                                result: content_result(hit, &settings),
                             });
                             hits += 1;
                         }
@@ -422,7 +422,7 @@ impl Engine {
                             tier: 2,
                             priority: 3,
                             score: 300.0,
-                            result: ocr_result(hit),
+                            result: ocr_result(hit, &settings),
                         });
                         hits += 1;
                     }
@@ -1842,7 +1842,7 @@ fn git_result(entry: &ps_sources::GitEntry) -> SearchResult {
     }
 }
 
-fn content_result(hit: ps_content::ContentHit) -> SearchResult {
+fn content_result(hit: ps_content::ContentHit, settings: &Settings) -> SearchResult {
     let ext = Path::new(&hit.path)
         .extension()
         .map(|ext| ext.to_string_lossy().to_lowercase())
@@ -1851,7 +1851,7 @@ fn content_result(hit: ps_content::ContentHit) -> SearchResult {
         id: format!("content:{}", hit.path.to_lowercase()),
         kind: SourceKind::ContentMatch,
         title: hit.title,
-        subtitle: hit.path.clone(),
+        subtitle: display_path(&hit.path, settings),
         path: Some(hit.path.clone()),
         icon: IconRef::FileType { ext },
         score: 0.0,
@@ -1874,7 +1874,7 @@ fn content_result(hit: ps_content::ContentHit) -> SearchResult {
     }
 }
 
-fn ocr_result(hit: crate::db::OcrHit) -> SearchResult {
+fn ocr_result(hit: crate::db::OcrHit, settings: &Settings) -> SearchResult {
     let ext = Path::new(&hit.path)
         .extension()
         .map(|ext| ext.to_string_lossy().to_lowercase())
@@ -1888,7 +1888,7 @@ fn ocr_result(hit: crate::db::OcrHit) -> SearchResult {
         } else {
             first_line
         },
-        subtitle: hit.path.clone(),
+        subtitle: display_path(&hit.path, settings),
         path: Some(hit.path.clone()),
         icon: IconRef::FileType { ext },
         score: 0.0,

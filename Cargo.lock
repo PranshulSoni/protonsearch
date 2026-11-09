@@ -3149,8 +3149,10 @@ name = "ps-ocr"
 version = "2.0.0-alpha.1"
 dependencies = [
  "anyhow",
+ "image 0.24.9",
  "rusqlite",
  "serde",
+ "sha2",
  "windows 0.58.0",
 ]
 

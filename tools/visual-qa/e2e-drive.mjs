@@ -131,6 +131,28 @@ try {
 } catch { /* attach-only or browser build */ }
 await new Promise((r) => setTimeout(r, 700));
 
+// Wait for the first scan to finish: a cold profile indexes ~100k+ entries on
+// first launch, and measuring during the scan would report partial results.
+const indexReady = await launcher
+  .evaluate(async () => {
+    const deadline = Date.now() + 180000;
+    while (Date.now() < deadline) {
+      try {
+        const status = await window.__TAURI_INTERNALS__.invoke("get_status");
+        if (status && (status.state === "ready" || status.state === "paused") && status.filenameEntries > 0) {
+          return { state: status.state, entries: status.filenameEntries };
+        }
+      } catch {
+        /* engine still starting */
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return { state: "timeout", entries: 0 };
+  })
+  .catch(() => ({ state: "unavailable", entries: 0 }));
+console.log(JSON.stringify({ indexReady }));
+await new Promise((r) => setTimeout(r, 400));
+
 async function shot(page, name) {
   try {
     const path = resolve(outDir, name + ".png");
@@ -158,24 +180,37 @@ async function measureQuery(page, query, label) {
     const input = document.querySelector("input.search-input") ?? document.querySelector("input");
     if (!input) return { error: "no input" };
     const listSelector = '[role="option"], .result, [role="listbox"] [aria-selected]';
+    const signature = () => {
+      const rows = document.querySelectorAll(listSelector);
+      const first = rows[0] ? rows[0].textContent : "";
+      const count = document.querySelector(".count")?.textContent ?? "";
+      const empty = document.querySelector(".launcher-empty") ? "empty" : "rows";
+      return count + "|" + rows.length + "|" + first + "|" + empty;
+    };
+    const baseline = signature();
     input.focus();
     const start = performance.now();
     // Native setter + input event: exactly what a keystroke produces.
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
     setter.call(input, q);
     input.dispatchEvent(new Event("input", { bubbles: true }));
-    const deadline = performance.now() + 3000;
+    const deadline = performance.now() + 4000;
     let visibleAt = null;
     while (performance.now() < deadline) {
-      const rows = document.querySelectorAll(listSelector);
-      if (rows.length > 0) {
+      if (signature() !== baseline) {
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         visibleAt = performance.now();
         break;
       }
       await new Promise((r) => setTimeout(r, 4));
     }
-    return { start, visibleAt, rows: document.querySelectorAll(listSelector).length, tookMs: visibleAt ? visibleAt - start : null };
+    return {
+      start,
+      visibleAt,
+      rows: document.querySelectorAll(listSelector).length,
+      tookMs: visibleAt ? visibleAt - start : null,
+      changed: visibleAt !== null,
+    };
   }, query);
   measurements.push({ label, query, ...result });
   return result;

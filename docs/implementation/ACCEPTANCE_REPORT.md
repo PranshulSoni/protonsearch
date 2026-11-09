@@ -65,20 +65,29 @@ the applications/clipboard/browser/Git sources and action execution, signed inst
 
 ## 4. Measured performance (summary; full report in docs/performance/BENCHMARKS.md)
 
-Engine-only, release build, synthetic realistic corpora (22 fixed queries x 30 iterations; p50/p95/p99 in ms):
+Engine-only, release build, committed engine hash 3906836, this host (22 fixed queries x 30 iterations, n=660 per corpus):
 
 | Corpus | p50 | p95 | p99 | Build | Engine memory |
 |---|---:|---:|---:|---:|---:|
-| 10k | 1.02 | 2.88 | 3.54 | 13.8 ms | 1.2 MB |
-| 100k | 2.46 | 5.64 | 6.96 | 219 ms | 11.4 MB |
-| 1M | 9.05 | 14.93 | 16.69 | 4.08 s | 109.8 MB |
+| 10k realistic | 0.070 | 0.584 | n/a | 15 ms | 1.2 MB |
+| 100k | 0.600 | 2.195 | n/a | 220 ms | 12.4 MB |
+| 1M | 2.713 | 7.583 | n/a | 3,529 ms | 110.1 MiB (~115 B/entry) |
 
-Targets from the brief: 100k warm p95 < 5 ms (**not met: 5.64 ms, +13 %**); 1M warm p95 < 15 ms (**met: 14.93 ms,
-margin 0.45 ms**). These are engine-only numbers; the UI adds WebView/React/render time.
-Real-app end-to-end input-to-visible (debug Rust build, production JS, 150 % DPI, 131,199 entries, n=4 queries):
-40.6 ms first query/cold render, then 12.6 / 8.4 / 10.8 ms warm. Not a p95; release-build percentile measurement is pending.
-Relevance: synthetic 10k MRR@10 0.895, exact@1 1.00; real legacy corpus MRR@10 0.928, recall@10 0.983, exact@1 1.00.
-Known relevance gaps: multi-term phrase queries and one typo class.
+Targets from the brief: 100k warm p95 < 5 ms (**MET: 2.195 ms**); 1M warm p95 < 15 ms (**MET: 7.583 ms**).
+Variance is disclosed in the report: an earlier pre-perf-fix revision measured 5.64/14.93 ms, and one contended 1M run measured 28.4 ms
+(concurrent agent compiles). Cold process: spawn+load 3.3/45-72/505-525 ms at 10k/100k/1M; the 1M cold load motivates pre-warming at app start
+rather than on the hotkey path (the launcher window is pre-created; the index is loaded during setup, not on summon).
+Content retrieval (v2, ps-content): warm p50 10.86 ms / p95 61.10 ms / p99 110.7 ms on 13,296 docs — **the 30 ms p95 target is NOT met**;
+the legacy v1 FTS5 baseline measured 6.07 ms p95 and is reported only as a migration baseline. Profiling is assigned as a release blocker.
+OCR (Windows.Media.Ocr, English only on this host): 244 images/s warm, p50 3.6 ms per image, p95 7.3 ms; 92.4 % character accuracy,
+59.7 % image-exact on the synthetic 72-image corpus; CJK/language variance UNVERIFIED (no CJK language pack installed).
+Relevance: synthetic 10k MRR@10 1.000/recall@10 1.000/exact@1 1.000; real 89,813-entry corpus MRR@10 0.928/recall@10 0.983/exact@1 1.000 (64/65).
+Real-app end-to-end input-to-visible (debug Rust build, production JS, 150 % DPI, 131,199 entries): n=4 exploratory queries
+(3.8-32.3 ms depending on cold render); not a p95; release-build percentile pass is pending the release binary.
+Competitors: no cross-tool latency table is published. Everything 1.4.1 is installed but its HTTP/ETP interfaces are disabled and no CLI/SDK
+is present; Kensaku 1.0.16 is installed without a CLI; PowerToys is present; Flow Launcher absent. Scope mismatch is stated in the report.
+Honest veto list (do not claim): sub-5 ms at 100k without naming commit 3906836; content speed without the snippet/rank split; UI under 30 ms
+p95 from the n=4 debug sample; CJK OCR; Everything/Kensaku parity.
 
 ## 5. What is partial (works, with documented limits)
 

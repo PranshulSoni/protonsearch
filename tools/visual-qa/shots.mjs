@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 // Visual QA screenshot harness. Renders the REAL React UI in Chromium against
 // the browser mock bridge (clearly labelled as such in the report), at several
 // viewport sizes, DPI scales and themes, then writes PNGs for human review.
@@ -60,7 +60,10 @@ async function shot(name, { viewport, url, scale = 1, actions = [], fullPage = f
   await page.goto(baseUrl + url, { waitUntil: "networkidle" });
   await page.waitForTimeout(350);
   for (const action of actions) {
-    if (action.type === "click") await page.getByText(action.text, { exact: false }).first().click();
+    if (action.type === "click") {
+      if (action.selector) await page.locator(action.selector).first().click();
+      else await page.getByText(action.text, { exact: false }).first().click();
+    }
     if (action.type === "press") await page.keyboard.press(action.key);
     if (action.type === "fill") await page.locator(action.selector).fill(action.value);
     if (action.type === "wait") await page.waitForTimeout(action.ms);

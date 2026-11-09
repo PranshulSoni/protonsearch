@@ -47,7 +47,7 @@ fn sha256_file(path: &Path) -> Option<String> {
     let file = std::fs::File::open(path).ok()?;
     let mut reader = std::io::BufReader::with_capacity(1024 * 1024, file);
     let mut hasher = Sha256::new();
-    let mut buf = [0u8; 1024 * 1024];
+    let mut buf = vec![0u8; 1024 * 1024];
     loop {
         match reader.read(&mut buf) {
             Ok(0) => break,

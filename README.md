@@ -30,13 +30,18 @@ Not yet wired in this alpha: OCR pipeline (Windows.Media.Ocr extraction is next)
 
 Engine-only, release build, this repo's benchmark harness (`cargo run -p ps-bench -- ...`):
 
-| Corpus | warm p50 | warm p95 | warm p99 | build time | engine memory |
-|---|---:|---:|---:|---:|---:|
-| 10k realistic paths | 1.02 ms | 2.88 ms | 3.54 ms | 13.8 ms | 1.2 MB |
-| 100k | 2.46 ms | 5.64 ms | 6.96 ms | 219 ms | 11.4 MB |
-| 1M | 9.05 ms | 14.93 ms | 16.69 ms | 4.08 s | 109.8 MB |
+| Corpus | warm p50 | warm p95 | build time | engine memory |
+|---|---:|---:|---:|---:|
+| 10k realistic paths | 0.070 ms | 0.584 ms | 15 ms | 1.2 MB |
+| 100k | 0.600 ms | 2.195 ms | 220 ms | 12.4 MB |
+| 1M | 2.713 ms | 7.583 ms | 3.5 s | 110 MB (~115 B/entry) |
 
-Real-app end-to-end input-to-visible (debug Rust build, production JS, 150% DPI, 131,199 entries, n=4 queries): 40.6 ms first query, then 12.6 / 8.4 / 10.8 ms. Release-build and percentile numbers are in `docs/performance/BENCHMARKS.md`; the 100k p95 target of 5 ms is **not** met (5.64 ms) and is reported as such. No "world's fastest" claim is made.
+Committed engine hash `3906836`, 22 fixed queries x 30 iterations (n=660 per corpus), release profile, this machine.
+Targets from the brief: 100k warm p95 < 5 ms is **met** (2.195 ms); 1M warm p95 < 15 ms is **met** (7.583 ms).
+Earlier pre-optimisation revision measured 5.64 / 14.93 ms and one contended run measured 28.4 ms — variance is disclosed in
+`docs/performance/BENCHMARKS.md`. Content retrieval does **not** meet its 30 ms p95 target yet (v2 p95 61.1 ms; see the report).
+Real-app input-to-visible samples on a debug build: 3.8–32.3 ms (n=4 exploratory; release-build percentile run pending).
+No "world's fastest" claim is made; the report includes an explicit veto list of claims it does not support.
 
 ## Architecture
 

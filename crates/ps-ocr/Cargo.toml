@@ -13,9 +13,18 @@ windows = { workspace = true, features = [
     "Storage",
     "Storage_Streams",
     "Globalization",
+    "Security_Cryptography",
+    "Win32_System_WinRT",
+    "Win32_Foundation",
 ] }
 
 [dependencies]
 serde = { workspace = true }
 anyhow = { workspace = true }
 rusqlite = { workspace = true }
+image = { workspace = true }
+sha2 = "0.10"
+
+[dev-dependencies]
+rusqlite = { workspace = true }
+image = { workspace = true }
