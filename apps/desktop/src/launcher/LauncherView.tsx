@@ -82,6 +82,7 @@ export default function LauncherView() {
       hideLauncher={hideLauncher}
       showMain={showMain}
       status={status}
+      clipboardHistoryEnabled={settings.privacy.clipboardHistory}
       density={settings.density}
       onGeometry={onGeometry}
     />

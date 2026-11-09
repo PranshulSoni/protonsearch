@@ -14,6 +14,8 @@ export const WINDOW_BORDER = 2;
 export const SEARCHLINE_HEIGHT = 72;
 /** Category/filter chip strip between the search row and the results. */
 export const FILTER_STRIP_HEIGHT = 40;
+export const FILTER_STRIP_HEIGHT_COMPACT = 36;
+
 /** SCREENS §6.1: the search row shrinks to 61 px on a narrow surface (≤700 px). */
 export const SEARCHLINE_HEIGHT_NARROW = 61;
 export const FOOTER_HEIGHT = 44;
@@ -27,7 +29,7 @@ export const ROW_HEIGHT = 58;
 export const ROW_HEIGHT_COMPACT = 48;
 /** 256 px reference floor + 40 px filter strip = 296 px. */
 export const MIN_LAUNCHER_HEIGHT = 296;
-export const MAX_LAUNCHER_HEIGHT = 480;
+export const MAX_LAUNCHER_HEIGHT = 544;
 export const MAX_RESULTS_VIEWPORT = 365;
 export const PREVIEW_DRAWER_HEIGHT = 240;
 export const PREVIEW_DRAWER_MAX_HEIGHT = 640;
@@ -75,6 +77,10 @@ export function labelHeightFor(density: Density | undefined): number {
   return density === "compact" ? GROUP_LABEL_HEIGHT_COMPACT : GROUP_LABEL_HEIGHT;
 }
 
+export function filterStripHeightFor(density: Density | undefined): number {
+  return density === "compact" ? FILTER_STRIP_HEIGHT_COMPACT : FILTER_STRIP_HEIGHT;
+}
+
 export interface LauncherMetricsInput {
   /** Number of rows in each rendered group, in group order. */
   groupRowCounts: readonly number[];
@@ -82,6 +88,7 @@ export interface LauncherMetricsInput {
   previewOpen: boolean;
   /** The inline confirm bar is visible and consumes a row above the footer. */
   confirmOpen?: boolean;
+
   workArea: WorkAreaSize;
 }
 
@@ -94,6 +101,7 @@ export interface LauncherMetrics {
   surfaceWidth: number;
   /** Category strip height included between search row and results. */
   filterStripHeight: number;
+
   /** Height of search row + results + footer, before preview drawer growth. */
   baseHeight: number;
   /** Actual window height to request (includes a bottom preview drawer). */
@@ -112,6 +120,7 @@ function snapTo2(value: number): number {
 export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMetrics {
   const rowHeight = rowHeightFor(input.density);
   const labelHeight = labelHeightFor(input.density);
+  const filterStripHeight = filterStripHeightFor(input.density);
   const surfaceWidth = Math.min(
     SURFACE_MAX_WIDTH,
     Math.max(480, input.workArea.width - SURFACE_HORIZONTAL_CLAMP),
@@ -123,18 +132,19 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     0,
   );
   const confirmHeight = input.confirmOpen ? CONFIRM_BAR_HEIGHT : 0;
+  const minimumHeight = MIN_LAUNCHER_HEIGHT;
   // The window height must include the filter strip, footer, confirm row and its
   // own 1 px borders (B2 / SCREENS §2.1); otherwise content overflows and scrolls.
   const raw =
     searchlineHeight +
-    FILTER_STRIP_HEIGHT +
+    filterStripHeight +
     RESULTS_PADDING +
     content +
     FOOTER_HEIGHT +
     confirmHeight +
     WINDOW_BORDER;
   const baseHeight = snapTo2(
-    Math.min(MAX_LAUNCHER_HEIGHT, Math.max(MIN_LAUNCHER_HEIGHT, raw)),
+    Math.min(MAX_LAUNCHER_HEIGHT, Math.max(minimumHeight, raw)),
   );
   const previewMode: PreviewMode =
     input.workArea.width >= PREVIEW_SIDE_MIN_WORK_WIDTH ? "side" : "drawer";
@@ -151,7 +161,7 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
       MAX_RESULTS_VIEWPORT,
       baseHeight -
         searchlineHeight -
-        FILTER_STRIP_HEIGHT -
+        filterStripHeight -
         FOOTER_HEIGHT -
         confirmHeight -
         WINDOW_BORDER,
@@ -162,7 +172,7 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     labelHeight,
     searchlineHeight,
     surfaceWidth,
-    filterStripHeight: FILTER_STRIP_HEIGHT,
+    filterStripHeight,
     confirmHeight,
     baseHeight,
     totalHeight,

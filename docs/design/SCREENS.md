@@ -62,7 +62,6 @@ element of the search row (reference:30, 136).
 │ [P 29px]  query input (21px)                     3 matches    │  search row: 72px, pad 14/20, gap 14
 ├──────────────────────────────────────────────────────────────┤  1px --ps-line
 │ [ALL] [FILES] [FOLDERS] [APPS] [CLIPBOARD] [WEB] [ACTIONS]     │  filter strip 40px, chips 26px, gap 6
-│ [ALL] [LINKS] [EMAILS] [PATHS] [CODE] [IMAGES]                 │  clipboard categories 36px (only when Clipboard is selected)
 ├──────────────────────────────────────────────────────────────┤
 │ DOCUMENTS                                                    │  group label: 34px block, 10px caps
 │ [icon] Architecture notes.docx                        Yesterday│  row: 58px, pad 8/12, radius 8
@@ -82,16 +81,12 @@ element of the search row (reference:30, 136).
   filter strip**, 23 px the results padding (10 top + 13 bottom); `rowH` 58 (comfortable) / 48 (compact); group label
   block 34 (30 compact); strip 40 (36 compact). Window height = `H + 56`. Height snaps to 2 px; resize is instant and
   happens in the same frame as the content change (never animated).
-  **Clipboard categories (§2.12):** when the Clipboard chip is selected, the second row adds **36 px** (32 compact):
-  `H = clamp(332, 72 + 44 + 40 + 36 + 23 + Σ(34 + rowH·n), 544)` and the window minimum for that state is 560×**388**
-  (the global native minimum stays 560×352; the launcher grows, never clips).
-- Results max-height = `min(365, H − 156)` normally, or `min(365, H − 192)` when the clipboard category strip is
-  visible (-36 px); scrollbar thin, thumb `--ps-scrollbar-thumb`. The filter/category strips live inside the results
-  column, so the preview panel keeps the full body height.
+- Results max-height = `min(365, H − 156)`; clipboard sections (§2.12) live inside the results viewport and add no
+  separate row or height; scrollbar thin, thumb `--ps-scrollbar-thumb`. The filter strip lives inside the results column,
+  so the preview panel keeps the full body height.
 - Header: brand mark (light or on-dark variant per theme, 29 px; 26 px at ≤700) + input + count.
 - Empty-input minimum card height is 296 px (search 72 + strip 40 + results 140 + footer 44) — compact, not an empty
-  stage — or 332 px while the clipboard category strip is visible (§2.12). The 28 px window pad is not click-through: a
-  press there dismisses the launcher.
+  stage. The 28 px window pad is not click-through: a press there dismisses the launcher.
 
 ### 2.2 Results model
 
@@ -101,7 +96,8 @@ element of the search row (reference:30, 136).
   pin is **CUT for v2.0 alpha** (§10): ACTIONS always renders last, even when a command or expression matches exactly.
   Filter chips (§2.11) expose only ALL/FILES/FOLDERS/APPS/CLIPBOARD/WEB/ACTIONS; DOCUMENTS and CODE stay in **ALL** and
   remain reachable with the `content:` / `git:` prefixes. Chips are exact: FILES never shows folder rows and FOLDERS
-  never shows file rows (§2.11).
+  never shows file rows (§2.11). Under the CLIPBOARD chip only, clipboard rows are grouped into category sections
+  (§2.12); in ALL they stay in the single CLIPBOARD group.
 - Row: 36 px icon slot · 12 px gap · title (13/680, ellipsis) · path (11 px `--ps-ink-2`, ellipsis, 4 px below) ·
   trailing meta 10–11 px `--ps-ink-3` (recency / size / item count / source). Path truncates at the end; title
   truncates with ellipsis; both keep a `title` tooltip and the accessible description carries the full path.
@@ -131,7 +127,6 @@ element of the search row (reference:30, 136).
 | Offline (network) | no special state — local search is unaffected; unavailable network roots are simply absent | normal | normal |
 | Preview open | rows + side/drawer preview; selected row unchanged | normal | "Preview" hint |
 | Filter active | results scoped to the chip's category; strip shows the selected chip; FILES/FOLDERS are exact object types | count reflects the scoped set | unchanged |
-| Clipboard category active | CLIPBOARD chip selected, category strip visible below it; rows filtered client-side by LINK/EMAIL/PATH/CODE/IMAGE/TEXT tag (§2.12) | count reflects the filtered visible set | unchanged |
 
 Filter-chip states, copy and keyboard behaviour are in §2.11. Chips stay interactive while a search is in flight; an empty scoped result uses "No matches in {label}." + "Try another category, or press Esc to clear the filter."
 
@@ -300,11 +295,10 @@ Filter choice is **not** persisted across summons (default ALL).
 | disabled | none — chips stay usable while a search is pending |
 
 **Keyboard and focus.** One roving tab stop: Tab from the search input lands on the **selected** chip; Tab again leaves
-the strip for the clipboard category strip (§2.12, only when visible), the preview, or the footer. ←/→ change the filter
+the strip for the preview or the footer. ←/→ change the filter
 immediately (radiogroup semantics) and keep focus; Home/End go to ALL/ACTIONS; Space/Enter re-applies the focused chip
 (no-op if already selected). Esc clears the filter to ALL and returns focus to the input **before** the normal
-query-clear/close chain (with a clipboard category active, Esc first resets that category, then the filter — §2.12).
-Ctrl+1–7 select from the input as above. When the strip overflows, the focused/selected chip is scrolled into view
+query-clear/close chain. Ctrl+1–7 select from the input as above. When the strip overflows, the focused/selected chip is scrolled into view
 (`scrollIntoView({inline:'nearest', block:'nearest'})`, no smooth behaviour). Pointer: click selects; no drag.
 
 **0 results.** "No matches in {label}." + "Try another category, or press Esc to clear the filter." The count text reflects
@@ -325,87 +319,78 @@ the same result list rather than swapping panels. Ctrl+1–7 are shortcuts, not 
 **Motion.** Background/border/box-shadow 110 ms `--ps-ease-standard`; no transform, no layout animation; reduced
 motion 0 ms.
 
-### 2.12 Clipboard categories — FINAL 2026-11-10 (task-23)
+### 2.12 Clipboard categories — grouped sections (FINAL 2026-11-10, task-26)
 
-A second-level strip that narrows CLIPBOARD results. It renders **only** when the CLIPBOARD chip is selected and clipboard
-history is enabled; it is a view filter over the returned clipboard rows, never a new engine request and never a fake
-mode.
+When the **CLIPBOARD** chip is selected, the returned clipboard rows are grouped into quiet category sections **inside the
+results viewport**. There is **no second chip row, no category filter controls, and no duplicated filtering**: the main
+filter strip selects Clipboard; the results themselves are sectioned.
 
-**Geometry.** Directly below the main filter strip, inside the results column: block **36 px** (32 compact) = 6 px top +
-**24 px chip** (22 compact) + 6 px bottom; inline padding **16 px** (12 compact); chip gap **6 px** (5 compact); chip
-radius **6 px**; chip padding-inline **9 px** (8 compact). Chips: **ALL · LINKS · EMAILS · PATHS · CODE · IMAGES**, 10 px/650,
-uppercase, `+0.06em`; no counts/icons/truncation; labels localised (`clipboard.all`, `clipboard.links`,
-`clipboard.emails`, `clipboard.paths`, `clipboard.code`, `clipboard.images`). Tokens:
-`--ps-cat-strip-height/-compact`, `--ps-cat-chip-height/-compact`, `--ps-cat-chip-gap`, `--ps-cat-chip-pad-x`,
-`--ps-cat-chip-radius`.
+**Order and visibility.** Fixed order **LINKS · EMAILS · PATHS · CODE · TEXT · IMAGES**; only non-empty sections render,
+each exactly once. Classification uses the rules below; TEXT is the fallback for everything that is not a link, email,
+path, code or image. IMAGES renders only when the engine returns real image rows (alpha: absent — no fake section). Section
+order never changes with query, score or pinned state. In **ALL**, clipboard rows are not sectioned; they stay in the
+single CLIPBOARD ResultGroup in engine order (no section labels).
 
-**Layout impact.** The row does not add to the filter strip; it sits between the strip and the results. While visible it
-adds **36 px** to the card's minimum (`H = clamp(332, 72+44+40+36+23+Σ, 544)`, window min 560×388 for that state) and
-reduces the results max height by 36 px (`min(365, H − 192)`). Window height snaps in the same frame; no animation.
-When the scope leaves CLIPBOARD the category resets to ALL and the row/extra height disappear immediately.
+**Section labels (subordinate to ResultGroup).**
+- Uppercase **10 px/700**, letter-spacing **+0.10em**, colour `--ps-ink-3`; line-height **14 px**; block **28 px**
+  (24 compact) = **8 px top + 14 px line + 6 px bottom**; inline padding **14 px**; no count, no icon, no hairline, no
+  action, no collapse control. (ResultGroup stays 34/30 block, 10/750/+0.12em — clipboard sections are one step quieter.)
+- Spacing: the first section label starts at the results viewport's normal top padding; every following section is
+  preceded by **6 px** vertical gap. Rows keep the standard **58 px** (48 compact) pitch.
+- Localisation keys: `clipboard.links`, `clipboard.emails`, `clipboard.paths`, `clipboard.code`,
+  `clipboard.text`, `clipboard.images`; no truncation; logical `padding-inline`/`gap` for RTL.
+- Dark: label `--ps-ink-3` exactly as light (do not dim below 4.5:1); same CSS px metrics at 125/150/200 %.
+- Semantics: each section is `role="group"` + `aria-labelledby` to its visible label; the label element is
+  `role="presentation"` (same pattern as ResultGroup); sections add **no tab stop and no interactive control**.
 
-**Selection and filtering.** Default **ALL** every time Clipboard is selected; category choice is session-only and not
-persisted. Selecting a category filters the visible clipboard rows client-side (the engine query already ran); it resets
-the active row to the first visible clipboard row and updates the match count to the filtered count. Pinned rows stay
-first; within a category the engine order (pinned, newest) is preserved. No category = ALL. Clearing/changing scope
-resets category to ALL.
+**Row anatomy (no per-row category tags).** The section label is the category; do not repeat it as a tag. Rows keep the
+standard clipboard anatomy: 36 px icon slot · clipboard glyph 20 px or 32×32 image thumbnail radius 4 (cover; never
+stretch) · title = first non-empty line, whitespace collapsed, max 120 chars, 13/680 ellipsis · sub 11
+`--ps-ink-2` = "`{source app} · {relative time}`" · trailing relative time 10–11 `--ps-ink-3`. Long text stays
+single-line; preview/copy actions unchanged. Pinned rows sort **first within their section**, then engine order (newest);
+pinned is never a separate section.
 
-**Selected state.** Quieter than the primary strip: `--ps-surface-soft` fill + 1 px `--ps-line-strong` border +
-`--ps-ink` 650 + **2 px inset bottom bar** `--ps-selected-bar`; rest `--ps-ink-2`; hover `--ps-surface-soft`;
-focus-visible 2 px `--ps-focus` ring, offset 2; pressed no transform; dark uses the same semantic tokens. Never a second
-accent fill — the bar carries the state.
+**Category classification (grouping only; not a UI control, not a security boundary).** Deterministic, from the text
+exposed to the launcher (first line / 120 chars):
 
-**Row category tags.** Every clipboard row gets one tag in the trailing meta line, before the relative time:
-- Labels: **LINK · EMAIL · PATH · CODE · IMAGE · TEXT** (singular; the strip labels are plural).
-- `.result-tag`: height 16 px, radius 4, 1 px `--ps-line` border, 0 5 px padding, 10 px/650 caps `+0.06em`,
-  `--ps-ink-2`; numbers/tags tabular; no semantic colour (categories are neutral, not status).
-- At narrow widths (≤700) the relative time hides before the tag; the tag never truncates. Accessible description gains
-  the category word ("Link, 2 minutes ago").
-
-**Category rules (deterministic, best effort, from the text exposed to the launcher — first line / 120 chars; not a
-security boundary):**
-
-| Tag | Rule |
+| Section | Rule |
 |---|---|
-| LINK | Trimmed single token matching `^https?://\S+$` |
-| EMAIL | Trimmed single token matching `^[^\s@]+@[^\s@]+\.[^\s@]{2,}$` |
-| PATH | Trimmed single absolute Windows path: `^[A-Za-z]:\\` or `^\\\\` or `^%[A-Za-z_]+%\\`; matching quotes are stripped |
-| CODE | Not LINK/EMAIL/PATH and either a fenced block or ≥2 lines with ≥2 code signals (`{ } ; => def function class import </`, indentation) |
-| IMAGE | The clipboard item is an image (engine flag; alpha: see below) |
-| TEXT | Everything else (appears under ALL only) |
+| LINKS | Trimmed single token matching `^https?://\S+$` |
+| EMAILS | Trimmed single token matching `^[^\s@]+@[^\s@]+\.[^\s@]{2,}$` |
+| PATHS | Trimmed single absolute Windows path: `^[A-Za-z]:\\` or `^\\\\` or `^%[A-Za-z_]+%\\`; matching quotes are stripped |
+| CODE | Not LINKS/EMAILS/PATHS and either a fenced block or ≥2 lines with ≥2 code signals (`{ } ; => def function class import </`, indentation) |
+| TEXT | Everything else (always catches plain text) |
+| IMAGES | The clipboard item is an image (engine flag; alpha: no image rows exist, so this section is absent) |
 
-**Clipboard row anatomy.** 36 px icon slot · clipboard glyph 20 px or, for images, a 32×32 thumbnail radius 4 (cover;
-never stretch) · title = first non-empty line, whitespace collapsed, max 120 chars, 13/680 ellipsis · sub 11
-`--ps-ink-2` = "`{source app} · {relative time}`" · trailing tag + relative time · pinned items sort first; selection,
-hover, actions and preview are unchanged. Long text stays single-line; full text is available in preview/copy action.
+**Height and overflow.** Section labels live inside the results viewport: **no extra 36 px**, no second strip, no change
+to the filter strip or window minimum. Standard maths: card `H = clamp(296, 72 + 44 + 40 + 23 + Σ(34 + rowH·n), 544)`,
+window `H + 56` (min 560×352), results max `min(365, H − 156)`. The section labels count inside the viewport's content
+like normal group labels; no +36 px, no 332/388 minimum. The viewport scrolls; section labels scroll with rows (no sticky
+headers); no collapse/expand.
 
-**Empty states (exact copy).**
+**Keyboard (flattened).** ↑/↓ traverse the visible rows continuously across section boundaries — no stop on a section
+label; Home/End first/last row; PageUp/PageDown unchanged; typing stays in the input. Enter/Ctrl+C unchanged. Esc chain is
+back to **menu → preview → clear filter → clear query → hide** (no category step). Tab order is back to
+input → filter strip (selected chip) → preview/footer; sections add no tab stops. Screen readers hear the section label
+when the active option crosses into it; no extra live region.
+
+**Empty and loading states.** No per-category empty states exist: empty sections are simply not rendered.
 
 | Situation | Copy |
 |---|---|
-| Clipboard history off (row hidden) | "Clipboard history is off." / "Turn it on in ProtonSearch → Preferences to keep copied text on this PC." |
+| Clipboard history off | "Clipboard history is off." / "Turn it on in ProtonSearch → Preferences to keep copied text on this PC." |
 | History on, no items at all | "No clipboard history yet." / "Copied text and images will appear here from now on. Only copies made while ProtonSearch is running are captured." |
-| Category empty, no query | "No links copied yet." / "Links you copy will appear here from now on." (emails/paths/code/images: same pattern; images uses the alpha copy below when unsupported) |
-| Category empty with a query | "No {links} matches in “{query}”." / "Try another category, or clear the search." |
-| IMAGES while the build has no image rows | "Image clipboard items aren't available in this build yet." / "Text clipboard history still works." |
+| Query returns no clipboard matches | "No matches in Clipboard." / "Try different words, or press Esc to clear the filter." |
+| Loading | Standard 3 skeleton rows at 58 px pitch; no section labels until data lands; previous rows stay during subsequent queries. |
+| IMAGES unavailable | No IMAGES section is rendered (no fake section, no empty category); the IPC gap is stated honestly in §10. |
 
-The no-history copy is deliberately honest: ProtonSearch does **not** import the Windows clipboard history and cannot
-show copies made before it was running. Images/OCR stay unavailable until the IPC exposes image rows (§10).
-
-**Keyboard.** Tab order: search input → selected main-filter chip → selected clipboard-category chip (only when the
-category row is visible) → preview/footer. ←/→ change category immediately and keep focus; Home/End go to ALL/IMAGES;
-Space/Enter re-apply; Esc chain adds one step **before** the filter clear: category ≠ ALL → reset category to ALL, keep
-the Clipboard scope, focus stays on the strip chip/input per current ring; category = ALL → clear the main filter to ALL;
-then the existing query-clear/hide chain. Ctrl+1–7 change the main filter and reset the category to ALL. No global
-shortcut for categories. Pointer click selects; no drag.
-
-**Accessibility.** `role="radiogroup"` + `aria-label="Clipboard categories"`; chips `role="radio"` +
-`aria-checked`; one roving tab stop; count live region updates once per change (polite, ≤1/300 ms); no second live
-region.
+Capture remains live-only: ProtonSearch does not import the Windows clipboard history and cannot show copies made before
+it was running. No category chips, no category counts, no category shortcuts, no filtering controls of any kind.
 
 ---
 
 ## 3. Full Desktop App
+
 ### 3.0 App type scale and alignment grid (FINAL 2026-11-09)
 
 User feedback: the app text is too small and alignment reads inconsistent. Every app/onboarding surface now uses one
@@ -602,7 +587,8 @@ while the probe runs). The panel lists only what the shell's `detect_agents` act
 and only Pi is runnable in this alpha.
 
 - **Detected row** (68 px, padding 12 0, 1 px `--ps-line` rule): 24 px icon slot with a 20 px runtime glyph · name
-  **14/600** · version badge **18 px** (10/650, "v1.5.0") when real · availability badge **18 px** · path row **12/18
+  **14/600** · version badge **18 px** (11/650 — the app type floor is 11 px, "v1.5.0") when real · availability badge
+  **18 px** (11/650) · path row **12/18
   `--ps-ink-2`**, middle-ellipsis with the full path in `title` · detail **12/18 `--ps-ink-3`**.
 - **Availability badges:** "Available" = neutral (surface-soft + ink-2), "Not found" = muted (ink-3), "Running" only when
   a run is active (8 px positive dot + word). Never a green "Ready" or an "AI" badge. Only badge text/colour + words.
@@ -644,7 +630,9 @@ hint "Pi starts only for a prompt you start here, then stops. Read-only in this 
 - **Run summary** (below actions; hidden until the first run, shown for running/finished/failed/cancelled): three 44 px
   metric rows — **Status** (8 px dot + "Running"/"Completed"/"Failed"/"Cancelled"; completed positive, failed negative,
   cancelled ink-2), **Started** (localized `Today, 14:32` — `Intl.DateTimeFormat` with date when not today), **Duration**
-  (tabular "4.2 s"). No runs yet → helper "No runs yet. Start a workflow above." Never invent a prior run.
+  (tabular "4.2 s"). No runs yet → helper "No runs yet. Start a workflow above." Never invent a prior run. For a finished
+  run the elapsed line and the Duration row must show the **same** value (prefer the run's reported `durationMs` when
+  the terminal event supplies it; the screenshot capture caught a mismatch when wall-clock elapsed was used).
 - Result block: final answer 14/21 max 60 ch width, selectable. Activity log: h3 "Workflow activity"; 32 px rows, 14 px
   icon, label 12/600, text 12/18; max 200 entries; `aria-live="polite"`; never raw provider text, tool stderr, paths or
   codes — product copy plus a sanitized `"Reference: {code}"` inside Details only.
@@ -1055,8 +1043,7 @@ transform and all durations.
 | Agent run failure | "Pi couldn't finish this workflow." · "Search still works. Nothing outside the workspace was changed." · "Try again" |
 | Clipboard history off | "Clipboard history is off." · "Turn it on in ProtonSearch → Preferences to keep copied text on this PC." |
 | Clipboard no history | "No clipboard history yet." · "Copied text and images will appear here from now on. Only copies made while ProtonSearch is running are captured." |
-| Clipboard category empty | "No links copied yet." · "Links you copy will appear here from now on." (emails/paths/code/images pattern) |
-| Clipboard images unavailable | "Image clipboard items aren't available in this build yet." · "Text clipboard history still works." |
+| Clipboard 0 matches | "No matches in Clipboard." · "Try different words, or press Esc to clear the filter." |
 | Workflows runtime error | "Agent workflows are unavailable." · "Search still works. The optional runtime didn't start." · "Try again" |
 | Preferences save | "Saved" (2 s stamp) |
 | Hotkey conflict | "That shortcut isn't available." · "Another app is already using it. Choose a different combination." |
@@ -1092,7 +1079,7 @@ fake percentage, sample data, or a teaser.
 | No native folder-picker command | Search & indexes locations, onboarding locations | Validated paste-path form; helper states the picker is not available in this build. |
 | No updater / logs / diagnostics-export commands | Preferences -> Updates & diagnostics | Read-only version/protocol rows + Refresh diagnostics; no update check, logs or export controls. |
 | No preview payload (thumbnail, document render, preview kinds) in `SearchResult` | Launcher preview panel | Metadata/snippet previews only; otherwise "Preview not available — press Enter to open." No fake thumbnail. |
-| Clipboard images are stored but not exposed as search rows (`ClipboardEntry` has no image/OCR fields; search excludes `is_image`) | Launcher Clipboard scope + IMAGES category | IMAGES category shows "Image clipboard items aren't available in this build yet." / "Text clipboard history still works." Never fake image rows. |
+| Clipboard images are stored but not exposed as search rows (`ClipboardEntry` has no image/OCR fields; search excludes `is_image`) | Launcher Clipboard sectioned results | The IMAGES section is omitted entirely while no image rows exist; never render a fake/empty IMAGES section or a category control. Text sections and capture copy are unaffected. |
 | No Windows clipboard-history import/backfill (capture is live-only) | Launcher Clipboard empty states, Preferences clipboard toggle | Copy states capture starts now; never promise or imply pre-install history. Preference helper says previous Windows clipboard history is not imported. |
 | `detect_agents` may return CLIs that are not wired to a run panel (Codex/OpenCode/Cline/Antigravity) | Workflows Agents list | Show them as detected with "Detected · not wired in this build" and no Run/Use control; only Pi is runnable. Never invent rows. |
 
@@ -1113,9 +1100,9 @@ contrast, keyboard focus. **Shadow proof:** light/dark cards on a light and a da
 straight cut-off edge on any side; corner radius reads). **Motion proof:** open and close captured mid-animation (or a
 short clip) plus reduced-motion instant. **Filter strip:** all seven chips in final order with Ctrl+1–7, selected state, keyboard focus, hover, both themes,
 FILES/FOLDERS exact rows (no mixed types), scoped 0-match copy, overflow at 560/820 with the selected chip scrolled into
-view, and a long localised label (German) proving no truncation. **Clipboard categories:** row visible only under
-CLIPBOARD, six chips, all category tags on rows, selected/rest/focus, empty history/category/image-limitation states,
-560/820 overflow, 36 px height proof, no extra height once the scope changes. **Agents:** detected list with
+view, and a long localised label (German) proving no truncation. **Clipboard sections:** only under CLIPBOARD, grouped labels in fixed order (LINKS/EMAILS/PATHS/CODE/TEXT; IMAGES absent in
+alpha), no chip row/tags/tabs, section label metrics and 6 px gap, flattened ↑/↓ across section boundaries, empty
+history/0-match states, standard card height (no +36 px), 560/820 and 125/150/200 % proof, both themes. **Agents:** detected list with
 available/unavailable + real path/version, no fake rows, Pi Use→In use and panel focus, empty/loading/load-error, recent
 runs (empty + completed/failed/cancelled), run summary status/started/duration while running and after finish, quiet
 errors; both themes and 560 width. App: Home (loaded, loading, empty, error — no progress bar), Search & indexes

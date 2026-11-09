@@ -266,3 +266,63 @@ gaps are listed in §8 and are environment/harness limitations, not launcher cod
 - Browser captures: 26 launcher task-1 files (plus the full 62-shot harness run including the 7×3×2 onboarding
   matrix); all at 860×640 / 560×640 / 1280×800, light+dark, DPI 1.25/1.5/2, reduced-motion path unit-tested.
 - Harness leftovers were cleaned (no ProtonSearch/vite-preview processes left after runs).
+
+---
+
+# Addendum — task-21 (final filter strip) and task-25 (clipboard grouped sections)
+
+**Date:** 2026-11-10. **Scope:** `apps/desktop/src/launcher/**`. **Supersedes:** the earlier clipboard-category
+chip-row draft (user rejected "filters on filters"); SCREENS §2.11/§2.12 are what shipped.
+
+## B1. Filter strip (task-21)
+
+- Final seven chips only: **ALL · FILES · FOLDERS · APPS · CLIPBOARD · WEB · ACTIONS** (DOCUMENTS/GIT removed, no
+  ghost chips). Ctrl+1..7 from the input keeps focus; Ctrl+8/9 are unbound. Roving-tab radiogroup, ←/→/Home/End when
+  the strip has focus, horizontal wheel scroll, no drag. The choice is **not persisted**: every launch starts on ALL.
+- Removed scopes stay reachable through query prefixes (file:/files:, folder:/folders:, app:/apps:,
+  clip:/clipboard:, web:/history:/bookmarks:/google:, content:/ocr:, git:/commits:/todos:, calc:/command:). A typed
+  prefix does **not** move the strip; choosing a chip strips a leading prefix from the query.
+- Strict FILES/FOLDERS: FILES = file-backed rows only, FOLDERS = folder rows only. Engine task-19 is still in
+  progress, so the launcher applies a **client-side guard** (folder rows filtered out under FILES, non-folders under
+  FOLDERS) as documented alpha debt; row anatomy verified for both (extension badge vs folder glyph, 20 px glyph).
+- Evidence (browser mock, real React UI, seeded fixtures at capture time): `screenshots/launcher-task21-chips-light.png`,
+  `launcher-task21-chips-dark.png`, `launcher-task21-files-light.png`, `launcher-task21-files-dark.png`,
+  `launcher-task21-folders-light.png`, `launcher-task21-folders-dark.png`; no horizontal overflow at 860/560.
+
+## B2. Clipboard grouped sections (task-25 — final design)
+
+- **No second chip row, no category controls, no per-row tags.** Under the CLIPBOARD chip the result viewport shows
+  clean sections in fixed order **LINKS · EMAILS · PATHS · CODE · TEXT · IMAGES**, only non-empty, each once.
+  Section label: 10 px/700 caps +0.10em `--ps-ink-3`, 14 px line, 28 px block (24 compact = 8/6 + 14), inline
+  padding 14; following sections get a 6 px gap; rows stay 58/48. This is one step quieter than the standard
+  ResultGroup. Sections use `role="group"` + `aria-labelledby` to the visible label (`role="presentation"`);
+  no tab stops, no collapse, no sticky.
+- Classification (grouping only) uses the engine meta label when present, otherwise deterministic text rules from the
+  exposed first line/120 chars (single URL, single email, absolute Windows path, fenced/multi-line code, else TEXT).
+  IMAGES renders only when the engine emits real image rows (alpha: normally absent). Pinned rows sort inside their
+  category (engine order preserved).
+- Keyboard/selection: flattened visual traversal over sections and rows (↑/↓ continue across section boundaries,
+  labels are not stops, Home/End/Ctrl+Home/End first/last, PgUp/Dn unchanged, Enter opens, Esc filter→query→hide).
+  Section labels are announced through group semantics; no extra live region. Tab order is back to
+  input → selected filter chip → preview/footer.
+- Height maths reverted to the standard card: no `--ps-cat-*` strip, no 332 min, no H−192; `H = clamp(296,
+  72+44+40+23+Σ(34+rowH·n), 544)`, window H+56, results `min(365, …)`. No layout shift when switching scope.
+- Empty/loading copy: history off → "Clipboard history is off." / "Turn it on in ProtonSearch → Preferences to keep
+  copied text on this PC."; no history → "No clipboard history yet." / "Copied text and images will appear here from
+  now on. Only copies made while ProtonSearch is running are captured."; 0 matches → "No matches in Clipboard." /
+  "Try different words, or press Esc to clear the filter."; loading = standard 3 skeleton rows (no section labels).
+- Evidence light+dark: `screenshots/launcher-task25-clipboard-mixed-light.png` / `-dark.png` (LINKS/EMAILS/PATHS/CODE
+  with recency, no tags), `launcher-task25-clipboard-empty-light.png` / `-dark.png`,
+  `launcher-task25-clipboard-query-light.png` / `-dark.png` (query "latency"), `launcher-task25-clipboard-560-light.png`.
+  Screenshots use the browser mock with seeded clipboard-fixture rows injected at capture time (the repo mock has no
+  clipboard seed yet); no repo files outside `launcher/**` were modified for this.
+
+## B3. Tests / build evidence
+
+- `npm run build` exit 0; `npm test` → **14 files / 207 tests passed** at this snapshot; launcher suite **76 tests**
+  covering seven chips, Ctrl+1..7, prefix clearing, non-persistence, strict FILES/FOLDERS rendering + guard,
+  grouped-section order/non-empty/classification, flattened traversal across sections, empty/history-off/query empty
+  copy, clipboard history-off copy, V2-04 confirm bar, icons, dismiss handshake.
+- Remaining risk: real-engine screenshot of strict FILES/FOLDERS and grouped clipboard awaits task-19/24 builds;
+  the UI guard and sectioning are engine-agnostic. `--ps-strip-*` tokens are still local fallbacks until L0 promotes
+  them to tokens.css.

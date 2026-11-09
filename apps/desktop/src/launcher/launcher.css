@@ -16,6 +16,13 @@ html[data-window="launcher"] body #root {
 .launcher {
   position: relative;
   --launcher-shadow-pad: 28px;
+  /* Strip/category metrics (SCREENS §2.11/§2.12). Tokens are the design contract;
+     the fallbacks keep the launcher correct until L0 promotes them to tokens.css. */
+  --launcher-strip-height: var(--ps-strip-height, 40px);
+  --launcher-chip-height: var(--ps-chip-height, 26px);
+  --launcher-chip-gap: var(--ps-chip-gap, 6px);
+  --launcher-chip-pad-x: var(--ps-chip-pad-x, 10px);
+  --launcher-strip-pad-x: var(--ps-strip-pad-x, 16px);
   /* Refined multi-layer floating shadow (light); fits inside the 28 px pad. */
   --launcher-shadow: 0 16px 40px rgba(36, 60, 43, 0.14), 0 2px 6px rgba(21, 44, 24, 0.06),
     0 0 0 1px rgba(20, 43, 49, 0.05);
@@ -72,18 +79,25 @@ html[data-window="launcher"] body #root {
 
 .filter-strip {
   flex: none;
-  height: 40px;
+  height: var(--launcher-strip-height);
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 0 12px;
+  gap: var(--launcher-chip-gap);
+  padding: 0 var(--launcher-strip-pad-x);
   border-bottom: 1px solid var(--ps-line);
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   user-select: none;
-  cursor: grab;
+}
+
+:root[data-density="compact"] .launcher {
+  --launcher-strip-height: var(--ps-strip-height-compact, 36px);
+  --launcher-chip-height: var(--ps-chip-height-compact, 24px);
+  --launcher-chip-gap: var(--ps-chip-gap, 5px);
+  --launcher-chip-pad-x: var(--ps-chip-pad-x, 8px);
+  --launcher-strip-pad-x: var(--ps-strip-pad-x, 12px);
 }
 
 .filter-strip::-webkit-scrollbar {
@@ -92,15 +106,15 @@ html[data-window="launcher"] body #root {
 
 .filter-chip {
   flex: none;
-  height: 28px;
-  padding: 0 10px;
-  border: 0;
+  height: var(--launcher-chip-height);
+  padding: 0 var(--launcher-chip-pad-x);
+  border: 1px solid transparent;
   border-radius: var(--ps-radius-control);
   background: transparent;
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-micro);
-  font-weight: var(--ps-fw-label);
-  letter-spacing: 0.12em;
+  font-size: var(--ps-text-meta);
+  font-weight: var(--ps-fw-semibold);
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   white-space: nowrap;
   transition:
@@ -110,19 +124,21 @@ html[data-window="launcher"] body #root {
 }
 
 .filter-chip:hover {
-  background: var(--hover);
+  background: var(--ps-surface-soft);
   color: var(--ps-ink);
 }
 
 .filter-chip[aria-checked="true"] {
   background: var(--ps-accent-soft);
-  color: var(--ps-accent-strong);
+  border-color: var(--ps-accent-border);
+  color: var(--ps-ink);
+  font-weight: 650;
   box-shadow: inset 0 -2px 0 var(--ps-selected-bar);
 }
 
 .filter-chip:focus-visible {
   outline: var(--ps-focus-width) solid var(--ps-focus);
-  outline-offset: calc(-1 * var(--ps-focus-width));
+  outline-offset: var(--ps-focus-offset);
 }
 
 .launcher-body {
@@ -207,6 +223,26 @@ html[data-window="launcher"] body #root {
 
 :root[data-density="compact"] .results .group-label {
   padding: 12px 13px 6px;
+}
+
+/* Clipboard grouped sections (SCREENS §2.12): one step quieter than ResultGroup.
+   28 px block = 8 top + 14 line + 6 bottom; 24 compact = 6 + 14 + 4. */
+.result-subgroup-label {
+  padding: 8px 14px 6px;
+  font-size: var(--ps-text-micro);
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ps-ink-3);
+}
+
+:root[data-density="compact"] .result-subgroup-label {
+  padding: 6px 14px 4px;
+}
+
+.result-subgroup + .result-subgroup {
+  margin-top: 6px;
 }
 
 :root[data-density="compact"] .result {
@@ -373,6 +409,12 @@ html[data-window="launcher"] body #root {
   width: 40px;
   height: 40px;
   border-radius: var(--ps-radius-row);
+}
+
+/* Folder rows use the 20 px folder glyph, never an extension badge. */
+.fileicon--folder .fileicon-glyph {
+  width: 20px;
+  height: 20px;
 }
 
 .fileicon--large img {
@@ -909,7 +951,7 @@ html[data-window="launcher"] body #root {
 
 @media (max-width: 700px) {
   .filter-strip {
-    padding: 0 8px;
+    padding-inline: 8px;
   }
 
   /* SCREENS §6.1: 61 px search row with a 16 px input on a narrow surface. */

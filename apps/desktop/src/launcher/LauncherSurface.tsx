@@ -10,7 +10,6 @@ import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
   type RefObject,
   type WheelEvent as ReactWheelEvent,
 } from "react";
@@ -34,9 +33,13 @@ import { formatBytes, formatNumber } from "../lib/format";
 import { formatRecency } from "./launcherFormat";
 import {
   SCOPE_CHIPS,
-  readStoredScope,
+  clipboardCategoryTag,
+  clipboardSectionDomId,
+  flattenClipboardSections,
+  groupClipboardSections,
+  guardScopeResults,
   scopeIndex,
-  storeScope,
+  stripScopePrefix,
 } from "./launcherScopes";
 import { ResultIcon } from "./ResultIcon";
 import { ResultPreview } from "./ResultPreview";
@@ -79,6 +82,8 @@ export interface LauncherSurfaceProps {
   hideLauncher: () => void;
   showMain: () => void;
   status: EngineStatus | null;
+  /** Settings.privacy.clipboardHistory; hides the category row and explains off. */
+  clipboardHistoryEnabled?: boolean;
   /** Server-side confirmation for destructive native commands (V2-04). */
   confirmNativeAction?: (command: NativeCommand) => Promise<OpenOutcome>;
   density?: Density;
@@ -182,13 +187,14 @@ function countTextFor(
   response: SearchResponse | null,
   searchError: string | null,
   query: string,
+  overrideTotal?: number,
 ): string {
   if (searchError) return "Search unavailable";
   if (pending) return "Searching…";
   if (!response) return "";
   // An empty query with no recents is the quiet placeholder state, not "0 matches".
-  if (response.total === 0 && query.trim().length === 0) return "";
-  return countMatches(response.total);
+  if (overrideTotal === undefined && response.total === 0 && query.trim().length === 0) return "";
+  return countMatches(overrideTotal ?? response.total);
 }
 
 /**
@@ -217,6 +223,11 @@ function itemCountFor(
 function metaText(result: SearchResult): string {
   const meta = result.meta;
   if (!meta) return "";
+  // Clipboard category labels live in the section header, not on every row; the
+  // trailing slot shows recency instead (SCREENS §2.12).
+  if (result.kind === "clipboard" && clipboardCategoryTag(result) !== null) {
+    return meta.modified ? formatRecency(meta.modified) : "";
+  }
   if (meta.label) return meta.label;
   if (meta.modified) return formatRecency(meta.modified);
   if (meta.line != null) return "Line " + meta.line;
@@ -283,7 +294,7 @@ function deriveHints(resultsCount: number, query: string, previewOpen: boolean):
 
 const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
   function LauncherSurface(props, ref) {
-    const { status, density, onGeometry } = props;
+    const { status, density, onGeometry, clipboardHistoryEnabled = true } = props;
     const workArea = props.workArea ?? getWorkAreaSize();
 
     const [query, setQuery] = useState("");
@@ -296,7 +307,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const [notice, setNotice] = useState<string | null>(null);
     const [announcement, setAnnouncement] = useState("");
     const [listScrollTop, setListScrollTop] = useState(0);
-    const [scope, setScope] = useState<SearchScope>(() => readStoredScope());
+    const [scope, setScope] = useState<SearchScope>("all");
     const [motionPhase, setMotionPhase] = useState<"closed" | "entering" | "visible" | "closing">(
       () => (isTauriRuntime() ? "closed" : "visible"),
     );
@@ -310,7 +321,6 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const footerRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
     const confirmCancelRef = useRef<HTMLButtonElement>(null);
-    const filterStripRef = useRef<HTMLDivElement>(null);
     const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const requestIdRef = useRef(0);
@@ -318,13 +328,11 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const epochQueryRef = useRef("");
     const epochScopeRef = useRef<SearchScope>("all");
     const queryRef = useRef("");
-    const scopeRef = useRef<SearchScope>(scope);
+    const scopeRef = useRef<SearchScope>("all");
     const motionPhaseRef = useRef<"closed" | "entering" | "visible" | "closing">(
       isTauriRuntime() ? "closed" : "visible",
     );
     const motionTimerRef = useRef<number | null>(null);
-    const dragRef = useRef<{ startX: number; startLeft: number; moved: boolean } | null>(null);
-    const suppressChipClickRef = useRef(false);
     const composingRef = useRef(false);
     const selectionRef = useRef<SelectionState>(EMPTY_SELECTION);
     const resultsRef = useRef<SearchResult[]>([]);
@@ -345,16 +353,46 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       }
     }, []);
 
-    const results = useMemo(
+    const rawResults = useMemo(
       () => (response ? response.results.slice(0, MAX_RENDERED_ROWS) : []),
       [response],
     );
-    const groups = useMemo(() => groupResults(results), [results]);
-    // Keyboard order is the visual grouped order, so arrow keys move between
-    // rendered neighbours instead of jumping across group sections.
+    // Strict FILES/FOLDERS guard until ps-core task-19 lands (alpha debt).
+    const results = useMemo(
+      () => guardScopeResults(rawResults, scope),
+      [rawResults, scope],
+    );
+    const groups = useMemo(
+      () => (scope === "clipboard" ? [] : groupResults(results)),
+      [results, scope],
+    );
+    // CLIPBOARD results render as clean category sections (task-25); keyboard
+    // order is the flattened visual order of those sections.
+    const clipboardSections = useMemo(
+      () => (scope === "clipboard" ? groupClipboardSections(results) : []),
+      [results, scope],
+    );
+    const displaySections = useMemo(() => {
+      if (scope === "clipboard") {
+        return clipboardSections.map((section) => ({
+          key: "clipboard:" + section.id,
+          label: section.label,
+          labelDomId: clipboardSectionDomId(section.id),
+          items: section.items,
+          subgroup: true,
+        }));
+      }
+      return groups.map((group) => ({
+        key: group.kind as string,
+        label: group.label,
+        labelDomId: groupLabelDomId(group.kind),
+        items: group.items.map((item) => item.result),
+        subgroup: false,
+      }));
+    }, [scope, clipboardSections, groups]);
     const orderedResults = useMemo(
-      () => groups.flatMap((group) => group.items.map((item) => item.result)),
-      [groups],
+      () => displaySections.flatMap((section) => section.items),
+      [displaySections],
     );
     resultsRef.current = orderedResults;
     const visualIndexById = useMemo(() => {
@@ -362,7 +400,10 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       orderedResults.forEach((item, index) => map.set(item.id, index));
       return map;
     }, [orderedResults]);
-    const groupRowCounts = useMemo(() => groups.map((group) => group.items.length), [groups]);
+    const groupRowCounts = useMemo(
+      () => displaySections.map((section) => section.items.length),
+      [displaySections],
+    );
 
     const activeIndex = useMemo(() => {
       if (orderedResults.length === 0) return -1;
@@ -436,9 +477,15 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
 
     const commitResponse = useCallback((next: SearchResponse, epoch: number) => {
       const nextResults = next.results.slice(0, MAX_RENDERED_ROWS);
-      const ordered = groupResults(nextResults).flatMap((group) =>
-        group.items.map((item) => item.result),
-      );
+      // Selection is tracked against the visible rows; the committed guard keeps
+      // the full engine set so a category change never invalidates the epoch.
+      const guarded = guardScopeResults(nextResults, scopeRef.current);
+      const ordered =
+        scopeRef.current === "clipboard"
+          ? flattenClipboardSections(groupClipboardSections(guarded))
+          : groupResults(guarded).flatMap((group) =>
+              group.items.map((item) => item.result),
+            );
       const nextSelection = commitSelection(selectionRef.current, ordered, epoch);
       selectionRef.current = nextSelection;
       setSelection(nextSelection);
@@ -816,14 +863,18 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         }
         scopeRef.current = nextScope;
         setScope(nextScope);
-        storeScope(nextScope);
         const chip = SCOPE_CHIPS.find((candidate) => candidate.scope === nextScope);
         if (chip) announce(chip.label + " filter");
+        // Choosing a chip clears a leading engine scope prefix from the query.
+        const cleanedQuery = stripScopePrefix(queryRef.current);
+        if (cleanedQuery !== queryRef.current) {
+          setQuery(cleanedQuery);
+        }
         // Reset selection immediately; the committed response selects row 0 for
         // the new query epoch (scope changes bump the epoch in runSearch).
         selectionRef.current = EMPTY_SELECTION;
         setSelection(EMPTY_SELECTION);
-        void runSearch(queryRef.current, nextScope);
+        void runSearch(cleanedQuery, nextScope);
         if (focusTarget === "input") focusInput();
       },
       [announce, focusInput, runSearch],
@@ -861,51 +912,16 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
 
     const onChipClick = useCallback(
       (nextScope: SearchScope) => {
-        if (suppressChipClickRef.current) {
-          suppressChipClickRef.current = false;
-          return;
-        }
         applyScope(nextScope, "input");
       },
       [applyScope],
     );
 
+    // Pointer/trackpad wheel scrolls the strip horizontally; no drag (SCREENS §2.11).
     const onStripWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
       const strip = event.currentTarget;
       if (strip.scrollWidth <= strip.clientWidth) return;
       strip.scrollLeft += event.deltaY + event.deltaX;
-    }, []);
-
-    const onStripPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) return;
-      // Chips are click targets; only the strip background starts a drag.
-      if (event.target instanceof Element && event.target.closest(".filter-chip")) return;
-      const strip = event.currentTarget;
-      dragRef.current = { startX: event.clientX, startLeft: strip.scrollLeft, moved: false };
-      try {
-        strip.setPointerCapture(event.pointerId);
-      } catch {
-        /* pointer capture is optional */
-      }
-    }, []);
-
-    const onStripPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const delta = drag.startX - event.clientX;
-      if (Math.abs(delta) > 4) drag.moved = true;
-      event.currentTarget.scrollLeft = drag.startLeft + delta;
-    }, []);
-
-    const onStripPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-      const drag = dragRef.current;
-      dragRef.current = null;
-      try {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      } catch {
-        /* already released */
-      }
-      if (drag?.moved) suppressChipClickRef.current = true;
     }, []);
 
     useEffect(() => {
@@ -928,10 +944,13 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         if (event.nativeEvent.isComposing || composingRef.current) return;
         const count = resultsRef.current.length;
         const key = event.key === "Spacebar" ? " " : event.key;
-        if (event.ctrlKey && !event.altKey && /^[1-9]$/.test(key)) {
-          event.preventDefault();
-          applyScope(SCOPE_CHIPS[Number(key) - 1].scope, "input");
-          return;
+        if (event.ctrlKey && !event.altKey && !event.shiftKey && /^[1-9]$/.test(key)) {
+          const index = Number(key) - 1;
+          if (index < SCOPE_CHIPS.length) {
+            event.preventDefault();
+            applyScope(SCOPE_CHIPS[index].scope, "input");
+            return;
+          }
         }
         switch (key) {
           case "ArrowDown":
@@ -1042,6 +1061,12 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
           focusInput();
           return;
         }
+        // Esc chain: filter reset -> query clear -> hide.
+        // Confirmation/menu/preview handled above.
+        if (scopeRef.current !== "all") {
+          applyScope("all", "input");
+          return;
+        }
         if (queryRef.current.length > 0) {
           resetState("");
           focusInput();
@@ -1052,6 +1077,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       },
       [
         announce,
+        applyScope,
         cancelConfirmation,
         closeMenu,
         dismiss,
@@ -1119,12 +1145,41 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     }, [menuOpen, activeIndex, flatEntries, listScrollTop, metrics]);
 
     const footerStatus = deriveFooterStatus(status, response, searchError);
-    const liveCount = useThrottledLiveText(countTextFor(pending, response, searchError, query));
+    const scopedGuardActive = scope === "files" || scope === "folders";
+    const countOverride = scopedGuardActive ? results.length : undefined;
+    const liveCount = useThrottledLiveText(
+      countTextFor(pending, response, searchError, query, countOverride),
+    );
     const hints = deriveHints(results.length, query, previewOpen);
     const itemCount = itemCountFor(status, response);
-    const countText = countTextFor(pending, response, searchError, query);
+    const countText = countTextFor(pending, response, searchError, query, countOverride);
     const showSkeleton = pending && response === null && !searchError;
     const queryText = query.trim();
+    const scopeLabel = SCOPE_CHIPS.find((chip) => chip.scope === scope)?.label ?? "ALL";
+    let emptyStrong = "";
+    let emptyHint = "";
+    if (scope === "clipboard") {
+      if (!clipboardHistoryEnabled) {
+        emptyStrong = "Clipboard history is off.";
+        emptyHint = "Turn it on in ProtonSearch → Preferences to keep copied text on this PC.";
+      } else if (queryText.length > 0) {
+        emptyStrong = "No matches in Clipboard.";
+        emptyHint = "Try different words, or press Esc to clear the filter.";
+      } else {
+        emptyStrong = "No clipboard history yet.";
+        emptyHint =
+          "Copied text and images will appear here from now on. Only copies made while ProtonSearch is running are captured.";
+      }
+    } else if (scope !== "all") {
+      emptyStrong = "No matches in " + scopeLabel + ".";
+      emptyHint = "Try another category, or press Esc to clear the filter.";
+    } else if (queryText.length > 0) {
+      emptyStrong = "No matches for “" + queryText + "”.";
+      emptyHint = "Try a different spelling, or a prefix such as file:, history:, or code:.";
+    } else {
+      emptyStrong = "Start typing to search files, apps, and actions.";
+      emptyHint = "Try a file name, an app, or a command like “lock”.";
+    }
     const previewMode = metrics.previewMode;
     const rootClassName = [
       "launcher",
@@ -1189,15 +1244,10 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
 
         <div
           className="filter-strip"
-          ref={filterStripRef}
           role="radiogroup"
           aria-label="Filter results"
           data-testid="filter-strip"
           onWheel={onStripWheel}
-          onPointerDown={onStripPointerDown}
-          onPointerMove={onStripPointerMove}
-          onPointerUp={onStripPointerUp}
-          onPointerCancel={onStripPointerUp}
         >
           {SCOPE_CHIPS.map((chip, index) => {
             const active = scope === chip.scope;
@@ -1234,26 +1284,29 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
               aria-label="Results"
               aria-busy={pending || undefined}
             >
-              {groups.map((group) => (
+              {displaySections.map((section) => (
                 <div
-                  key={group.kind}
-                  className="result-group"
+                  key={section.key}
+                  className={"result-group" + (section.subgroup ? " result-subgroup" : "")}
                   role="group"
-                  aria-labelledby={groupLabelDomId(group.kind)}
+                  aria-labelledby={section.labelDomId}
                   data-testid="result-group"
+                  data-subgroup={section.subgroup ? "true" : undefined}
                 >
                   <div
-                    className="group-label"
-                    id={groupLabelDomId(group.kind)}
+                    className={section.subgroup ? "result-subgroup-label" : "group-label"}
+                    id={section.labelDomId}
                     role="presentation"
                   >
-                    {group.label}
+                    {section.label}
                   </div>
-                  {group.items.map(({ result }) => {
+                  {section.items.map((result) => {
                     const index = visualIndexById.get(result.id) ?? 0;
                     const isSelected = index === activeIndex;
                     const meta = metaText(result);
-                    const description = [result.path ?? result.subtitle, meta].filter(Boolean).join(" · ");
+                    const description = [result.path ?? result.subtitle, meta]
+                      .filter(Boolean)
+                      .join(" · ");
                     return (
                       <div
                         key={result.id}
@@ -1335,17 +1388,8 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
 
             {!showSkeleton && !searchError && results.length === 0 ? (
               <div className="launcher-state" role="status" data-testid="empty-state">
-                {queryText.length > 0 ? (
-                  <>
-                    <strong>No matches for “{queryText}”.</strong>
-                    <span>Try a different spelling, or a prefix such as file:, history:, or code:.</span>
-                  </>
-                ) : (
-                  <>
-                    <strong>Start typing to search files, apps, and actions.</strong>
-                    <span>Try a file name, an app, or a command like “lock”.</span>
-                  </>
-                )}
+                <strong>{emptyStrong}</strong>
+                <span>{emptyHint}</span>
               </div>
             ) : null}
           </div>

@@ -498,20 +498,18 @@ export default function OnboardingView() {
               />
               <span className="choice-text">
                 <span className="choice-name">Set up agent workflows later</span>
-                <span className="choice-hint">
-                  The runtime stays off until you run one. ProtonSearch works fully without it.
-                </span>
+                <span className="choice-hint">The Pi runtime stays off until you run one.</span>
               </span>
             </label>
             <Callout tone="note">
-              No models are downloaded automatically. You choose a provider and a model in
-              Preferences.
+              ProtonSearch never downloads Pi, a model or a provider key. Install the Pi CLI
+              yourself later if you want agent workflows.
             </Callout>
             <details className="disclosure">
               <summary>What leaves this PC?</summary>
               <p>
-                Nothing leaves this PC unless you configure a provider and run an agent workflow.
-                Then the prompt and the data you approve are sent to that provider.
+                Nothing leaves this PC unless you install Pi, configure a provider and run an agent
+                workflow. Then the prompt, context and tool output are sent to that provider.
               </p>
             </details>
           </>

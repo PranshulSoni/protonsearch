@@ -43,7 +43,6 @@ Bindings below are the contract. "Selected row" means the option referenced by `
 | **Summon hotkey** (default **Alt+Space**, user-configurable) | anywhere | Show launcher with empty query and focused input; press again while visible → hide | Global; default preserved from legacy (`protonsearch/src/settings.rs:149-150`); conflict detection `hotkey.rs:67-88`. Never hard-code the chord in UI copy beyond the footer's "Alt + Space" where it is the configured value. |
 | **Esc** | context menu open | Close menu, return focus to input, selection unchanged | first in the chain |
 | **Esc** | preview open (no menu) | Close preview, keep query and selection | |
-| **Esc** | clipboard category active (no menu/preview) | Reset clipboard category to ALL, keep CLIPBOARD filter and query, focus stays per §2.12 | before the filter clear |
 | **Esc** | filter active (no menu/preview) | Clear filter to All, keep query/results, focus input | before clearing the query |
 | **Esc** | query non-empty | Clear query and selection, keep window open, focus input | reference footer: "Esc Clear" (reference:136) |
 | **Esc** | query empty | Hide launcher | "Esc Close" when empty |
@@ -62,15 +61,11 @@ Bindings below are the contract. "Selected row" means the option referenced by `
 | **Home / End** | filter strip focused | Select All / last filter | same |
 | **Space / Enter** | filter strip focused | Re-apply the focused chip (no-op if already selected) | |
 | **Ctrl+1 … Ctrl+7** | input focused | Select ALL / FILES / FOLDERS / APPS / CLIPBOARD / WEB / ACTIONS in order; input keeps focus; results re-scope instantly | Ctrl+8/Ctrl+9 unbound — do not capture them |
-| **Tab into clipboard category strip** | CLIPBOARD active and category strip visible | Focus the selected category chip (one roving tab stop); Tab again leaves for preview/footer | only when CLIPBOARD is selected and history is on |
-| **← / →** | clipboard category strip focused | Change the category immediately (radiogroup) and keep focus | filters visible clipboard rows client-side; count updates |
-| **Home / End** | clipboard category strip focused | Select ALL / IMAGES | same |
-| **Space / Enter** | clipboard category strip focused | Re-apply the focused category (no-op if already selected) | |
 | **Shift+Enter / Shift+↑↓ / Ctrl+A** | clipboard results | **Unbound — clipboard multi-select is CUT for v2.0 alpha** (SCREENS §10) | Do not render a teaser or disabled markers |
 | **Ctrl+C** | input has **no text selection** and a row is selected | Copy the full path (files/folders), URL (web), or text (clipboard) of the selected row; footer announces "Path copied" | if input text is selected, native copy wins |
 | **Ctrl+C** | input text selected | Native copy of the selection | |
 | **Menu key / Shift+F10** | row selected | Open the row's context menu, focus first item | |
-| **Tab** | launcher | Move focus: input → filter strip (selected chip) → clipboard category strip (selected chip, only when visible) → preview scroll region (if open) → preview action buttons (if any) → "Open ProtonSearch" → input | stops are never the result rows (combobox pattern) |
+| **Tab** | launcher | Move focus: input → filter strip (selected chip) → preview scroll region (if open) → preview action buttons (if any) → "Open ProtonSearch" → input | stops are never the result rows (combobox pattern; clipboard sections add no tab stops) |
 | **Shift+Tab** | launcher | Reverse of Tab | |
 | **Typing / Backspace / Delete / Ctrl+A/C/X/V/Z** | input focused | Native text editing; typing always goes to the query | selection resets to row 0 on any query change |
 | **Alt+F4** | launcher | OS close (hide) | native behaviour allowed |
@@ -84,15 +79,14 @@ shortcut. Shortcut education lives only in the footer and Preferences.
 ```text
 if (menuOpen)                  closeMenu();             return
 if (previewOpen)               closePreview();          return
-if (clipboardCategoryActive)   clearClipboardCategory(); return   // category -> ALL only
 if (filterActive)              clearFilter();            return
 if (query.length > 0)          clearQuery();            return
                                hideLauncher()
 ```
 
 Every branch keeps focus on the input except "hide". No branch triggers an action. The chain is menu → preview →
-clear clipboard category (when it is not ALL) → clear filter → clear query → hide (multi-select is CUT for v2.0 alpha,
-SCREENS §10). Ctrl+1–7 change the main filter and reset the category to ALL.
+clear filter → clear query → hide (multi-select is CUT for v2.0 alpha, SCREENS §10). Clipboard sections add no branch:
+grouping is presentation, not a filter.
 
 ### 2.2 Caret vs list keys
 
@@ -211,7 +205,7 @@ navigable); it is an ordered list with `aria-current="step"`.
 | Input | `role="combobox"`, `aria-expanded` ("true" when options exist, "false" when empty/0 results/error), `aria-controls="ps-results"`, `aria-autocomplete="list"`, `aria-activedescendant="ps-opt-<id>"` (only while a row is active), `aria-label="Search files, apps, and actions"`, `autocomplete="off"`, `spellcheck="false"` | the visible placeholder is **not** the label |
 | Listbox | `role="listbox"`, `aria-label="Results"`; **single-select only in alpha** (multi-select CUT — §5), so no `aria-multiselectable` | one listbox; virtualisation keeps option ids stable |
 | Filter strip | `role="radiogroup"` + `aria-label="Filter results"`; each of the seven chips `role="radio"` + `aria-checked`, one roving tab stop (selected chip only); Ctrl+1–7 are shortcuts, not tab stops | never `role="tab"`; selecting swaps the scoped result set in the same listbox; labels localised, no counts in chips (SCREENS §2.11) |
-| Clipboard category strip | `role="radiogroup"` + `aria-label="Clipboard categories"`; six chips `role="radio"` + `aria-checked`, one roving tab stop; only present under CLIPBOARD | client-side filter over the same listbox; no extra live region; Esc order per §2.1 (SCREENS §2.12) |
+| Clipboard sections | under CLIPBOARD only, clipboard options are wrapped in `role="group"` sections labelled by visible caps labels (LINKS/EMAILS/PATHS/CODE/TEXT/IMAGES); labels are `role="presentation"` and not options | labels are never tab stops or controls; `aria-activedescendant` stays flat across sections so ↑/↓ crosses boundaries; the section label announces when the active option enters it (SCREENS §2.12) |
 | Group | `role="group"` + `aria-labelledby` to the visible caps label | label element is `role="presentation"`, the group name carries it |
 | Option | `role="option"`, id from the stable result id, `aria-selected` as in §5, `aria-describedby` pointing to path/meta text | accessible name = item title only; description = path + trailing meta; disabled option `aria-disabled="true"` with the reason in the description |
 | Count | `role="status"` `aria-live="polite"` `aria-atomic="true"` | throttle to ≤1 update/300 ms; announce "No matches" once |
@@ -389,6 +383,8 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 12. **Filter strip:** seven chips in final order, Ctrl+1–7 from the input (Ctrl+8/9 unbound), FILES/FOLDERS exact rows;
     selected chip keeps its 2 px bar at 560/820 widths; Tab lands on the selected chip only; ←/→ dispatches a scoped
     search and keeps focus; Home/End reach ALL/ACTIONS; Esc clears to ALL and returns focus to the
+13. **Clipboard sections:** under CLIPBOARD only, ↑/↓ cross section boundaries without stopping on labels, labels
+    are not tab stops/options, no chip row or category control exists, and the standard card height applies.
     input; overflow scrolls the focused chip into view; no truncation with a long localised label.
 
 ---

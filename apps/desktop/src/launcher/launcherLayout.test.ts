@@ -87,10 +87,10 @@ describe("computeLauncherMetrics", () => {
       previewOpen: false,
       workArea: WORK_AREA,
     });
-    // 72 + 40 + 23 + 204 + 44 + 2 = 385 -> snapped 386.
+    // 72 + 36 compact filter + 23 + 204 + 44 + 2 = 381 -> snapped 382.
     expect(metrics.rowHeight).toBe(48);
     expect(metrics.labelHeight).toBe(30);
-    expect(metrics.baseHeight).toBe(386);
+    expect(metrics.baseHeight).toBe(382);
     expect(metrics.listViewport).toBe(228);
   });
 
@@ -102,7 +102,7 @@ describe("computeLauncherMetrics", () => {
       workArea: WORK_AREA,
     });
     expect(metrics.baseHeight).toBe(MAX_LAUNCHER_HEIGHT);
-    expect(metrics.listViewport).toBe(322);
+    expect(metrics.listViewport).toBe(365); // capped by MAX_RESULTS_VIEWPORT
   });
 
   it("reserves 44 px for the inline confirmation bar above the footer", () => {

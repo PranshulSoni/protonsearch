@@ -256,9 +256,9 @@ decisions recorded here so docs and code cannot drift:
 - **User visual pass (2026-11-09):** launcher shadow retuned to layered tokens that fit the 28 px pad (§5.4); launcher
   open/close motion 150/110 ms (§6.3/§6.4); horizontal filter strip added (SCREENS §2.11); stale app/title-bar icon is
   a defect (REVIEW_1 §8).
-- **Filter/clipboard/agents pass (2026-11-10, task-23):** filter strip final seven chips ALL/FILES/FOLDERS/APPS/
-  CLIPBOARD/WEB/ACTIONS with Ctrl+1–7; DOCUMENTS/GIT removed but prefixes kept; strict FILES/FOLDERS rows; clipboard
-  category strip + row tags + honest capture copy (§2.12); Workflows Agents section; tokens in §11.
+- **Filter/clipboard/agents pass (2026-11-10):** filter strip final seven chips ALL/FILES/FOLDERS/APPS/CLIPBOARD/WEB/
+  ACTIONS with Ctrl+1–7; DOCUMENTS/GIT removed but prefixes kept; strict FILES/FOLDERS rows; clipboard category **sections**
+  inside the results viewport (no chip row/tags; task-26); Workflows Agents section.
 - **App readability pass (2026-11-09):** app/onboarding type scale raised one step (§4.2b, main-window tokens only);
   12-column alignment grid and rhythm added (§5.5); quiet error/empty/offline state family added (§8.3, copy map
   SCREENS §3.7); launcher tokens and specs unchanged/final.
@@ -733,10 +733,9 @@ below must implement all states that apply, including empty/loading/error at its
 | 32 | **FilterStrip** | horizontal category chips: `role="radiogroup"`, one roving tab stop; selected = `--ps-accent-soft` fill + 1 px `--ps-accent-border` + 2 px inset bottom `--ps-selected-bar`; 11/600 uppercase | block 40 px (36 compact); chip 26 px (24 compact); gap 6; inline pad 16 | **final seven chips: ALL · FILES · FOLDERS · APPS · CLIPBOARD · WEB · ACTIONS** with Ctrl+1–7 from the input; FILES/FOLDERS exact object types; scrolls horizontally (no wrap/fade); Tab enters selected chip, ←/→/Home/End change, Esc clears to All; spec SCREENS §2.11 |
 | 33 | **OfflineNotice** | `.state.state--offline` variant: cloud-off icon, title "You're offline.", one sentence, optional Try again | same block metrics as ErrorState | only for genuinely network-dependent content; local search/indexing never shows it; `role="status"` |
 | 34 | **DetailsDisclosure** | native `<details>`: summary "Details" 12/600 `--ps-ink-2`; content 12/18 `--ps-ink-2` — sanitized message + reference id only | — | collapsed by default; no stack traces, no paths, no raw `err.message`; omit entirely if there is nothing safe to show |
-| 35 | **ClipboardCategoryStrip** | second-level quiet chips under CLIPBOARD only: `role="radiogroup"` + `aria-label="Clipboard categories"`; selected = surface-soft fill + 1 px line-strong + 2 px inset bottom bar + ink 650; 10/650 caps `+0.06em` | block 36 px (32 compact); chip 24 (22 compact); gap 6 (5); inline pad 16 (12); pad-x 9 (8); radius 6 | six chips ALL · LINKS · EMAILS · PATHS · CODE · IMAGES; client-side filter over clipboard rows; no row persisted; spec SCREENS §2.12 |
-| 36 | **ResultTag** | 1 px line border, 0 5 padding, 10/650 caps `+0.06em` ink-2; no semantic colour | height 16; radius 4 | clipboard row category LINK/EMAIL/PATH/CODE/IMAGE/TEXT before the relative time; tag stays at ≤700 while time hides; category word in the accessible description |
-| 37 | **AgentRuntimeRow** | 68 px row: 24 px icon slot (20 px glyph) · name 14/600 · version badge 18 · availability badge (Available/Not found) · path 12/18 middle-ellipsis + `title` · detail 12/18 ink-3; Pi primary = 2 px start bar + "Default" tag + "Use"/"In use" | 68 px row; 1 px rule | only shell-detected runtimes, never invented; only Pi runnable; other detected = "Detected · not wired in this build" with no control; badges pair word+colour, no fake green |
-| 38 | **AgentRunSummary** | three 44 px metric rows: Status (8 px dot + word), Started (localized `Today, 14:32`), Duration (tabular `0.1 s`/`m ss`) | 44 px rows; label 13 ink-2 · value 14/600 right | shown while running and after finished/failed/cancelled; no runs = "No runs yet."; status words Completed/Failed/Cancelled/Running, never colour-only |
+| 35 | **ClipboardCategorySection** | quiet section inside the results viewport for CLIPBOARD only: caps label + its rows, `role="group"` + `aria-labelledby`; label 10/700 `+0.10em` `--ps-ink-3`, no count/icon/control; no chip row, no row tags, no filtering controls | label block **28 px** (24 compact = 8 top + 14 line + 6 bottom), inline pad 14; **6 px** between sections; rows 58/48 | fixed order **LINKS · EMAILS · PATHS · CODE · TEXT · IMAGES**, only non-empty; flattened keyboard traversal (labels are not stops); standard card height (no +36 px); spec SCREENS §2.12 |
+| 36 | **AgentRuntimeRow** | 68 px row: 24 px icon slot (20 px glyph) · name 14/600 · version badge 18 (11/650, app floor) · availability badge 18 · path 12/18 middle-ellipsis + `title` · detail 12/18 ink-3; Pi primary = 2 px start bar + "Default" tag + "Use"/"In use" | 68 px row; 1 px rule | only shell-detected runtimes, never invented; only Pi runnable; other detected = "Detected · not wired in this build" with no control; badges pair word+colour, no fake green |
+| 37 | **AgentRunSummary** | three 44 px metric rows: Status (8 px dot + word), Started (localized `Today, 14:32`), Duration (tabular `0.1 s`/`m ss`) | 44 px rows; label 13 ink-2 · value 14/600 right | shown while running and after finished/failed/cancelled; no runs = "No runs yet."; status words Completed/Failed/Cancelled/Running, never colour-only |
 
 ### 8.2 Complex-component rules
 
@@ -777,18 +776,19 @@ preview panel keeps full body height. **Final order: ALL · FILES · FOLDERS · 
 with Ctrl+1–7 from the input (Ctrl+8/9 unbound). FILES/FOLDERS are exact object types: FILES never renders folder rows,
 FOLDERS never renders file rows; DOCUMENTS/CODE groups stay in ALL and use the `content:`/`git:` prefixes. The
 removed DOCUMENTS/GIT chips are never rendered as ghosts. Radio-group semantics, not tabs: ←/→ changes the filter
-immediately and keeps focus; Tab lands on the selected chip and then leaves for the clipboard category strip (when
-visible), preview or footer; Home/End jump to first/last. Selected state uses the same 2 px accent bar as result rows
+immediately and keeps focus; Tab lands on the selected chip and then leaves for the preview or footer; Home/End jump
+to first/last. Selected state uses the same 2 px accent bar as result rows
 (fill alone is 1.14:1 and fails WCAG 1.4.11). Overflow is horizontal scroll only (`overflow-x:auto`, hidden scrollbar);
 the selected chip scrolls into view on focus/keyboard change; no gradient/fade edges. Labels are uppercase and
 localised; no counts inside chips. Full spec: SCREENS §2.11.
 
-**ClipboardCategoryStrip.** A second-level quiet strip below the main strip, rendered only with CLIPBOARD selected and
-clipboard history on: ALL · LINKS · EMAILS · PATHS · CODE · IMAGES (10/650 caps, 24 px chips, 36 px block). It filters
-the returned clipboard rows client-side and resets to ALL on scope change; it adds 36 px to the card minimum (window
-minimum 560×388 for that state) and reduces the results viewport by 36 px. Every clipboard row carries a 16 px
-ResultTag (LINK/EMAIL/PATH/CODE/IMAGE/TEXT) before the time. See SCREENS §2.12 for geometry, classification, empty copy
-and the Esc order.
+**ClipboardCategorySection.** Inside the results viewport, clipboard results are grouped into quiet sections under the
+CLIPBOARD chip only: LINKS · EMAILS · PATHS · CODE · TEXT · IMAGES (fixed order, only non-empty; alpha has no image rows,
+so IMAGES is omitted). There is **no second chip row, no filtering control and no per-row tag** — the user already chose
+Clipboard once; grouping is presentation, not another filter. Section label: 10/700 caps +0.10em, ink-3, 28 px block
+(8/14/6), 14 px inline pad, 6 px between sections; each section is a `role="group"` labelled by its visible label; labels
+are not tab stops and the listbox traversal stays flat across sections. Card height/window math is the normal launcher
+formula (no extra 36 px). See SCREENS §2.12 for classification, empty/loading states and keyboard.
 
 **Agents section.** Workflows' top panel lists only runtimes the shell actually detected: 68 px rows, real path/version,
 availability word + badge, no invented rows. Only Pi is runnable in alpha; other detected CLIs show "Detected · not wired
@@ -974,9 +974,6 @@ the semantics.
   /* Launcher filter strip */
   --ps-strip-height: 40px; --ps-chip-height: 26px; --ps-chip-gap: 6px;
   --ps-chip-pad-x: 10px; --ps-chip-radius: 6px; --ps-strip-pad-x: 16px;
---ps-cat-strip-height: 36px; --ps-cat-chip-height: 24px; --ps-cat-chip-gap: 6px;
---ps-cat-chip-pad-x: 9px; --ps-cat-chip-radius: 6px;
---ps-tag-height: 16px; --ps-tag-radius: 4px; --ps-tag-pad-x: 5px;
 }
 
 :root[data-theme="dark"] {
@@ -1016,7 +1013,6 @@ the semantics.
   --ps-control-height: 28px; --ps-field-height: 32px;
   --ps-strip-height: 36px; --ps-chip-height: 24px; --ps-chip-gap: 5px;
   --ps-chip-pad-x: 8px; --ps-strip-pad-x: 12px;
-  --ps-cat-strip-height: 32px; --ps-cat-chip-height: 22px; --ps-cat-chip-gap: 5px; --ps-cat-chip-pad-x: 8px;
 }
 
 html[data-window="main"] {

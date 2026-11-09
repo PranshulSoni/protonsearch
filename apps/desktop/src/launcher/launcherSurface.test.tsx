@@ -11,7 +11,6 @@ import type {
 } from "../bridge/types";
 import LauncherSurface, { type LauncherSurfaceHandle } from "./LauncherSurface";
 import type { WorkAreaSize } from "./launcherLayout";
-import { SCOPE_STORAGE_KEY } from "./launcherScopes";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -90,7 +89,11 @@ function response(
   };
 }
 
-function setup(options?: { workArea?: WorkAreaSize; status?: EngineStatus }): Harness {
+function setup(options?: {
+  workArea?: WorkAreaSize;
+  status?: EngineStatus;
+  clipboardHistoryEnabled?: boolean;
+}): Harness {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -118,6 +121,7 @@ function setup(options?: { workArea?: WorkAreaSize; status?: EngineStatus }): Ha
         hideLauncher={hideLauncher}
         showMain={showMain}
         status={options?.status ?? READY}
+        clipboardHistoryEnabled={options?.clipboardHistoryEnabled ?? true}
         density="comfortable"
         workArea={options?.workArea ?? WIDE}
         onGeometry={onGeometry}
@@ -920,23 +924,22 @@ describe("category filter strip", () => {
       (element) => element.textContent === label,
     ) ?? null;
 
-  it("renders nine chips, defaults to All and sends scope on the initial search", async () => {
+  it("renders seven chips, defaults to All and sends scope on the initial search", async () => {
     const harness = setup();
     await resolveSearch(harness, 0, THREE);
     const chips = [...harness.container.querySelectorAll('[data-testid="filter-chip"]')];
-    expect(chips.length).toBe(9);
+    expect(chips.length).toBe(7);
     expect(chips.map((element) => element.textContent)).toEqual([
       "ALL",
       "FILES",
       "FOLDERS",
-      "DOCUMENTS",
       "APPS",
       "CLIPBOARD",
       "WEB",
-      "GIT",
       "ACTIONS",
     ]);
     expect(chips[0].getAttribute("aria-checked")).toBe("true");
+    expect(chips[4].getAttribute("aria-keyshortcuts")).toBe("Control+5");
     expect(
       harness.container.querySelector('[role="radiogroup"][aria-label="Filter results"]'),
     ).not.toBeNull();
@@ -967,29 +970,48 @@ describe("category filter strip", () => {
     expect(chip(harness, "ALL")?.getAttribute("aria-checked")).toBe("false");
   });
 
-  it("supports Ctrl+1..9 from the input without moving focus", async () => {
+  it("supports Ctrl+1..7 from the input without moving focus", async () => {
     const harness = setup();
     await resolveSearch(harness, 0, THREE);
     const input = inputOf(harness);
 
     await press(input, "4", { ctrlKey: true });
-    expect(harness.pending[1].request.scope).toBe("content");
+    expect(harness.pending[1].request.scope).toBe("apps");
     expect(document.activeElement).toBe(input);
     await resolveSearch(harness, 1, THREE);
-    expect(chip(harness, "DOCUMENTS")?.getAttribute("aria-checked")).toBe("true");
+    expect(chip(harness, "APPS")?.getAttribute("aria-checked")).toBe("true");
+
+    await press(input, "5", { ctrlKey: true });
+    expect(harness.pending[2].request.scope).toBe("clipboard");
+    await resolveSearch(harness, 2, THREE);
+
+    // Ctrl+8/9 no longer map to a removed chip.
+    await press(input, "8", { ctrlKey: true });
+    expect(harness.pending.length).toBe(3);
 
     await press(input, "1", { ctrlKey: true });
-    expect(harness.pending[2].request.scope).toBe("all");
+    expect(harness.pending[3].request.scope).toBe("all");
     expect(document.activeElement).toBe(input);
   });
 
-  it("remembers the scope for the session", async () => {
-    window.sessionStorage.setItem(SCOPE_STORAGE_KEY, "git");
+  it("always starts on ALL: the filter choice is not persisted", async () => {
+    window.sessionStorage.setItem("protonsearch.launcher.scope", "git");
     const harness = setup();
-    expect(harness.pending[0].request.scope).toBe("git");
-    expect(chip(harness, "GIT")?.getAttribute("aria-checked")).toBe("true");
+    expect(harness.pending[0].request.scope).toBe("all");
+    expect(chip(harness, "ALL")?.getAttribute("aria-checked")).toBe("true");
     await resolveSearch(harness, 0, THREE);
-    expect(chip(harness, "GIT")?.getAttribute("aria-checked")).toBe("true");
+    expect(chip(harness, "ALL")?.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("keeps the removed content/git scopes reachable only through query prefixes", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    const labels = [...harness.container.querySelectorAll('[data-testid="filter-chip"]')].map(
+      (element) => element.textContent,
+    );
+    expect(labels).not.toContain("DOCUMENTS");
+    expect(labels).not.toContain("GIT");
+    expect(harness.pending[0].request.query).toBe("");
   });
 
   it("keeps the strip horizontally scrollable without wrapping chips", async () => {
@@ -1119,5 +1141,274 @@ describe("dismiss handshake cancellation", () => {
       .querySelector('[data-testid="launcher"]')
       ?.getAttribute("data-phase");
     expect(phase === "visible" || phase === "entering").toBe(true);
+  });
+});
+
+describe("FILES vs FOLDERS strict rendering", () => {
+  const fileRow = result({
+    id: "file:report",
+    title: "report.txt",
+    kind: "file",
+    subtitle: "Documents / Reports",
+    icon: { type: "file_type", ext: "txt" },
+  });
+  const folderRow = result({
+    id: "folder:projects",
+    title: "Projects",
+    kind: "folder",
+    subtitle: "Documents / Projects",
+    icon: { type: "file_type", ext: "folder" },
+  });
+
+  it("renders separate FILES and FOLDERS groups with the right row anatomy in ALL", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, [fileRow, folderRow]);
+    const labels = [...harness.container.querySelectorAll(".group-label")].map(
+      (label) => label.textContent,
+    );
+    expect(labels).toEqual(["FILES", "FOLDERS"]);
+    const fileOption = harness.container.querySelector('[data-result-id="file:report"]');
+    expect(fileOption?.querySelector(".fileicon-text")?.textContent).toBe("TXT");
+    const folderOption = harness.container.querySelector('[data-result-id="folder:projects"]');
+    expect(folderOption?.querySelector("svg.fileicon-glyph")).not.toBeNull();
+    expect(folderOption?.getAttribute("aria-label")).toBe("Projects");
+  });
+
+  it("renders FILES-only and FOLDERS-only responses strictly", async () => {
+    const filesOnly = setup();
+    await resolveSearch(filesOnly, 0, [fileRow]);
+    expect(
+      [...filesOnly.container.querySelectorAll(".group-label")].map((label) => label.textContent),
+    ).toEqual(["FILES"]);
+    expect(filesOnly.container.querySelectorAll('[role="option"]').length).toBe(1);
+    expect(
+      [...filesOnly.container.querySelectorAll(".group-label")].map((label) => label.textContent),
+    ).not.toContain("FOLDERS");
+
+    const foldersOnly = setup();
+    await resolveSearch(foldersOnly, 0, [folderRow]);
+    expect(
+      [...foldersOnly.container.querySelectorAll(".group-label")].map((label) => label.textContent),
+    ).toEqual(["FOLDERS"]);
+    expect(foldersOnly.container.querySelector('[role="option"] svg.fileicon-glyph')).not.toBeNull();
+  });
+
+  it("sends strict files/folders scopes and keeps single-kind rendering", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    const filesChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
+      (element) => element.textContent === "FILES",
+    );
+    await act(async () => {
+      filesChip?.click();
+      await Promise.resolve();
+    });
+    expect(harness.pending[1].request.scope).toBe("files");
+    await resolveSearch(harness, 1, [fileRow]);
+    expect(
+      [...harness.container.querySelectorAll(".group-label")].map((label) => label.textContent),
+    ).toEqual(["FILES"]);
+
+    const foldersChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
+      (element) => element.textContent === "FOLDERS",
+    );
+    await act(async () => {
+      foldersChip?.click();
+      await Promise.resolve();
+    });
+    expect(harness.pending[2].request.scope).toBe("folders");
+    await resolveSearch(harness, 2, [folderRow]);
+    expect(
+      [...harness.container.querySelectorAll(".group-label")].map((label) => label.textContent),
+    ).toEqual(["FOLDERS"]);
+  });
+});
+
+describe("clipboard grouped sections", () => {
+  const clip = (id: string, label: string | null, title: string): SearchResult =>
+    result({
+      id,
+      title,
+      kind: "clipboard",
+      subtitle: "Copied just now",
+      icon: { type: "monogram" },
+      meta: label ? { label, modified: Date.now() - 60_000 } : { modified: Date.now() - 60_000 },
+      action: { type: "copy_text", text: title },
+    });
+  const seeds = [
+    clip("clip:link", "LINK", "https://example.com/docs"),
+    clip("clip:email", "EMAIL", "hello@example.com"),
+    clip("clip:path", "PATH", "C:\\Users\\Pranshul\\Documents"),
+    clip("clip:code", "CODE", "const answer = 42;"),
+    clip("clip:text", "TEXT", "remember the milk"),
+    clip("clip:image", "IMAGE", "Screenshot.png"),
+  ];
+
+  const openClipboard = async (
+    harness: Harness,
+    rows: SearchResult[],
+    query = "",
+  ): Promise<void> => {
+    await resolveSearch(harness, 0, THREE);
+    if (query) {
+      setInputValue(harness, query);
+      await resolveSearch(harness, 1, THREE);
+    }
+    const clipboardChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
+      (element) => element.textContent === "CLIPBOARD",
+    );
+    await act(async () => {
+      clipboardChip?.click();
+      await Promise.resolve();
+    });
+    await resolveSearch(harness, harness.pending.length - 1, rows);
+  };
+  const sectionLabels = (harness: Harness): (string | null)[] =>
+    [...harness.container.querySelectorAll('[data-testid="result-group"]')].map(
+      (group) =>
+        group.querySelector(".result-subgroup-label, .group-label")?.textContent ?? null,
+    );
+
+  it("renders only non-empty category sections without a second chip row or row tags", async () => {
+    const harness = setup();
+    await openClipboard(harness, [seeds[0], seeds[2], seeds[3], seeds[4], seeds[5]]);
+    expect(sectionLabels(harness)).toEqual(["LINKS", "PATHS", "CODE", "TEXT", "IMAGES"]);
+    expect(harness.container.querySelector('[data-testid="clipboard-categories"]')).toBeNull();
+    expect(harness.container.querySelectorAll(".result-tag").length).toBe(0);
+    // No duplicate category words in the trailing meta either.
+    const metas = [...harness.container.querySelectorAll(".result-meta")].map(
+      (element) => element.textContent ?? "",
+    );
+    expect(metas).not.toContain("LINK");
+    expect(harness.container.querySelectorAll('[role="option"]').length).toBe(5);
+    expect(harness.container.querySelector('[data-testid="launcher-count"]')?.textContent).toBe(
+      "5 matches",
+    );
+    const group = harness.container.querySelector('[data-testid="result-group"]');
+    expect(group?.getAttribute("role")).toBe("group");
+    expect(group?.getAttribute("aria-labelledby")).toBe("ps-clipboard-section-links");
+    expect(group?.querySelector(".result-subgroup-label")?.textContent).toBe("LINKS");
+    expect(group?.getAttribute("data-subgroup")).toBe("true");
+  });
+
+  it("traverses flattened rows in visual section order and Enter is stale-safe", async () => {
+    const harness = setup();
+    await openClipboard(harness, seeds);
+    const input = inputOf(harness);
+    expect(selectedId(harness)).toBe("clip:link");
+
+    await press(input, "ArrowDown");
+    expect(selectedId(harness)).toBe("clip:email");
+    await press(input, "ArrowDown");
+    await press(input, "ArrowDown");
+    expect(selectedId(harness)).toBe("clip:code");
+    await press(input, "End", { ctrlKey: true });
+    expect(selectedId(harness)).toBe("clip:image");
+    await press(input, "ArrowDown");
+    expect(selectedId(harness)).toBe("clip:link"); // wraps across sections
+    const active = harness.container.querySelector('[role="option"][aria-selected="true"]');
+    expect(input.getAttribute("aria-activedescendant")).toBe(active?.id);
+  });
+
+  it("classifies unlabeled text into the same sections", async () => {
+    const harness = setup();
+    await openClipboard(harness, [
+      clip("clip:url", null, "https://example.com/page"),
+      clip("clip:mail", null, "person@example.com"),
+      clip("clip:winpath", null, "C:\\Users\\Pranshul\\Documents"),
+      clip("clip:plain", null, "ordinary copied words"),
+    ]);
+    expect(sectionLabels(harness)).toEqual(["LINKS", "EMAILS", "PATHS", "TEXT"]);
+  });
+
+  it("shows the honest empty clipboard copy when there are no items", async () => {
+    const harness = setup();
+    await openClipboard(harness, []);
+    const empty = harness.container.querySelector('[data-testid="empty-state"]');
+    expect(empty?.textContent).toContain("No clipboard history yet.");
+    expect(empty?.textContent).toContain(
+      "Only copies made while ProtonSearch is running are captured.",
+    );
+  });
+
+  it("uses the query empty copy when a clipboard query has no matches", async () => {
+    const harness = setup();
+    await openClipboard(harness, [], "zzz nothing");
+    const empty = harness.container.querySelector('[data-testid="empty-state"]');
+    expect(empty?.textContent).toContain("No matches in Clipboard.");
+    expect(empty?.textContent).toContain("Try different words, or press Esc to clear the filter.");
+  });
+
+  it("explains clipboard history being off", async () => {
+    const harness = setup({ clipboardHistoryEnabled: false });
+    await resolveSearch(harness, 0, THREE);
+    const clipboardChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
+      (element) => element.textContent === "CLIPBOARD",
+    );
+    await act(async () => {
+      clipboardChip?.click();
+      await Promise.resolve();
+    });
+    await resolveSearch(harness, 1, []);
+    const empty = harness.container.querySelector('[data-testid="empty-state"]');
+    expect(empty?.textContent).toContain("Clipboard history is off.");
+    expect(empty?.textContent).toContain("Turn it on in ProtonSearch → Preferences");
+  });
+});
+
+describe("FILES guard and prefix clearing (alpha debt)", () => {
+  it("filters folder rows out of a FILES response until the engine fix lands", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    const filesChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
+      (element) => element.textContent === "FILES",
+    );
+    await act(async () => {
+      filesChip?.click();
+      await Promise.resolve();
+    });
+    expect(harness.pending[1].request.scope).toBe("files");
+    await resolveSearch(harness, 1, [
+      result({ id: "file:kept", title: "kept.txt", kind: "file" }),
+      result({ id: "folder:leaked", title: "Leaked folder", kind: "folder", icon: { type: "file_type", ext: "folder" } }),
+    ]);
+    expect(harness.container.querySelectorAll('[role="option"]').length).toBe(1);
+    expect(harness.container.querySelector('[data-result-id="folder:leaked"]')).toBeNull();
+    expect(harness.container.querySelector('[data-result-id="file:kept"]')).not.toBeNull();
+  });
+
+  it("clears a typed scope prefix when a chip is chosen", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    setInputValue(harness, "file: architecture");
+    await resolveSearch(harness, 1, THREE);
+    const foldersChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
+      (element) => element.textContent === "FOLDERS",
+    );
+    await act(async () => {
+      foldersChip?.click();
+      await Promise.resolve();
+    });
+    expect(harness.pending[2].request.query).toBe("architecture");
+    expect(harness.pending[2].request.scope).toBe("folders");
+    expect(inputOf(harness).value).toBe("architecture");
+  });
+});
+
+describe("scoped empty copy", () => {
+  it("uses the scoped filter empty copy", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    const appsChip = [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
+      (element) => element.textContent === "APPS",
+    );
+    await act(async () => {
+      appsChip?.click();
+      await Promise.resolve();
+    });
+    await resolveSearch(harness, 1, []);
+    const empty = harness.container.querySelector('[data-testid="empty-state"]');
+    expect(empty?.textContent).toContain("No matches in APPS.");
+    expect(empty?.textContent).toContain("Try another category, or press Esc to clear the filter.");
   });
 });
