@@ -96,3 +96,6 @@ dist-installer/
 .agents/*.py
 .agents/*.log
 .agents/notes/
+
+# Verification WebView2 profiles are runtime artifacts
+docs/qa/**/webview2/
