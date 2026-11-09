@@ -78,3 +78,7 @@ agent-sidecar/.venv-nanobot/
 .agents/*.log
 .agents/notes/
 .agents/*.txt
+
+# agent sidecar scratch
+.nanobot-install.log
+scripts/smoke_run.py

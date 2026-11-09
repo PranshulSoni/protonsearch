@@ -308,6 +308,84 @@ fn caps_extracted_text_and_flags_truncation() {
     assert!(document.text.len() <= 4096, "len={}", document.text.len());
 }
 
+/// Malformed PDF whose content stream cannot be parsed. pdf-extract 0.10
+/// panics internally on this class of input (InvalidContentStream), which used
+/// to kill the extraction worker noisily; the pipeline must contain it.
+fn pdf_with_invalid_content_stream() -> Vec<u8> {
+    let content: Vec<u8> = b"BT ((( /F1 12 Tf 72 720 Td (broken) Tj ET \xFF\xFE\x00\x01 garbage ) Tj".to_vec();
+    let objects: Vec<(String, Vec<u8>)> = vec![
+        ("<< /Type /Catalog /Pages 2 0 R >>".to_string(), Vec::new()),
+        ("<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(), Vec::new()),
+        (
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R \
+             /Resources << /Font << /F1 5 0 R >> >> >>"
+                .to_string(),
+            Vec::new(),
+        ),
+        (
+            format!("<< /Length {} >>\nstream\n", content.len()),
+            content,
+        ),
+        ("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(), Vec::new()),
+    ];
+    let mut pdf: Vec<u8> = b"%PDF-1.4\n".to_vec();
+    let mut offsets = Vec::new();
+    for (index, (dictionary, stream)) in objects.iter().enumerate() {
+        offsets.push(pdf.len());
+        pdf.extend_from_slice(format!("{} 0 obj\n{dictionary}", index + 1).as_bytes());
+        if !stream.is_empty() {
+            pdf.extend_from_slice(stream);
+            pdf.extend_from_slice(b"\nendstream");
+        }
+        pdf.extend_from_slice(b"\nendobj\n");
+    }
+    let xref_offset = pdf.len();
+    pdf.extend_from_slice(
+        format!("xref\n0 {}\n", objects.len() + 1).as_bytes(),
+    );
+    pdf.extend_from_slice(b"0000000000 65535 f \n");
+    for offset in &offsets {
+        pdf.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
+    }
+    pdf.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n",
+            objects.len() + 1
+        )
+        .as_bytes(),
+    );
+    pdf
+}
+
+#[test]
+fn panicking_pdf_is_contained_and_batch_continues() {
+    let dir = workdir("pdf-panic-containment");
+    let bad = dir.join("broken-content-stream.pdf");
+    std::fs::write(&bad, pdf_with_invalid_content_stream()).unwrap();
+    let good = dir.join("good-after-panic.txt");
+    std::fs::write(&good, b"protonsearch survives the malformed pdf").unwrap();
+    let db = dir.join("index.db");
+    let index = ContentIndex::open(&db).unwrap();
+
+    // A panicking parser must not abort the process nor the indexing batch.
+    let summary = index.index_paths(&[bad.clone(), good.clone()], DEFAULT_MAX_BYTES);
+    assert!(summary.indexed >= 1, "good file must be indexed: {summary:?}");
+    let hits = index.search("protonsearch", 10).unwrap();
+    assert_eq!(hits.len(), 1, "hits={hits:?}");
+    assert!(hits[0].path.ends_with("good-after-panic.txt"));
+    if summary.errors > 0 {
+        let stats = index.stats();
+        assert!(stats.errors >= 1, "errors must be recorded: {stats:?}");
+    }
+
+    // Direct extraction of the malformed PDF must return (Err or Ok), never panic.
+    match extract_text(&bad, DEFAULT_MAX_BYTES) {
+        Ok(None) => {}
+        Ok(Some(document)) => assert!(document.text.len() <= DEFAULT_MAX_BYTES),
+        Err(error) => assert!(!error.to_string().is_empty()),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Index / search tests
 // ---------------------------------------------------------------------------

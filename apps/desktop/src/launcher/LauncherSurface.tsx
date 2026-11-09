@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type RefObject,
@@ -143,10 +144,28 @@ function countTextFor(
   pending: boolean,
   response: SearchResponse | null,
   searchError: string | null,
+  query: string,
 ): string {
   if (searchError) return "Search unavailable";
   if (pending) return "Searching…";
-  return response ? countMatches(response.total) : "";
+  if (!response) return "";
+  // An empty query with no recents is the quiet placeholder state, not "0 matches".
+  if (response.total === 0 && query.trim().length === 0) return "";
+  return countMatches(response.total);
+}
+
+/** Truthful index item count: search response first, EngineStatus as fallback. */
+function itemCountFor(
+  status: EngineStatus | null,
+  response: SearchResponse | null,
+): number | undefined {
+  const searchStatus = response?.status;
+  const fromSearch =
+    searchStatus != null &&
+    (searchStatus.type === "ready" || searchStatus.type === "indexing")
+      ? searchStatus.indexedFiles
+      : undefined;
+  return fromSearch ?? status?.filenameEntries;
 }
 
 function metaText(result: SearchResult): string {
@@ -221,6 +240,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const [menuOpen, setMenuOpen] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
     const [announcement, setAnnouncement] = useState("");
+    const [listScrollTop, setListScrollTop] = useState(0);
 
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
@@ -711,6 +731,10 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       }
     }, []);
 
+    const onListScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+      setListScrollTop(event.currentTarget.scrollTop);
+    }, []);
+
     const onRootMouseDown = useCallback(
       (event: ReactMouseEvent<HTMLDivElement>) => {
         if (!menuOpen) return;
@@ -738,14 +762,26 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       [openResultFor, selectIndex],
     );
 
+    // Anchor the context menu to the selected row's edge, using the same fixed
+    // row offsets as the keyboard scroll math (no DOM measuring in handlers).
+    const menuAnchorStyle = useMemo<CSSProperties | undefined>(() => {
+      if (!menuOpen || activeIndex < 0) return undefined;
+      const entry = flatEntries.entries.find((candidate) => candidate.index === activeIndex);
+      if (!entry) return undefined;
+      const rowTop =
+        1 + metrics.searchlineHeight + entry.top - listScrollTop;
+      const rowBottom = rowTop + metrics.rowHeight;
+      if (rowTop > metrics.totalHeight / 2) {
+        return { bottom: Math.max(8, metrics.totalHeight - rowBottom - 8) };
+      }
+      return { top: Math.max(8, rowTop + 8) };
+    }, [menuOpen, activeIndex, flatEntries, listScrollTop, metrics]);
+
     const footerStatus = deriveFooterStatus(status, response, searchError);
-    const liveCount = useThrottledLiveText(countTextFor(pending, response, searchError));
+    const liveCount = useThrottledLiveText(countTextFor(pending, response, searchError, query));
     const hints = deriveHints(results.length, query, previewOpen);
-    const itemCount =
-      response?.status.type === "ready" || response?.status.type === "indexing"
-        ? response.status.indexedFiles
-        : status?.filenameEntries;
-    const countText = countTextFor(pending, response, searchError);
+    const itemCount = itemCountFor(status, response);
+    const countText = countTextFor(pending, response, searchError, query);
     const showSkeleton = pending && response === null && !searchError;
     const queryText = query.trim();
     const previewMode = metrics.previewMode;
@@ -808,7 +844,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         </div>
 
         <div className="launcher-body">
-          <div className="results" ref={listRef}>
+          <div className="results" ref={listRef} onScroll={onListScroll}>
             <div
               id={LISTBOX_ID}
               role="listbox"
@@ -889,11 +925,11 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
             {showSkeleton ? (
               <div className="launcher-skeleton" aria-hidden="true">
                 {[0, 1, 2].map((row) => (
-                  <div className="skeleton-row" key={row}>
-                    <span className="skeleton-icon" />
-                    <span className="skeleton-lines">
-                      <span className="skeleton-title" />
-                      <span className="skeleton-path" />
+                  <div className="launcher-skeleton-row" key={row}>
+                    <span className="launcher-skeleton-icon" />
+                    <span className="launcher-skeleton-lines">
+                      <span className="launcher-skeleton-title" />
+                      <span className="launcher-skeleton-path" />
                     </span>
                   </div>
                 ))}
@@ -999,6 +1035,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
             result={selectedResult}
             model={menuModel}
             menuRef={menuRef as RefObject<HTMLDivElement | null>}
+            style={menuAnchorStyle}
             onRun={runMenuAction}
             onClose={closeMenu}
           />

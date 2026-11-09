@@ -52,7 +52,7 @@ describe("computeLauncherMetrics", () => {
     expect(metrics.baseHeight).toBe(MIN_LAUNCHER_HEIGHT);
     expect(metrics.totalHeight).toBe(MIN_LAUNCHER_HEIGHT);
     expect(metrics.searchlineHeight).toBe(72);
-    expect(metrics.listViewport).toBe(140);
+    expect(metrics.listViewport).toBe(138);
   });
 
   it("adds a 34 px group label and 58 px rows, snapped to 2 px", () => {
@@ -73,8 +73,8 @@ describe("computeLauncherMetrics", () => {
       previewOpen: false,
       workArea: WORK_AREA,
     });
-    // B2: the window includes the footer. 72 + 23 + 242 + 44 = 381 -> snapped 382.
-    expect(taller.baseHeight).toBe(382);
+    // B2 + 2 px border: 72 + 23 + 242 + 44 + 2 = 383 -> snapped 384.
+    expect(taller.baseHeight).toBe(384);
     expect(taller.listViewport).toBe(266);
   });
 
@@ -85,10 +85,10 @@ describe("computeLauncherMetrics", () => {
       previewOpen: false,
       workArea: WORK_AREA,
     });
-    // 72 + 23 + 204 + 44 = 343 -> snapped 344.
+    // 72 + 23 + 204 + 44 + 2 = 345 -> snapped 346.
     expect(metrics.rowHeight).toBe(48);
     expect(metrics.labelHeight).toBe(30);
-    expect(metrics.baseHeight).toBe(344);
+    expect(metrics.baseHeight).toBe(346);
     expect(metrics.listViewport).toBe(228);
   });
 
@@ -100,7 +100,7 @@ describe("computeLauncherMetrics", () => {
       workArea: WORK_AREA,
     });
     expect(metrics.baseHeight).toBe(MAX_LAUNCHER_HEIGHT);
-    expect(metrics.listViewport).toBe(364);
+    expect(metrics.listViewport).toBe(362);
   });
 
   it("grows for a bottom preview drawer but not a side panel", () => {
@@ -152,8 +152,8 @@ describe("computeLauncherMetrics", () => {
     });
     expect(metrics.surfaceWidth).toBe(618);
     expect(metrics.searchlineHeight).toBe(61);
-    // 61 + 23 + 150 + 44 = 278.
-    expect(metrics.baseHeight).toBe(278);
+    // 61 + 23 + 150 + 44 + 2 = 280.
+    expect(metrics.baseHeight).toBe(280);
     expect(metrics.listViewport).toBe(173);
   });
 });

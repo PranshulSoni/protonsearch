@@ -7,13 +7,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use ps_agent::{AgentClient, AgentEvent};
 use ps_core::{Engine, EngineConfig};
 use ps_ipc::{
-    ActionSpec, ActivityItem, ActivityQuery, EngineStatus, IndexCommand, OnboardingInput,
-    OnboardingState, OpenOutcome, SearchRequest, SearchResponse, Settings, SettingsPatch,
+    ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentState,
+    AgentStatus, EngineStatus, IndexCommand, OnboardingInput, OnboardingState, OpenOutcome,
+    SearchRequest, SearchResponse, Settings, SettingsPatch,
 };
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -29,6 +31,9 @@ const LAUNCHER_DEFAULT_HEIGHT: f64 = 520.0;
 struct AppState {
     engine: Arc<Engine>,
     data_dir: PathBuf,
+    /// Optional Python agent sidecar. Created only when a workflow is started;
+    /// never touched by search, startup or settings.
+    agent: Mutex<Option<AgentClient>>,
 }
 
 fn now_ms() -> u64 {
@@ -379,6 +384,11 @@ fn show_main(app: AppHandle) {
 #[tauri::command]
 fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
     let _ = state.engine.index_command(IndexCommand::Shutdown);
+    if let Ok(mut slot) = state.agent.lock() {
+        if let Some(client) = slot.take() {
+            client.shutdown();
+        }
+    }
     app.exit(0);
 }
 
@@ -403,6 +413,108 @@ fn set_hotkey(
     let mut patch = SettingsPatch::default();
     patch.hotkey = Some(candidate);
     state.engine.update_settings(patch).map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Optional Python agent sidecar (Gate 6). Never started for search.
+// ---------------------------------------------------------------------------
+
+fn probe_agent_status(state: &AppState) -> AgentStatus {
+    let config = ps_agent::default_config(&state.data_dir);
+    let running = state
+        .agent
+        .lock()
+        .ok()
+        .and_then(|slot| slot.as_ref().map(|client| client.is_alive()))
+        .unwrap_or(false);
+    match config {
+        None => AgentStatus {
+            state: AgentState::NotConfigured,
+            runtime: None,
+            model: None,
+            detail: Some("Optional Python sidecar runtime is not installed.".into()),
+        },
+        Some(config) => AgentStatus {
+            state: if running {
+                AgentState::Running
+            } else {
+                AgentState::Stopped
+            },
+            runtime: Some("pydantic-ai (optional sidecar)".into()),
+            model: config.model.clone(),
+            detail: Some(if running {
+                "Agent sidecar is running for the current workflow.".into()
+            } else {
+                "Starts only when you run a workflow.".into()
+            }),
+        },
+    }
+}
+
+#[tauri::command]
+fn agent_status(state: tauri::State<'_, AppState>) -> AgentStatus {
+    probe_agent_status(&state)
+}
+
+#[tauri::command]
+fn agent_start(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    request: AgentRunRequest,
+) -> Result<(), String> {
+    if !state.engine.settings().agent.enabled {
+        return Err("Agent workflows are disabled in Preferences.".into());
+    }
+    let mut slot = state.agent.lock().map_err(|e| e.to_string())?;
+    let needs_spawn = slot
+        .as_ref()
+        .map(|client| !client.is_alive())
+        .unwrap_or(true);
+    if needs_spawn {
+        let config = ps_agent::default_config(&state.data_dir).ok_or_else(|| {
+            "The optional Python agent runtime is not installed on this machine.".to_string()
+        })?;
+        let handle = app.clone();
+        let client = AgentClient::spawn(config, move |event: &AgentEvent| {
+            let _ = handle.emit("agent:event", event);
+        })
+        .map_err(|e| e.to_string())?;
+        *slot = Some(client);
+    }
+    slot.as_ref()
+        .ok_or_else(|| "Agent sidecar is unavailable.".to_string())?
+        .send_run(&request)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn agent_cancel(state: tauri::State<'_, AppState>, run_id: Option<String>) -> Result<(), String> {
+    let slot = state.agent.lock().map_err(|e| e.to_string())?;
+    match slot.as_ref() {
+        Some(client) => client.cancel(run_id.as_deref()).map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
+#[tauri::command]
+fn agent_approve(
+    state: tauri::State<'_, AppState>,
+    response: AgentApprovalResponse,
+) -> Result<(), String> {
+    let slot = state.agent.lock().map_err(|e| e.to_string())?;
+    match slot.as_ref() {
+        Some(client) => client.approve(&response).map_err(|e| e.to_string()),
+        None => Err("No agent workflow is running.".into()),
+    }
+}
+
+#[tauri::command]
+fn agent_stop(state: tauri::State<'_, AppState>) {
+    if let Ok(mut slot) = state.agent.lock() {
+        if let Some(client) = slot.take() {
+            client.shutdown();
+        }
+    }
 }
 
 #[tauri::command]
@@ -442,7 +554,7 @@ fn main() {
             let data_dir = ps_core::paths::v2_data_dir();
             let config = engine_config(data_dir.clone());
             let engine = Arc::new(Engine::open(config).map_err(|e| format!("engine init: {e}"))?);
-            app.manage(AppState { engine: engine.clone(), data_dir });
+            app.manage(AppState { engine: engine.clone(), data_dir, agent: Mutex::new(None) });
 
             step("windows: creating");
             create_windows(app.handle())?;
@@ -483,6 +595,11 @@ fn main() {
             show_main,
             quit_app,
             set_hotkey,
+            agent_status,
+            agent_start,
+            agent_cancel,
+            agent_approve,
+            agent_stop,
             app_info,
         ])
         .run(tauri::generate_context!())

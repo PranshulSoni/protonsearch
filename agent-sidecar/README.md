@@ -42,8 +42,9 @@ agent-sidecar/.venv/Scripts/python.exe -m pip install -r agent-sidecar/requireme
 ```
 
 Pinned dependency: `pydantic-ai==2.66.0`. Measured footprint on this host:
-229.0 MB venv (213.7 MB site-packages), import cost 1.83–2.62 s (see the
-evaluation doc). `requirements.lock.txt` is a machine-generated freeze of the
+229.0 MB venv (213.7 MB site-packages), spawn+import wall time 1.79–2.76 s
+(median 2.41 s) and sidecar spawn→first event 2.05 s median (see the evaluation
+doc). `requirements.lock.txt` is a machine-generated freeze of the
 exact working set for reproducibility.
 
 `.venv`, `.venv-nanobot` and friends are gitignored; they are machine-local.
@@ -83,6 +84,7 @@ PROTONSEARCH_AGENT_CONFIG       path to a JSON override file (default
                                 %APPDATA%/protonsearch/v2/agent.json)
 PROTONSEARCH_AGENT_MAX_STEPS    tool-approval budget per run (1..32, default 8)
 PROTONSEARCH_AGENT_RUN_TIMEOUT_S  hard run timeout (default 300)
+PROTONSEARCH_AGENT_DEBUG=1       opt-in stderr diagnostics (never stdout)
 ```
 
 The JSON config file may carry `model`, `baseUrl`, `testModel`, `maxSteps`,

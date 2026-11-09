@@ -3054,6 +3054,7 @@ name = "protonsearch-v2"
 version = "2.0.0-alpha.1"
 dependencies = [
  "anyhow",
+ "ps-agent",
  "ps-core",
  "ps-ipc",
  "ps-sources",

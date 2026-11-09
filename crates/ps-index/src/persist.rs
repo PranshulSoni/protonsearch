@@ -333,7 +333,7 @@ impl FilenameIndex {
             if (name_off as u64 + name_len as u64) > arena_len {
                 return Err(corrupt("entry name out of arena"));
             }
-            if ext_len as u16 >= name_len && name_len > 0 {
+            if ext_len > 0 && (ext_len as u32 + 1) > name_len as u32 {
                 return Err(corrupt("entry extension longer than name"));
             }
             if kind > 1 {
@@ -401,6 +401,16 @@ impl FilenameIndex {
             let end = start + e.name_len as usize;
             if std::str::from_utf8(&arena[start..end]).is_err() {
                 return Err(corrupt("entry name not utf-8"));
+            }
+        }
+
+        // The sorted array must actually be ordered by the same comparator the
+        // runtime uses; otherwise prefix binary search would silently misbehave.
+        for pair in sorted.windows(2) {
+            if crate::sort_cmp_parts(&arena, &entries, &dirs, pair[0], pair[1])
+                == std::cmp::Ordering::Greater
+            {
+                return Err(corrupt("sorted array is not ordered"));
             }
         }
 

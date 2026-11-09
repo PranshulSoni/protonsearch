@@ -338,6 +338,20 @@ export interface AppInfo {
   arch: string;
 }
 
+export interface AgentRunRequest {
+  runId: string;
+  prompt: string;
+  contextPaths?: string[];
+  model?: string | null;
+  maxSteps?: number | null;
+}
+
+export interface AgentApprovalResponse {
+  runId: string;
+  approvalId: string;
+  approved: boolean;
+}
+
 export type AgentEvent =
   | { type: "started"; runId: string; runtime: string; model: string }
   | { type: "plan"; steps: string[] }

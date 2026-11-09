@@ -200,6 +200,46 @@ fn ranking_order_is_exact_stem_prefix_word_substring_path_fuzzy() {
 }
 
 #[test]
+fn multi_term_and_extension_shaped_queries_work() {
+    // Regression coverage for perf-bench's relevance findings: multi-token
+    // queries must match names where tokens are separated by _ . or case, and
+    // extension-shaped queries (".pdf", "xlsx") must match by substring.
+    let entries = vec![
+        entry(
+            r"C:\docs\quarterly_report_final.pdf",
+            EntryKind::File,
+            10,
+            1000,
+        ),
+        entry(r"C:\docs\quarterly_report_draft.pdf", EntryKind::File, 11, 2000),
+        entry(r"C:\docs\budget.xlsx", EntryKind::File, 12, 3000),
+        entry(r"C:\docs\notes.txt", EntryKind::File, 13, 4000),
+    ];
+    let index = FilenameIndex::from_entries(entries);
+
+    let hits = index.search("quarterly report final", 10);
+    assert_eq!(
+        index.entry_name(hits[0].entry_index),
+        "quarterly_report_final.pdf",
+        "multi-term query must rank the matching file first"
+    );
+    // Typo in one token must still find it.
+    let hits = index.search("quaterly report final", 10);
+    assert!(hits
+        .iter()
+        .any(|h| index.entry_name(h.entry_index) == "quarterly_report_final.pdf"));
+
+    let hits = index.search(".pdf", 10);
+    assert!(hits.len() >= 2, "extension-shaped query matches .pdf files");
+    assert!(hits
+        .iter()
+        .all(|h| index.entry_ext(h.entry_index).eq_ignore_ascii_case("pdf")));
+    let hits = index.search("xlsx", 10);
+    assert!(!hits.is_empty());
+    assert_eq!(index.entry_name(hits[0].entry_index), "budget.xlsx");
+}
+
+#[test]
 fn filters_restrict_results() {
     let entries = vec![
         entry("C:\\docs\\a.pdf", EntryKind::File, 100, 1000),

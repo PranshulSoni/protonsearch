@@ -1,13 +1,267 @@
 //! Git repositories, commits and TODO/FIXME scanning. OWNER: sources-content.
-//! Uses git CLI with CREATE_NO_WINDOW and structured arguments only.
+//! Uses the git CLI with CREATE_NO_WINDOW and structured arguments only.
+
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use anyhow::{bail, Context};
+use walkdir::WalkDir;
 
 use super::GitEntry;
-use std::path::Path;
 
-pub fn scan_roots(_roots: &[String], _cancelled: &dyn Fn() -> bool) -> (Vec<GitEntry>, Vec<String>) {
-    (Vec::new(), Vec::new())
+const MAX_REPOS: usize = 100;
+const MAX_DEPTH: usize = 8;
+const MAX_COMMITS: usize = 100;
+const MAX_TODOS_PER_REPO: usize = 200;
+const MAX_TODO_FILE_BYTES: u64 = 1024 * 1024;
+
+const JUNK_DIRS: &[&str] = &[
+    "node_modules", "target", "dist", "build", "venv", ".venv", "appdata", "obj", "out",
+    ".next", ".nuxt", ".cache", "cache", "__pycache__", "vendor", "third_party",
+];
+
+const CODE_EXTENSIONS: &[&str] = &[
+    "rs", "py", "js", "jsx", "ts", "tsx", "go", "cpp", "c", "h", "hpp", "java", "kt", "cs",
+    "md", "txt", "rb", "php", "swift", "sh", "ps1", "sql", "lua", "scala", "dart", "yaml",
+    "yml", "toml", "css", "html",
+];
+
+pub fn scan_roots(roots: &[String], cancelled: &dyn Fn() -> bool) -> (Vec<GitEntry>, Vec<String>) {
+    let mut entries = Vec::new();
+    let mut warnings = Vec::new();
+    let mut seen_repos: Vec<PathBuf> = Vec::new();
+    for root in roots {
+        if cancelled() || seen_repos.len() >= MAX_REPOS {
+            break;
+        }
+        let root_path = Path::new(root);
+        if !root_path.is_dir() {
+            continue;
+        }
+        for repo in discover_repos(root_path, MAX_DEPTH, MAX_REPOS) {
+            if cancelled() || seen_repos.len() >= MAX_REPOS {
+                break;
+            }
+            let normalized = repo.canonicalize().unwrap_or_else(|_| repo.clone());
+            if seen_repos.contains(&normalized) {
+                continue;
+            }
+            seen_repos.push(normalized);
+            let (mut repo_entries, mut repo_warnings) = scan_repo(&repo);
+            entries.append(&mut repo_entries);
+            for warning in repo_warnings.drain(..) {
+                if warnings.len() < 20 {
+                    warnings.push(warning);
+                }
+            }
+        }
+    }
+    (entries, warnings)
 }
 
-pub fn scan_repo(_repo: &Path) -> (Vec<GitEntry>, Vec<String>) {
-    (Vec::new(), Vec::new())
+/// Recursively find repository roots, pruning at each repository (so submodules
+/// and vendored copies are not re-scanned) and skipping junk directories.
+pub fn discover_repos(root: &Path, max_depth: usize, max_repos: usize) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    if max_repos == 0 || max_depth == 0 {
+        return found;
+    }
+    let walker = WalkDir::new(root)
+        .max_depth(max_depth)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| {
+            if entry.file_type().is_dir() {
+                let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+                !JUNK_DIRS.contains(&name.as_str())
+            } else {
+                true
+            }
+        });
+    for entry in walker.filter_map(|entry| entry.ok()) {
+        if !entry.file_type().is_dir() {
+            continue;
+        }
+        if entry.path().join(".git").exists() {
+            found.push(entry.path().to_path_buf());
+            if found.len() >= max_repos {
+                break;
+            }
+        }
+    }
+    found
+}
+
+pub fn scan_repo(repo: &Path) -> (Vec<GitEntry>, Vec<String>) {
+    let mut entries = Vec::new();
+    let mut warnings = Vec::new();
+    let name = repo
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| repo.to_string_lossy().to_string());
+
+    let mut branch: Option<String> = None;
+    match run_git(repo, &["branch", "--no-color"]) {
+        Ok(output) => {
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                if let Some(head) = line.strip_prefix('*') {
+                    branch = Some(head.trim().to_string());
+                }
+            }
+        }
+        Err(error) => {
+            if warnings.len() < 10 {
+                warnings.push(format!("{}: {error}", repo.display()));
+            }
+        }
+    }
+    entries.push(GitEntry::Repo {
+        path: repo.to_string_lossy().to_string(),
+        name,
+        branch,
+    });
+
+    match run_git(
+        repo,
+        &[
+            "log",
+            "--max-count=100",
+            "--format=%H%x1F%an%x1F%at%x1F%s",
+        ],
+    ) {
+        Ok(output) => {
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines().take(MAX_COMMITS) {
+                let parts: Vec<&str> = line.split('\x1F').collect();
+                if parts.len() < 4 {
+                    continue;
+                }
+                let hash = parts[0].to_string();
+                let author = parts[1].to_string();
+                let date_seconds: i64 = parts[2].parse().unwrap_or(0);
+                let message = parts[3].to_string();
+                entries.push(GitEntry::Commit {
+                    repo: repo.to_string_lossy().to_string(),
+                    hash,
+                    message,
+                    author,
+                    date_ms: date_seconds.saturating_mul(1000),
+                });
+            }
+        }
+        Err(error) => {
+            if warnings.len() < 10 {
+                warnings.push(format!("{}: {error}", repo.display()));
+            }
+        }
+    }
+
+    entries.extend(scan_todos(repo));
+    (entries, warnings)
+}
+
+fn scan_todos(repo: &Path) -> Vec<GitEntry> {
+    let mut todos = Vec::new();
+    let walker = WalkDir::new(repo)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| {
+            if entry.depth() == 0 {
+                return true;
+            }
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            if entry.file_type().is_dir() {
+                if name == ".git" || JUNK_DIRS.contains(&name.as_str()) {
+                    return false;
+                }
+                // Do not descend into nested repositories/submodules.
+                if entry.path().join(".git").exists() {
+                    return false;
+                }
+                true
+            } else {
+                true
+            }
+        });
+    for entry in walker.filter_map(|entry| entry.ok()) {
+        if todos.len() >= MAX_TODOS_PER_REPO {
+            break;
+        }
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let path = entry.path();
+        let extension = path
+            .extension()
+            .map(|ext| ext.to_string_lossy().to_ascii_lowercase())
+            .unwrap_or_default();
+        if !CODE_EXTENSIONS.contains(&extension.as_str()) {
+            continue;
+        }
+        if entry
+            .metadata()
+            .map(|meta| meta.len() > MAX_TODO_FILE_BYTES)
+            .unwrap_or(true)
+        {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        for (index, line) in content.lines().enumerate() {
+            let trimmed = line.trim();
+            if !(trimmed.starts_with("//")
+                || trimmed.starts_with('#')
+                || trimmed.starts_with("/*")
+                || trimmed.starts_with("--")
+                || trimmed.starts_with("<!--")
+                || trimmed.starts_with('*'))
+            {
+                continue;
+            }
+            if trimmed.contains("TODO") || trimmed.contains("FIXME") || trimmed.contains("BUG") {
+                todos.push(GitEntry::Todo {
+                    repo: repo.to_string_lossy().to_string(),
+                    path: path.to_string_lossy().to_string(),
+                    line: (index + 1) as u32,
+                    text: trimmed.chars().take(300).collect(),
+                });
+                if todos.len() >= MAX_TODOS_PER_REPO {
+                    break;
+                }
+            }
+        }
+    }
+    todos
+}
+
+fn git_command() -> Command {
+    let mut command = Command::new("git");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    command
+}
+
+fn run_git(repo: &Path, args: &[&str]) -> anyhow::Result<std::process::Output> {
+    let output = git_command()
+        .current_dir(repo)
+        .args(args)
+        .output()
+        .with_context(|| format!("running git {:?} in {}", args, repo.display()))?;
+    if !output.status.success() {
+        bail!(
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(output)
 }

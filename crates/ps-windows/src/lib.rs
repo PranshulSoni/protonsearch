@@ -385,15 +385,3 @@ pub fn broadcast_setting_change() -> anyhow::Result<()> {
         Ok(())
     }
 }
-
-/// Toggle the Windows app theme (HKCU Personalize) and notify the shell.
-pub fn toggle_dark_mode() -> anyhow::Result<bool> {
-    #[cfg(windows)]
-    {
-        imp::native_toggle_dark_mode()
-    }
-    #[cfg(not(windows))]
-    {
-        anyhow::bail!("not supported on this platform")
-    }
-}

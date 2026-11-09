@@ -6,7 +6,7 @@
 use std::process::Command;
 
 use anyhow::{anyhow, bail};
-use windows::core::{PCWSTR, w};
+use windows::core::PCWSTR;
 use windows::Win32::Foundation::{BOOLEAN, HWND, LPARAM, WPARAM};
 use windows::Win32::System::Power::SetSuspendState;
 use windows::Win32::System::Shutdown::LockWorkStation;

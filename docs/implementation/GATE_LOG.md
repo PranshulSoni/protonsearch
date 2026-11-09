@@ -42,3 +42,27 @@ Status per gate lives in docs/implementation/WORK_BREAKDOWN.md.
   PROTONSEARCH_DATA_DIR override (also useful for portable installs); real-app E2E runs use .devdata/ inside the repo.
   End-user default remains %APPDATA%\\protonsearch\\v2. Verified with a compiled probe: writes under the workspace succeed,
   writes to %APPDATA%/%TEMP% fail with os error 5 from child executables while PowerShell itself is allowed.
+## Gate 2 / 3 — engine + launcher integration (evidence)
+
+- 2026-11-09: **First real end-to-end app run.** Tauri debug binary (WebView2 157), production frontend served by Vite preview,
+  ps-core engine + ps-index over the real user profile (Documents/Desktop/Downloads).
+  - Filesystem: 131,199 entries indexed at warm startup (3 roots, names-only depth).
+  - Real search verified through WebView2 CDP against the actual window: "arch" -> 50 matches (ARCHITECTURE.md first),
+    "readme" -> real files, typo query fuzzy-matched, zero-match state rendered.
+  - End-to-end input-to-visible latency (page timestamp before input event -> double rAF after first row, debug Rust build,
+    150% DPI, production JS, n=4 queries only): 40.6 ms first query/cold render; 12.6 ms, 8.4 ms, 10.8 ms warm.
+    Raw: docs/qa/visual/app-captures/latency-real-app.json. Debug-build caveat recorded; release numbers pending.
+  - Real window captures: docs/qa/visual/app-captures/real-launcher-*.png, real-app-*.png (150% DPI, live data).
+- 2026-11-09: **Legacy migration verified on real data** (copy of the 149.4 MB v1 index; source opened read-only via SQLite backup API):
+  - v2 DB 149.8 MB; files 89,813 imported; documents 14,491 (legacy files_fts) imported; source SHA-256 identical before/after
+    (BE255E99... -> BE255E99...), legacy_migrated=true in settings.
+  - NOTE: extra migrated tables (browser_items/quicklinks/snippets) were absent in that run; migration error surfaced as a warning
+    instead of aborting (by design), and content extraction then indexed real PDFs. Root cause under investigation (see known issues).
+  - pdf-extract 0.10 panics internally on malformed PDF content streams (InvalidContentStream). This was observed as isolated worker
+    thread panics in debug; **release profile panic=abort was removed** so a malformed document can never abort the whole app.
+    Extraction must additionally catch panics in the worker (assigned to sources-content, tracked as a release blocker).
+- 2026-11-09: Tauri shell now supports live hotkey re-registration (set_hotkey), cursor-monitor launcher placement, WebView2
+  user-data-dir override for portable/testing installs, CDP test hook (PROTONSEARCH_CDP_PORT), and optional agent-sidecar commands
+  (agent_status/start/cancel/approve/stop) with events forwarded on agent:event. The sidecar is never started at setup/search.
+- 2026-11-09: ps-ipc AgentEvent payload fields corrected to camelCase (rename_all_fields) + contract test; ADR-0005 accepted
+  (Pydantic AI 2.66.0 over Nanobot 0.4.1, measured).

@@ -618,7 +618,6 @@ fn parse_conversion(query: &str) -> Option<(f64, String, String)> {
 }
 
 fn split_value_unit(token: &str) -> Option<(f64, String)> {
-    let mut number_end = 0usize;
     let bytes = token.as_bytes();
     let mut has_digit = false;
     let mut index = 0usize;
@@ -641,7 +640,7 @@ fn split_value_unit(token: &str) -> Option<(f64, String)> {
             break;
         }
     }
-    number_end = index;
+    let number_end = index;
     if !has_digit || number_end == token.len() {
         return None;
     }

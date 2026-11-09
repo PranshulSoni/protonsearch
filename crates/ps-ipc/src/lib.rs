@@ -787,7 +787,7 @@ pub struct AgentRunRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", rename_all_fields = "camelCase")]
 pub enum AgentEvent {
     Started {
         run_id: String,
@@ -911,6 +911,26 @@ mod tests {
     fn source_kind_group_labels_are_stable() {
         assert_eq!(SourceKind::Application.group_label(), "APPLICATIONS");
         assert_eq!(SourceKind::ContentMatch.group_label(), "DOCUMENTS");
+    }
+
+    #[test]
+    fn agent_events_use_camel_case_payload_fields() {
+        let event = AgentEvent::Started {
+            run_id: "run-1".into(),
+            runtime: "pydantic-ai".into(),
+            model: "test".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("\"runId\":\"run-1\""), "{json}");
+        let approval = AgentEvent::ApprovalRequest {
+            approval_id: "a1".into(),
+            title: "Open file".into(),
+            detail: "path".into(),
+            action: ActionSpec::None,
+            destructive: false,
+        };
+        let json = serde_json::to_string(&approval).unwrap();
+        assert!(json.contains("\"approvalId\":\"a1\""), "{json}");
     }
 
     #[test]

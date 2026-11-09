@@ -13,10 +13,12 @@ Contract (frozen Rust side: `crates/ps-ipc/src/lib.rs`):
     The bare frozen struct (no `type`) is accepted as well.
 * Sidecar -> host messages: `AgentEvent`, externally tagged with `type`
   ("started", "plan", "progress", "approval_request", "tool_result", "output",
-  "error", "finished"). Field names inside the variants are **snake_case**:
-  the frozen Rust enum has `rename_all = "snake_case"` on the variant names but
-  no `rename_all_fields`, so serde expects e.g. `run_id`, `approval_id`,
-  `duration_ms`, `final_answer`. Do not "helpfully" camelCase them.
+  "error", "finished"). The frozen Rust enum uses
+  `rename_all = "snake_case"` for the tag/variant names and
+  `rename_all_fields = "camelCase"` for the fields inside variants, so emit
+  e.g. `runId`, `approvalId`, `durationMs`, `finalAnswer` (envelope fields
+  such as `type`, `steps`, `message`, `fraction`, `tool`, `ok`, `preview`,
+  `code` stay as they are).
 
 Anything the host does not understand is reported back as an `error` event and
 does not kill the process.
@@ -181,12 +183,12 @@ def _validate_run_id(run_id: str | None, *, required: bool) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Outbound AgentEvent constructors (snake_case fields, frozen Rust shape)
+# Outbound AgentEvent constructors (camelCase fields, frozen Rust shape)
 # ---------------------------------------------------------------------------
 
 
 def started(run_id: str, runtime: str, model: str) -> dict[str, Any]:
-    return {"type": "started", "run_id": run_id, "runtime": runtime, "model": model}
+    return {"type": "started", "runId": run_id, "runtime": runtime, "model": model}
 
 
 def plan(steps: list[str]) -> dict[str, Any]:
@@ -206,7 +208,7 @@ def approval_request(
 ) -> dict[str, Any]:
     return {
         "type": "approval_request",
-        "approval_id": approval_id,
+        "approvalId": approval_id,
         "title": title,
         "detail": detail,
         "action": action,
@@ -219,7 +221,7 @@ def tool_result(tool: str, ok: bool, preview: str) -> dict[str, Any]:
 
 
 def output(text: str, final_answer: bool = True) -> dict[str, Any]:
-    return {"type": "output", "text": text, "final_answer": final_answer}
+    return {"type": "output", "text": text, "finalAnswer": final_answer}
 
 
 def error(code: str, message: str) -> dict[str, Any]:
@@ -227,7 +229,7 @@ def error(code: str, message: str) -> dict[str, Any]:
 
 
 def finished(ok: bool, duration_ms: int) -> dict[str, Any]:
-    return {"type": "finished", "ok": ok, "duration_ms": duration_ms}
+    return {"type": "finished", "ok": ok, "durationMs": duration_ms}
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   ActionSpec,
+  AgentApprovalResponse,
+  AgentRunRequest,
+  AgentStatus,
   ActivityItem,
   ActivityQuery,
   AppInfo,
@@ -27,6 +30,11 @@ type Bridge = {
   getSettings(): Promise<Settings>;
   updateSettings(patch: SettingsPatch): Promise<Settings>;
   setHotkey(hotkey: string): Promise<Settings>;
+  agentStatus(): Promise<AgentStatus>;
+  agentStart(request: AgentRunRequest): Promise<void>;
+  agentCancel(runId?: string | null): Promise<void>;
+  agentApprove(response: AgentApprovalResponse): Promise<void>;
+  agentStop(): Promise<void>;
   getActivity(query?: ActivityQuery): Promise<ActivityItem[]>;
   getOnboarding(): Promise<OnboardingState>;
   completeOnboarding(input: OnboardingInput): Promise<Settings>;
@@ -46,6 +54,11 @@ const tauriBridge: Bridge = {
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (patch) => invoke<Settings>("update_settings", { patch }),
   setHotkey: (hotkey) => invoke<Settings>("set_hotkey", { hotkey }),
+  agentStatus: () => invoke<AgentStatus>("agent_status"),
+  agentStart: (request) => invoke<void>("agent_start", { request }),
+  agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),
+  agentApprove: (response) => invoke<void>("agent_approve", { response }),
+  agentStop: () => invoke<void>("agent_stop"),
   getActivity: (query) => invoke<ActivityItem[]>("get_activity", { query: query ?? null }),
   getOnboarding: () => invoke<OnboardingState>("get_onboarding"),
   completeOnboarding: (input) => invoke<Settings>("complete_onboarding", { input }),

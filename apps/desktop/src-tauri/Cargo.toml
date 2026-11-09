@@ -22,3 +22,4 @@ anyhow = { workspace = true }
 ps-ipc = { path = "../../../crates/ps-ipc" }
 ps-core = { path = "../../../crates/ps-core" }
 ps-sources = { path = "../../../crates/ps-sources" }
+ps-agent = { path = "../../../crates/ps-agent" }

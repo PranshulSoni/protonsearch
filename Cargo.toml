@@ -39,7 +39,8 @@ opt-level = 3
 lto = "thin"
 codegen-units = 4
 strip = true
-panic = "abort"
+# No panic=abort: a malformed document must never abort the whole app; the
+# extraction workers catch panics and the search engine degrades gracefully.
 
 [profile.bench]
 inherits = "release"

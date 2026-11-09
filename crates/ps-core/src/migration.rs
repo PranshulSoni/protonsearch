@@ -52,10 +52,11 @@ fn read_only_uri(path: &Path) -> anyhow::Result<String> {
     let canonical = path
         .canonicalize()
         .with_context(|| format!("legacy database not found: {}", path.display()))?;
-    let mut uri = String::from("file:");
-    uri.push_str(&canonical.to_string_lossy().replace('\\', "/"));
-    uri.push_str("?mode=ro");
-    Ok(uri)
+    // canonicalize() yields a verbatim path on Windows (\\?\C:\...); SQLite URIs
+    // reject that as an authority component, so normalise to file:///C:/...
+    let normalized = canonical.to_string_lossy().replace('\\', "/");
+    let stripped = normalized.strip_prefix("//?/").unwrap_or(&normalized);
+    Ok(format!("file:///{stripped}?mode=ro"))
 }
 
 fn sha256_file(path: &Path) -> anyhow::Result<String> {
@@ -266,9 +267,21 @@ mod tests {
         .unwrap();
     }
 
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("target")
+            .join("ps-core-tests")
+            .join(format!("{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
     #[test]
     fn dry_run_reports_counts_and_never_mutates_source() {
-        let dir = std::env::temp_dir().join(format!("ps-migration-{}", std::process::id()));
+        let dir = scratch_dir("migration-dry-run");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let legacy = dir.join("legacy.db");
@@ -290,7 +303,7 @@ mod tests {
 
     #[test]
     fn real_import_copies_safe_tables_only() {
-        let dir = std::env::temp_dir().join(format!("ps-migration-real-{}", std::process::id()));
+        let dir = scratch_dir("migration-real");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let legacy = dir.join("legacy.db");

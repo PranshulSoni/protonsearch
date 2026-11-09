@@ -113,13 +113,24 @@ function badgeText(result: SearchResult): string | null {
 
 type GlyphName = "folder" | "command" | "arrow" | "clipboard" | "globe" | "code" | "calculator" | "image" | "settings" | "file";
 
-function glyphFor(result: SearchResult, tone: Tone): GlyphName | null {
+function glyphFor(result: SearchResult): GlyphName | null {
+  // File-ish results use the deterministic extension badge (DESIGN_SYSTEM §9.2);
+  // glyphs are reserved for semantic kinds (folders, apps, actions, web, git, OCR).
+  if (
+    result.kind === "file" ||
+    result.kind === "document" ||
+    result.kind === "content_match" ||
+    result.kind === "recent"
+  ) {
+    return null;
+  }
   switch (result.kind) {
     case "folder":
       return "folder";
     case "application":
     case "window":
-      return result.icon.type === "app_icon" ? null : "arrow";
+      // Real app icons render as images; the fallback is the app's initials.
+      return null;
     case "command":
       return "command";
     case "action":
@@ -141,13 +152,9 @@ function glyphFor(result: SearchResult, tone: Tone): GlyphName | null {
       return "settings";
     case "ocr_text":
       return "image";
-    case "content_match":
-      return "file";
     default:
       break;
   }
-  if (tone === "image") return "image";
-  if (tone === "code") return "code";
   return null;
 }
 
@@ -230,7 +237,7 @@ export function ResultIcon({ result, large = false }: { result: SearchResult; la
     );
   }
 
-  const glyph = glyphFor(result, tone);
+  const glyph = glyphFor(result);
   const text = glyph ? null : badgeText(result);
   return (
     <span className={className} data-testid="result-icon" aria-hidden="true">

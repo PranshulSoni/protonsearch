@@ -1,11 +1,20 @@
-# ProtonSearch v2 — Measured Benchmarks (Gate 2, first measured pass)
+# ProtonSearch v2 — Measured Benchmarks (Gate 2 / Gate 7 evidence)
 
 - **Owner:** L1-C Performance & Search Quality (perf-bench)
-- **Measured:** 2026-11-09 `11:38-11:48 UTC (17:08-17:18 IST) on the user workstation
-- **Method:** [METHODOLOGY.md](./METHODOLOGY.md). Raw JSON: [results/](./results/). Every number below came from a command printed in this section; nothing is projected, extrapolated or copied from vendors.
-- **Rule:** a target is only "MET" when a measured number is below it. Otherwise it is "NOT MET" or "NOT MEASURED". No composite scores.
+- **Measured:** 2026-11-09, `11:33-11:54 UTC (17:03-17:24 IST) on the user workstation, release profile
+- **Engine revision:** ps-index working tree at 2026-11-09 17:16 IST (engine-core's scan-strategy perf fix on top of commit `b4df328`; the commit for that fix was still pending when this report was written, so the hash is not quoted as if verified).
+- **Method:** [METHODOLOGY.md](./METHODOLOGY.md). Raw JSON: [results/](./results/). Every number below was printed by a command in this repository on this machine. Nothing is projected or copied from vendors.
+- **Rule:** a target is "MET" only when a measured number is below it. Otherwise **NOT MET** or **NOT MEASURED**. Single-run numbers are labelled as such.
 
-## 1. Environment (recorded by `ps-bench env` inside the result files)
+## 0. Read this before quoting anything
+
+1. The repo is developed by several agents in parallel. During these runs the box showed **19-58% total CPU** from other agent/electron processes and compiler bursts. **from_entries build time is used as the contention proxy** (same code path: 1.4 s is normal, 5.9-6.8 s means the machine was busy).
+2. Repeat runs are published, not hidden: the filename table shows the primary run plus repeat ranges. A single p95 is an estimate (n=660 samples over 22 queries x 30 iterations).
+3. **100k and 1M filename targets were met in the final engine revision on this machine**; the earlier, pre-perf-fix pass did not meet 100k (5.64 ms) and is kept in the results directory as first-pass evidence. The 100k result moved by 3.6x across engine revisions, so a gate claim must name the revision.
+4. UI latency exists only as a 4-query debug-build exploratory sample (section 8); it is **not** a p50/p95 claim.
+5. The v2 content index currently misses the 30 ms retrieval target (61 ms p95) while the legacy v1 FTS5 baseline is 6 ms p95. That is the most important finding in this report (section 4).
+
+## 1. Environment (captured by `ps-bench env` inside every result file)
 
 | Item | Value |
 |---|---|
@@ -15,119 +24,160 @@
 | Disk | C: 445.3 GB used / 367.9 GB free at measurement time |
 | Hostname | PRANSHULASUS |
 | Rust | rustc 1.99.0 (b940084d7 2026-09-28), cargo 1.99.0 |
-| Build profile | `release` (workspace opt-level 3, lto thin, codegen-units 4) |
-| Harness | `crates/ps-bench` (dev-only, not shipped), engine = `crates/ps-index` as landed at measurement time |
-
-Confound recorded: the repo is developed by several agents in parallel; at measurement time the machine showed `17-47% total CPU from other agent/electron processes and had recent compiler activity. This can inflate p95/p99. The numbers are published as measured under those conditions, and will be re-run on an idle machine before any release claim. Defender was never disabled; page-cache state was not controlled.
+| Build profile | `release` (opt-level 3, lto thin, codegen-units 4) |
+| Harness | `crates/ps-bench` (dev-only, not shipped); no network calls, no telemetry |
+| Defender / page cache | unchanged / not controlled (recorded as confounds, never disabled) |
 
 ## 2. Corpora
 
-| Corpus | Entries | Files/folders | Bytes | FNV-1a 64 | SHA-256 |
+| Corpus | Entries | Files / folders | Bytes | FNV-1a 64 | SHA-256 |
 |---|---:|---|---:|---|---|
 | synthetic 10k (seed 20261109) | 10,000 | 9,179 / 807 (+14 anchors) | 1,858,494 | b4025e64e2a1fb0a | 5c53593380543f456907b03147b540597574dfeacd5a8a93b191004c3d1d7d8e |
 | synthetic 100k (seed 20261109) | 100,000 | 92,032 / 7,954 (+14 anchors) | 18,603,792 | e648c61e4cf57ac1 | ca5e8d781384a23058ef073b625305ca28924e53a3ee6b9df5570421026f1c62 |
 | synthetic 1M (seed 20261109) | 1,000,000 | 920,260 / 79,726 (+14 anchors) | 186,145,379 | d3092bcbbb84f6a3 | f497eb88fd03b2e716cae90fd1fe36757ddc732e532fabae848c5505d4d43d96 |
 | real legacy export (read-only) | 89,813 | 59,526 / 30,287 | 20,078,459 | 6457750a37badf7d | a86f0ae2a7497a5fb1294f2f66db1ab1bd5a7c18744fd37b032cfc61b1a732f8 |
 
-The real export has exactly 89,813 rows — equal to the Gate 0 baseline — so the immutable read-only export did not silently lose committed data. It contains 0 CJK paths and 6 non-ASCII paths (a fact relevant to Japanese/CJK relevance expectations: the real corpus cannot test them).
-
-Synthetic corpora include 41,152 hidden names, 53,993 CJK paths, 125,885 non-ASCII paths and 1,737 paths over 200 chars at 1M; planted anchors make all sizes directly comparable.
+Real export = exactly 89,813 rows (Gate-0 baseline), read via `?immutable=1`. It contains **0 CJK paths** and 6 non-ASCII paths, which is why real-corpus relevance has no CJK queries. Synthetic corpora at 1M include 41,152 hidden names, 53,993 CJK paths, 125,885 non-ASCII paths and 1,737 paths over 200 chars.
 
 ## 3. Filename engine — warm search (release)
 
-Harness: `ps-bench filename --iters 30 --limit 50 --cold-restarts 3 --save-index ...`. Warm = 2 untimed warmups + 30 timed iterations per query, 22 fixed queries (n=660 samples), in-process, engine only (dataset parse and build excluded from the timed loop). Deterministic ordering verified for every query in every run.
+Harness: `ps-bench filename --iters 30 --limit 50 --save-index ...`. Warm = 2 untimed warmups + 30 timed iterations per query over the fixed 22-query suite (n=660), in-process, engine only. Deterministic ordering verified for every query in every run.
 
-| Corpus | Warm p50 | Warm p90 | Warm p95 | Warm p99 | Max | Verdict vs target |
-|---|---:|---:|---:|---:|---:|---|
-| 10k | 1.020 ms | 2.472 ms | 2.882 ms | 3.543 ms | 7.662 ms | — |
-| 100k | 2.460 ms | 5.056 ms | **5.636 ms** | 6.961 ms | 11.498 ms | target p95 < 5 ms: **NOT MET** (+0.636 ms, +12.7%) |
-| 1M | 9.048 ms | 13.768 ms | **14.933 ms** | 16.688 ms | 24.974 ms | target p95 < 15 ms: **MET** (0.45 ms margin, single run) |
+| Corpus | Warm p50 | Warm p90 | Warm p95 | Warm p99 | Max | Mean |
+|---|---:|---:|---:|---:|---:|---:|
+| 10k | 0.071 ms | 0.480 ms | **0.598 ms** | 0.627 ms | 0.701 ms | 0.140 ms |
+| 100k | 0.514 ms | 1.012 ms | **1.570 ms** | 1.910 ms | 2.129 ms | 0.514 ms |
+| 1M | 2.300 ms | 7.164 ms | **8.297 ms** | 9.869 ms | 10.567 ms | 2.672 ms |
 
-Raw: [10k result](./results/filename-10k-20261109T1138Z.json), [100k result](./results/filename-100k-20261109T1139Z.json), [1M result](./results/filename-1m-20261109T1140Z.json).
+Raw: [filename-10k](./results/filename-10k-20261109T1148Z.json), [filename-100k](./results/filename-100k-20261109T1148Z.json), [filename-1m](./results/filename-1m-20261109T1149Z.json).
 
-### 3.1 Per-category p50 / p95 / p99 (100k and 1M)
+### 3.1 Repeat-run variance (published, not hidden)
+
+| Corpus | Engine revision | p95 | Build time | Note |
+|---|---:|---:|---:|---|
+| 10k | pre-perf-fix | 2.882 ms | 13.8 ms | first pass, loaded machine |
+| 100k | pre-perf-fix | 5.636 ms | 219 ms | first pass; did **not** meet the 5 ms target |
+| 1M | pre-perf-fix | 14.933 ms | 4,084 ms | first pass |
+| 100k | final | 1.570 / 1.676 / 2.194 ms | 191-250 ms | three runs; all meet target |
+| 1M | final | 8.297 / 9.504 / 12.666 ms | 2,793-6,200 ms | three runs; all meet target |
+| 1M | final, contended | 28.425 ms | 5,963 ms | outlier while other agents compiled; disclosed, not used as headline |
+
+First-pass raw files are kept: [10k-firstpass](./results/filename-10k-firstpass-20261109T1133Z.json), [100k-firstpass](./results/filename-100k-firstpass-20261109T1133Z.json), [1m-firstpass](./results/filename-1m-firstpass-20261109T1134Z.json). The 1M contended outlier: [filename-1m-contended](./results/filename-1m-contended-20261109T1148Z.json).
+
+### 3.2 Per-category p50 / p95 / p99 (primary runs)
 
 | Query category | 100k p50 | 100k p95 | 100k p99 | 1M p50 | 1M p95 | 1M p99 |
 |---|---:|---:|---:|---:|---:|---:|
-| exact | 0.055 | 6.050 | 11.498 | 0.132 | 10.781 | 11.462 |
-| exact_duplicate | 0.036 | 0.076 | 0.157 | 0.093 | 0.113 | 0.192 |
-| prefix | 3.286 | 5.630 | 5.984 | 0.063 | 12.178 | 13.833 |
-| multi_term | 4.455 | 6.961 | 7.469 | 10.040 | 12.101 | 14.933 |
-| typo | 4.089 | 5.999 | 7.110 | 10.795 | 14.428 | 15.777 |
-| fuzzy | 4.856 | 6.525 | 6.546 | 15.740 | 20.546 | 24.974 |
-| cjk | 0.049 | 0.051 | 0.068 | 0.128 | 0.191 | 0.416 |
-| unicode | 3.716 | 5.142 | 5.337 | 12.260 | 13.950 | 15.129 |
-| hidden | 0.034 | 0.055 | 0.091 | 0.064 | 0.104 | 0.115 |
-| long_path | 2.147 | 2.566 | 2.737 | 3.099 | 3.580 | 3.771 |
-| extension_like | 1.993 | 2.398 | 2.588 | 10.740 | 12.495 | 16.869 |
-| folder | 4.122 | 5.278 | 5.324 | 13.984 | 16.331 | 16.688 |
-| zero_match | 2.569 | 3.938 | 4.781 | 9.111 | 10.369 | 11.531 |
+| exact | 0.031 | 0.743 | 0.955 | 0.060 | 3.276 | 3.720 |
+| exact_duplicate | 0.030 | 0.032 | 0.062 | 0.049 | 0.075 | 0.101 |
+| prefix | 0.493 | 0.741 | 0.991 | 1.620 | 2.580 | 2.640 |
+| multi_term | 0.699 | 0.911 | 1.023 | 2.800 | 4.040 | 4.180 |
+| typo | 0.506 | 0.711 | 0.999 | 2.220 | 2.520 | 2.660 |
+| fuzzy | 0.591 | 0.760 | 0.817 | 4.470 | 4.900 | 5.020 |
+| cjk | 0.053 | 0.070 | 0.115 | 0.070 | 0.070 | 0.090 |
+| unicode | 0.334 | 0.458 | 0.566 | 1.720 | 1.910 | 2.010 |
+| hidden | 0.030 | 0.033 | 0.040 | 0.050 | 0.070 | 0.070 |
+| long_path | 1.654 | 1.998 | 2.129 | 3.630 | 3.840 | 3.870 |
+| extension_like | 0.807 | 1.027 | 1.092 | 7.320 | 8.300 | 8.520 |
+| folder | 1.435 | 1.926 | 2.085 | 9.550 | 10.190 | 10.570 |
+| zero_match | 0.468 | 0.705 | 0.786 | 3.130 | 3.650 | 4.390 |
 
-Interpretation, stated conservatively: queries with strong prefilter selectivity (hidden dotfiles, CJK prefixes, duplicates) are fast even at 1M; *full scans* (fuzzy /**ppjbudget**-style, extension-shaped, folder, typo, multi-term, unicode) dominate the p95 at 1M and are where the 100k target is missed. The engine currently returns zero results for the extension-shaped queries (`.pdf`, `xlsx`) and the hard fuzzy query `ppjbudget` at every size while still paying the scan cost — a relevance finding, not a latency win.
+Consistent with the engine owner's note: at 1M the remaining cost is in queries that reach the **path/folder phase** (folder-only names, extension-shaped queries) — `8-10 ms p95 — and the full-scan fuzzy pass (`4.9 ms p95). Name-prefix/hidden/duplicate/CJK queries are sub-millisecond thanks to bloom filtering. Queries returning results: 20/22 at 100k, 19/22 at 1M (the 0-result ones are the extension-shaped `.pdf`/`xlsx` and hard-fuzzy `ppjbudget` shapes, which still pay scan cost; a relevance, not a latency, item).
 
-### 3.2 Index construction, persistence, memory
+### 3.3 Index construction, persistence, memory
 
-| Corpus | Dataset parse | Index build (`from_entries`) | Engine `memory_bytes()` | Bytes/entry | Steady RSS | Peak RSS (during load) |
+| Corpus | Dataset parse | `from_entries` build | `memory_bytes()` | Bytes/entry | Steady RSS | Peak RSS |
 |---|---:|---:|---:|---:|---:|---:|
-| 10k | 9.8 ms | 13.8 ms | 1,174,257 B (1.12 MiB) | `117 B | 11 MiB | 14 MiB |
-| 100k | 96.5 ms | 219.0 ms | 11,416,376 B (10.9 MiB) | `114 B | 21 MiB | 43 MiB |
-| 1M | 1,073.9 ms | 4,084.3 ms | 109,791,502 B (104.7 MiB) | `110 B | 120 MiB | 315 MiB |
+| 10k | 9.6 ms | 13.8 ms | 1,245,513 B (1.19 MiB) | `124 B | 11.1 MB | 13.9 MB |
+| 100k | 105.7 ms | 191.2 ms | 12,063,032 B (11.5 MiB) | `121 B | 21.5 MB | 41.9 MB |
+| 1M | 1,076.3 ms | 2,793.4 ms | 115,491,574 B (110.1 MiB) | `115 B | 120.8 MB | 304.3 MB |
 
-- Binary index save: 3.6 ms / 1.08 MiB at 10k; 23.8 ms / 10.5 MiB at 100k; 278.2 ms / 100.9 MiB at 1M.
-- COLD = fresh process loading the saved binary (no dataset parse): load 3.1 ms (10k), 30.9 ms (100k), 300.1-388.5 ms (1M); first query after load 0.97 ms (10k), 4.69 ms (100k), 9.93-11.70 ms (1M).
-- RSS byte/entry (`110 B) is consistent across sizes and matches the documented ADR-0002 expectation (`100-150 MB at 1M; measured 104.7 MiB engine, 120 MiB steady RSS). Peak RSS at 1M (315 MiB) is dominated by the harness's transient `Vec<IndexEntry>` during load, not by the engine; a production loader that streams into the arena should be measured separately.
-- Cold process wall time in this run was inflated by the child's PowerShell RSS probe (`0.4 s); the harness now reports and subtracts probe time (`rss_probe_ms`) and the final numbers will be re-published from the corrected run.
+- Binary index save: 1,205,581 B / 3.0 ms (10k); 11,663,100 B / 21.4 ms (100k); 111,491,642 B / 232.5 ms (1M).
+- COLD = fresh process loading the saved binary (no dataset parse): load 2.4 ms (10k), 20.4-22.4 ms (100k), 240-254 ms (1M, measured while other agents compiled - label); first query after load 0.13-0.15 ms (10k), 1.48-1.75 ms (100k), 3.73-5.68 ms (1M).
+- Cold process wall (spawn + load + 5 queries, RSS-probe time subtracted by the harness): 20-24 ms (10k), 45-48 ms (100k), 281-300 ms (1M contended).
+- Memory is consistent with ADR-0002's investigated envelope (`100-150 MB at 1M; measured 110.1 MiB engine, 120.8 MB steady RSS). Peak RSS at 1M (304 MB) is dominated by the harness's transient `Vec<IndexEntry>` during load; a production streaming loader must be measured separately before quoting a 1M memory profile to users.
+- Raw cold files: [100k-cold](./results/filename-100k-cold-20261109T1150Z.json), [1m-cold](./results/filename-1m-cold-20261109T1150Z.json).
 
-## 4. Content retrieval — BASELINE-FOR-MIGRATION (legacy v1 FTS5, read-only)
+## 4. Content retrieval
 
-**Scope label:** this measures the user's historical v1 SQLite FTS5 index (`files_fts`, 14,609 docs), not v2 `ps-content`. It is the baseline ADR-0003 must beat when the v2 content index lands. The DB was opened `?immutable=1` read-only; no writes, no checkpoints.
+### 4.1 v2 ps-content FTS5 (current schema/query path)
+
+Scope: `v2 ps-content FTS5 (current schema/query path)`. Corpus imported from the same 14,609-doc legacy `files_fts` via `ps_content::import_legacy` (read-only ATTACH; never mutates the legacy DB). Import also copies the 89,813 legacy filename rows.
+
+| Fact | Measured |
+|---|---:|
+| Import (89,813 files / 13,296 content docs) | 6,601 ms wall (summary reported 6,572 ms, 0 errors) |
+| v2 DB file | 136,097,792 B |
+| Indexed text bytes | 72,072,254 B |
+| documents / errors | 13,296 / 0 |
+| Estimated FTS shadow bytes | 25,302,350 B |
+| Open time (index already warm) | 1.72 ms |
+| Cold first query (fresh process, 2 restarts) | 46.19 ms p50 |
+| Warm search (30 iters x 32 queries, n=960) | **p50 10.860 ms, p95 61.095 ms, p99 110.730 ms**, max 153.925 ms |
+| Queries with results | 25/32 |
+
+By category (warm, snippet + snippet_line included by the API): single_high_df p50 28.743 / p95 106.600 / p99 124.815 ms; single_medium_df 11.330 / 18.797 / 20.610; prefix 0.135 / 36.627 / 61.270; multi_term_and 6.670 / 24.090 / 26.866; phrase 4.860 / 6.150 / 6.687; cjk 0.038 / 3.412 / 4.042; zero_match 0.031 / 0.045 / 0.082.
+
+**Verdict vs target: "Indexed document content retrieval p95 < 30 ms" is NOT MET on the v2 query path (61.1 ms p95, `2x target, `10x the legacy baseline below).** The p50 single-term cost (28.7 ms) points at per-hit snippet/line-offset work or FTS ranking; that is sources-content's call to profile. Raw: [content-v2-pscontent](./results/content-v2-pscontent-20261109T1146Z.json).
+
+### 4.2 BASELINE-FOR-MIGRATION: legacy v1 FTS5 (read-only)
+
+Scope: the user's historical v1 SQLite FTS5 index (`files_fts`, 14,609 docs), opened `?immutable=1`. Not a v2 result; it is the baseline ADR-0003 must beat.
 
 | Index fact | Measured |
 |---|---:|
 | Documents | 14,609 |
 | Extracted text bytes | 72,216,618 (avg 4,943 B/doc, max 51,200 B/doc) |
-| FTS shadow-byte estimate | 101,802,788 B (`97.1 MiB) |
-| Whole DB file | 149,372,928 B (142.4 MiB; includes non-FTS tables) |
-| Open time (warm OS cache) | 0.15 ms |
+| FTS shadow-byte estimate | 101,802,788 B (97.1 MiB) |
+| Whole DB file | 149,372,928 B (142.4 MiB, includes non-FTS tables) |
+| Open time (warm OS cache) | 0.15-0.19 ms |
 | Cold first query after fresh process | 27.2 / 23.8 / 45.1 ms (3 restarts) |
 
 Warm retrieval, 30 iterations x 32 queries (n=960), prepared statement reused:
 
-| Path | p50 | p90 | p95 | p99 | Mean | Max |
-|---|---:|---:|---:|---:|---:|---:|
-| With `snippet()` (highlighting included) | 1.953 ms | 4.442 ms | **6.465 ms** | 23.807 ms | 2.702 ms | 29.179 ms |
-| Rank-only (no snippet) | 0.515 ms | 1.959 ms | 2.103 ms | 2.534 ms | 0.810 ms | 4.048 ms |
+| Path | p50 | p90 | p95 | p99 | Mean |
+|---|---:|---:|---:|---:|---:|
+| With `snippet()` (highlighting included) | 2.056 ms | 4.442 ms | **6.066 ms** | 24.976 ms | 2.822 ms |
+| Rank-only (no snippet) | 0.568 ms | 1.959 ms | 2.221 ms | 2.865 ms | 0.855 ms |
 
-By category (with snippet): single_high_df p95 23.662 ms (posting-list traversal dominates), prefix p95 9.291 ms, multi_term_and p95 4.169 ms, cjk p95 2.992 ms, phrase p95 2.434 ms, single_medium_df p95 2.034 ms, zero_match p95 0.042 ms.
+By category (snippet path): single_high_df p95 23.290 ms, prefix p95 7.595 ms, multi_term_and p95 3.689 ms, cjk p95 2.911 ms, phrase p95 2.403 ms, single_medium_df p95 2.747 ms, zero_match p95 0.051 ms. Highlight generation is `4x p95 versus rank-only, so snippet rendering must be budgeted explicitly in the UI. Raw: [content-legacy-fts5](./results/content-legacy-fts5-20261109T1139Z.json).
 
-Raw: [content-legacy-fts5-20261109T1145Z.json](./results/content-legacy-fts5-20261109T1145Z.json).
+## 5. OCR — Windows.Media.Ocr (speed and accuracy reported separately)
 
-Reading: highlight generation is the expensive part (`4x p95 versus rank-only), so a v2 UI that shows snippets pays that cost; open-at-match/snippet rendering must be budgeted explicitly. The v2 `ps-content` index has not been measured yet (crate stub at measurement time), so no v2 content target is claimed.
+Corpus: 90 synthetic GDI+ rendered images across 9 scenarios (ui_light, ui_dark, small_text 11px, heading 30px, rotated doc_scan, monospace code, numbers, low_contrast, CJK font) x 10 known strings each. Ground truth = the exact drawn string (manifest). Engine: `Windows.Media.Ocr` through the ps-bench WinRT adapter (ps-ocr was still a stub); language = en-GB, installed recognizer languages = [en-GB, en-US] only.
 
-## 5. OCR (Windows.Media.Ocr)
+| Metric | Pass 1 (cold session) | Pass 2 (warm) |
+|---|---:|---:|
+| Images | 90 | 90 |
+| Wall | 370 ms | 368 ms |
+| Throughput | 243.4 images/sec | 244.4 images/sec |
+| Per-image p50 / p95 / p99 | 3.6 / 7.4 / 14.4 ms | 3.6 / 7.3 / 9.2 ms |
+| Session open | 0.2 ms | (same session) |
 
-Status: **pending run** in this revision (the release rebuild was blocked by an in-flight `ps-index` edit). The corpus generator, ground-truth manifest (54 PNGs, 9 scenarios) and the WinRT adapter are in place; the measurement command is:
+Accuracy, warm pass (never combined with throughput above):
 
-    cargo run -p ps-bench --release -- ocr-corpus
-    cargo run -p ps-bench --release -- ocr --passes 2 --out docs/performance/results/ocr-windows.json
+| Subset | n | Mean CER | Median CER | Image exact-match | Char accuracy |
+|---|---:|---:|---:|---:|---:|
+| All images | 90 | 0.1834 | 0.0227 | 47.8% | 87.7% |
+| English-only text | 72 | **0.0556** | - | **59.7%** | **92.4%** |
+| CJK text | 18 | 0.6944 | - | 0.0% | 33.7% |
 
-If Windows.Media.Ocr cannot be exercised on this host the report will be `status: unverified` with no numbers, per METHODOLOGY section 9. **No OCR accuracy or throughput claim exists until this section is replaced with measured output.**
+Interpretation: English UI/document-style text is recognized quickly and mostly exactly at this size (p50 3.6 ms/image, char accuracy 92.4%). CJK text fails because **no CJK OCR language pack is installed** on this host — this is a language-pack limitation, not evidence about Windows OCR's CJK capability on a machine with those packs. By-scenario mean CER (warm): cjk 0.1375, heading 0.1416, doc_scan 0.1865, ui_light 0.1866, ui_dark 0.1866, numbers 0.1916, low_contrast 0.1927, small_text 0.1968, code 0.2303. Synthetic rendered text is not photographs/scans; real-scan accuracy will differ. Raw: [ocr-windows](./results/ocr-windows-20261109T1142Z.json).
 
-## 6. Relevance quality (golden fixtures, release)
+## 6. Relevance quality (golden fixtures, release engine)
 
-### 6.1 Synthetic corpus, 10k, 21 golden queries (portable fixture)
+### 6.1 Synthetic 10k, 21 queries (portable fixture)
 
 | Metric | Measured |
 |---|---:|
-| MRR@10 | 0.895 |
-| recall@10 | 0.895 |
+| MRR@10 | 1.000 |
+| recall@10 | 1.000 |
 | exact-match@1 | 1.000 (13/13 asserted top-1 queries) |
-| pass rate | 0.905 (19/21) |
-| 0-match queries correct | 2/2 |
+| pass rate | 1.000 (19/19 scored + 2/2 zero-match) |
 
-Failures (genuine engine gaps, reported to engine-core): `quarterly report final` (multi-term) returns no expected hit in top-10, while the prefix `quarterly_rep` ranks the same file #1; `quaterly report final` (typo) finds no fuzzy match, while the single-token typo `screnshot 2026-11-09` ranks #1. Raw: [relevance-synthetic-10k result](./results/relevance-synthetic-10k-20261109T1147Z.json).
+This includes multi-token partial matching and multi-token typo tolerance, which failed in the earlier engine revision and now rank #1. Raw: [relevance-synthetic](./results/relevance-synthetic-10k-20261109T1148Z.json).
 
-### 6.2 Real legacy corpus, 89,813 entries, 65 golden queries (machine-specific evidence)
+### 6.2 Real legacy corpus, 89,813 entries, 65 queries (machine-specific evidence)
 
 | Metric | Measured |
 |---|---:|
@@ -135,66 +185,110 @@ Failures (genuine engine gaps, reported to engine-core): `quarterly report final
 | recall@10 | 0.983 |
 | exact-match@1 | 1.000 |
 | pass rate | 0.985 (64/65) |
-| 0-match queries correct | 5/5 |
+| zero-match queries correct | 5/5 |
 
-Only failure: prefix `Pasted image` did not surface the expected file in top-10. Categories covered: exact (25), duplicate names (10), prefix (7), typo (8), hidden (5), long paths (5), 0-match (5); no CJK queries are possible because the real corpus has zero CJK paths. Raw: [relevance-real result](./results/relevance-real-20261109T1148Z.json). Fixture: [tests/golden/real-corpus-golden.json](../../tests/golden/real-corpus-golden.json).
+One failure: prefix `Pasted image` did not surface the expected file in top-10 (other results with that prefix ranked above it). Categories: exact 25/25 rank 1; duplicate names 10 (all listed copies found); prefix 6/7; typo 8/8 rank 1; hidden 5/5; long paths 5/5; zero-match 5/5. No CJK queries possible (real corpus has 0 CJK paths). Raw: [relevance-real](./results/relevance-real-20261109T1148Z.json). Fixture: [tests/golden/real-corpus-golden.json](../../tests/golden/real-corpus-golden.json).
 
-CI smoke test: `cargo test -p ps-bench --test relevance_smoke` — 2 tests pass; builds the deterministic 10k corpus in memory, evaluates the committed synthetic fixture, asserts MRR@10 >= 0.80 and exact@1 >= 0.90 when the engine serves results (gates documented in the test; they are regression gates, not product targets).
+CI smoke test: `cargo test -p ps-bench` — 2 tests pass. The relevance test builds the deterministic 10k corpus in memory, evaluates the committed fixture and asserts MRR@10 >= 0.80 / exact@1 >= 0.90 when results exist (regression gates, not product targets; `ENGINE_NOT_READY` skips quality assertions while the engine is a stub).
 
-## 7. Targets vs achieved (master prompt, section VIII)
+## 7. Targets vs achieved (master prompt section VIII)
 
 | Target | Condition | Status | Evidence |
 |---|---|---|---|
-| Hotkey -> visible + input-ready p95 < 50 ms | prewarmed launcher | **NOT MEASURED** | no Tauri/WebView2 measurement yet; method in METHODOLOGY section 10 |
-| 100k warm filename search p95 < 5 ms | representative names, engine query | **NOT MET** | 5.636 ms p95 (n=660, release, this host) |
-| 1M warm filename search p95 < 15 ms | realistic names/paths, indexed | **MET (margin 0.45 ms)** | 14.933 ms p95 (n=660, release, single run; shared-machine confound) |
-| First visible results from input p95 < 30 ms | UI+IPC+Rust+paint | **NOT MEASURED** | no UI numbers published |
-| Indexed document content retrieval p95 < 30 ms | fixed mixed corpus | **NOT MEASURED for v2**; legacy v1 baseline with snippet p95 = 6.465 ms | v1 baseline only; v2 `ps-content` pending |
-| Indexed OCR-text retrieval p95 < 30 ms | OCR text already indexed | **NOT MEASURED** | no OCR index yet |
-| Responsive interaction 60 FPS / 120 FPS | scroll/selection/preview | **NOT MEASURED** | needs real app build |
-| Inactive Python agent processes = 0 | agent unused | **NOT MEASURED** | app/sidecar not launched during this pass |
-| Idle CPU near 0 | truly idle | **NOT MEASURED** | no instrumentation; other agents active |
+| Hotkey -> visible + input-ready p95 < 50 ms | prewarmed launcher | **NOT MEASURED** | no hotkey-to-visible instrumentation yet; UI sample below covers input->visible only |
+| 100k warm filename search p95 < 5 ms | representative names, engine query | **MET** | 1.570 ms p95 primary; 1.570-2.194 ms across three final-revision runs. Earlier pre-perf-fix revision was 5.636 ms (kept as evidence) |
+| 1M warm filename search p95 < 15 ms | realistic names/paths, indexed | **MET** | 8.297 ms p95 primary; 8.297-12.666 ms across three final-revision runs; one contended outlier 28.425 ms disclosed |
+| First visible results from input p95 < 30 ms | UI+IPC+Rust+paint | **NOT MEASURED as p95** | exploratory n=4 debug-build sample: 3.8-32.3 ms input->visible (section 8); no p50/p95 until release build + >=30 takes |
+| Indexed document content retrieval p95 < 30 ms | fixed mixed corpus | **NOT MET (v2)** | v2 ps-content p95 61.095 ms; legacy v1 baseline p95 6.066 ms (not a v2 number) |
+| Indexed OCR-text retrieval p95 < 30 ms | OCR text already indexed | **NOT MEASURED** | OCR text is not indexed yet (ps-content/ps-ocr integration pending) |
+| Responsive interaction 60 FPS / 120 FPS | scroll/selection/preview | **NOT MEASURED** | needs frame-time instrumentation in the real app |
+| Inactive Python agent processes = 0 | agent unused | **NOT MEASURED** | app/sidecar were not part of these runs |
+| Idle CPU near 0 | truly idle | **NOT MEASURED** | no idle-CPU instrumentation; other agents active |
 
-Explicitly rejected claims (the harness vetoes these): "sub-5ms at 100k" (measured 5.64 ms p95), "5ms-class at 1M" (measured 9.05 ms p50 / 14.93 ms p95), "content search is fast" without the snippet/rank-only split, and any "Everything/Kensaku-class" claim (no cross-tool measurement was run; see section 8). A single-run 1M MET result is not a guarantee under indexing load; it is a measurement.
+## 8. UI / end-to-end latency (honest first sample, NOT a p50/p95 claim)
 
-## 8. Competitor scope on this machine (no installs, no settings changes)
+### 8.1 Harness of record and ownership
 
-| Tool | Installed | Observed facts (read-only) | Query latency compared? |
+- **Canonical real-app harness:** `tools/visual-qa/e2e-drive.mjs` (Owner: Lead / UX-QA; launches the Tauri debug binary with WebView2 CDP, serves the production frontend via a preview server, types real queries, captures real window screenshots and measures input->visible latency).
+- **Auxiliary mark collector:** `tools/ui-latency/cdp-latency.mjs` (Owner: perf-bench). It does **not** launch or drive the app; it attaches to an already-running CDP-enabled page and collects page-internal marks for decomposition. It is not a second E2E harness; when a real app run is needed, e2e-drive is used.
+
+### 8.2 Method (as implemented by e2e-drive, confirmed against its source)
+
+1. `performance.now()` immediately before typing the query (input event time).
+2. Wait until the first result row appears in the DOM, then **two requestAnimationFrame ticks** ("paint").
+3. Record `visibleAt - start` on the same page clock. Rust-side `SearchResponse.took_ms` is recorded alongside for engine-vs-UI decomposition, but the reported number is end-to-end input->visible DOM paint.
+
+### 8.3 Conditions (record exactly)
+
+- **Debug Rust build** (`target/debug`), production JS served by Vite preview; 150% DPI; launcher + app pages; other agents may have been compiling; n = **4 queries, no warmup separation, single take each** — this is an exploratory sample, not a distribution; release-build comparison is pending.
+
+### 8.4 Measured sample (raw: [latency-real-app.json](../../docs/qa/visual/app-captures/latency-real-app.json))
+
+| Query | Rows | input -> visible |
+|---|---:|---:|
+| `arch` (broad, first query) | 50 | 32.3 ms |
+| `readme` | 50 | 4.9 ms |
+| `protonserch` (typo) | 50 | 7.3 ms |
+| `zzzzzz-no-such-file` (zero-match shape) | 19 | 3.8 ms |
+
+Honest notes: (a) the broad first query includes first-use warming, so it is not comparable to the rest; (b) the "zero-match" query returned **19 rows**, i.e. the app did not show an empty state for that input — worth investigating as a relevance/fallback question; (c) hotkey->visible, focus timing, WebView2 process-tree memory, FPS and idle CPU are still unmeasured. No UI number from this section may be quoted as "p95" or as release performance.
+
+## 9. Competitor scope on this machine (no installs, no settings changes)
+
+| Tool | Installed | Observed facts (read-only) | Latency compared? |
 |---|---|---|---|
-| Everything 1.4.1.1032 (voidtools) | yes, running at probe time | WS 10.9 MB, private 2.3 MB; name-only NTFS index; `Everything.ini` has `allow_http_server=0` and `allow_etp_server=0`; **no `es.exe` CLI in the install dir or PATH**, no SDK DLL present | **No.** No scriptable query interface; enabling ETP/HTTP or installing the CLI/SDK would change the competitor's setup (forbidden). Different scope: whole-volume names, no indexed content. |
-| Kensaku 1.0.16 (Yash Jangid) | yes, not running at probe time | Tantivy `index/` 42,255,059 B across 48 files; `metadata.db` 10,784,768 B (+10.9 MB WAL); models 30.2 MB safetensors; thumbs 47.5 MB; config watches 4 dirs (Documents/Downloads/Desktop/Pictures), skip_hidden=true, OCR enabled. Read-only immutable `metadata.db`: nodes=10,853; units=13,103; visual_units=0 (WAL not replayed; caveat recorded) | **No.** Only the GUI is installed (`kensaku-cli` is not); automating a GUI launcher is not an equal-workload measurement. Scope differs: 10,853 nodes over 4 watched dirs vs our 89,813-entry real corpus / 1M synthetic. |
-| PowerToys (Preview) 0.102.3101.0 | yes (`%LOCALAPPDATA%\PowerToys`) | installed; Command Palette component present in this version family | **No.** Not launched; it is a different product surface and no benchmark was run. |
-| Flow Launcher | no | not installed | **No.** Not installed; no install performed. |
+| Everything 1.4.1.1032 (voidtools) | yes, running at probe time | WS 10.9 MB, private 2.3 MB; name-only NTFS index; `Everything.ini` has `allow_http_server=0`, `allow_etp_server=0`; no `es.exe` CLI in install dir or PATH; no SDK DLL present | **No.** No scriptable query interface; enabling servers or installing CLI/SDK would change the competitor's setup (forbidden). Different scope: whole-volume names, no indexed content. |
+| Kensaku 1.0.16 (Yash Jangid) | yes, not running at probe time | Tantivy `index/` 42,255,059 B / 48 files; `metadata.db` 10,784,768 B (+10.9 MB WAL); models 30.2 MB; thumbs 47.5 MB; watches 4 dirs (Documents/Downloads/Desktop/Pictures), skip_hidden=true, OCR enabled. Read-only immutable metadata: nodes 10,853; units 13,103; visual_units 0 (WAL not replayed; caveat recorded) | **No.** Only the GUI is installed (`kensaku-cli` is not); automating a GUI launcher is not an equal-workload measurement. Scope differs: 10,853 nodes / 4 watched dirs vs our 89,813-entry real corpus and 1M synthetic. |
+| PowerToys (Preview) 0.102.3101.0 | yes (`%LOCALAPPDATA%\PowerToys`) | installed; Command Palette family present in this version | **No.** Not launched/measured (different product surface). |
+| Flow Launcher | no | not installed | **No.** No install performed. |
 
-Scope mismatch is stated openly: our filename corpus has 89,813 real entries and up to 1M synthetic; Kensaku's observed metadata covers 10,853 nodes; Everything indexes names for entire volumes. A cross-tool latency table would compare different corpora, scopes and cache states, so none is published. Kensaku's architecture notes (four tiers, `128 B/entry arena, 64-bit bloom) are cited in docs/research/RESEARCH.md as design input, not as our measurements.
+Scope mismatch is stated openly, therefore **no cross-tool latency table is published**. Kensaku's architecture notes (four tiers, `128 B/entry arena, 64-bit bloom) are cited in docs/research/RESEARCH.md as design input, not as our measurements.
 
-## 9. What the numbers mean for engineering priorities
+## 10. What the numbers mean for engineering priorities
 
-1. **100k target is 0.64 ms off**; the 1M MET result rests on selective prefiltering, while full-scan query shapes (fuzzy/typo/folder/unicode/multi-term/extension-shaped) cost 10-20 ms at 1M. Reducing full scans (better prefilter, trigram/prefix index, or bounded early-exit) is the highest-impact filename work.
-2. **Cold load at 1M is 300-388 ms** for a 100.9 MiB binary. That directly threatens "hotkey -> visible" if the launcher loads the index on demand; a pre-warmed hidden window or memory-mapped/streamed load is required, and that tradeoff must be measured (not assumed).
-3. **Memory is within the investigated envelope** (`110 B/entry; 104.7 MiB engine at 1M), but the current loader's transient peak (315 MiB) needs a streaming path before claiming a 1M memory profile.
-4. **Content snippet generation costs `4x p95** vs rank-only; the UI must not render snippets for every keystroke and needs a measured budget.
-5. **Relevance is strong for exact/prefix/duplicate/hidden/long-path/unicode/CJK** (rank 1 in almost all synthetic cases, MRR 0.928 on the real corpus) but has two concrete gaps: multi-token partial matching and multi-token typo tolerance. Both are testable with the committed fixtures.
+1. **v2 content p95 is 61 ms vs the 30 ms target and `10x the legacy v1 FTS5 baseline (6 ms).** This is the top performance regression in the current tree; profile the ps-content snippet/line-offset and ranking path. (Legacy baseline is not a v2 accomplishment either — it is what v2 should at least match.)
+2. **Filename targets are met on the final engine revision** (100k 1.57 ms, 1M 8.30 ms p95) but the 1M cold load is 240-254 ms for a 111 MB binary. A launcher that loads the index on demand cannot meet hotkey->visible 50 ms; pre-warm/memory-map/streaming load must be measured next.
+3. **1M memory** `115 B/entry (110.1 MiB engine) is inside the investigated envelope; the transient loader peak (304 MB RSS) is a harness artifact that a production streaming loader should beat.
+4. **Path/folder-phase queries cost `8-10 ms p95 at 1M** (folder-only names, extension-shaped); bounding that phase is the remaining filename push (engine-core is aware).
+5. **OCR**: English UI text is fast (3.6 ms/image, 92.4% char accuracy on synthetic renders); CJK is unverified on this host (no language pack). Real-scan accuracy needs a real corpus before any product claim.
+6. **Relevance** is strong (synthetic 1.000 MRR, real 0.928); the single real-corpus prefix miss is worth a look but is not a broad failure.
+7. **UI latency** needs the release build and >=30 takes through e2e-drive before any claim; the current 4-query debug sample is only a sanity check.
 
-## 10. Raw result files
+## 11. Raw result files (this report)
 
 | File | Contents |
 |---|---|
-| results/filename-10k-20261109T1138Z.json | warm/cold filename, build, memory, per-query samples |
-| results/filename-100k-20261109T1139Z.json | same at 100k |
-| results/filename-1m-20261109T1140Z.json | same at 1M |
-| results/content-legacy-fts5-20261109T1145Z.json | legacy v1 FTS5 latency, index size, cold |
-| results/relevance-synthetic-10k-20261109T1147Z.json | golden relevance, portable fixture |
-| results/relevance-real-20261109T1148Z.json | golden relevance, real corpus |
-| results/ocr-windows-*.json | OCR speed/accuracy (pending run) |
-| ../tests/golden/synthetic-golden.json | committed golden queries (synthetic) |
-| ../tests/golden/real-corpus-golden.json | committed golden queries (real corpus, machine-specific) |
+| [filename-10k](./results/filename-10k-20261109T1148Z.json) | primary 10k warm/cold, build, memory, per-query samples |
+| [filename-100k](./results/filename-100k-20261109T1148Z.json) | primary 100k |
+| [filename-1m](./results/filename-1m-20261109T1149Z.json) | primary 1M |
+| [filename-100k-cold](./results/filename-100k-cold-20261109T1150Z.json) | 100k cold restart detail |
+| [filename-1m-cold](./results/filename-1m-cold-20261109T1150Z.json) | 1M cold restart detail (contended) |
+| [filename-*-firstpass](./results/filename-100k-firstpass-20261109T1133Z.json) | pre-perf-fix engine, loaded machine (variance evidence) |
+| [filename-1m-contended](./results/filename-1m-contended-20261109T1148Z.json) | contended outlier (p95 28.4 ms), disclosed |
+| [content-legacy-fts5](./results/content-legacy-fts5-20261109T1139Z.json) | legacy v1 FTS5 baseline (snippet vs rank-only, cold) |
+| [content-v2-pscontent](./results/content-v2-pscontent-20261109T1146Z.json) | v2 ps-content FTS5 (import, index facts, warm/cold) |
+| [ocr-windows](./results/ocr-windows-20261109T1142Z.json) | OCR speed + accuracy, per-image evidence |
+| [relevance-synthetic-10k](./results/relevance-synthetic-10k-20261109T1148Z.json) | synthetic golden evaluation |
+| [relevance-real](./results/relevance-real-20261109T1148Z.json) | real-corpus golden evaluation |
+| [latency-real-app.json](../../docs/qa/visual/app-captures/latency-real-app.json) | exploratory UI input->visible sample (e2e-drive) |
+| [synthetic-golden.json](../../tests/golden/synthetic-golden.json) / [real-corpus-golden.json](../../tests/golden/real-corpus-golden.json) | committed golden fixtures |
 
-## 11. Reproduce
+## 12. Reproduce
 
-See [METHODOLOGY.md](./METHODOLOGY.md) section 14 for the complete command sequence. Minimum reproduction for the filename table:
+See [METHODOLOGY.md](./METHODOLOGY.md) section 14 for the full sequence. Minimum filename reproduction:
 
     cargo build -p ps-bench --release
     cargo run -p ps-bench --release -- gen --count 100000 --out .bench/dataset-100k.jsonl
     cargo run -p ps-bench --release -- queries --out .bench/queries.jsonl
     cargo run -p ps-bench --release -- filename --dataset .bench/dataset-100k.jsonl --queries .bench/queries.jsonl --iters 30 --cold-restarts 3 --save-index .bench/index-100k.bin --out docs/performance/results/filename-100k.json
+    cargo run -p ps-bench --release -- content-v2 --queries .bench/queries-content.jsonl --iters 30 --cold-restarts 2 --out docs/performance/results/content-v2.json
+    cargo run -p ps-bench --release -- ocr --passes 2 --out docs/performance/results/ocr-windows.json
+
+## 13. Veto list (claims this report does not support)
+
+- "Sub-5 ms at 100k" is only true on the final engine revision (1.57 ms p95); it was 5.64 ms one revision earlier. Any claim must name the revision and machine state.
+- "Content search is fast" without the snippet/rank-only split is not supported: v2 p95 is 61 ms with snippet.
+- "Everything/Kensaku-class speed" — no cross-tool measurement was run (section 9 explains why); no comparison claim is valid.
+- "UI is under 30 ms p95" — only a 4-query debug-build sample exists; it is not a p95.
+- "OCR works for CJK" — unverified on this host (no CJK language pack); only English rendered text was measured.
+- Any 1M memory claim based on peak RSS 304 MB — that includes the harness's transient entry vector; use the engine's 110.1 MiB / steady 120.8 MB with the stated caveat.

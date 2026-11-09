@@ -310,6 +310,20 @@ export const mockBridge = {
     return settings;
   },
   async indexCommand(_command: IndexCommand): Promise<void> {},
+  async agentStatus(): Promise<import("./types").AgentStatus> {
+    return {
+      state: "not_configured",
+      runtime: null,
+      model: null,
+      detail: "Browser preview: the optional Python sidecar is only available in the desktop app.",
+    };
+  },
+  async agentStart(): Promise<void> {
+    throw new Error("Agent workflows require the desktop app (browser preview has no sidecar).");
+  },
+  async agentCancel(): Promise<void> {},
+  async agentApprove(): Promise<void> {},
+  async agentStop(): Promise<void> {},
   async setHotkey(hotkey: string): Promise<Settings> {
     settings = { ...settings, hotkey };
     return settings;

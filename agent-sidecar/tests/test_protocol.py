@@ -79,12 +79,12 @@ class ParseInboundTests(unittest.TestCase):
 
 
 class OutboundEventShapeTests(unittest.TestCase):
-    """The Rust serde definitions are snake_case inside the tagged enum."""
+    """The frozen Rust serde definition is camelCase inside the tagged enum."""
 
     def test_started(self) -> None:
         self.assertEqual(
             protocol.started("r1", "pydantic-ai 2.66.0", "test:scripted"),
-            {"type": "started", "run_id": "r1", "runtime": "pydantic-ai 2.66.0", "model": "test:scripted"},
+            {"type": "started", "runId": "r1", "runtime": "pydantic-ai 2.66.0", "model": "test:scripted"},
         )
 
     def test_plan_and_progress(self) -> None:
@@ -101,7 +101,7 @@ class OutboundEventShapeTests(unittest.TestCase):
             event,
             {
                 "type": "approval_request",
-                "approval_id": "apr-1",
+                "approvalId": "apr-1",
                 "title": "Open",
                 "detail": "detail",
                 "action": {"type": "open_path", "path": "C:/x y.txt", "line": None, "column": None},
@@ -122,7 +122,7 @@ class OutboundEventShapeTests(unittest.TestCase):
         )
         self.assertEqual(
             protocol.output("hello", True),
-            {"type": "output", "text": "hello", "final_answer": True},
+            {"type": "output", "text": "hello", "finalAnswer": True},
         )
         self.assertEqual(
             protocol.error("cancelled", "m"),
@@ -130,7 +130,7 @@ class OutboundEventShapeTests(unittest.TestCase):
         )
         self.assertEqual(
             protocol.finished(False, 12),
-            {"type": "finished", "ok": False, "duration_ms": 12},
+            {"type": "finished", "ok": False, "durationMs": 12},
         )
 
 

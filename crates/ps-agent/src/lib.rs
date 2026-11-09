@@ -13,8 +13,8 @@
 //!
 //! Integration contract for the Tauri shell: docs/agent/INTEGRATION.md.
 
-pub mod config;
 mod client;
+pub mod config;
 mod error;
 mod protocol;
 
@@ -40,10 +40,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn scratch_dir(tag: &str) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         // Use the workspace target dir instead of the OS temp dir: the host
         // sandbox may deny writes under %TEMP%, while target/ is always usable.
         let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

@@ -43,8 +43,6 @@ use matching::{
 /// Below this many entries the rayon wake-up cost dominates, so scans run
 /// serially. Measured on this host: a 10k-entry scan is ~10x faster serial.
 const SERIAL_SCAN_THRESHOLD: usize = 48_000;
-/// Directory-count threshold for the path phase.
-const SERIAL_DIR_THRESHOLD: usize = 32_000;
 const SCAN_CHUNK: usize = 16_384;
 
 /// Dedicated scan pool. A small pool (2..=8 threads) beats the global pool
@@ -442,15 +440,8 @@ impl FilenameIndex {
 
     /// Deterministic ordering for the name-sorted array: lower-cased name,
     /// then exact name bytes, then directory path, then index.
-    fn entry_sort_cmp(&self, a: u32, b: u32) -> Ordering {
-        let ra = &self.entries[a as usize];
-        let rb = &self.entries[b as usize];
-        let na = self.arena_str(ra.name_off, ra.name_len);
-        let nb = self.arena_str(rb.name_off, rb.name_len);
-        cmp_ci(na, nb)
-            .then_with(|| na.as_bytes().cmp(nb.as_bytes()))
-            .then_with(|| self.dir_bytes(ra.dir).cmp(self.dir_bytes(rb.dir)))
-            .then_with(|| a.cmp(&b))
+    pub(crate) fn entry_sort_cmp(&self, a: u32, b: u32) -> Ordering {
+        sort_cmp_parts(&self.arena, &self.entries, &self.dirs, a, b)
     }
 
     pub fn len(&self) -> usize {
@@ -463,6 +454,11 @@ impl FilenameIndex {
 
     pub fn roots(&self) -> &[String] {
         &self.roots
+    }
+
+    /// Number of unique directories in the dir table (diagnostic).
+    pub fn dir_count(&self) -> usize {
+        self.dirs.len()
     }
 
     pub fn built_at(&self) -> i64 {
@@ -914,7 +910,7 @@ impl FilenameIndex {
         if plan.has_sep {
             return self.search_spanning(plan, limit, filter);
         }
-        let mut name_hits = self.scan_name_phase(plan, limit, filter, false);
+        let mut name_hits = self.scan_name_phase(plan, limit, filter);
         // Typo matches are the lowest tier: only scan for them when the top-k
         // is not already filled by stronger matches.
         let need_typo = name_hits.len() < limit
@@ -947,55 +943,48 @@ impl FilenameIndex {
         plan: &QueryPlan,
         limit: usize,
         filter: &EntryFilter<'_>,
-        allow_typo: bool,
     ) -> Vec<FileHit> {
         let under = self.compute_under(filter);
         let n = self.entries.len();
-        const CHUNK: usize = 16_384;
-        let nchunks = n.div_ceil(CHUNK);
-        let partials: Vec<Vec<Candidate>> = (0..nchunks)
-            .into_par_iter()
-            .map(|c| {
-                let mut top = TopK::new(self, limit);
-                let mut scratch: Vec<(usize, usize)> = Vec::new();
-                let start = c * CHUNK;
-                let end = ((c + 1) * CHUNK).min(n);
-                for i in start..end {
-                    let r = &self.entries[i];
-                    if r.kind == KIND_TOMBSTONE {
-                        continue;
-                    }
-                    if !plan.bloom_pass(self.blooms[i]) {
-                        continue;
-                    }
-                    // A match needs at least one character per query char.
-                    if (r.name_len as usize) < plan.char_len {
-                        continue;
-                    }
-                    let name = self.arena_str(r.name_off, r.name_len);
-                    let stem = self.entry_stem(i);
-                    let Some(score) = match_name_into(name, stem, plan, allow_typo, &mut scratch)
-                    else {
-                        continue;
-                    };
-                    if !top.would_accept(score, r.name_len, r.modified, i as u32) {
-                        continue;
-                    }
-                    if !self.filter_pass(filter, i, under.as_deref()) {
-                        continue;
-                    }
-                    let ranges = to_utf16_ranges(name, &scratch);
-                    top.push(Candidate {
-                        idx: i as u32,
-                        score: (score * SCORE_SCALE) as i64,
-                        name_len: r.name_len,
-                        modified: r.modified,
-                        ranges,
-                    });
+        let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
+            let mut top = TopK::new(self, limit);
+            let mut scratch: Vec<(usize, usize)> = Vec::new();
+            let start = c * SCAN_CHUNK;
+            let end = ((c + 1) * SCAN_CHUNK).min(n);
+            for i in start..end {
+                let r = &self.entries[i];
+                if r.kind == KIND_TOMBSTONE {
+                    continue;
                 }
-                top.items
-            })
-            .collect();
+                if !plan.bloom_pass(self.blooms[i]) {
+                    continue;
+                }
+                // A match needs at least one character per query char.
+                if (r.name_len as usize) < plan.char_len {
+                    continue;
+                }
+                let name = self.arena_str(r.name_off, r.name_len);
+                let stem = self.entry_stem(i);
+                let Some(score) = match_name_into(name, stem, plan, false, &mut scratch) else {
+                    continue;
+                };
+                if !top.would_accept(score, r.name_len, r.modified, i as u32) {
+                    continue;
+                }
+                if !self.filter_pass(filter, i, under.as_deref()) {
+                    continue;
+                }
+                let ranges = to_utf16_ranges(name, &scratch);
+                top.push(Candidate {
+                    idx: i as u32,
+                    score: (score * SCORE_SCALE) as i64,
+                    name_len: r.name_len,
+                    modified: r.modified,
+                    ranges,
+                });
+            }
+            top.items
+        });
         self.merge_candidates(partials, limit)
     }
 
@@ -1010,78 +999,103 @@ impl FilenameIndex {
         let relaxed = plan.relaxed();
         let under = self.compute_under(filter);
         let n = self.entries.len();
-        const CHUNK: usize = 16_384;
-        let nchunks = n.div_ceil(CHUNK);
-        let partials: Vec<Vec<Candidate>> = (0..nchunks)
-            .into_par_iter()
-            .map(|c| {
-                let mut top = TopK::new(self, limit);
-                let mut scratch: Vec<(usize, usize)> = Vec::new();
-                let start = c * CHUNK;
-                let end = ((c + 1) * CHUNK).min(n);
-                for i in start..end {
-                    let r = &self.entries[i];
-                    if r.kind == KIND_TOMBSTONE {
-                        continue;
-                    }
-                    if !relaxed.bloom_pass(self.blooms[i]) {
-                        continue;
-                    }
-                    let name = self.arena_str(r.name_off, r.name_len);
-                    let stem = self.entry_stem(i);
-                    let score = if plan.multi {
-                        // Multi-term typo queries are rare; reuse the full
-                        // matcher (every term may be exact/fuzzy/typo).
-                        match match_name_into(name, stem, &relaxed, true, &mut scratch) {
-                            Some(score) => score,
-                            None => continue,
-                        }
-                    } else if typo_only_match(name, stem, plan) {
-                        SCORE_TYPO
-                    } else {
-                        continue;
-                    };
-                    if !top.would_accept(score, r.name_len, r.modified, i as u32) {
-                        continue;
-                    }
-                    if !self.filter_pass(filter, i, under.as_deref()) {
-                        continue;
-                    }
-                    top.push(Candidate {
-                        idx: i as u32,
-                        score: (score * SCORE_SCALE) as i64,
-                        name_len: r.name_len,
-                        modified: r.modified,
-                        ranges: Vec::new(),
-                    });
+        let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
+            let mut top = TopK::new(self, limit);
+            let mut scratch: Vec<(usize, usize)> = Vec::new();
+            let start = c * SCAN_CHUNK;
+            let end = ((c + 1) * SCAN_CHUNK).min(n);
+            for i in start..end {
+                let r = &self.entries[i];
+                if r.kind == KIND_TOMBSTONE {
+                    continue;
                 }
-                top.items
-            })
-            .collect();
+                if !relaxed.bloom_pass(self.blooms[i]) {
+                    continue;
+                }
+                // Typo candidates are only plausible within a small length
+                // window and with a matching first character; this prunes the
+                // vast majority of the million-entry scan before the edit
+                // distance work.
+                let name = self.arena_str(r.name_off, r.name_len);
+                let stem_len = name
+                    .len()
+                    .saturating_sub(r.ext_len as usize + usize::from(r.ext_len > 0));
+                let qlen = plan.char_len;
+                let name_in_window =
+                    r.name_len as usize + 2 >= qlen && (r.name_len as usize) <= qlen + 2;
+                let stem_in_window = stem_len + 2 >= qlen && stem_len <= qlen + 2;
+                if !name_in_window && !stem_in_window {
+                    continue;
+                }
+                if let Some(first) = plan.terms_chars.first().and_then(|c| c.first()) {
+                    if name.as_bytes().first().map(|b| b.to_ascii_lowercase())
+                        != Some(*first as u8)
+                    {
+                        continue;
+                    }
+                }
+                let stem = self.entry_stem(i);
+                let score = if plan.multi {
+                    // Multi-term typo queries are rare; reuse the full matcher
+                    // (every term may be exact/fuzzy/typo).
+                    match match_name_into(name, stem, &relaxed, true, &mut scratch) {
+                        Some(score) => score,
+                        None => continue,
+                    }
+                } else if typo_only_match(name, stem, plan) {
+                    SCORE_TYPO
+                } else {
+                    continue;
+                };
+                if !top.would_accept(score, r.name_len, r.modified, i as u32) {
+                    continue;
+                }
+                if !self.filter_pass(filter, i, under.as_deref()) {
+                    continue;
+                }
+                top.push(Candidate {
+                    idx: i as u32,
+                    score: (score * SCORE_SCALE) as i64,
+                    name_len: r.name_len,
+                    modified: r.modified,
+                    ranges: Vec::new(),
+                });
+            }
+            top.items
+        });
         self.merge_candidates(partials, limit)
     }
 
     fn dir_levels(&self, plan: &QueryPlan) -> Vec<u8> {
         let qlen = plan.lower.len();
-        (0..self.dirs.len())
-            .into_par_iter()
-            .map(|d| {
-                // Per-dir bloom rejects almost every directory in a couple of
-                // nanoseconds before the (much slower) substring scan.
-                if !plan.bloom_pass(self.dir_blooms[d]) {
-                    return 0;
-                }
-                let path = self.dir_path_slice(d);
-                if path.len() < qlen {
-                    return 0;
-                }
-                if plan.multi {
-                    segment_level_multi(path, &plan.terms)
+        let nd = self.dirs.len();
+        const DIR_CHUNK: usize = 65_536;
+        let parts: Vec<Vec<u8>> = parallel_chunks(nd, DIR_CHUNK, |c| {
+            let start = c * DIR_CHUNK;
+            let end = ((c + 1) * DIR_CHUNK).min(nd);
+            let mut out = Vec::with_capacity(end - start);
+            for d in start..end {
+                let level = if !plan.bloom_pass(self.dir_blooms[d]) {
+                    0
                 } else {
-                    segment_level(path, &plan.lower)
-                }
-            })
-            .collect()
+                    let path = self.dir_path_slice(d);
+                    if path.len() < qlen {
+                        0
+                    } else if plan.multi {
+                        segment_level_multi(path, &plan.terms)
+                    } else {
+                        segment_level(path, &plan.lower)
+                    }
+                };
+                out.push(level);
+            }
+            out
+        });
+        let mut levels = Vec::with_capacity(nd);
+        for mut part in parts {
+            levels.append(&mut part);
+        }
+        levels
     }
 
     fn scan_path_phase(
@@ -1092,38 +1106,33 @@ impl FilenameIndex {
     ) -> Vec<FileHit> {
         let under = self.compute_under(filter);
         let n = self.entries.len();
-        const CHUNK: usize = 16_384;
-        let nchunks = n.div_ceil(CHUNK);
-        let partials: Vec<Vec<Candidate>> = (0..nchunks)
-            .into_par_iter()
-            .map(|c| {
-                let mut top = TopK::new(self, limit);
-                let start = c * CHUNK;
-                let end = ((c + 1) * CHUNK).min(n);
-                for i in start..end {
-                    let r = &self.entries[i];
-                    if r.kind == KIND_TOMBSTONE {
-                        continue;
-                    }
-                    let level = levels.get(r.dir as usize).copied().unwrap_or(0);
-                    if level == 0 {
-                        continue;
-                    }
-                    if !self.filter_pass(filter, i, under.as_deref()) {
-                        continue;
-                    }
-                    let score = score_for_segment(level);
-                    top.push(Candidate {
-                        idx: i as u32,
-                        score: (score * SCORE_SCALE) as i64,
-                        name_len: r.name_len,
-                        modified: r.modified,
-                        ranges: Vec::new(),
-                    });
+        let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
+            let mut top = TopK::new(self, limit);
+            let start = c * SCAN_CHUNK;
+            let end = ((c + 1) * SCAN_CHUNK).min(n);
+            for i in start..end {
+                let r = &self.entries[i];
+                if r.kind == KIND_TOMBSTONE {
+                    continue;
                 }
-                top.items
-            })
-            .collect();
+                let level = levels.get(r.dir as usize).copied().unwrap_or(0);
+                if level == 0 {
+                    continue;
+                }
+                if !self.filter_pass(filter, i, under.as_deref()) {
+                    continue;
+                }
+                let score = score_for_segment(level);
+                top.push(Candidate {
+                    idx: i as u32,
+                    score: (score * SCORE_SCALE) as i64,
+                    name_len: r.name_len,
+                    modified: r.modified,
+                    ranges: Vec::new(),
+                });
+            }
+            top.items
+        });
         self.merge_candidates(partials, limit)
     }
 
@@ -1139,42 +1148,37 @@ impl FilenameIndex {
         const MAX_SPAN_ENTRIES: usize = 250_000;
         let under = self.compute_under(filter);
         let n = self.entries.len().min(MAX_SPAN_ENTRIES);
-        const CHUNK: usize = 16_384;
-        let nchunks = n.div_ceil(CHUNK);
-        let partials: Vec<Vec<Candidate>> = (0..nchunks)
-            .into_par_iter()
-            .map(|c| {
-                let mut top = TopK::new(self, limit);
-                let mut buf = String::with_capacity(160);
-                let start = c * CHUNK;
-                let end = ((c + 1) * CHUNK).min(n);
-                for i in start..end {
-                    let r = &self.entries[i];
-                    if r.kind == KIND_TOMBSTONE {
-                        continue;
-                    }
-                    if !self.filter_pass(filter, i, under.as_deref()) {
-                        continue;
-                    }
-                    buf.clear();
-                    buf.push_str(self.dir_path_slice(r.dir as usize));
-                    if !buf.is_empty() && !buf.ends_with('\\') && !buf.ends_with('/') {
-                        buf.push(std::path::MAIN_SEPARATOR);
-                    }
-                    buf.push_str(self.arena_str(r.name_off, r.name_len));
-                    if find_ci(&buf, &plan.lower).is_some() {
-                        top.push(Candidate {
-                            idx: i as u32,
-                            score: (SCORE_SPANNING * SCORE_SCALE) as i64,
-                            name_len: r.name_len,
-                            modified: r.modified,
-                            ranges: Vec::new(),
-                        });
-                    }
+        let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
+            let mut top = TopK::new(self, limit);
+            let mut buf = String::with_capacity(160);
+            let start = c * SCAN_CHUNK;
+            let end = ((c + 1) * SCAN_CHUNK).min(n);
+            for i in start..end {
+                let r = &self.entries[i];
+                if r.kind == KIND_TOMBSTONE {
+                    continue;
                 }
-                top.items
-            })
-            .collect();
+                if !self.filter_pass(filter, i, under.as_deref()) {
+                    continue;
+                }
+                buf.clear();
+                buf.push_str(self.dir_path_slice(r.dir as usize));
+                if !buf.is_empty() && !buf.ends_with('\\') && !buf.ends_with('/') {
+                    buf.push(std::path::MAIN_SEPARATOR);
+                }
+                buf.push_str(self.arena_str(r.name_off, r.name_len));
+                if find_ci(&buf, &plan.lower).is_some() {
+                    top.push(Candidate {
+                        idx: i as u32,
+                        score: (SCORE_SPANNING * SCORE_SCALE) as i64,
+                        name_len: r.name_len,
+                        modified: r.modified,
+                        ranges: Vec::new(),
+                    });
+                }
+            }
+            top.items
+        });
         self.merge_candidates(partials, limit)
     }
 
@@ -1374,6 +1378,43 @@ impl FilenameIndex {
     }
 }
 
+/// Comparator for the name-sorted array, usable before a FilenameIndex exists
+/// (persistence validation avoids cloning the whole index).
+pub(crate) fn sort_cmp_parts(
+    arena: &[u8],
+    entries: &[EntryRec],
+    dirs: &[DirRec],
+    a: u32,
+    b: u32,
+) -> Ordering {
+    let str_of = |rec: &EntryRec| -> &str {
+        let start = rec.name_off as usize;
+        let end = start.saturating_add(rec.name_len as usize);
+        arena
+            .get(start..end)
+            .and_then(|b| std::str::from_utf8(b).ok())
+            .unwrap_or("")
+    };
+    let dir_of = |rec: &EntryRec| -> &[u8] {
+        match dirs.get(rec.dir as usize) {
+            Some(d) => {
+                let start = d.path_off as usize;
+                let end = start.saturating_add(d.path_len as usize);
+                arena.get(start..end).unwrap_or(&[])
+            }
+            None => &[],
+        }
+    };
+    let ra = &entries[a as usize];
+    let rb = &entries[b as usize];
+    let na = str_of(ra);
+    let nb = str_of(rb);
+    cmp_ci(na, nb)
+        .then_with(|| na.as_bytes().cmp(nb.as_bytes()))
+        .then_with(|| dir_of(ra).cmp(dir_of(rb)))
+        .then_with(|| a.cmp(&b))
+}
+
 fn is_under(path: &str, root: &str) -> bool {
     if root.is_empty() {
         return true;
@@ -1405,7 +1446,7 @@ impl<'a> TopK<'a> {
     }
 
     /// Cheap eligibility check before allocating highlight ranges.
-    fn would_accept(&self, score: f32, name_len: u16, modified: i64, idx: u32) -> bool {
+    fn would_accept(&self, score: f32, name_len: u16, modified: i64, _idx: u32) -> bool {
         if self.limit == 0 {
             return false;
         }

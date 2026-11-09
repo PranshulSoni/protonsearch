@@ -173,13 +173,9 @@ export default function WorkflowsView() {
                     <span className="command-title">{row.label}</span>
                     <span className="command-desc">{row.description}</span>
                   </span>
-                  <span
-                    className={
-                      "badge" + (row.requiresConfirmation ? " badge-warn" : " badge-quiet")
-                    }
-                  >
-                    {row.requiresConfirmation ? "Confirmation required" : "Built in"}
-                  </span>
+                  {row.requiresConfirmation ? (
+                    <span className="badge badge-warn">Confirmation required</span>
+                  ) : null}
                 </li>
               ))}
             </ul>

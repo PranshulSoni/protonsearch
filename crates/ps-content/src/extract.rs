@@ -136,6 +136,7 @@ pub fn extract_text_with(
         // Structured formats: isolate parsing so a pathological file cannot
         // block the indexing pipeline indefinitely.
         _ => {
+            install_quiet_panic_hook();
             let owned = path.to_path_buf();
             let (tx, rx) = mpsc::channel();
             let worker = std::thread::Builder::new()
@@ -161,14 +162,53 @@ pub fn extract_text_with(
 }
 
 /// Run a parser, converting panics into errors (malformed input safety).
+///
+/// Third-party parsers (notably pdf-extract) can panic on malformed input; the
+/// panic is contained to the extraction worker thread and converted into a
+/// normal error that the indexer records in content_errors.
 fn catch_unwind_result<F>(f: F) -> anyhow::Result<ExtractedDocument>
 where
     F: FnOnce() -> anyhow::Result<ExtractedDocument>,
 {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
         Ok(result) => result,
-        Err(_) => Err(anyhow!("parser panicked on malformed input")),
+        Err(payload) => {
+            let detail = panic_payload_message(&payload);
+            Err(anyhow!("parser panicked on malformed input: {detail}"))
+        }
     }
+}
+
+fn panic_payload_message(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic".to_string()
+    }
+}
+
+/// Suppress the default panic printout for the extraction worker threads.
+///
+/// A caught panic still runs the global panic hook, which would spam stderr (and
+/// any attached log) for every malformed PDF. This hook is installed once and
+/// delegates to the previously installed hook for every other thread, so the
+/// application's own hook behaviour is preserved.
+fn install_quiet_panic_hook() {
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let quiet = std::thread::current()
+                .name()
+                .map(|name| name.starts_with("ps-content-extract"))
+                .unwrap_or(false);
+            if !quiet {
+                previous(info);
+            }
+        }));
+    });
 }
 
 fn extract_structured(

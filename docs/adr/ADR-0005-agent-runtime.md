@@ -1,6 +1,7 @@
 # ADR-0005: Optional agent layer — adopt an existing Python runtime, do not invent one
 
-- Status: **Proposed** (Gate 6) — decision direction recorded before implementation; framework spike pending
+- Status: **Accepted** (Gate 6) — Pydantic AI 2.66.0 selected after a measured spike against Nanobot 0.4.1
+  (evidence: docs/agent/AGENT_RUNTIME_EVALUATION.md)
 - Owners: L2-A4 (agent sidecar), L1-A, L0
 
 ## Context

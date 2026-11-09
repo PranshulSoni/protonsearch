@@ -1,0 +1,13 @@
+[package]
+name = "ps-migration-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Standalone workspace: this probe is a dev-only contract harness, not a shipped member.
+[workspace]
+
+[dependencies]
+ps-core = { path = "../../../crates/ps-core" }
+serde_json = "1"
+sha2 = "0.10"

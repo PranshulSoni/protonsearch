@@ -717,8 +717,12 @@
   background: var(--ps-surface-soft);
 }
 
-.command-group + .command-group {
+.command-group {
   margin-top: var(--space-5);
+}
+
+.command-group:first-of-type {
+  margin-top: var(--space-4);
 }
 
 .command-group-title {

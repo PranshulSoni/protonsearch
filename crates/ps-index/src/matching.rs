@@ -638,7 +638,9 @@ fn fuzzy_match_ascii(name: &str, q: &[char]) -> Option<(f32, Vec<(usize, usize)>
     Some((SCORE_FUZZY_BASE + SCORE_FUZZY_SPAN * quality, ranges))
 }
 
-/// Bounded Damerau-Levenshtein <= 1 check on folded characters.
+/// Bounded Damerau-Levenshtein <= 1 check on folded characters (tests only;
+/// the hot path uses damerau_le1_ascii).
+#[allow(dead_code)]
 pub(crate) fn damerau_le1(a: &[char], b: &[char]) -> bool {
     let (long, short) = if a.len() >= b.len() { (a, b) } else { (b, a) };
     match long.len().checked_sub(short.len()) {

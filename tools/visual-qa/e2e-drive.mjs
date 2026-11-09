@@ -210,7 +210,19 @@ for (const label of ["Search & Indexes", "Activity", "Workflows", "Preferences"]
   }
 }
 
-console.log(JSON.stringify({ outDir, pages: pages.length, measurements }, null, 2));
-await browser.close().catch(() => undefined);
+const report = { outDir, pages: pages.length, measurements, capturedAt: new Date().toISOString() };
+console.log(JSON.stringify(report, null, 2));
+try {
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(resolve(outDir, "latency-real-app.json"), JSON.stringify(report, null, 2));
+} catch (error) {
+  console.error("could not persist latency report", String(error));
+}
+try {
+  await browser.close();
+} catch {
+  /* the app process may already be gone */
+}
 if (appProcess) appProcess.kill();
 if (server) server.kill();
+process.exit(0);

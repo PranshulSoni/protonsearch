@@ -209,7 +209,7 @@ describe("LauncherSurface structure and grouping", () => {
   it("renders a frameless dialog with grouped, bounded results and correct ARIA", async () => {
     const harness = setup();
     // First query in flight shows the flat 3-row skeleton (no shimmer).
-    expect(harness.container.querySelectorAll(".skeleton-row").length).toBe(3);
+    expect(harness.container.querySelectorAll(".launcher-skeleton-row").length).toBe(3);
     expect(harness.container.querySelector('[data-testid="launcher-count"]')?.textContent).toBe(
       "Searching…",
     );
@@ -282,6 +282,8 @@ describe("LauncherSurface structure and grouping", () => {
     expect(docOption?.querySelector(".fileicon-text")?.textContent).toBe("DOC");
     const folderOption = harness.container.querySelector('[data-result-id="folder:arch"]');
     expect(folderOption?.querySelector("svg.fileicon-glyph")).not.toBeNull();
+    const appOption = harness.container.querySelector('[data-result-id="app:vsc"]');
+    expect(appOption?.querySelector(".fileicon-text")?.textContent).toBe("VS");
   });
 
   it("groups multiple kinds into the fixed shared labels from lib/results.ts", async () => {
@@ -310,6 +312,8 @@ describe("LauncherSurface structure and grouping", () => {
   it("shows the exact empty-input and 0-match copy", async () => {
     const harness = setup();
     await resolveSearch(harness, 0, []);
+    // Empty query with no recents is a quiet placeholder, not "No matches".
+    expect(harness.container.querySelector('[data-testid="launcher-count"]')?.textContent).toBe("");
     const empty = harness.container.querySelector('[data-testid="empty-state"]');
     expect(empty?.textContent).toContain("Start typing to search files, apps, and actions.");
     expect(empty?.textContent).toContain(
@@ -554,12 +558,13 @@ describe("preview pane", () => {
     expect(panel?.textContent).toContain("The filename arena keeps warm queries under a millisecond.");
     expect(panel?.textContent).toContain("180 KB");
     expect(hintTexts(harness)).toEqual(["Ctrl+Space Close preview", "Esc Close"]);
-    // B2 geometry: search 72 + padding 23 + 2*(label 34 + rows 116) + footer 44 = 323 -> 324.
-    expect(harness.onGeometry).toHaveBeenLastCalledWith(324, true);
+    // B2 geometry: search 72 + padding 23 + (2 labels 68 + 2 rows 116) + footer 44 + border 2
+    // = 325 -> snapped 326.
+    expect(harness.onGeometry).toHaveBeenLastCalledWith(326, true);
 
     await press(input, " ", { ctrlKey: true });
     expect(harness.container.querySelector('[data-testid="preview-panel"]')).toBeNull();
-    expect(harness.onGeometry).toHaveBeenLastCalledWith(324, false);
+    expect(harness.onGeometry).toHaveBeenLastCalledWith(326, false);
   });
 
   it("grows the window for a bottom drawer on narrow work areas", async () => {
@@ -740,6 +745,29 @@ describe("window, density and bounded rendering", () => {
       await Promise.resolve();
     });
     expect(harness.showMain).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the EngineStatus item count when the search response omits counts", async () => {
+    const harness = setup({ status: { ...READY, filenameEntries: 777 } });
+    await resolveSearch(harness, 0, THREE, {
+      type: "ready",
+      indexedFiles: undefined as unknown as number,
+      contentDocs: 0,
+    });
+    expect(footerText(harness)).toContain((777).toLocaleString() + " items");
+  });
+
+  it("renders extension badges instead of generic glyphs for file results", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, [
+      result({ id: "md", title: "notes.md", kind: "document", icon: { type: "file_type", ext: "md" } }),
+      result({ id: "js", title: "app.js", kind: "file", icon: { type: "file_type", ext: "js" } }),
+    ]);
+    // FILES group renders before DOCUMENTS; both use extension badges.
+    const badges = [...harness.container.querySelectorAll('[role="option"] .fileicon-text')].map(
+      (badge) => badge.textContent,
+    );
+    expect(badges).toEqual(["JS", "MD"]);
   });
 
   it("reports truthful index states in the footer", async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ActionSpec, SearchResult } from "../bridge/types";
 
 /**
@@ -42,11 +42,20 @@ export interface ResultActionsProps {
   result: SearchResult;
   model: MenuModel;
   menuRef: React.RefObject<HTMLDivElement | null>;
+  /** Position from the selected row anchor (top or bottom, launcher-relative). */
+  style?: CSSProperties;
   onRun: (action: MenuAction) => void;
   onClose: () => void;
 }
 
-export function ResultActions({ result, model, menuRef, onRun, onClose }: ResultActionsProps) {
+export function ResultActions({
+  result,
+  model,
+  menuRef,
+  style,
+  onRun,
+  onClose,
+}: ResultActionsProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const count = model.actions.length;
@@ -105,6 +114,7 @@ export function ResultActions({ result, model, menuRef, onRun, onClose }: Result
       role="menu"
       aria-label={"Actions for " + result.title}
       ref={menuRef}
+      style={style}
       onKeyDown={onKeyDown}
       data-testid="actions-menu"
     >

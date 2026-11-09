@@ -13,3 +13,9 @@ anyhow = { workspace = true }
 rusqlite = { workspace = true }
 walkdir = { workspace = true }
 winreg = { workspace = true }
+
+[dev-dependencies]
+ps-ipc = { path = "../ps-ipc" }
+ps-windows = { path = "../ps-windows" }
+rusqlite = { workspace = true }
+serde_json = { workspace = true }

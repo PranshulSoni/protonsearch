@@ -102,3 +102,22 @@ Blocking edges: `ps-ipc` → everything; `ps-core` facade → Tauri shell; UI sh
 - Real OCR/Windows APIs need this Windows host; Linux-only validation is not acceptable evidence.
 - The machine has a real 149 MB legacy index and 89,813 files — use it for migration and realistic benchmarks.
 - Missing artifacts: `assets/protonsearch-mark.svg`, `assets/protonsearch-logo-concept.png`, `assets/original-logo-crop-reference.png` are **not present** in the workspace. The mark embedded in the supplied HTML is the visual source of truth; a reconstructed vector is stored in `assets/brand/` and documented as reconstructed.
+## Status ledger additions (2026-11-09, evening)
+
+| Gate | Item | Owner | Status | Evidence |
+|---|---|---|---|---|
+| G2 | ps-index compact engine: scan/arena/matching/persist/incremental + tests | engine-core | WIP (finishing perf pass) | crates/ps-index src+tests; bench JSONs |
+| G2 | Engine facade: tiered coordinator, settings/activity/onboarding/migration/background | L0 | DONE (first integration) | crates/ps-core engine.rs/db.rs/catalog.rs/migration.rs; real app run |
+| G2 | Content FTS + extractors + legacy import | sources-content | DONE (tests 16) | crates/ps-content; real migration run |
+| G2 | Win32 helpers: icons/shell/clipboard/AppsFolder | sources-content | DONE (tests 7) | crates/ps-windows |
+| G2/G5 | ps-sources (actions/apps/recent/browser/git/clipboard) | sources-content | IN PROGRESS (compile) | crates/ps-sources |
+| G5 | OCR pipeline (Windows.Media.Ocr) | sources-content | TODO (next) | crates/ps-ocr stub |
+| G3 | Launcher UI + review fixes + real-window captures | ui-launcher | DONE (visual QA pending) | apps/desktop/src/launcher; docs/qa captures |
+| G3 | Real-app E2E + latency harness (CDP) | L0 | DONE | tools/visual-qa/e2e-drive.mjs; latency JSON |
+| G4 | Desktop app + onboarding + review fixes | ui-app | DONE (visual QA pending) | apps/desktop/src/app,onboarding |
+| G4 | Real-data legacy migration (read-only source) | L0 | VERIFIED with caveat | gate log; tests/migration; ps-core migration tests |
+| G6 | Pydantic AI sidecar + Rust client + docs + tests | agent-sidecar | DONE | crates/ps-agent (14 tests), agent-sidecar (18 tests) |
+| G6 | Tauri shell wiring for agent commands/events | L0 | CODE DONE (UI panel pending) | src-tauri main.rs |
+| G7 | Benchmarks final report | perf-bench | IN PROGRESS | docs/performance/results |
+| G7 | Visual QA + screenshots audit | ui-launcher/ui-app (acting as L2-B4) | IN PROGRESS | docs/qa/visual |
+| G7 | Installer/updater/CI/release docs | rel-recon | READY; installer run pending green build | .github, scripts, docs/release |

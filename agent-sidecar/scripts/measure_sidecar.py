@@ -126,7 +126,7 @@ def measure_once(index: int) -> dict:
                 response = {
                     "type": "approval_response",
                     "runId": request["runId"],
-                    "approvalId": event["approval_id"],
+                    "approvalId": event["approvalId"],
                     "approved": True,
                 }
                 proc.stdin.write(json.dumps(response) + "\n")

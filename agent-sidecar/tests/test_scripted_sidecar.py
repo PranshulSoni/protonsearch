@@ -121,7 +121,7 @@ class ScriptedSidecarTests(unittest.TestCase):
         )
         started = self.sidecar.next_event()
         self.assertEqual(started["type"], "started")
-        self.assertEqual(started["run_id"], "run-e2e")
+        self.assertEqual(started["runId"], "run-e2e")
         self.assertEqual(started["model"], "test:scripted")
         self.assertIn("pydantic-ai", started["runtime"])
 
@@ -136,7 +136,7 @@ class ScriptedSidecarTests(unittest.TestCase):
             {
                 "type": "approval_response",
                 "runId": "run-e2e",
-                "approvalId": first_approval["approval_id"],
+                "approvalId": first_approval["approvalId"],
                 "approved": True,
             }
         )
@@ -151,18 +151,18 @@ class ScriptedSidecarTests(unittest.TestCase):
             {
                 "type": "approval_response",
                 "runId": "run-e2e",
-                "approvalId": second_approval["approval_id"],
+                "approvalId": second_approval["approvalId"],
                 "approved": True,
             }
         )
         self.assertTrue(self.sidecar.wait_for("tool_result")["ok"])
 
         output = self.sidecar.wait_for("output")
-        self.assertTrue(output["final_answer"])
+        self.assertTrue(output["finalAnswer"])
         self.assertIn("TEST MODEL", output["text"])
         finished = self.sidecar.wait_for("finished")
         self.assertTrue(finished["ok"])
-        self.assertGreaterEqual(finished["duration_ms"], 0)
+        self.assertGreaterEqual(finished["durationMs"], 0)
 
     def test_denied_approval_is_reported_not_executed(self) -> None:
         self.sidecar.send({"runId": "run-denied", "prompt": "find budget"})
@@ -171,7 +171,7 @@ class ScriptedSidecarTests(unittest.TestCase):
             {
                 "type": "approval_response",
                 "runId": "run-denied",
-                "approvalId": approval["approval_id"],
+                "approvalId": approval["approvalId"],
                 "approved": False,
             }
         )
@@ -194,7 +194,7 @@ class ScriptedSidecarTests(unittest.TestCase):
         error_event = self.sidecar.wait_for("error")
         self.assertEqual(error_event["code"], "protocol_error")
         self.sidecar.send({"runId": "run-after", "prompt": "still alive"})
-        self.assertEqual(self.sidecar.wait_for("started")["run_id"], "run-after")
+        self.assertEqual(self.sidecar.wait_for("started")["runId"], "run-after")
 
     def test_describe_mode_needs_no_protocol(self) -> None:
         env = dict(os.environ)

@@ -132,7 +132,9 @@ impl AgentClient {
 
     /// Spawn and receive events on a std channel (convenience for tests and for
     /// callers that prefer a queue over a callback).
-    pub fn spawn_channel(config: SidecarConfig) -> Result<(Self, std::sync::mpsc::Receiver<AgentEvent>), AgentError> {
+    pub fn spawn_channel(
+        config: SidecarConfig,
+    ) -> Result<(Self, std::sync::mpsc::Receiver<AgentEvent>), AgentError> {
         let (tx, rx) = std::sync::mpsc::channel();
         let sender = Mutex::new(tx);
         let callback: EventCallback = Arc::new(move |event: &AgentEvent| {
@@ -292,7 +294,10 @@ fn spawn_child(shared: &Arc<Shared>) -> Result<Child, AgentError> {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env("PROTONSEARCH_AGENT_TEST_MODEL", if config.test_model { "1" } else { "0" })
+        .env(
+            "PROTONSEARCH_AGENT_TEST_MODEL",
+            if config.test_model { "1" } else { "0" },
+        )
         .env("PYTHONUNBUFFERED", "1")
         .env("PYTHONIOENCODING", "utf-8");
     if let Some(model) = &config.model {
@@ -367,10 +372,7 @@ fn read_events(shared: Arc<Shared>, stdout: ChildStdout) {
                 match protocol::parse_event(&line) {
                     Ok(event) => {
                         if matches!(event, AgentEvent::Finished { .. }) {
-                            let mut state = shared
-                                .state
-                                .lock()
-                                .unwrap_or_else(|poison| poison.into_inner());
+                            let mut state = shared.state.lock().unwrap_or_else(|poison| poison.into_inner());
                             state.active_run = None;
                         }
                         shared.emit(event);
@@ -539,4 +541,3 @@ fn stop_child(shared: &Arc<Shared>, grace: Duration) {
     }
     shared.child_alive.store(false, Ordering::SeqCst);
 }
-

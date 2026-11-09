@@ -9,10 +9,10 @@
     "ram_bytes": 33447858176,
     "hostname": "PRANSHULASUS",
     "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
-    "captured_at_local": "2026-11-09T17:04:33.5366149+05:30",
-    "captured_at_utc": "2026-11-09T11:34:33.5366149Z"
+    "captured_at_local": "2026-11-09T17:18:42.9449041+05:30",
+    "captured_at_utc": "2026-11-09T11:48:42.9449041Z"
   },
-  "generated_at_utc": "unix:1794224073",
+  "generated_at_utc": "unix:1794224923",
   "command": "ps-bench relevance --dataset .bench/real-paths.jsonl --golden tests/golden/real-corpus-golden.json --out docs/performance/results/relevance-real-20261109T1148Z.json",
   "dataset": {
     "path": ".bench/real-paths.jsonl",

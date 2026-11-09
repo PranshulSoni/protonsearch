@@ -3,8 +3,8 @@
 //! Framing: one JSON object per UTF-8 line, newline terminated, hard-capped at
 //! MAX_LINE_BYTES in both directions. The host sends a bare AgentRunRequest
 //! (camelCase fields, frozen struct), control envelopes for cancel and approval
-//! responses, and receives AgentEvent values whose inner fields are snake_case
-//! (frozen Rust serde shape).
+//! responses, and receives AgentEvent values whose inner fields are camelCase
+//! (frozen Rust serde shape: rename_all_fields = "camelCase").
 
 use serde::Serialize;
 use serde_json::Value;
@@ -58,17 +58,12 @@ pub fn encode_cancel(run_id: &str) -> Result<Vec<u8>, AgentError> {
 pub fn encode_approval_response(response: &AgentApprovalResponse) -> Result<Vec<u8>, AgentError> {
     let mut value = serde_json::to_value(response)?;
     if let Value::Object(ref mut map) = value {
-        map.insert(
-            "type".to_string(),
-            Value::String("approval_response".to_string()),
-        );
+        map.insert("type".to_string(), Value::String("approval_response".to_string()));
     } else {
-        return Err(AgentError::Encode(serde_json::Error::io(
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "approval response is not an object",
-            ),
-        )));
+        return Err(AgentError::Encode(serde_json::Error::io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "approval response is not an object",
+        ))));
     }
     encode_line(&value, MAX_LINE_BYTES)
 }
@@ -146,14 +141,14 @@ mod tests {
     #[test]
     fn parses_every_frozen_event_variant() {
         let cases = [
-            r#"{"type":"started","run_id":"r","runtime":"pydantic-ai 2.66.0","model":"m"}"#,
+            r#"{"type":"started","runId":"r","runtime":"pydantic-ai 2.66.0","model":"m"}"#,
             r#"{"type":"plan","steps":["a","b"]}"#,
             r#"{"type":"progress","message":"working","fraction":0.5}"#,
-            r#"{"type":"approval_request","approval_id":"a1","title":"t","detail":"d","action":{"type":"none"},"destructive":false}"#,
+            r#"{"type":"approval_request","approvalId":"a1","title":"t","detail":"d","action":{"type":"none"},"destructive":false}"#,
             r#"{"type":"tool_result","tool":"search_files","ok":true,"preview":"p"}"#,
-            r#"{"type":"output","text":"done","final_answer":true}"#,
+            r#"{"type":"output","text":"done","finalAnswer":true}"#,
             r#"{"type":"error","code":"cancelled","message":"m"}"#,
-            r#"{"type":"finished","ok":false,"duration_ms":12}"#,
+            r#"{"type":"finished","ok":false,"durationMs":12}"#,
         ];
         for raw in cases {
             parse_event(raw).unwrap_or_else(|err| panic!("failed to parse {raw}: {err}"));

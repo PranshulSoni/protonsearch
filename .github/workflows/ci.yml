@@ -87,6 +87,44 @@ jobs:
       - name: Typecheck + production build
         run: npm run build
 
+  migration:
+    name: Migration contract (fixture + real API probe)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: '.'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate synthetic legacy fixture
+        run: python tests/migration/make_legacy_fixture.py --out-dir .migration-fixture
+
+      - name: Contract tests (calls ps_core migration via probe)
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+        run: python -m unittest discover -s tests/migration -p "test_*.py" -v
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-contract-evidence
+          path: tests/migration/*.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   tauri-build:
     name: Tauri NSIS build (manual, unsigned)
     if: github.event_name == 'workflow_dispatch'

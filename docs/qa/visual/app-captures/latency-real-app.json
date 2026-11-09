@@ -1,0 +1,39 @@
+{
+  "outDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures",
+  "pages": 2,
+  "measurements": [
+    {
+      "label": "architecture",
+      "query": "arch",
+      "start": 1694,
+      "visibleAt": 1726.3000000044703,
+      "rows": 50,
+      "tookMs": 32.30000000447035
+    },
+    {
+      "label": "recent-exact",
+      "query": "readme",
+      "start": 2222.3000000044703,
+      "visibleAt": 2227.2000000029802,
+      "rows": 50,
+      "tookMs": 4.899999998509884
+    },
+    {
+      "label": "typo",
+      "query": "protonserch",
+      "start": 2719.10000000149,
+      "visibleAt": 2726.4000000059605,
+      "rows": 50,
+      "tookMs": 7.300000004470348
+    },
+    {
+      "label": "zero",
+      "query": "zzzzzz-no-such-file",
+      "start": 3198.3000000044703,
+      "visibleAt": 3202.10000000149,
+      "rows": 19,
+      "tookMs": 3.7999999970197678
+    }
+  ],
+  "capturedAt": "2026-11-09T11:50:58.070Z"
+}

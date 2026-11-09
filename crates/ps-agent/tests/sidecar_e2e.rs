@@ -9,8 +9,7 @@ use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
 use ps_agent::{
-    runtime_available_for, AgentApprovalResponse, AgentClient, AgentEvent, AgentRunRequest,
-    SidecarConfig,
+    runtime_available_for, AgentApprovalResponse, AgentClient, AgentEvent, AgentRunRequest, SidecarConfig,
 };
 use ps_ipc::ActionSpec;
 
@@ -93,7 +92,11 @@ fn approval_flow_streams_events_and_finishes() {
     assert!(client.is_alive());
     client.send_run(&run_request("e2e-run")).expect("send run");
 
-    match wait_for(&events, |event| matches!(event, AgentEvent::Started { .. }), EVENT_TIMEOUT) {
+    match wait_for(
+        &events,
+        |event| matches!(event, AgentEvent::Started { .. }),
+        EVENT_TIMEOUT,
+    ) {
         AgentEvent::Started {
             run_id,
             runtime,
@@ -105,7 +108,11 @@ fn approval_flow_streams_events_and_finishes() {
         }
         other => panic!("unexpected event {other:?}"),
     }
-    wait_for(&events, |event| matches!(event, AgentEvent::Plan { .. }), EVENT_TIMEOUT);
+    wait_for(
+        &events,
+        |event| matches!(event, AgentEvent::Plan { .. }),
+        EVENT_TIMEOUT,
+    );
 
     let first_approval = wait_for(
         &events,
@@ -181,10 +188,7 @@ fn approval_flow_streams_events_and_finishes() {
         EVENT_TIMEOUT,
     );
     match output {
-        AgentEvent::Output {
-            text,
-            final_answer,
-        } => {
+        AgentEvent::Output { text, final_answer } => {
             assert!(final_answer);
             assert!(text.contains("TEST MODEL"), "{text}");
             assert!(text.contains("e2e-run"), "{text}");

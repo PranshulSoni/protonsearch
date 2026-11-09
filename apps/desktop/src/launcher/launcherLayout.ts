@@ -9,6 +9,8 @@ import type { ResultGroup } from "../lib/results";
  * keyboard/selection rules can be unit-tested without a DOM.
  */
 
+/** 1 px top + 1 px bottom launcher border, part of the window height. */
+export const WINDOW_BORDER = 2;
 export const SEARCHLINE_HEIGHT = 72;
 /** SCREENS §6.1: the search row shrinks to 61 px on a narrow surface (≤700 px). */
 export const SEARCHLINE_HEIGHT_NARROW = 61;
@@ -109,8 +111,9 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     (sum, rows) => sum + labelHeight + rows * rowHeight,
     0,
   );
-  // The window height must include the footer (B2 / SCREENS §2.1).
-  const raw = searchlineHeight + RESULTS_PADDING + content + FOOTER_HEIGHT;
+  // The window height must include the footer and its own 1 px borders
+  // (B2 / SCREENS §2.1); without them a 2 px overflow forces a scrollbar.
+  const raw = searchlineHeight + RESULTS_PADDING + content + FOOTER_HEIGHT + WINDOW_BORDER;
   const baseHeight = snapTo2(
     Math.min(MAX_LAUNCHER_HEIGHT, Math.max(MIN_LAUNCHER_HEIGHT, raw)),
   );
@@ -125,7 +128,10 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
   }
   const listViewport = Math.max(
     0,
-    Math.min(MAX_RESULTS_VIEWPORT, baseHeight - searchlineHeight - FOOTER_HEIGHT),
+    Math.min(
+      MAX_RESULTS_VIEWPORT,
+      baseHeight - searchlineHeight - FOOTER_HEIGHT - WINDOW_BORDER,
+    ),
   );
   return {
     rowHeight,

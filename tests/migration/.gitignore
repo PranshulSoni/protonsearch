@@ -5,3 +5,4 @@
 fixture_manifest.json
 __pycache__/
 .tmp/
+harness/target/
