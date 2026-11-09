@@ -8,7 +8,6 @@
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use ps_agent::{AgentClient, AgentEvent};
 use ps_core::{Engine, EngineConfig};
@@ -34,13 +33,6 @@ struct AppState {
     /// Optional Python agent sidecar. Created only when a workflow is started;
     /// never touched by search, startup or settings.
     agent: Mutex<Option<AgentClient>>,
-}
-
-fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
 }
 
 /// Position the frameless launcher near the top-center of the monitor under the

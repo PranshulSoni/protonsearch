@@ -1,7 +1,7 @@
 # ProtonSearch v2 — Performance & Relevance Benchmark Methodology
 
 - **Owner:** L1-C Performance & Search Quality (perf-bench)
-- **Status:** living document; measured numbers live in [BENCHMARKS.md](./BENCHMARKS.md), raw JSON in [results/](./results/). Filename numbers in that report were measured on committed engine hash 3906836c492f6bb3f3b5e07c9af08874cad69b2e.
+- **Status:** living document; measured numbers live in [BENCHMARKS.md](./BENCHMARKS.md), raw JSON in [results/](./results/). Filename numbers in that report were measured on committed engine hash a28042d1282e4c9630a952bd5b02894f66850037 (superseding the earlier 3906836 table; see BENCHMARKS.md section 3.4 for the 1M long-path regression fix).
 - **Rule of record:** no number appears in project documentation unless a command in this repository printed it on this machine. Targets are not claims.
 
 ## 1. Purpose and rules

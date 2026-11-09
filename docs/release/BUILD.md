@@ -101,6 +101,28 @@ frontend has transient TS errors in files owned by the UI agents. Re-run after G
 **Unsigned-build caveat:** artifacts are not Authenticode-signed. Signing + signed update
 manifest is a G7 gate (docs/security/SECURITY_RISK_REGISTER.md S-02/S-17). Do not publish.
 
+## 6b. Last local build (2026-11-09, verified)
+
+Command: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-installer.ps1 -Execute
+Result: exit 0; cargo release build finished in 1m 02s; NSIS bundle produced and copied.
+
+| Artifact (dist-installer/) | Bytes | SHA-256 | Authenticode |
+|---|---:|---|---|
+| ProtonSearch_2.0.0-alpha.1_x64-setup.exe | 4,935,678 | 76DD0FC38FE03478130F44786334F9A0772E580062C0023480E0935E3C841C5E | NotSigned |
+| ProtonSearch.exe | 17,917,952 | 57A0233740905CFE31D507283144F1C59190770DD19EEF8577EF522D43C4B82F | NotSigned |
+
+BUILD_INFO.txt records: built_utc=2026-11-09T12:17:27Z, git_rev=5f7522a,
+rustc/cargo 1.99.0, node v26.7.0, npm 11.19.0, bundle_target=nsis,
+installer_mode=currentUser, SIGNED=false.
+
+Caveats:
+- UNSIGNED: do not distribute; signing + signed update manifest are G7 gates (S-02/S-17).
+- The build used git rev 5f7522a plus uncommitted working-tree changes (ps-content perf work
+  in progress). BUILD_INFO records the commit but not the dirty state; before a release,
+  commit/stamp the exact tree and add a dirty flag to BUILD_INFO.
+- Build warnings observed (non-fatal): unused mut in ps-content/index.rs, unused import in
+  ps-core/rank.rs, unused now_ms in the Tauri shell. Clean these before RC.
+
 ## 7. Reproducibility checklist
 
 1. Commit both lockfiles (above) and record the git commit in release notes.

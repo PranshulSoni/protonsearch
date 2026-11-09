@@ -1,0 +1,176 @@
+# VISUAL_AUDIT_LAUNCHER — ProtonSearch v2 Quick Launcher
+
+**Owner:** ui-launcher (L2-B1). **Date:** 2026-11-09, capture window 17:38–17:47 +02:00.
+**Scope:** `apps/desktop/src/launcher/**` rendered in (a) the real Tauri/WebView2 app with live engine data and
+(b) the real React UI in Chromium against the browser-mock bridge. **Contracts:** `docs/design/SCREENS.md` §2,
+`docs/design/KEYBOARD_AND_A11Y.md`, `docs/design/DESIGN_SYSTEM.md`, `docs/security/V2_SECURITY_REVIEW.md` V2-04.
+
+This audit is launcher-only. The desktop app/onboarding audit lives in `docs/qa/visual/VISUAL_AUDIT_APP.md`.
+
+---
+
+## 1. Environment and artifacts
+
+| Item | Value |
+|---|---|
+| Host | Windows 11, WebView2 (real app), AMD Ryzen AI 9, 31 GB |
+| Real app build | `cargo build -p protonsearch-v2 --bin ProtonSearch` (debug), binary 17:43:57; frontend `npm run build` |
+| Real data dir | `.devdata` — migrated index, **131,199 filename entries**, engine reported "Indexing…" during captures |
+| Real DPI | host display at **150 %** (physical PNG = CSS × 1.5: 1230×384 = 820×256 CSS) |
+| Real capture driver | CDP attach (Playwright `connectOverCDP`), Tauri `show_launcher`, strict waits on `#ps-results[aria-busy]` + input value + expected count + window resize, then `page.screenshot` |
+| Browser mock | `vite preview` of the production build + Playwright Chromium; mock bridge clearly identified below |
+| Real-state report | `docs/qa/visual/app-captures/capture-run-report.json` (states, window sizes, supplementary latency) |
+| Build/test evidence | `npm run build` exit 0 (tsc --noEmit + vite); `npm test` **9 files / 143 tests passed** (launcher: 52 tests) |
+| Harness note | `e2e-drive.mjs` was run per instructions; its `latency-real-app.json` undercounts later queries (see §7) |
+
+---
+
+## 2. Real-app state matrix (live engine, 150 % DPI)
+
+| # | State | File (`docs/qa/visual/app-captures/`) | Window (CSS) | Observed |
+|---|---|---|---:|---|
+| 1 | Empty input, no recents | `real-launcher-empty.png` | 820×256 | placeholder rows, exact "Start typing…" copy, **no scrollbar**, count blank, footer "Indexing… · 1,31,199 items" |
+| 2 | Empty input, recents/query results (readme) | `real-launcher-recent-exact.png` | 820×480 | 50 matches, grouped rows, count "50 matches" |
+| 3 | Many results + selected row | `real-launcher-architecture.png` | 820×480 | 50 matches; FILES group; selected fill + 2 px inset bar; MD/JS badges; meta "18 Oct" |
+| 4 | Typo query | `real-launcher-typo.png` | 820×480 | 19 matches, "protonserch" |
+| 5 | 0 matches | `real-launcher-zero.png` | 820×256 | exact copy "No matches for “…”." + prefix hint; count "No matches"; footer hints = Esc Clear only |
+| 6 | 1 match | `real-launcher-one-match.png` | 820×256 | "1 match"; JSO badge for .json; selected row; no scrollbar |
+| 7 | Long list / scroll | `real-launcher-long-list.png` | 820×480 | 50 matches; APPLICATIONS group first (AN/AI/AT/AS monogram badges), FILES below; thin scrollbar |
+| 8 | Preview side panel | `real-launcher-preview.png` | **1180×480** | side panel 360 px; title/kind/path/size/"Modified 18 Oct"; honest "Preview not available — press Enter to open."; action row Open / Reveal in Explorer / Copy path; hints "Ctrl+Space Close preview · Esc Close" |
+| 9 | Context menu | `real-launcher-context-menu.png` | 820×480 | anchored at the **selected row edge**; Open (focused ring), Reveal in Explorer, Copy path (Ctrl+C) |
+| 10 | Destructive native command confirmation (V2-04) | `real-launcher-confirm.png` | 820×278 | ACTIONS group "Empty Recycle Bin / Windows action - requires confirmation"; inline bar: "Confirmation required for EmptyRecycleBin. Ask again to execute." + **Cancel (default focus, visible ring)** + "Run action"; selection preserved |
+
+The real destructive flow was exercised safely: Enter produced the server-side challenge, **nothing executed**;
+Esc cancelled, window returned to 820×256, focus returned to the input, selection and query preserved.
+(`engine.rs` `execute_action` returns `ok:false` and records a 15 s pending request before any native call.)
+
+---
+
+## 3. Browser-mock state matrix (real React UI, mock bridge)
+
+| State | File (`docs/qa/visual/screenshots/`) | Viewport / scale |
+|---|---|---|
+| Results light / selected / empty / zero / loading (3 flat skeletons) | `launcher-results-light`, `launcher-selected`, `launcher-empty`, `launcher-zero`, `launcher-loading` | 860×640, 1× |
+| Dark theme | `launcher-results-dark` | 860×640, 1×, dark |
+| Long list / 1 result | `launcher-long-list`, `launcher-one-result` | 860×640, 1× |
+| Context menu (keyboard) | `launcher-context-menu` | 860×640, 1× |
+| Preview side light/dark (work area 1400 ≥ 1200) | `launcher-preview-side`, `launcher-preview-side-dark` | 1280×800, screen 1400×900 |
+| Preview bottom drawer (work area 1000 < 1200) | `launcher-preview-drawer` | 860×640, screen 1000×700 |
+| Narrow surface 560 px (61 px search row, 26 px mark, hidden meta/hints) | `launcher-560-empty`, `launcher-560-results`, `launcher-560-dark` | 560×640, 1× |
+| DPI 125 / 150 / 200 % | `launcher-dpi1-25-results`, `launcher-dpi1-5-results`, `launcher-dpi2-results` | 820×600 CSS, scale 1.25/1.5/2 |
+
+Browser captures show the real UI; the bridge is the mock (sample rows, no OS actions). They are used for
+theme/DPI/narrow/preview-drawer coverage that the single real window could not produce.
+
+---
+
+## 4. Findings fixed in this pass
+
+| ID | Sev | Finding | Fix | Evidence |
+|---|---|---|---|---|
+| L1 | Blocker | Window height omitted the 44 px footer (REVIEW_1 B2) → small result sets scrolled/clipped by 44 px | `computeLauncherMetrics`: `raw = searchline + 23 + content + footer + border`; viewport = `base − searchline − footer − confirm − border`; tests updated (382→384, 344→346, floor 256/138, clamp 480/362) | real empty 256 px / 50-match 480 px fixed heights; layout tests |
+| L2 | Major | 2 px launcher border not counted → empty/1-row states showed a scrollbar | `WINDOW_BORDER = 2` added to geometry and results cap; empty state min-height 112 | `real-launcher-empty.png` (no scrollbar), `real-launcher-one-match.png` |
+| L3 | Major | Loading skeleton inherited ui-app's global `.skeleton-row` background → wide grey band behind bars | Launcher-scoped classes `.launcher-skeleton-*`; explicit transparent row | `launcher-loading.png` (flat bars only) |
+| L4 | Major | App/file fallbacks used generic `<>`/arrow glyphs, hiding file type/app identity | File-ish results show deterministic extension badges (MD/JS/DOC/JSO/SVG); apps show initials; glyphs only for semantic kinds | `real-launcher-architecture.png`, `real-launcher-long-list.png`, preview SVG |
+| L5 | Major | Context menu was anchored to the launcher's lower-right corner, not the row edge (SCREENS §2.8) | Anchored to selected row using the same fixed offsets/scrollTop as keyboard nav (top/bottom flip near mid-height) | `real-launcher-context-menu.png`, `launcher-context-menu.png` |
+| L6 | Blocker for V2-04 | Destructive native commands had no launcher confirmation UI; also `App.openResult` hides the launcher even on the server challenge, so the bar could not appear | Inline confirm bar above footer: role=alertdialog, engine message, **Cancel default focus**, "Run action", Esc cancels, focus/selection preserved; launcher uses `api.openResult` + `api.confirmNativeAction` directly and owns hide-after-execute | real `real-launcher-confirm.png`; 4 new unit tests (challenge, Esc cancel, bridge confirm, non-destructive unchanged) |
+| L7 | Minor | Empty query + no recents showed "No matches" count | Count is blank in the quiet placeholder state; typed 0-match still shows "No matches" | `launcher-empty.png`, tests |
+| L8 | Minor | Real `SearchResponse` may omit `indexedFiles` → footer item count disappeared | Fallback to `EngineStatus.filenameEntries`; verified "1,31,199 items" in real captures | `real-launcher-empty.png`, test |
+| L9 | Minor | Selected-row meta/path used 4.20:1 tertiary ink (REVIEW_1 M5.1) | Selected row meta/path promoted to `--ps-ink-2` | `launcher.css`; not machine-measured this pass |
+| L10 | Minor | Selection transition used linear easing; context-menu suppression was root-wide (blocked input/preview right-click) | `--ps-ease-standard`; context-menu prevention scoped to result rows only | code + menu screenshots |
+| L11 | Minor | Search row stayed 72 px ≤700 px surface (REVIEW_1 M3/n5) | Media query to 61 px/16 px input; geometry uses `SEARCHLINE_HEIGHT_NARROW` for surface ≤700 | `launcher-560-*.png` |
+
+---
+
+## 5. DPI and theme coverage
+
+| Mode | Real app | Browser mock | Verdict |
+|---|---|---|---|
+| Light 100 % | not capturable in this host session | 860×640 1× | PASS (mock) |
+| Light 125 % | **not verified** | 1.25× (1025×750 physical) | PASS (mock), real pending |
+| Light 150 % | **real capture of 10 states** (host DPI) | 1.5× | PASS |
+| Light 200 % | **not verified** | 2× (1640×1200 physical) | PASS (mock), real pending |
+| Dark | **not verified** (host theme light; launcher window does not hot-reload the setting) | results, 560 narrow, preview side | PASS (mock), real pending |
+| High contrast / forced colours | **not verified** | not captured | CSS block present; needs Windows HC run |
+| Narrow 560 px | **not producible** (shell window is 820 CSS; work-area clamp not exercised) | 560×640 empty/results/dark | PASS (mock), real pending |
+
+---
+
+## 6. Accessibility spot checks (code + visuals)
+
+- Roles: dialog `ProtonSearch`; input combobox + `aria-activedescendant`; listbox "Results"; groups labelled by
+  visible caps labels; options `aria-label` = title, `aria-describedby` = path + meta; error `role=alert`;
+  footer state and throttled count polite live regions; preview `aside` + tabbable scroll region; menu
+  `role=menu`; confirm bar `role=alertdialog` with Cancel focused.
+- Keyboard (unit-tested): ↑/↓ wrap, PageUp/Dn ±6, Ctrl+Home/End, Home/End caret, Esc chain
+  confirm → menu → preview → clear → hide, Tab/Shift+Tab input ↔ preview ↔ footer, Ctrl+Space preview,
+  Ctrl+C copy path (native copy wins when text is selected), Menu key/Shift+F10/right-click menu, Enter
+  epoch/id validation, rapid-arrow no queue (20 presses test), stale-response rejection.
+- Confirm bar: default focus Cancel (real capture), Esc cancels, "Run action" requires explicit activation,
+  focus returns to input, selection preserved. Non-destructive actions unchanged.
+- Focus treatment: launcher input has no ring by design decision (caret only); every other control keeps the
+  2 px `--ps-focus` ring (visible in context-menu and confirm captures).
+- **Not verified:** Narrator/NVDA transcripts, Windows High Contrast themes, 100–200 % real DPI, real 560 px
+  clamp, real dark. These remain manual/gate items.
+
+---
+
+## 7. Latency note (truthful correction)
+
+Official `e2e-drive.mjs` report: query 1 "arch" = 32.3 ms, later queries 4.9/7.3/3.8 ms. The later numbers are
+**not valid**: the harness selector counts rows still painted from the previous query, so it observes stale rows
+instead of the committed response. A supplementary CDP measurement (input event → `#ps-results[aria-busy]` false
+→ double rAF) on the same real app/150 % DPI gave warm end-to-end **commit-to-render 35.8–40.9 ms** for
+"arch"/"readme"/"protonserch"/"a" (50/50/19/50 rows), recorded in
+`app-captures/capture-run-report.json`. Distribution/p50/p95 must come from the perf harness, not this audit.
+
+---
+
+## 8. Known limitations / not-fixed observations (honest list)
+
+1. **Real dark theme, real 100/125/200 % DPI, real 560 px window and Windows High Contrast are not captured.**
+   Browser-mock covers them; gate evidence still needs real-window runs.
+2. Preview bodies remain metadata/snippet only: the frozen IPC has no preview payload/renderer, so file text,
+   image thumbnails and PDF/Office rendering are honestly "Preview not available — press Enter to open."
+3. Multi-select (clipboard) is CUT pending an IPC extension; Esc chain has no multi-select branch (decided).
+4. Exact-command ACTIONS pinning is not implemented — `SearchResult` has no exact-match marker; not invented.
+5. Confirmation bar message text is the engine's raw Rust debug command name ("EmptyRecycleBin"). The UI must not
+   rewrite engine security copy; recommend mapping to human labels in `ps-core` (`format!("{command:?}")`→label).
+6. While the confirm bar is open the footer still shows Navigate/Open/Clear; SCREENS does not define a confirm
+   hint set. Candidate follow-up: "Esc Cancel · Tab Run/Cancel" (design decision needed).
+7. Footer item count is localized by OS locale (captures show en-IN grouping "1,31,199"); Intl-correct, but the
+   design reference shows en-US grouping. Expected behaviour, called out for reviewers.
+8. No app icons for installed apps in this build path: real results use monogram badges (contract exposes
+   `IconRef::Monogram`/`AppIcon` only; shell icon extraction is a separate L0/ENGINE item).
+9. `App.openResult` hides the launcher unconditionally after any action; the launcher now calls
+   `api.openResult` directly to keep the confirmation bar and copy-path feedback visible. Other consumers may
+   still need that shell behaviour fixed (needs Lead approval, outside launcher scope).
+10. Leftover `vite preview` servers from earlier harness runs caused one inconsistent capture batch at 17:20
+    (stale server on port 5173 + racing queries). Servers were cleaned; all real captures in this report are from
+    the 17:40+ consistent run. Harness scripts should kill child processes, not only the shell wrapper.
+11. `tools/visual-qa/shots.mjs` on disk during this pass still captured 5 onboarding steps at one viewport
+    (mtime 17:28); Lead's announced 7 steps × 3 viewports update was not present at capture time. Launcher
+    captures are unaffected; onboarding coverage should be re-run after that harness change lands.
+
+---
+
+## 9. Reproduce
+
+```powershell
+# UI build + tests
+cd apps/desktop; npm run build; npm test
+
+# real-app binary with confirmation support
+cargo build -p protonsearch-v2 --bin ProtonSearch
+
+# real captures + report (CDP; kills the app when done)
+node tools/visual-qa/e2e-drive.mjs --serve --exe ..\..\target\debug\ProtonSearch.exe `
+  --out ..\..\docs\qa\visual\app-captures --data-dir ..\..\.devdata
+
+# browser-mock states (results/selected/empty/zero/loading/dark + narrow/preview/menu/DPI variants)
+node tools/visual-qa/shots.mjs
+```
+
+**Verdict:** launcher states, geometry, keyboard/focus behaviour and the new destructive-action confirmation are
+verified against real engine data at 150 % DPI, with dark/DPI/narrow coverage from the browser mock. Remaining
+gaps are listed in §8 and are environment/harness limitations, not launcher code defects at this snapshot.

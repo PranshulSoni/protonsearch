@@ -82,3 +82,8 @@ agent-sidecar/.venv-nanobot/
 # agent sidecar scratch
 .nanobot-install.log
 scripts/smoke_run.py
+# release artifacts (built locally, not source)
+dist-installer/
+.devdata-mig/
+.devdata-mig2/
+.omc/

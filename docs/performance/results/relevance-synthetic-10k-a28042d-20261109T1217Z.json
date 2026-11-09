@@ -1,0 +1,398 @@
+{
+  "schema": "ps-bench-result/1",
+  "kind": "relevance-evaluation",
+  "host": {
+    "os": "Microsoft Windows 11 Home Single Language 10.0.26300 build 26300",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "physical_cores": 10,
+    "logical_cores": 20,
+    "ram_bytes": 33447858176,
+    "hostname": "PRANSHULASUS",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "captured_at_local": "2026-11-09T17:47:35.7820004+05:30",
+    "captured_at_utc": "2026-11-09T12:17:35.7820004Z"
+  },
+  "generated_at_utc": "unix:1794226655",
+  "command": "ps-bench relevance --dataset .bench/dataset-10k.jsonl --golden tests/golden/synthetic-golden.json --out docs/performance/results/relevance-synthetic-10k-a28042d-20261109T1217Z.json",
+  "dataset": {
+    "path": ".bench/dataset-10k.jsonl",
+    "entries": 10000,
+    "bytes": 1858494,
+    "fnv1a64": "b4025e64e2a1fb0a"
+  },
+  "golden": {
+    "corpus": "synthetic-deterministic-planted-anchors",
+    "queries": 21,
+    "seed": 20261109
+  },
+  "aggregate": {
+    "queries": 21,
+    "scored_queries": 19,
+    "queries_with_any_result": 19,
+    "mrr_at_10": 1.0,
+    "recall_at_10": 1.0,
+    "exact_at_1": 1.0,
+    "pass_rate": 1.0,
+    "zero_match_correct": 2,
+    "zero_match_total": 2
+  },
+  "per_query": [
+    {
+      "id": "exact_unique",
+      "category": "exact",
+      "query": "Project Phoenix Budget 2026.xlsx",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx"
+      ]
+    },
+    {
+      "id": "exact_quarterly",
+      "category": "exact",
+      "query": "quarterly_report_final_v2.pdf",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf"
+      ]
+    },
+    {
+      "id": "exact_screenshot",
+      "category": "exact",
+      "query": "Screenshot 2026-11-09 142233.png",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png"
+      ]
+    },
+    {
+      "id": "exact_cjk_jp",
+      "category": "cjk",
+      "query": "会議議事録_2026-11-09.docx",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\会議\\会議議事録_2026-11-09.docx",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\会議\\会議議事録_2026-11-09.docx"
+      ]
+    },
+    {
+      "id": "exact_unicode",
+      "category": "unicode",
+      "query": "café_résumé_naïve.md",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Notes\\café_résumé_naïve.md",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Notes\\café_résumé_naïve.md"
+      ]
+    },
+    {
+      "id": "exact_hidden",
+      "category": "hidden",
+      "query": ".env",
+      "expected_set_size": 1,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Downloads\\.env",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Downloads\\.env",
+        "C:\\Users\\Pranshul\\Documents\\2024\\node_modules\\.env.example",
+        "C:\\Windows\\System32\\tests\\.env.example"
+      ]
+    },
+    {
+      "id": "exact_long_path",
+      "category": "long_path",
+      "query": "C:\\Users\\Pranshul\\Documents\\Archive\\2026\\Q3\\Backups\\Projects\\protonsearch\\apps\\desktop\\src\\components\\internal\\generated\\very_long_anchor_filename_for_path_length_testing_0001.json",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Archive\\2026\\Q3\\Backups\\Projects\\protonsearch\\apps\\desktop\\src\\components\\internal\\generated\\very_long_anchor_filename_for_path_length_testing_0001.json",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Archive\\2026\\Q3\\Backups\\Projects\\protonsearch\\apps\\desktop\\src\\components\\internal\\generated\\very_long_anchor_filename_for_path_length_testing_0001.json"
+      ]
+    },
+    {
+      "id": "exact_readme",
+      "category": "exact_duplicate",
+      "query": "README.md",
+      "expected_set_size": 1,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Projects\\protonsearch\\README.md",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Projects\\protonsearch\\README.md",
+        "C:\\Users\\Pranshul\\AppData\\Local\\target\\Archive\\receipts\\personal\\docs\\2025\\README.md",
+        "C:\\Users\\Pranshul\\Downloads\\Q1\\public\\app\\vendor\\assets\\README.md"
+      ]
+    },
+    {
+      "id": "exact_index_dup",
+      "category": "exact_duplicate",
+      "query": "index.js",
+      "expected_set_size": 3,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Projects\\api\\src\\index.js",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Projects\\api\\src\\index.js",
+        "C:\\Users\\Pranshul\\Projects\\web\\src\\index.js",
+        "C:\\Users\\Pranshul\\Projects\\admin\\src\\index.js"
+      ]
+    },
+    {
+      "id": "exact_package",
+      "category": "exact_duplicate",
+      "query": "package.json",
+      "expected_set_size": 1,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Projects\\protonsearch\\apps\\desktop\\package.json",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Projects\\protonsearch\\apps\\desktop\\package.json",
+        "C:\\Users\\Pranshul\\Documents\\build\\generated\\server\\.git\\Backups\\Archive\\package.json",
+        "C:\\Users\\Pranshul\\OneDrive\\bin\\package.json"
+      ]
+    },
+    {
+      "id": "prefix_screenshot",
+      "category": "prefix",
+      "query": "Screenshot 2026-11-09",
+      "expected_set_size": 1,
+      "result_count": 3,
+      "top1": "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png",
+        "C:\\Users\\Pranshul\\OneDrive\\out\\shared\\Backups\\2025\\shared\\Screenshot 2026-11-09 212046.png",
+        "C:\\Users\\Pranshul\\Downloads\\Q1\\vendor\\2026\\final\\Desktop\\Screenshot 2026-11-11 233709.png"
+      ]
+    },
+    {
+      "id": "prefix_quarterly",
+      "category": "prefix",
+      "query": "quarterly_rep",
+      "expected_set_size": 1,
+      "result_count": 5,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+        "D:\\Data\\Work\\Pictures\\exports\\unsorted\\seed_quarterly_parse.webp",
+        "C:\\Users\\Pranshul\\OneDrive\\Projects\\assets\\Music\\tests\\private\\client\\quarterly_import_table.pdf"
+      ]
+    },
+    {
+      "id": "multi_term_name",
+      "category": "multi_term",
+      "query": "project phoenix budget",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx"
+      ]
+    },
+    {
+      "id": "multi_term_partial",
+      "category": "multi_term",
+      "query": "quarterly report final",
+      "expected_set_size": 1,
+      "result_count": 3,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+        "C:\\Users\\Pranshul\\AppData\\Local\\images\\Q2\\contracts\\internal\\data\\lib\\notes\\logs\\2023\\misc\\generated\\old\\scripts\\vendor\\Desktop\\fixture_quarterly_capture_common_survey_metrics_quarterly_migration_702.json",
+        "C:\\Users\\Pranshul\\Videos\\Videos\\clients\\media\\server\\build\\temp\\tools\\final\\Music\\target\\screenshots\\sprint_dialog_offline_dynamic_backup_render_contract_findings_quarterly_591.json"
+      ]
+    },
+    {
+      "id": "typo_quarterly",
+      "category": "typo",
+      "query": "quaterly report final",
+      "expected_set_size": 1,
+      "result_count": 3,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+        "C:\\Users\\Pranshul\\AppData\\Local\\images\\Q2\\contracts\\internal\\data\\lib\\notes\\logs\\2023\\misc\\generated\\old\\scripts\\vendor\\Desktop\\fixture_quarterly_capture_common_survey_metrics_quarterly_migration_702.json",
+        "C:\\Users\\Pranshul\\Videos\\Videos\\clients\\media\\server\\build\\temp\\tools\\final\\Music\\target\\screenshots\\sprint_dialog_offline_dynamic_backup_render_contract_findings_quarterly_591.json"
+      ]
+    },
+    {
+      "id": "typo_screenshot",
+      "category": "typo",
+      "query": "screnshot 2026-11-09",
+      "expected_set_size": 1,
+      "result_count": 3,
+      "top1": "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png",
+        "C:\\Users\\Pranshul\\OneDrive\\out\\shared\\Backups\\2025\\shared\\Screenshot 2026-11-09 212046.png",
+        "C:\\Users\\Pranshul\\Downloads\\Q1\\vendor\\2026\\final\\Desktop\\Screenshot 2026-11-11 233709.png"
+      ]
+    },
+    {
+      "id": "cjk_prefix",
+      "category": "cjk",
+      "query": "会議議事録_2026-11-09",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\会議\\会議議事録_2026-11-09.docx",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\会議\\会議議事録_2026-11-09.docx"
+      ]
+    },
+    {
+      "id": "cjk_japanese_memo",
+      "category": "cjk",
+      "query": "日本語_メモ_2026.txt",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\日本語\\日本語_メモ_2026.txt",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\日本語\\日本語_メモ_2026.txt"
+      ]
+    },
+    {
+      "id": "folder_anchor",
+      "category": "folder",
+      "query": "ProtonSearch Phoenix",
+      "expected_set_size": 1,
+      "result_count": 2,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx"
+      ]
+    },
+    {
+      "id": "zero_match",
+      "category": "zero_match",
+      "query": "zzqxvbnmplkjhgfdsa9917",
+      "expected_set_size": 0,
+      "result_count": 0,
+      "top1": null,
+      "rank_of_first_expected": null,
+      "mrr": 0.0,
+      "recall_at_10": 0.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": []
+    },
+    {
+      "id": "zero_match_cjk",
+      "category": "zero_match",
+      "query": "存在しないファイル名です",
+      "expected_set_size": 0,
+      "result_count": 0,
+      "top1": null,
+      "rank_of_first_expected": null,
+      "mrr": 0.0,
+      "recall_at_10": 0.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": []
+    }
+  ],
+  "engine_ready": true,
+  "notes": [
+    "metrics fixed at top-10: MRR@10, recall@10, exact-match@1; expectEmpty scored separately",
+    "expectedTop5 is the expected set for MRR/recall, not an exhaustive reference list",
+    "engine_not_ready means ps-index::search returned no results; the table is structural only"
+  ]
+}

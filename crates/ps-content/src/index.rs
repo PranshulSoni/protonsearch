@@ -450,7 +450,7 @@ impl ContentIndex {
 pub fn query_terms(query: &str) -> Vec<String> {
     let mut terms = Vec::new();
     let mut current = String::new();
-    let mut push_current = |terms: &mut Vec<String>, current: &mut String| {
+    let push_current = |terms: &mut Vec<String>, current: &mut String| {
         let term = current.trim();
         if !term.is_empty() && terms.len() < 16 {
             terms.push(term.chars().take(128).collect::<String>());

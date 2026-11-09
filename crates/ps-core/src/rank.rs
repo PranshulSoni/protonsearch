@@ -11,7 +11,6 @@
 //! hits live in tier 0; semantic/agent hits live in tier 2 and can therefore
 //! never displace them.
 
-use std::cmp::Ordering;
 
 use ps_ipc::{SearchResult, SourceKind};
 
