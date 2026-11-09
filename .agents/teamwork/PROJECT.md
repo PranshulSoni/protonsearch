@@ -98,3 +98,13 @@ content, wired controls, tokenised motion, responsive + reduced-motion, accessib
 Checker PASS 16/16; jsdom interaction smoke clean; Chromium screenshots under
 docs/design/revision-2026-11-09/. The native Tauri app is unchanged; re-pinning the HTML
 authority waits for user approval of this revision.
+
+## M7 - Widget design v2 (delegated, in progress)
+
+- [x] v2 base + work order written: .agents/design/v2/WORKORDER.md, base.html
+- [ ] A - widget design research/spec (web: docktor, Dockspace, icon sets)
+- [ ] B - size system (bigger tiles/icons, per-widget width steps, size buckets, collisions, clock)
+- [ ] C - motion (neighbour-push magnification, capsule<->lines morph)
+- [ ] D - colour accents + icon polish
+- [ ] Lead integrates A-D into dock-editable.html, runs checker + size matrix + screenshots
+- [ ] Reviewer audit, then commit on dock

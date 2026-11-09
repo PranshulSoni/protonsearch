@@ -1906,28 +1906,28 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
       </div>
 
       <!-- 2. Battery & Power Telemetry Popover -->
-      <div class="dock-popover" id="popover-status-battery" role="dialog" aria-label="Battery and Power Telemetry">
+      <div class="dock-popover" id="popover-status-battery" role="dialog" aria-label="Battery" data-demo="1">
         <div class="dpop-head">
           <div class="dpop-title">
             <svg class="pd-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.4" y="7.6" width="17.4" height="8.8" rx="2.4"/><path d="M21.4 10.4v3.2"/></svg>
-            <span>Power Delivery</span>
+            <span>Battery</span>
           </div>
-          <span class="dpop-badge is-green" id="battStateBadge">65W AC Connected</span>
+          <span class="dpop-badge is-green" id="battStateBadge">Charging</span>
         </div>
         <div class="dpop-body">
           <div class="batt-telemetry-top">
             <div class="batt-percent-num" id="battPercentDisplay">88%</div>
-            <div class="batt-power-rate" id="battPowerRate">+48.2 W Fast Charge</div>
+            <div class="batt-power-rate" id="battPowerRate">+48.2 W</div>
           </div>
           <div class="batt-metrics-grid">
-            <div class="batt-cell"><span class="bc-label">Flow Rate</span><span class="bc-val" id="bcFlow">+48.2W</span></div>
-            <div class="batt-cell"><span class="bc-label">Cycle Count</span><span class="bc-val" id="bcCycles">142 cycles</span></div>
+            <div class="batt-cell"><span class="bc-label">Flow rate</span><span class="bc-val" id="bcFlow">+48.2W</span></div>
+            <div class="batt-cell"><span class="bc-label">Cycles</span><span class="bc-val" id="bcCycles">142 cycles</span></div>
             <div class="batt-cell"><span class="bc-label">Health</span><span class="bc-val" id="bcHealth">96.4%</span></div>
             <div class="batt-cell"><span class="bc-label">Capacity</span><span class="bc-val">68.4 / 71.0 Wh</span></div>
             <div class="batt-cell"><span class="bc-label">Voltage</span><span class="bc-val">19.85 V</span></div>
-            <div class="batt-cell"><span class="bc-label">Temperature</span><span class="bc-val">31.2°C</span></div>
+            <div class="batt-cell"><span class="bc-label">Temperature</span><span class="bc-val">31.2 °C</span></div>
           </div>
-          <div class="batt-est-line" id="battEstTime">Estimated time to 100%: 34 minutes remaining</div>
+          <div class="batt-est-line" id="battEstTime">34 min to full</div>
           <p class="dpop-note">Preview data. This build does not read battery telemetry.</p>
           <button class="batt-sim-toggle" id="battSimToggleBtn" type="button" aria-pressed="false">Show on battery</button>
         </div>
@@ -1966,6 +1966,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
             </div>
           </div>
           <p class="dpop-note">Preview data. This build does not scan for networks or read the adapter.</p>
+          <p class="dpop-note">Preview data. This build does not scan for networks or read the adapter.</p>
         </div>
       </div>
 
@@ -2002,6 +2003,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
             </div>
           </div>
           <p class="dpop-note">Preview data. This build does not read Bluetooth devices.</p>
+          <p class="dpop-note">Preview data. This build does not read Bluetooth devices.</p>
         </div>
       </div>
 
@@ -2032,6 +2034,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
               <button class="notif-del" data-close-nid="3" type="button" aria-label="Dismiss notification">&times;</button>
             </div>
           </div>
+          <p class="dpop-note">Preview data. These notifications are a sample.</p>
         </div>
         <p class="dpop-note">Preview data. These notifications are a sample.</p>
       </div>
@@ -2101,18 +2104,18 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
         <div class="dpop-head">
           <div class="dpop-title">
             <svg class="pd-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M13.6 3.2H7.2a2.6 2.6 0 0 0-2.6 2.6v12.4a2.6 2.6 0 0 0 2.6 2.6h9.6a2.6 2.6 0 0 0 2.6-2.6V9.2Z"/><path d="M13.6 3.2v6h6"/><path d="M8.6 12.8h6.8M8.6 16.4h4.4"/></svg>
-            <span>Take a Note</span>
+            <span>New note</span>
           </div>
           <button class="dpop-btn-text" id="closeNoteBtn" type="button">Close</button>
         </div>
         <div class="dpop-body">
-          <textarea class="note-textarea" id="noteTextarea" placeholder="Jot down a quick thought, task, or scratch idea..." rows="3"></textarea>
+          <textarea class="note-textarea" id="noteTextarea" placeholder="Write a note" rows="3"></textarea>
           <div class="note-actions">
-            <span class="note-char-count" id="noteCharCount">0 chars</span>
-            <button class="note-save-btn" id="saveNoteBtn" type="button">Save Note</button>
+            <span class="note-char-count" id="noteCharCount">0 characters</span>
+            <button class="note-save-btn" id="saveNoteBtn" type="button">Save note</button>
           </div>
           <div class="note-recent-section" id="noteRecentSection">
-            <div class="note-recent-heading">Recent Notes</div>
+            <div class="note-recent-heading">Recent notes</div>
             <div class="note-recent-list" id="noteRecentList"></div>
           </div>
         </div>
@@ -2230,6 +2233,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
             </div>
           </div>
           <p class="dpop-note">Preview data. Device batteries are a sample.</p>
+          <p class="dpop-note">Preview data. Device batteries are a sample.</p>
         </div>
       </div>
 
@@ -2250,22 +2254,22 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
       <div class="cust-head-top">
         <div class="cust-title-group">
           <h2>ProtonDock Customizer</h2>
-          <p>Locked 48px square height for all widgets. Enable or disable widgets and pin installed apps.</p>
+          <p>Widgets are 48px high. Set a width, or turn a widget off.</p>
         </div>
         <button class="cust-close" id="closeCustomizerBtn" type="button" aria-label="Close customizer">&times;</button>
       </div>
       <div class="cust-nav-tabs">
         <button class="cust-nav-tab is-active" id="tabGalleryBtn" type="button">
-          <span>Widget Gallery</span>
+          <span>Widget gallery</span>
           <span class="cust-tag is-accent" id="galleryCountTag">9</span>
         </button>
         <button class="cust-nav-tab" id="tabAppsBtn" type="button">
-          <span>Apps (Pin Apps)</span>
+          <span>Apps</span>
           <span class="cust-tag" id="pinnedCountTag">Pinned</span>
         </button>
         <button class="cust-nav-tab" id="tabStoreBtn" type="button">
-          <span>Widget Store</span>
-          <span class="cust-tag">Coming Soon</span>
+          <span>Widget store</span>
+          <span class="cust-tag">Coming soon</span>
         </button>
       </div>
     </div>
@@ -2273,16 +2277,16 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
     <!-- PANE 1: WIDGET GALLERY (INSTALLED WIDGETS) -->
     <div class="cust-pane is-active" id="paneGallery">
       <div class="cust-toolbar">
-        <button class="cust-action-btn is-accent" id="allSquareBtn" type="button" title="Set every widget to 48px square">
+        <button class="cust-action-btn is-accent" id="allSquareBtn" type="button" title="Set every widget to 48px">
           <svg class="pd-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4.6" y="4.6" width="14.8" height="14.8" rx="3.2"/></svg>
-          <span>All Square (48px)</span>
+          <span>Square (48px)</span>
         </button>
         <button class="cust-action-btn" id="allCompactBtn" type="button" title="Set widgets with text to 124px rectangle">
           <svg class="pd-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.6" y="6.2" width="18.8" height="11.6" rx="3.2"/></svg>
-          <span>Expand Rectangles</span>
+          <span>Wide (124px)</span>
         </button>
         <button class="cust-action-btn" id="resetDefaultsBtn" type="button" title="Reset all widths and enabled status to defaults">
-          <span>Reset Defaults</span>
+          <span>Reset defaults</span>
         </button>
       </div>
       <div class="cust-gallery-list" id="custWidgetList">
@@ -2308,7 +2312,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
               </span>
               <span class="store-title">Calendar & Events</span>
             </div>
-            <span class="store-badge">Coming Soon</span>
+            <span class="store-badge">Coming soon</span>
           </div>
           <p class="store-desc">Agenda overview, countdown to next meeting, and local ICS calendar synchronization.</p>
         </div>
@@ -2321,7 +2325,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
               </span>
               <span class="store-title">Clipboard Manager</span>
             </div>
-            <span class="store-badge">Coming Soon</span>
+            <span class="store-badge">Coming soon</span>
           </div>
           <p class="store-desc">Access recent snippets, pinned text templates, and quick clipboard history.</p>
         </div>
@@ -2334,9 +2338,9 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
               </span>
               <span class="store-title">Focus & Pomodoro</span>
             </div>
-            <span class="store-badge">Coming Soon</span>
+            <span class="store-badge">Coming soon</span>
           </div>
-          <p class="store-desc">Distraction-free focus sessions, custom intervals, and break timers right on the rail.</p>
+          <p class="store-desc">Focus sessions, custom intervals, and break timers on the rail.</p>
         </div>
 
         <div class="store-card">
@@ -2347,9 +2351,9 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
               </span>
               <span class="store-title">Network & Ping</span>
             </div>
-            <span class="store-badge">Coming Soon</span>
+            <span class="store-badge">Coming soon</span>
           </div>
-          <p class="store-desc">Live bandwidth throughput gauges, gateway ping latency, and connection status.</p>
+          <p class="store-desc">Bandwidth throughput, gateway ping latency, and connection status.</p>
         </div>
 
         <div class="store-card">
@@ -2360,7 +2364,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
               </span>
               <span class="store-title">GitHub & PRs</span>
             </div>
-            <span class="store-badge">Coming Soon</span>
+            <span class="store-badge">Coming soon</span>
           </div>
           <p class="store-desc">Review requests, GitHub Actions workflow states, and assigned issue tracking.</p>
         </div>
@@ -2373,9 +2377,9 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
               </span>
               <span class="store-title">Market Ticker</span>
             </div>
-            <span class="store-badge">Coming Soon</span>
+            <span class="store-badge">Coming soon</span>
           </div>
-          <p class="store-desc">Real-time stock and cryptocurrency pricing, day change percentages, and watchlists.</p>
+          <p class="store-desc">Stock and cryptocurrency prices, day change, and watchlists.</p>
         </div>
       </div>
     </div>
@@ -2393,38 +2397,38 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
       <div class="pcc-title">Create New Profile</div>
       <button class="pcc-close-btn" id="closeNewProfileModalBtn" type="button" aria-label="Close dialog">&times;</button>
     </div>
-    <div class="pcc-sub">Personalize an isolated dock layout for specific workflows or contexts.</div>
+    <div class="pcc-sub">Create a layout for a task.</div>
     
     <div class="pcc-field">
-      <label class="pcc-label" for="newProfileNameInput">Profile Name</label>
+      <label class="pcc-label" for="newProfileNameInput">Profile name</label>
       <input type="text" id="newProfileNameInput" class="pcc-input" placeholder="e.g. Coding, Gaming, Streaming, Zen..." autocomplete="off" />
     </div>
 
     <div class="pcc-field">
-      <label class="pcc-label">Starting Layout</label>
+      <label class="pcc-label">Starting layout</label>
       <div class="pcc-presets" role="radiogroup">
         <label class="pcc-preset-opt">
           <input type="radio" name="baseProfilePreset" value="current" checked />
-          <span>From Current Dock</span>
+          <span>From current dock</span>
         </label>
         <label class="pcc-preset-opt">
           <input type="radio" name="baseProfilePreset" value="daily" />
-          <span>Daily (Essentials)</span>
+          <span>Daily</span>
         </label>
         <label class="pcc-preset-opt">
           <input type="radio" name="baseProfilePreset" value="work" />
-          <span>Work (Full Telemetry)</span>
+          <span>Work</span>
         </label>
         <label class="pcc-preset-opt">
           <input type="radio" name="baseProfilePreset" value="focus" />
-          <span>Focus (Zero Distraction)</span>
+          <span>Focus</span>
         </label>
       </div>
     </div>
 
     <div class="pcc-footer">
       <button class="pcc-btn is-secondary" id="cancelNewProfileBtn" type="button">Cancel</button>
-      <button class="pcc-btn is-primary" id="confirmNewProfileBtn" type="button">Create Profile</button>
+      <button class="pcc-btn is-primary" id="confirmNewProfileBtn" type="button">Create profile</button>
     </div>
   </div>
 </div>
@@ -2515,9 +2519,9 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
         <div class="ql-preview-box" id="qlPreviewBox"></div>
         <div class="ql-meta-row" id="qlMetaRow"></div>
         <div class="ql-actions-row">
-          <button class="ql-action-btn primary" id="qlOpenBtn" type="button">Open File</button>
+          <button class="ql-action-btn primary" id="qlOpenBtn" type="button">Open file</button>
           <button class="ql-action-btn" id="qlFolderBtn" type="button">Reveal in Explorer</button>
-          <button class="ql-action-btn" id="qlCopyPathBtn" type="button">Copy Path</button>
+          <button class="ql-action-btn" id="qlCopyPathBtn" type="button">Copy path</button>
         </div>
       </div>
     </div>
@@ -2853,6 +2857,7 @@ function iconSvg(name, size) {
     wifi: {
       id: 'wifi',
       label: 'Wi-Fi',
+      label: 'Wi-Fi',
       title: 'Studio-5GHz',
       sub: 'Wi-Fi 6',
       defaultWidth: 48,
@@ -3135,6 +3140,94 @@ function iconSvg(name, size) {
     });
   }
 
+  /* --------------------------------------------------------------------------
+     MOTION: one source for every JS-driven transition.
+     Tokens resolve brief v2 first (--dur-1..4, --ease-out, --ease-in-out), then
+     the legacy names (--speed-hover, --speed-rail, --ease), then the brief's
+     literal value. Nothing here animates a shadow, a filter or a static surface.
+     -------------------------------------------------------------------------- */
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var MOTION = { ms: {}, ease: {}, refresh: refreshMotion };
+
+  function motionAllowed() {
+    return !reduceMotion.matches;
+  }
+
+  function motionToken(name, legacy, fallback) {
+    var cs = getComputedStyle(document.documentElement);
+    var value = cs.getPropertyValue(name).trim();
+    if (!value && legacy) value = cs.getPropertyValue(legacy).trim();
+    return value || fallback;
+  }
+
+  function motionMs(name, legacy, fallback) {
+    var value = motionToken(name, legacy, fallback + 'ms');
+    var n = parseFloat(value);
+    if (!isFinite(n)) return fallback;
+    return /ms\s*$/.test(value) ? n : n * 1000;
+  }
+
+  function refreshMotion() {
+    MOTION.ms = {
+      quick: motionMs('--dur-1', '--speed-hover', 120),  /* hover, press, tooltip, exits */
+      state: motionMs('--dur-2', null, 180),             /* popover, customizer, new tile */
+      swap: motionMs('--dur-3', '--speed-rail', 240),    /* profile swap, resize, reorder */
+      enter: motionMs('--dur-4', null, 320)              /* the one authored entrance */
+    };
+    MOTION.ease = {
+      out: motionToken('--ease-out', '--ease', 'cubic-bezier(.22,.61,.36,1)'),
+      travel: motionToken('--ease-in-out', null, 'cubic-bezier(.65,0,.35,1)')
+    };
+  }
+  refreshMotion();
+
+  function captureRailPositions() {
+    var first = new Map();
+    if (!rail) return first;
+    rail.querySelectorAll('.dock-slot').forEach(function (slot) {
+      if (!slot.dataset.id) return;
+      var rect = slot.getBoundingClientRect();
+      first.set(slot.dataset.id, { left: rect.left, width: rect.width });
+    });
+    return first;
+  }
+
+  /* FLIP: replay the delta that the re-render erased. Tiles travel to their new
+     x and, when their width changed, resize with the rail instead of spilling
+     out of it. */
+  function playRailFlip(first) {
+    if (!rail || !first || !first.size || !motionAllowed()) return;
+    var timing = { duration: MOTION.ms.swap, easing: MOTION.ease.travel };
+    rail.querySelectorAll('.dock-slot').forEach(function (slot) {
+      var before = first.get(slot.dataset.id);
+      if (!before) return;
+      var now = slot.getBoundingClientRect();
+      var dx = before.left - now.left;
+      var dw = before.width - now.width;
+      if (Math.abs(dx) > 0.5) {
+        slot.animate([
+          { transform: 'translateX(' + dx + 'px)' },
+          { transform: 'translateX(0px)' }
+        ], timing);
+      }
+      if (Math.abs(dw) > 0.5) {
+        slot.animate([
+          { width: before.width + 'px' },
+          { width: now.width + 'px' }
+        ], timing);
+      }
+    });
+  }
+
+  /* The OS setting can flip while the app is running: refresh the tokens and
+     drop any magnification that was mid-flight. */
+  if (reduceMotion.addEventListener) {
+    reduceMotion.addEventListener('change', function () {
+      refreshMotion();
+      resetMagnify();
+    });
+  }
+
   function renderAnalogClockSvg() {
     return '<svg class="dock-clock-analog" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">' +
       '<circle cx="16" cy="16" r="14.5" fill="var(--text-1)" stroke="none" />' +
@@ -3289,6 +3382,9 @@ function iconSvg(name, size) {
       if (!w.isConfigured) {
         return '<div class="dock-ring-wrap"><span class="ring-glyph" style="color:' + w.glyphColor + '">' + w.iconSvg + '</span></div>';
       }
+      if (!w.isConfigured) {
+        return '<div class="dock-ring-wrap"><span class="ring-glyph" style="color:' + w.glyphColor + '">' + w.iconSvg + '</span></div>';
+      }
       var circumference = 2 * Math.PI * 13;
       var offset = circumference - (circumference * w.ringPct / 100);
       var workingClass = w.isWorking ? ' is-working' : '';
@@ -3331,6 +3427,32 @@ function iconSvg(name, size) {
     claude: 1,
     codex: 1,
     'music-player': 1
+  };
+
+  function widgetAccessibleName(w) {
+    if (!w) return '';
+    var name = w.label || w.title || w.id;
+    var value = '';
+    if (w.isWeather) value = (w.isConfigured && w.temp != null) ? w.temp + ' degrees' : 'not set';
+    else if (w.isBattery) value = w.batteryPct + ' percent, ' + (w.charging ? 'charging' : 'on battery');
+    else if (w.isPeripherals) value = w.batteryPct + ' percent';
+    else if (w.isNotifications) value = w.unreadCount + ' unread';
+    return name + (value ? ', ' + value : '') + (DEMO_WIDGETS[w.id] ? ', preview data' : '');
+  }
+
+  /* Widgets whose numbers are sample data. One place, one flag. */
+  var DEMO_WIDGETS = {
+    weather: 1,
+    'system-stats': 1,
+    peripherals: 1,
+    'status-battery': 1,
+    wifi: 1,
+    bluetooth: 1,
+    notifications: 1,
+    'system-tray': 1,
+    calendar: 1,
+    claude: 1,
+    codex: 1
   };
 
   function widgetAccessibleName(w) {
@@ -3497,7 +3619,7 @@ function iconSvg(name, size) {
         '</span>' +
         resizeChipHtml +
         (w.hasDot ? '<span class="dock-dot"></span>' : '') +
-        '<span class="dock-tip">' + escapeHtml(w.title) + '</span>' +
+        '<span class="dock-tip">' + escapeHtml(w.label || w.title) + '</span>' +
       '</button>';
     });
 
@@ -3547,7 +3669,7 @@ function iconSvg(name, size) {
           customWidths[id] = nextW;
           saveState();
           renderDock(true); // Apple spring FLIP
-          var wTitle = (WIDGETS[id] && WIDGETS[id].title) || id;
+          var wTitle = (WIDGETS[id] && (WIDGETS[id].label || WIDGETS[id].title)) || id;
           showToast(wTitle + ': toggled to ' + (nextW > 52 ? 'expanded live widget' : 'compact tile') + ' (Alt-click)');
           return;
         }
@@ -3958,39 +4080,44 @@ function iconSvg(name, size) {
       if (!w) return;
       var width = getWidth(id);
       var enabled = isEnabled(id);
+      var isCollection = (id === 'running-apps' || id === 'pinned-apps');
       if (enabled) enabledCount++;
+
+      var widthControls = isCollection ? '' :
+        '<div class="ci-presets">' +
+          '<button class="ci-preset-btn ' + (width === 48 ? 'is-active' : '') + '" data-set-width="48" type="button">48px</button>' +
+          '<button class="ci-preset-btn ' + (width === 96 ? 'is-active' : '') + '" data-set-width="96" type="button">96px</button>' +
+          '<button class="ci-preset-btn ' + (width === 130 ? 'is-active' : '') + '" data-set-width="130" type="button">130px</button>' +
+          '<button class="ci-preset-btn ' + (width === 180 ? 'is-active' : '') + '" data-set-width="180" type="button">180px</button>' +
+        '</div>' +
+        '<div class="ci-slider-wrap">' +
+          '<input class="ci-slider" type="range" min="48" max="220" step="2" value="' + width + '" data-slider-id="' + id + '" aria-label="' + escapeHtml(w.label || w.title) + ' width" />' +
+          '<span class="ci-val-badge">' + width + 'px</span>' +
+        '</div>';
 
       html += '<div class="cust-item ' + (enabled ? '' : 'is-disabled') + '" data-id="' + id + '">' +
         '<div class="cust-toggle-wrap">' +
-          '<input type="checkbox" class="cust-toggle" data-toggle-enable="' + id + '" ' + (enabled ? 'checked' : '') + ' title="Enable or disable widget" />' +
+          '<input type="checkbox" class="cust-toggle" data-toggle-enable="' + id + '" ' + (enabled ? 'checked' : '') + ' title="Enable or disable widget" aria-label="Show ' + escapeHtml(w.label || w.title) + ' in the dock" />' +
         '</div>' +
         '<div class="ci-icon-box">' +
           renderWidgetGlyph(w) +
         '</div>' +
         '<div class="ci-info">' +
-          '<div class="ci-title">' + w.title + '</div>' +
-          '<div class="ci-sub">' + (width <= 52 ? 'Square (48px)' : 'Rectangle (' + width + 'px)') + '</div>' +
+          '<div class="ci-title">' + escapeHtml(w.label || w.title) + '</div>' +
+          '<div class="ci-sub">' + (isCollection ? 'App collection' : (width <= 52 ? 'Square (48px)' : 'Rectangle (' + width + 'px)')) + '</div>' +
+          (DEMO_WIDGETS[id] ? '<span class="cust-tag">Preview data</span>' : '') +
         '</div>' +
-        '<div class="ci-presets">' +
-          '<button class="ci-preset-btn ' + (width === 48 ? 'is-active' : '') + '" data-set-width="48">48px</button>' +
-          '<button class="ci-preset-btn ' + (width === 96 ? 'is-active' : '') + '" data-set-width="96">96px</button>' +
-          '<button class="ci-preset-btn ' + (width === 130 ? 'is-active' : '') + '" data-set-width="130">130px</button>' +
-          '<button class="ci-preset-btn ' + (width === 180 ? 'is-active' : '') + '" data-set-width="180">180px</button>' +
-        '</div>' +
-        '<div class="ci-slider-wrap">' +
-          '<input class="ci-slider" type="range" min="48" max="220" step="2" value="' + width + '" data-slider-id="' + id + '" />' +
-          '<span class="ci-val-badge">' + width + 'px</span>' +
-        '</div>' +
+        widthControls +
         '<div class="ci-order-btns">' +
-          '<button class="ci-order-btn" data-move="-1" data-id="' + id + '" ' + (idx === 0 ? 'disabled' : '') + ' title="Move Left">&larr;</button>' +
-          '<button class="ci-order-btn" data-move="1" data-id="' + id + '" ' + (idx === widgetOrder.length - 1 ? 'disabled' : '') + ' title="Move Right">&rarr;</button>' +
+          '<button class="ci-order-btn" data-move="-1" data-id="' + id + '" type="button" ' + (idx === 0 ? 'disabled' : '') + ' title="Move left" aria-label="Move left">&larr;</button>' +
+          '<button class="ci-order-btn" data-move="1" data-id="' + id + '" type="button" ' + (idx === widgetOrder.length - 1 ? 'disabled' : '') + ' title="Move right" aria-label="Move right">&rarr;</button>' +
         '</div>' +
       '</div>';
     });
 
     custWidgetList.innerHTML = html;
-    galleryCountTag.textContent = enabledCount;
-    pinnedCountTag.textContent = pinnedAppIds.length + ' Pinned';
+    galleryCountTag.textContent = enabledCount + ' of ' + DEFAULT_DOCK_ORDER.length;
+    pinnedCountTag.textContent = pinnedAppIds.length + ' pinned';
     attachCustomizerEvents();
   }
 
@@ -4214,7 +4341,7 @@ function iconSvg(name, size) {
     customWidths[widgetId] = next;
     saveState();
     renderDock(true); // Apple spring FLIP transition
-    var wTitle = (WIDGETS[widgetId] && WIDGETS[widgetId].title) || widgetId;
+    var wTitle = (WIDGETS[widgetId] && (WIDGETS[widgetId].label || WIDGETS[widgetId].title)) || widgetId;
     showToast(wTitle + ' resized to ' + next + 'px');
   }
 
@@ -4532,6 +4659,18 @@ function iconSvg(name, size) {
     });
   });
 
+  var ancBtns = document.querySelectorAll('.p-anc-btn');
+  ancBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      ancBtns.forEach(function (b) {
+        b.classList.remove('is-active');
+        b.setAttribute('aria-pressed', 'false');
+      });
+      btn.classList.add('is-active');
+      btn.setAttribute('aria-pressed', 'true');
+    });
+  });
+
   /* 4. Notification Center Controls */
   var clearAllNotifsBtn = document.getElementById('clearAllNotifsBtn');
   var notifCardsList = document.getElementById('notifCardsList');
@@ -4584,6 +4723,22 @@ function iconSvg(name, size) {
   /* 5. Date & Time Format Switcher and Live Clock Ticker */
   var clockModePills = document.querySelectorAll('.clock-mode-pill');
   var clockPopTime = document.getElementById('clockPopTime');
+  var clockPopDate = document.getElementById('clockPopDate');
+
+  (function setClockZoneBadge() {
+    var badge = document.getElementById('clockZoneBadge');
+    if (!badge) return;
+    var zoneName = '';
+    try {
+      zoneName = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').split('/').pop().replace(/_/g, ' ');
+    } catch (e) {}
+    var offset = -new Date().getTimezoneOffset();
+    var sign = offset < 0 ? '-' : '+';
+    var hours = Math.floor(Math.abs(offset) / 60);
+    var minutes = Math.abs(offset) % 60;
+    var utc = 'UTC' + sign + hours + (minutes ? ':' + String(minutes).padStart(2, '0') : '');
+    badge.textContent = zoneName ? zoneName + ' · ' + utc : utc;
+  })();
   var clockPopDate = document.getElementById('clockPopDate');
 
   (function setClockZoneBadge() {
@@ -4771,14 +4926,24 @@ function iconSvg(name, size) {
   }
   setInterval(updateLiveSystemStats, 2500);
 
-  /* 6. System Tray App Launchers */
+  /* 6. System tray launchers */
   var trayAppTiles = document.querySelectorAll('.tray-app-tile');
   trayAppTiles.forEach(function (tile) {
+    var app = tile.dataset.trayApp || 'Tray icon';
+    tile.setAttribute('role', 'button');
+    tile.setAttribute('tabindex', '0');
+    tile.setAttribute('aria-label', app);
+    tile.removeAttribute('title');
     tile.addEventListener('click', function (e) {
       e.stopPropagation();
-      var app = tile.dataset.trayApp || 'Service';
-      showToast('Activated ' + app);
+      showToast(app);
       setTimeout(closeActivePopover, 300);
+    });
+    tile.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        tile.click();
+      }
     });
   });
 
@@ -4844,7 +5009,7 @@ function iconSvg(name, size) {
 
   if (noteTextarea) {
     noteTextarea.addEventListener('input', function () {
-      if (noteCharCount) noteCharCount.textContent = noteTextarea.value.length + ' chars';
+      if (noteCharCount) noteCharCount.textContent = noteTextarea.value.length + ' characters';
     });
     noteTextarea.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -4866,7 +5031,7 @@ function iconSvg(name, size) {
     notesList.unshift(note);
     saveNotesToStorage();
     noteTextarea.value = '';
-    if (noteCharCount) noteCharCount.textContent = '0 chars';
+    if (noteCharCount) noteCharCount.textContent = '0 characters';
     renderNotesList();
     showToast('Note saved');
   }
@@ -4880,36 +5045,32 @@ function iconSvg(name, size) {
   var weatherCityInput = document.getElementById('weatherCityInput');
   function configureWeatherCity() {
     if (!weatherCityInput) return;
-    var city = weatherCityInput.value.trim() || 'San Francisco, CA';
-    var w = WIDGETS['weather'];
-    if (w) {
-      w.isConfigured = true;
-      w.temp = 24;
-      w.title = '24° Clear';
-      w.sub = 'H:28° L:19° · ' + city;
-      var citySpan = document.getElementById('weatherPopCity');
-      if (citySpan) citySpan.textContent = city;
-      var badge = document.getElementById('weatherPopBadge');
-      if (badge) badge.textContent = '24° Clear';
-      var tempBig = document.getElementById('wthrTempBig');
-      if (tempBig) tempBig.textContent = '24°';
-      var condText = document.getElementById('wthrCondText');
-      if (condText) condText.textContent = 'Clear Sky';
-      var hiLoText = document.getElementById('wthrHiLoText');
-      if (hiLoText) hiLoText.textContent = 'Feels like 25° · H: 28° L: 19°';
-      var hum = document.getElementById('wthrHumidity');
-      if (hum) hum.textContent = '48%';
-      var wnd = document.getElementById('wthrWind');
-      if (wnd) wnd.textContent = '11 km/h NW';
-      var uv = document.getElementById('wthrUv');
-      if (uv) uv.textContent = '3 Mod';
-      var aqi = document.getElementById('wthrAqi');
-      if (aqi) aqi.textContent = '28 Good';
-      saveState();
-      renderDock();
-      showToast('Weather configured for ' + city);
-      setTimeout(closeActivePopover, 400);
+    var city = weatherCityInput.value.trim();
+    if (!city) {
+      weatherCityInput.setAttribute('aria-invalid', 'true');
+      weatherCityInput.focus();
+      return;
     }
+    weatherCityInput.removeAttribute('aria-invalid');
+    var w = WIDGETS['weather'];
+    if (!w) return;
+    w.isConfigured = true;
+    w.city = city;
+    w.title = 'Weather';
+    w.sub = w.condition + ' · ' + city;
+    setText('weatherPopCity', city);
+    setText('weatherPopBadge', w.condition);
+    setText('wthrTempBig', w.temp == null ? '--°' : w.temp + '°');
+    setText('wthrCondText', w.condition);
+    setText('wthrHiLoText', 'H ' + w.high + '° L ' + w.low + '°');
+    setText('wthrHumidity', '48%');
+    setText('wthrWind', '11 km/h NW');
+    setText('wthrUv', '3');
+    setText('wthrAqi', '28');
+    saveState();
+    renderDock();
+    showToast('Location saved');
+    setTimeout(closeActivePopover, 400);
   }
   if (setWeatherCityBtn) setWeatherCityBtn.addEventListener('click', configureWeatherCity);
   if (weatherCityInput) {
@@ -5697,6 +5858,16 @@ function iconSvg(name, size) {
   if (calculatorHeroContainer) {
     calculatorHeroContainer.addEventListener('click', copyCalculatorResult);
   }
+
+  if (searchModal) {
+    searchModal.addEventListener('click', handleSearchBackdrop);
+  }
+
+  searchScopePills.forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      selectNavScope(pill.dataset.scope, pill);
+    });
+  });
 
   if (spotlightInput) {
     spotlightInput.addEventListener('input', function () {
