@@ -12,8 +12,14 @@ Non-filesystem search sources for ProtonSearch v2 (owner: sources-content / L2-A
   password tables are never touched). Gated by `settings.privacy.browser_history`.
 - `git` - repository/commit/TODO discovery via the git CLI (CREATE_NO_WINDOW,
   structured argv only).
-- `clipboard` - clipboard history capture/search (text + PNG images, pinned)
-  plus best-effort legacy import.
+- `clipboard` - live clipboard history capture/search (text + PNG images, pinned,
+  categorized link/email/path/code/image/text) plus one-time legacy v1 import.
+  `capture_current(db, image_dir)` seeds the current clipboard so a fresh history
+  is never empty; `start_listener(db, image_dir)` seeds then captures every
+  subsequent change (one listener per process); `count(db)` returns the row count
+  for source status. Windows 11 exposes no documented readable clipboard-history
+  store, so the old %LOCALAPPDATA%\\Microsoft\\Windows\\Clipboard scan was removed -
+  history is captured live from now on.
 - `quicklinks` - quicklinks/snippets stored in the shared v2 database.
 - `calc` - recursive-descent calculator, percentages and unit conversion.
 - `actions` - executes structured `ps_ipc::ActionSpec` values via ps-windows.

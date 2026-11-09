@@ -28,6 +28,39 @@ const STATE_INDEXING: u8 = 2;
 const STATE_PAUSED: u8 = 3;
 const STATE_ERROR: u8 = 4;
 
+/// Test seam: unit tests must never install a real Win32 clipboard hook (it is
+/// a process-global hook thread and can corrupt a short-lived test process on
+/// teardown). Tests use an inert handle so the engine lifecycle logic is still
+/// exercised end to end. Production always uses the real listener.
+#[cfg(test)]
+static FAKE_CLIPBOARD_HOOK: AtomicBool = AtomicBool::new(true);
+
+enum ClipboardHook {
+    Real(ps_windows::ClipboardListener),
+    #[cfg(test)]
+    Fake,
+}
+
+impl ClipboardHook {
+    fn start(db_path: PathBuf, image_dir: PathBuf) -> anyhow::Result<Self> {
+        #[cfg(test)]
+        if FAKE_CLIPBOARD_HOOK.load(Ordering::Relaxed) {
+            return Ok(ClipboardHook::Fake);
+        }
+        Ok(ClipboardHook::Real(
+            ps_sources::clipboard::start_listener(db_path, image_dir)?,
+        ))
+    }
+
+    fn stop(self) {
+        match self {
+            ClipboardHook::Real(listener) => listener.stop(),
+            #[cfg(test)]
+            ClipboardHook::Fake => {}
+        }
+    }
+}
+
 /// Unix milliseconds.
 pub fn now_ms() -> i64 {
     SystemTime::now()
@@ -82,6 +115,9 @@ pub struct Engine {
     shutdown: AtomicBool,
     force_rescan: AtomicBool,
     legacy_summary: Mutex<Option<LegacySummary>>,
+    /// Live Win32 clipboard listener (only one per process). Held so it can be
+    /// stopped explicitly on shutdown or when the privacy setting is disabled.
+    clipboard_listener: Mutex<Option<ClipboardHook>>,
     /// One-shot confirmation state for destructive native commands: a request
     /// must be repeated through confirm_destructive within 15 seconds.
     pending_destructive: Mutex<Option<(NativeCommand, i64)>>,
@@ -174,6 +210,7 @@ impl Engine {
             shutdown: AtomicBool::new(false),
             force_rescan: AtomicBool::new(false),
             legacy_summary: Mutex::new(None),
+            clipboard_listener: Mutex::new(None),
             pending_destructive: Mutex::new(None),
         })
     }
@@ -352,11 +389,23 @@ impl Engine {
                 .iter()
                 .map(|ext| ext.trim_start_matches('.').to_lowercase())
                 .collect();
-            let kind_filter = match (filters.kinds.contains(&SourceKind::Folder), filters.kinds.contains(&SourceKind::File)) {
+            // Strict scope semantics: Files never returns folders and Folders
+            // never returns files (All keeps both groups separate). An explicit
+            // kind: filter can only narrow, never widen, the scope.
+            let scope_kind = match scope {
+                SearchScope::Files => Some(EntryKind::File),
+                SearchScope::Folders => Some(EntryKind::Folder),
+                _ => None,
+            };
+            let explicit_kind = match (
+                filters.kinds.contains(&SourceKind::Folder),
+                filters.kinds.contains(&SourceKind::File),
+            ) {
                 (true, false) => Some(EntryKind::Folder),
                 (false, true) => Some(EntryKind::File),
                 _ => None,
             };
+            let kind_filter = scope_kind.or(explicit_kind);
             let entry_filter = ps_index::EntryFilter {
                 kind: kind_filter,
                 extensions: &extensions,
@@ -421,19 +470,30 @@ impl Engine {
         }
 
         let tier_start = Instant::now();
-        let sources = self.sources.read().unwrap();
         let mut source_hits = 0usize;
-        if scope_allows(scope, SourceKind::Clipboard) {
-            for entry in match_clipboard(&sources.clipboard, &terms).into_iter().take(4) {
+        // Clipboard results are read live from the v2 database: the in-memory
+        // sources snapshot is loaded once at startup and would be stale.
+        if settings.privacy.clipboard_history && scope_allows(scope, SourceKind::Clipboard) {
+            let db_path = self.clipboard_db_path();
+            let query = if terms.is_empty() {
+                ""
+            } else {
+                filename_query.as_str()
+            };
+            for entry in ps_sources::clipboard::search(&db_path, query, 8)
+                .into_iter()
+                .take(4)
+            {
                 ranked.push(Ranked {
                     tier: 1,
                     priority: 8,
                     score: 400.0,
-                    result: clipboard_result(entry),
+                    result: clipboard_result(&entry),
                 });
                 source_hits += 1;
             }
         }
+        let sources = self.sources.read().unwrap();
         if scope_allows(scope, SourceKind::BrowserHistory) {
             for entry in match_browser(&sources.browser, &terms).into_iter().take(4) {
                 ranked.push(Ranked {
@@ -581,6 +641,7 @@ impl Engine {
             })
             .collect();
         drop(index);
+        let clipboard_items = ps_sources::clipboard::count(&self.clipboard_db_path());
         let sources = self.sources.read().unwrap();
         let source_status = vec![
             SourceStatus {
@@ -603,9 +664,18 @@ impl Engine {
                 id: "clipboard".into(),
                 label: "Clipboard".into(),
                 enabled: settings.privacy.clipboard_history,
-                item_count: sources.clipboard.len() as u64,
-                state: if settings.privacy.clipboard_history { "ready" } else { "disabled" }.into(),
-                detail: None,
+                item_count: clipboard_items,
+                state: if settings.privacy.clipboard_history {
+                    "ready"
+                } else {
+                    "disabled"
+                }
+                .into(),
+                detail: if settings.privacy.clipboard_history {
+                    Some("capturing clipboard updates".into())
+                } else {
+                    None
+                },
             },
             SourceStatus {
                 id: "recent".into(),
@@ -669,6 +739,10 @@ impl Engine {
         };
         if changed {
             self.save_settings(&next)?;
+            if patch.privacy.is_some() {
+                // Enabling/disabling clipboard history must take effect at once.
+                self.sync_clipboard_listener();
+            }
             if patch.indexing.is_some() || patch.privacy.is_some() {
                 if next.indexing.paused {
                     self.paused.store(true, Ordering::SeqCst);
@@ -882,6 +956,7 @@ impl Engine {
             }
             IndexCommand::Shutdown => {
                 self.shutdown.store(true, Ordering::SeqCst);
+                self.stop_clipboard_listener();
                 if let Ok(mut guard) = self.background.lock() {
                     if let Some(handle) = guard.take() {
                         let _ = handle.join();
@@ -951,6 +1026,49 @@ impl Engine {
                 len
             }
             Err(_) => self.filename_entries.load(Ordering::Relaxed),
+        }
+    }
+
+    fn clipboard_db_path(&self) -> PathBuf {
+        self.config.data_dir.join(DB_FILE)
+    }
+
+    /// Start or stop the Win32 clipboard listener to match the privacy setting.
+    /// Idempotent: never creates a second listener and never leaks the hook
+    /// thread when disabled (ClipboardListener has no Drop impl; stop() joins).
+    fn sync_clipboard_listener(&self) {
+        let enabled = self.settings_snapshot().privacy.clipboard_history;
+        let mut guard = match self.clipboard_listener.lock() {
+            Ok(guard) => guard,
+            Err(_) => return,
+        };
+        if enabled {
+            if guard.is_some() {
+                return;
+            }
+            let db_path = self.clipboard_db_path();
+            let image_dir = self.config.data_dir.join("clipboard-images");
+            match ClipboardHook::start(db_path, image_dir) {
+                Ok(listener) => *guard = Some(listener),
+                Err(err) => {
+                    drop(guard);
+                    self.push_warning(format!(
+                        "clipboard listener unavailable ({err}); history shows imported items only"
+                    ));
+                }
+            }
+        } else if let Some(listener) = guard.take() {
+            drop(guard);
+            listener.stop();
+        }
+    }
+
+    fn stop_clipboard_listener(&self) {
+        if let Ok(mut guard) = self.clipboard_listener.lock() {
+            if let Some(listener) = guard.take() {
+                drop(guard);
+                listener.stop();
+            }
         }
     }
 
@@ -1068,6 +1186,14 @@ impl Engine {
     }
 }
 
+impl Drop for Engine {
+    fn drop(&mut self) {
+        // Never leak the Win32 clipboard hook thread when an Engine is dropped
+        // without an explicit Shutdown command.
+        self.stop_clipboard_listener();
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Background pipeline
 // ---------------------------------------------------------------------------
@@ -1098,6 +1224,9 @@ fn run_background_inner(engine: &Arc<Engine>) {
             engine.migrate_legacy(&legacy);
         }
     }
+
+    // Clipboard capture is live from startup when enabled.
+    engine.sync_clipboard_listener();
 
     if engine.shutdown.load(Ordering::SeqCst) {
         return;
@@ -1515,7 +1644,6 @@ fn scope_allows(scope: SearchScope, kind: SourceKind) -> bool {
     matches!(
         (scope, kind),
         (SearchScope::Files, SourceKind::File)
-            | (SearchScope::Files, SourceKind::Folder)
             | (SearchScope::Folders, SourceKind::Folder)
             | (SearchScope::Apps, SourceKind::Application)
             | (SearchScope::Clipboard, SourceKind::Clipboard)
@@ -1588,19 +1716,6 @@ fn match_apps<'a>(
             .then(a.0.name.cmp(&b.0.name))
     });
     hits
-}
-
-fn match_clipboard<'a>(
-    items: &'a [ps_sources::ClipboardEntry],
-    terms: &[String],
-) -> Vec<&'a ps_sources::ClipboardEntry> {
-    let mut hits: Vec<(&ps_sources::ClipboardEntry, i64)> = items
-        .iter()
-        .filter(|item| terms.iter().all(|term| item.text.to_lowercase().contains(term)))
-        .map(|item| (item, item.timestamp_ms))
-        .collect();
-    hits.sort_by(|a, b| b.1.cmp(&a.1));
-    hits.into_iter().map(|(item, _)| item).collect()
 }
 
 fn match_browser<'a>(
@@ -1985,6 +2100,18 @@ fn workflow_result(workflow: &ps_sources::WorkflowEntry) -> SearchResult {
     }
 }
 
+/// Stable upper-case category label for the launcher badge/filter strip.
+fn clip_category_label(category: ps_sources::ClipCategory) -> &'static str {
+    match category {
+        ps_sources::ClipCategory::Link => "LINK",
+        ps_sources::ClipCategory::Email => "EMAIL",
+        ps_sources::ClipCategory::Path => "PATH",
+        ps_sources::ClipCategory::Code => "CODE",
+        ps_sources::ClipCategory::Image => "IMAGE",
+        ps_sources::ClipCategory::Text => "TEXT",
+    }
+}
+
 fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
     let first_line = entry.text.lines().next().unwrap_or("").trim();
     let title: String = first_line.chars().take(120).collect();
@@ -1996,10 +2123,17 @@ fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
         } else {
             title
         },
-        subtitle: if entry.source_app.is_empty() {
-            "Clipboard history".into()
-        } else {
-            format!("Clipboard - {}", entry.source_app)
+        subtitle: {
+            let base = if entry.source_app.is_empty() {
+                "Clipboard history".to_string()
+            } else {
+                format!("Clipboard - {}", entry.source_app)
+            };
+            if entry.pinned {
+                format!("{base} - pinned")
+            } else {
+                base
+            }
         },
         path: None,
         icon: IconRef::Monogram,
@@ -2007,11 +2141,9 @@ fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
         match_ranges: Vec::new(),
         meta: ResultMeta {
             modified: Some(entry.timestamp_ms),
-            label: if entry.pinned {
-                Some("Pinned".into())
-            } else {
-                Some("Clipboard".into())
-            },
+            // Category drives the UI badge/filter: LINK, EMAIL, PATH, CODE,
+            // IMAGE or TEXT (pinned state is carried in the subtitle).
+            label: Some(clip_category_label(entry.category).to_string()),
             ..ResultMeta::default()
         },
         action: ActionSpec::CopyText {
@@ -2599,6 +2731,234 @@ mod tests {
                 .unwrap_or(false)),
             "literal 'open' search must still work"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn scope_allow_matrix_is_strict_for_files_and_folders() {
+        assert!(scope_allows(SearchScope::Files, SourceKind::File));
+        assert!(!scope_allows(SearchScope::Files, SourceKind::Folder));
+        assert!(scope_allows(SearchScope::Folders, SourceKind::Folder));
+        assert!(!scope_allows(SearchScope::Folders, SourceKind::File));
+        assert!(scope_allows(SearchScope::All, SourceKind::File));
+        assert!(scope_allows(SearchScope::All, SourceKind::Folder));
+    }
+
+    #[test]
+    fn files_scope_is_strict_and_all_keeps_groups_separate() {
+        let dir = scratch_dir("scopes");
+        let engine = make_engine(&dir, None);
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![
+            ps_index::IndexEntry {
+                path: r"C:\docs\report.txt".into(),
+                name: "report.txt".into(),
+                ext: "txt".into(),
+                kind: EntryKind::File,
+                size: 1,
+                modified: 1,
+            },
+            ps_index::IndexEntry {
+                path: r"C:\docs\report".into(),
+                name: "report".into(),
+                ext: String::new(),
+                kind: EntryKind::Folder,
+                size: 0,
+                modified: 2,
+            },
+        ]);
+        engine.sync_filename_entries();
+
+        let mut files = SearchRequest::new(30, "report");
+        files.scope = SearchScope::Files;
+        let resp = engine.search(&files);
+        assert!(!resp.results.is_empty(), "FILES scope must return files");
+        assert!(
+            resp.results.iter().all(|r| r.kind == SourceKind::File),
+            "FILES scope must not return folders: {:?}",
+            resp.results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+        );
+
+        let mut folders = SearchRequest::new(31, "report");
+        folders.scope = SearchScope::Folders;
+        let resp = engine.search(&folders);
+        assert!(!resp.results.is_empty(), "FOLDERS scope must return folders");
+        assert!(
+            resp.results.iter().all(|r| r.kind == SourceKind::Folder),
+            "FOLDERS scope must not return files: {:?}",
+            resp.results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+        );
+
+        // ALL keeps the two groups and both are present.
+        let resp = engine.search(&SearchRequest::new(32, "report"));
+        assert!(resp.results.iter().any(|r| r.kind == SourceKind::File));
+        assert!(resp.results.iter().any(|r| r.kind == SourceKind::Folder));
+
+        // kind: filter narrows within ALL.
+        // ALL scope also surfaces tier-0 action rows, so look at filename rows.
+        let is_filename = |kind: SourceKind| matches!(kind, SourceKind::File | SourceKind::Folder);
+        let resp = engine.search(&SearchRequest::new(33, "report kind:folder"));
+        let rows: Vec<_> = resp.results.iter().filter(|r| is_filename(r.kind)).collect();
+        assert!(!rows.is_empty(), "kind:folder must return the folder");
+        assert!(
+            rows.iter().all(|r| r.kind == SourceKind::Folder),
+            "kind:folder returned: {:?}",
+            rows.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+        );
+        let resp = engine.search(&SearchRequest::new(34, "report kind:file"));
+        let rows: Vec<_> = resp.results.iter().filter(|r| is_filename(r.kind)).collect();
+        assert!(!rows.is_empty(), "kind:file must return the file");
+        assert!(
+            rows.iter().all(|r| r.kind == SourceKind::File),
+            "kind:file returned: {:?}",
+            rows.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clipboard_results_are_live_categorized_and_counted() {
+        let dir = scratch_dir("clipboard-live");
+        let engine = make_engine(&dir, None);
+        // Clipboard history is opt-in in v2; enable it for this test.
+        let mut privacy = engine.settings().privacy;
+        privacy.clipboard_history = true;
+        engine
+            .update_settings(SettingsPatch {
+                privacy: Some(privacy),
+                ..Default::default()
+            })
+            .unwrap();
+        let db = engine.clipboard_db_path();
+        // Seed through the public API; record() classifies at write time.
+        let seeds = [
+            ("https://example.com/kall-link", "link"),
+            ("kall-mail@example.com", "email"),
+            (r"C:\docs\kall.txt", "path"),
+            ("SELECT * FROM kall WHERE id = 1;", "code"),
+            ("kall plain text", "text"),
+        ];
+        for (text, expected) in seeds {
+            assert!(ps_sources::clipboard::record(&db, text, "test-app").unwrap());
+            assert_eq!(
+                ps_sources::clipboard::classify(text).as_str(),
+                expected,
+                "classifier mismatch for {text}"
+            );
+        }
+        assert_eq!(ps_sources::clipboard::count(&db), 5);
+        // Live status count comes from the database, not the startup snapshot.
+        let status = engine.status();
+        let clip = status.sources.iter().find(|s| s.id == "clipboard").unwrap();
+        assert_eq!(clip.item_count, 5);
+        assert!(clip.enabled);
+
+        // Pin the link item: search must put pinned items first.
+        let pinned_row = ps_sources::clipboard::list_recent(&db, 10)
+            .into_iter()
+            .find(|row| row.text.contains("kall-link"))
+            .expect("seeded link row");
+        assert_eq!(pinned_row.category.as_str(), "link");
+        ps_sources::clipboard::set_pinned(&db, pinned_row.id, true).unwrap();
+        let mut req = SearchRequest::new(40, "kall");
+        req.scope = SearchScope::Clipboard;
+        let resp = engine.search(&req);
+        assert!(!resp.results.is_empty(), "live clipboard query must return rows");
+        assert!(
+            resp.results.iter().all(|r| r.kind == SourceKind::Clipboard),
+            "clipboard scope must only return clipboard rows"
+        );
+        assert_eq!(
+            resp.results[0].meta.label.as_deref(),
+            Some("LINK"),
+            "pinned item must rank first: {:?}",
+            resp.results.iter().map(|r| r.meta.label.clone()).collect::<Vec<_>>()
+        );
+        // Category labels map to the UI badge vocabulary.
+        let labels: Vec<String> = resp
+            .results
+            .iter()
+            .filter_map(|r| r.meta.label.clone())
+            .collect();
+        assert!(labels.contains(&"LINK".to_string()));
+        assert!(labels.contains(&"TEXT".to_string()));
+        assert!(labels.iter().all(|l| ["LINK", "EMAIL", "PATH", "CODE", "IMAGE", "TEXT"]
+            .contains(&l.as_str())));
+
+        // Disabling privacy stops clipboard results immediately.
+        let mut settings = engine.settings();
+        settings.privacy.clipboard_history = false;
+        engine
+            .update_settings(SettingsPatch {
+                privacy: Some(settings.privacy),
+                ..Default::default()
+            })
+            .unwrap();
+        let resp = engine.search(&req);
+        assert!(
+            !resp.results.iter().any(|r| r.kind == SourceKind::Clipboard),
+            "disabled clipboard privacy must hide clipboard results"
+        );
+        let clip = engine
+            .status()
+            .sources
+            .into_iter()
+            .find(|s| s.id == "clipboard")
+            .unwrap();
+        assert!(!clip.enabled);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clipboard_listener_lifecycle_follows_privacy_setting() {
+        let dir = scratch_dir("clipboard-listener");
+        let engine = make_engine(&dir, None);
+        assert!(engine.clipboard_listener.lock().unwrap().is_none());
+        // Clipboard history is opt-in: nothing runs while the setting is off.
+        assert!(!engine.settings().privacy.clipboard_history);
+        engine.sync_clipboard_listener();
+        assert!(engine.clipboard_listener.lock().unwrap().is_none());
+        // Enabling starts the hook thread exactly once.
+        let mut settings = engine.settings();
+        settings.privacy.clipboard_history = true;
+        engine
+            .update_settings(SettingsPatch {
+                privacy: Some(settings.privacy),
+                ..Default::default()
+            })
+            .unwrap();
+        let started = engine.clipboard_listener.lock().unwrap().is_some();
+        engine.sync_clipboard_listener();
+        assert_eq!(engine.clipboard_listener.lock().unwrap().is_some(), started);
+        // Disabling the privacy setting stops the hook thread.
+        let mut settings = engine.settings();
+        settings.privacy.clipboard_history = false;
+        engine
+            .update_settings(SettingsPatch {
+                privacy: Some(settings.privacy),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(engine.clipboard_listener.lock().unwrap().is_none());
+        // Re-enabling starts it again.
+        let mut settings = engine.settings();
+        settings.privacy.clipboard_history = true;
+        engine
+            .update_settings(SettingsPatch {
+                privacy: Some(settings.privacy),
+                ..Default::default()
+            })
+            .unwrap();
+        let restarted = engine.clipboard_listener.lock().unwrap().is_some();
+        engine.stop_clipboard_listener();
+        assert!(engine.clipboard_listener.lock().unwrap().is_none());
+        if started != restarted {
+            eprintln!(
+                "clipboard listener lifecycle: started={started} restarted={restarted} warnings={:?}",
+                engine.status().warnings
+            );
+        }
+        // The sandbox may forbid a clipboard hook; require lifecycle consistency.
+        assert_eq!(started, restarted);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -38,6 +38,47 @@ pub struct RecentEntry {
     pub last_used_ms: i64,
 }
 
+/// Coarse content category of a clipboard item. The launcher/UI uses it to
+/// pick an icon and to offer sensible actions (open link, reveal path, ...).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ClipCategory {
+    Link,
+    Email,
+    Path,
+    Code,
+    Image,
+    #[default]
+    Text,
+}
+
+impl ClipCategory {
+    /// Stable database/wire string.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ClipCategory::Link => "link",
+            ClipCategory::Email => "email",
+            ClipCategory::Path => "path",
+            ClipCategory::Code => "code",
+            ClipCategory::Image => "image",
+            ClipCategory::Text => "text",
+        }
+    }
+
+    /// Parse a stored category; unknown/empty values fall back to None.
+    pub fn from_db(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "link" => Some(ClipCategory::Link),
+            "email" => Some(ClipCategory::Email),
+            "path" => Some(ClipCategory::Path),
+            "code" => Some(ClipCategory::Code),
+            "image" => Some(ClipCategory::Image),
+            "text" => Some(ClipCategory::Text),
+            _ => None,
+        }
+    }
+}
+
 /// A clipboard history item captured by v2.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClipboardEntry {
@@ -46,6 +87,10 @@ pub struct ClipboardEntry {
     pub timestamp_ms: i64,
     pub source_app: String,
     pub pinned: bool,
+    /// Content category (link/email/path/code/image/text). Serialized with a
+    /// default so older consumers keep parsing.
+    #[serde(default)]
+    pub category: ClipCategory,
 }
 
 /// Chromium/Firefox history or bookmark item.
@@ -129,7 +174,10 @@ impl Sources {
             if let Some(legacy) = legacy_db {
                 let _ = clipboard::import_legacy_clipboard(v2_db, legacy);
             }
-            let _ = clipboard::import_windows_history(v2_db);
+            // Windows exposes no readable clipboard-history store, so seed the
+            // current clipboard once; the live listener (started by the engine)
+            // appends every subsequent change.
+            let _ = clipboard::capture_current(v2_db, &default_clipboard_images_dir());
             sources.clipboard = clipboard::list_recent(v2_db, 200);
         }
 

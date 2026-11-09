@@ -5,8 +5,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ps_sources::{
-    browser, clipboard, git, quicklinks, BrowserEntry, GitEntry, Sources, WorkflowKind,
+    browser, clipboard, git, quicklinks, BrowserEntry, ClipCategory, ClipboardEntry, GitEntry,
+    Sources, WorkflowKind,
 };
+
+/// The OS clipboard is process-global; serialize tests that read/write it.
+static CLIPBOARD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn workdir(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
@@ -116,6 +120,188 @@ fn clipboard_image_is_stored_as_png() {
     assert!(!clipboard::record_image(&db, &png, "snippingtool", &images).unwrap());
     let files: Vec<_> = std::fs::read_dir(&images).unwrap().flatten().collect();
     assert_eq!(files.len(), 1);
+}
+
+#[test]
+fn clipboard_categories_are_classified_and_returned() {
+    let dir = workdir("clipboard-categories");
+    let db = dir.join("index.db");
+    assert!(clipboard::record(&db, "https://example.com/page", "browser").unwrap());
+    assert!(clipboard::record(&db, "finance.team@example.com", "mail").unwrap());
+    assert!(clipboard::record(&db, r"C:\Users\me\Documents\report.pdf", "explorer").unwrap());
+    assert!(clipboard::record(&db, "SELECT * FROM users WHERE id = 1;", "editor").unwrap());
+    assert!(clipboard::record(&db, "meeting notes for tomorrow", "notes").unwrap());
+    assert_eq!(clipboard::count(&db), 5);
+
+    let entries = clipboard::list_recent(&db, 10);
+    let by_text: std::collections::HashMap<&str, ClipCategory> =
+        entries.iter().map(|entry| (entry.text.as_str(), entry.category)).collect();
+    assert_eq!(by_text["https://example.com/page"], ClipCategory::Link);
+    assert_eq!(by_text["finance.team@example.com"], ClipCategory::Email);
+    assert_eq!(by_text[r"C:\Users\me\Documents\report.pdf"], ClipCategory::Path);
+    assert_eq!(by_text["SELECT * FROM users WHERE id = 1;"], ClipCategory::Code);
+    assert_eq!(by_text["meeting notes for tomorrow"], ClipCategory::Text);
+
+    // search() returns categories too.
+    let hits = clipboard::search(&db, "https://example.com/page", 10);
+    assert_eq!(hits.len(), 1, "hits={hits:?}");
+    assert_eq!(hits[0].category, ClipCategory::Link);
+    let email_hits = clipboard::search(&db, "finance.team", 10);
+    assert_eq!(email_hits.len(), 1, "hits={email_hits:?}");
+    assert_eq!(email_hits[0].category, ClipCategory::Email);
+
+    // Wire/serde contract for engine-core.
+    assert_eq!(serde_json::to_string(&ClipCategory::Path).unwrap(), "\"path\"");
+    let decoded: ClipboardEntry = serde_json::from_str(
+        r#"{"id":1,"text":"x","timestamp_ms":0,"source_app":"","pinned":false}"#,
+    )
+    .unwrap();
+    assert_eq!(decoded.category, ClipCategory::Text, "missing category must default to text");
+}
+
+#[test]
+fn clipboard_category_migration_is_idempotent() {
+    let dir = workdir("clipboard-migration");
+    let db = dir.join("index.db");
+    // Old v2 schema: no category column yet.
+    {
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch(
+            r#"
+CREATE TABLE clipboard_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT UNIQUE,
+    timestamp INTEGER NOT NULL,
+    source_app TEXT NOT NULL DEFAULT '',
+    is_image INTEGER NOT NULL DEFAULT 0,
+    pinned INTEGER NOT NULL DEFAULT 0,
+    ocr_text TEXT,
+    image_path TEXT
+);
+INSERT INTO clipboard_history(content, timestamp, source_app, is_image, pinned)
+    VALUES('https://old.example.com/x', 1000, 'old', 0, 0);
+INSERT INTO clipboard_history(content, timestamp, source_app, is_image, pinned)
+    VALUES('plain old note', 1001, 'old', 0, 0);
+"#,
+        )
+        .unwrap();
+    }
+
+    // First write migrates the schema (ALTER TABLE) and backfills categories.
+    assert!(clipboard::record(&db, r"C:\temp\new-file.txt", "test").unwrap());
+    {
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        let mut statement = conn.prepare("PRAGMA table_info(clipboard_history)").unwrap();
+        let columns: Vec<String> = statement
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .flatten()
+            .collect();
+        assert!(
+            columns.iter().any(|column| column == "category"),
+            "category column missing after migration: {columns:?}"
+        );
+    }
+
+    let entries = clipboard::list_recent(&db, 10);
+    assert_eq!(entries.len(), 3, "entries={entries:?}");
+    let by_text: std::collections::HashMap<&str, ClipCategory> =
+        entries.iter().map(|entry| (entry.text.as_str(), entry.category)).collect();
+    assert_eq!(by_text["https://old.example.com/x"], ClipCategory::Link, "backfill link");
+    assert_eq!(by_text["plain old note"], ClipCategory::Text, "backfill text");
+    assert_eq!(by_text[r"C:\temp\new-file.txt"], ClipCategory::Path);
+    assert_eq!(clipboard::count(&db), 3);
+
+    // Idempotent: a second write after migration keeps working.
+    assert!(clipboard::record(&db, "second plain note", "test").unwrap());
+    assert_eq!(clipboard::count(&db), 4);
+}
+
+#[test]
+fn clipboard_capture_current_seeds_the_history() {
+    let _clip = CLIPBOARD_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let dir = workdir("clipboard-capture");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+
+    ps_windows::set_clipboard_text("https://example.com/captured-link").expect("set clipboard");
+    let captured = clipboard::capture_current(&db, &images)
+        .expect("capture current clipboard")
+        .expect("an entry");
+    assert_eq!(captured.text, "https://example.com/captured-link");
+    assert_eq!(captured.category, ClipCategory::Link);
+    assert_eq!(clipboard::count(&db), 1);
+
+    // Same consecutive content refreshes freshness without a second row.
+    let again = clipboard::capture_current(&db, &images)
+        .expect("capture again")
+        .expect("an entry");
+    assert_eq!(again.id, captured.id);
+    assert_eq!(clipboard::count(&db), 1);
+
+    ps_windows::set_clipboard_text("plain captured note").expect("set clipboard");
+    let plain = clipboard::capture_current(&db, &images)
+        .expect("capture plain text")
+        .expect("an entry");
+    assert_eq!(plain.category, ClipCategory::Text);
+    assert_eq!(clipboard::count(&db), 2);
+}
+
+#[test]
+fn clipboard_live_listener_records_new_copies() {
+    let _clip = CLIPBOARD_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let dir = workdir("clipboard-listener");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    let listener = clipboard::start_listener(db.clone(), images.clone()).expect("start listener");
+
+    let marker = format!("live listener marker {}", std::process::id());
+    ps_windows::set_clipboard_text(&marker).expect("set clipboard");
+    let mut found = false;
+    for _ in 0..60 {
+        found = clipboard::search(&db, "live listener marker", 10)
+            .iter()
+            .any(|entry| entry.text == marker);
+        if found {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    listener.stop();
+    assert!(found, "clipboard listener did not record the new clipboard text");
+    assert!(clipboard::count(&db) >= 1);
+}
+
+#[test]
+fn clipboard_image_rows_are_categorised_as_image() {
+    let dir = workdir("clipboard-image-category");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    let png: Vec<u8> = vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
+        0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
+        0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78,
+        0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+        0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+    assert!(clipboard::record_image(&db, &png, "snippingtool", &images).unwrap());
+    let recent = clipboard::list_recent(&db, 5);
+    assert_eq!(recent.len(), 1);
+    assert_eq!(recent[0].category, ClipCategory::Image);
+    assert_eq!(clipboard::count(&db), 1);
+    assert!(
+        clipboard::search(&db, "image", 5).is_empty(),
+        "text search must exclude image rows"
+    );
+}
+
+#[test]
+fn clipboard_count_and_reads_handle_missing_database() {
+    let dir = workdir("clipboard-missing");
+    let db = dir.join("absent.db");
+    assert_eq!(clipboard::count(&db), 0);
+    assert!(clipboard::list_recent(&db, 5).is_empty());
+    assert!(clipboard::search(&db, "anything", 5).is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -520,11 +706,17 @@ fn actions_dispatch_is_structured_and_safe() {
 
     // CopyText is a safe real action: verify the clipboard actually changed.
     let payload = format!("ps-sources action test {}", std::process::id());
-    let outcome = ps_sources::actions::execute(&ActionSpec::CopyText {
-        text: payload.clone(),
-    });
-    assert!(outcome.ok, "copy action failed: {}", outcome.message);
-    assert_eq!(ps_windows::get_clipboard_text().as_deref(), Some(payload.as_str()));
+    {
+        let _clip = CLIPBOARD_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let outcome = ps_sources::actions::execute(&ActionSpec::CopyText {
+            text: payload.clone(),
+        });
+        assert!(outcome.ok, "copy action failed: {}", outcome.message);
+        assert_eq!(
+            ps_windows::get_clipboard_text().as_deref(),
+            Some(payload.as_str())
+        );
+    }
 
     // Missing paths return structured failures, never panics.
     let outcome = ps_sources::actions::execute(&ActionSpec::OpenPath {

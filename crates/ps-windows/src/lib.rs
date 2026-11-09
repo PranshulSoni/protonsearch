@@ -87,11 +87,26 @@ impl ClipboardListener {
 
     /// Stop the listener and wait for its thread to exit.
     pub fn stop(mut self) {
-        #[cfg(windows)]
-        imp::clipboard::stop_listener(self.thread_id);
-        if let Some(join) = self.join.take() {
-            let _ = join.join();
+        self.shutdown();
+    }
+
+    fn shutdown(&mut self) {
+        if self.join.is_some() {
+            #[cfg(windows)]
+            imp::clipboard::stop_listener(self.thread_id);
+            if let Some(join) = self.join.take() {
+                let _ = join.join();
+            }
         }
+    }
+}
+
+impl Drop for ClipboardListener {
+    /// Dropping the listener also stops the hook thread, so forgetting an
+    /// explicit stop cannot leak a background thread that keeps writing to the
+    /// clipboard history after the engine is gone.
+    fn drop(&mut self) {
+        self.shutdown();
     }
 }
 

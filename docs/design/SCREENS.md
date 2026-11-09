@@ -61,7 +61,8 @@ element of the search row (reference:30, 136).
 ┌──────────────────────────────────────────────────────────────┐  radius 14, 1px --ps-line-strong
 │ [P 29px]  query input (21px)                     3 matches    │  search row: 72px, pad 14/20, gap 14
 ├──────────────────────────────────────────────────────────────┤  1px --ps-line
-│ [All] [Files] [Folders] [Documents] [Applications] …           │  filter strip 40px, chips 26px, gap 6
+│ [ALL] [FILES] [FOLDERS] [APPS] [CLIPBOARD] [WEB] [ACTIONS]     │  filter strip 40px, chips 26px, gap 6
+│ [ALL] [LINKS] [EMAILS] [PATHS] [CODE] [IMAGES]                 │  clipboard categories 36px (only when Clipboard is selected)
 ├──────────────────────────────────────────────────────────────┤
 │ DOCUMENTS                                                    │  group label: 34px block, 10px caps
 │ [icon] Architecture notes.docx                        Yesterday│  row: 58px, pad 8/12, radius 8
@@ -81,18 +82,26 @@ element of the search row (reference:30, 136).
   filter strip**, 23 px the results padding (10 top + 13 bottom); `rowH` 58 (comfortable) / 48 (compact); group label
   block 34 (30 compact); strip 40 (36 compact). Window height = `H + 56`. Height snaps to 2 px; resize is instant and
   happens in the same frame as the content change (never animated).
-- Results max-height = `min(365, H − 156)`; scrollbar thin, thumb `--ps-scrollbar-thumb`. The filter strip lives
-  inside the results column, so the preview panel keeps the full body height.
+  **Clipboard categories (§2.12):** when the Clipboard chip is selected, the second row adds **36 px** (32 compact):
+  `H = clamp(332, 72 + 44 + 40 + 36 + 23 + Σ(34 + rowH·n), 544)` and the window minimum for that state is 560×**388**
+  (the global native minimum stays 560×352; the launcher grows, never clips).
+- Results max-height = `min(365, H − 156)` normally, or `min(365, H − 192)` when the clipboard category strip is
+  visible (-36 px); scrollbar thin, thumb `--ps-scrollbar-thumb`. The filter/category strips live inside the results
+  column, so the preview panel keeps the full body height.
 - Header: brand mark (light or on-dark variant per theme, 29 px; 26 px at ≤700) + input + count.
 - Empty-input minimum card height is 296 px (search 72 + strip 40 + results 140 + footer 44) — compact, not an empty
-  stage. The 28 px window pad is not click-through: a press there dismisses the launcher.
+  stage — or 332 px while the clipboard category strip is visible (§2.12). The 28 px window pad is not click-through: a
+  press there dismisses the launcher.
 
 ### 2.2 Results model
 
 - The UI receives a ranked list, groups by `SourceKind`, and renders only non-empty groups in **fixed order**:
-  **APPLICATIONS · FILES · FOLDERS · DOCUMENTS · CLIPBOARD · WEB · CODE · ACTIONS** in that fixed order. The exact-command / calculator ACTIONS pin is **CUT for v2.0 alpha** (§10): ACTIONS always
-renders last, even when a command or expression matches exactly. Group labels are the literal
-  uppercase strings above (they are content labels, rendered with CSS caps; localised).
+  **APPLICATIONS · FILES · FOLDERS · DOCUMENTS · CLIPBOARD · WEB · CODE · ACTIONS**. Group labels are the literal
+  uppercase strings above (content labels, rendered with CSS caps; localised). The exact-command / calculator ACTIONS
+  pin is **CUT for v2.0 alpha** (§10): ACTIONS always renders last, even when a command or expression matches exactly.
+  Filter chips (§2.11) expose only ALL/FILES/FOLDERS/APPS/CLIPBOARD/WEB/ACTIONS; DOCUMENTS and CODE stay in **ALL** and
+  remain reachable with the `content:` / `git:` prefixes. Chips are exact: FILES never shows folder rows and FOLDERS
+  never shows file rows (§2.11).
 - Row: 36 px icon slot · 12 px gap · title (13/680, ellipsis) · path (11 px `--ps-ink-2`, ellipsis, 4 px below) ·
   trailing meta 10–11 px `--ps-ink-3` (recency / size / item count / source). Path truncates at the end; title
   truncates with ellipsis; both keep a `title` tooltip and the accessible description carries the full path.
@@ -121,7 +130,8 @@ renders last, even when a command or expression matches exactly. Group labels ar
 | Index paused | normal results | normal | dot neutral + "Index paused" |
 | Offline (network) | no special state — local search is unaffected; unavailable network roots are simply absent | normal | normal |
 | Preview open | rows + side/drawer preview; selected row unchanged | normal | "Preview" hint |
-| Filter active | results scoped to the chip's category; strip shows the selected chip | count reflects the scoped set | unchanged |
+| Filter active | results scoped to the chip's category; strip shows the selected chip; FILES/FOLDERS are exact object types | count reflects the scoped set | unchanged |
+| Clipboard category active | CLIPBOARD chip selected, category strip visible below it; rows filtered client-side by LINK/EMAIL/PATH/CODE/IMAGE/TEXT tag (§2.12) | count reflects the filtered visible set | unchanged |
 
 Filter-chip states, copy and keyboard behaviour are in §2.11. Chips stay interactive while a search is in flight; an empty scoped result uses "No matches in {label}." + "Try another category, or press Esc to clear the filter."
 
@@ -218,23 +228,67 @@ close. Re-summon during close cancels the close and restarts open (Rust safety h
 status text, window resize, preview geometry, filter application (search dispatches immediately), scrolling. Reduced
 motion: 0 ms, no transform, window hides next frame. No shadow animation, no height animation, no bounce.
 
-### 2.11 Filter strip — FINAL 2026-11-09 (launcher untouched by task-8)
+### 2.11 Filter strip — FINAL 2026-11-10 (task-23)
 
 A horizontal category strip between the search row and the results. It is the reference's segmented-control language
 applied to a scrolling filter row (SCREENS §2.1 diagram; REFERENCE_MAPPING §2).
 
-**Placement and geometry.** Inside the results column, directly under the search row's hairline and above the results:
-block **40 px** (36 compact) = 7 px top + 26 px chip + 7 px bottom + 1 px bottom hairline; inline padding **16 px**
+**Placement and geometry (unchanged).** Inside the results column, directly under the search row's hairline and above the
+results: block **40 px** (36 compact) = 7 px top + 26 px chip + 7 px bottom + 1 px bottom hairline; inline padding **16 px**
 (12 compact); chip height **26 px** (24 compact); gap **6 px** (5 compact); chip radius **6 px**; chip padding-inline
 **10 px** (8 compact). The strip scrolls horizontally; it never wraps and never changes the results column width.
 Tokens: `--ps-strip-height/--ps-strip-height-compact`, `--ps-chip-height/-compact`, `--ps-chip-gap`,
 `--ps-chip-pad-x`, `--ps-chip-radius`, `--ps-strip-pad-x`.
 
-**Chips and order.** Sentence case, 11 px/600, `--ps-ink-2` at rest. Fixed order mirrors the group order:
-**All · Applications · Files · Folders · Documents · Clipboard · Web · Code · Actions.** No counts in chips (the match
-count lives in the search row); no icons; no truncation — a chip grows to its localised label (guideline ≤ 20 chars).
+**Chips and order (FINAL).** Seven chips only, fixed order:
+**ALL · FILES · FOLDERS · APPS · CLIPBOARD · WEB · ACTIONS.** Labels are uppercase, localised, 11 px/600,
+`--ps-ink-2` at rest; no counts, no icons, no truncation — a chip grows to its localised label (guideline ≤ 20 chars).
+DOCUMENTS and GIT chips were removed on 2026-11-10; their result groups stay in ALL and their scopes remain reachable by
+prefix (below). Never render a ghost/disabled chip for a removed scope.
 
-**States.**
+**Shortcuts.** From the search input, **Ctrl+1 … Ctrl+7** select ALL/FILES/FOLDERS/APPS/CLIPBOARD/WEB/ACTIONS in that
+order, without moving focus out of the input (the input remains the primary focus target). Ctrl+8 and Ctrl+9 are
+**unbound**; do not capture them. The shortcut is a selection, not a separate focus mode; the radiogroup state and the
+result-count live region announce the change. Chips show no shortcut hint; the footer hint unchanged.
+
+**Scopes and prefixes.** Selecting a chip dispatches a new search with `scope` and resets the selection to row 0 (new
+query epoch). A typed prefix is still supported and does **not** select a chip: the strip stays on ALL and the query text
+is the only indicator; choosing any chip clears the prefix. Removed scopes remain reachable exactly as before:
+
+| Chip | `scope` | Query prefixes |
+|---|---|---|
+| ALL | `all` | (none) |
+| FILES | `files` | `file:` `files:` |
+| FOLDERS | `folders` | `folder:` `folders:` |
+| APPS | `apps` | `app:` `apps:` |
+| CLIPBOARD | `clipboard` | `clip:` `clipboard:` |
+| WEB | `browser` | `web:` `history:` `bookmarks:` `google:` |
+| ACTIONS | `actions` | `calc:` `command:` |
+| *(removed)* DOCUMENTS | `content` | `content:` `ocr:` |
+| *(removed)* CODE | `git` | `git:` `commits:` `todos:` |
+
+Filter choice is **not** persisted across summons (default ALL).
+
+**Strict FILES vs FOLDERS (FINAL).** The two chips are exact; they never mix object types:
+- **FILES** = file-backed rows only: `SourceKind::File`, `content_match` and `ocr_text` (their normal DOCUMENTS/FILES
+  group labels stay). A folder row must never appear under FILES.
+- **FOLDERS** = `SourceKind::Folder` rows only. A file/document row must never appear under FOLDERS.
+- **ALL** keeps the fixed groups separate (FILES, FOLDERS, DOCUMENTS are distinct headings; a folder row is never
+  rendered inside FILES and a file row never inside FOLDERS).
+- Backend dependency: `ps-core` currently maps FILES to `File | Folder` (`crates/ps-core/src/engine.rs:1517-1519`).
+  That must become `File | ContentMatch | OcrText` (folder removed) before the chip ships; until the engine change
+  lands, ui-launcher filters folder rows out of FILES as a guard and records it as alpha debt.
+
+**Row anatomy.**
+
+| Scope | Row anatomy |
+|---|---|
+| FILES row | 36 px icon slot · 12 px gap · real shell/file-type icon 32 px **or** extension badge (2–4 chars, 10/650, caps, 35×37, radius 7, `--ps-badge-*`) · filename 13/680 ellipsis · path 11 `--ps-ink-2` below (4 px gap, ellipsis) · trailing recency 10–11 + size when real. Content-match rows keep the same file row and open the file at the match. |
+| FOLDERS row | 36 px icon slot · 12 px gap · folder glyph 20 px tinted `--ps-badge-folder-bg/ink` (never a file icon or extension badge) · folder name 13/680 ellipsis · full path 11 `--ps-ink-2` below · trailing `{n} items` only when `meta.itemCount` is real (tabular), otherwise nothing. |
+| Mixed ALL | The two row types keep their own group headings; no visual mixing inside one group. |
+
+**States.** Unchanged:
+
 | State | Visual |
 |---|---|
 | rest | transparent bg, 1 px transparent border, `--ps-ink-2` |
@@ -245,33 +299,109 @@ count lives in the search row); no icons; no truncation — a chip grows to its 
 | dark | unselected `--ps-ink-2` (8.47:1), selected fill `--ps-accent-soft`, bar `--ps-selected-bar` |
 | disabled | none — chips stay usable while a search is pending |
 
-**Filtering semantics.** Selecting a chip dispatches a new `search` request with `scope` and resets the selection
-to row 0 (new query epoch): All → `all`; Applications → `apps`; Files → `files`; Folders → `folders`;
-Documents → `content`; Clipboard → `clipboard`; Web → `browser`; Code → `git`; Actions → `actions`. A typed
-prefix (e.g. `file:`) selects the matching chip and clears it when another chip is chosen. Filter choice is **not**
-persisted across summons (default All). The count text reflects the scoped result set; 0 results shows "No matches in
-{label}." + "Try another category, or press Esc to clear the filter."
-
 **Keyboard and focus.** One roving tab stop: Tab from the search input lands on the **selected** chip; Tab again leaves
-the strip for the preview/footer. ←/→ change the filter immediately (radiogroup semantics) and keep focus; Home/End go
-to All/last; Space/Enter re-applies the focused chip (no-op if already selected). Esc clears the filter to All and
-returns focus to the input **before** the normal query-clear/close chain. When the strip overflows, the focused/selected
-chip is scrolled into view (`scrollIntoView({inline:'nearest', block:'nearest'})`, no smooth behaviour). Pointer: click
-selects; no drag.
+the strip for the clipboard category strip (§2.12, only when visible), the preview, or the footer. ←/→ change the filter
+immediately (radiogroup semantics) and keep focus; Home/End go to ALL/ACTIONS; Space/Enter re-applies the focused chip
+(no-op if already selected). Esc clears the filter to ALL and returns focus to the input **before** the normal
+query-clear/close chain (with a clipboard category active, Esc first resets that category, then the filter — §2.12).
+Ctrl+1–7 select from the input as above. When the strip overflows, the focused/selected chip is scrolled into view
+(`scrollIntoView({inline:'nearest', block:'nearest'})`, no smooth behaviour). Pointer: click selects; no drag.
+
+**0 results.** "No matches in {label}." + "Try another category, or press Esc to clear the filter." The count text reflects
+the scoped result set.
 
 **Overflow and localisation.** `overflow-x:auto; overflow-y:hidden; white-space:nowrap; scrollbar-width:none`, hidden
 WebKit scrollbar, `overscroll-behavior-x:contain`, `scroll-padding-inline` = strip inline padding. No edge fades or
-gradient masks (banned device); chips clip at the edge. Labels come from i18n keys `filter.all`, `filter.apps`, …,
-receive no truncation, and the row uses logical properties (`padding-inline`, `gap`) so RTL scrolls from the right.
-The strip's `aria-label` ("Filter results") and chip accessible names are localised; a change is announced through the
-chip's radio state and the existing result-count live region (no extra live region).
+gradient masks (banned device); chips clip at the edge. Labels come from i18n keys `filter.all`, `filter.files`,
+`filter.folders`, `filter.apps`, `filter.clipboard`, `filter.web`, `filter.actions`; receive no truncation; the
+row uses logical properties (`padding-inline`, `gap`) so RTL scrolls from the right. The strip's `aria-label`
+("Filter results") and chip accessible names are localised; a change is announced through the chip's radio state and the
+existing result-count live region (no extra live region).
 
 **Accessibility.** `role="radiogroup"` with `aria-label="Filter results"`; each chip is a `role="radio"` with
 `aria-checked`; roving tabindex (only the selected chip is in the tab order). Never `role="tab"` — the strip filters
-the same result list rather than swapping panels.
+the same result list rather than swapping panels. Ctrl+1–7 are shortcuts, not extra tab stops; the input keeps focus.
 
 **Motion.** Background/border/box-shadow 110 ms `--ps-ease-standard`; no transform, no layout animation; reduced
 motion 0 ms.
+
+### 2.12 Clipboard categories — FINAL 2026-11-10 (task-23)
+
+A second-level strip that narrows CLIPBOARD results. It renders **only** when the CLIPBOARD chip is selected and clipboard
+history is enabled; it is a view filter over the returned clipboard rows, never a new engine request and never a fake
+mode.
+
+**Geometry.** Directly below the main filter strip, inside the results column: block **36 px** (32 compact) = 6 px top +
+**24 px chip** (22 compact) + 6 px bottom; inline padding **16 px** (12 compact); chip gap **6 px** (5 compact); chip
+radius **6 px**; chip padding-inline **9 px** (8 compact). Chips: **ALL · LINKS · EMAILS · PATHS · CODE · IMAGES**, 10 px/650,
+uppercase, `+0.06em`; no counts/icons/truncation; labels localised (`clipboard.all`, `clipboard.links`,
+`clipboard.emails`, `clipboard.paths`, `clipboard.code`, `clipboard.images`). Tokens:
+`--ps-cat-strip-height/-compact`, `--ps-cat-chip-height/-compact`, `--ps-cat-chip-gap`, `--ps-cat-chip-pad-x`,
+`--ps-cat-chip-radius`.
+
+**Layout impact.** The row does not add to the filter strip; it sits between the strip and the results. While visible it
+adds **36 px** to the card's minimum (`H = clamp(332, 72+44+40+36+23+Σ, 544)`, window min 560×388 for that state) and
+reduces the results max height by 36 px (`min(365, H − 192)`). Window height snaps in the same frame; no animation.
+When the scope leaves CLIPBOARD the category resets to ALL and the row/extra height disappear immediately.
+
+**Selection and filtering.** Default **ALL** every time Clipboard is selected; category choice is session-only and not
+persisted. Selecting a category filters the visible clipboard rows client-side (the engine query already ran); it resets
+the active row to the first visible clipboard row and updates the match count to the filtered count. Pinned rows stay
+first; within a category the engine order (pinned, newest) is preserved. No category = ALL. Clearing/changing scope
+resets category to ALL.
+
+**Selected state.** Quieter than the primary strip: `--ps-surface-soft` fill + 1 px `--ps-line-strong` border +
+`--ps-ink` 650 + **2 px inset bottom bar** `--ps-selected-bar`; rest `--ps-ink-2`; hover `--ps-surface-soft`;
+focus-visible 2 px `--ps-focus` ring, offset 2; pressed no transform; dark uses the same semantic tokens. Never a second
+accent fill — the bar carries the state.
+
+**Row category tags.** Every clipboard row gets one tag in the trailing meta line, before the relative time:
+- Labels: **LINK · EMAIL · PATH · CODE · IMAGE · TEXT** (singular; the strip labels are plural).
+- `.result-tag`: height 16 px, radius 4, 1 px `--ps-line` border, 0 5 px padding, 10 px/650 caps `+0.06em`,
+  `--ps-ink-2`; numbers/tags tabular; no semantic colour (categories are neutral, not status).
+- At narrow widths (≤700) the relative time hides before the tag; the tag never truncates. Accessible description gains
+  the category word ("Link, 2 minutes ago").
+
+**Category rules (deterministic, best effort, from the text exposed to the launcher — first line / 120 chars; not a
+security boundary):**
+
+| Tag | Rule |
+|---|---|
+| LINK | Trimmed single token matching `^https?://\S+$` |
+| EMAIL | Trimmed single token matching `^[^\s@]+@[^\s@]+\.[^\s@]{2,}$` |
+| PATH | Trimmed single absolute Windows path: `^[A-Za-z]:\\` or `^\\\\` or `^%[A-Za-z_]+%\\`; matching quotes are stripped |
+| CODE | Not LINK/EMAIL/PATH and either a fenced block or ≥2 lines with ≥2 code signals (`{ } ; => def function class import </`, indentation) |
+| IMAGE | The clipboard item is an image (engine flag; alpha: see below) |
+| TEXT | Everything else (appears under ALL only) |
+
+**Clipboard row anatomy.** 36 px icon slot · clipboard glyph 20 px or, for images, a 32×32 thumbnail radius 4 (cover;
+never stretch) · title = first non-empty line, whitespace collapsed, max 120 chars, 13/680 ellipsis · sub 11
+`--ps-ink-2` = "`{source app} · {relative time}`" · trailing tag + relative time · pinned items sort first; selection,
+hover, actions and preview are unchanged. Long text stays single-line; full text is available in preview/copy action.
+
+**Empty states (exact copy).**
+
+| Situation | Copy |
+|---|---|
+| Clipboard history off (row hidden) | "Clipboard history is off." / "Turn it on in ProtonSearch → Preferences to keep copied text on this PC." |
+| History on, no items at all | "No clipboard history yet." / "Copied text and images will appear here from now on. Only copies made while ProtonSearch is running are captured." |
+| Category empty, no query | "No links copied yet." / "Links you copy will appear here from now on." (emails/paths/code/images: same pattern; images uses the alpha copy below when unsupported) |
+| Category empty with a query | "No {links} matches in “{query}”." / "Try another category, or clear the search." |
+| IMAGES while the build has no image rows | "Image clipboard items aren't available in this build yet." / "Text clipboard history still works." |
+
+The no-history copy is deliberately honest: ProtonSearch does **not** import the Windows clipboard history and cannot
+show copies made before it was running. Images/OCR stay unavailable until the IPC exposes image rows (§10).
+
+**Keyboard.** Tab order: search input → selected main-filter chip → selected clipboard-category chip (only when the
+category row is visible) → preview/footer. ←/→ change category immediately and keep focus; Home/End go to ALL/IMAGES;
+Space/Enter re-apply; Esc chain adds one step **before** the filter clear: category ≠ ALL → reset category to ALL, keep
+the Clipboard scope, focus stays on the strip chip/input per current ring; category = ALL → clear the main filter to ALL;
+then the existing query-clear/hide chain. Ctrl+1–7 change the main filter and reset the category to ALL. No global
+shortcut for categories. Pointer click selects; no drag.
+
+**Accessibility.** `role="radiogroup"` + `aria-label="Clipboard categories"`; chips `role="radio"` +
+`aria-checked`; one roving tab stop; count live region updates once per change (polite, ≤1/300 ms); no second live
+region.
 
 ---
 
@@ -463,26 +593,77 @@ searches, launches, and optional workflows." (reference:143)
 
 ### 3.5 Workflows
 
-**Question:** "What can run, and what is allowed to run?" h1 "Workflows"; lead "Native commands respond instantly;
-the Python agent sidecar is optional and starts only when needed." (reference:144)
+**Question:** "What can run, and what is allowed to run?" h1 "Workflows"; lead "Native commands respond instantly.
+The optional Pi agent runtime starts only when you start a workflow, then stops."
 
-- **NATIVE COMMANDS** panel: rows "Window management", "Clipboard actions", "System actions" with status word
-  ("Available"/"Unavailable") and one-line description. No buttons that fake actions; actions live in the launcher.
-- **AGENT RUNTIME** panel: status row (dot + "Not set up" / "Not running" / "Running" / "Couldn't start"), copy
-  "Agent workflows are optional. The runtime starts only when you run one, then exits when idle.", and an opt-in
-  toggle. Alpha limitation (§10): no runtime setup/start/stop or provider-config commands are in the IPC, so those
-  controls are omitted and the panel says setup is not available in this build.
-  Off-state copy: "Agent workflows are off. ProtonSearch works fully without them." No permanent "Ask AI" affordance
-  (master prompt §VI).
+**AGENTS panel (top of the route; id `workflows-agents`).** Title "Agents" (12 caps/750); hint "Agent runtimes detected
+on this PC. Optional; nothing runs until you start a workflow."; header action "Refresh" (13/600; "Checking…" disabled
+while the probe runs). The panel lists only what the shell's `detect_agents` actually returned — **no invented rows** —
+and only Pi is runnable in this alpha.
+
+- **Detected row** (68 px, padding 12 0, 1 px `--ps-line` rule): 24 px icon slot with a 20 px runtime glyph · name
+  **14/600** · version badge **18 px** (10/650, "v1.5.0") when real · availability badge **18 px** · path row **12/18
+  `--ps-ink-2`**, middle-ellipsis with the full path in `title` · detail **12/18 `--ps-ink-3`**.
+- **Availability badges:** "Available" = neutral (surface-soft + ink-2), "Not found" = muted (ink-3), "Running" only when
+  a run is active (8 px positive dot + word). Never a green "Ready" or an "AI" badge. Only badge text/colour + words.
+- **Pi is primary:** 2 px inset `--ps-selected-bar` start bar + "Default" quiet tag. When not selected it offers a
+  **"Use"** button (36 px, secondary); selecting shows an "In use" quiet tag instead of the button (no dead button).
+  Other detected runtimes show "Detected · not wired in this build" in the detail line and **no control**; unavailable
+  entries (if the shell returns one) show "Not found" + "Not found on PATH." Never render a fake run button.
+- **Loading:** quiet line "Looking for agent runtimes…" with `aria-busy="true"` (no spinner, no skeleton). **Empty:**
+  "No agent runtimes found." / "Install the Pi CLI, then refresh. Nothing is downloaded automatically." / **Refresh**
+  action. **Load error:** quiet state "Couldn't look for agents." / "Nothing runs until an agent runtime is available." /
+  "Try again" (§3.7 tones).
+- **RECENT RUNS** (inside the Agents panel): h3 "Recent runs" (12 caps/750). Up to **4** rows visible (max **10** stored in
+  UI-local metadata): row 36 px, 8 px status dot + word **13/600** — "Completed" positive, "Failed" negative,
+  "Cancelled" ink-2 — and meta **12 `--ps-ink-2`**: "`{runtime}@ · {relative time} · {duration}@" with tabular
+  numbers. No runs: "No runs yet." Helper: "Run history stays on this PC and keeps status, time and duration only —
+  never prompts, tool output or paths." Never show prompts, tool output, provider text or paths in this list.
+
+**RUN A PI WORKFLOW panel (id `pi-agent-panel`; the Agents "Use" action scrolls here).** Title "Run a Pi workflow";
+hint "Pi starts only for a prompt you start here, then stops. Read-only in this alpha."
+
+- Runtime metrics (44 px rows, label 13 ink-2 / value 14/600 right, tabular where numeric): Runtime ("Pi 1.5.0" when
+  detected, else "Pi CLI"), Provider ("Pi default" or configured), Model ("Pi default" or configured), Idle process
+  ("None" / "Running this workflow"). No fake "online"/"model ready" states.
+- Workspace row: field label "Workspace"; path **12/18**, ellipsis, full path in `title` (default
+  `%APPDATA%\protonsearch\v2\agent-workspace` shown as managed default); "Open in Explorer" secondary disabled until
+  an explicit workspace is set; "Set workspace…" text button opens the 40 px field + "Save workspace"/"Cancel". Invalid:
+  "Enter a full folder path, for example `C:\Users\You\AgentWorkspace`." The helper says the workspace is the default
+  working folder, **not a sandbox**.
+- Enable switch "Enable agent workflows" (44 px row); off → quiet notice "Agent workflows are off." /
+  "ProtonSearch works fully without them. Turn the switch on to run a Pi workflow."
+- Prompt: textarea rows=3, maxlength 2000, disabled when off/not detected/running; label 11 caps; placeholder "Describe
+  the workflow you want, for example: list the TODOs in this workspace and propose a plan."
+- Safety lines (12/18 ink-2, always visible, three sentences): Pi runs with your Windows permissions; read tools can open
+  any file you can read; the workspace is not a sandbox. There is no per-tool approval; file edits and shell access are
+  disabled in this alpha. When a run starts, the prompt, context and tool output are sent to the configured provider.
+- Actions: **Run workflow** (primary, 36 px; disabled with a visible reason when off, not detected, prompt empty, or a run
+  is active), **Cancel workflow** while active, "Try again" after finished/cancelled/failed. Elapsed line right:
+  "Running · 3.2 s" / "Last run · 4.2 s" (tabular; 0.1 s below a minute, `m ss` above).
+- **Run summary** (below actions; hidden until the first run, shown for running/finished/failed/cancelled): three 44 px
+  metric rows — **Status** (8 px dot + "Running"/"Completed"/"Failed"/"Cancelled"; completed positive, failed negative,
+  cancelled ink-2), **Started** (localized `Today, 14:32` — `Intl.DateTimeFormat` with date when not today), **Duration**
+  (tabular "4.2 s"). No runs yet → helper "No runs yet. Start a workflow above." Never invent a prior run.
+- Result block: final answer 14/21 max 60 ch width, selectable. Activity log: h3 "Workflow activity"; 32 px rows, 14 px
+  icon, label 12/600, text 12/18; max 200 entries; `aria-live="polite"`; never raw provider text, tool stderr, paths or
+  codes — product copy plus a sanitized `"Reference: {code}"` inside Details only.
+- **Quiet errors** (§3.7): probe failure `warn` "Pi isn't detected." / "Install the Pi CLI, then refresh. Nothing is
+  downloaded automatically." / "Refresh"; start failure `error` "Agent workflows are unavailable." / "Search still works.
+  The optional runtime didn't start." / "Try again" + Details; run failure `error` "Pi couldn't finish this workflow." /
+  "Search still works. Nothing outside the workspace was changed." / "Try again" + sanitized Details; cancellation is
+  neutral "Workflow cancelled." / "Nothing outside the workspace was changed." — never an error tone. No process may idle
+  after a terminal state; cancel/stop is best effort and the panel reports only what the shell confirms.
+
+- **NATIVE COMMANDS** panel: rows "System actions", "Windows tools", "Index control" with one-line descriptions and
+  "Confirmation required" badges; actions execute in the launcher, not here. No fake buttons.
 - **PERMISSIONS** panel: "Files & folders — read only", "Clipboard", "Shell commands", "Network" with state
   "Ask every time" (default); note "Writes, deletes, shell commands, and network access always ask first." Link
-  "Review approvals" once an approvals log exists; otherwise omit the link rather than ship a dead control.
-- **QUICKLINKS & SNIPPETS** — alpha limitation (§10): the IPC has no quicklinks list/CRUD command, so no editor or dead
-  control is shown; the panel reports migration status read-only where the engine exposes it.
-- Error: quiet state "Agent workflows are unavailable." / "Search still works. The optional runtime didn't start." /
-  "Try again" + collapsed Details (sanitized only — §3.7).
-- States: loading, off, starting, running, failed, offline (provider unreachable: "Can't reach the provider." / "Check
-  your connection, then try again. Local search still works." / "Try again"), dark.
+  "Review approvals" only once an approvals log exists; otherwise omit the link rather than ship a dead control.
+- **QUICKLINKS & SNIPPETS** — alpha limitation (§10): no bridge command to list/edit; read-only migration note only.
+- **States:** loading, no agents, agents detected, off, running, completed, failed, cancelled, offline (provider
+  unreachable post-alpha: "Can't reach the provider." / "Check your connection, then try again. Local search still
+  works." / "Try again"), dark.
 
 ### 3.6 Preferences
 
@@ -689,10 +870,10 @@ Current raw renders to replace: `IndexesView.tsx:275`, `HomeView.tsx:122`, `Acti
 
 - h1 "Add an agent, only if you want one."
 - lead "ProtonSearch works fully without AI. Agent workflows are optional, start on demand, and ask before they act."
-- Content: checkbox row "Set up agent workflows later" · description "The runtime stays off until you run one.";
-  note "No models are downloaded automatically. You choose a provider and a model in Preferences."; disclosure
-  "What leaves this PC?" expanding to truthful copy: "Nothing leaves this PC unless you configure a provider and run
-  an agent workflow. Then the prompt and the data you approve are sent to that provider."
+- Content: checkbox row "Set up agent workflows later" · description "The Pi runtime stays off until you run one.";
+  note "ProtonSearch never downloads Pi, a model or a provider key. Install the Pi CLI yourself later if you want agent
+  workflows."; disclosure "What leaves this PC?" expanding to truthful copy: "Nothing leaves this PC unless you install Pi,
+  configure a provider and run an agent workflow. Then the prompt, context and tool output are sent to that provider."
 - Default unchecked.
 - Back / Continue / Skip setup.
 
@@ -751,7 +932,7 @@ Current raw renders to replace: `IndexesView.tsx:275`, `HomeView.tsx:122`, `Acti
 | Home | skeleton | no index / no recents | quiet error state (§3.7) | n/a | indexing, incomplete setup |
 | Search & indexes | skeleton | no locations | quiet error state / row errors + Try again (§3.7) | network root row state | indexing, paused, rebuild |
 | Activity | skeleton rows | no activity | quiet error state (§3.7) | n/a | recording paused, filtered empty |
-| Workflows | skeleton | agent off | quiet error state (§3.7) | provider unreachable (offline variant) | starting/running/stopped |
+| Workflows | agents checking; first run | no agents detected; no runs yet | quiet error state (§3.7) | provider unreachable (offline variant) | agents detected/selected, off, running, completed, failed, cancelled, read-only alpha |
 | Preferences | skeleton | n/a | quiet error state (§3.7) | n/a (no updater in alpha) | hotkey conflict, disabled reasons |
 | Onboarding | n/a | no locations (step 4) | hotkey conflict (inline, §3.7) | n/a | resumed, skipped, complete |
 
@@ -868,6 +1049,14 @@ transform and all durations.
 | Activity paused | "Activity recording is paused." · "Resume" |
 | Clear activity confirm (post-alpha) | "Clear all activity? This removes {n} recorded items from this PC. It can't be undone." |
 | Workflows agent off | "Agent workflows are off." · "ProtonSearch works fully without them." |
+| Agents empty | "No agent runtimes found." · "Install the Pi CLI, then refresh. Nothing is downloaded automatically." · "Refresh" |
+| Agents load error | "Couldn't look for agents." · "Nothing runs until an agent runtime is available." · "Try again" |
+| Agent recent runs empty | "No runs yet." |
+| Agent run failure | "Pi couldn't finish this workflow." · "Search still works. Nothing outside the workspace was changed." · "Try again" |
+| Clipboard history off | "Clipboard history is off." · "Turn it on in ProtonSearch → Preferences to keep copied text on this PC." |
+| Clipboard no history | "No clipboard history yet." · "Copied text and images will appear here from now on. Only copies made while ProtonSearch is running are captured." |
+| Clipboard category empty | "No links copied yet." · "Links you copy will appear here from now on." (emails/paths/code/images pattern) |
+| Clipboard images unavailable | "Image clipboard items aren't available in this build yet." · "Text clipboard history still works." |
 | Workflows runtime error | "Agent workflows are unavailable." · "Search still works. The optional runtime didn't start." · "Try again" |
 | Preferences save | "Saved" (2 s stamp) |
 | Hotkey conflict | "That shortcut isn't available." · "Another app is already using it. Choose a different combination." |
@@ -903,11 +1092,16 @@ fake percentage, sample data, or a teaser.
 | No native folder-picker command | Search & indexes locations, onboarding locations | Validated paste-path form; helper states the picker is not available in this build. |
 | No updater / logs / diagnostics-export commands | Preferences -> Updates & diagnostics | Read-only version/protocol rows + Refresh diagnostics; no update check, logs or export controls. |
 | No preview payload (thumbnail, document render, preview kinds) in `SearchResult` | Launcher preview panel | Metadata/snippet previews only; otherwise "Preview not available — press Enter to open." No fake thumbnail. |
+| Clipboard images are stored but not exposed as search rows (`ClipboardEntry` has no image/OCR fields; search excludes `is_image`) | Launcher Clipboard scope + IMAGES category | IMAGES category shows "Image clipboard items aren't available in this build yet." / "Text clipboard history still works." Never fake image rows. |
+| No Windows clipboard-history import/backfill (capture is live-only) | Launcher Clipboard empty states, Preferences clipboard toggle | Copy states capture starts now; never promise or imply pre-install history. Preference helper says previous Windows clipboard history is not imported. |
+| `detect_agents` may return CLIs that are not wired to a run panel (Codex/OpenCode/Cline/Antigravity) | Workflows Agents list | Show them as detected with "Detected · not wired in this build" and no Run/Use control; only Pi is runnable. Never invent rows. |
 
 ### 10.3 UI-level alpha limitations
 
 Hotkey capture/conflict UX is still a code item tracked by REVIEW_1 M2; the contract in §3.6/§4.6 stands and must not
-be quietly downgraded. Anything else added to the alpha must be listed here before sign-off.
+be quietly downgraded. Clipboard capture starts when clipboard history is enabled (no OS backfill); agent run history is
+UI-local metadata only (max 10 records, status/time/duration, never prompts, paths or tool output). Anything else added to
+the alpha must be listed here before sign-off.
 
 ---
 
@@ -917,9 +1111,14 @@ Launcher: first summon, empty input, 0 matches, 1 match, many+selected, preview 
 drawer below 1200 work width), loading, index error, indexing/paused, dark, 560/820/1000/1280, 125/150/200 % DPI, high
 contrast, keyboard focus. **Shadow proof:** light/dark cards on a light and a dark wallpaper at 100 % and 150 % (no
 straight cut-off edge on any side; corner radius reads). **Motion proof:** open and close captured mid-animation (or a
-short clip) plus reduced-motion instant. **Filter strip:** all chips, selected state, keyboard focus, hover, both
-themes, scoped 0-match copy, overflow at 560/820 with the selected chip scrolled into view, and a long localised label
-(German) proving no truncation. App: Home (loaded, loading, empty, error — no progress bar), Search & indexes
+short clip) plus reduced-motion instant. **Filter strip:** all seven chips in final order with Ctrl+1–7, selected state, keyboard focus, hover, both themes,
+FILES/FOLDERS exact rows (no mixed types), scoped 0-match copy, overflow at 560/820 with the selected chip scrolled into
+view, and a long localised label (German) proving no truncation. **Clipboard categories:** row visible only under
+CLIPBOARD, six chips, all category tags on rows, selected/rest/focus, empty history/category/image-limitation states,
+560/820 overflow, 36 px height proof, no extra height once the scope changes. **Agents:** detected list with
+available/unavailable + real path/version, no fake rows, Pi Use→In use and panel focus, empty/loading/load-error, recent
+runs (empty + completed/failed/cancelled), run summary status/started/duration while running and after finish, quiet
+errors; both themes and 560 width. App: Home (loaded, loading, empty, error — no progress bar), Search & indexes
 (locations incl. paste-path form, depth, health, rebuild confirm, alpha-limit copy), Activity (list, empty, paused —
 no clear control), Workflows (off/on, alpha-limit copy, error), Preferences (theme/density, hotkey field/validation,
 alpha-limit diagnostics). Onboarding: all 7 steps, resumed state, 700 boundary (rail shown at 701, hidden at 700),
