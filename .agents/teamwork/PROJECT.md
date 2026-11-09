@@ -63,3 +63,17 @@
   code-complete, not accepted. Committed: docs/qa/phase-a.md, .agents/teamwork/,
   .agents/skills/teamwork/ on dock. STATUS.md pointer intentionally left uncommitted (the file
   already carried another lane's uncommitted append).
+
+## User direction - 2026-11-09 (recorded)
+
+User confirmed the current dock widgets are **standalone, non-functional stand-ins** ("not
+actually working"), and authorised the plan to change the final widget design/implementation
+while keeping the overall look. Interpretation recorded here so later phases do not drift:
+
+- **Look:** still the pinned `docs/design/dock-editable.2126c49.html` + design system. The user
+  does not want a different visual direction; the 10 defaults and 28 deviations stay vetoable.
+- **Widget functionality/implementation:** explicitly open to change. The current 14 tiles
+  (46px tinted, status-only) are not the target. Phases C-G may replace their ids, sizes,
+  glyphs, providers, cards and actions as specified in the plan.
+- **Not a waiver** of IC-A native gates: N-A1..N-A6 remain unverified until `orca` is available
+  or the user writes an explicit waiver.
