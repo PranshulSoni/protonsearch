@@ -10,7 +10,9 @@ import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type RefObject,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import type {
   ActionSpec,
@@ -21,13 +23,21 @@ import type {
   SearchRequest,
   SearchResponse,
   SearchResult,
+  SearchScope,
 } from "../bridge/types";
 import { Highlight } from "../components/Highlight";
 import { Kbd } from "../components/Kbd";
 import { Logo } from "../components/Logo";
+import { isTauriRuntime } from "../bridge/api";
 import { groupResults } from "../lib/results";
 import { formatBytes, formatNumber } from "../lib/format";
 import { formatRecency } from "./launcherFormat";
+import {
+  SCOPE_CHIPS,
+  readStoredScope,
+  scopeIndex,
+  storeScope,
+} from "./launcherScopes";
 import { ResultIcon } from "./ResultIcon";
 import { ResultPreview } from "./ResultPreview";
 import { ResultActions, buildMenuActions, type MenuAction, type MenuModel } from "./ResultActions";
@@ -78,10 +88,34 @@ export interface LauncherSurfaceProps {
 }
 
 export interface LauncherSurfaceHandle {
-  /** Reset to an empty query, focus the input and select the first row. */
+  /** Reset to an empty query, focus the input, select the first row, animate in. */
   summon: () => void;
+  /** Play the exit animation, then ask the shell to hide the window. */
+  dismiss: () => void;
   /** Clear all launcher state (window hidden). */
   clear: () => void;
+}
+
+/** Exit motion contract (task-1): 110 ms close; the 150 ms enter runs in CSS. */
+const CLOSE_MS = 110;
+
+function nextFrame(callback: () => void): void {
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(callback);
+    return;
+  }
+  window.setTimeout(callback, 16);
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof document !== "undefined" && document.documentElement.dataset.motion === "reduced") {
+    return true;
+  }
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
 }
 
 const LISTBOX_ID = "ps-results";
@@ -157,7 +191,11 @@ function countTextFor(
   return countMatches(response.total);
 }
 
-/** Truthful index item count: search response first, EngineStatus as fallback. */
+/**
+ * Truthful index item count: the larger of the search-response counter and
+ * EngineStatus.filenameEntries. Never renders "0 items" while either source has
+ * entries (the engine can report 0 in a SearchStatus before its counter is set).
+ */
 function itemCountFor(
   status: EngineStatus | null,
   response: SearchResponse | null,
@@ -167,8 +205,13 @@ function itemCountFor(
     searchStatus != null &&
     (searchStatus.type === "ready" || searchStatus.type === "indexing")
       ? searchStatus.indexedFiles
-      : undefined;
-  return fromSearch ?? status?.filenameEntries;
+      : 0;
+  const fromEngine = status?.filenameEntries ?? 0;
+  const count = Math.max(
+    Number.isFinite(fromSearch) ? fromSearch : 0,
+    Number.isFinite(fromEngine) ? fromEngine : 0,
+  );
+  return count > 0 ? count : undefined;
 }
 
 function metaText(result: SearchResult): string {
@@ -188,8 +231,17 @@ function deriveFooterStatus(
   searchError: string | null,
 ): FooterStatus {
   if (searchError) return { word: "Index unavailable", tone: "negative", detail: searchError };
+  // The search response is the freshest engine status available to the launcher
+  // window (it does not poll EngineStatus). Prefer it so the footer never keeps
+  // saying "Indexing…" after the engine has reported ready.
   if (response?.status.type === "degraded") {
     return { word: "Index unavailable", tone: "negative", detail: response.status.reason };
+  }
+  if (response?.status.type === "ready") {
+    return { word: "Index ready", tone: "positive" };
+  }
+  if (response?.status.type === "indexing") {
+    return { word: "Indexing…", tone: "warning" };
   }
   switch (status?.state) {
     case "ready":
@@ -244,6 +296,10 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const [notice, setNotice] = useState<string | null>(null);
     const [announcement, setAnnouncement] = useState("");
     const [listScrollTop, setListScrollTop] = useState(0);
+    const [scope, setScope] = useState<SearchScope>(() => readStoredScope());
+    const [motionPhase, setMotionPhase] = useState<"closed" | "entering" | "visible" | "closing">(
+      () => (isTauriRuntime() ? "closed" : "visible"),
+    );
     const [pendingConfirmation, setPendingConfirmation] = useState<{
       command: NativeCommand;
       message: string;
@@ -254,11 +310,21 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const footerRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
     const confirmCancelRef = useRef<HTMLButtonElement>(null);
+    const filterStripRef = useRef<HTMLDivElement>(null);
+    const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const requestIdRef = useRef(0);
     const epochRef = useRef(0);
     const epochQueryRef = useRef("");
+    const epochScopeRef = useRef<SearchScope>("all");
     const queryRef = useRef("");
+    const scopeRef = useRef<SearchScope>(scope);
+    const motionPhaseRef = useRef<"closed" | "entering" | "visible" | "closing">(
+      isTauriRuntime() ? "closed" : "visible",
+    );
+    const motionTimerRef = useRef<number | null>(null);
+    const dragRef = useRef<{ startX: number; startLeft: number; moved: boolean } | null>(null);
+    const suppressChipClickRef = useRef(false);
     const composingRef = useRef(false);
     const selectionRef = useRef<SelectionState>(EMPTY_SELECTION);
     const resultsRef = useRef<SearchResult[]>([]);
@@ -269,6 +335,15 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const lastGeometryRef = useRef<{ height: number; previewOpen: boolean } | null>(null);
 
     previewOpenRef.current = previewOpen;
+    scopeRef.current = scope;
+    motionPhaseRef.current = motionPhase;
+
+    const clearMotionTimer = useCallback(() => {
+      if (motionTimerRef.current != null) {
+        window.clearTimeout(motionTimerRef.current);
+        motionTimerRef.current = null;
+      }
+    }, []);
 
     const results = useMemo(
       () => (response ? response.results.slice(0, MAX_RENDERED_ROWS) : []),
@@ -374,18 +449,27 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     }, []);
 
     const runSearch = useCallback(
-      async (nextQuery: string) => {
+      async (nextQuery: string, nextScope: SearchScope = scopeRef.current) => {
         const requestId = ++requestIdRef.current;
         const epoch =
-          nextQuery === epochQueryRef.current ? epochRef.current : ++epochRef.current;
+          nextQuery === epochQueryRef.current && nextScope === epochScopeRef.current
+            ? epochRef.current
+            : ++epochRef.current;
         epochQueryRef.current = nextQuery;
+        epochScopeRef.current = nextScope;
         queryRef.current = nextQuery;
+        scopeRef.current = nextScope;
         setPending(true);
         setSearchError(null);
         setNotice(null);
         setPendingConfirmation(null);
         try {
-          const next = await props.search({ requestId, query: nextQuery, limit: SEARCH_LIMIT });
+          const next = await props.search({
+            requestId,
+            query: nextQuery,
+            scope: nextScope,
+            limit: SEARCH_LIMIT,
+          });
           // Drop stale responses: only the newest request may render.
           if (requestId !== requestIdRef.current) return;
           commitResponse(next, epoch);
@@ -409,6 +493,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       requestIdRef.current += 1; // invalidate any in-flight response
       queryRef.current = nextQuery;
       epochQueryRef.current = nextQuery;
+      epochScopeRef.current = scopeRef.current;
       epochRef.current += 1;
       committedRef.current = null;
       resultsRef.current = [];
@@ -423,26 +508,71 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       setPendingConfirmation(null);
     }, []);
 
+    const setMotion = useCallback((phase: "closed" | "entering" | "visible" | "closing") => {
+      motionPhaseRef.current = phase;
+      setMotionPhase(phase);
+    }, []);
+
+    const startEnterMotion = useCallback(() => {
+      clearMotionTimer();
+      if (prefersReducedMotion()) {
+        setMotion("visible");
+        return;
+      }
+      setMotion("entering");
+      // Two frames: the entering style paints first, then the visible style
+      // transitions in. No layout work happens in this window.
+      nextFrame(() => {
+        nextFrame(() => setMotion("visible"));
+      });
+    }, [clearMotionTimer, setMotion]);
+
     const summon = useCallback(() => {
       resetState("");
       setPreviewOpen(false);
       focusInput();
-      void runSearch("");
-    }, [resetState, focusInput, runSearch]);
+      startEnterMotion();
+      void runSearch("", scopeRef.current);
+    }, [resetState, focusInput, runSearch, startEnterMotion]);
+
+    const dismiss = useCallback(() => {
+      if (motionPhaseRef.current === "closing") return;
+      clearMotionTimer();
+      if (prefersReducedMotion()) {
+        setMotion("closed");
+        props.hideLauncher();
+        return;
+      }
+      setMotion("closing");
+      motionTimerRef.current = window.setTimeout(() => {
+        motionTimerRef.current = null;
+        setMotion("closed");
+        props.hideLauncher();
+      }, CLOSE_MS + 10);
+    }, [clearMotionTimer, props.hideLauncher, setMotion]);
 
     const clear = useCallback(() => {
+      clearMotionTimer();
+      setMotion("closed");
       resetState("");
       setPreviewOpen(false);
-    }, [resetState]);
+    }, [clearMotionTimer, resetState, setMotion]);
 
-    useImperativeHandle(ref, () => ({ summon, clear }), [summon, clear]);
+    useImperativeHandle(ref, () => ({ summon, dismiss, clear }), [summon, dismiss, clear]);
 
     useEffect(() => {
       if (bootedRef.current) return;
       bootedRef.current = true;
       focusInput();
-      void runSearch("");
+      void runSearch("", scopeRef.current);
     }, [focusInput, runSearch]);
+
+    useEffect(
+      () => () => {
+        clearMotionTimer();
+      },
+      [clearMotionTimer],
+    );
 
     // Request window geometry only when the computed height/preview changes.
     useEffect(() => {
@@ -678,6 +808,113 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       void runOpenAction(action, "Path copied");
     }, [announce, commitIsCurrent, runOpenAction]);
 
+    const applyScope = useCallback(
+      (nextScope: SearchScope, focusTarget: "input" | "chip" = "input") => {
+        if (nextScope === scopeRef.current) {
+          if (focusTarget === "input") focusInput();
+          return;
+        }
+        scopeRef.current = nextScope;
+        setScope(nextScope);
+        storeScope(nextScope);
+        const chip = SCOPE_CHIPS.find((candidate) => candidate.scope === nextScope);
+        if (chip) announce(chip.label + " filter");
+        // Reset selection immediately; the committed response selects row 0 for
+        // the new query epoch (scope changes bump the epoch in runSearch).
+        selectionRef.current = EMPTY_SELECTION;
+        setSelection(EMPTY_SELECTION);
+        void runSearch(queryRef.current, nextScope);
+        if (focusTarget === "input") focusInput();
+      },
+      [announce, focusInput, runSearch],
+    );
+
+    const onChipKeyDown = useCallback(
+      (index: number) => (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+        const last = SCOPE_CHIPS.length - 1;
+        let next: number | null = null;
+        switch (event.key) {
+          case "ArrowRight":
+          case "ArrowDown":
+            next = index === last ? 0 : index + 1;
+            break;
+          case "ArrowLeft":
+          case "ArrowUp":
+            next = index === 0 ? last : index - 1;
+            break;
+          case "Home":
+            next = 0;
+            break;
+          case "End":
+            next = last;
+            break;
+          default:
+            return;
+        }
+        event.preventDefault();
+        const chip = SCOPE_CHIPS[next];
+        applyScope(chip.scope, "chip");
+        nextFrame(() => chipRefs.current[next]?.focus());
+      },
+      [applyScope],
+    );
+
+    const onChipClick = useCallback(
+      (nextScope: SearchScope) => {
+        if (suppressChipClickRef.current) {
+          suppressChipClickRef.current = false;
+          return;
+        }
+        applyScope(nextScope, "input");
+      },
+      [applyScope],
+    );
+
+    const onStripWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+      const strip = event.currentTarget;
+      if (strip.scrollWidth <= strip.clientWidth) return;
+      strip.scrollLeft += event.deltaY + event.deltaX;
+    }, []);
+
+    const onStripPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      // Chips are click targets; only the strip background starts a drag.
+      if (event.target instanceof Element && event.target.closest(".filter-chip")) return;
+      const strip = event.currentTarget;
+      dragRef.current = { startX: event.clientX, startLeft: strip.scrollLeft, moved: false };
+      try {
+        strip.setPointerCapture(event.pointerId);
+      } catch {
+        /* pointer capture is optional */
+      }
+    }, []);
+
+    const onStripPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const delta = drag.startX - event.clientX;
+      if (Math.abs(delta) > 4) drag.moved = true;
+      event.currentTarget.scrollLeft = drag.startLeft + delta;
+    }, []);
+
+    const onStripPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      dragRef.current = null;
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        /* already released */
+      }
+      if (drag?.moved) suppressChipClickRef.current = true;
+    }, []);
+
+    useEffect(() => {
+      const chip = chipRefs.current[scopeIndex(scope)];
+      if (chip && typeof chip.scrollIntoView === "function") {
+        chip.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+    }, [scope]);
+
     const togglePreview = useCallback(() => {
       if (!selectionRef.current.resultId) return;
       const next = !previewOpenRef.current;
@@ -691,6 +928,11 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         if (event.nativeEvent.isComposing || composingRef.current) return;
         const count = resultsRef.current.length;
         const key = event.key === "Spacebar" ? " " : event.key;
+        if (event.ctrlKey && !event.altKey && /^[1-9]$/.test(key)) {
+          event.preventDefault();
+          applyScope(SCOPE_CHIPS[Number(key) - 1].scope, "input");
+          return;
+        }
         switch (key) {
           case "ArrowDown":
             event.preventDefault();
@@ -770,7 +1012,16 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
             break;
         }
       },
-      [copySelected, currentIndex, move, openActive, openMenu, selectIndex, togglePreview],
+      [
+        applyScope,
+        copySelected,
+        currentIndex,
+        move,
+        openActive,
+        openMenu,
+        selectIndex,
+        togglePreview,
+      ],
     );
 
     const onRootKeyDown = useCallback(
@@ -794,20 +1045,20 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         if (queryRef.current.length > 0) {
           resetState("");
           focusInput();
-          void runSearch("");
+          void runSearch("", scopeRef.current);
           return;
         }
-        props.hideLauncher();
+        dismiss();
       },
       [
         announce,
         cancelConfirmation,
         closeMenu,
+        dismiss,
         focusInput,
         menuOpen,
         pendingConfirmation,
         previewOpen,
-        props.hideLauncher,
         resetState,
         runSearch,
       ],
@@ -859,7 +1110,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       const entry = flatEntries.entries.find((candidate) => candidate.index === activeIndex);
       if (!entry) return undefined;
       const rowTop =
-        1 + metrics.searchlineHeight + entry.top - listScrollTop;
+        1 + metrics.searchlineHeight + metrics.filterStripHeight + entry.top - listScrollTop;
       const rowBottom = rowTop + metrics.rowHeight;
       if (rowTop > metrics.totalHeight / 2) {
         return { bottom: Math.max(8, metrics.totalHeight - rowBottom - 8) };
@@ -877,6 +1128,8 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const previewMode = metrics.previewMode;
     const rootClassName = [
       "launcher",
+      motionPhase === "entering" ? "launcher--entering" : "",
+      motionPhase === "closing" ? "launcher--closing" : "",
       previewOpen ? "launcher--preview" : "",
       previewOpen ? "launcher--preview-" + previewMode : "",
     ]
@@ -892,6 +1145,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         aria-keyshortcuts="ArrowUp ArrowDown Enter Escape Control+Space"
         onKeyDown={onRootKeyDown}
         onMouseDown={onRootMouseDown}
+        data-phase={motionPhase}
         data-testid="launcher"
       >
         <div className="searchline">
@@ -931,6 +1185,45 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
           <span className="sr-only" role="status" aria-live="polite">
             {announcement}
           </span>
+        </div>
+
+        <div
+          className="filter-strip"
+          ref={filterStripRef}
+          role="radiogroup"
+          aria-label="Filter results"
+          data-testid="filter-strip"
+          onWheel={onStripWheel}
+          onPointerDown={onStripPointerDown}
+          onPointerMove={onStripPointerMove}
+          onPointerUp={onStripPointerUp}
+          onPointerCancel={onStripPointerUp}
+        >
+          {SCOPE_CHIPS.map((chip, index) => {
+            const active = scope === chip.scope;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                aria-keyshortcuts={chip.shortcut.replace("Ctrl+", "Control+")}
+                tabIndex={active ? 0 : -1}
+                title={chip.label + " (" + chip.shortcut + ")"}
+                className={"filter-chip" + (active ? " filter-chip--active" : "")}
+                data-testid="filter-chip"
+                data-scope={chip.scope}
+                ref={(element) => {
+                  chipRefs.current[index] = element;
+                }}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => onChipClick(chip.scope)}
+                onKeyDown={onChipKeyDown(index)}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="launcher-body">

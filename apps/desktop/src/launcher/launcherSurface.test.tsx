@@ -11,6 +11,7 @@ import type {
 } from "../bridge/types";
 import LauncherSurface, { type LauncherSurfaceHandle } from "./LauncherSurface";
 import type { WorkAreaSize } from "./launcherLayout";
+import { SCOPE_STORAGE_KEY } from "./launcherScopes";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -53,6 +54,12 @@ const disposers: (() => void)[] = [];
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose();
   document.body.innerHTML = "";
+  try {
+    window.sessionStorage.clear();
+  } catch {
+    /* ignore */
+  }
+  document.documentElement.dataset.motion = "";
 });
 
 function result(overrides: Partial<SearchResult> & { id: string; title: string }): SearchResult {
@@ -401,6 +408,10 @@ describe("keyboard model", () => {
     expect(harness.hideLauncher).not.toHaveBeenCalled();
 
     await press(input, "Escape");
+    // Empty query -> dismiss animation (110 ms) before the window hides.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    });
     expect(harness.hideLauncher).toHaveBeenCalledTimes(1);
   });
 });
@@ -562,20 +573,21 @@ describe("preview pane", () => {
     expect(panel?.textContent).toContain("The filename arena keeps warm queries under a millisecond.");
     expect(panel?.textContent).toContain("180 KB");
     expect(hintTexts(harness)).toEqual(["Ctrl+Space Close preview", "Esc Close"]);
-    // B2 geometry: search 72 + padding 23 + (2 labels 68 + 2 rows 116) + footer 44 + border 2
-    // = 325 -> snapped 326.
-    expect(harness.onGeometry).toHaveBeenLastCalledWith(326, true);
+    // Geometry: search 72 + filter strip 40 + padding 23 + (2 labels 68 + 2 rows 116)
+    // + footer 44 + border 2 = 365 -> snapped 366.
+    expect(harness.onGeometry).toHaveBeenLastCalledWith(366, true);
 
     await press(input, " ", { ctrlKey: true });
     expect(harness.container.querySelector('[data-testid="preview-panel"]')).toBeNull();
-    expect(harness.onGeometry).toHaveBeenLastCalledWith(326, false);
+    expect(harness.onGeometry).toHaveBeenLastCalledWith(366, false);
   });
 
   it("grows the window for a bottom drawer on narrow work areas", async () => {
     const harness = setup({ workArea: { width: 1024, height: 768 } });
     await resolveSearch(harness, 0, [previewResult]);
     await press(inputOf(harness), " ", { ctrlKey: true });
-    expect(harness.onGeometry).toHaveBeenLastCalledWith(496, true);
+    // 72 + 40 + 23 + (34 + 58) + 44 + 2 = 273 -> floor 296; drawer +240 = 536.
+    expect(harness.onGeometry).toHaveBeenLastCalledWith(536, true);
   });
 
   it("runs declared preview actions without hiding the window for copy actions", async () => {
@@ -844,22 +856,30 @@ describe("window, density and bounded rendering", () => {
   });
 
   it("reports truthful index states in the footer", async () => {
-    const indexing = setup({ status: { ...READY, state: "indexing" } });
-    await resolveSearch(indexing, 0, THREE);
+    // The search response is fresher than the boot-time EngineStatus.
+    const indexing = setup({ status: { ...READY, state: "ready" } });
+    await resolveSearch(indexing, 0, THREE, {
+      type: "indexing",
+      indexedFiles: 42018,
+      phase: "content",
+    });
     expect(footerText(indexing)).toContain("Indexing…");
     expect(
       indexing.container.querySelector('[data-testid="status-dot"]')?.className,
     ).toContain("status-dot--warning");
 
+    const readyAfterIndexing = setup({ status: { ...READY, state: "indexing" } });
+    await resolveSearch(readyAfterIndexing, 0, THREE);
+    expect(footerText(readyAfterIndexing)).toContain("Index ready");
+
+    // Before the first response the boot snapshot is the only source.
     const paused = setup({ status: { ...READY, state: "paused" } });
-    await resolveSearch(paused, 0, THREE);
     expect(footerText(paused)).toContain("Index paused");
     expect(
       paused.container.querySelector('[data-testid="status-dot"]')?.className,
     ).toContain("status-dot--neutral");
 
     const broken = setup({ status: { ...READY, state: "error", warnings: ["Drive offline"] } });
-    await resolveSearch(broken, 0, THREE);
     expect(footerText(broken)).toContain("Index unavailable");
     expect(
       broken.container.querySelector('[data-testid="status-dot"]')?.className,
@@ -881,7 +901,223 @@ describe("menu key and footer", () => {
     const outsideFooter = [...harness.container.querySelectorAll("button")].filter(
       (button) => !button.closest('[data-testid="launcher-footer"]'),
     );
-    // Only the error-state Retry button may live outside the footer.
-    expect(outsideFooter.every((button) => button.classList.contains("inline-retry"))).toBe(true);
+    // Only the error Retry button, filter chips and confirm buttons may live outside
+    // the footer; result rows are options, not stray buttons.
+    expect(
+      outsideFooter.every(
+        (button) =>
+          button.classList.contains("inline-retry") ||
+          button.classList.contains("filter-chip") ||
+          button.classList.contains("confirm-button"),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("category filter strip", () => {
+  const chip = (harness: Harness, label: string): HTMLButtonElement | null =>
+    [...harness.container.querySelectorAll<HTMLButtonElement>('[data-testid="filter-chip"]')].find(
+      (element) => element.textContent === label,
+    ) ?? null;
+
+  it("renders nine chips, defaults to All and sends scope on the initial search", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    const chips = [...harness.container.querySelectorAll('[data-testid="filter-chip"]')];
+    expect(chips.length).toBe(9);
+    expect(chips.map((element) => element.textContent)).toEqual([
+      "ALL",
+      "FILES",
+      "FOLDERS",
+      "DOCUMENTS",
+      "APPS",
+      "CLIPBOARD",
+      "WEB",
+      "GIT",
+      "ACTIONS",
+    ]);
+    expect(chips[0].getAttribute("aria-checked")).toBe("true");
+    expect(
+      harness.container.querySelector('[role="radiogroup"][aria-label="Filter results"]'),
+    ).not.toBeNull();
+    expect(harness.pending[0].request.scope).toBe("all");
+  });
+
+  it("clicking a chip searches with that scope, keeps input focus and resets selection", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    await press(inputOf(harness), "ArrowDown");
+    expect(selectedId(harness)).toBe("r2");
+
+    const files = chip(harness, "FILES");
+    await act(async () => {
+      files?.click();
+      await Promise.resolve();
+    });
+    expect(harness.pending[1].request.scope).toBe("files");
+    expect(harness.pending[1].request.requestId).toBeGreaterThan(harness.pending[0].request.requestId);
+    expect(document.activeElement).toBe(inputOf(harness));
+
+    await resolveSearch(harness, 1, [
+      result({ id: "f1", title: "First file" }),
+      result({ id: "f2", title: "Second file" }),
+    ]);
+    expect(selectedId(harness)).toBe("f1");
+    expect(chip(harness, "FILES")?.getAttribute("aria-checked")).toBe("true");
+    expect(chip(harness, "ALL")?.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("supports Ctrl+1..9 from the input without moving focus", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    const input = inputOf(harness);
+
+    await press(input, "4", { ctrlKey: true });
+    expect(harness.pending[1].request.scope).toBe("content");
+    expect(document.activeElement).toBe(input);
+    await resolveSearch(harness, 1, THREE);
+    expect(chip(harness, "DOCUMENTS")?.getAttribute("aria-checked")).toBe("true");
+
+    await press(input, "1", { ctrlKey: true });
+    expect(harness.pending[2].request.scope).toBe("all");
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("remembers the scope for the session", async () => {
+    window.sessionStorage.setItem(SCOPE_STORAGE_KEY, "git");
+    const harness = setup();
+    expect(harness.pending[0].request.scope).toBe("git");
+    expect(chip(harness, "GIT")?.getAttribute("aria-checked")).toBe("true");
+    await resolveSearch(harness, 0, THREE);
+    expect(chip(harness, "GIT")?.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("keeps the strip horizontally scrollable without wrapping chips", async () => {
+    const harness = setup({ workArea: { width: 560, height: 640 } });
+    await resolveSearch(harness, 0, THREE);
+    const strip = harness.container.querySelector<HTMLDivElement>('[data-testid="filter-strip"]');
+    expect(strip).not.toBeNull();
+    expect(strip?.getAttribute("role")).toBe("radiogroup");
+    // Chips are flex-none buttons: the strip scrolls instead of wrapping.
+    for (const element of harness.container.querySelectorAll('[data-testid="filter-chip"]')) {
+      expect(element.className).toContain("filter-chip");
+    }
+  });
+});
+
+describe("item count truthfulness and dismiss motion", () => {
+  it("never shows 0 items while EngineStatus has entries", async () => {
+    const harness = setup({ status: { ...READY, filenameEntries: 777 } });
+    await resolveSearch(harness, 0, THREE, {
+      type: "ready",
+      indexedFiles: 0,
+      contentDocs: 0,
+    });
+    expect(footerText(harness)).toContain((777).toLocaleString() + " items");
+    expect(footerText(harness)).not.toContain("0 items");
+  });
+
+  it("dismisses immediately under reduced motion and lets the shell hide the window", async () => {
+    document.documentElement.dataset.motion = "reduced";
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+    await act(async () => {
+      harness.ref.current?.dismiss();
+      await Promise.resolve();
+    });
+    expect(harness.hideLauncher).toHaveBeenCalledTimes(1);
+    expect(
+      harness.container.querySelector('[data-testid="launcher"]')?.getAttribute("data-phase"),
+    ).toBe("closed");
+  });
+});
+
+describe("real app icons (IconRef app_icon_data)", () => {
+  const pngData =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+  it("renders app_icon_data as an img inside the fixed tile", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, [
+      result({
+        id: "app:code",
+        title: "Visual Studio Code",
+        kind: "application",
+        icon: { type: "app_icon_data", data: pngData },
+        action: { type: "launch_app", appId: "code" },
+      }),
+    ]);
+    const img = harness.container.querySelector<HTMLImageElement>('[role="option"] img');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("src")).toBe(pngData);
+    expect(img?.getAttribute("alt")).toBe("");
+    expect(img?.getAttribute("data-icon-source")).toBe("data");
+    expect(img?.getAttribute("width")).toBe("28");
+  });
+
+  it("falls back to the monogram badge for unsafe/non-image data URLs", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, [
+      result({
+        id: "app:unsafe",
+        title: "Visual Studio Code",
+        kind: "application",
+        icon: { type: "app_icon_data", data: "data:text/html;base64," + "A".repeat(80) },
+        action: { type: "launch_app", appId: "code" },
+      }),
+    ]);
+    expect(harness.container.querySelector('[role="option"] img')).toBeNull();
+    const badge = harness.container.querySelector('[role="option"] .fileicon-text');
+    expect(badge?.textContent).toBe("VS");
+  });
+
+  it("removes a broken image and shows the monogram fallback (no broken glyph)", async () => {
+    const harness = setup();
+    await resolveSearch(harness, 0, [
+      result({
+        id: "app:broken",
+        title: "Notepad",
+        kind: "application",
+        icon: { type: "app_icon_data", data: pngData },
+        action: { type: "launch_app", appId: "notepad" },
+      }),
+    ]);
+    const img = harness.container.querySelector<HTMLImageElement>('[role="option"] img');
+    expect(img).not.toBeNull();
+    await act(async () => {
+      img?.dispatchEvent(new Event("error", { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(harness.container.querySelector('[role="option"] img')).toBeNull();
+    expect(harness.container.querySelector('[role="option"] .fileicon-text')?.textContent).toBe("NO");
+  });
+});
+
+describe("dismiss handshake cancellation", () => {
+  it("cancels a pending close animation when the launcher is re-summoned", async () => {
+    document.documentElement.dataset.motion = "full";
+    const harness = setup();
+    await resolveSearch(harness, 0, THREE);
+
+    await act(async () => {
+      harness.ref.current?.dismiss();
+      await Promise.resolve();
+    });
+    expect(
+      harness.container.querySelector('[data-testid="launcher"]')?.getAttribute("data-phase"),
+    ).toBe("closing");
+
+    await act(async () => {
+      harness.ref.current?.summon();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    });
+    expect(harness.hideLauncher).not.toHaveBeenCalled();
+    const phase = harness.container
+      .querySelector('[data-testid="launcher"]')
+      ?.getAttribute("data-phase");
+    expect(phase === "visible" || phase === "entering").toBe(true);
   });
 });

@@ -216,21 +216,44 @@ const GLYPH_PATHS: Record<GlyphName, ReactElement> = {
   ),
 };
 
+/** Only safe, renderable image data URLs are passed to <img>. */
+function isRenderableIconData(value: string | null | undefined): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 64 &&
+    /^data:image\/(?:png|jpe?g|webp|gif|svg\+xml);base64,/i.test(value.slice(0, 64))
+  );
+}
+
 export function ResultIcon({ result, large = false }: { result: SearchResult; large?: boolean }) {
   const [iconFailed, setIconFailed] = useState(false);
   const tone = toneFor(result);
   const className = "fileicon fileicon--" + tone + (large ? " fileicon--large" : "");
 
-  if (result.icon.type === "app_icon" && !iconFailed && isTauriRuntime()) {
+  // Real app icon sources: IPC app_icon_data (data URL, preferred — no asset
+  // scope issues) or the legacy app_icon path via convertFileSrc. Any decode
+  // failure falls back to the deterministic monogram/letter badge.
+  const dataIcon =
+    result.icon.type === "app_icon_data" && isRenderableIconData(result.icon.data)
+      ? result.icon.data
+      : null;
+  const fileIconSrc =
+    result.icon.type === "app_icon" && isTauriRuntime()
+      ? convertFileSrc(result.icon.path)
+      : null;
+  const appIconSrc = dataIcon ?? fileIconSrc;
+  if (appIconSrc && !iconFailed) {
     return (
       <span className={className + " fileicon--real"} data-testid="result-icon" aria-hidden="true">
         <img
-          src={convertFileSrc(result.icon.path)}
+          src={appIconSrc}
           alt=""
           width={large ? 32 : 28}
           height={large ? 32 : 28}
           draggable={false}
+          decoding="async"
           loading="lazy"
+          data-icon-source={dataIcon ? "data" : "path"}
           onError={() => setIconFailed(true)}
         />
       </span>

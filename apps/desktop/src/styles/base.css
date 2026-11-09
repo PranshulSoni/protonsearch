@@ -89,11 +89,15 @@ input[type="search"]:focus-visible {
 }
 
 /* Launcher window is a transparent, frameless surface. */
+/* The native launcher window is padded by 28 logical px on every side so the
+   card shadow is never clipped; keep the card inside that breathing room. */
 html[data-window="launcher"] #root {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
   background: transparent;
+  /* Keep in sync with LAUNCHER_SHADOW_PAD in apps/desktop/src-tauri/src/main.rs. */
+  padding: var(--ps-launcher-shadow-pad, 28px);
 }
 
 /* Shared primitives used across launcher / app / onboarding. */

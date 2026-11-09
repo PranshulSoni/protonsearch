@@ -73,8 +73,10 @@ describe("computeLauncherMetrics", () => {
       previewOpen: false,
       workArea: WORK_AREA,
     });
-    // B2 + 2 px border: 72 + 23 + 242 + 44 + 2 = 383 -> snapped 384.
-    expect(taller.baseHeight).toBe(384);
+    // 72 search + 40 filter strip + 23 padding + 242 content + 44 footer + 2 border
+    // = 423 -> snapped 424.
+    expect(taller.filterStripHeight).toBe(40);
+    expect(taller.baseHeight).toBe(424);
     expect(taller.listViewport).toBe(266);
   });
 
@@ -85,10 +87,10 @@ describe("computeLauncherMetrics", () => {
       previewOpen: false,
       workArea: WORK_AREA,
     });
-    // 72 + 23 + 204 + 44 + 2 = 345 -> snapped 346.
+    // 72 + 40 + 23 + 204 + 44 + 2 = 385 -> snapped 386.
     expect(metrics.rowHeight).toBe(48);
     expect(metrics.labelHeight).toBe(30);
-    expect(metrics.baseHeight).toBe(346);
+    expect(metrics.baseHeight).toBe(386);
     expect(metrics.listViewport).toBe(228);
   });
 
@@ -100,7 +102,7 @@ describe("computeLauncherMetrics", () => {
       workArea: WORK_AREA,
     });
     expect(metrics.baseHeight).toBe(MAX_LAUNCHER_HEIGHT);
-    expect(metrics.listViewport).toBe(362);
+    expect(metrics.listViewport).toBe(322);
   });
 
   it("reserves 44 px for the inline confirmation bar above the footer", () => {
@@ -111,9 +113,9 @@ describe("computeLauncherMetrics", () => {
       confirmOpen: true,
       workArea: WORK_AREA,
     });
-    // 72 + 23 + (34 + 58) + 44 footer + 44 confirm + 2 border = 277 -> 278.
+    // 72 + 40 + 23 + (34 + 58) + 44 footer + 44 confirm + 2 border = 317 -> 318.
     expect(metrics.confirmHeight).toBe(44);
-    expect(metrics.baseHeight).toBe(278);
+    expect(metrics.baseHeight).toBe(318);
     expect(metrics.listViewport).toBe(116);
   });
 
@@ -166,8 +168,8 @@ describe("computeLauncherMetrics", () => {
     });
     expect(metrics.surfaceWidth).toBe(618);
     expect(metrics.searchlineHeight).toBe(61);
-    // 61 + 23 + 150 + 44 + 2 = 280.
-    expect(metrics.baseHeight).toBe(280);
+    // 61 + 40 + 23 + 150 + 44 + 2 = 320.
+    expect(metrics.baseHeight).toBe(320);
     expect(metrics.listViewport).toBe(173);
   });
 });

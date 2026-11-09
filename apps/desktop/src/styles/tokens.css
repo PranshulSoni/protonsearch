@@ -101,7 +101,11 @@
   --ps-selected-bar-width: 2px;
 
   /* Elevation: floating surfaces only */
-  --ps-shadow-launcher: 0 24px 56px rgba(36, 60, 43, 0.11), 0 2px 5px rgba(21, 44, 24, 0.04);
+  /* Layered launcher shadow: every layer's |offsetY| + 1.5*blur stays inside the
+     28px transparent window pad, so it is never clipped into a straight edge. */
+  --ps-shadow-launcher: 0 1px 2px rgba(21, 44, 24, 0.1), 0 3px 6px rgba(36, 60, 43, 0.08),
+    0 6px 12px rgba(36, 60, 43, 0.1), 0 0 0 1px rgba(20, 43, 49, 0.05);
+  --ps-launcher-shadow-pad: 28px;
   --ps-shadow-app: 0 18px 45px rgba(33, 59, 40, 0.08);
   --ps-shadow-popover: 0 8px 24px rgba(32, 43, 49, 0.14), 0 1px 3px rgba(32, 43, 49, 0.06);
   --ps-shadow-dialog: 0 24px 64px rgba(32, 43, 49, 0.2);
@@ -290,7 +294,10 @@
   --ps-scrollbar-thumb: #3f463d;
   --ps-scrim: rgba(0, 0, 0, 0.5);
 
-  --ps-shadow-launcher: 0 24px 56px rgba(0, 0, 0, 0.55), 0 2px 5px rgba(0, 0, 0, 0.35);
+  /* Dark theme: the ambient black is nearly invisible on a dark desktop; the
+     1px light rim + border make the edge legible without any glow. */
+  --ps-shadow-launcher: 0 1px 3px rgba(0, 0, 0, 0.5), 0 3px 8px rgba(0, 0, 0, 0.4),
+    0 6px 12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(236, 239, 232, 0.08);
   --ps-shadow-app: 0 18px 45px rgba(0, 0, 0, 0.45);
   --ps-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
   --ps-shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55);

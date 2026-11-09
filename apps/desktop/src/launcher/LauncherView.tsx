@@ -11,6 +11,11 @@ import LauncherSurface, { type LauncherSurfaceHandle } from "./LauncherSurface";
 export default function LauncherView() {
   const { status, settings, hideLauncher, showMain } = useApp();
   const surfaceRef = useRef<LauncherSurfaceHandle>(null);
+  // A hide event emitted by an earlier dismissal can arrive after a re-summon
+  // (Tauri events are async). Ignore that stale event so re-summon really cancels
+  // the close instead of clearing the freshly opened surface.
+  const summonGuardRef = useRef<number | null>(null);
+  const justSummonedRef = useRef(false);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -20,16 +25,34 @@ export default function LauncherView() {
       try {
         const { listen } = await import("@tauri-apps/api/event");
         const offSummoned = await listen("launcher:summoned", () => {
+          justSummonedRef.current = true;
+          if (summonGuardRef.current != null) window.clearTimeout(summonGuardRef.current);
+          summonGuardRef.current = window.setTimeout(() => {
+            justSummonedRef.current = false;
+            summonGuardRef.current = null;
+          }, 300);
           surfaceRef.current?.summon();
         });
+        // The shell asks for a dismiss animation instead of hiding directly
+        // (hotkey toggle, window blur, tray actions).
+        const offDismiss = await listen("launcher:dismiss", () => {
+          justSummonedRef.current = false;
+          surfaceRef.current?.dismiss();
+        });
         const offHidden = await listen("launcher:hidden", () => {
+          if (justSummonedRef.current) {
+            // Stale hide from a dismissed generation; the launcher is visible again.
+            justSummonedRef.current = false;
+            return;
+          }
           surfaceRef.current?.clear();
         });
         if (disposed) {
           offSummoned();
+          offDismiss();
           offHidden();
         } else {
-          unlisteners.push(offSummoned, offHidden);
+          unlisteners.push(offSummoned, offDismiss, offHidden);
         }
       } catch {
         /* Event plumbing unavailable: the launcher still works on first open. */
@@ -37,6 +60,7 @@ export default function LauncherView() {
     })();
     return () => {
       disposed = true;
+      if (summonGuardRef.current != null) window.clearTimeout(summonGuardRef.current);
       unlisteners.forEach((unlisten) => unlisten());
     };
   }, []);

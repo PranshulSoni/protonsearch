@@ -3,24 +3,126 @@
    Preferences only: no title bar, no gradients/glow/glass, no dashboard cards.
    All colour comes from tokens (--ps-*); local literals are non-colour sizes. */
 
+/* The native launcher window is enlarged by 28 logical px on every side so the
+   floating shadow is never clipped (shell: LAUNCHER_SHADOW_PAD = 28). The card
+   itself keeps its 820 px / 1180 px visual width, centred inside that padding. */
+/* The shell pads #root by --ps-launcher-shadow-pad (28 px) and stretches its only
+   child; the card keeps its own content height so the browser-preview harness
+   shows the same surface as the native window. */
+html[data-window="launcher"] body #root {
+  align-items: flex-start;
+}
+
 .launcher {
   position: relative;
-  width: min(820px, 96vw);
+  --launcher-shadow-pad: 28px;
+  /* Refined multi-layer floating shadow (light); fits inside the 28 px pad. */
+  --launcher-shadow: 0 16px 40px rgba(36, 60, 43, 0.14), 0 2px 6px rgba(21, 44, 24, 0.06),
+    0 0 0 1px rgba(20, 43, 49, 0.05);
+  width: min(var(--launcher-width), calc(100vw - 2 * var(--launcher-shadow-pad)));
   margin: 0 auto;
   background: var(--ps-surface);
   border: 1px solid var(--ps-line-strong);
   border-radius: var(--ps-radius-launcher);
-  box-shadow: var(--ps-shadow-launcher);
+  box-shadow: var(--launcher-shadow);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 100vh;
-  /* Show/hide is instant by spec (0 ms): no entrance animation. */
+  max-height: calc(100vh - 2 * var(--launcher-shadow-pad));
+  /* Motion: entering/closing only — typing, selection and results stay instant. */
+  transform-origin: 50% 0;
+}
+
+:root[data-theme="dark"] .launcher {
+  --launcher-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.launcher[data-phase="closed"] {
+  opacity: 0;
+}
+
+.launcher--entering {
+  opacity: 0;
+  transform: scale(0.985);
+}
+
+.launcher[data-phase="visible"] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 150ms var(--ps-ease-out),
+    transform 150ms var(--ps-ease-out);
+}
+
+.launcher--closing {
+  opacity: 0;
+  transform: scale(0.99);
+  transition:
+    opacity 110ms var(--ps-ease-in-out),
+    transform 110ms var(--ps-ease-in-out);
 }
 
 .launcher--preview-side {
-  /* Shell contract: LAUNCHER_PREVIEW_WIDTH = 1180 (820 + 360 side panel). */
-  width: min(var(--launcher-width-preview), 96vw);
+  /* Shell contract: LAUNCHER_PREVIEW_CARD_WIDTH = 1180 (820 + 360 side panel). */
+  width: min(var(--launcher-width-preview), calc(100vw - 2 * var(--launcher-shadow-pad)));
+}
+
+/* ---------- Category / filter strip ---------- */
+
+.filter-strip {
+  flex: none;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ps-line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.filter-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-chip {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ps-radius-control);
+  background: transparent;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-micro);
+  font-weight: var(--ps-fw-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition:
+    background-color var(--ps-dur-base) var(--ps-ease-standard),
+    color var(--ps-dur-base) var(--ps-ease-standard),
+    box-shadow var(--ps-dur-base) var(--ps-ease-standard);
+}
+
+.filter-chip:hover {
+  background: var(--hover);
+  color: var(--ps-ink);
+}
+
+.filter-chip[aria-checked="true"] {
+  background: var(--ps-accent-soft);
+  color: var(--ps-accent-strong);
+  box-shadow: inset 0 -2px 0 var(--ps-selected-bar);
+}
+
+.filter-chip:focus-visible {
+  outline: var(--ps-focus-width) solid var(--ps-focus);
+  outline-offset: calc(-1 * var(--ps-focus-width));
 }
 
 .launcher-body {
@@ -88,8 +190,8 @@
   min-width: 0;
   min-height: 0;
   /* Browser-preview cap; in Tauri the window height is set from the same formula
-     (search 72 + footer 44 + 2 px borders). */
-  max-height: min(365px, calc(100vh - 118px));
+     (search 72 + filter strip 40 + footer 44 + 2 px borders + 56 px shadow pad). */
+  max-height: min(365px, calc(100vh - 214px));
   overflow-y: auto;
   padding: 10px 11px 13px;
   overscroll-behavior: contain;
@@ -709,6 +811,14 @@
   white-space: nowrap;
 }
 
+@media (forced-colors: active) {
+  .filter-chip[aria-checked="true"] {
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+  }
+}
+
 .launcher .kbd {
   font: 650 10px/1.2 var(--ps-font-ui);
   color: var(--ps-kbd-ink);
@@ -798,6 +908,10 @@
 /* ---------- Responsive / DPI ---------- */
 
 @media (max-width: 700px) {
+  .filter-strip {
+    padding: 0 8px;
+  }
+
   /* SCREENS §6.1: 61 px search row with a 16 px input on a narrow surface. */
   .searchline {
     height: 61px;
@@ -811,7 +925,7 @@
   }
 
   .results {
-    max-height: min(365px, calc(100vh - 107px));
+    max-height: min(365px, calc(100vh - 203px));
   }
 
   .search-input {

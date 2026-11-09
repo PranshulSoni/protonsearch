@@ -12,6 +12,8 @@ import type { ResultGroup } from "../lib/results";
 /** 1 px top + 1 px bottom launcher border, part of the window height. */
 export const WINDOW_BORDER = 2;
 export const SEARCHLINE_HEIGHT = 72;
+/** Category/filter chip strip between the search row and the results. */
+export const FILTER_STRIP_HEIGHT = 40;
 /** SCREENS §6.1: the search row shrinks to 61 px on a narrow surface (≤700 px). */
 export const SEARCHLINE_HEIGHT_NARROW = 61;
 export const FOOTER_HEIGHT = 44;
@@ -23,7 +25,8 @@ export const GROUP_LABEL_HEIGHT = 34;
 export const GROUP_LABEL_HEIGHT_COMPACT = 30;
 export const ROW_HEIGHT = 58;
 export const ROW_HEIGHT_COMPACT = 48;
-export const MIN_LAUNCHER_HEIGHT = 256;
+/** 256 px reference floor + 40 px filter strip = 296 px. */
+export const MIN_LAUNCHER_HEIGHT = 296;
 export const MAX_LAUNCHER_HEIGHT = 480;
 export const MAX_RESULTS_VIEWPORT = 365;
 export const PREVIEW_DRAWER_HEIGHT = 240;
@@ -89,6 +92,8 @@ export interface LauncherMetrics {
   searchlineHeight: number;
   /** Width the launcher window will have for this work area. */
   surfaceWidth: number;
+  /** Category strip height included between search row and results. */
+  filterStripHeight: number;
   /** Height of search row + results + footer, before preview drawer growth. */
   baseHeight: number;
   /** Actual window height to request (includes a bottom preview drawer). */
@@ -118,10 +123,11 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     0,
   );
   const confirmHeight = input.confirmOpen ? CONFIRM_BAR_HEIGHT : 0;
-  // The window height must include the footer, the confirm row and its own 1 px
-  // borders (B2 / SCREENS §2.1); otherwise content overflows and scrolls.
+  // The window height must include the filter strip, footer, confirm row and its
+  // own 1 px borders (B2 / SCREENS §2.1); otherwise content overflows and scrolls.
   const raw =
     searchlineHeight +
+    FILTER_STRIP_HEIGHT +
     RESULTS_PADDING +
     content +
     FOOTER_HEIGHT +
@@ -143,7 +149,12 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     0,
     Math.min(
       MAX_RESULTS_VIEWPORT,
-      baseHeight - searchlineHeight - FOOTER_HEIGHT - confirmHeight - WINDOW_BORDER,
+      baseHeight -
+        searchlineHeight -
+        FILTER_STRIP_HEIGHT -
+        FOOTER_HEIGHT -
+        confirmHeight -
+        WINDOW_BORDER,
     ),
   );
   return {
@@ -151,6 +162,7 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     labelHeight,
     searchlineHeight,
     surfaceWidth,
+    filterStripHeight: FILTER_STRIP_HEIGHT,
     confirmHeight,
     baseHeight,
     totalHeight,
