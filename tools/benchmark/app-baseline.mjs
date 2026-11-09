@@ -77,7 +77,7 @@ const exeArgs = (args["exe-args"] || "").split(" ").filter(Boolean);
 const HOTKEY_PS = resolve(__dirname, "hotkey-activate.ps1");
 const METRICS_PS = resolve(__dirname, "process-metrics.ps1");
 const QUERIES = ["arch", "readme", "proton", "index", "report", "screenshot", "会議", "café", "zzzz-no-match", "pdf"];
-const MARKS_FILE = resolve(dataDir, "perf-marks.jsonl");
+const MARKS_FILE = resolve(dataDir, "v2", "perf-marks.jsonl");
 let marksOffset = 0;
 
 function truncateMarks() {

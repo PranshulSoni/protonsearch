@@ -5,11 +5,16 @@ import type {
   SearchResult,
   SearchScope,
 } from "../bridge/types";
+import { useEffect, useState } from "react";
 import { Logo } from "../components/Logo";
 import { IslandIcon, type IslandIconName } from "./IslandIcon";
 import { relativeTime, type ClipTab, CLIP_TABS, clipboardKind } from "./islandData";
 
 /** V9 card views. All rows come from real bridge data; unsupported cards say so. */
+
+function rowsPerPage(count: number): number {
+  return Math.max(1, Math.min(count, 5));
+}
 
 const CARD_ICON: Record<IslandCardId, IslandIconName> = {
   search: "search",
@@ -80,6 +85,14 @@ export function SearchCard({
   onFocus: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [results]);
+  const openActive = () => {
+    const result = results[activeIndex];
+    if (result) onOpen(result);
+  };
   const filters: Array<{ id: SearchScope; label: string }> = [
     { id: "all", label: "All" },
     { id: "files", label: "Files" },
@@ -98,6 +111,24 @@ export function SearchCard({
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           onFocus={onFocus}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setActiveIndex((index) =>
+                results.length ? (index + 1) % rowsPerPage(results.length) : 0,
+              );
+            } else if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setActiveIndex((index) =>
+                results.length
+                  ? (index - 1 + rowsPerPage(results.length)) % rowsPerPage(results.length)
+                  : 0,
+              );
+            } else if (event.key === "Enter") {
+              event.preventDefault();
+              openActive();
+            }
+          }}
           placeholder="Search anything…"
           aria-label="Search"
           role="combobox"
@@ -143,10 +174,14 @@ export function SearchCard({
                 <button
                   type="button"
                   role="option"
-                  aria-selected={false}
+                  aria-selected={results.indexOf(result) === activeIndex}
                   key={result.id}
-                  className="island-result-row"
+                  className={
+                    "island-result-row" +
+                    (results.indexOf(result) === activeIndex ? " is-active" : "")
+                  }
                   onClick={() => onOpen(result)}
+                  onMouseEnter={() => setActiveIndex(results.indexOf(result))}
                 >
                   <span className="island-result-icon">
                     <IslandIcon

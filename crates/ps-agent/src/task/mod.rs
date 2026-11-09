@@ -3,8 +3,10 @@
 //! The V9 Agents card and desktop Agents view need real, durable task state
 //! rather than a transcript-only view. This module provides:
 //!
-//! * [model] - runtime-agnostic task types (persistable, camelCase JSON, ready
-//!   to be lifted into ps-ipc); they map the frozen [crate::AgentEvent] stream;
+//! * [model] - re-exports the runtime-agnostic task DTOs from
+//!   [ps_ipc::agent_task] (V10 single source of truth; the same nominal types as
+//!   before so ps_agent::AgentTask etc. keep working) plus the persistence
+//!   policy/redaction/projection helpers;
 //! * [store::AgentTaskStore] - durable JSON store at
 //!   <data_dir>/agents/tasks.json with a redacted log ring, parent/child ids,
 //!   permissions, restart history, bounded history and crash recovery;

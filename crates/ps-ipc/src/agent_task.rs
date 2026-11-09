@@ -415,7 +415,8 @@ mod tests {
 
     #[test]
     fn older_records_with_optional_fields_missing_still_parse() {
-        let minimal = r#"{"id":"old","title":"t","promptSummary":"p","state":"queued","createdAt":1,"updatedAt":1}"#;
+        let minimal =
+            r#"{"id":"old","title":"t","promptSummary":"p","state":"queued","createdAt":1,"updatedAt":1}"#;
         let task: AgentTask = serde_json::from_str(minimal).unwrap();
         assert_eq!(task.id, "old");
         assert_eq!(task.runtime, AgentTaskRuntime::Unknown);

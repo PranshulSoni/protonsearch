@@ -10,6 +10,7 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 rusqlite = { workspace = true }
 walkdir = { workspace = true }
+memchr = "2"
 
 # Extraction pipeline (bounded, background only; never per-query).
 pdf-extract = "0.10"

@@ -3099,6 +3099,7 @@ version = "2.0.0-alpha.1"
 dependencies = [
  "anyhow",
  "encoding_rs",
+ "memchr",
  "pdf-extract",
  "quick-xml",
  "rusqlite",

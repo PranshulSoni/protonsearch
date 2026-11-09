@@ -280,6 +280,7 @@ html[data-window="island"] #root {
 }
 
 .island-result-row:hover,
+.island-result-row.is-active,
 .island-result-row:focus-visible {
   background: var(--island-row-hover);
   border-color: var(--island-row-border);

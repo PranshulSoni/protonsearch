@@ -31,7 +31,6 @@ import {
 import {
   Icon,
   SavedStamp,
-  SegmentedControl,
   StateNotice,
   Switch,
   useSavedStamp,
@@ -213,7 +212,9 @@ export default function IslandSettingsView({
       setNotice(
         adjusted
           ? "Position adjusted to stay inside the work area."
-          : "Placement saved for the selected display.",
+          : tab === "placement"
+            ? "Placement saved for the selected display."
+            : "Settings saved.",
       );
     } catch {
       setSaveError(true);
@@ -388,19 +389,31 @@ export default function IslandSettingsView({
             <div className="island-monitor-area">
               <div className="island-monitor-top">
                 <span className="island-monitor-title">DISPLAY PREVIEW</span>
-                {monitors && monitors.length > 1 ? (
-                  <SegmentedControl
-                    label="Display"
-                    value={activeMonitor?.id === builtIn?.id ? "built-in" : "external"}
-                    options={[
-                      { value: "built-in", label: "Built-in" },
-                      { value: "external", label: "External" },
-                    ]}
-                    onChange={(next) => selectBuiltInOrExternal(next)}
-                  />
-                ) : (
-                  <span className="island-display-note">{dpiLabel(activeMonitor)}</span>
-                )}
+                <span className="island-seg" role="group" aria-label="Display">
+                  <button
+                    type="button"
+                    className={
+                      "island-seg-btn" +
+                      (activeMonitor?.id === builtIn?.id ? " is-active" : "")
+                    }
+                    aria-pressed={activeMonitor?.id === builtIn?.id}
+                    onClick={() => selectBuiltInOrExternal("built-in")}
+                  >
+                    Built-in
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      "island-seg-btn" +
+                      (activeMonitor && activeMonitor.id === external?.id ? " is-active" : "")
+                    }
+                    aria-pressed={Boolean(activeMonitor && activeMonitor.id === external?.id)}
+                    disabled={!external}
+                    onClick={() => selectBuiltInOrExternal("external")}
+                  >
+                    External
+                  </button>
+                </span>
               </div>
 
               {monitorError ? (
@@ -455,7 +468,8 @@ export default function IslandSettingsView({
                     </div>
                   </div>
                   <p className="island-screen-hint">
-                    Preview only · position is constrained inside the selected monitor.
+                    {activeMonitor.name} · {dpiLabel(activeMonitor)} · Preview only. Position is
+                    constrained inside the selected monitor.
                   </p>
                 </>
               ) : null}
@@ -616,7 +630,9 @@ export default function IslandSettingsView({
                     key={card.id}
                     className={"island-card-row" + (disabled ? " is-disabled" : "")}
                     draggable
-                    onDragStart={() => {
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", String(index));
                       dragIndex.current = index;
                       setDragging(index);
                     }}

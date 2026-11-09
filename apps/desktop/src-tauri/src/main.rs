@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 mod monitors;
 
 use ps_agent::{AgentClient, AgentEvent, PiAgentClient, PiAgentConfig};
+use ps_ipc::agent_task::DetectedAgent;
 use ps_core::{Engine, EngineConfig};
 use ps_ipc::{
     ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentRuntime, AgentState,
@@ -883,19 +884,6 @@ fn probe_agent_status(state: &AppState) -> AgentStatus {
             }),
         },
     }
-}
-
-/// A locally detected agent runtime shown in the Workflows Agents section.
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DetectedAgent {
-    id: String,
-    name: String,
-    kind: String,
-    version: Option<String>,
-    path: Option<String>,
-    available: bool,
-    detail: Option<String>,
 }
 
 fn locate_agent_on_path(exe: &str) -> Option<std::path::PathBuf> {

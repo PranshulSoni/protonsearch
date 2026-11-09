@@ -2,10 +2,13 @@
 
 - Date: 2026-11-10
 - Owner: L1-D (agent-sidecar / Agent Runtime & Extensibility)
-- Task: task-34. Backend implemented in `crates/ps-agent/src/task/**`; Tauri
-  shell and UI are Lead/UI-owned and were not edited.
+- Tasks: task-34 (backend/persistence/service) and task-44 (DTO move to
+  ps-ipc). Persistence/service/helpers live in `crates/ps-agent/src/task/**`;
+  **wire DTOs live in `crates/ps-ipc/src/agent_task.rs` (V10 single source of
+  truth)**. Tauri shell and UI are Lead/UI-owned and were not edited.
 - Status: backend + persistence + tests implemented; **accepted by L0
-  (2026-11-10) and wired into the Tauri shell.** See the decision record below.
+  (2026-11-10), DTOs moved to ps-ipc, and wired into the Tauri shell.** See the
+  decision record below.
 
 This document is the contract for the V9 Agents card (launcher) and the desktop
 Agents view. It defines the runtime-agnostic task record, its persistence,
@@ -14,10 +17,9 @@ accepted Rust/Tauri API.
 
 ## 0. Decision record (L0, 2026-11-10)
 
-1. **Types stay in `crates/ps-agent/src/task`** for now: no ps-ipc move and no
-   `PROTOCOL_VERSION` bump. The Tauri shell depends on `ps-agent` directly and
-   Tauri serializes the types on the wire; TS mirrors will be added when the
-   Agents card UI task starts. §8 keeps the exact type list for that work.
+1. **~~Types stay in `crates/ps-agent/src/task`~~ — superseded by decision 6**
+   (task-44 moved the DTOs into ps-ipc; ps-agent re-exports them and the
+   `PROTOCOL_VERSION` is still unbumped because the JSON shapes are unchanged).
 2. **Commands/events accepted** with the names/signatures in §8:
    `agent_tasks`, `agent_task_tree`, `agent_task`, `agent_permissions`,
    `agent_cancel(run_id?)`, `agent_stop_all`; `agent_pause`/`agent_resume`
@@ -34,6 +36,17 @@ accepted Rust/Tauri API.
    (engine-core/L0), not implemented in this phase.
 5. **UI contract**: the Agents card uses `controls.canPause`/
    `controls.canResume` and hides disabled controls.
+6. **DTO single source of truth (task-44, 2026-11-10):** `AgentTask`,
+   `AgentTaskNode`, `AgentPermissionState`, progress/log/restart/controls/
+   activity types and `DetectedAgent` now live in
+   `crates/ps-ipc/src/agent_task.rs`. ps-agent re-exports the same nominal types
+   (`ps_agent::AgentTask` == `ps_ipc::agent_task::AgentTask`), so its public API
+   and the shell's existing imports keep working. JSON shapes are byte-identical
+   — pinned by frozen pre-move serialization fixtures in ps-ipc contract tests.
+   `apps/desktop/src/bridge/types.ts` is the TypeScript mirror of ps-ipc (not of
+   ps-agent) and must be kept in sync when DTOs change. No
+   `PROTOCOL_VERSION`/`DATA_SCHEMA_VERSION` bump (wire and persisted shapes
+   unchanged).
 
 ## 1. Goals and non-goals
 
@@ -71,7 +84,9 @@ runtime label.
 
 ## 3. Data model
 
-Persisted JSON file: `<data_dir>/agents/tasks.json` (v2 data dir;
+The DTOs themselves live in `ps_ipc::agent_task` (single source of truth);
+ps-agent re-exports them and owns persistence policy. Persisted JSON file:
+`<data_dir>/agents/tasks.json` (v2 data dir;
 `%APPDATA%/protonsearch/v2/agents/tasks.json` on Windows), schema:
 
 ```json
@@ -215,6 +230,10 @@ Event mapping (`AgentTaskService::apply_event`):
 
 ## 7. Rust API (crates/ps-agent/src/task)
 
+The DTO types used below are defined in `ps_ipc::agent_task` and re-exported by
+`ps_agent` (`ps_agent::AgentTask` etc. resolve to the ps-ipc types), so existing
+shell code and imports keep working; new code may import either path.
+
 ```rust
 pub type AgentTaskListener = Arc<dyn Fn(&AgentTask) + Send + Sync + 'static>;
 
@@ -273,15 +292,17 @@ client.send_run(&request)?;
 
 ## 8. Accepted Tauri commands and events
 
-Type list for the future TS mirrors (all camelCase JSON; snake_case enum
-values) — these live in `ps_agent::task` and stay there for now (decision 1);
-they can be moved/copied into `crates/ps-ipc` unchanged at any later point:
+DTO types for the TS mirror (all camelCase JSON; snake_case enum values) live in
+`crates/ps-ipc/src/agent_task.rs` (exported as `ps_ipc::agent_task::*` and
+re-exported by ps-agent):
 
 `AgentTask`, `AgentTaskNode`, `AgentTaskRuntime`, `AgentTaskState`,
 `AgentTaskProgressKind`, `AgentTaskProgress`, `AgentPermissionState`,
 `AgentTaskLogLevel`, `AgentTaskLogEntry`, `AgentTaskErrorInfo`,
-`AgentTaskRestart`, `AgentTaskControls`, `AgentTaskActivity`.
-`AgentEvent` / `AgentRunRequest` are unchanged.
+`AgentTaskRestart`, `AgentTaskControls`, `AgentTaskActivity`, `DetectedAgent`.
+`AgentEvent` / `AgentRunRequest` are unchanged. The shell's `detect_agents`
+command should use `ps_ipc::agent_task::DetectedAgent` (the local shell struct was
+the duplicated copy; JSON shape is unchanged).
 
 | Tauri command | Signature | Notes |
 |---|---|---|
@@ -351,8 +372,13 @@ Card states:
 
 ## 10. Tests (run on this host 2026-11-10)
 
-`cargo test -p ps-agent` → **74 unit + 5 agent-task E2E + 16 Pi E2E + 4 legacy
-sidecar E2E = 99 passed, 0 failed**.
+`cargo test -p ps-agent` → **75 unit + 5 agent-task E2E + 16 Pi E2E + 4 legacy
+sidecar E2E = 100 passed, 0 failed**.
+`cargo test -p ps-ipc` → **17 passed**, including the new agent_task contract
+tests (frozen pre-move AgentTask fixtures byte-identical, full fixture, missing
+optional-field defaults, enum strings, node nesting, DetectedAgent fixture).
+`cargo check --workspace` clean (only pre-existing warnings in other crates and
+the shell, none from this move).
 
 Agent-task coverage:
 
@@ -390,7 +416,13 @@ Agent-task coverage:
    the write path when its activity API is no longer internal. ps-agent already
    exposes `AgentTaskService::activity()` and the projection/search text.
 8. The Agents card UI + TS mirrors are pending (UI task): the shell is wired and
-   serializes the types directly; the card must use the honest controls and the
+   serializes the ps-ipc DTOs directly; `apps/desktop/src/bridge/types.ts` is the
+   hand-maintained mirror of `ps_ipc::agent_task` and must be updated whenever
+   those DTOs change. The card must use the honest controls and the
    no-fake-progress rules in §9.
+9. The shell still owns a local `DetectedAgent` struct at review time (the
+   duplicate this move replaces); L0 updates `main.rs` to import
+   `ps_ipc::agent_task::DetectedAgent`. Until then the two definitions are
+   field-identical and serialize the same JSON.
 9. The shell/UI wiring itself is Lead/UI-owned; this backend change did not edit
    Tauri or UI files.

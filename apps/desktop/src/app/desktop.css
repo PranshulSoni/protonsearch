@@ -1557,6 +1557,14 @@ html[data-theme="dark"] .island-tab.is-active { border-bottom-color: var(--ps-ac
 .island-monitor-title { color: #6f7f79; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
 html[data-theme="dark"] .island-monitor-title { color: var(--ps-ink-2); }
 .island-display-note { color: var(--island-muted); font-size: 10px; }
+.island-seg { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid #cbd6cd; border-radius: 8px; background: #dce4dd; }
+html[data-theme="dark"] .island-seg { background: var(--ps-surface-soft); border-color: var(--ps-line); }
+.island-seg-btn { padding: 6px 10px; border: 0; border-radius: 5px; background: transparent; color: #5d6d67; font-size: 11px; cursor: pointer; }
+html[data-theme="dark"] .island-seg-btn { color: var(--ps-ink-2); }
+.island-seg-btn.is-active { background: #fff; color: #2d4147; box-shadow: 0 1px 3px rgba(20, 44, 36, 0.075); }
+html[data-theme="dark"] .island-seg-btn.is-active { background: var(--ps-surface-raised); color: var(--ps-ink); }
+.island-seg-btn:disabled { opacity: 0.45; cursor: default; }
+.island-seg-btn:focus-visible { outline: 2px solid #639bbb; outline-offset: 1px; }
 .island-screen { position: relative; width: min(100%, 524px); margin: 18px auto 8px; border: 7px solid #333d3f; border-radius: 11px; outline: 1px solid #6d7973; background: #d9e0da; box-shadow: 0 4px 0 #7c8780, 0 15px 23px rgba(36, 51, 38, 0.106); }
 html[data-theme="dark"] .island-screen { background: #2a3534; }
 .island-screen-ellipse { position: absolute; inset: 12% 18%; border: 1px solid rgba(109, 121, 115, 0.35); border-radius: 50%; pointer-events: none; }
@@ -1634,6 +1642,11 @@ html[data-theme="dark"] .island-choice { background: var(--ps-surface-raised); b
 html[data-theme="dark"] .island-toast { color: var(--ps-positive-pill-ink, var(--ps-positive)); }
 .island-footer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .island-footer .btn { padding: 10px 14px; border-radius: 7px; font-size: 11px; font-weight: 720; }
+@media (max-width: 1000px) and (min-width: 801px) {
+  .island-brand { justify-content: center; padding: 0; }
+  .island-brand span:last-child { display: none; }
+}
+
 @media (max-width: 800px) {
   .island-frame { grid-template-columns: 56px minmax(0, 1fr); max-width: none; min-height: 100vh; margin: 0; border: 0; border-radius: 0; }
   .island-sidebar { padding: 16px 6px; align-items: center; }

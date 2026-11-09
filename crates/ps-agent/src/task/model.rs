@@ -58,11 +58,7 @@ impl AgentTaskLaunch {
         }
     }
 
-    pub fn for_pydantic(
-        model: Option<String>,
-        allow_writes: bool,
-        parent_id: Option<String>,
-    ) -> Self {
+    pub fn for_pydantic(model: Option<String>, allow_writes: bool, parent_id: Option<String>) -> Self {
         Self {
             runtime: AgentTaskRuntime::Pydantic,
             runtime_version: None,

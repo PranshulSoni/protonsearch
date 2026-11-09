@@ -2,9 +2,10 @@
 // the Dynamic Island master switch. Settings are real IPC fields; no fake
 // normal-launcher options are exposed until the shell has them.
 
+import { useState } from "react";
 import { useApp } from "../../App";
 import type { LauncherMode } from "../../bridge/types";
-import { SavedStamp, useSavedStamp } from "../ui";
+import { SavedStamp, StateNotice, useSavedStamp } from "../ui";
 
 export default function LauncherPreferences({
   onNavigate,
@@ -13,17 +14,20 @@ export default function LauncherPreferences({
 }) {
   const { settings, updateSettings } = useApp();
   const { savedKey, markSaved } = useSavedStamp();
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const setMode = async (mode: LauncherMode) => {
+    setSaveFailed(false);
     try {
       await updateSettings({ launcher: { ...settings.launcher, primaryMode: mode } });
       markSaved("launcher");
     } catch {
-      /* the parent quiet notice covers rare failures on the General tab */
+      setSaveFailed(true);
     }
   };
 
   const setIslandEnabled = async (enabled: boolean) => {
+    setSaveFailed(false);
     try {
       await updateSettings({
         launcher: {
@@ -33,12 +37,19 @@ export default function LauncherPreferences({
       });
       markSaved("launcher");
     } catch {
-      /* keep the previous setting */
+      setSaveFailed(true);
     }
   };
 
   return (
     <>
+      {saveFailed ? (
+        <StateNotice
+          tone="error"
+          title="Couldn't save that change."
+          body="Your previous setting is still active."
+        />
+      ) : null}
       <div className="settings-grid">
         <section className="settings-section" aria-labelledby="prefs-launcher-mode">
           <div className="settings-label">

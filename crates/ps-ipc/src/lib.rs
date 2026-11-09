@@ -321,17 +321,9 @@ pub struct TierTiming {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SearchStatus {
-    Ready {
-        indexed_files: u64,
-        content_docs: u64,
-    },
-    Indexing {
-        indexed_files: u64,
-        phase: String,
-    },
-    Degraded {
-        reason: String,
-    },
+    Ready { indexed_files: u64, content_docs: u64 },
+    Indexing { indexed_files: u64, phase: String },
+    Degraded { reason: String },
 }
 
 fn default_protocol_version() -> u32 {
@@ -629,9 +621,7 @@ pub fn urlencode(input: &str) -> String {
     let mut out = String::with_capacity(input.len() * 3);
     for byte in input.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char)
-            }
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(byte as char),
             b' ' => out.push_str("%20"),
             _ => out.push_str(&format!("%{byte:02X}")),
         }

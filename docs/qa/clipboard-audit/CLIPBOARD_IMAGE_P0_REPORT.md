@@ -5,6 +5,7 @@
 | Gate / task | G0 audit, task-30 (owner: sources-content / L2-A3 under L1-A) |
 | Severity | **P0** (user-reported: clipboard history shows no images) |
 | Status | **REPRODUCED on real Windows**; root cause identified; no product code changed (Gate 0 is read-only) |
+| Repair | **FIXED in task-39 / G2** — see @BOOT_P0_REPAIR_EVIDENCE.md |
 | Date | 2026-11-10 (Asia/Calcutta) |
 | Host | Windows 11, AMD Ryzen AI 9 (10C/20T), 31 GB RAM |
 | Evidence | @docs/qa/clipboard-audit/evidence/** (logs, decoded PNGs, runtime DBs, harness source) |
@@ -198,7 +199,3 @@ copy image in Paint/Snipping Tool/browser
 - The GUI app was not launched (environment rule). Reproduction uses the exact production modules and call path (engine listener registration/DB/image dir); it is not a UI-level E2E. A real-app E2E with Paint/Snipping Tool/browser remains required for G2 acceptance.
 - Real Paint / Snipping Tool / browser interactive copies were not automated (no GUI automation in this task); real clipboard format families from .NET (System.Windows.Forms.Clipboard.SetImage) and synthetic Win32 sets were used. Snipping Tool and browser copy-image are marked UNVERIFIED.
 - The user's live v2 database at %APPDATA%\protonsearch\v2\index.db does not exist on this machine, and the E2E data dirs (.devdata*, .devdata-mig2) contain no clipboard_history table, so no real captured-image DB rows from the shipped app could be inspected; evidence comes from the production code path driven by the audit harness.
-- The audit harness first run crashed with STATUS_HEAP_CORRUPTION; that was isolated to the harness's own misuse of SetDIBits on a selected bitmap (fixed in the harness, re-run clean, exit 0). It is unrelated to the product and to the earlier engine-core teardown note.
-- Timing numbers in this report are diagnostic, not benchmark evidence.
-
-Reproduce: see @docs/qa/clipboard-audit/harness and the commands in the Reproduction section.

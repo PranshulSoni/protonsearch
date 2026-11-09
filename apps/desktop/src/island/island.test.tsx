@@ -200,6 +200,31 @@ describe("V9 island surface", () => {
     expect(element.querySelector(".island-unsupported")?.textContent).toContain("No mock data is shown.");
   });
 
+  it("honours reduced motion: card swaps are instant and never play the out phase", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    const element = await renderIsland();
+    await waitFor(() => element.querySelectorAll(".island-dot-button").length === 8);
+    await act(async () => {
+      (element.querySelectorAll(".island-dot-button")[1] as HTMLButtonElement).click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(element.querySelector(".island-card-heading h2")?.textContent).toBe("Media");
+    expect(element.querySelector(".island-surface--out")).toBeNull();
+  });
+
   it("switches cards with Ctrl+ArrowDown, wheel threshold and Esc", async () => {
     const element = await renderIsland();
     await waitFor(() => element.querySelectorAll(".island-dot-button").length === 8);
