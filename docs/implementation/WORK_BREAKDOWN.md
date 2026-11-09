@@ -152,6 +152,8 @@ rollback. L0 re-runs verification before accepting.
 | 2026-11-10 | G8 | Round 1: frontend 237/237 + build 0; targeted Rust ps-ipc 17/17, ps-agent 100/100; full workspace blocked by in-flight task-35 | L1-E | PARTIAL | V10_G8_VERIFICATION_ROUND1.md; .agents/notes/g8-*.log |
 | 2026-11-10 | G8 | Live P0-1 previews and P0-2 clipboard images through the real app (payloads, screenshots, restart) | L1-E | PASS (partial matrix) | docs/qa/g8-verify/ |
 | 2026-11-10 | G8 | Pairwise round 1: P-03/P-07/P-10/P-13/P-26 partial; P-06/P-09/P-17 blocked; G8 NOT SIGNED | L1-E | PARTIAL | CROSS_FEATURE_PAIRWISE_MATRIX section 6 |
+| 2026-11-10 | G8 | RC round 2: cargo workspace 306 passed/0 failed; frontend 241 passed/build 0; P0-1 14 formats live; P0-2 capture/thumbnail/restart live; highlight condition open | L1-E | PASS local alpha | V10_G8_VERIFICATION_ROUND2.md; docs/qa/g8-verify-round2/ |
+| 2026-11-10 | G8 | RC artifacts hash-verified (4e9f589, SIGNED=false); release app launch smokes; final L0 recommendation recorded | L1-E | DELIVERED | dist-installer/SHA256SUMS.txt; V10_G8_VERIFICATION_ROUND2 section 9 |
 | 2026-11-10 | G2 | Preview backend/UI + clipboard images + island renderer + settings started in parallel | L1-A/L2-A/L1-B | IN PROGRESS | tasks 37-41 |
 
 ## 8. Prior program (superseded, evidence retained)

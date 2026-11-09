@@ -3,7 +3,44 @@
 All notable changes to the v2 "Project Phoenix" line. This file covers **v2 only**; the
 legacy v1.1.1 baseline is audited in docs/audit/GATE0_BASELINE.md.
 
-## [2.0.0-alpha.1] — 2026-11-09 — UNRELEASED, NOT DISTRIBUTABLE
+## [2.0.0-alpha.1] — 2026-11-10 — RELEASE CANDIDATE (UNSIGNED, internal alpha)
+
+First RC of the v2 "Project Phoenix" rebuild. Source commit 4e9f589; unsigned NSIS installer and
+portable binary produced. Internal alpha only: do not distribute.
+
+### Added / verified
+- Normal Launcher v2: All/Files/Folders/Apps filters, real quick destinations, result previews,
+  keyboard/a11y and live input-latency captures.
+- V9 Dynamic Island renderer: 8 cards, page dots, wheel/swipe, motion tokens, V9 geometry, real data
+  for Search/Clipboard/Agents/Browser/Git; Media/Quick Settings/Notifications capability-honest.
+- Preview pipeline P0-1: resultId-only get_preview IPC + bounded engine previews with LRU cache;
+  live-verified TXT/code/MD/JSON/CSV/PDF/DOCX/XLSX/PNG+OCR/binary/unknown/large/Unicode and
+  stale-file fallbacks. Known gap: matched-term highlight ranges (BUG-G8-01).
+- Clipboard image P0-2: real CF_DIB/BI_BITFIELDS/DIBV5/CF_BITMAP/registered PNG capture, PNG storage
+  + bounded thumbnails (<=128 KiB, dims <=8192, image/png allowlist), island Images thumbnails,
+  restart persistence, paste-back harness coverage, master privacy gate + format toggles.
+- Agent task DTOs moved to ps-ipc; runtime-agnostic task history; read-only Pi alpha gate
+  (allow_writes=false, RR-02); detect-agents and agent task APIs wired.
+- Settings: two-launcher model, island placement/card manager, clipboard/privacy toggles, validation
+  and additive-serde migration policy; ADR-0007..0012 + versioning policy.
+- Release artifacts: dist-installer/ProtonSearch.exe, NSIS setup.exe, BUILD_INFO.txt, SHA256SUMS.txt;
+  UNSIGNED=true documented.
+
+### Performance
+- Content retrieval p95 8.984 ms MET (30 ms target, official quiet, n=960, 13,296 docs).
+- Release activation p95 14.289 ms MET; selection 6 ms MET.
+- Debug input->visible p95 38.2 ms NOT MET (30 ms target); idle tree WS 786.9 MiB NOT MET
+  (~150 MB budget). Both recorded honestly for post-alpha work.
+
+### Known issues (public-release gates)
+- Artifacts unsigned; no updater; installer upgrade/uninstall drill not run.
+- Single-monitor host: mixed-DPI/High-Contrast/multi-monitor untested.
+- Native media/Wi-Fi/Bluetooth adapters post-alpha milestone 2 (honest disabled states).
+- No live Pi provider credentials; write-enabled agent path closed.
+- Preview matched-term highlight missing; island preview hookup/both-launcher parity pending.
+- Public release NOT signed off; see docs/release/ACCEPTANCE_REPORT.md.
+
+## [2.0.0-alpha.1] — 2026-11-09 — historical Gate-0 scaffold
 
 Internal Gate-0/Gate-1 scaffold. No installer, no signed artifacts, no public release.
 

@@ -1,0 +1,88 @@
+{
+  "capturedAt": "2026-11-09T21:58:24.609Z",
+  "api": [
+    {
+      "token": "KOALA-DOCX-2026",
+      "rows": [
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "title": "report",
+          "kind": "content_match"
+        }
+      ],
+      "p": {
+        "status": "ok",
+        "format": "docx",
+        "text": "Preview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.",
+        "highlights": [],
+        "snippet": "Preview Audit DOCX This Word document carries the token KOALA-DOCX-2026 for content search. Second paragraph: KOALA-DOCX-2026 again."
+      }
+    },
+    {
+      "token": "KOALA-JSON-2026",
+      "rows": [
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "title": "sample",
+          "kind": "content_match"
+        }
+      ],
+      "p": {
+        "status": "ok",
+        "format": "json",
+        "text": "{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}",
+        "highlights": [],
+        "snippet": "{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}"
+      }
+    },
+    {
+      "token": "KOALA-CSV-2026",
+      "rows": [
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "title": "sample",
+          "kind": "content_match"
+        }
+      ],
+      "p": {
+        "status": "ok",
+        "format": "csv",
+        "text": "name,token\nprotonsearch,KOALA-CSV-2026",
+        "highlights": [],
+        "snippet": "name,token protonsearch,KOALA-CSV-2026"
+      }
+    },
+    {
+      "token": "KOALA-UNICODE-2026",
+      "rows": [
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+          "title": "unicode-note",
+          "kind": "content_match"
+        }
+      ],
+      "p": {
+        "status": "ok",
+        "format": "txt",
+        "text": "नमस्ते KOALA-UNICODE-2026 你好 😀",
+        "highlights": [],
+        "snippet": "नमस्ते KOALA-UNICODE-2026 你好 😀"
+      }
+    }
+  ],
+  "ui": [
+    {
+      "query": "content:KOALA-DOCX-2026",
+      "panel": {
+        "text": "DOC\nreport\nDOCX\nC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx\nDOCX PREVIEW\nPreview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.\nKind\nline 2\nSize\n35.8 KB\nModified\n2026-11-09 20:32 UTC\nLines\n3\nWords\n17\nOpen",
+        "marks": 0
+      },
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify-round2/p0-1-highlight.png"
+    },
+    {
+      "query": "content:KOALA-UNICODE-2026",
+      "panel": null,
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify-round2/p0-1-unicode-highlight.png"
+    }
+  ]
+}

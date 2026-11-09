@@ -107,3 +107,20 @@ Sign-off sequence: (1) rerun on a green commit with cargo test --workspace + fro
 (2) execute the G8 sign-off list in docs/implementation/V10_G8_VERIFICATION_ROUND1.md section 7;
 (3) independent reviewer (L1-E) re-runs a sample and records it; (4) L0 accepts; no gate is signed on
 this round's partial evidence.
+
+
+## 8. Final L0 recommendation (task-53, RC 4e9f589)
+
+- **Deployment-ready locally: YES - unsigned internal alpha.** RC artifacts are hash-verified and
+  match SHA256SUMS.txt; the release app launches and renders; cargo workspace 306 passed/0 failed and
+  frontend 241 passed/build 0; P0-1 previews (14 formats incl DOCX/XLSX/PNG+OCR/JSON/CSV/Unicode,
+  honest unsupported, stale-file error) and P0-2 clipboard images (live capture, thumbnails, restart
+  persistence) are verified; content p95 8.984 ms, activation 14.289 ms and selection 6 ms meet
+  targets.
+- **Public release signed off: NO.** Blockers: unsigned/no updater, installer upgrade/uninstall/
+  rollback drill not run, single-monitor (no mixed-DPI/HC/multi-monitor evidence), idle memory
+  786.9 MiB over budget, debug input->visible p95 38.2 ms over 30 ms target, native media/Wi-Fi/
+  Bluetooth deferred to post-alpha milestone 2, no live Pi credentials/approval verification, and
+  the matched-term preview highlight condition open.
+- Next: sign + verify, run installer drill on a clean VM, close highlight/UI parity and memory/input
+  budgets, execute remaining pairwise/list items, then L0 public-release acceptance.

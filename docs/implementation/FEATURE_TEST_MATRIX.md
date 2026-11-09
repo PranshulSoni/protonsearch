@@ -146,3 +146,25 @@ acceptance checklist. Full details: docs/implementation/V10_G8_VERIFICATION_ROUN
 | FT-P09 Binary/unsupported | PASS (live launcher UI) | p0-1-preview-blob.png |
 | FT-P02/P03/P04/P06/P10 | NOT EXECUTED this round | G8 sign-off item |
 | FT-S12 Agents | BLOCKED/PARTIAL (no Pi credentials live; read-only alpha gate) | PI security review |
+
+
+## G8 round 2 executed evidence on RC 4e9f589 (2026-11-10, task-53)
+
+Full-binary suites are green on the RC tree (cargo workspace 306 passed / 0 failed; frontend 241
+passed; see V10_G8_VERIFICATION_ROUND2.md). Live evidence on RC/dev-CDP build:
+
+| Matrix ID | Round-2 status | Evidence |
+|---|---|---|
+| FT-P01 TXT preview | PASS (text/Unicode) | p0-1-round2 evidence |
+| FT-P02 Source code | PASS (rs text preview) | p0-1-round2 evidence |
+| FT-P03 Markdown/HTML | PARTIAL (MD text pass; HTML not executed) | p0-1-round2 evidence |
+| FT-P04 JSON/CSV | PASS (JSON + CSV text preview) | p0-1-round2 evidence |
+| FT-P05 PDF text | PASS (text layer) | p0-1-round2 evidence |
+| FT-P06 PDF scanned | PARTIAL - honest unsupported "no text layer; OCR preview not available" | p0-1-round2 evidence |
+| FT-P07 DOCX/Office | PASS (DOCX + XLSX text preview; UI screenshot) | p0-1-docx.png |
+| FT-P08 Images | PASS (thumbnail data URL 26,746 chars + OCR 45 chars; UI screenshot) | p0-1-image.png |
+| FT-P09 Binary/unsupported/encrypted | PASS (bin/xyz explicit unsupported; stale file explicit error) | p0-1 evidence + stale test |
+| FT-P10 Unicode/highlight | PARTIAL/FAIL - Unicode text preserved but matched-term highlightRanges empty and UI marks 0 (condition open) | p0-1-token-evidence.json |
+| FT-S11 Clipboard images | PASS (live .NET capture, thumbnail, restart persistence) | p0-2 evidence |
+| FT-L02/L03 | PASS (live launcher filters/quick destinations) | e2e/launcher tests |
+| FT-L04/L05, FT-S01/S03/S10/S12 | PARTIAL/blocked as in round 1 (native adapters, no Pi creds, full parity pending) | round-1 + gates |

@@ -157,3 +157,18 @@ only where UI/app-level evidence is still pending (preview UI task-38; interacti
 - Open sign-off items: UI paste-back path, full format matrix, both-launcher preview parity, app GUI
   clipboard matrix, native adapter/DPI/frame-pacing evidence. Full report:
   docs/implementation/V10_G8_VERIFICATION_ROUND1.md.
+
+
+## 6. G8 round 2 finding and P0 status (RC 4e9f589, 2026-11-10)
+
+- **BUG-G8-01 (P1, OPEN)**: preview matched-term highlight is not delivered. Content FTS token
+  searches return correct content_match results and preview text contains the token, but
+  PreviewPayload.highlightRanges is empty and the live UI renders 0 mark elements for DOCX/JSON/CSV/
+  Unicode tokens. Text/snippet preview itself works. Owner: preview backend/UI; gate: G2 condition.
+- **P0-1 previews**: FIXED + VERIFIED live on RC for 14 formats (TXT/code/MD/JSON/CSV/PDF text/
+  scanned-PDF honest unsupported/DOCX/XLSX/PNG+OCR/binary/unknown/large truncation/Unicode/stale);
+  matched-term highlight remains the open condition above.
+- **P0-2 clipboard images**: FIXED + VERIFIED live on RC (real .NET SetImage 320x200 -> clip:2 with
+  thumbnailDataUrl 4,918 chars, image/png, 320x200; island Images tab shows real thumbnail; restart
+  persistence verified). UI paste-back path remains a G8 sign-off item (harness-level paste-back
+  verified).

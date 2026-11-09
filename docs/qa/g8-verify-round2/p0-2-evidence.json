@@ -1,0 +1,41 @@
+{
+  "capturedAt": "2026-11-09T21:59:08.190Z",
+  "clipboard": {
+    "id": "clipboard",
+    "label": "Clipboard",
+    "enabled": true,
+    "itemCount": 2,
+    "state": "ready",
+    "detail": "capturing clipboard updates"
+  },
+  "rows": [
+    {
+      "id": "clip:1",
+      "title": "listener restart cycle 2",
+      "hasThumb": false,
+      "thumbLen": 0,
+      "w": null,
+      "h": null,
+      "mime": "text/plain"
+    },
+    {
+      "id": "clip:2",
+      "title": "Image 320 x 200",
+      "hasThumb": true,
+      "thumbLen": 4918,
+      "w": 320,
+      "h": 200,
+      "mime": "image/png"
+    }
+  ],
+  "dom": {
+    "body": "Clipboard\n\nYour recent copies\n\nAll\nText\nImages\nLinks\nCode\nFiles\nPinned\nImage 320 x 200\nImage · just now\nImage 320 x 200",
+    "imgs": [
+      {
+        "w": 34,
+        "h": 34,
+        "src": "data:image/png;base64,iVBORw0K"
+      }
+    ]
+  }
+}

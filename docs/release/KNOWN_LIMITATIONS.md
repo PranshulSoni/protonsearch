@@ -1,12 +1,43 @@
+# Known Limitations — v2.0.0-alpha.1 (Release Candidate, 2026-11-10)
+
+This document describes the release candidate (source 4e9f589). The RC is an unsigned internal
+alpha: it can be deployed locally for evaluation but is NOT signed off for public release. The
+Gate-0 list further down is kept as historical detail; where it contradicts this RC status section,
+this section wins.
+
+## RC status (what still blocks a public release)
+
+1. Unsigned. No Authenticode signature, no signed update manifest and no updater. Artifacts are
+   marked SIGNED=false in dist-installer/BUILD_INFO.txt. Do not distribute publicly.
+2. Installer drill not run. The currentUser NSIS installer is built and hash-verified, but install,
+   upgrade-over, uninstall, data-retention/rollback has not been executed on a clean VM.
+3. Hardware coverage. Single built-in display only: mixed-DPI, disconnect/reconnect, dual-monitor,
+   taskbar-edge and High-Contrast evidence is missing; DPI validation is limited to default 150%.
+4. Performance budgets. Content p95 8.984 ms, activation 14.289 ms and selection 6 ms meet targets,
+   but idle process-tree memory is 786.9 MiB (over the ~150 MB budget; mostly WebView2) and debug
+   input-to-visible p95 is 38.2 ms (over the 30 ms target).
+5. Native adapters. Media transport, Wi-Fi and Bluetooth are honest-disabled and deferred to
+   post-alpha milestone 2. Alpha-native scope is volume/brightness/audio output/notifications with
+   capability probes and no fake toggles.
+6. Agent credentials. No live Pi provider credentials on the audit host; live inference, approval
+   behavior and any write path are unverified. Write-enabled runs remain closed (RR-02).
+7. Preview condition. Matched-term highlight ranges are not delivered (BUG-G8-01); island preview
+   hookup and both-launcher preview parity remain open.
+8. Environment. No clean VM/second machine, no signing certificate, no non-Pi provider keys; CI
+   reproducibility/packaging re-audit is not part of the RC evidence.
+
+## Deployment recommendation
+
+- Locally deployable as an unsigned internal alpha for evaluation on this machine.
+- NOT signed off for public release or distribution; public-release gates are listed above.
+
 # Known Limitations — v2.0.0-alpha.1 (Gate 0)
 
 This is an **internal alpha scaffold**, not a shipped product. Everything below is a known
 limitation at the time of writing (2026-11-09); remove an entry only with evidence.
 
 ## Build / packaging
-1. **No v2 artifact has been built or run.** The release installer has not been produced;
-   npx tauri build is **UNVERIFIED** on this host. scripts/build-installer.ps1 is
-   dry-run-tested only.
+1. **Artifact status (superseded 2026-11-10):** the RC binary and NSIS installer were built and hash-verified; see docs/release/ACCEPTANCE_REPORT.md. Installer install/upgrade/uninstall drill remains not run.
 2. **Unsigned.** No Authenticode signing, no signed update manifest, no updater implemented.
    The wrapper emits SIGNED=false and refuses to publish (it never publishes at all).
 3. **Lockfiles untracked.** Cargo.lock and apps/desktop/package-lock.json exist but are not

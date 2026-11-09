@@ -8,6 +8,45 @@ ProtonSearch is a fast, local-first, Windows-native search and command centre. P
 
 > **Project Phoenix — v2 alpha.** This branch is a ground-up rebuild of the v1 Win32/Slint application into a modular Rust engine + Tauri 2 / React desktop app. The legacy app is preserved in `protonsearch/` and is still buildable for comparison. v2 is an alpha: the sections below mark what is verified, what is partial and what is not implemented.
 
+
+## v10 release candidate (2026-11-10) — unsigned internal alpha
+
+Source commit 4e9f589; artifacts in dist-installer/ (binary + NSIS setup + BUILD_INFO + SHA256SUMS).
+SIGNED=false — do not distribute publicly.
+
+### Verified on the RC
+- Suites: cargo workspace 306 passed / 0 failed / 1 pre-existing ignored; frontend 18 files /
+  241 tests passed; production build clean.
+- P0-1 previews: 14 live formats including DOCX/XLSX/PNG+OCR/JSON/CSV/Unicode, honest unsupported
+  (binary/scanned PDF), large-file truncation and stale-file error; matched-term highlight is the
+  one open condition (BUG-G8-01).
+- P0-2 clipboard images: real .NET clipboard image captured live (320x200 PNG), bounded thumbnail
+  in IPC and island Images tab, restart persistence verified; UI paste-back path remains a
+  verification item (harness-level paste-back passes).
+- Launcher/island: Normal Launcher v2 (All/Files/Folders/Apps, quick destinations, previews) and
+  the V9 Dynamic Island renderer (8 cards, dots, wheel/swipe, motion) captured on real Windows.
+
+### Benchmarks (honest)
+| Metric | Result | Target | Status |
+|---|---:|---:|---|
+| Content v2 retrieval p95 | 8.984 ms (official quiet, n=960) | 30 ms | MET |
+| Release hotkey to window visible p95 | 14.289 ms | 50 ms | MET |
+| Selection paint | 6 ms | 16 ms | MET |
+| Input to first visible result p95 (debug) | 38.2 ms | 30 ms | NOT MET |
+| Idle process-tree working set | 786.9 MiB | ~150 MB budget | NOT MET |
+
+### Artifact hashes (unsigned)
+- ProtonSearch.exe: 3010FBEED2AE5BB9EA0FC91960F0D8325BBF5BC589D9F3596B631BEFB6FE15EF (20,750,336 B)
+- ProtonSearch_2.0.0-alpha.1_x64-setup.exe: F5D15C2D89CA2857C6DDB71B9289645A693B37C958AAA462E7B662CEBD6FBF8D (5,567,529 B)
+
+### Honest blockers / recommendation
+Unsigned installer (no public distribution), installer upgrade/uninstall drill not run, single
+monitor only (mixed-DPI/High-Contrast/multi-monitor untested), idle memory and debug input latency
+over budget, native media/Wi-Fi/Bluetooth post-alpha milestone 2, no live Pi provider credentials,
+preview highlight open. Deployment-ready locally as an unsigned internal alpha: YES. Public release
+signed off: NO. Full detail: docs/release/ACCEPTANCE_REPORT.md and
+docs/implementation/V10_G8_VERIFICATION_ROUND2.md.
+
 ---
 
 ## What works today (verified on this machine)
@@ -24,11 +63,11 @@ Measured and captured with the real app over a real user profile (131,199 indexe
 | Applications, browser history/bookmarks, recent files, Git, clipboard sources | Implemented and visible with real data | real-launcher-long-list.png; crates/ps-sources |
 | Screenshot OCR search | Pipeline implemented (Windows.Media.Ocr); native engine measured; end-to-end UI run pending | crates/ps-ocr; docs/performance/BENCHMARKS.md |
 | Legacy v1 migration (settings, 89,813 file rows, 14,609 document texts) | Works, source read-only and hash-verified | docs/implementation/GATE_LOG.md; migration tests |
-| Desktop app (Home / Search & Indexes / Activity / Workflows / Preferences), onboarding, dark mode, hotkey capture | Works | real-app-*.png; 136 frontend tests |
+| Desktop app (Home / Search & Indexes / Activity / Workflows / Preferences), onboarding, dark mode, hotkey capture | Works | real-app-*.png; 241 frontend tests |
 | Optional Python agent sidecar (Pydantic AI, on-demand, approval-gated) | Sidecar + Rust client + shell commands work; Workflows panel integration in progress | crates/ps-agent (14 tests), agent-sidecar (18 tests) |
 | Marketing/telemetry/silent downloads | None. Ever. | settings model has telemetry forced off |
 
-Not yet wired in this alpha: OCR pipeline (Windows.Media.Ocr extraction is next), clipboard capture UI, applications/clipboard/browser/Git sources are implemented behind the engine but still being finalised, previews beyond metadata/snippets, quicklink/snippet editing, signed installer.
+Verified in the v10 release candidate (source 4e9f589, unsigned internal alpha, 2026-11-10): real previews for TXT/code/Markdown/JSON/CSV/PDF/DOCX/XLSX/images/OCR with explicit unsupported and stale-file fallbacks; clipboard text+image history with island thumbnails and restart persistence; V9 Dynamic Island with 8 cards/dots/motion; two-launcher settings/placement/card manager; agent task APIs with read-only Pi gate. Still open: matched-term preview highlight, island preview hookup, native Media/Wi-Fi/Bluetooth (post-alpha milestone 2), live Pi provider verification, signed installer/updater, mixed-DPI/High-Contrast/multi-monitor evidence.
 
 ## Measured performance (honest, reproducible)
 

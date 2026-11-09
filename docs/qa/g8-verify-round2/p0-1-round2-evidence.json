@@ -1,0 +1,991 @@
+{
+  "capturedAt": "2026-11-09T21:58:03.181Z",
+  "engine": {
+    "state": "ready",
+    "entries": 14
+  },
+  "api": [
+    {
+      "query": "notes",
+      "matcher": "notes.txt",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+        "kind": "file",
+        "title": "notes.txt",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+          "kind": "file",
+          "title": "notes.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+          "snippet": null
+        },
+        {
+          "id": "app:Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe!App",
+          "kind": "application",
+          "title": "Sticky Notes",
+          "path": "shell:AppsFolder\\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe!App",
+          "snippet": null
+        },
+        {
+          "id": "app:C:\\Program Files\\Microsoft Office\\root\\Office16\\ONENOTE.EXE",
+          "kind": "application",
+          "title": "Sticky Notes (new)",
+          "path": "C:\\Program Files\\Microsoft Office\\root\\Office16\\ONENOTE.EXE",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"notes\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+          "kind": "content_match",
+          "title": "notes",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+          "snippet": "Quarterly preview audit notes This plain-text file exists to test the file/text preview pipeline. Unique token: ZEBRA-TXT-2026. Second paragraph with the same token repeated: ZEBRA-TX…"
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "txt",
+        "text": "Quarterly preview audit notes\n\nThis plain-text file exists to test the file/text preview pipeline.\nUnique token: ZEBRA-TXT-2026.\nSecond paragraph with the same token repeated: ZEBRA-TXT-2026.",
+        "snippet": "Quarterly preview audit notes",
+        "textLen": 191,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "sample",
+      "matcher": "sample.rs",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+        "kind": "file",
+        "title": "sample.rs",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "kind": "file",
+          "title": "sample.csv",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "kind": "file",
+          "title": "sample.json",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "kind": "file",
+          "title": "sample.rs",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"sample\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026."
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "snippet": "name,token protonsearch,KOALA-CSV-2026"
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "snippet": "{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}"
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "snippet": "//! Preview audit code fixture. // Unique token: PANDA-CODE-2026 pub fn preview_probe(input: &str) -> usize { let mut total = 0usize; for ch in input.chars() { if ch.is_alphabetic() { total += 1; } } total }"
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "rs",
+        "text": "//! Preview audit code fixture.\n// Unique token: PANDA-CODE-2026\n\npub fn preview_probe(input: &str) -> usize {\n    let mut total = 0usize;\n    for ch in input.chars() {\n        if ch.is_alphabetic() { total += 1; }\n    }\n    total\n}",
+        "snippet": "//! Preview audit code fixture.",
+        "textLen": 232,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "readme",
+      "matcher": "readme.md",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+        "kind": "file",
+        "title": "readme.md",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+          "kind": "file",
+          "title": "readme.md",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"readme\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+          "kind": "content_match",
+          "title": "readme",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+          "snippet": "# Preview Audit Readme ## Markdown document This markdown file carries the token UNICORN-MD-2026 so content search can find it. - bullet one - bullet two fn demo() { pr…"
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "md",
+        "text": "# Preview Audit Readme\n\n## Markdown document\n\nThis markdown file carries the token UNICORN-MD-2026 so content search can find it.\n\n- bullet one\n- bullet two\n\n    fn demo() { println!(\"hello preview\"); }",
+        "snippet": "# Preview Audit Readme",
+        "textLen": 202,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "sample",
+      "matcher": "sample.json",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+        "kind": "file",
+        "title": "sample.json",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "kind": "file",
+          "title": "sample.csv",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "kind": "file",
+          "title": "sample.json",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "kind": "file",
+          "title": "sample.rs",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"sample\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026."
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "snippet": "name,token protonsearch,KOALA-CSV-2026"
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "snippet": "{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}"
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "snippet": "//! Preview audit code fixture. // Unique token: PANDA-CODE-2026 pub fn preview_probe(input: &str) -> usize { let mut total = 0usize; for ch in input.chars() { if ch.is_alphabetic() { total += 1; } } total }"
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "json",
+        "text": "{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}",
+        "snippet": "{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}",
+        "textLen": 70,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "sample",
+      "matcher": "sample.csv",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+        "kind": "file",
+        "title": "sample.csv",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "kind": "file",
+          "title": "sample.csv",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "kind": "file",
+          "title": "sample.json",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "kind": "file",
+          "title": "sample.rs",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"sample\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026."
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "snippet": "name,token protonsearch,KOALA-CSV-2026"
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "snippet": "{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}"
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+          "snippet": "//! Preview audit code fixture. // Unique token: PANDA-CODE-2026 pub fn preview_probe(input: &str) -> usize { let mut total = 0usize; for ch in input.chars() { if ch.is_alphabetic() { total += 1; } } total }"
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "csv",
+        "text": "name,token\nprotonsearch,KOALA-CSV-2026",
+        "snippet": "name,token",
+        "textLen": 38,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "report",
+      "matcher": "report.pdf",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+        "kind": "file",
+        "title": "report.pdf",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "kind": "file",
+          "title": "report.docx",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "file",
+          "title": "report.pdf",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"report\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "snippet": "Preview Audit DOCX This Word document carries the token KOALA-DOCX-2026 for content search. Second paragraph: KOALA-DOCX-2026 again."
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026."
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "pdf",
+        "text": "\n\nWALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+        "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+        "textLen": 83,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "scanned",
+      "matcher": "scanned.pdf",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+        "kind": "file",
+        "title": "scanned.pdf",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+          "kind": "file",
+          "title": "scanned.pdf",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"scanned\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+          "kind": "content_match",
+          "title": "scanned",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+          "snippet": ""
+        }
+      ],
+      "preview": {
+        "status": "unsupported",
+        "format": "pdf",
+        "text": "",
+        "snippet": "",
+        "textLen": 0,
+        "fields": 2,
+        "highlights": [
+          {
+            "start": 0,
+            "end": 7
+          }
+        ],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": "This PDF has no text layer (scanned document); OCR preview is not available yet.",
+        "error": null
+      }
+    },
+    {
+      "query": "report",
+      "matcher": "report.docx",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+        "kind": "file",
+        "title": "report.docx",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "kind": "file",
+          "title": "report.docx",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "file",
+          "title": "report.pdf",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"report\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "snippet": "Preview Audit DOCX This Word document carries the token KOALA-DOCX-2026 for content search. Second paragraph: KOALA-DOCX-2026 again."
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026."
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "docx",
+        "text": "Preview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.",
+        "snippet": "Preview Audit DOCX",
+        "textLen": 132,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "sheet",
+      "matcher": "sheet.xlsx",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+        "kind": "file",
+        "title": "sheet.xlsx",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+          "kind": "file",
+          "title": "sheet.xlsx",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"sheet\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+          "kind": "content_match",
+          "title": "sheet",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+          "snippet": "Token Meaning TIGER-XLSX-2026 spreadsheet preview audit"
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "xlsx",
+        "text": "Token\tMeaning\nTIGER-XLSX-2026\tspreadsheet preview audit",
+        "snippet": "Token\tMeaning",
+        "textLen": 55,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "diagram",
+      "matcher": "diagram.png",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+        "kind": "file",
+        "title": "diagram.png",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+          "kind": "file",
+          "title": "diagram.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"diagram\"",
+          "path": null,
+          "snippet": null
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "png",
+        "text": "",
+        "snippet": "",
+        "textLen": 0,
+        "fields": 3,
+        "highlights": [
+          {
+            "start": 0,
+            "end": 7
+          }
+        ],
+        "truncated": false,
+        "imageMime": "image/png",
+        "imageDataUrlLen": 26746,
+        "ocrLen": 45,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "blob",
+      "matcher": "blob.bin",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+        "kind": "file",
+        "title": "blob.bin",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+          "kind": "file",
+          "title": "blob.bin",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"blob\"",
+          "path": null,
+          "snippet": null
+        }
+      ],
+      "preview": {
+        "status": "unsupported",
+        "format": "bin",
+        "text": "",
+        "snippet": "",
+        "textLen": 0,
+        "fields": 2,
+        "highlights": [
+          {
+            "start": 0,
+            "end": 4
+          }
+        ],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": "Preview is not available for .bin files.",
+        "error": null
+      }
+    },
+    {
+      "query": "unknown",
+      "matcher": "unknown.xyz",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+        "kind": "file",
+        "title": "unknown.xyz",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+          "kind": "file",
+          "title": "unknown.xyz",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"unknown\"",
+          "path": null,
+          "snippet": null
+        }
+      ],
+      "preview": {
+        "status": "unsupported",
+        "format": "xyz",
+        "text": "",
+        "snippet": "",
+        "textLen": 0,
+        "fields": 2,
+        "highlights": [
+          {
+            "start": 0,
+            "end": 7
+          }
+        ],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": "Preview is not available for .xyz files.",
+        "error": null
+      }
+    },
+    {
+      "query": "large",
+      "matcher": "large.txt",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+        "kind": "file",
+        "title": "large.txt",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+          "kind": "file",
+          "title": "large.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"large\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+          "kind": "content_match",
+          "title": "large",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+          "snippet": "LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line …"
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "txt",
+        "text": "LARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\n",
+        "snippet": "LARGE-TXT-2026 line",
+        "textLen": 1499,
+        "fields": 5,
+        "highlights": [],
+        "truncated": true,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "unicode",
+      "matcher": "unicode-note.txt",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+        "kind": "file",
+        "title": "unicode-note.txt",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+          "kind": "file",
+          "title": "unicode-note.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"unicode\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+          "kind": "content_match",
+          "title": "unicode-note",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+          "snippet": "नमस्ते KOALA-UNICODE-2026 你好 😀"
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "txt",
+        "text": "नमस्ते KOALA-UNICODE-2026 你好 😀",
+        "snippet": "नमस्ते KOALA-UNICODE-2026 你好 😀",
+        "textLen": 31,
+        "fields": 4,
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    }
+  ],
+  "tokens": [
+    {
+      "query": "KOALA-DOCX-2026",
+      "matcher": "report.docx",
+      "candidates": [
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"KOALA-DOCX-2026\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "snippet": "Preview Audit DOCX This Word document carries the token KOALA-DOCX-2026 for content search. Second paragraph: KOALA-DOCX-2026 again."
+        }
+      ],
+      "preview": null,
+      "target": null
+    },
+    {
+      "query": "KOALA-JSON-2026",
+      "matcher": "sample.json",
+      "candidates": [
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"KOALA-JSON-2026\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json",
+          "snippet": "{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}"
+        }
+      ],
+      "preview": null,
+      "target": null
+    },
+    {
+      "query": "KOALA-CSV-2026",
+      "matcher": "sample.csv",
+      "candidates": [
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"KOALA-CSV-2026\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "kind": "content_match",
+          "title": "sample",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.csv",
+          "snippet": "name,token protonsearch,KOALA-CSV-2026"
+        }
+      ],
+      "preview": null,
+      "target": null
+    },
+    {
+      "query": "KOALA-UNICODE-2026",
+      "matcher": "unicode-note.txt",
+      "candidates": [
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"KOALA-UNICODE-2026\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+          "kind": "content_match",
+          "title": "unicode-note",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unicode-note.txt",
+          "snippet": "नमस्ते KOALA-UNICODE-2026 你好 😀"
+        }
+      ],
+      "preview": null,
+      "target": null
+    }
+  ],
+  "stale": {
+    "resultId": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+    "after": {
+      "status": "error",
+      "format": "png",
+      "truncated": false,
+      "unsupportedReason": "Image could not be decoded: The system cannot find the file specified. (os error 2)",
+      "error": "Image could not be decoded: The system cannot find the file specified. (os error 2)",
+      "textLen": 0,
+      "img": 0
+    }
+  },
+  "ui": [
+    {
+      "query": "report.docx",
+      "panel": {
+        "text": "DOC\nreport.docx\nDOCX\nC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx\nDOCX PREVIEW\nPreview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.\nSize\n35.8 KB\nModified\n2026-11-09 20:32 UTC\nLines\n3\nWords\n17\nOpen\nReveal in Explorer\nCopy path",
+        "marks": 0,
+        "imgs": [],
+        "unsupported": 0
+      },
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify-round2/p0-1-docx.png"
+    },
+    {
+      "query": "unicode",
+      "panel": null,
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify-round2/p0-1-unicode.png"
+    },
+    {
+      "query": "diagram.png",
+      "panel": {
+        "text": "PNG\ndiagram.png\nPNG\nC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png\nTEXT FOUND IN IMAGE\nIMAGE-OCR-PROBE-2026 screenshot preview audit\nSize\n16.2 KB\nModified\n2026-11-09 20:32 UTC\nDimensions\n900 x 260\nOpen\nReveal in Explorer\nCopy path",
+        "marks": 0,
+        "imgs": [
+          {
+            "w": 300,
+            "h": 87,
+            "src": "data:image/png;base64,iVBORw0K"
+          }
+        ],
+        "unsupported": 0
+      },
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify-round2/p0-1-image.png"
+    },
+    {
+      "query": "blob.bin",
+      "panel": null,
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify-round2/p0-1-unsupported.png"
+    },
+    {
+      "query": "sample.json",
+      "panel": {
+        "text": "JSO\nsample.json\nJSON\nC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.json\nJSON PREVIEW\n{\"name\":\"protonsearch\",\"token\":\"KOALA-JSON-2026\",\"nested\":{\"ok\":true}}\nSize\n75 B\nModified\n2026-11-09 21:51 UTC\nLines\n1\nWords\n1\nOpen\nReveal in Explorer\nCopy path",
+        "marks": 0,
+        "imgs": [],
+        "unsupported": 0
+      },
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify-round2/p0-1-json.png"
+    }
+  ]
+}

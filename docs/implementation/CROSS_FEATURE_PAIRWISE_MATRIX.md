@@ -41,17 +41,17 @@ at least once on real Windows hardware.
 |---|---|---|---|---|---|---|---|
 | P-01 | Normal Launcher x every source | 2 modes x 12 source families; parity assertion | P01-01..24 | yes, both modes | L1-B + L2-A | G8 | PARTIAL (representative sources live on both surfaces; full parity matrix not executed) |
 | P-02 | Dynamic Island x every source | same data set as P-01; parity with Normal | P02-01..24 | yes | L1-B | G8 | PARTIAL (island cards live; full source parity not executed) |
-| P-03 | Clipboard Image capture x Images category x restart x re-paste | exhaustive: 4 lifecycle points x 3 sources (Paint, Snipping Tool, browser image) x 2 modes | P03-01..18 | yes (real pixel copy) | L2-A | G2/G8 | PARTIAL PASS (capture/category/thumbnails/restart live; UI re-paste + Paint/Snipping/browser/privacy variants not executed) |
+| P-03 | Clipboard Image capture x Images category x restart x re-paste | exhaustive: 4 lifecycle points x 3 sources (Paint, Snipping Tool, browser image) x 2 modes | P03-01..18 | yes (real pixel copy) | L2-A | G2/G8 | PARTIAL PASS round 2 (RC: capture/category/thumbnail/restart pass; UI re-paste + GUI source matrix open) |
 | P-04 | Clipboard Code x preview x long/unicode text | 3 lengths x 3 charsets x 2 modes | P04-01..12 | yes | L2-A/L1-B | G8 | PLANNED |
 | P-05 | Pinned image x retention/clear x restart | exhaustive | P05-01..08 | yes | L2-A | G8 | PLANNED |
 | P-06 | Clipboard paste x focused target window | Notepad, VS Code, Paint, browser, terminal; unsupported target error | P06-01..10 | yes | L2-A | G2/G8 | PLANNED |
-| P-07 | Search result x preview x file type (TXT, code, MD, PDF, DOCX, image/OCR, binary/error) | 7 file classes x 2 modes | P07-01..14 | yes | L1-A/L1-B | G2/G8 | PARTIAL PASS (TXT/PDF/DOCX/PNG+OCR/binary live; code/MD/HTML/JSON/CSV + both-launcher parity not executed) |
+| P-07 | Search result x preview x file type (TXT, code, MD, PDF, DOCX, image/OCR, binary/error) | 7 file classes x 2 modes | P07-01..14 | yes | L1-A/L1-B | G2/G8 | PARTIAL PASS round 2 (14 formats live incl DOCX/XLSX/PNG+OCR/JSON/CSV/Unicode; matched-term highlight FAILS; both-launcher parity open) |
 | P-08 | Text preview x highlighted match x Unicode | ASCII, Hindi, CJK, emoji, mixed direction | P08-01..10 | yes | L1-A | G8 | PLANNED |
-| P-09 | Renamed/deleted file x stale preview | rename, move, delete, lock while selected; cancellation tokens | P09-01..08 | yes | L1-A | G8 | PLANNED |
-| P-10 | Card reorder x dots x scroll/swipe x default card x disabled card x restart | covering array (order x enabled x default x motion) + exhaustive restart persistence | P10-01..24 | yes | L1-B/L2-B | G6/G8 | PARTIAL (8 cards + dot navigation verified; reorder/default/disabled/restart combination not executed) |
+| P-09 | Renamed/deleted file x stale preview | rename, move, delete, lock while selected; cancellation tokens | P09-01..08 | yes | L1-A | G8 | PASS round 2 (stale file preview returns explicit error, no blank/crash) |
+| P-10 | Card reorder x dots x scroll/swipe x default card x disabled card x restart | covering array (order x enabled x default x motion) + exhaustive restart persistence | P10-01..24 | yes | L1-B/L2-B | G6/G8 | PARTIAL (component tests + live card shots; reorder/default/disabled combination not executed) |
 | P-11 | Card ordering x multi-monitor placement | order x monitor strategy x anchor x DPI | P11-01..16 | **blocked: single monitor**; partial 1-monitor + scaling only | L1-B | G6/G8 | BLOCKED (env) |
 | P-12 | Island placement x primary/secondary x DPI x taskbar x edge clamp x tall expanded card x disconnect/reconnect | exhaustive on available: 1 monitor x 4 scaling x 4 edges x 8 card heights; dual/disconnect blocked | P12-01..40 | partial | L1-B | G6/G8 | PARTIAL/BLOCKED |
-| P-13 | Settings Apply/Cancel x ghost preview x persistence x hotkey/show/hide | apply, cancel, revert, reset, crash before save, restart | P13-01..12 | yes | L1-B/L1-E | G6/G8 | PARTIAL (settings/placement UI implemented; full apply/cancel/reset/restart E2E not executed) |
+| P-13 | Settings Apply/Cancel x ghost preview x persistence x hotkey/show/hide | apply, cancel, revert, reset, crash before save, restart | P13-01..12 | yes | L1-B/L1-E | G6/G8 | PARTIAL (settings/placement implemented; full apply/cancel/restart E2E not executed) |
 | P-14 | Fullscreen app x topmost island; hotkey conflict x restore previous focus | 3 window states x 2 policies | P14-01..08 | yes | L1-B/L1-E | G4/G5/G8 | PLANNED |
 | P-15 | Media x output selection x Bluetooth device disconnect | session states x output states x device loss | P15-01..12 | yes | L1-A | G7/G8 | PLANNED |
 | P-16 | Quick Settings Wi-Fi toggle x network list; airplane x Wi-Fi/Bluetooth availability; brightness x unsupported monitor | capability matrix x toggle/drilldown independence | P16-01..20 | yes | L1-A/L2-A | G7/G8 | PLANNED |
@@ -129,3 +129,13 @@ docs/implementation/V10_G8_VERIFICATION_ROUND1.md.
 
 A pair is PASS only when both features behave as specified when combined; the PARTIAL rows above are
 not sign-off evidence. G8 sign-off list: V10_G8_VERIFICATION_ROUND1.md section 7.
+
+
+## 7. G8 round 2 (RC 4e9f589) execution
+
+Executed live on the release-candidate tree (debug CDP build for UI; see
+docs/implementation/V10_G8_VERIFICATION_ROUND2.md):
+P-03 PARTIAL PASS (capture/category/thumbnail/restart), P-07 PARTIAL PASS (14 formats; matched-term
+highlight FAILS), P-09 PASS (stale file explicit error), P-10/P-13/P-26 PARTIAL. P-06/P-17/P-18/P-23
+not executed (GUI target matrix, no Pi credentials, installer drill not run); P-11/P-12/P-14 still
+blocked by single-monitor host. No pair is signed off on partial evidence.
