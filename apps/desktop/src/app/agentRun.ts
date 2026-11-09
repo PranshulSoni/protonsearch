@@ -191,6 +191,27 @@ export function elapsedMs(view: AgentRunView, now = Date.now()): number {
   return Math.max(0, end - view.startedAt);
 }
 
+/** Localized "Today, 14:32"; includes the date when the run is not from today. */
+export function formatRunStarted(timestamp: number, now = Date.now()): string {
+  const date = new Date(timestamp);
+  const current = new Date(now);
+  const sameDay =
+    date.getFullYear() === current.getFullYear() &&
+    date.getMonth() === current.getMonth() &&
+    date.getDate() === current.getDate();
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+  if (sameDay) return "Today, " + time;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function formatElapsed(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "0.0 s";
   if (ms < 60_000) return (Math.round(ms / 100) / 10).toFixed(1) + " s";

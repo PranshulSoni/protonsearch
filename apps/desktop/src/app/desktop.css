@@ -1111,8 +1111,8 @@
 .agent-safety-line {
   margin: 0;
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-small);
-  line-height: var(--ps-leading-small);
+  font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
 }
 
 .agent-actions {
@@ -1157,11 +1157,12 @@
 
 .agent-result-text {
   margin: 0;
-  max-width: 72ch;
+  max-width: 60ch;
   color: var(--ps-ink);
   font-size: var(--ps-text-body);
   line-height: var(--ps-leading-body);
   white-space: pre-wrap;
+  user-select: text;
 }
 
 .agent-log {
@@ -1175,14 +1176,15 @@
 
 .agent-log-entry {
   display: grid;
-  grid-template-columns: 18px 96px minmax(0, 1fr);
+  grid-template-columns: 14px 96px minmax(0, 1fr);
   gap: var(--space-3);
-  align-items: start;
-  padding: 8px 0;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 0;
   border-bottom: var(--ps-border) solid var(--ps-line-soft);
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-small);
-  line-height: var(--ps-leading-small);
+  font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
 }
 
 .agent-log-entry:last-child {
@@ -1192,21 +1194,24 @@
 .agent-log-icon {
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 20px;
+  width: 14px;
+  height: 16px;
   color: var(--ps-ink-3);
 }
 
 .agent-log-label {
   color: var(--ps-ink-2);
   font-size: var(--ps-text-meta);
-  font-weight: var(--ps-fw-label);
-  letter-spacing: 0.02em;
+  font-weight: var(--ps-fw-semibold);
+  letter-spacing: 0;
+  line-height: var(--ps-leading-meta);
 }
 
 .agent-log-text {
   min-width: 0;
   color: var(--ps-ink);
+  font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -1226,7 +1231,7 @@
 
 @media (max-width: 700px) {
   .agent-log-entry {
-    grid-template-columns: 18px minmax(0, 1fr);
+    grid-template-columns: 14px minmax(0, 1fr);
   }
 
   .agent-log-label {
@@ -1239,5 +1244,224 @@
 
   .agent-refresh {
     margin-left: 0;
+  }
+}
+
+/* Agents catalog + recent-run summary (task-22). Quiet rows, no fake badges. */
+.agent-catalog {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-catalog-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 68px;
+  padding: 12px 0;
+  border-bottom: var(--ps-border) solid var(--ps-line);
+}
+
+.agent-catalog-row.is-primary {
+  box-shadow: inset var(--ps-selected-bar-width) 0 0 var(--ps-selected-bar);
+}
+
+.agent-catalog-row:last-child {
+  border-bottom: 0;
+}
+
+.agent-catalog-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--ps-ink-2);
+}
+
+.agent-catalog-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.agent-catalog-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agent-catalog-name {
+  color: var(--ps-ink);
+  font-size: var(--ps-text-strong);
+  font-weight: var(--ps-fw-semibold);
+  line-height: var(--ps-leading-small);
+}
+
+.agent-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: var(--ps-border) solid var(--ps-line);
+  border-radius: var(--ps-radius-kbd);
+  font-size: var(--ps-text-micro);
+  font-weight: 650;
+  line-height: var(--ps-leading-micro);
+  white-space: nowrap;
+}
+
+.agent-badge--available {
+  background: var(--ps-surface-soft);
+  color: var(--ps-ink-2);
+}
+
+.agent-badge--missing {
+  background: transparent;
+  color: var(--ps-ink-3);
+}
+
+.agent-badge--running {
+  gap: 4px;
+  border-color: transparent;
+  background: var(--ps-positive-pill-bg);
+  color: var(--ps-positive-pill-ink);
+}
+
+.agent-default-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: var(--ps-border) solid var(--ps-line);
+  border-radius: var(--ps-radius-kbd);
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-micro);
+  line-height: var(--ps-leading-micro);
+}
+
+.agent-catalog-path {
+  overflow: hidden;
+  color: var(--ps-ink-2);
+  font-family: var(--ps-font-mono);
+  font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-catalog-detail {
+  color: var(--ps-ink-3);
+  font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
+}
+
+.agent-catalog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.agent-runs {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: var(--ps-border) solid var(--ps-line-soft);
+}
+
+.agent-runs .agent-section-label {
+  margin-top: 0;
+}
+
+.agent-run-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-run-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: 36px;
+  padding: 6px 0;
+  border-bottom: var(--ps-border) solid var(--ps-line-soft);
+}
+
+.agent-run-row:last-child {
+  border-bottom: 0;
+}
+
+.agent-run-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 94px;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-small);
+  font-weight: var(--ps-fw-semibold);
+}
+
+.agent-run-ok {
+  color: var(--ps-positive);
+}
+
+.agent-run-error {
+  color: var(--ps-negative);
+}
+
+.agent-run-cancelled {
+  color: var(--ps-ink-2);
+}
+
+.agent-run-dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--ps-radius-full);
+  background: var(--ps-ink-3);
+}
+
+.agent-run-dot--ok {
+  background: var(--ps-positive);
+}
+
+.agent-run-dot--error {
+  background: var(--ps-negative);
+}
+
+.agent-run-dot--busy {
+  background: var(--ps-accent);
+}
+
+.agent-run-dot--muted {
+  background: var(--ps-ink-3);
+}
+
+.agent-run-meta {
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-panel-anchor:focus {
+  outline: 2px solid var(--ps-focus);
+  outline-offset: 4px;
+  border-radius: var(--ps-radius-window);
+}
+
+@media (max-width: 700px) {
+  .agent-catalog-row {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .agent-catalog-actions {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 }

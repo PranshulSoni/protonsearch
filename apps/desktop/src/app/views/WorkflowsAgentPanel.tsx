@@ -19,10 +19,13 @@ import {
   createAgentRunId,
   elapsedMs,
   formatElapsed,
+  formatRunStarted,
   initialAgentView,
   markAgentStartFailed,
 } from "../agentRun";
 import { readMockAgentStatus, subscribeAgentEvents } from "../agentEvents";
+import { setAgentActivity } from "../agentActivity";
+import { recordAgentRun } from "../agentRunHistory";
 import {
   Dot,
   Icon,
@@ -61,6 +64,21 @@ function runtimeTone(status: AgentStatus | null): "ok" | "warn" | "error" | "off
   }
 }
 
+function runStatusWord(phase: string): string {
+  if (phase === "starting" || phase === "running") return "Running";
+  if (phase === "finished") return "Completed";
+  if (phase === "error") return "Failed";
+  if (phase === "cancelled") return "Cancelled";
+  return "";
+}
+
+function runStatusTone(phase: string): "busy" | "ok" | "error" | "muted" {
+  if (phase === "starting" || phase === "running") return "busy";
+  if (phase === "finished") return "ok";
+  if (phase === "error") return "error";
+  return "muted";
+}
+
 function logIcon(tone: string): IconName {
   if (tone === "error") return "alert";
   if (tone === "warn") return "alert";
@@ -87,6 +105,11 @@ export default function PiAgentPanel() {
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const phaseRef = useRef(view.phase);
   phaseRef.current = view.phase;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const recordedRunRef = useRef<string | null>(null);
 
   const refreshStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -128,13 +151,26 @@ export default function PiAgentPanel() {
   }, [view.phase]);
 
   // One run at a time; after any terminal state make sure no Pi process is left
-  // running while idle (the runtime is strictly on demand).
+  // running while idle (the runtime is strictly on demand) and record the run
+  // (metadata only) for the Agents section.
   useEffect(() => {
     if (view.phase !== "finished" && view.phase !== "error" && view.phase !== "cancelled") return;
+    if (view.runId && view.startedAt && recordedRunRef.current !== view.runId) {
+      recordedRunRef.current = view.runId;
+      recordAgentRun({
+        runId: view.runId,
+        runtime: statusRef.current?.runtime ?? "Pi",
+        status:
+          view.phase === "finished" ? "ok" : view.phase === "error" ? "error" : "cancelled",
+        startedAt: view.startedAt,
+        endedAt: view.finishedAt ?? Date.now(),
+        durationMs: view.durationMs ?? elapsedMs(view, Date.now()),
+      });
+    }
     void api.agentStop().catch(() => undefined);
     const timer = window.setTimeout(() => void refreshStatus(), 350);
     return () => window.clearTimeout(timer);
-  }, [view.phase, refreshStatus]);
+  }, [view, refreshStatus]);
 
   // Navigating away mid-run must not leave an orphaned agent process.
   useEffect(() => {
@@ -142,6 +178,18 @@ export default function PiAgentPanel() {
       if (phaseRef.current === "running" || phaseRef.current === "starting") {
         void api.agentCancel().catch(() => undefined);
         void api.agentStop().catch(() => undefined);
+        const latest = viewRef.current;
+        if (latest.runId && latest.startedAt && recordedRunRef.current !== latest.runId) {
+          recordedRunRef.current = latest.runId;
+          recordAgentRun({
+            runId: latest.runId,
+            runtime: statusRef.current?.runtime ?? "Pi",
+            status: "cancelled",
+            startedAt: latest.startedAt,
+            endedAt: Date.now(),
+            durationMs: elapsedMs(latest, Date.now()),
+          });
+        }
       }
     };
   }, []);
@@ -149,6 +197,17 @@ export default function PiAgentPanel() {
   useEffect(() => {
     setWorkspaceDraft(settings.agent.workspace ?? "");
   }, [settings.agent.workspace]);
+
+  // Publish the live "running" state for the Agents list badge.
+  useEffect(() => {
+    if (view.phase === "starting" || view.phase === "running") {
+      setAgentActivity(true, statusRef.current?.runtime ?? "Pi");
+    } else if (view.phase !== "idle") {
+      setAgentActivity(false);
+    }
+  }, [view.phase]);
+
+  useEffect(() => () => setAgentActivity(false), []);
 
   const detected = status?.state === "running" || status?.state === "stopped";
   const active = agentIsActive(view.phase);
@@ -164,6 +223,7 @@ export default function PiAgentPanel() {
       : "Install the Pi CLI, then refresh. Nothing is downloaded automatically.";
   const disabled = !settings.agent.enabled;
   const elapsed = elapsedMs(view, now);
+  const displayDuration = view.durationMs ?? elapsed;
   const canRun =
     !disabled && detected && prompt.trim().length > 0 && !starting && !active;
 
@@ -263,8 +323,8 @@ export default function PiAgentPanel() {
   return (
     <Panel
       id="workflows-agent"
-      title="Pi agent"
-      hint="Optional. Starts only when you run a workflow, then stops; no process runs while idle."
+      title="Run a Pi workflow"
+      hint="Pi starts only for a prompt you start here, then stops. Read-only in this alpha."
       actions={<SavedStamp show={savedKey === "agent"} />}
     >
       <div className="config-row">
@@ -444,7 +504,7 @@ export default function PiAgentPanel() {
             {starting ? "Starting…" : "Run workflow"}
           </button>
         )}
-        {!active && (view.phase === "finished" || view.phase === "cancelled") ? (
+        {!active && (view.phase === "error" || view.phase === "cancelled") ? (
           <button
             type="button"
             className="btn"
@@ -456,7 +516,7 @@ export default function PiAgentPanel() {
         ) : null}
         <span className="agent-elapsed">
           {view.phase === "finished" || view.phase === "error" || view.phase === "cancelled"
-            ? "Last run · " + formatElapsed(elapsed)
+            ? "Last run · " + formatElapsed(displayDuration)
             : active
               ? "Running · " + formatElapsed(elapsed)
               : ""}
@@ -465,6 +525,31 @@ export default function PiAgentPanel() {
           Refresh status
         </button>
       </div>
+
+      {view.startedAt ? (
+        <dl className="metric-list agent-run-summary">
+          <div className="metric-row">
+            <dt>Status</dt>
+            <dd>
+              <span
+                className={"agent-run-dot agent-run-dot--" + runStatusTone(view.phase)}
+                aria-hidden="true"
+              />
+              {runStatusWord(view.phase)}
+            </dd>
+          </div>
+          <div className="metric-row">
+            <dt>Started</dt>
+            <dd>{formatRunStarted(view.startedAt)}</dd>
+          </div>
+          <div className="metric-row">
+            <dt>Duration</dt>
+            <dd>{formatElapsed(displayDuration)}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p className="field-help">No runs yet. Start a workflow above.</p>
+      )}
 
       {actionNotice ? (
         <StateNotice
@@ -485,6 +570,13 @@ export default function PiAgentPanel() {
           details={view.errorReference ?? undefined}
           actionLabel="Try again"
           onAction={retryRun}
+        />
+      ) : null}
+
+      {view.phase === "cancelled" ? (
+        <StateNotice
+          title="Workflow cancelled."
+          body="Nothing outside the workspace was changed."
         />
       ) : null}
 

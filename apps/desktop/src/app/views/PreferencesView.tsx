@@ -314,7 +314,10 @@ export default function PreferencesView({
             <div className="pref-row">
               <div className="pref-copy">
                 <span className="pref-title">Clipboard history</span>
-                <span className="pref-desc">Save copied text locally so it can appear in search.</span>
+                <span className="pref-desc">
+                  Save copied text locally so it can appear in search. Capture starts now; previous
+                  Windows clipboard history is not imported or backfilled.
+                </span>
               </div>
               <Switch
                 checked={settings.privacy.clipboardHistory}

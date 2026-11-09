@@ -47,6 +47,8 @@ struct AppState {
     agent: Mutex<Option<AgentClient>>,
     /// Pi CLI agent (default runtime). Spawned only when a workflow starts.
     pi_agent: Mutex<Option<PiAgentClient>>,
+    /// Cached agent discovery for the Workflows Agents section.
+    agents: Mutex<Option<Vec<DetectedAgent>>>,
 }
 
 /// Position the frameless launcher near the top-center of the monitor under the
@@ -361,8 +363,11 @@ fn update_settings(
         .engine
         .update_settings(patch)
         .map_err(|e| e.to_string())?;
-    // The Pi launcher path may have changed; drop the cached probe.
+    // The Pi launcher path may have changed; drop the cached probe and agent list.
     ps_agent::clear_probe_cache();
+    if let Ok(mut cache) = state.agents.lock() {
+        *cache = None;
+    }
     // Settings may change roots/depth/pause; restarting is idempotent.
     if !settings.indexing.paused {
         std::sync::Arc::clone(&state.engine).spawn_background();
@@ -572,6 +577,160 @@ fn probe_agent_status(state: &AppState) -> AgentStatus {
     }
 }
 
+/// A locally detected agent runtime shown in the Workflows Agents section.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DetectedAgent {
+    id: String,
+    name: String,
+    kind: String,
+    version: Option<String>,
+    path: Option<String>,
+    available: bool,
+    detail: Option<String>,
+}
+
+fn locate_agent_on_path(exe: &str) -> Option<std::path::PathBuf> {
+    let mut cmd = std::process::Command::new("where");
+    cmd.arg(exe);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    text.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(std::path::PathBuf::from)
+        .filter(|path| path.is_file())
+        .max_by_key(|path| match path.extension().and_then(|value| value.to_str()) {
+            Some(ext) if ext.eq_ignore_ascii_case("exe") => 3,
+            Some(ext) if ext.eq_ignore_ascii_case("cmd") => 2,
+            Some(ext) if ext.eq_ignore_ascii_case("bat") => 1,
+            _ => 0,
+        })
+}
+
+/// Run the agent CLI version command with a hard 2.5 s bound and a 64 KiB cap.
+fn bounded_agent_version(path: &std::path::Path) -> Option<String> {
+    let text = path.to_string_lossy();
+    if text
+        .chars()
+        .any(|c| matches!(c, '&' | '|' | '<' | '>' | '^' | '"' | '%' | '\r' | '\n'))
+    {
+        return None;
+    }
+    let ext = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let mut cmd = if matches!(ext.as_str(), "cmd" | "bat") {
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/d", "/s", "/c", &format!("\"{text}\" --version")]);
+        c
+    } else {
+        let mut c = std::process::Command::new(path);
+        c.arg("--version");
+        c
+    };
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let mut child = cmd.spawn().ok()?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(2500);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if std::time::Instant::now() > deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return None;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(40));
+            }
+            Err(_) => {
+                let _ = child.kill();
+                return None;
+            }
+        }
+    }
+    use std::io::Read;
+    let mut buffer = String::new();
+    if let Some(mut stdout) = child.stdout.take() {
+        let _ = stdout.take(64 * 1024).read_to_string(&mut buffer);
+    }
+    if buffer.trim().is_empty() {
+        if let Some(mut stderr) = child.stderr.take() {
+            let _ = stderr.take(64 * 1024).read_to_string(&mut buffer);
+        }
+    }
+    let first = buffer
+        .lines()
+        .map(|line| line.trim())
+        .find(|line| !line.is_empty())?;
+    Some(first.chars().take(80).collect())
+}
+
+/// Detected local agent CLIs (Pi first, then other installed coding agents).
+#[tauri::command]
+fn detect_agents(state: tauri::State<'_, AppState>) -> Vec<DetectedAgent> {
+    if let Ok(cache) = state.agents.lock() {
+        if let Some(agents) = cache.as_ref() {
+            return agents.clone();
+        }
+    }
+    let settings = state.engine.settings();
+    let mut agents = Vec::new();
+    if let Some(info) =
+        ps_agent::probe_pi_cached(settings.agent.pi_path.as_deref().map(std::path::Path::new))
+    {
+        agents.push(DetectedAgent {
+            id: "pi".into(),
+            name: "Pi".into(),
+            kind: "agent".into(),
+            version: Some(info.version.clone()),
+            path: Some(info.path.to_string_lossy().into_owned()),
+            available: true,
+            detail: Some("Default agent runtime. Read-only in this alpha.".into()),
+        });
+    }
+    for (exe, name, detail) in [
+        ("codex", "Codex CLI", "OpenAI Codex coding agent"),
+        ("opencode", "OpenCode", "OpenCode coding agent"),
+        ("cline", "Cline", "Cline coding agent"),
+        ("agy", "Antigravity", "Antigravity agent"),
+    ] {
+        if let Some(path) = locate_agent_on_path(exe) {
+            let version = bounded_agent_version(&path);
+            agents.push(DetectedAgent {
+                id: exe.into(),
+                name: name.into(),
+                kind: "agent".into(),
+                version,
+                path: Some(path.to_string_lossy().into_owned()),
+                available: true,
+                detail: Some(detail.into()),
+            });
+        }
+    }
+    if let Ok(mut cache) = state.agents.lock() {
+        *cache = Some(agents.clone());
+    }
+    agents
+}
+
 #[tauri::command]
 fn agent_status(state: tauri::State<'_, AppState>) -> AgentStatus {
     probe_agent_status(&state)
@@ -729,6 +888,7 @@ fn main() {
                 data_dir,
                 agent: Mutex::new(None),
                 pi_agent: Mutex::new(None),
+                agents: Mutex::new(None),
             });
 
             step("windows: creating");
@@ -773,6 +933,7 @@ fn main() {
             quit_app,
             set_hotkey,
             agent_status,
+            detect_agents,
             agent_start,
             agent_cancel,
             agent_approve,

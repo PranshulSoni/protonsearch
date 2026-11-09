@@ -22,6 +22,9 @@ const params = new URLSearchParams(typeof location !== "undefined" ? location.se
 const MOCK_ONBOARDING = params.get("onboard") === "1";
 const MOCK_STATE = params.get("state") ?? "ready";
 const MOCK_SLOW_MS = params.get("slow") === "1" ? 1200 : 0;
+// Agent-catalog fixtures for visual QA: default = Pi detected + Codex missing,
+// ?agents=none = no runtimes, ?agents=multi = several CLIs including misses.
+const MOCK_AGENTS = params.get("agents") ?? "default";
 const USER = "C:\\Users\\Pranshul";
 
 let settings: Settings = {
@@ -317,6 +320,68 @@ export const mockBridge = {
   async confirmNativeAction(): Promise<OpenOutcome> {
     return { ok: false, message: "Browser preview: system actions are disabled." };
   },
+  async detectAgents(): Promise<import("./types").DetectedAgent[]> {
+    const pi = {
+      id: "pi",
+      name: "Pi",
+      kind: "cli",
+      version: "1.5.0",
+      path: "C:\\Users\\you\\.pi\\agent\\bin\\pi.cmd",
+      available: true,
+      detail: "Detected on PATH. Read-only in this alpha.",
+    };
+    const codexMissing = {
+      id: "codex",
+      name: "Codex",
+      kind: "cli",
+      version: null,
+      path: null,
+      available: false,
+      detail: "Not found on PATH.",
+    };
+    const codex = {
+      id: "codex",
+      name: "Codex",
+      kind: "cli",
+      version: "0.9.2",
+      path: "C:\\Users\\you\\AppData\\Roaming\\npm\\codex.cmd",
+      available: true,
+      detail: "Detected on PATH.",
+    };
+    const opencode = {
+      id: "opencode",
+      name: "OpenCode",
+      kind: "cli",
+      version: "0.12.4",
+      path: "C:\\Users\\you\\AppData\\Roaming\\npm\\opencode.cmd",
+      available: true,
+      detail: "Detected on PATH.",
+    };
+    const clineMissing = {
+      id: "cline",
+      name: "Cline",
+      kind: "cli",
+      version: null,
+      path: null,
+      available: false,
+      detail: "Not found on PATH.",
+    };
+    const antigravityMissing = {
+      id: "antigravity",
+      name: "Antigravity",
+      kind: "cli",
+      version: null,
+      path: null,
+      available: false,
+      detail: "Not found on PATH.",
+    };
+    if (MOCK_AGENTS === "none") return [];
+    if (MOCK_AGENTS === "multi") {
+      return [pi, codex, opencode, clineMissing, antigravityMissing];
+    }
+    return [pi, codexMissing];
+  },
+
   async agentStatus(): Promise<import("./types").AgentStatus> {
     return {
       state: "not_configured",

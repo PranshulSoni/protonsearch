@@ -4,6 +4,7 @@
 import { useApp } from "../../App";
 import { SECTION_EYEBROWS } from "../sections";
 import { Icon, Panel, RouteHeading, type IconName } from "../ui";
+import AgentsSection from "./AgentsSection";
 import PiAgentPanel from "./WorkflowsAgentPanel";
 
 interface CommandDoc {
@@ -110,12 +111,22 @@ export default function WorkflowsView() {
   const { settings } = useApp();
   const legacyMigrated = settings.legacyMigrated;
 
+  const focusPiPanel = () => {
+    const anchor = document.getElementById("pi-agent-panel");
+    if (!anchor) return;
+    anchor.scrollIntoView({ block: "start" });
+    anchor.focus({ preventScroll: true });
+  };
+
   return (
     <div className="view">
       <RouteHeading eyebrow={SECTION_EYEBROWS.workflows}>Workflows</RouteHeading>
       <p className="page-lead">
-        Native commands respond instantly; the optional Pi agent runs only when you start a workflow.
+        Native commands respond instantly. The optional Pi agent runtime starts only when you start
+        a workflow, then stops.
       </p>
+
+      <AgentsSection onUsePi={focusPiPanel} />
 
       <Panel
         id="workflows-native"
@@ -148,7 +159,9 @@ export default function WorkflowsView() {
         </p>
       </Panel>
 
-      <PiAgentPanel />
+      <div id="pi-agent-panel" className="agent-panel-anchor" tabIndex={-1}>
+        <PiAgentPanel />
+      </div>
 
       <Panel
         id="workflows-quicklinks"

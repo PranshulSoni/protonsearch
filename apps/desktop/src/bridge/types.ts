@@ -343,6 +343,16 @@ export interface OpenOutcome {
   message: string;
 }
 
+export interface DetectedAgent {
+  id: string;
+  name: string;
+  kind: string;
+  version: string | null;
+  path: string | null;
+  available: boolean;
+  detail: string | null;
+}
+
 export interface AppInfo {
   name: string;
   version: string;

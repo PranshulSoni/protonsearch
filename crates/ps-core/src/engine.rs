@@ -274,8 +274,34 @@ impl Engine {
         let mut timings: Vec<TierTiming> = Vec::new();
         let mut ranked: Vec<Ranked> = Vec::new();
 
-        // Empty query: recent items only (launcher shows the RECENT group).
+        // Empty query: the launcher shows contextual recent content. For the
+        // CLIPBOARD scope that is recent clipboard history (privacy-gated,
+        // pinned-first/newest, categorized) - not recent files.
         if terms.is_empty() {
+            if scope == SearchScope::Clipboard {
+                let tier_start = Instant::now();
+                let mut hits = 0usize;
+                if settings.privacy.clipboard_history {
+                    let db_path = self.clipboard_db_path();
+                    for entry in ps_sources::clipboard::list_recent(&db_path, 8) {
+                        ranked.push(Ranked {
+                            tier: 0,
+                            priority: 8,
+                            score: 400.0,
+                            result: clipboard_result(&entry),
+                        });
+                        hits += 1;
+                    }
+                }
+                timings.push(TierTiming {
+                    tier: 0,
+                    label: "clipboard history".to_string(),
+                    took_ms: tier_start.elapsed().as_secs_f64() as f32 * 1000.0,
+                    hits,
+                });
+                let results = finalize(ranked, limit);
+                return self.response(req, query_text, results, timings, started, &settings);
+            }
             let sources = self.sources.read().unwrap();
             let mut recent: Vec<&ps_sources::RecentEntry> = sources.recent.iter().collect();
             recent.sort_by(|a, b| b.last_used_ms.cmp(&a.last_used_ms));
@@ -2959,6 +2985,81 @@ mod tests {
         }
         // The sandbox may forbid a clipboard hook; require lifecycle consistency.
         assert_eq!(started, restarted);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn empty_query_clipboard_scope_lists_recent_categorized_history() {
+        let dir = scratch_dir("clipboard-empty");
+        let engine = make_engine(&dir, None);
+        // Clipboard history is opt-in in v2.
+        let mut privacy = engine.settings().privacy;
+        privacy.clipboard_history = true;
+        engine
+            .update_settings(SettingsPatch {
+                privacy: Some(privacy),
+                ..Default::default()
+            })
+            .unwrap();
+        let db = engine.clipboard_db_path();
+        assert!(ps_sources::clipboard::record(&db, "https://example.com/one", "app").unwrap());
+        assert!(ps_sources::clipboard::record(&db, "kall-mail@example.com", "app").unwrap());
+        assert!(ps_sources::clipboard::record(&db, "kall plain text", "app").unwrap());
+        let pinned = ps_sources::clipboard::list_recent(&db, 10)
+            .into_iter()
+            .find(|row| row.text.contains("example.com/one"))
+            .expect("seeded link row");
+        ps_sources::clipboard::set_pinned(&db, pinned.id, true).unwrap();
+
+        let mut req = SearchRequest::new(50, "");
+        req.scope = SearchScope::Clipboard;
+        let resp = engine.search(&req);
+        assert_eq!(
+            resp.results.len(),
+            3,
+            "empty clipboard query must list recent rows: {:?}",
+            resp.results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+        );
+        assert!(
+            resp.results.iter().all(|r| r.kind == SourceKind::Clipboard),
+            "clipboard scope must only return clipboard rows"
+        );
+        assert_eq!(
+            resp.results[0].meta.label.as_deref(),
+            Some("LINK"),
+            "pinned row must rank first: {:?}",
+            resp.results.iter().map(|r| r.meta.label.clone()).collect::<Vec<_>>()
+        );
+        let labels: Vec<String> = resp
+            .results
+            .iter()
+            .filter_map(|r| r.meta.label.clone())
+            .collect();
+        assert!(labels.contains(&"EMAIL".to_string()), "labels: {labels:?}");
+        assert!(labels.contains(&"TEXT".to_string()), "labels: {labels:?}");
+
+        // Empty query in ALL scope keeps the existing recent-files behaviour.
+        let resp_all = engine.search(&SearchRequest::new(51, ""));
+        assert!(
+            resp_all.results.iter().all(|r| r.kind != SourceKind::Clipboard),
+            "ALL scope must not leak clipboard rows into the recent list"
+        );
+
+        // Privacy off => the clipboard scope is empty, never stale rows.
+        let mut privacy = engine.settings().privacy;
+        privacy.clipboard_history = false;
+        engine
+            .update_settings(SettingsPatch {
+                privacy: Some(privacy),
+                ..Default::default()
+            })
+            .unwrap();
+        let resp = engine.search(&req);
+        assert!(
+            resp.results.is_empty(),
+            "privacy off must hide clipboard history: {:?}",
+            resp.results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -5,6 +5,7 @@ import type {
   AgentApprovalResponse,
   AgentRunRequest,
   AgentStatus,
+  DetectedAgent,
   ActivityItem,
   ActivityQuery,
   AppInfo,
@@ -33,6 +34,7 @@ type Bridge = {
   setHotkey(hotkey: string): Promise<Settings>;
   confirmNativeAction(command: NativeCommand): Promise<OpenOutcome>;
   agentStatus(): Promise<AgentStatus>;
+  detectAgents(): Promise<DetectedAgent[]>;
   agentStart(request: AgentRunRequest): Promise<void>;
   agentCancel(runId?: string | null): Promise<void>;
   agentApprove(response: AgentApprovalResponse): Promise<void>;
@@ -58,6 +60,7 @@ const tauriBridge: Bridge = {
   setHotkey: (hotkey) => invoke<Settings>("set_hotkey", { hotkey }),
   confirmNativeAction: (command) => invoke<OpenOutcome>("confirm_native_action", { command }),
   agentStatus: () => invoke<AgentStatus>("agent_status"),
+  detectAgents: () => invoke<DetectedAgent[]>("detect_agents"),
   agentStart: (request) => invoke<void>("agent_start", { request }),
   agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),
   agentApprove: (response) => invoke<void>("agent_approve", { response }),

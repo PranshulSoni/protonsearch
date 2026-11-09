@@ -11,6 +11,7 @@ import {
   createAgentRunId,
   elapsedMs,
   formatElapsed,
+  formatRunStarted,
   initialAgentView,
   markAgentStartFailed,
 } from "./agentRun";
@@ -134,5 +135,23 @@ describe("agent run state machine", () => {
     });
     expect(view.phase).toBe("running");
     expect(view.runId).toBe("qa-run");
+  });
+});
+
+describe("run start formatting", () => {
+  it("uses a localized Today time for same-day runs", () => {
+    const now = new Date(2026, 4, 20, 18, 0, 0).getTime();
+    const started = new Date(2026, 4, 20, 14, 32, 0).getTime();
+    const label = formatRunStarted(started, now);
+    expect(label).toMatch(/^Today, /);
+    expect(label).toMatch(/\d/);
+  });
+
+  it("includes the date for older runs", () => {
+    const now = new Date(2026, 4, 20, 18, 0, 0).getTime();
+    const started = new Date(2026, 4, 18, 9, 15, 0).getTime();
+    const label = formatRunStarted(started, now);
+    expect(label).not.toContain("Today");
+    expect(label).toMatch(/\d/);
   });
 });

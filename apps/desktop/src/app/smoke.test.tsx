@@ -133,6 +133,25 @@ describe("desktop app shell smoke", () => {
     expect(radios).toEqual(expect.arrayContaining(["Google", "Bing", "DuckDuckGo", "YouTube"]));
   });
 
+  it("lists detected agent runtimes and the honest recent-runs state", async () => {
+    window.localStorage.clear();
+    await act(async () => {
+      root.render(<App view="main" />);
+    });
+    await flush(8);
+    await act(async () => {
+      container.querySelectorAll<HTMLButtonElement>(".navbtn")[3].click();
+    });
+    await flush(8);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Agents");
+    expect(text).toContain("Pi");
+    expect(text).toContain("Codex");
+    expect(text).toContain("Available");
+    expect(text).toContain("No runs yet.");
+    expect(container.querySelector("#workflows-agents")).not.toBeNull();
+  });
+
   it("keeps the first focusable element a skip link and the route h1 focusable", async () => {
     await act(async () => {
       root.render(<App view="main" />);
