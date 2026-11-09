@@ -312,7 +312,10 @@ impl PiEventMapper {
         }
         match self.settled {
             Some(false) if exit_code == Some(0) => {
-                let text = self.assistant_text.trim_end().to_string();
+                // PI-SEC-04: the final answer is displayed in the UI and stored
+                // in agent history, so it gets the same redaction treatment as
+                // stderr, previews and errors.
+                let text = redact_text(self.assistant_text.trim_end(), &self.redactions);
                 vec![
                     AgentEvent::Output {
                         text,
@@ -636,6 +639,33 @@ mod tests {
         mapper.on_line(r#"{"type":"session"}"#);
         let finish = mapper.finish(None, 5, Some(0), "");
         assert!(matches!(&finish[0], AgentEvent::Error { code, .. } if code == "pi_exit_error"));
+    }
+
+    #[test]
+    fn final_output_is_redacted_with_exact_and_shaped_secrets() {
+        let mut mapper = mapper();
+        mapper.on_line(r#"{"type":"session"}"#);
+        let text = "known sk-known-secret-1234567890 and AIzaSyD-EXAMPLEFAKEKEY0123456789abcdefg plus api_key=abcdefgh12345678";
+        let message = serde_json::json!({
+            "type": "message_end",
+            "message": {"role": "assistant", "content": [{"type": "text", "text": text}], "stopReason": "stop"}
+        });
+        let _ = mapper.on_line(&message.to_string());
+        let _ = mapper.on_line(r#"{"type":"agent_settled","aborted":false}"#);
+        let finish = mapper.finish(None, 10, Some(0), "");
+        match &finish[0] {
+            AgentEvent::Output { text, final_answer } => {
+                assert!(final_answer);
+                assert!(text.contains("[redacted]"), "{text}");
+                assert!(!text.contains("sk-known-secret-1234567890"), "{text}");
+                assert!(
+                    !text.contains("AIzaSyD-EXAMPLEFAKEKEY0123456789abcdefg"),
+                    "{text}"
+                );
+                assert!(!text.contains("abcdefgh12345678"), "{text}");
+            }
+            other => panic!("unexpected {other:?}"),
+        }
     }
 
     #[test]

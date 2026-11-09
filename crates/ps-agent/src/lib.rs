@@ -26,8 +26,10 @@ pub use config::{
 };
 pub use error::AgentError;
 pub use pi::{
-    build_pi_run_args, locate_pi, pi_safety_preamble, pi_tool_allowlist, probe_pi, PiAgentClient,
-    PiAgentConfig, PiInfo, PiRunArgsSpec, DEFAULT_MAX_RUN_DURATION, DEFAULT_PI_IDLE_TIMEOUT,
+    build_pi_run_args, clear_probe_cache, is_child_env_allowed, locate_pi, locate_pi_with_source,
+    pi_safety_preamble, pi_tool_allowlist, pi_version_supported, probe_pi, probe_pi_cached, PiAgentClient,
+    PiAgentConfig, PiInfo, PiRunArgsSpec, PiSource, DEFAULT_MAX_RUN_DURATION, DEFAULT_PI_IDLE_TIMEOUT,
+    MAX_CAPTURE_BYTES, MIN_PI_VERSION,
 };
 pub use ps_ipc::{AgentApprovalResponse, AgentEvent, AgentRunRequest};
 

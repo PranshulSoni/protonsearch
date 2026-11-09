@@ -12,12 +12,19 @@
 //! * Tools are read-only by default (`read,grep,find,ls`); `edit,write,bash,
 //!   powershell` are added only when the user explicitly enabled writes.
 //!
+//! Security hardening defaults (rel-recon PI-SEC-01..06): MCP, user
+//! extensions/skills/prompt-templates and AGENTS.md/CLAUDE.md context files are
+//! all disabled by default; the final Output is redacted; the child gets a
+//! minimal environment instead of the full user environment; and startup
+//! offline/telemetry/version-check network calls are disabled.
+//!
 //! Honest security note: Pi has no per-tool approval prompt and no OS sandbox.
 //! The allowlist and workspace limit what the model is offered, not what the
 //! process can reach on the filesystem. See docs/agent/PI_INTEGRATION.md.
 
 mod args;
 mod client;
+mod env;
 mod events;
 mod probe;
 mod process;
@@ -35,8 +42,13 @@ pub use args::{
     THINKING_LEVELS, WRITE_TOOLS,
 };
 pub use client::PiAgentClient;
+pub use env::{is_child_env_allowed, PROVIDER_ENV_VARS};
 pub use events::PiEventMapper;
-pub use probe::{locate_pi, node_version_ok, pid_alive, probe_pi, PiInfo, MIN_NODE_VERSION, PROBE_TIMEOUT};
+pub use probe::{
+    clear_probe_cache, locate_pi, locate_pi_with_source, node_version_ok, pi_version_supported, pid_alive,
+    probe_pi, probe_pi_cached, PiInfo, PiSource, MAX_CAPTURE_BYTES, MIN_NODE_VERSION, MIN_PI_VERSION,
+    PROBE_TIMEOUT,
+};
 
 /// Kill a Pi run when no stdout event arrives for this long.
 pub const DEFAULT_PI_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
@@ -81,7 +93,13 @@ impl PiAgentConfig {
     /// [`PiAgentConfig::with_workspace`].
     pub fn from_settings(settings: &AgentSettings, data_dir: &Path) -> Result<Self, AgentError> {
         let explicit = settings.pi_path.as_deref().map(Path::new);
-        let pi = probe_pi(explicit).ok_or(AgentError::NotAvailable)?;
+        let pi = probe_pi_cached(explicit).ok_or(AgentError::NotAvailable)?;
+        if !pi_version_supported(&pi.version) {
+            return Err(AgentError::Pi(format!(
+                "Pi {} is older than the supported minimum {}.{}.{}; update Pi",
+                pi.version, MIN_PI_VERSION.0, MIN_PI_VERSION.1, MIN_PI_VERSION.2
+            )));
+        }
         let model = settings
             .model
             .clone()
@@ -169,6 +187,7 @@ mod tests {
                 path: "pi.cmd".into(),
                 version: "1.5.0".into(),
                 node_ok: true,
+                source: PiSource::Managed,
             },
             workspace: "ws".into(),
             data_dir: "data".into(),

@@ -2,9 +2,20 @@
 //!
 //! Canonical invocation (see docs/agent/PI_INTEGRATION.md):
 //!
-//!   pi --mode json --no-session --no-approve --tools <allowlist>
+//!   pi --mode json --no-session --no-approve --no-mcp --exclude-tools mcp__*
+//!      --no-context-files --no-extensions --no-skills --no-prompt-templates
+//!      --tools <allowlist>
 //!      [--model <id> [--provider <name>]] [--thinking <level>]
 //!      [--system-prompt <file>]
+//!
+//! Security hardening defaults (rel-recon PI-SEC-01/02/03):
+//! * --no-mcp + --exclude-tools mcp__*: MCP tools are never declared, even when
+//!   the user has user-level MCP servers configured.
+//! * --no-context-files: AGENTS.md/CLAUDE.md are not loaded into the system
+//!   context, so a workspace cannot inject persistent instructions.
+//! * --no-extensions --no-skills --no-prompt-templates: user-level Pi resources
+//!   execute in-process and must not run by default. There is no opt-in yet;
+//!   enabling them would be trusted-code execution requiring explicit consent.
 //!
 //! The user prompt is NOT an argument: it is written to Pi's stdin, which Pi
 //! documents (and its installed source implements) as the "piped stdin"
@@ -79,6 +90,16 @@ pub fn build_pi_run_args(spec: &PiRunArgsSpec<'_>) -> Result<Vec<String>, AgentE
         "json".to_string(),
         "--no-session".to_string(),
         "--no-approve".to_string(),
+        // PI-SEC-01: MCP tools survive a plain --tools allowlist; both flags.
+        "--no-mcp".to_string(),
+        "--exclude-tools".to_string(),
+        "mcp__*".to_string(),
+        // PI-SEC-03: context files load regardless of project trust.
+        "--no-context-files".to_string(),
+        // PI-SEC-02: user-level Pi resources execute in-process; load none.
+        "--no-extensions".to_string(),
+        "--no-skills".to_string(),
+        "--no-prompt-templates".to_string(),
         "--tools".to_string(),
         pi_tool_allowlist(spec.allow_writes).to_string(),
     ];
@@ -158,10 +179,45 @@ mod tests {
                 "json",
                 "--no-session",
                 "--no-approve",
+                "--no-mcp",
+                "--exclude-tools",
+                "mcp__*",
+                "--no-context-files",
+                "--no-extensions",
+                "--no-skills",
+                "--no-prompt-templates",
                 "--tools",
                 "read,grep,find,ls"
             ]
         );
+    }
+
+    #[test]
+    fn security_hardening_flags_are_present_for_read_only_and_writes() {
+        for allow_writes in [false, true] {
+            let args = build_pi_run_args(&PiRunArgsSpec {
+                allow_writes,
+                ..Default::default()
+            })
+            .expect("args");
+            for expected in [
+                "--no-mcp",
+                "--no-context-files",
+                "--no-extensions",
+                "--no-skills",
+                "--no-prompt-templates",
+            ] {
+                assert!(
+                    args.iter().any(|arg| arg == expected),
+                    "{expected} missing: {args:?}"
+                );
+            }
+            let exclude_index = args
+                .iter()
+                .position(|arg| arg == "--exclude-tools")
+                .expect("--exclude-tools");
+            assert_eq!(args[exclude_index + 1], "mcp__*");
+        }
     }
 
     #[test]
@@ -176,6 +232,12 @@ mod tests {
         })
         .expect("args");
         let joined = args.join(" ");
+        assert!(joined.contains("--no-mcp"), "{joined}");
+        assert!(joined.contains("--exclude-tools mcp__*"), "{joined}");
+        assert!(
+            joined.contains("--no-context-files --no-extensions --no-skills --no-prompt-templates"),
+            "{joined}"
+        );
         assert!(
             joined.contains("--tools read,grep,find,ls,edit,write,bash,powershell"),
             "{joined}"

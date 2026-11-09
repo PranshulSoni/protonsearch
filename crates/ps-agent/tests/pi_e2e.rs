@@ -12,7 +12,10 @@ use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ps_agent::pi::pid_alive;
-use ps_agent::{probe_pi, AgentEvent, AgentRunRequest, PiAgentClient, PiAgentConfig, PiInfo};
+use ps_agent::{
+    clear_probe_cache, is_child_env_allowed, probe_pi, probe_pi_cached, AgentEvent, AgentRunRequest,
+    PiAgentClient, PiAgentConfig, PiInfo, PiSource,
+};
 
 fn fake_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_ps_agent_fake_pi"))
@@ -61,6 +64,7 @@ fn test_config(
             path: pi_path,
             version: "1.5.0-fake".to_string(),
             node_ok: true,
+            source: PiSource::Explicit,
         },
         workspace,
         data_dir: root.join("data"),
@@ -103,6 +107,13 @@ fn collect_until_finished(receiver: &Receiver<AgentEvent>) -> Vec<AgentEvent> {
             Err(error) => panic!("pi event stream ended unexpectedly: {error}"),
         }
     }
+}
+
+fn read_json(workspace: &Path, name: &str) -> serde_json::Value {
+    serde_json::from_str(
+        &fs::read_to_string(workspace.join(name)).unwrap_or_else(|_| panic!("missing {name}")),
+    )
+    .unwrap_or_else(|error| panic!("invalid {name}: {error}"))
 }
 
 fn has_error(events: &[AgentEvent], code: &str) -> bool {
@@ -401,6 +412,12 @@ fn command_line_uses_mode_json_no_session_allowlist_and_flags() {
     assert!(joined.contains("--mode json"), "{joined}");
     assert!(joined.contains("--no-session"), "{joined}");
     assert!(joined.contains("--no-approve"), "{joined}");
+    assert!(joined.contains("--no-mcp"), "{joined}");
+    assert!(joined.contains("--exclude-tools mcp__*"), "{joined}");
+    assert!(joined.contains("--no-context-files"), "{joined}");
+    assert!(joined.contains("--no-extensions"), "{joined}");
+    assert!(joined.contains("--no-skills"), "{joined}");
+    assert!(joined.contains("--no-prompt-templates"), "{joined}");
     assert!(joined.contains("--tools read,grep,find,ls"), "{joined}");
     assert!(joined.contains("--model fake-model"), "{joined}");
     assert!(joined.contains("--provider fake-provider"), "{joined}");
@@ -441,6 +458,117 @@ fn probe_reads_the_launcher_version_without_a_model_call() {
     let info = probe_pi(Some(&wrapper)).expect("fake pi probe");
     assert_eq!(info.version, "1.5.0-fake");
     assert_eq!(info.path, wrapper);
+    assert_eq!(info.source, PiSource::Explicit);
+}
+
+#[test]
+fn probe_rejects_relative_and_arbitrary_paths() {
+    let root = case_root("probe-invalid");
+    assert_eq!(probe_pi(Some(Path::new("pi.cmd"))), None);
+    let not_pi = root.join("not-a-pi.exe");
+    fs::copy(fake_bin(), &not_pi).expect("copy fake binary");
+    assert_eq!(probe_pi(Some(&not_pi)), None, "launcher name must be pi");
+}
+
+#[test]
+fn probe_results_are_cached() {
+    let root = case_root("probe-cache");
+    let wrapper = make_cmd_wrapper(&root);
+    clear_probe_cache();
+    let first = probe_pi_cached(Some(&wrapper)).expect("first cached probe");
+    let second = probe_pi_cached(Some(&wrapper)).expect("second cached probe");
+    assert_eq!(first, second);
+    clear_probe_cache();
+}
+
+#[test]
+fn child_environment_is_minimal_and_pi_network_controls_are_set() {
+    let root = case_root("env");
+    let config = test_config(
+        &root,
+        "happy",
+        false,
+        Duration::from_secs(30),
+        Duration::from_secs(120),
+        true,
+    );
+    let workspace = config.workspace.clone();
+    let (client, receiver) = PiAgentClient::spawn_channel(config).expect("spawn client");
+    client.send_run(&run_request("pi-env")).expect("send run");
+    let events = collect_until_finished(&receiver);
+    assert!(
+        matches!(events.last(), Some(AgentEvent::Finished { ok: true, .. })),
+        "{events:?}"
+    );
+
+    let dump = read_json(&workspace, "ps_fake_pi_env.json");
+    let keys: Vec<String> = dump["keys"]
+        .as_array()
+        .expect("env keys array")
+        .iter()
+        .filter_map(|key| key.as_str().map(str::to_string))
+        .collect();
+    for key in &keys {
+        assert!(
+            is_child_env_allowed(key),
+            "unexpected inherited environment variable: {key}"
+        );
+    }
+    assert!(keys.iter().any(|key| key.eq_ignore_ascii_case("PATH")));
+    #[cfg(windows)]
+    {
+        assert!(keys.iter().any(|key| key.eq_ignore_ascii_case("SystemRoot")));
+        assert!(keys.iter().any(|key| key.eq_ignore_ascii_case("USERPROFILE")));
+    }
+    assert!(!dump["FAKE_SECRET_present"].as_bool().unwrap_or(true));
+    assert_eq!(dump["PI_OFFLINE"].as_str(), Some("1"));
+    assert_eq!(dump["PI_SKIP_VERSION_CHECK"].as_str(), Some("1"));
+    assert_eq!(dump["PI_TELEMETRY"].as_str(), Some("0"));
+}
+
+#[test]
+fn final_output_redacts_planted_and_shaped_secrets() {
+    let root = case_root("output-redact");
+    let mut config = test_config(
+        &root,
+        "output_secret",
+        false,
+        Duration::from_secs(30),
+        Duration::from_secs(120),
+        true,
+    );
+    let planted = "sk-test-planted-output-secret-123456".to_string();
+    config.extra_env = vec![("OPENAI_API_KEY".to_string(), planted.clone())];
+    let workspace = config.workspace.clone();
+    let (client, receiver) = PiAgentClient::spawn_channel(config).expect("spawn client");
+    client
+        .send_run(&run_request("pi-output-redact"))
+        .expect("send run");
+    let events = collect_until_finished(&receiver);
+    let output = events
+        .iter()
+        .find_map(|event| match event {
+            AgentEvent::Output { text, .. } => Some(text.clone()),
+            _ => None,
+        })
+        .expect("Output event");
+    assert!(!output.contains(&planted), "planted env secret leaked: {output}");
+    assert!(
+        !output.contains("AIzaSyD-EXAMPLEFAKEKEY0123456789abcdefg"),
+        "AIza key leaked: {output}"
+    );
+    assert!(
+        !output.contains("abcdefgh12345678"),
+        "api_key= value leaked: {output}"
+    );
+    assert!(output.contains("[redacted]"), "{output}");
+
+    // The secret was delivered by environment, never by argv.
+    let args = read_json(&workspace, "ps_fake_pi_args.json");
+    assert!(
+        !args.to_string().contains(&planted),
+        "secret appeared on the command line"
+    );
 }
 
 #[test]
@@ -449,10 +577,11 @@ fn real_pi_version_probe_skips_when_absent() {
         Some(info) => {
             assert!(!info.version.is_empty());
             eprintln!(
-                "real pi probe: version={} path={} node_ok={}",
+                "real pi probe: version={} path={} node_ok={} source={:?}",
                 info.version,
                 info.path.display(),
-                info.node_ok
+                info.node_ok,
+                info.source
             );
         }
         None => eprintln!("SKIP real_pi_version_probe: pi is not installed on this host"),

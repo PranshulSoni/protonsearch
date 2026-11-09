@@ -7,8 +7,13 @@
 //!
 //! The behaviour is selected by a file `ps_fake_pi_mode` in the working
 //! directory (the Pi workspace), so parallel tests never share state:
-//!   happy (default), stderr_secret, malformed, oversize, idle, tree, crash,
-//!   no_session.
+//!   happy (default), stderr_secret, output_secret, malformed, oversize, idle,
+//!   tree, crash, no_session.
+//!
+//! It also records, in the workspace: `ps_fake_pi_args.json` (the argv it was
+//! launched with) and `ps_fake_pi_env.json` (the child environment keys, the
+//! PI_* controls and presence flags), so tests can prove the minimal child
+//! environment and the security flags.
 //!
 //! This binary is never used by the app.
 
@@ -20,6 +25,20 @@ use std::time::Duration;
 fn emit(out: &mut impl Write, value: serde_json::Value) {
     let _ = writeln!(out, "{}", serde_json::to_string(&value).unwrap_or_default());
     let _ = out.flush();
+}
+
+fn dump_environment(cwd: &std::path::Path) {
+    let keys: Vec<String> = std::env::vars().map(|(key, _)| key).collect();
+    let value = |name: &str| std::env::var(name).ok();
+    let dump = serde_json::json!({
+        "keys": keys,
+        "PI_OFFLINE": value("PI_OFFLINE"),
+        "PI_SKIP_VERSION_CHECK": value("PI_SKIP_VERSION_CHECK"),
+        "PI_TELEMETRY": value("PI_TELEMETRY"),
+        "FAKE_SECRET_present": std::env::var_os("FAKE_SECRET").is_some(),
+        "OPENAI_API_KEY_present": std::env::var_os("OPENAI_API_KEY").is_some(),
+    });
+    let _ = std::fs::write(cwd.join("ps_fake_pi_env.json"), dump.to_string());
 }
 
 fn sleep_forever() -> ! {
@@ -131,6 +150,7 @@ fn main() {
         cwd.join("ps_fake_pi_args.json"),
         serde_json::to_string(&args).unwrap_or_default(),
     );
+    dump_environment(&cwd);
     let mode = std::fs::read_to_string(cwd.join("ps_fake_pi_mode"))
         .unwrap_or_else(|_| "happy".to_string())
         .trim()
@@ -180,6 +200,33 @@ fn main() {
             session(&mut out);
             eprintln!("debug: provider token=sk-live-supersecret-abcdef");
             happy(&mut out, &prompt, Some("sk-live-supersecret-abcdef"));
+        }
+        "output_secret" => {
+            session(&mut out);
+            let planted = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| "MISSING_KEY".to_string());
+            let text =
+                format!("Answer: {planted} AIzaSyD-EXAMPLEFAKEKEY0123456789abcdefg api_key=abcdefgh12345678");
+            emit(&mut out, serde_json::json!({"type": "agent_start"}));
+            emit(
+                &mut out,
+                serde_json::json!({"type": "message_start", "message": {"role": "assistant", "content": [], "stopReason": "pending"}}),
+            );
+            emit(
+                &mut out,
+                serde_json::json!({
+                    "type": "message_end",
+                    "message": {
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": text}],
+                        "stopReason": "stop",
+                        "timestamp": 1
+                    }
+                }),
+            );
+            emit(
+                &mut out,
+                serde_json::json!({"type": "agent_settled", "aborted": false}),
+            );
         }
         _ => {
             session(&mut out);
