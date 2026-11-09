@@ -1,8 +1,8 @@
 # ProtonSearch v2 — Measured Benchmarks (Gate 2 / Gate 7 evidence)
 
 - **Owner:** L1-C Performance & Search Quality (perf-bench)
-- **Measured:** 2026-11-09, ~11:33-12:17 UTC (17:03-17:47 IST) on the user workstation, release profile; the filename table is the committed-hash re-run.
-- **Engine revision:** **commit a28042d1282e4c9630a952bd5b02894f66850037** (`fix(ps-index): full-path queries anchor basename + uncapped fallback (1M long-path regression)`). The filename table below was re-measured on this exact committed tree, on a quiet machine (from_entries build 12/171/2,867 ms). The previous committed revision 3906836 table is kept in results/ and its 1M long-path regression is documented in section 3.4; **a28042d supersedes it**.
+- **Measured:** 2026-11-09, ~11:33-12:20 UTC (17:03-17:50 IST) on the user workstation, release profile; the filename table is the committed-hash re-run.
+- **Engine revision:** **commit a28042d1282e4c9630a952bd5b02894f66850037** (`fix(ps-index): full-path queries anchor basename + uncapped fallback (1M long-path regression)`). The filename table below was re-measured on this exact committed tree, on a quiet machine (from_entries build 12/171/2,867 ms). ps-index was unchanged between a28042d and HEAD 8692997 (only ps-core/ps-content/UI/docs changed), so the filename table remains the ps-index measurement for HEAD 8692997. The previous committed revision 3906836 table is kept in results/ and its 1M long-path regression is documented in section 3.4; **a28042d supersedes it**. The v2 content table was re-measured at HEAD 8692997 after the ps-content perf change (section 4.1).
 - **Method:** [METHODOLOGY.md](./METHODOLOGY.md). Raw JSON: [results/](./results/). Every number below was printed by a command in this repository on this machine. Nothing is projected or copied from vendors.
 - **Rule:** a target is "MET" only when a measured number is below it. Otherwise **NOT MET** or **NOT MEASURED**. Single-run numbers are labelled as such.
 
@@ -86,7 +86,7 @@ First-pass raw files are kept: [10k-firstpass](./results/filename-10k-firstpass-
 | folder | 1.33 | 1.70 | 1.79 | 7.05 | 7.76 | 8.74 |
 | zero_match | 0.45 | 0.70 | 0.89 | 2.95 | 3.21 | 3.58 |
 
-Consistent with the engine owner's note: at 1M the remaining cost is in queries that reach the **path/folder phase** (folder-only names, extension-shaped queries) — `8-10 ms p95 — and the full-scan fuzzy pass (`4.9 ms p95). Name-prefix/hidden/duplicate/CJK queries are sub-millisecond thanks to bloom filtering. Queries returning results: 19/22 at 10k, 20/22 at 100k, 19/22 at 1M. The zero-result queries are the two zero-match controls plus (10k only) the hard-fuzzy `ppjbudget` shape and (1M only) the full long-path query, which ranks #1 at 10k/100k - flagged to engine-core as a 1M-only path-phase issue. Extension-shaped queries now return results after the frozen relevance fixes, but still pay scan cost: a relevance, not a latency, item.
+Consistent with the engine owner's note: at 1M the remaining cost is in queries that reach the **path/folder phase** (folder-only names, extension-shaped queries) — ~8-10 ms p95 — and the full-scan fuzzy pass (~4.9 ms p95). Name-prefix/hidden/duplicate/CJK queries are sub-millisecond thanks to bloom filtering. Queries returning results: 19/22 at 10k, **20/22 at 100k**, **20/22 at 1M** (long_path fixed, section 3.4). At 100k/1M only the two zero-match controls return nothing; at 10k the hard-fuzzy `ppjbudget` shape also returns nothing (dataset-size dependent, not a correctness bug). Extension-shaped queries return results after the frozen relevance fixes but still pay scan cost: a relevance, not a latency item.
 
 ### 3.3 Index construction, persistence, memory
 
@@ -121,19 +121,19 @@ Scope: `v2 ps-content FTS5 (current schema/query path)`. Corpus imported from th
 
 | Fact | Measured |
 |---|---:|
-| Import (89,813 files / 13,296 content docs) | 6,601 ms wall (summary reported 6,572 ms, 0 errors) |
+| Import (89,813 files / 13,296 content docs) | 3,722 ms wall (summary reported 3,695 ms, 0 errors) at HEAD 8692997 |
 | v2 DB file | 136,097,792 B |
 | Indexed text bytes | 72,072,254 B |
 | documents / errors | 13,296 / 0 |
 | Estimated FTS shadow bytes | 25,302,350 B |
-| Open time (index already warm) | 1.72 ms |
-| Cold first query (fresh process, 2 restarts) | 46.19 ms p50 |
-| Warm search (30 iters x 32 queries, n=960) | **p50 10.860 ms, p95 61.095 ms, p99 110.730 ms**, max 153.925 ms |
+| Open time (index already warm) | 1.76 ms |
+| Cold first query (fresh process, 2 restarts) | 50.05 ms p50 |
+| Warm search (30 iters x 32 queries, n=960) | **p50 9.406 ms, p95 42.998 ms, p99 67.547 ms**, max 78.161 ms (HEAD 8692997) |
 | Queries with results | 25/32 |
 
-By category (warm, snippet + snippet_line included by the API): single_high_df p50 28.743 / p95 106.600 / p99 124.815 ms; single_medium_df 11.330 / 18.797 / 20.610; prefix 0.135 / 36.627 / 61.270; multi_term_and 6.670 / 24.090 / 26.866; phrase 4.860 / 6.150 / 6.687; cjk 0.038 / 3.412 / 4.042; zero_match 0.031 / 0.045 / 0.082.
+By category (warm, snippet + snippet_line included by the API, HEAD 8692997): single_high_df p50 27.347 / p95 67.073 / p99 76.538 ms; single_medium_df 9.877 / 18.649 / 20.280; prefix 0.183 / 30.036 / 36.876; multi_term_and 5.697 / 14.307 / 15.520; phrase 3.905 / 4.321 / 4.489; cjk 0.033 / 2.092 / 3.210; zero_match 0.031 / 0.032 / 0.057.
 
-**Verdict vs target: "Indexed document content retrieval p95 < 30 ms" is NOT MET on the v2 query path (61.1 ms p95, `2x target, `10x the legacy baseline below).** The p50 single-term cost (28.7 ms) points at per-hit snippet/line-offset work or FTS ranking; that is sources-content's call to profile. Raw: [content-v2-pscontent](./results/content-v2-pscontent-20261109T1146Z.json).
+**Verdict vs target: "Indexed document content retrieval p95 < 30 ms" is NOT MET on the v2 query path (43.0 ms p95 at HEAD 8692997, ~1.4x target and ~7x the legacy baseline below; it was 61.1 ms before the ps-content perf change).** The p50 single-term cost (27.3 ms) still points at per-hit snippet/line-offset work or FTS ranking; that is sources-content's call to profile. Raw (HEAD 8692997): [content-v2-pscontent-8692997](./results/content-v2-pscontent-8692997-20261109T1220Z.json); earlier revision: [content-v2-pscontent-1146Z](./results/content-v2-pscontent-20261109T1146Z.json).
 
 ### 4.2 BASELINE-FOR-MIGRATION: legacy v1 FTS5 (read-only)
 
@@ -261,7 +261,7 @@ Scope mismatch is stated openly, therefore **no cross-tool latency table is publ
 
 ## 10. What the numbers mean for engineering priorities
 
-1. **v2 content p95 is 61 ms vs the 30 ms target and ~10x the legacy v1 FTS5 baseline (6 ms).** This is the top performance regression in the current tree; profile the ps-content snippet/line-offset and ranking path. (Legacy baseline is not a v2 accomplishment either — it is what v2 should at least match.)
+1. **v2 content p95 is 43 ms at HEAD 8692997 vs the 30 ms target and ~7x the legacy v1 FTS5 baseline (6 ms); it improved from 61 ms after the ps-content perf change.** This remains the top performance gap; profile the ps-content snippet/line-offset and ranking path. (Legacy baseline is not a v2 accomplishment either — it is what v2 should at least match.)
 2. **Filename targets are met on the final engine revision** (100k 1.57 ms, 1M 8.30 ms p95) but the 1M cold load is 240-254 ms for a 111 MB binary. A launcher that loads the index on demand cannot meet hotkey->visible 50 ms; pre-warm/memory-map/streaming load must be measured next.
 3. **1M memory** ~115 B/entry (110.1 MiB engine) is inside the investigated envelope; the transient loader peak (304 MB RSS) is a harness artifact that a production streaming loader should beat.
 4. **Path/folder-phase queries cost ~8-10 ms p95 at 1M** (folder-only names, extension-shaped); bounding that phase is the remaining filename push (engine-core is aware).
@@ -282,7 +282,7 @@ Scope mismatch is stated openly, therefore **no cross-tool latency table is publ
 | [filename-*-firstpass](./results/filename-100k-firstpass-20261109T1133Z.json) | pre-perf-fix engine, loaded machine (variance evidence) |
 | [filename-1m-contended](./results/filename-1m-contended-20261109T1148Z.json) | contended outlier (p95 28.4 ms), disclosed |
 | [content-legacy-fts5](./results/content-legacy-fts5-20261109T1139Z.json) | legacy v1 FTS5 baseline (snippet vs rank-only, cold) |
-| [content-v2-pscontent](./results/content-v2-pscontent-20261109T1146Z.json) | v2 ps-content FTS5 (import, index facts, warm/cold) |
+| [content-v2-pscontent-8692997](./results/content-v2-pscontent-8692997-20261109T1220Z.json) | v2 ps-content FTS5 at HEAD 8692997 (import, index facts, warm/cold) |
 | [ocr-windows](./results/ocr-windows-20261109T1142Z.json) | OCR speed + accuracy, per-image evidence |
 | [relevance-synthetic-10k-a28042d](./results/relevance-synthetic-10k-a28042d-20261109T1217Z.json) | synthetic golden evaluation (a28042d) |
 | [relevance-real-a28042d](./results/relevance-real-a28042d-20261109T1217Z.json) | real-corpus golden evaluation (a28042d) |

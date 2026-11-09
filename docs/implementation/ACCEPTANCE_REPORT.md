@@ -178,3 +178,33 @@ OCR, the agent UI panel, signed packaging, and complete visual QA and release ga
 - COMPETITOR COMPARISON: not published. Everything 1.4.1 is installed but its HTTP/ETP interface and CLI are absent;
   Kensaku 1.0.16 has no CLI; PowerToys is present; Flow Launcher absent. Scope mismatch makes any single-number
   comparison misleading; docs/performance/BENCHMARKS.md documents what was and was not measured.
+## 12. Final RC numbers and evidence index (supersedes earlier tables where they differ)
+
+Filename engine, formal revision a28042d (ps-index frozen and unchanged through HEAD; quiet-machine run, release):
+- 10k: p50 0.059 ms / p95 0.451 ms / p99 0.488 ms; build 12 ms
+- 100k: p50 0.471 ms / p95 1.047 ms / p99 1.552 ms; build 171 ms -> target <5 ms MET
+- 1M: p50 2.433 ms / p95 7.228 ms / p99 8.545 ms; build 2.87 s; 110.1 MiB (~115 B/entry) -> target <15 ms MET
+- cold binary load 3 ms / 52-65 ms / 442-448 ms at 10k/100k/1M; cold first query 0.13 / 1.30-2.07 / 3.22-4.01 ms.
+- 1M full-path regression fixed in a28042d: long_path 0 -> 1 result (top-1 anchor), per-query p50 1.073 ms; new regression tests.
+
+Content retrieval (v2 ps-content, HEAD 8692997): warm p50 9.4 ms / p95 43.0 ms / p99 67.5 ms after the bounded line-lookup
+optimisation (was p95 61.1 ms; 108.2 ms before the first fix). Target <30 ms is NOT met. Top remaining gap; the remaining
+cost is FTS snippet() over external-content rows plus the rank path. Legacy v1 FTS5 baseline (6.07 ms p95) is baseline-for-migration only.
+
+OCR (native engine, measured independently): 244 images/s warm, p50 3.6 ms, p95 7.3 ms per image; 92.4% character accuracy on the
+synthetic English corpus; exact recognition of two generated PNGs verified through ps_ocr::extract_image; CJK UNVERIFIED (no CJK
+language pack installed). End-to-end screenshot indexing through a running UI session is not user-validated.
+
+Tests at final commit: cargo test --workspace -> 129 Rust tests passed, 0 failed, 1 ignored (action smoke, separately verified:
+real ShellExecute marker file); frontend npm test -> 143 passed / 9 files; legacy v1 suite unchanged at 85 passed / 1 ignored.
+Visual QA: docs/qa/visual/VISUAL_AUDIT_APP.md (74 mock-state captures) + VISUAL_AUDIT_LAUNCHER.md (10 real captures) + real-app
+captures under docs/qa/visual/app-captures/. Security: docs/security/V2_SECURITY_REVIEW.md with resolved-in-tree mapping.
+
+Installable artifacts (unsigned):
+- dist-installer/ProtonSearch.exe (17,917,952 bytes; SHA-256 57A0233740905CFE31D507283144F1C59190770DD19EEF8577EF522D43C4B82F)
+- dist-installer/ProtonSearch_2.0.0-alpha.1_x64-setup.exe (4,935,678 bytes; SHA-256 76DD0FC38FE03478130F44786334F9A0772E580062C0023480E0935E3C841C5E)
+- dist-installer/SHA256SUMS.txt + BUILD_INFO.txt; Authenticode status: NotSigned (do not distribute publicly without signing).
+
+Remaining work for a GA release (unchanged): Authenticode signing + signed update manifest; content p95 <30 ms; OCR end-to-end
+UI validation + CJK; clipboard source-app exclusions/TTL/DPAPI; signed installer + rollback drill; visual QA on real 100/125/200%
+DPI, High Contrast and screen readers; optional agent Workflows panel finishing; legacy key rotation by the repository owner (S-01).

@@ -81,3 +81,19 @@ Status per gate lives in docs/implementation/WORK_BREAKDOWN.md.
   owns OCR text storage/search. perf-bench measured the native OCR engine at 244 images/s (p50 3.6 ms, English
   char accuracy 92.4% on the synthetic corpus; CJK unverified). End-to-end screenshot indexing through the app
   still needs an exercised run (settings-gated; stated in the acceptance report).
+## Gate 7 — final RC evidence (build 4, committed tree 4066df7)
+
+- Final installer rebuilt from the committed tree: dist-installer/ProtonSearch_2.0.0-alpha.1_x64-setup.exe
+  (SHA-256 3CB375B4EB48C791FFE9A90C33666DBB2997A4C5E2DB73A9B021D0C73EAC12DD) and
+  dist-installer/ProtonSearch.exe (SHA-256 A251D784B3E4B372FD73DDF00EB86AAD9A6B49559D9CD4C64DAC7BE256D97E33),
+  BUILD_INFO git_rev=4066df7, unsigned, install mode currentUser.
+- Release binary smoke test: launched from dist-installer with PROTONSEARCH_DATA_DIR; process stayed alive, setup completed
+  (engine/windows/tray/hotkey), WebView2 profile + v2 index created under the data dir; a real window was captured at
+  1195x837 (docs/qa/visual/app-captures-release/release-1-1195x837.png). The pre-warmed launcher is intentionally hidden on
+  startup for returning users; CDP-based automation is deliberately disabled in release builds (security V2-05), so
+  interaction-level release screenshots are not automatable — documented limitation.
+- Final test totals: cargo test --workspace 129 passed / 0 failed / 1 ignored (action smoke verified separately);
+  frontend 143 passed / 9 files; ps-bench 2 passed; migration harness 6 contract checks.
+- Formal filename benchmark at a28042d (valid at HEAD): 10k p95 0.451 ms; 100k p95 1.047 ms (target <5 ms MET);
+  1M p95 7.228 ms (target <15 ms MET); 110.1 MiB at 1M; long_path regression fixed (0 -> 1 result, p50 1.073 ms).
+- v2 content retrieval re-measured after optimisation: p95 43.0 ms (was 61.1; 108.2 before the first fix) — target <30 ms NOT MET.
