@@ -9,7 +9,7 @@ const main = pages[kinds.indexOf("main")]; const launcher = pages[kinds.indexOf(
 const status = await main.evaluate(() => window.__TAURI_INTERNALS__.invoke("get_status"));
 async function searchAndPreview(query, matcher) {
   return await main.evaluate(async ({ query, matcher }) => {
-    const r = await window.__TAURI_INTERNALS__.invoke("search", { req: { requestId: Date.now() + Math.random(), query, scope: "all", filters: {}, limit: 15 } });
+    const r = await window.__TAURI_INTERNALS__.invoke("search", { req: { requestId: (Date.now() * 1000 + Math.floor(Math.random() * 1000)), query, scope: "all", filters: {}, limit: 15 } });
     const cands = r.results.map(x => ({ id: x.id, kind: x.kind, title: x.title, path: x.path || null, snippet: x.meta?.snippet ?? null }));
     const target = cands.find(x => (matcher ? (x.title && x.title.toLowerCase().includes(matcher)) : true));
     if (!target) return { query, matcher, candidates: cands.slice(0, 8), preview: null, target: null };
@@ -17,6 +17,7 @@ async function searchAndPreview(query, matcher) {
     return { query, matcher, target, candidates: cands.slice(0, 8), preview: { status: p.status, format: p.format, text: (p.text||"").slice(0, 400), snippet: (p.snippet||"").slice(0, 200), fields: p.fields||[], highlights: p.highlightRanges||[], truncated: p.truncated, imageMime: p.imageMime||null, imageDataUrlLen: (p.imageDataUrl||"").length, ocrLen: (p.ocrText||"").length, unsupportedReason: p.unsupportedReason||null, error: p.error||null } };
   }, { query, matcher });
 }
+let apiCounter = 0;
 const api = [];
 api.push(await searchAndPreview("notes", "notes.txt"));
 api.push(await searchAndPreview("KOALA-DOCX-2026", "report.docx"));

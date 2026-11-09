@@ -1,99 +1,369 @@
 {
-  "capturedAt": "2026-11-09T21:28:58.923Z",
+  "capturedAt": "2026-11-09T21:35:16.354Z",
   "engine": {
     "state": "ready",
-    "entries": 11,
-    "clipboardCount": 1
+    "entries": 11
   },
   "api": [
     {
-      "query": "report",
-      "first": {
-        "id": "web-search:google",
-        "kind": "action",
-        "title": "Search the web for \"report\"",
-        "path": null,
-        "hasSnippet": false
+      "query": "notes",
+      "matcher": "notes.txt",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+        "kind": "file",
+        "title": "notes.txt",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+        "snippet": null
       },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+          "kind": "file",
+          "title": "notes.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+          "snippet": null
+        },
+        {
+          "id": "app:Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe!App",
+          "kind": "application",
+          "title": "Sticky Notes",
+          "path": "shell:AppsFolder\\Microsoft.MicrosoftStickyNotes_8wekyb3d8bbwe!App",
+          "snippet": null
+        },
+        {
+          "id": "app:C:\\Program Files\\Microsoft Office\\root\\Office16\\ONENOTE.EXE",
+          "kind": "application",
+          "title": "Sticky Notes (new)",
+          "path": "C:\\Program Files\\Microsoft Office\\root\\Office16\\ONENOTE.EXE",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"notes\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+          "kind": "content_match",
+          "title": "notes",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+          "snippet": "Quarterly preview audit notes This plain-text file exists to test the file/text preview pipeline. Unique token: ZEBRA-TXT-2026. Second paragraph with the same token repeated: ZEBRA-TX…"
+        }
+      ],
       "preview": {
         "status": "ok",
-        "format": "action",
-        "textLen": 25,
-        "snippetLen": 0,
-        "fields": 1,
-        "highlights": 0,
+        "format": "txt",
+        "text": "Quarterly preview audit notes\n\nThis plain-text file exists to test the file/text preview pipeline.\nUnique token: ZEBRA-TXT-2026.\nSecond paragraph with the same token repeated: ZEBRA-TXT-2026.",
+        "snippet": "Quarterly preview audit notes",
+        "fields": [
+          {
+            "label": "Size",
+            "value": "197 B"
+          },
+          {
+            "label": "Modified",
+            "value": "2026-11-09 20:32 UTC"
+          },
+          {
+            "label": "Lines",
+            "value": "5"
+          },
+          {
+            "label": "Words",
+            "value": "25"
+          }
+        ],
+        "highlights": [],
         "truncated": false,
         "imageMime": null,
         "imageDataUrlLen": 0,
+        "ocrLen": 0,
+        "unsupportedReason": null,
+        "error": null
+      }
+    },
+    {
+      "query": "KOALA-DOCX-2026",
+      "matcher": "report.docx",
+      "candidates": [
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"KOALA-DOCX-2026\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "snippet": "Preview Audit DOCX This Word document carries the token KOALA-DOCX-2026 for content search. Second paragraph: KOALA-DOCX-2026 again."
+        }
+      ],
+      "preview": null,
+      "target": null
+    },
+    {
+      "query": "report",
+      "matcher": "report.pdf",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+        "kind": "file",
+        "title": "report.pdf",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+        "snippet": null
+      },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "kind": "file",
+          "title": "report.docx",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "snippet": null
+        },
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "file",
+          "title": "report.pdf",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"report\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+          "snippet": "Preview Audit DOCX This Word document carries the token KOALA-DOCX-2026 for content search. Second paragraph: KOALA-DOCX-2026 again."
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "kind": "content_match",
+          "title": "report",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+          "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026."
+        }
+      ],
+      "preview": {
+        "status": "ok",
+        "format": "pdf",
+        "text": "\n\nWALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+        "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+        "fields": [
+          {
+            "label": "Size",
+            "value": "657 B"
+          },
+          {
+            "label": "Modified",
+            "value": "2026-11-09 20:32 UTC"
+          },
+          {
+            "label": "Lines",
+            "value": "3"
+          },
+          {
+            "label": "Words",
+            "value": "9"
+          }
+        ],
+        "highlights": [],
+        "truncated": false,
+        "imageMime": null,
+        "imageDataUrlLen": 0,
+        "ocrLen": 0,
         "unsupportedReason": null,
         "error": null
       }
     },
     {
       "query": "diagram",
-      "first": {
-        "id": "web-search:google",
-        "kind": "action",
-        "title": "Search the web for \"diagram\"",
-        "path": null,
-        "hasSnippet": false
+      "matcher": "diagram.png",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+        "kind": "file",
+        "title": "diagram.png",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+        "snippet": null
       },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+          "kind": "file",
+          "title": "diagram.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"diagram\"",
+          "path": null,
+          "snippet": null
+        }
+      ],
       "preview": {
         "status": "ok",
-        "format": "action",
-        "textLen": 25,
-        "snippetLen": 0,
-        "fields": 1,
-        "highlights": 0,
+        "format": "png",
+        "text": "",
+        "snippet": "",
+        "fields": [
+          {
+            "label": "Size",
+            "value": "16.2 KB"
+          },
+          {
+            "label": "Modified",
+            "value": "2026-11-09 20:32 UTC"
+          },
+          {
+            "label": "Dimensions",
+            "value": "900 x 260"
+          }
+        ],
+        "highlights": [
+          {
+            "start": 0,
+            "end": 7
+          }
+        ],
         "truncated": false,
-        "imageMime": null,
-        "imageDataUrlLen": 0,
+        "imageMime": "image/png",
+        "imageDataUrlLen": 26746,
+        "ocrLen": 45,
         "unsupportedReason": null,
         "error": null
       }
     },
     {
       "query": "blob",
-      "first": {
-        "id": "web-search:google",
-        "kind": "action",
-        "title": "Search the web for \"blob\"",
-        "path": null,
-        "hasSnippet": false
+      "matcher": "blob.bin",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+        "kind": "file",
+        "title": "blob.bin",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+        "snippet": null
       },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+          "kind": "file",
+          "title": "blob.bin",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"blob\"",
+          "path": null,
+          "snippet": null
+        }
+      ],
       "preview": {
-        "status": "ok",
-        "format": "action",
-        "textLen": 25,
-        "snippetLen": 0,
-        "fields": 1,
-        "highlights": 0,
+        "status": "unsupported",
+        "format": "bin",
+        "text": "",
+        "snippet": "",
+        "fields": [
+          {
+            "label": "Size",
+            "value": "4.0 KB"
+          },
+          {
+            "label": "Modified",
+            "value": "2026-11-09 20:32 UTC"
+          }
+        ],
+        "highlights": [
+          {
+            "start": 0,
+            "end": 4
+          }
+        ],
         "truncated": false,
         "imageMime": null,
         "imageDataUrlLen": 0,
-        "unsupportedReason": null,
+        "ocrLen": 0,
+        "unsupportedReason": "Preview is not available for .bin files.",
         "error": null
       }
     },
     {
       "query": "large",
-      "first": {
-        "id": "web-search:google",
-        "kind": "action",
-        "title": "Search the web for \"large\"",
-        "path": null,
-        "hasSnippet": false
+      "matcher": "large.txt",
+      "target": {
+        "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+        "kind": "file",
+        "title": "large.txt",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+        "snippet": null
       },
+      "candidates": [
+        {
+          "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+          "kind": "file",
+          "title": "large.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+          "snippet": null
+        },
+        {
+          "id": "web-search:google",
+          "kind": "action",
+          "title": "Search the web for \"large\"",
+          "path": null,
+          "snippet": null
+        },
+        {
+          "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+          "kind": "content_match",
+          "title": "large",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+          "snippet": "LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line LARGE-TXT-2026 line …"
+        }
+      ],
       "preview": {
         "status": "ok",
-        "format": "action",
-        "textLen": 25,
-        "snippetLen": 0,
-        "fields": 1,
-        "highlights": 0,
-        "truncated": false,
+        "format": "txt",
+        "text": "LARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\n",
+        "snippet": "LARGE-TXT-2026 line",
+        "fields": [
+          {
+            "label": "Size",
+            "value": "1.2 MB"
+          },
+          {
+            "label": "Modified",
+            "value": "2026-11-09 20:32 UTC"
+          },
+          {
+            "label": "Lines",
+            "value": "60"
+          },
+          {
+            "label": "Words",
+            "value": "120"
+          },
+          {
+            "label": "Note",
+            "value": "Preview truncated"
+          }
+        ],
+        "highlights": [],
+        "truncated": true,
         "imageMime": null,
         "imageDataUrlLen": 0,
+        "ocrLen": 0,
         "unsupportedReason": null,
         "error": null
       }
@@ -101,32 +371,25 @@
   ],
   "ui": [
     {
-      "query": "report",
-      "rows": 5,
-      "panel": {
-        "text": "DOC\nreport.docx\nDOCX\nC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx\nDOCX PREVIEW\nPreview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.\nSize\n35.8 KB\nModified\n2026-11-09 20:32 UTC\nLines\n3\nWords\n17\nOpen\nReveal in Explorer\nCopy path",
-        "html": "<div class=\"preview-scroll\" tabindex=\"0\" aria-label=\"Preview of report.docx\"><div class=\"preview-head\"><span class=\"fileicon fileicon--word\" data-testid=\"result-icon\" aria-hidden=\"true\"><span class=\"fileicon-text\">DOC</span></span><div class=\"preview-heading\"><div class=\"preview-title\">report.docx</div><div class=\"preview-kind\">DOCX</div></div></div><div class=\"preview-path\" title=\"C:\\Users\\Pransh",
-        "imgs": [],
-        "testid": "preview-panel"
-      },
-      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-report.png"
+      "query": "KOALA-DOCX-2026",
+      "titlePiece": "report.docx",
+      "clicked": true,
+      "panel": null,
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-highlight.png"
     },
     {
       "query": "diagram",
-      "rows": 2,
+      "titlePiece": "diagram.png",
+      "clicked": true,
       "panel": null,
-      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-diagram.png"
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-image.png"
     },
     {
-      "query": "blob",
-      "rows": 2,
-      "panel": {
-        "text": "BIN\nblob.bin\nBIN\nC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin\n\nPreview is not available for .bin files.\n\nSize\n4.0 KB\nModified\n2026-11-09 20:32 UTC\nOpen\nReveal in Explorer\nCopy path",
-        "html": "<div class=\"preview-scroll\" tabindex=\"0\" aria-label=\"Preview of blob.bin\"><div class=\"preview-head\"><span class=\"fileicon fileicon--neutral\" data-testid=\"result-icon\" aria-hidden=\"true\"><span class=\"fileicon-text\">BIN</span></span><div class=\"preview-heading\"><div class=\"preview-title\">blob.bin</div><div class=\"preview-kind\">BIN</div></div></div><div class=\"preview-path\" title=\"C:\\Users\\Pranshul\\D",
-        "imgs": [],
-        "testid": "preview-panel"
-      },
-      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-blob.png"
+      "query": "large.txt",
+      "titlePiece": "large.txt",
+      "clicked": true,
+      "panel": null,
+      "file": "C:/Users/Pranshul/Documents/Projects/protonsearch/docs/qa/g8-verify/p0-1-preview-large.png"
     }
   ]
 }

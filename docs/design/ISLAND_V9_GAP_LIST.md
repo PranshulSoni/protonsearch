@@ -15,8 +15,9 @@ capability adapters, IPC gaps and evidence/a11y polish. No fake data is accepted
 | 4 | Search real results/filters (All/Files/Folders/Apps/Actions), borderless focus line, no recency meta | island-v9/search-* |
 | 5 | Clipboard real categories/snippets/image thumbnails; counts removed; neutral row copy; Pinned honestly disabled | island-v9/clipboard-* + live-shots/island-clipboard-images |
 | 6 | Agents flat real Pi tasks + gated Pause/Resume + progress/permissions/logs summary; no fake tree | island-v9/agents-* |
-| 7 | Browser/Git real scoped rows; disabled Media/Quick Settings/Notifications with reasons, no mock data | island-v9/{browser,git,media,controls,notifications}-1150 |
+| 7 | Browser/Git real scoped rows; Media honest-disabled; Quick Settings (volume/brightness/audio output) and Notifications now real via the shell controls API | island-v9/{browser,git,media,controls,notifications}-1150 |
 | 8 | Placement editor + card manager + Launcher/Onboarding primary choice | ui-app task-40; ISLAND_SETTINGS_SPEC (embedded-frame adaptation allowed) |
+| 9 | Zero-results, reduced-motion and expanded 860/430 evidence captured; agent copy/action code pluralised and action-gated; spec-recheck JSON landed | island-v9 zero-results/reduced-motion/{search,clipboard,agents}-860,430; task49-spec-recheck.json |
 
 ## Remaining gaps
 
@@ -24,31 +25,33 @@ capability adapters, IPC gaps and evidence/a11y polish. No fake data is accepted
 
 | # | Gap | Current evidence | Required / owner |
 |---|---|---|---|
-| 1 | No native Media/Quick Settings/Notifications adapters; cards show honest disabled states, not V9 controls/drill-downs | island-v9 media/controls/notifications-1150; audit §3.1 | task-35 native adapters; then restore V9 card bodies/drill-downs |
+| 1 | Media adapter still absent (honest disabled card). Quick Settings/Notifications now use the shell controls API, but media/Wi-Fi/BT drill-downs and notification dismiss/clear commands remain pending | island-v9 media/controls/notifications-1150; task-49 | Media task-35; wire drilldowns when milestone-2/adapters land; gate test-only toast out of production |
 | 2 | Agent task-tree/hierarchy/log IPC missing; flat task list only | island-v9/agents-*; audit §3.2 | Lead/IPC owner; wire when agent task tree APIs exist |
 | 3 | Clipboard pinning IPC missing; Pinned tab disabled | island-v9/clipboard-*; audit §3.3 | G2/clipboard IPC; then real pinning |
 | 4 | Compact page dots keep 11×37 visual/hit box (expanded 24×30 hit pseudo); WCAG target-size deviation | island compact captures; audit D2.1 | Accept as documented a11y deviation; showDots opt-out + keyboard/wheel; revisit touch target design with Lead |
 | 5 | Real Windows/WebView2 visual/DPI/frame-pacing evidence missing (Chromium/mock only) | audit §3.5; live-shots partial | L0/task-31: capture real window at 125/150/200 %, taskbar/fullscreen, shadow |
-| 6 | Evidence gaps: zero-results, reduced-motion and media/controls/notification drill-down captures absent because adapters unavailable | audit D2.8 / this list | Add when adapters land; keep reduced-motion test evidence |
+| 6 | Zero-results/reduced-motion evidence is now present; media output/Wi-Fi/BT drill-down captures still absent | audit D2.8; task-49 evidence | Add drill-downs when adapters land; keep reduced-motion test evidence |
 | 7 | Preview error detail can show raw bridge error; preview skeleton uses a pulse gradient (design says flat) | `ResultPreview.tsx:149-153`, `launcher.css:1216-1235` | sanitize/Details only; flat skeleton; tracked in REVIEW_3 |
-| 8 | Agent copy nits: "1 TASKS", "1 permissions granted"; both Pause and Resume rendered (one disabled but not visually distinct) | island-v9/agents-1150 | pluralise + render only the available action (or clear disabled style); ui-launcher |
+| 8 | Agent copy/action code is fixed ("1 TASK"/"1 permission", only allowed actions) but agents-1150.png is stale and still shows the old "1 TASKS" + Pause/Resume pair | code fixed; agents-1150 timestamp 02:45 | Refresh agents-1150/520/335 captures; no code change needed |
 | 9 | Settings IPC gaps: no per-monitor placement map, cursor/active-window monitor policy, pin/undo, Normal Launcher-specific options | ui-app task-40 caveats | Add IPC fields or keep explicit no-fake-controls notes; do not silently drop |
-| 10 | Stale live-shots: `island-shown.png`/`island-placeholder.png` still show the old letter-tile placeholder | `docs/qa/visual/live-shots` | Refresh or label stale; current renderer shown in island-live-compact |
+| 10 | Stale live-shots: `island-shown.png`/`island-placeholder.png` still show the old letter-tile placeholder | `docs/qa/visual/live-shots` | Outside ui-launcher scope; L0/design refresh or label stale; current renderer shown in island-live-compact |
+| 11 | Controls card overflows: at 516×376 the bottom Wi-Fi/Bluetooth tiles are cut behind the dots; V9 controls must show 2×2 tiles + brightness/volume without clipping | island-v9/controls-1150/430 | Reorder/compact controls or move audio-output to the Media drill-down so the V9 structure fits; body scroll only if intentionally signalled |
+| 12 | Zero-results copy exists in the DOM but is not visible at the canonical 185 px expanded card (blank results area) | island-v9/zero-results-1150/860/430; task49 JSON | Show a compact 1–2 line empty state inside the available results area (no 110 px min-height); keep card height 185; never ship a blank zero state |
+| 13 | Notifications: dismiss is disabled pending a bridge command and a test-only "Test local toast" control appears; disabled × is not visually distinct | island-v9/notifications-1150; task-49 | Gate the test action out of production; show dismiss disabled with reason or hide; keep Clear all only with a real command |
 
 ### P2 — polish / verification
 
 | # | Item | Required |
 |---|---|---|
-| 11 | V9 demo stage/bar must not ship | Only island surface binds; no product stage chrome |
-| 12 | Icon set stroke/size exactness | 24 viewBox, 1.85 stroke, 19/23/18 sizes; no stretch |
-| 13 | Reference-vs-production comparison harness | Use captures + per-state metrics; compare real Windows screenshots |
-| 14 | Settings dark-theme treatment | Reference settings is light; embed app theme intentionally, document if dark |
-| 15 | Tail-copy/pluralisation sweep | Check remaining counts ("1 items" etc.) across island/settings |
+| 14 | V9 demo stage/bar must not ship | Only island surface binds; no product stage chrome |
+| 15 | Icon set stroke/size exactness | 24 viewBox, 1.85 stroke, 19/23/18 sizes; no stretch |
+| 16 | Reference-vs-production comparison harness | Use captures + per-state metrics; compare real Windows screenshots |
+| 17 | Settings dark-theme treatment | Reference settings is light; embed app theme intentionally, document if dark |
+| 18 | Tail-copy/pluralisation sweep | Check remaining counts ("1 items" etc.) across island/settings |
 
 ## Ownership
 
-- **ui-launcher:** island cards/dots/interaction, agent copy/action-state nits, stale live-shot refresh, capability card
-  structure readiness.
+- **ui-launcher:** island cards/dots/interaction, controls overflow/zero-state visibility, notification test-action gating, refresh stale agent captures; capability card structure readiness.
 - **ui-app:** settings pages/persistence; expose only real IPC fields; keep gap notes for cursor/active policy, pin/undo.
-- **L0:** native shadow margin (done), real monitor/DPI/taskbar/fullscreen verification, IPC extensions for card data.
+- **L0:** native shadow margin (done), live-shots refresh/label (outside ui-launcher scope), real monitor/DPI/taskbar/fullscreen verification, IPC extensions for card data.
 - **sources/agent owners:** Media/Quick Settings/Notifications, agent task tree/logs, clipboard pinning.

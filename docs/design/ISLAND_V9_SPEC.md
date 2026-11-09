@@ -152,7 +152,7 @@ labels All/Files/Folders/Apps/Actions (prototype; production real scopes, no fak
 Results: padding 7 11, max-height 215; row min-height **50**, padding 8 10 gap 10 radius 8; icon 34 radius 7 bg
 #253744, 18 glyph; title 12 bold ellipsis, sub 10 #99a6ad margin 4; active/hover #202d35 + border #334b5b.
 Result foot: min-height 33, padding 8 15 9, border-top #2c3034, font 10; "{n} local results" + kbd hints (second
-hidden ≤520). Empty prototype message "No matching sample results." — production real empty state.
+hidden ≤520). Empty prototype message "No matching sample results." — production must render a real empty state, and at the canonical 185 px card it must be a **compact visible 1–2 line state** inside the results area (title 11/600, hint 10, no 110 px min-height). The prototype's blank zero-results capture is a reference defect; never ship a blank state.
 Card body: padding **17 22 14**, overflow-y auto, thin scrollbar #3c474a; card top min-height 42 gap 11; icon tile
 40×40 radius 12 bg #1c2931, icon 23; h2 16/700; sub 11 margin-top 4; divider #262b30 margin 13. No card counter.
 
@@ -189,7 +189,7 @@ disabled); progress % right when determinate; track 4 bg #27343d fill #a6c7d8. I
 `api.agentTasks(50)` with real state/progress/permissions/log summary, no fabricated tree; hierarchy/agent-task-tree and
 log IPC remain gaps. Pluralise counts ("1 TASK", "1 permission"); never show both Pause and Resume as enabled.
 
-**Controls:** 515×376 (400 ≤520, 483 ≤380); drill-down 515×366 (418 ≤520). Head; divider margin 12; grid 2 col gap 9;
+**Controls:** 515×376 (400 ≤520, 483 ≤380); drill-down 515×366 (418 ≤520). Real v1 data: Volume 62 %, Brightness 80 %, audio-output row + toggles via shell controls API. The fixed V9 height must show the 2×2 tile grid and brightness/volume without clipping; the audio-output row belongs to the Media output drill-down (or a dedicated Sound drill-down), not the first paint. Head; divider margin 12; grid 2 col gap 9;
 tile 61 (58 ≤520, 50 ≤380) radius 10 bg #171e23 border #34434a; on bg #223a49 border #416178. Left toggle flex 1,
 padding 9 11 (8 ≤520, 7 12 ≤380), gap 9, icon 19, label 11 (10 ≤520), sub 10 margin 5; right expand 36 (27 ≤520),
 border-left #4b606c, chevron 16; only Wi-Fi/Bluetooth expand. Sliders margin-top 17 gap 12 min-height 25; icon 19,
@@ -203,9 +203,14 @@ tracking); 2 bookmark rows + 1 history row; choose rows 47, icon 18, title 12, m
 **Git:** 505×330 (355 ≤520). Head, divider, 3 commit rows (Optimize metadata search / 2 hours ago; Improve OCR
 scheduling / Yesterday; Refine window animations / Monday) with git icon 18, title 12, meta 10, tail more. Real repo.
 
-**Notifications:** 500×345 (385 ≤520). Head, divider; rows min 47, bell icon 18, title 12, body 10/1.4; dismiss
-30×30 icon 15 radius 6 hover #293941. Sample 3; dismiss removes; 0 state centred "All caught up" margin-top 25.
-Real local + supported Windows sources only.
+**Notifications:** 500×345 (385 ≤520). Real v1 list via shell notifications API. Head, divider; rows min 47, bell icon 18, title 12, body 10/1.4; dismiss
+30×30 icon 15 radius 6 hover #293941. Dismiss may be disabled pending a bridge command — show the disabled reason, never a
+silent dead ×; test-only controls (e.g. Test local toast) must be gated out of production. Sample 3; dismiss removes; 0
+state centred "All caught up" margin-top 25. Real local + supported Windows sources only.
+
+**Task-49 recheck findings (open):** zero-results copy invisible at 185 px; controls overflow cuts the Wi-Fi/Bluetooth
+row; notifications test-only toast + disabled dismiss styling; agents-1150/520/335 captures stale. Fix before calling G5
+fully accepted; G5 remains conditional.
 
 ## 5. Motion
 
@@ -283,3 +288,13 @@ counts/copy/thumbnail, V9 card subtitles, browser two-end context/chevron.
 compact 11 px dot target (documented); zero-results/reduced-motion/drilldown capture evidence; real Windows/DPI/frame
 pacing; agent copy pluralisation ("1 TASK"/"1 permission") and disabled-action visual state; preview error detail must be
 sanitized (tracked in REVIEW_3).
+
+### Task-49 evidence update (2026-11-10)
+
+Zero-results (1150/860/430), reduced-motion (compact/search 1150), expanded 860/430 and refreshed
+media/controls/notifications captures plus `task49-spec-recheck.json` now exist. Agent copy/action and clipboard
+thumbnail deltas are resolved in code; Controls/Notifications now use the shell controls API. Open visual fixes: controls
+card overflow (bottom tiles clipped), zero-results copy invisible at 185 px, notification test-action gating/disabled
+dismiss state, and stale agents-1150/520/335 captures. Media adapter and media/Wi-Fi/BT drill-downs remain pending;
+compact 11×37 dot target remains the documented accessibility deviation. Geometry is unchanged and passing.
+

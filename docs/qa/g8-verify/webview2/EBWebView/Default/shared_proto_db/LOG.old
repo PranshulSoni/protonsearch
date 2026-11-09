@@ -1,2 +1,3 @@
-2026/11/10-02:56:31.257 1db0 Creating DB C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default\shared_proto_db since it was missing.
-2026/11/10-02:56:31.262 1db0 Reusing MANIFEST C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default\shared_proto_db/MANIFEST-000001
+2026/11/10-03:06:25.567 464 Reusing MANIFEST C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default\shared_proto_db/MANIFEST-000001
+2026/11/10-03:06:25.568 464 Recovering log #3
+2026/11/10-03:06:25.568 464 Reusing old log C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default\shared_proto_db/000003.log 

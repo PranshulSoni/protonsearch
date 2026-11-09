@@ -16,3 +16,32 @@
 2026-11-09 21:27:29.163: [INFO] BookmarkModelLoaded, ids_reassigned: 0
 2026-11-09 21:27:29.163: [INFO] BookmarksLoadDropped droppedNodes=0
 2026-11-09 21:27:29.163: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-11-09 21:34:32.192: [INFO] CurrentProfilePath: C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default
+2026-11-09 21:34:32.192: [INFO] Profiles total count: 1
+2026-11-09 21:34:32.192: [INFO] Profile: name=Profile 1 path=C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default lastActive=2026-11-09T21:28:52.159Z
+2026-11-09 21:34:32.192: [INFO] LastUsedProfileDir: C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default
+2026-11-09 21:34:32.192: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default lastActive=2026-11-09T21:28:52.159Z
+2026-11-09 21:34:32.192: [INFO] OnDoneLoading sync enabled: 0
+2026-11-09 21:34:32.192: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-11-09 21:34:32.192: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-11-09 21:34:32.192: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-11-09 21:35:48.229: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-11-09 21:36:25.556: [INFO] CurrentProfilePath: C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default
+2026-11-09 21:36:25.556: [INFO] Profiles total count: 1
+2026-11-09 21:36:25.556: [INFO] Profile: name=Profile 1 path=C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default lastActive=2026-11-09T21:35:46.127Z
+2026-11-09 21:36:25.556: [INFO] LastUsedProfileDir: C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default
+2026-11-09 21:36:25.556: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default lastActive=2026-11-09T21:35:46.127Z
+2026-11-09 21:36:25.556: [INFO] OnDoneLoading sync enabled: 0
+2026-11-09 21:36:25.556: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-11-09 21:36:25.556: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-11-09 21:36:25.556: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-11-09 21:37:22.371: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-11-09 21:37:24.531: [INFO] CurrentProfilePath: C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default
+2026-11-09 21:37:24.531: [INFO] Profiles total count: 1
+2026-11-09 21:37:24.531: [INFO] Profile: name=Profile 1 path=C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default lastActive=2026-11-09T21:37:10.954Z
+2026-11-09 21:37:24.531: [INFO] LastUsedProfileDir: C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default
+2026-11-09 21:37:24.531: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=C:\Users\Pranshul\Documents\Projects\protonsearch\docs\qa\g8-verify\webview2\EBWebView\Default lastActive=2026-11-09T21:37:10.954Z
+2026-11-09 21:37:24.531: [INFO] OnDoneLoading sync enabled: 0
+2026-11-09 21:37:24.531: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-11-09 21:37:24.531: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-11-09 21:37:24.531: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1

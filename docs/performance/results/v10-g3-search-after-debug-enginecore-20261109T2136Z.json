@@ -1,0 +1,438 @@
+{
+  "contentDocuments": 16848,
+  "dataDir": ".devdata-perf51/v2",
+  "filenameEntries": 139386,
+  "iterations": 20,
+  "ocrDocuments": 373,
+  "openMs": 159.599474,
+  "profile": "debug",
+  "rows": [
+    {
+      "contentDirect": {
+        "p50": 2.0991489999999997,
+        "p95": 2.238064
+      },
+      "engine": {
+        "p50": 0.300387,
+        "p95": 0.32532099999999997,
+        "p99": 0.33007000000000003
+      },
+      "filenameDirect": {
+        "p50": 0.067676,
+        "p95": 0.075988
+      },
+      "query": "readme",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.09260999411344528
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 0.14959999918937683
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 10.362770000000001,
+        "p95": 11.491893
+      },
+      "engine": {
+        "p50": 0.458298,
+        "p95": 0.5046029999999999,
+        "p99": 0.5770289999999999
+      },
+      "filenameDirect": {
+        "p50": 0.1496,
+        "p95": 0.173347
+      },
+      "query": "index",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 3,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.11160600185394287
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 0.26833000779151917
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 11.962064999999999,
+        "p95": 13.860561
+      },
+      "engine": {
+        "p50": 0.42030399999999996,
+        "p95": 0.470172,
+        "p99": 0.499855
+      },
+      "filenameDirect": {
+        "p50": 0.099733,
+        "p95": 0.124666
+      },
+      "query": "screenshot",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 2,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.1353520005941391
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 0.19352999329566956
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 10.080192,
+        "p95": 11.445589
+      },
+      "engine": {
+        "p50": 2.9801279999999997,
+        "p95": 3.569029,
+        "p99": 3.5702160000000003
+      },
+      "filenameDirect": {
+        "p50": 2.5978160000000003,
+        "p95": 3.0703620000000003
+      },
+      "query": "report",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.14959999918937683
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 2.3995370864868164
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 2.7034860000000003,
+        "p95": 4.04395
+      },
+      "engine": {
+        "p50": 6.831734,
+        "p95": 8.816903,
+        "p99": 9.038928
+      },
+      "filenameDirect": {
+        "p50": 2.718921,
+        "p95": 3.212839
+      },
+      "query": "project phoenix",
+      "results": 13,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.12941600382328033
+        },
+        {
+          "hits": 0,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 3.7293150424957275
+        },
+        {
+          "hits": 12,
+          "label": "indexed content",
+          "tier": 1,
+          "tookMs": 2.8495240211486816
+        },
+        {
+          "hits": 0,
+          "label": "OCR text",
+          "tier": 2,
+          "tookMs": 0.16384799778461456
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 2.8851430000000002,
+        "p95": 4.0451369999999995
+      },
+      "engine": {
+        "p50": 1.365397,
+        "p95": 1.915117,
+        "p99": 2.18701
+      },
+      "filenameDirect": {
+        "p50": 1.380832,
+        "p95": 1.5684259999999999
+      },
+      "query": "final",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.11041900515556335
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 1.091130018234253
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 2.410222,
+        "p95": 3.032369
+      },
+      "engine": {
+        "p50": 2.657181,
+        "p95": 3.162972,
+        "p99": 3.262706
+      },
+      "filenameDirect": {
+        "p50": 2.3188000000000004,
+        "p95": 2.642934
+      },
+      "query": "invoice",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.14485099911689758
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 2.7865970134735107
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 10.527804,
+        "p95": 11.037157
+      },
+      "engine": {
+        "p50": 3.2377719999999997,
+        "p95": 3.640267,
+        "p99": 4.085506
+      },
+      "filenameDirect": {
+        "p50": 2.658369,
+        "p95": 3.000311
+      },
+      "query": "notes",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.12941600382328033
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 2.4778990745544434
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 7.176051999999999,
+        "p95": 7.947798000000001
+      },
+      "engine": {
+        "p50": 0.432178,
+        "p95": 0.482045,
+        "p99": 0.49035599999999996
+      },
+      "filenameDirect": {
+        "p50": 0.132978,
+        "p95": 0.155536
+      },
+      "query": "config",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.10685700178146362
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 0.22321300208568573
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 1.9649839999999998,
+        "p95": 2.105086
+      },
+      "engine": {
+        "p50": 1.155244,
+        "p95": 1.443759,
+        "p99": 1.560114
+      },
+      "filenameDirect": {
+        "p50": 1.1148760000000002,
+        "p95": 1.197988
+      },
+      "query": "pdf",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.09498400241136551
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 0.8750410079956055
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 17.74185,
+        "p95": 19.122681999999998
+      },
+      "engine": {
+        "p50": 0.572279,
+        "p95": 0.715943,
+        "p99": 0.785993
+      },
+      "filenameDirect": {
+        "p50": 0.19234199999999999,
+        "p95": 0.212527
+      },
+      "query": "x",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.10685700178146362
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 0.430990993976593
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 0.127041,
+        "p95": 0.151975
+      },
+      "engine": {
+        "p50": 2.012477,
+        "p95": 2.482648,
+        "p99": 2.527765
+      },
+      "filenameDirect": {
+        "p50": 0.641143,
+        "p95": 0.77412
+      },
+      "query": "zzzzqqqq",
+      "results": 2,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.14485099911689758
+        },
+        {
+          "hits": 0,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 0.6423299908638
+        },
+        {
+          "hits": 1,
+          "label": "indexed content",
+          "tier": 1,
+          "tookMs": 0.17215900123119354
+        },
+        {
+          "hits": 0,
+          "label": "OCR text",
+          "tier": 2,
+          "tookMs": 0.06886300444602966
+        }
+      ]
+    },
+    {
+      "contentDirect": {
+        "p50": 3.119042,
+        "p95": 3.856356
+      },
+      "engine": {
+        "p50": 1.690717,
+        "p95": 2.008915,
+        "p99": 2.089652
+      },
+      "filenameDirect": {
+        "p50": 1.6182919999999998,
+        "p95": 1.898496
+      },
+      "query": "screenshot 2026-11-09",
+      "results": 30,
+      "tiers": [
+        {
+          "hits": 1,
+          "label": "exact + actions + apps",
+          "tier": 0,
+          "tookMs": 0.1662220060825348
+        },
+        {
+          "hits": 60,
+          "label": "filename index",
+          "tier": 1,
+          "tookMs": 1.347588062286377
+        }
+      ]
+    }
+  ]
+}

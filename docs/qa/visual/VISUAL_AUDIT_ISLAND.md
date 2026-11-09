@@ -206,3 +206,30 @@ New deterministic browser-mock captures in docs/qa/visual/screenshots/island-v9/
 - TypeScript/build: 18 files / 239 tests pass, build exit 0; the earlier EmptyState export issue is fixed.
 - Requested follow-up from Lead if wanted: an `api.notificationsDismiss(id)` / clear command so the dismiss buttons
   can become live; no other controls gap blocks this task.
+
+## E5. Notification dismissal wired
+
+- The landed api.notificationsDismiss(id) / api.notificationsClear() calls are wired to the 30×30 dismiss buttons and
+  a Clear all footer action; both refresh the status after completion. The local-toast test remains gated by
+  toastCapability (honest false on the unpackaged dev binary).
+- Refreshed captures: island-v9/notifications-1150.png / notifications-430.png (real stored notification, unread
+  subtitle, enabled dismiss, Clear all, disabled toast test). Tests cover one-dismiss and clear-all bridge calls;
+  full suite 18 files / 239 tests, build exit 0.
+
+## D4. Task-49 recheck — zero/reduced/expanded evidence + real controls (2026-11-10)
+
+Reviewed `docs/qa/visual/screenshots/island-v9/` zero-results/reduced-motion/expanded 860/430 + refreshed
+media/controls/notifications + `task49-spec-recheck.json`.
+**Verified:** surface boxes unchanged and correct (search 550x397/185, clipboard 510x391 / 410x416, agents 520x411 /
+410x445, compact 520/410/315x66); expanded dots passive 14+5 pitch with active 22; borderless focus row inset; placeholder
+and Actions filter; neutral clipboard subs + real thumbnail; flat real agent rows; reducedMotion true. Agent code now
+pluralises and renders only allowed pause/resume.
+**New visual defects to fix:** (1) Controls 516x376 overflows — audio-output plus sliders push the 2x2 Wi-Fi/Bluetooth
+tiles below the viewport, so the bottom tile row is cut behind the dots; V9 controls must fit its fixed height or move
+audio-output to the Media drill-down. (2) zero-results card 550x185 is blank — the empty message exists in DOM but the
+110px centred block is outside the visible results area; use a compact 1–2 line state. (3) notifications capture includes
+a test-only “Test local toast” control and a dismiss × whose disabled state is not visually distinct; gate test actions and
+show disabled reason. (4) agents-1150/520/335 are stale and still show “1 TASKS”/both actions; refresh captures. Stale
+live-shots remain outside ui-launcher write scope.
+**Verdict:** geometry/motion unchanged PASS; G5 stays conditional on the fixes above.
+

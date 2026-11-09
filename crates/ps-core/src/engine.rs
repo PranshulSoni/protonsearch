@@ -1434,6 +1434,7 @@ fn run_background_inner(engine: &Arc<Engine>) {
     if let Some(legacy) = engine.config.legacy_db.clone() {
         if legacy.is_file() {
             engine.migrate_legacy(&legacy);
+            let _ = engine.db.checkpoint();
         }
     }
 
@@ -1485,6 +1486,7 @@ fn run_background_inner(engine: &Arc<Engine>) {
 
 /// Publish the terminal state and counters. Runs on every background exit path.
 fn finish_background(engine: &Arc<Engine>) {
+    let _ = engine.db.checkpoint();
     engine.sync_filename_entries();
     let shutdown = engine.shutdown.load(Ordering::SeqCst);
     let paused = engine.paused.load(Ordering::SeqCst);
@@ -1559,9 +1561,16 @@ fn index_content(engine: &Arc<Engine>, roots: &[PathBuf]) {
         return;
     };
     let mut written = 0usize;
+    let mut processed = 0usize;
     for path in candidates {
         if engine.shutdown.load(Ordering::SeqCst) || engine.paused.load(Ordering::SeqCst) {
             break;
+        }
+        processed += 1;
+        if processed % 256 == 0 {
+            // Auto-checkpoint is off: fold the WAL here so a long content pass
+            // cannot grow it without bound.
+            let _ = engine.db.checkpoint();
         }
         match content.index_file(&path, ps_content::DEFAULT_MAX_BYTES) {
             Ok(true) => written += 1,
@@ -1572,6 +1581,7 @@ fn index_content(engine: &Arc<Engine>, roots: &[PathBuf]) {
     }
     let documents = content.stats().documents;
     engine.content_documents.store(documents, Ordering::SeqCst);
+    let _ = engine.db.checkpoint();
     let _ = roots;
     engine.last_updated.store(now_ms(), Ordering::SeqCst);
     let _ = written;
@@ -1598,9 +1608,14 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
             .collect()
     };
     let mut indexed = 0usize;
+    let mut processed = 0usize;
     for (path, size, modified) in candidates {
         if engine.shutdown.load(Ordering::SeqCst) || engine.paused.load(Ordering::SeqCst) {
             break;
+        }
+        processed += 1;
+        if processed % 128 == 0 {
+            let _ = engine.db.checkpoint();
         }
         let hash = quick_hash(&path, size, modified);
         if engine.db.ocr_has(&path, &hash) {
@@ -1625,6 +1640,7 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
     engine
         .ocr_documents
         .store(engine.db.ocr_count(), Ordering::SeqCst);
+    let _ = engine.db.checkpoint();
     engine.last_updated.store(now_ms(), Ordering::SeqCst);
     let _ = roots;
     let _ = indexed;

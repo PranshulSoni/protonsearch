@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use ps_ipc::{SearchRequest, SearchScope, SearchResponse};
+use ps_ipc::{SearchRequest, SearchResponse};
 
 fn percentile(sorted: &[f64], p: f64) -> f64 {
     if sorted.is_empty() {

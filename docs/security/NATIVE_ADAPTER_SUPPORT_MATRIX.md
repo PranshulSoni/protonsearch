@@ -1,49 +1,66 @@
-# Native adapter support matrix — host evidence (task-35 milestone 1)
+# Native adapter support matrix — MILESTONE 1 FINAL (task-35)
 
 | Field | Value |
 |---|---|
-| Milestone | task-35 milestone 1: capability probes, Core Audio volume/output, brightness, local notification store |
+| Status | **Milestone 1 final** — wired end-to-end by the shell/UI; task-35 closed as milestone-1 complete |
 | Date | 2026-11-10 (Asia/Calcutta) |
 | Host | Windows 11, AMD Ryzen AI 9 (10C/20T), 31 GB RAM, Cirrus Logic onboard audio |
-| Evidence | @native-probe-host.log (raw JSON capability matrix + live device data) |
-| API | crates/ps-windows (+ crates/ps-sources::notifications) — user-level, no admin, bounded probes (3 s per capability) |
+| Evidence | @native-probe-host.log (regenerated capability matrix + live device data) |
+| Code | crates/ps-windows: audio, brightness, capabilities, toast, winrt modules; crates/ps-sources: notifications store |
 
-## Capability matrix on this host
+## Decision
+Milestone 1 (capabilities + Core Audio volume/output + brightness + local notification store) is complete, verified and wired. Milestone 2 (GSMTC media transport, Wi-Fi network connect, Bluetooth device list/radio toggle) is **deferred to post-alpha**; it needs its own contract/IPC additions and real media/network/Bluetooth hardware verification that should not be rushed into this release. To keep the UI honest, the not-yet-shipped adapters now report `supported=false` with explicit reasons (they previously reported raw API availability, which could have produced non-functional controls).
 
-| Capability | Supported | Host result / reason | Milestone status |
+## Capability matrix on this host (milestone-1 final)
+
+| Capability | Supported | Host result / reason | State |
 |---|---|---|---|
-| media_sessions (GSMTC) | **yes** | GSMTC session manager created via WinRT | probe done; enumeration/transport controls in milestone 2 |
-| audio_output (enumerate render endpoints) | **yes** | 1 active device: 
-`Speakers (Cirrus Logic XU (with APO Extensions))`, default | done |
-| audio_volume (master volume/mute) | **yes** | read/write verified: volume 0.88, muted=false; round-trip test restores state | done |
-| audio_output_switch (default device) | **yes** | IPolicyConfig interface created; SetDefaultEndpoint implemented (not exercised on this host because only one endpoint exists) | done |
-| wifi (WLAN API) | **yes** | WlanOpenHandle + WlanEnumInterfaces succeed (adapter present) | probe done; SSID/connect in milestone 2 |
-| bluetooth (WinRT radio) | **yes** | Radio::GetRadiosAsync returns a Bluetooth radio | probe done; device list/toggle in milestone 2 |
-| brightness | **no** | no monitor exposes user-level brightness control (external desktop monitor; Dxva2 path) | honest disabled state; per-monitor support detection implemented |
-| local_notifications (store) | **yes** | SQLite-backed local store (add/list/read/dismiss/clear) | done |
-| toast_notifications (Windows toasts) | **no** | error 0x80073D54: process has no package identity (unpackaged dev binary) | best-effort API implemented; see limitation below |
-| airplane_mode / energy_saver / hotspot / cast / night_light | no (not implemented) | explicit unsupported reasons returned to UI | planned later / may remain unsupported honestly |
+| audio_output | **yes** | 1 active render endpoint: `Speakers (Cirrus Logic XU (with APO Extensions))`, marked default | shipped |
+| audio_volume | **yes** | master volume 0.88, muted=false; read/write round-trip with state restore | shipped |
+| audio_output_switch | **yes** | IPolicyConfig interface created; SetDefaultEndpoint implemented | shipped (single endpoint on this host) |
+| local_notifications | **yes** | SQLite local store: add/list/unread/mark_read/dismiss/clear | shipped |
+| brightness | **no** | no monitor exposes user-level brightness control (external desktop monitor; Dxva2 per-monitor detection) | capability-gated in UI |
+| toast_notifications | **no** | 0x80073D54: process has no package identity (unpackaged dev binary) | honest limitation; fix = AUMID shortcut at install |
+| media_sessions | **no** | 'GSMTC media enumeration/transport controls are a post-alpha follow-up; capability probe exists but the control API is not shipped in this build' | milestone 2 (post-alpha) |
+| wifi | **no** | 'Wi-Fi network list/connect is a post-alpha follow-up; the UI should open Windows network settings for now' | milestone 2 (post-alpha) |
+| bluetooth | **no** | 'Bluetooth device list/radio toggle is a post-alpha follow-up; the UI should open Windows Bluetooth settings for now' | milestone 2 (post-alpha) |
+| airplane_mode / energy_saver / hotspot / cast / night_light | no | explicit unsupported reasons | not planned for alpha |
 
-## API surface (milestone 1)
+## Shipped API surface (milestone 1)
 `cargo
-ps_windows::native_capabilities() -> NativeCapabilities   // per-feature supported + reason
-ps_windows::list_audio_outputs() -> Result<Vec<AudioOutputDevice>>
-ps_windows::default_audio_output() -> Result<AudioOutputDevice>
-ps_windows::set_audio_output(device_id: &str) -> Result<()>
+ps_windows::native_capabilities() -> NativeCapabilities   // serde; per-feature supported + reason
+ps_windows::list_audio_outputs() / default_audio_output() / set_audio_output(id)
 ps_windows::get_audio_volume() / set_audio_volume(f32) / get_audio_mute() / set_audio_mute(bool) / audio_state()
-ps_windows::brightness_supported() -> bool; brightness_monitors() -> Vec<String>; get_brightness(); set_brightness(u8)
-ps_windows::toast_supported() -> bool; show_toast(title, body) -> Result<()>
+ps_windows::brightness_supported() / brightness_monitors() / get_brightness() / set_brightness(u8)
+ps_windows::toast_supported() / show_toast(title, body)
 ps_sources::notifications::{add, list, unread_count, mark_read, dismiss, clear, add_and_maybe_toast}
 `
+All user-level (no admin). Capability probes are bounded at 3 s each and side-effect free.
 
-## Honest limitations / follow-ups
-- **Windows toasts need app identity.** An unpackaged binary (current dev build) cannot create a toast notifier (0x80073D54). Fix path: register a Start Menu shortcut carrying an AppUserModelID (IShellLink + PKEY_AppUserModel_ID) or a package identity at install time, then toast_notifications becomes supported. The local store always works and remains the source of truth.
-- **Brightness is per-monitor and hardware dependent.** Dxva2 works for internal laptop panels that expose brightness; this desktop monitor does not. The capability reason is shown to the UI instead of a fake slider. DDC/CI fallback for external monitors is optional future work.
-- **Output switching uses IPolicyConfig**, a stable but undocumented Windows interface (the same one the OS sound UI uses). If a future build removes it the capability probe reports unsupported and the UI should open Windows sound settings.
-- No admin privileges are requested anywhere; all probes are bounded (3 s) and side-effect free.
-- Media/Wi-Fi/Bluetooth adapters currently expose **capability probes only**; enumeration/transport/connect operations are milestone 2 work.
+## Milestone 2 — post-alpha follow-up plan (explicitly deferred)
 
-## Test evidence
-- `cargo test -p ps-windows`: 7 unit + 15 integration = 22 passed / 0 failed, including native capability probe (bounded + serde round-trip), audio device enumeration, volume/mute restore round-trip, brightness round-trip guarded by capability, toast honesty.
-- `cargo test -p ps-sources`: 18 unit + 3 notifications tests + 31/32 sources tests passed / 0 failed (1 ignored action smoke), including store round-trip, read/dismiss/clear counts, input validation/truncation, toast fallback honesty.
-- Host probe command: `cargo run -p ps-windows --example native_probe` (raw output in @native-probe-host.log).
+### (1) GSMTC media sessions/transport
+- `GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get()` (already probed) -> `GetSessions()`; per session: `GetPlaybackInfo()` (status + supported controls), `TryGetMediaPropertiesAsync()` (title/artist/album + thumbnail via `RandomAccessStreamReference`, bounded <=512 KiB, no network), `GetTimelineProperties()` for position/seek support; `TryTogglePlayPause` / `TrySkipNext` / `TrySkipPrevious`; shuffle/repeat/seek exposed only when playback-info reports support.
+- New ps-ipc contract additions needed (L0): `MediaSessionInfo` {sessionId, sourceAppUserModelId, title, artist, album, playbackStatus, canPlayPause/canSkip, positionMs/durationMs, artwork (bounded bytes) } + `MediaAction` enum + transport result DTO.
+- Tests: enumerate sessions/source apps; control calls guarded by playback status; artwork size bound; honest unsupported when no session/media apps. Requires a real playing media app for control verification.
+
+### (2) Wi-Fi
+- WlanAPI: `WlanOpenHandle` / `WlanEnumInterfaces` / `WlanGetAvailableNetworkList` (SSID, signal quality, security, profile name, connectable flag); radio state via WinRT `Radio` (RadioKind::WiFi, `SetStateAsync`) with `RadioAccessStatus` gating; `WlanConnect` only against an existing profile (`WlanGetProfileNames`), never prompts for keys; missing profile/permission -> structured error + 'open Windows network settings'.
+- IPC additions needed: `WifiNetworkInfo` {ssid, signal, security, hasProfile, connected} + `WifiRadioState` + connect result DTO.
+- Tests: network list on host; radio state read (no toggle during tests); connect path only when a saved profile exists, otherwise asserts structured error.
+
+### (3) Bluetooth
+- WinRT `Radio`: enumerate radios, Bluetooth on/off via `SetStateAsync` gated on `RadioAccessStatus`; paired devices via `DeviceInformation::FindAllAsync(BluetoothDevice::GetDeviceSelectorFromPairingState(true))` -> name/id/connected; pairing and connection remain OS UI; no fake pairing. Connect only if the platform exposes it for the device class, otherwise return unsupported.
+- IPC additions needed: `BluetoothRadioState` + `BluetoothDeviceInfo` {id, name, connected, paired}.
+- Tests: radio enumeration, device list; toggle only with explicit user action in manual E2E (never in automated tests to avoid changing the user's radios).
+
+### Preconditions / risks for milestone 2
+- WinRT async + COM apartment discipline on background threads; bounded calls with timeouts.
+- New ps-ipc DTOs (L0-owned) and UI card wiring; cannot be verified without real media/network/Bluetooth hardware and a release-candidate pass.
+- No admin required anywhere; no network access for artwork (local stream only).
+
+## Verification (milestone 1 final)
+- `cargo test -p ps-windows`: 7 unit + 15 integration = 22 passed / 0 failed (capability probe bounded + serde round-trip, audio enumeration, volume/mute restore, brightness gated round-trip, toast honesty).
+- `cargo test -p ps-sources`: 18 unit + 3 notification-store tests + 31/32 sources tests passed / 0 failed (1 ignored action smoke).
+- `cargo check -p ps-windows -p ps-sources -p ps-content -p ps-ocr --all-targets` clean.
+- Host probe: `cargo run -p ps-windows --example native_probe` -> @native-probe-host.log.

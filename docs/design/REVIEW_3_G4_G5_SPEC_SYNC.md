@@ -68,3 +68,25 @@ implementations caught up with the binding design specs.
 - Re-sign must not treat the documented honest gaps as defects of this design pass; they are capability/evidence gaps in
   the owning tracks. If any condition regresses the visual/semantic contract (fake data, dead controls, hidden raw error,
   removed a11y alternative), reopen the design review.
+
+## 5. Task-49 evidence update (2026-11-10)
+
+**Additional evidence verified:** island-v9/zero-results-{1150,860,430}, reduced-motion-{compact,search}-1150,
+expanded search/clipboard/agents at 860/430, refreshed media/controls/notifications, and
+`docs/qa/visual/screenshots/island-v9/task49-spec-recheck.json` (surface boxes, dots pitch, focus, filters, clipboard,
+agent rows, reducedMotion). Agent copy/action code is now pluralised and action-gated; Controls/Notifications are wired to
+the shell controls API (volume 62 %, brightness 80 %, audio output, real notification list).
+
+**Still open conditions (G5 stays conditional):**
+- Controls card overflows at 516x376: bottom Wi-Fi/Bluetooth tiles are cut behind the dots; V9 structure (2x2 tiles +
+  brightness/volume) must fit or audio-output must move to the Media drill-down.
+- Zero-results copy is in the DOM but not visible at the canonical 185 px card; render a compact visible empty state.
+- Notifications: dismiss is disabled pending a bridge command and a test-only “Test local toast” control appears; gate
+  test controls out of production and give disabled dismiss a clear state.
+- agents-1150/520/335 captures are stale (code fixed) and must be refreshed; stale live-shots remain L0/design.
+- Media adapter + media/Wi-Fi/BT drilldowns still pending; compact 11x37 dot a11y deviation remains documented.
+- Preview error detail/raw and pulse skeleton remain as previously recorded.
+
+**Gate status unchanged:** G4 PASS WITH CONDITIONS; G5 PASS WITH CONDITIONS (evidence improved, new visual fixes required
+before rel-recon can treat card states as fully accepted). re-sign may proceed for the rest; these are owner-tracked.
+

@@ -1,0 +1,889 @@
+{
+  "schema": "ps-bench-result/1",
+  "kind": "filename-benchmark",
+  "status": "ok",
+  "host": {
+    "os": "Microsoft Windows 11 Home Single Language 10.0.26300 build 26300",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "physical_cores": 10,
+    "logical_cores": 20,
+    "ram_bytes": 33447858176,
+    "hostname": "PRANSHULASUS",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "captured_at_local": "2026-11-10T03:05:03.7965813+05:30",
+    "captured_at_utc": "2026-11-09T21:35:03.7965813Z"
+  },
+  "generated_at_utc": "unix:1794260103",
+  "command": "ps-bench filename --dataset .bench/dataset-1m.jsonl --queries .bench/queries.jsonl --iters 10 --limit 50 --cold-restarts 0 --out target/filename-1m-after.json",
+  "engine": "ps-index 2.0.0-alpha.1 (from_entries + search + save/load + memory_bytes)",
+  "build": {
+    "dataset_path": ".bench/dataset-1m.jsonl",
+    "dataset_bytes": 186145379,
+    "dataset_fnv1a64": "d3092bcbbb84f6a3",
+    "entries": 1000000,
+    "parse_ms": 720.0367650000001,
+    "build_ms": 2196.086723,
+    "total_ms": 2916.123488,
+    "memory_before": {
+      "pid": 38880,
+      "working_set_bytes": 9752576,
+      "peak_working_set_bytes": 9940992
+    },
+    "memory_after_build": {
+      "pid": 38880,
+      "working_set_bytes": 126517248,
+      "peak_working_set_bytes": 319127552
+    },
+    "engine_memory_bytes": 115491574,
+    "rss_delta_bytes": 116764672,
+    "rss_bytes_per_entry": 116.764672
+  },
+  "warm": {
+    "iterations": 10,
+    "overall": {
+      "count": 220,
+      "min": 0.052240999999999996,
+      "mean": 2.3629247136363647,
+      "p50": 2.23094,
+      "p90": 6.651263999999999,
+      "p95": 6.993207000000001,
+      "p99": 7.2627239999999995,
+      "max": 7.895556
+    },
+    "by_category": [
+      {
+        "category": "cjk",
+        "summary": {
+          "count": 20,
+          "min": 0.070051,
+          "mean": 0.07195049999999999,
+          "p50": 0.072425,
+          "p90": 0.073613,
+          "p95": 0.073613,
+          "p99": 0.073613,
+          "max": 0.073613
+        },
+        "queries": 2
+      },
+      {
+        "category": "exact",
+        "summary": {
+          "count": 20,
+          "min": 0.055803,
+          "mean": 1.5957336999999998,
+          "p50": 0.058178,
+          "p90": 3.310197,
+          "p95": 3.395683,
+          "p99": 3.569029,
+          "max": 3.569029
+        },
+        "queries": 2
+      },
+      {
+        "category": "exact_duplicate",
+        "summary": {
+          "count": 20,
+          "min": 0.052240999999999996,
+          "mean": 0.05693115,
+          "p50": 0.054616,
+          "p90": 0.058178,
+          "p95": 0.059365,
+          "p99": 0.079549,
+          "max": 0.079549
+        },
+        "queries": 2
+      },
+      {
+        "category": "extension_like",
+        "summary": {
+          "count": 20,
+          "min": 5.8439,
+          "mean": 6.8541741,
+          "p50": 6.933842,
+          "p90": 7.2627239999999995,
+          "p95": 7.569049,
+          "p99": 7.895556,
+          "max": 7.895556
+        },
+        "queries": 2
+      },
+      {
+        "category": "folder",
+        "summary": {
+          "count": 10,
+          "min": 6.60496,
+          "mean": 6.860229599999999,
+          "p50": 6.7628710000000005,
+          "p90": 7.143995,
+          "p95": 7.228293,
+          "p99": 7.228293,
+          "max": 7.228293
+        },
+        "queries": 1
+      },
+      {
+        "category": "fuzzy",
+        "summary": {
+          "count": 10,
+          "min": 4.251727000000001,
+          "mean": 4.481707699999999,
+          "p50": 4.474940999999999,
+          "p90": 4.590108,
+          "p95": 4.664908,
+          "p99": 4.664908,
+          "max": 4.664908
+        },
+        "queries": 1
+      },
+      {
+        "category": "hidden",
+        "summary": {
+          "count": 10,
+          "min": 0.054615,
+          "mean": 0.054853299999999994,
+          "p50": 0.054616,
+          "p90": 0.055803,
+          "p95": 0.055803,
+          "p99": 0.055803,
+          "max": 0.055803
+        },
+        "queries": 1
+      },
+      {
+        "category": "long_path",
+        "summary": {
+          "count": 10,
+          "min": 0.930844,
+          "mean": 1.0302215000000001,
+          "p50": 1.0068309999999998,
+          "p90": 1.085194,
+          "p95": 1.250229,
+          "p99": 1.250229,
+          "max": 1.250229
+        },
+        "queries": 1
+      },
+      {
+        "category": "multi_term",
+        "summary": {
+          "count": 20,
+          "min": 2.443467,
+          "mean": 3.03961115,
+          "p50": 2.9943750000000002,
+          "p90": 3.463359,
+          "p95": 3.561906,
+          "p99": 3.653327,
+          "max": 3.653327
+        },
+        "queries": 2
+      },
+      {
+        "category": "prefix",
+        "summary": {
+          "count": 30,
+          "min": 0.062927,
+          "mean": 1.3331419333333336,
+          "p50": 1.352337,
+          "p90": 2.629873,
+          "p95": 2.659556,
+          "p99": 2.74148,
+          "max": 2.74148
+        },
+        "queries": 3
+      },
+      {
+        "category": "typo",
+        "summary": {
+          "count": 20,
+          "min": 1.979232,
+          "mean": 2.255517,
+          "p50": 2.23094,
+          "p90": 2.4173459999999998,
+          "p95": 2.422095,
+          "p99": 2.6904250000000003,
+          "max": 2.6904250000000003
+        },
+        "queries": 2
+      },
+      {
+        "category": "unicode",
+        "summary": {
+          "count": 10,
+          "min": 1.757206,
+          "mean": 2.0060648999999997,
+          "p50": 1.9186800000000002,
+          "p90": 2.173949,
+          "p95": 2.298616,
+          "p99": 2.298616,
+          "max": 2.298616
+        },
+        "queries": 1
+      },
+      {
+        "category": "zero_match",
+        "summary": {
+          "count": 20,
+          "min": 2.578819,
+          "mean": 2.9020028499999997,
+          "p50": 2.8055939999999997,
+          "p90": 3.158222,
+          "p95": 3.354127,
+          "p99": 3.503727,
+          "max": 3.503727
+        },
+        "queries": 2
+      }
+    ],
+    "queries": [
+      {
+        "id": "exact_unique",
+        "category": "exact",
+        "query": "Project Phoenix Budget 2026.xlsx",
+        "result_count": 1,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx",
+        "samples_ms": [
+          3.395683,
+          3.25202,
+          3.569029,
+          3.310197,
+          2.674991,
+          2.897017,
+          2.90414,
+          2.9575690000000003,
+          3.255582,
+          3.133289
+        ],
+        "summary": {
+          "count": 10,
+          "min": 2.674991,
+          "mean": 3.1349517,
+          "p50": 3.133289,
+          "p90": 3.395683,
+          "p95": 3.569029,
+          "p99": 3.569029,
+          "max": 3.569029
+        }
+      },
+      {
+        "id": "exact_dup",
+        "category": "exact_duplicate",
+        "query": "index.js",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\AppData\\Local\\2026\\2025\\Videos\\draft\\Q4\\index.js",
+        "samples_ms": [
+          0.054616,
+          0.054616,
+          0.054615,
+          0.053429,
+          0.052242,
+          0.053429,
+          0.053429,
+          0.053427999999999996,
+          0.053427999999999996,
+          0.052240999999999996
+        ],
+        "summary": {
+          "count": 10,
+          "min": 0.052240999999999996,
+          "mean": 0.0535473,
+          "p50": 0.053429,
+          "p90": 0.054616,
+          "p95": 0.054616,
+          "p99": 0.054616,
+          "max": 0.054616
+        }
+      },
+      {
+        "id": "exact_readme",
+        "category": "exact_duplicate",
+        "query": "README.md",
+        "result_count": 50,
+        "top1_path": "C:\\ProgramData\\screenshots\\README.md",
+        "samples_ms": [
+          0.059365,
+          0.058178,
+          0.079549,
+          0.058178,
+          0.058178,
+          0.058177,
+          0.058178,
+          0.056991,
+          0.058178,
+          0.058178
+        ],
+        "summary": {
+          "count": 10,
+          "min": 0.056991,
+          "mean": 0.060314999999999994,
+          "p50": 0.058178,
+          "p90": 0.059365,
+          "p95": 0.079549,
+          "p99": 0.079549,
+          "max": 0.079549
+        }
+      },
+      {
+        "id": "exact_package",
+        "category": "exact",
+        "query": "package.json",
+        "result_count": 50,
+        "top1_path": "C:\\ProgramData\\out\\app\\receipts\\package.json",
+        "samples_ms": [
+          0.058178,
+          0.056991,
+          0.05699,
+          0.056991,
+          0.055804000000000006,
+          0.056991,
+          0.055803,
+          0.055803,
+          0.055803,
+          0.055803
+        ],
+        "summary": {
+          "count": 10,
+          "min": 0.055803,
+          "mean": 0.05651569999999999,
+          "p50": 0.055804000000000006,
+          "p90": 0.056991,
+          "p95": 0.058178,
+          "p99": 0.058178,
+          "max": 0.058178
+        }
+      },
+      {
+        "id": "prefix_screenshot",
+        "category": "prefix",
+        "query": "Screenshot 2026-11-09",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png",
+        "samples_ms": [
+          1.443758,
+          1.58861,
+          1.352337,
+          1.355899,
+          1.405765,
+          1.4461330000000001,
+          1.270412,
+          1.290597,
+          1.278724,
+          1.2953459999999999
+        ],
+        "summary": {
+          "count": 10,
+          "min": 1.270412,
+          "mean": 1.3727581,
+          "p50": 1.352337,
+          "p90": 1.4461330000000001,
+          "p95": 1.58861,
+          "p99": 1.58861,
+          "max": 1.58861
+        }
+      },
+      {
+        "id": "prefix_quarterly",
+        "category": "prefix",
+        "query": "quarterly_rep",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\Downloads\\temp\\bin\\Downloads\\Q4\\Desktop\\quarterly_report_map.docx",
+        "samples_ms": [
+          2.582381,
+          2.629873,
+          2.562197,
+          2.588318,
+          2.495708,
+          2.74148,
+          2.202445,
+          2.654807,
+          2.508769,
+          2.659556
+        ],
+        "summary": {
+          "count": 10,
+          "min": 2.202445,
+          "mean": 2.5625533999999996,
+          "p50": 2.582381,
+          "p90": 2.659556,
+          "p95": 2.74148,
+          "p99": 2.74148,
+          "max": 2.74148
+        }
+      },
+      {
+        "id": "prefix_img",
+        "category": "prefix",
+        "query": "IMG_2026",
+        "result_count": 50,
+        "top1_path": "C:\\Program Files\\Desktop\\Backups\\generated\\IMG_20261103_044350.h",
+        "samples_ms": [
+          0.065301,
+          0.064115,
+          0.064115,
+          0.062927,
+          0.065301,
+          0.062927,
+          0.064114,
+          0.064115,
+          0.064114,
+          0.064114
+        ],
+        "summary": {
+          "count": 10,
+          "min": 0.062927,
+          "mean": 0.06411430000000003,
+          "p50": 0.064114,
+          "p90": 0.065301,
+          "p95": 0.065301,
+          "p99": 0.065301,
+          "max": 0.065301
+        }
+      },
+      {
+        "id": "multi_term",
+        "category": "multi_term",
+        "query": "project phoenix budget",
+        "result_count": 2,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx",
+        "samples_ms": [
+          3.280514,
+          3.398058,
+          3.561906,
+          3.399245,
+          3.366,
+          3.463359,
+          3.653327,
+          3.411117,
+          3.420617,
+          3.456236
+        ],
+        "summary": {
+          "count": 10,
+          "min": 3.280514,
+          "mean": 3.4410379,
+          "p50": 3.411117,
+          "p90": 3.561906,
+          "p95": 3.653327,
+          "p99": 3.653327,
+          "max": 3.653327
+        }
+      },
+      {
+        "id": "multi_term_2",
+        "category": "multi_term",
+        "query": "quarterly report final",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+        "samples_ms": [
+          2.729607,
+          2.9943750000000002,
+          2.549137,
+          2.57407,
+          2.568134,
+          2.693987,
+          2.443467,
+          2.803219,
+          2.546762,
+          2.479086
+        ],
+        "summary": {
+          "count": 10,
+          "min": 2.443467,
+          "mean": 2.6381844,
+          "p50": 2.568134,
+          "p90": 2.803219,
+          "p95": 2.9943750000000002,
+          "p99": 2.9943750000000002,
+          "max": 2.9943750000000002
+        }
+      },
+      {
+        "id": "typo_quarterly",
+        "category": "typo",
+        "query": "quaterly report final",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+        "samples_ms": [
+          2.074216,
+          2.177511,
+          2.3686670000000003,
+          2.4173459999999998,
+          1.979232,
+          2.23094,
+          2.3282979999999998,
+          2.1276450000000002,
+          2.219067,
+          2.324737
+        ],
+        "summary": {
+          "count": 10,
+          "min": 1.979232,
+          "mean": 2.2247658999999995,
+          "p50": 2.219067,
+          "p90": 2.3686670000000003,
+          "p95": 2.4173459999999998,
+          "p99": 2.4173459999999998,
+          "max": 2.4173459999999998
+        }
+      },
+      {
+        "id": "typo_screenshot",
+        "category": "typo",
+        "query": "screnshot 2026-11-09",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png",
+        "samples_ms": [
+          2.171575,
+          2.210756,
+          2.276057,
+          2.6904250000000003,
+          2.312863,
+          2.422095,
+          2.238064,
+          2.1062730000000003,
+          2.109836,
+          2.324737
+        ],
+        "summary": {
+          "count": 10,
+          "min": 2.1062730000000003,
+          "mean": 2.2862681,
+          "p50": 2.238064,
+          "p90": 2.422095,
+          "p95": 2.6904250000000003,
+          "p99": 2.6904250000000003,
+          "max": 2.6904250000000003
+        }
+      },
+      {
+        "id": "fuzzy_subseq",
+        "category": "fuzzy",
+        "query": "ppjbudget",
+        "result_count": 7,
+        "top1_path": "C:\\Users\\Pranshul\\Downloads\\Backups\\unsorted\\docs\\out\\Projects\\notes\\map_project_budget.css",
+        "samples_ms": [
+          4.664908,
+          4.590108,
+          4.251727000000001,
+          4.496312,
+          4.588921,
+          4.330089,
+          4.474940999999999,
+          4.447632,
+          4.5366800000000005,
+          4.435759
+        ],
+        "summary": {
+          "count": 10,
+          "min": 4.251727000000001,
+          "mean": 4.481707699999999,
+          "p50": 4.474940999999999,
+          "p90": 4.590108,
+          "p95": 4.664908,
+          "p99": 4.664908,
+          "max": 4.664908
+        }
+      },
+      {
+        "id": "cjk_jp",
+        "category": "cjk",
+        "query": "会議議事録",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\client\\unsorted\\dist\\会議議事録.pdf",
+        "samples_ms": [
+          0.071238,
+          0.072425,
+          0.071238,
+          0.070051,
+          0.070051,
+          0.071238,
+          0.070051,
+          0.071238,
+          0.070051,
+          0.071238
+        ],
+        "summary": {
+          "count": 10,
+          "min": 0.070051,
+          "mean": 0.07088190000000001,
+          "p50": 0.071238,
+          "p90": 0.071238,
+          "p95": 0.072425,
+          "p99": 0.072425,
+          "max": 0.072425
+        }
+      },
+      {
+        "id": "cjk_zh",
+        "category": "cjk",
+        "query": "日本語_メモ",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\Q4\\client\\tests\\old\\exports\\日本語_メモ.pdf",
+        "samples_ms": [
+          0.073613,
+          0.072425,
+          0.073612,
+          0.072425,
+          0.072425,
+          0.073613,
+          0.073613,
+          0.072426,
+          0.072426,
+          0.073613
+        ],
+        "summary": {
+          "count": 10,
+          "min": 0.072425,
+          "mean": 0.07301910000000002,
+          "p50": 0.072426,
+          "p90": 0.073613,
+          "p95": 0.073613,
+          "p99": 0.073613,
+          "max": 0.073613
+        }
+      },
+      {
+        "id": "unicode",
+        "category": "unicode",
+        "query": "café résumé",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Downloads\\logs\\screenshots\\Documents\\notes\\2024\\café_résumé_22.h",
+        "samples_ms": [
+          1.9186800000000002,
+          2.1692,
+          2.173949,
+          2.1680129999999997,
+          2.298616,
+          1.98873,
+          1.88781,
+          1.847442,
+          1.757206,
+          1.851003
+        ],
+        "summary": {
+          "count": 10,
+          "min": 1.757206,
+          "mean": 2.0060648999999997,
+          "p50": 1.9186800000000002,
+          "p90": 2.173949,
+          "p95": 2.298616,
+          "p99": 2.298616,
+          "max": 2.298616
+        }
+      },
+      {
+        "id": "hidden",
+        "category": "hidden",
+        "query": ".env",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Downloads\\.env",
+        "samples_ms": [
+          0.055803,
+          0.054616,
+          0.054616,
+          0.055803,
+          0.054616,
+          0.054615,
+          0.054616,
+          0.054616,
+          0.054616,
+          0.054616
+        ],
+        "summary": {
+          "count": 10,
+          "min": 0.054615,
+          "mean": 0.054853299999999994,
+          "p50": 0.054616,
+          "p90": 0.055803,
+          "p95": 0.055803,
+          "p99": 0.055803,
+          "max": 0.055803
+        }
+      },
+      {
+        "id": "long_path",
+        "category": "long_path",
+        "query": "C:\\Users\\Pranshul\\Documents\\Archive\\2026\\Q3\\Backups\\Projects\\protonsearch\\apps\\desktop\\src\\components\\internal\\generated\\very_long_anchor_filename_for_path_length_testing_0001.json",
+        "result_count": 1,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\Archive\\2026\\Q3\\Backups\\Projects\\protonsearch\\apps\\desktop\\src\\components\\internal\\generated\\very_long_anchor_filename_for_path_length_testing_0001.json",
+        "samples_ms": [
+          1.034139,
+          1.0483879999999999,
+          1.085194,
+          0.983086,
+          1.02939,
+          0.978336,
+          1.0068309999999998,
+          1.250229,
+          0.930844,
+          0.955778
+        ],
+        "summary": {
+          "count": 10,
+          "min": 0.930844,
+          "mean": 1.0302215000000001,
+          "p50": 1.0068309999999998,
+          "p90": 1.085194,
+          "p95": 1.250229,
+          "p99": 1.250229,
+          "max": 1.250229
+        }
+      },
+      {
+        "id": "ext_pdf",
+        "category": "extension_like",
+        "query": ".pdf",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Downloads\\screenshots\\Q1\\contracts\\notes\\Desktop\\cv.pdf",
+        "samples_ms": [
+          7.06682,
+          7.069194,
+          6.983709,
+          7.058508,
+          7.569049,
+          7.2627239999999995,
+          7.246102,
+          6.926718,
+          7.895556,
+          6.933842
+        ],
+        "summary": {
+          "count": 10,
+          "min": 6.926718,
+          "mean": 7.201222200000001,
+          "p50": 7.06682,
+          "p90": 7.569049,
+          "p95": 7.895556,
+          "p99": 7.895556,
+          "max": 7.895556
+        }
+      },
+      {
+        "id": "ext_xlsx",
+        "category": "extension_like",
+        "query": "xlsx",
+        "result_count": 50,
+        "top1_path": "C:\\Users\\Pranshul\\Pictures\\final\\notes\\cv.xlsx",
+        "samples_ms": [
+          6.354437999999999,
+          6.202464,
+          5.8439,
+          6.356814,
+          6.340192,
+          6.61802,
+          6.651263999999999,
+          6.993207000000001,
+          7.041887,
+          6.669073999999999
+        ],
+        "summary": {
+          "count": 10,
+          "min": 5.8439,
+          "mean": 6.5071259999999995,
+          "p50": 6.356814,
+          "p90": 6.993207000000001,
+          "p95": 7.041887,
+          "p99": 7.041887,
+          "max": 7.041887
+        }
+      },
+      {
+        "id": "folder_name",
+        "category": "folder",
+        "query": "ProtonSearch Phoenix",
+        "result_count": 8,
+        "top1_path": "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix",
+        "samples_ms": [
+          6.832921,
+          7.228293,
+          6.60496,
+          6.7628710000000005,
+          6.768808,
+          7.1416200000000005,
+          6.654827,
+          6.73675,
+          7.143995,
+          6.727251
+        ],
+        "summary": {
+          "count": 10,
+          "min": 6.60496,
+          "mean": 6.860229599999999,
+          "p50": 6.7628710000000005,
+          "p90": 7.143995,
+          "p95": 7.228293,
+          "p99": 7.228293,
+          "max": 7.228293
+        }
+      },
+      {
+        "id": "zero_match",
+        "category": "zero_match",
+        "query": "zzqxvbnmplkjhgfdsa9917",
+        "result_count": 0,
+        "top1_path": null,
+        "samples_ms": [
+          2.7628510000000004,
+          2.781848,
+          2.755728,
+          3.065613,
+          3.354127,
+          3.158222,
+          3.018121,
+          2.866147,
+          3.081048,
+          3.503727
+        ],
+        "summary": {
+          "count": 10,
+          "min": 2.755728,
+          "mean": 3.0347432000000003,
+          "p50": 3.018121,
+          "p90": 3.354127,
+          "p95": 3.503727,
+          "p99": 3.503727,
+          "max": 3.503727
+        }
+      },
+      {
+        "id": "zero_match_cjk",
+        "category": "zero_match",
+        "query": "存在しないファイル名です",
+        "result_count": 0,
+        "top1_path": null,
+        "samples_ms": [
+          2.749791,
+          2.9741910000000003,
+          2.641746,
+          2.595442,
+          2.578819,
+          2.680927,
+          2.8055939999999997,
+          2.817467,
+          2.791346,
+          3.057302
+        ],
+        "summary": {
+          "count": 10,
+          "min": 2.578819,
+          "mean": 2.7692625,
+          "p50": 2.749791,
+          "p90": 2.9741910000000003,
+          "p95": 3.057302,
+          "p99": 3.057302,
+          "max": 3.057302
+        }
+      }
+    ],
+    "queries_returning_zero": 2,
+    "queries_with_results": 20,
+    "deterministic_order": true
+  },
+  "cold": [],
+  "save": null,
+  "notes": [
+    "engine-only time: parse/build measured in-process; process startup excluded from warm search",
+    "status=engine_not_ready means the engine returned no results for the suite; search numbers must not be cited",
+    "RSS delta is working-set based and includes allocator slack; peak RSS is reported for context",
+    "cold restarts measure process spawn + dataset/index load + first queries; wall_ms includes OS process creation cost"
+  ]
+}
