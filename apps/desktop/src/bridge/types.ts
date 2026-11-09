@@ -50,6 +50,7 @@ export interface TextRange {
 
 export type IconRef =
   | { type: "app_icon"; path: string }
+  | { type: "app_icon_data"; data: string }
   | { type: "file_type"; ext: string }
   | { type: "monogram" }
   | { type: "kind"; kind: SourceKind };
@@ -221,8 +222,15 @@ export interface PrivacySettings {
   telemetry: boolean;
 }
 
+export type AgentRuntime = "pi" | "pydantic";
+
 export interface AgentSettings {
   enabled: boolean;
+  runtime?: AgentRuntime;
+  piPath?: string | null;
+  allowWrites?: boolean;
+  workspace?: string | null;
+  thinking?: string | null;
   provider?: string | null;
   model?: string | null;
   sidecarPath?: string | null;
@@ -232,6 +240,8 @@ export interface SemanticSettings {
   enabled: boolean;
   model?: string | null;
 }
+
+export type WebSearchEngine = "google" | "bing" | "duck_duck_go" | "you_tube";
 
 export interface Settings {
   schemaVersion: number;
@@ -245,6 +255,8 @@ export interface Settings {
   privacy: PrivacySettings;
   agent: AgentSettings;
   semantic: SemanticSettings;
+  webSearchEnabled: boolean;
+  webSearchEngine: WebSearchEngine;
   onboardingComplete: boolean;
   legacyMigrated: boolean;
   resultLimit: number;
@@ -261,6 +273,8 @@ export interface SettingsPatch {
   privacy?: PrivacySettings;
   agent?: AgentSettings;
   semantic?: SemanticSettings;
+  webSearchEnabled?: boolean;
+  webSearchEngine?: WebSearchEngine;
   resultLimit?: number;
 }
 

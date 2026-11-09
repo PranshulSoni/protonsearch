@@ -255,12 +255,18 @@ pub(crate) fn list_appsfolder() -> anyhow::Result<Vec<AppsFolderEntry>> {
 
         let mut entries = Vec::new();
         loop {
-            let child: *mut ITEMIDLIST = std::ptr::null_mut();
+            // NOTE: the item pointer must live in a local array; passing a
+            // temporary slice would leave the out-parameter unreadable.
+            let mut children: [*mut ITEMIDLIST; 1] = [std::ptr::null_mut()];
             let mut fetched = 0u32;
-            let hr = enumerator.Next(&mut [child], Some(&mut fetched));
+            let hr = enumerator.Next(&mut children, Some(&mut fetched));
+            let child = children[0];
             if hr.is_err() || fetched == 0 || child.is_null() {
                 if !child.is_null() {
                     CoTaskMemFree(Some(child as *const _));
+                }
+                if entries.is_empty() && hr.is_err() {
+                    return Err(anyhow!("AppsFolder enumeration failed: {hr:?}"));
                 }
                 break;
             }

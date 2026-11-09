@@ -90,3 +90,9 @@ dist-installer/
 
 # local dev/test data (never commit)
 .devdata*/
+
+# local agent scratch (keep .agents/AGENTS.md tracked)
+.agents/*.ps1
+.agents/*.py
+.agents/*.log
+.agents/notes/

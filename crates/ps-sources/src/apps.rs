@@ -104,6 +104,7 @@ pub fn scan_with_icons(icon_cache_dir: &Path) -> (Vec<AppEntry>, Vec<String>) {
     let mut out = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
     let mut icons_written = 0usize;
+    let mut icon_warnings = 0usize;
     for mut entry in raw {
         let key = format!(
             "{}\u{1}{}",
@@ -115,9 +116,30 @@ pub fn scan_with_icons(icon_cache_dir: &Path) -> (Vec<AppEntry>, Vec<String>) {
         }
         if icons_written < MAX_ICONS {
             let source = PathBuf::from(&entry.target);
-            if let Ok(icon) = ps_windows::extract_icon_png(&source, 32, icon_cache_dir) {
-                entry.icon_path = Some(icon.to_string_lossy().to_string());
-                icons_written += 1;
+            match ps_windows::extract_icon_png(&source, 32, icon_cache_dir) {
+                Ok(icon) => {
+                    // Only report a path the shell/UI can actually read.
+                    if icon.is_file() {
+                        entry.icon_path = Some(icon.to_string_lossy().to_string());
+                        icons_written += 1;
+                    } else {
+                        icon_warnings += 1;
+                        if warnings.len() < 20 {
+                            warnings.push(format!(
+                                "icon {}: extraction reported a missing file",
+                                entry.name
+                            ));
+                        }
+                    }
+                }
+                Err(error) => {
+                    // A single bad target must never break app discovery or
+                    // produce a path that does not exist.
+                    icon_warnings += 1;
+                    if warnings.len() < 20 {
+                        warnings.push(format!("icon {}: {error}", entry.name));
+                    }
+                }
             }
         }
         out.push(entry);
@@ -131,6 +153,11 @@ pub fn scan_with_icons(icon_cache_dir: &Path) -> (Vec<AppEntry>, Vec<String>) {
             .cmp(&b.name.to_lowercase())
             .then_with(|| a.target.cmp(&b.target))
     });
+    if icon_warnings > warnings.iter().filter(|w| w.starts_with("icon ")).count() {
+        warnings.push(format!(
+            "icon extraction failed for {icon_warnings} app(s); remaining apps show monograms"
+        ));
+    }
     (out, warnings)
 }
 

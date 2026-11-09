@@ -106,10 +106,26 @@ impl Engine {
                 FilenameIndex::new()
             }
         };
-        let filename_entries = index.len() as u64;
-
         let db_path = data_dir.join(DB_FILE);
         let db = EngineDb::open(&db_path)?;
+        // Heal the case where a previous run imported legacy rows into the v2
+        // database but never persisted the in-memory index: the rows are still
+        // there, so search/counts must not start at zero.
+        let index = if index.is_empty() {
+            match load_migrated_files(&db_path) {
+                Ok(entries) if !entries.is_empty() => {
+                    warnings.push(format!(
+                        "recovered {} migrated filename entries from the v2 database",
+                        entries.len()
+                    ));
+                    FilenameIndex::from_entries(entries)
+                }
+                _ => index,
+            }
+        } else {
+            index
+        };
+        let filename_entries = index.len() as u64;
         let content = match ps_content::ContentIndex::open(&db_path) {
             Ok(index) => Some(index),
             Err(err) => {
@@ -123,12 +139,20 @@ impl Engine {
             .unwrap_or(0);
         let ocr_documents = db.ocr_count();
 
-        let needs_work = settings.onboarding_complete
-            && settings
-                .indexing
-                .roots
-                .iter()
-                .any(|root| root.enabled && !root.path.trim().is_empty());
+        // A pending one-time legacy migration is real background work, so the
+        // UI must show Starting until the pipeline has actually finished.
+        let legacy_pending = !settings.legacy_migrated
+            && config
+                .legacy_db
+                .as_deref()
+                .map(|path| path.is_file())
+                .unwrap_or(false);
+        let has_roots = settings
+            .indexing
+            .roots
+            .iter()
+            .any(|root| root.enabled && !root.path.trim().is_empty());
+        let needs_work = legacy_pending || (settings.onboarding_complete && has_roots);
         let initial_state = if needs_work { STATE_STARTING } else { STATE_READY };
 
         Ok(Self {
@@ -174,6 +198,14 @@ impl Engine {
             }
         }
         self.shutdown.store(false, Ordering::SeqCst);
+        // Starting -> Indexing -> Ready: the thread publishes Indexing once it
+        // begins real work and always finalizes the state when it exits.
+        if self.paused.load(Ordering::SeqCst) {
+            self.set_state(STATE_PAUSED);
+        } else {
+            self.set_phase("starting");
+            self.set_state(STATE_STARTING);
+        }
         let engine = Arc::clone(&self);
         *guard = Some(std::thread::spawn(move || run_background(engine)));
     }
@@ -185,7 +217,11 @@ impl Engine {
         let limit = req.limit.clamp(5, 100);
         let settings = self.settings_snapshot();
         let (prefix_scope, query_text) = effective_query(&req.query, req.scope);
-        let parsed = crate::query::ParsedQuery::parse(&query_text);
+        // Natural-language imperative prefixes ("open chrome", "launch ...")
+        // are stripped for app/file/source matching. A query that is only a
+        // verb is left untouched so literal searches keep working.
+        let intent_text = strip_imperative_verbs(&query_text);
+        let parsed = crate::query::ParsedQuery::parse(intent_text.as_ref());
         let scope = if parsed.scope != SearchScope::All {
             parsed.scope
         } else {
@@ -256,6 +292,21 @@ impl Engine {
                 tier0_hits += 1;
             }
             drop(sources);
+        }
+        // Direct web search: offered in the All and Web scopes so the "Web"
+        // filter is genuinely useful without a browser-history entry.
+        let web_scope_ok = matches!(scope, SearchScope::All | SearchScope::Browser);
+        if settings.web_search_enabled && web_scope_ok {
+            let trimmed = query_text.trim();
+            if !trimmed.is_empty() && trimmed.chars().count() <= 160 {
+                ranked.push(Ranked {
+                    tier: 0,
+                    priority: 9,
+                    score: 200.0,
+                    result: web_search_result(trimmed, settings.web_search_engine),
+                });
+                tier0_hits += 1;
+            }
         }
         if scope_allows(scope, SourceKind::Application) {
             let sources = self.sources.read().unwrap();
@@ -345,7 +396,7 @@ impl Engine {
         if settings.indexing.content_enabled && content_scope_allows(scope) {
             let tier_start = Instant::now();
             let mut hits = 0usize;
-            if let Some(result) = self.with_content(|content| content.search(&query_text, 12)) {
+            if let Some(result) = self.with_content(|content| content.search(intent_text.as_ref(), 12)) {
                 match result {
                     Ok(content_hits) => {
                         for hit in content_hits {
@@ -465,9 +516,10 @@ impl Engine {
         settings: &Settings,
     ) -> SearchResponse {
         let state = self.state.load(Ordering::Relaxed);
+        let indexed_files = self.filename_count();
         let status = match state {
             STATE_INDEXING | STATE_STARTING => SearchStatus::Indexing {
-                indexed_files: self.filename_entries.load(Ordering::Relaxed),
+                indexed_files,
                 phase: self.phase.lock().map(|p| p.clone()).unwrap_or_default(),
             },
             STATE_ERROR => SearchStatus::Degraded {
@@ -478,7 +530,7 @@ impl Engine {
                     .unwrap_or_default(),
             },
             _ => SearchStatus::Ready {
-                indexed_files: self.filename_entries.load(Ordering::Relaxed),
+                indexed_files,
                 content_docs: self.content_documents.load(Ordering::Relaxed),
             },
         };
@@ -500,6 +552,11 @@ impl Engine {
     pub fn status(&self) -> EngineStatus {
         let settings = self.settings_snapshot();
         let index = self.index.read().unwrap();
+        // The index is the source of truth for the user-visible count; refresh
+        // the cached atomic here so a missed update elsewhere can never make the
+        // UI show "0 items" while entries are searchable.
+        let filename_entries = index.len() as u64;
+        self.filename_entries.store(filename_entries, Ordering::Relaxed);
         let counts = index.root_counts();
         let roots: Vec<RootStatus> = settings
             .indexing
@@ -573,7 +630,7 @@ impl Engine {
             protocol: PROTOCOL_VERSION,
             version: self.version().to_string(),
             state: indexer_state(self.state.load(Ordering::Relaxed)),
-            filename_entries: self.filename_entries.load(Ordering::Relaxed),
+            filename_entries,
             content_documents: self.content_documents.load(Ordering::Relaxed),
             ocr_documents: self.ocr_documents.load(Ordering::Relaxed),
             roots,
@@ -619,6 +676,17 @@ impl Engine {
                 } else {
                     self.paused.store(false, Ordering::SeqCst);
                     self.force_rescan.store(false, Ordering::SeqCst);
+                    // Unpausing with no worker running is "Starting" until the
+                    // shell re-spawns the background pipeline, not "Indexing".
+                    let running = self
+                        .background
+                        .lock()
+                        .ok()
+                        .and_then(|guard| guard.as_ref().map(|handle| !handle.is_finished()))
+                        .unwrap_or(false);
+                    if !running {
+                        self.set_state(STATE_STARTING);
+                    }
                 }
             }
         }
@@ -783,12 +851,21 @@ impl Engine {
             }
             IndexCommand::Resume => {
                 self.paused.store(false, Ordering::SeqCst);
-                self.set_state(STATE_INDEXING);
-                // The Tauri shell restarts indexing on resume (spawn_background).
+                // Indexing only while a worker is actually running; otherwise
+                // Starting until the shell re-spawns the background pipeline.
+                let running = self
+                    .background
+                    .lock()
+                    .ok()
+                    .and_then(|guard| guard.as_ref().map(|handle| !handle.is_finished()))
+                    .unwrap_or(false);
+                self.set_state(if running { STATE_INDEXING } else { STATE_STARTING });
             }
             IndexCommand::Rebuild => {
-                *self.index.write().unwrap() = FilenameIndex::new();
-                self.filename_entries.store(0, Ordering::SeqCst);
+                {
+                    *self.index.write().unwrap() = FilenameIndex::new();
+                }
+                self.sync_filename_entries();
                 let path = self.config.data_dir.join(INDEX_FILE);
                 let _ = std::fs::remove_file(path);
                 self.force_rescan.store(true, Ordering::SeqCst);
@@ -851,6 +928,29 @@ impl Engine {
     fn set_phase(&self, phase: &str) {
         if let Ok(mut guard) = self.phase.lock() {
             *guard = phase.to_string();
+        }
+    }
+
+    /// Recompute the cached filename count from the index. Call after every
+    /// mutation of the index (load, migration replace_all, scan, rebuild).
+    fn sync_filename_entries(&self) {
+        if let Ok(index) = self.index.read() {
+            self.filename_entries
+                .store(index.len() as u64, Ordering::Relaxed);
+        }
+    }
+
+    /// Current filename count read from the index itself, healing the cached
+    /// atomic. Used by the status/search hot paths so the footer can never show
+    /// "0 items" while entries are searchable.
+    fn filename_count(&self) -> u64 {
+        match self.index.read() {
+            Ok(index) => {
+                let len = index.len() as u64;
+                self.filename_entries.store(len, Ordering::Relaxed);
+                len
+            }
+            Err(_) => self.filename_entries.load(Ordering::Relaxed),
         }
     }
 
@@ -936,8 +1036,16 @@ impl Engine {
                 }
                 if let Ok(entries) = load_migrated_files(&db_path) {
                     if !entries.is_empty() {
-                        let mut index = self.index.write().unwrap();
-                        index.replace_all(entries);
+                        {
+                            let mut index = self.index.write().unwrap();
+                            index.replace_all(entries);
+                        }
+                        // Migrated rows are searchable right away: publish the
+                        // count now instead of waiting for a rescan, and persist
+                        // the index so a restart does not start at zero.
+                        self.sync_filename_entries();
+                        self.save_index();
+                        self.last_updated.store(now_ms(), Ordering::SeqCst);
                     }
                 }
                 let documents = self
@@ -964,7 +1072,23 @@ impl Engine {
 // Background pipeline
 // ---------------------------------------------------------------------------
 
+/// Background pipeline entry point. Always finalizes the visible state, even
+/// when the work returns early (shutdown) or panics, so the UI can never stay
+/// stuck on "Indexing…" after the pipeline is done.
 fn run_background(engine: Arc<Engine>) {
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        run_background_inner(&engine);
+    }));
+    if outcome.is_err() {
+        engine.push_warning(
+            "background indexing stopped unexpectedly; the visible index may be partial".to_string(),
+        );
+    }
+    finish_background(&engine);
+}
+
+fn run_background_inner(engine: &Arc<Engine>) {
+    // Starting -> Indexing: published only once the thread is doing real work.
     engine.set_state(STATE_INDEXING);
     engine.set_phase("preparing");
     engine.last_updated.store(now_ms(), Ordering::SeqCst);
@@ -1008,17 +1132,29 @@ fn run_background(engine: Arc<Engine>) {
             };
         if rescan {
             engine.set_phase("scanning files");
-            scan_into_index(&engine, &roots);
+            scan_into_index(engine, &roots);
             engine.save_index();
         }
         engine.set_phase("indexing content");
-        index_content(&engine, &roots);
+        index_content(engine, &roots);
         engine.set_phase("indexing screenshots");
-        index_ocr(&engine, &roots);
+        index_ocr(engine, &roots);
     }
+}
 
-    engine.set_phase("ready");
-    engine.set_state(if engine.paused.load(Ordering::SeqCst) {
+/// Publish the terminal state and counters. Runs on every background exit path.
+fn finish_background(engine: &Arc<Engine>) {
+    engine.sync_filename_entries();
+    let shutdown = engine.shutdown.load(Ordering::SeqCst);
+    let paused = engine.paused.load(Ordering::SeqCst);
+    engine.set_phase(if shutdown {
+        "stopped"
+    } else if paused {
+        "paused"
+    } else {
+        "ready"
+    });
+    engine.set_state(if paused && !shutdown {
         STATE_PAUSED
     } else {
         STATE_READY
@@ -1049,11 +1185,11 @@ fn scan_into_index(engine: &Arc<Engine>, roots: &[PathBuf]) {
         .map(|root| ps_index::normalize_root(root))
         .collect();
     index.set_roots(root_strings);
-    engine.filename_entries.store(index.len() as u64, Ordering::Relaxed);
     if stats.errors > 0 {
         engine.push_warning(format!("{} directories or files could not be read", stats.errors));
     }
     *engine.index.write().unwrap() = index;
+    engine.sync_filename_entries();
 }
 
 fn index_content(engine: &Arc<Engine>, roots: &[PathBuf]) {
@@ -1292,11 +1428,61 @@ fn read_legacy_summary(path: &Path) -> LegacySummary {
 // Query helpers
 // ---------------------------------------------------------------------------
 
+/// Strip a leading imperative verb ("open", "launch", "start", "run", "show",
+/// "go to", "switch to", "open up") and a trailing "please" so natural-language
+/// queries match apps and files. A query that is only a verb (or only
+/// "please") is returned unchanged so literal searches are not broken.
+fn strip_imperative_verbs(raw: &str) -> std::borrow::Cow<'_, str> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return std::borrow::Cow::Borrowed(trimmed);
+    }
+    let mut text = trimmed;
+    // Remove a trailing "please" (word boundary required).
+    loop {
+        let lower = text.to_ascii_lowercase();
+        if lower.ends_with("please") {
+            let cut = text.len() - "please".len();
+            let before_is_boundary =
+                cut == 0 || text.as_bytes()[cut - 1].is_ascii_whitespace();
+            if before_is_boundary {
+                let candidate = text[..cut].trim_end();
+                if candidate.is_empty() {
+                    break;
+                }
+                text = candidate;
+                continue;
+            }
+        }
+        break;
+    }
+    let lower = text.to_ascii_lowercase();
+    const VERBS: [&str; 8] = [
+        "go to", "switch to", "open up", "open", "launch", "start", "run", "show",
+    ];
+    for verb in VERBS {
+        if lower.starts_with(verb) {
+            let rest = &text[verb.len()..];
+            if rest.starts_with(' ') || rest.starts_with('\t') {
+                let rest = rest.trim_start();
+                if !rest.is_empty() {
+                    return std::borrow::Cow::Owned(rest.to_string());
+                }
+            }
+        }
+    }
+    if text.len() != trimmed.len() {
+        std::borrow::Cow::Owned(text.to_string())
+    } else {
+        std::borrow::Cow::Borrowed(trimmed)
+    }
+}
+
 /// Strips a leading scope prefix and returns the remaining free text.
 fn effective_query(raw: &str, fallback: SearchScope) -> (SearchScope, String) {
     let trimmed = raw.trim_start();
     let lower = trimmed.to_lowercase();
-    const PREFIXES: [(&str, SearchScope); 14] = [
+    const PREFIXES: [(&str, SearchScope); 16] = [
         ("file:", SearchScope::Files),
         ("files:", SearchScope::Files),
         ("folder:", SearchScope::Folders),
@@ -1311,6 +1497,8 @@ fn effective_query(raw: &str, fallback: SearchScope) -> (SearchScope, String) {
         ("commits:", SearchScope::Git),
         ("todos:", SearchScope::Git),
         ("ocr:", SearchScope::Ocr),
+        ("web:", SearchScope::Browser),
+        ("google:", SearchScope::Browser),
     ];
     for (prefix, scope) in PREFIXES {
         if lower.starts_with(prefix) {
@@ -1633,11 +1821,7 @@ fn app_result(app: &ps_sources::AppEntry) -> SearchResult {
         title: app.name.clone(),
         subtitle: "Application".into(),
         path: Some(app.target.clone()),
-        icon: app
-            .icon_path
-            .as_ref()
-            .map(|path| IconRef::AppIcon { path: path.clone() })
-            .unwrap_or(IconRef::Monogram),
+        icon: app_icon(app.icon_path.as_deref()),
         score: 0.0,
         match_ranges: Vec::new(),
         meta: ResultMeta {
@@ -1650,6 +1834,38 @@ fn app_result(app: &ps_sources::AppEntry) -> SearchResult {
         },
         actions: Vec::new(),
     }
+}
+
+/// Real application icon as a self-contained PNG data URL (no asset-protocol
+/// scope needed in the WebView). Falls back to a monogram tile.
+fn app_icon(icon_path: Option<&str>) -> IconRef {
+    if let Some(path) = icon_path {
+        if let Ok(bytes) = std::fs::read(path) {
+            if bytes.starts_with(&[0x89, b'P', b'N', b'G']) && bytes.len() <= 512 * 1024 {
+                return IconRef::AppIconData {
+                    data: format!("data:image/png;base64,{}", base64_encode(&bytes)),
+                };
+            }
+        }
+    }
+    IconRef::Monogram
+}
+
+/// Minimal base64 encoder (icons only; no dependency needed).
+fn base64_encode(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
+        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        out.push(TABLE[((triple >> 18) & 0x3f) as usize] as char);
+        out.push(TABLE[((triple >> 12) & 0x3f) as usize] as char);
+        out.push(if chunk.len() > 1 { TABLE[((triple >> 6) & 0x3f) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { TABLE[(triple & 0x3f) as usize] as char } else { '=' });
+    }
+    out
 }
 
 fn recent_result(entry: &ps_sources::RecentEntry) -> SearchResult {
@@ -1711,6 +1927,29 @@ fn command_result(action: &catalog::CatalogAction) -> SearchResult {
         } else {
             Vec::new()
         },
+    }
+}
+
+fn web_search_result(query: &str, engine: ps_ipc::WebSearchEngine) -> SearchResult {
+    SearchResult {
+        id: format!("web-search:{}", engine.label().to_lowercase()),
+        kind: SourceKind::Action,
+        title: format!("Search the web for \"{query}\""),
+        subtitle: format!("Direct search with {}", engine.label()),
+        path: None,
+        icon: IconRef::Kind {
+            kind: SourceKind::Bookmark,
+        },
+        score: 0.0,
+        match_ranges: Vec::new(),
+        meta: ResultMeta {
+            label: Some("Web".into()),
+            ..ResultMeta::default()
+        },
+        action: ActionSpec::OpenUrl {
+            url: engine.search_url(query),
+        },
+        actions: Vec::new(),
     }
 }
 
@@ -2078,4 +2317,320 @@ fn suggested_roots() -> Vec<RootSuggestion> {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch_dir(name: &str) -> PathBuf {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("target")
+            .join("ps-core-tests")
+            .join(format!("engine-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn make_engine(dir: &Path, legacy: Option<PathBuf>) -> Engine {
+        Engine::open(EngineConfig {
+            data_dir: dir.to_path_buf(),
+            legacy_db: legacy,
+            version: "test".to_string(),
+        })
+        .unwrap()
+    }
+
+    fn sample_entries(n: usize) -> Vec<ps_index::IndexEntry> {
+        (0..n)
+            .map(|i| ps_index::IndexEntry {
+                path: format!(r"C:\test\file{i}.txt"),
+                name: format!("file{i}.txt"),
+                ext: "txt".into(),
+                kind: EntryKind::File,
+                size: i as u64,
+                modified: i as i64,
+            })
+            .collect()
+    }
+
+    fn indexed_files(status: SearchStatus) -> u64 {
+        match status {
+            SearchStatus::Ready { indexed_files, .. } => indexed_files,
+            SearchStatus::Indexing { indexed_files, .. } => indexed_files,
+            SearchStatus::Degraded { reason } => panic!("unexpected degraded status: {reason}"),
+        }
+    }
+
+    fn make_legacy_fixture(path: &Path) {
+        let conn = rusqlite::Connection::open(path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE files (path TEXT PRIMARY KEY, name TEXT NOT NULL, extension TEXT NOT NULL,
+                modified INTEGER NOT NULL, size INTEGER NOT NULL, is_dir INTEGER NOT NULL,
+                last_seen_scan INTEGER NOT NULL DEFAULT 0);
+             INSERT INTO files VALUES ('C:/Docs/a.txt','a.txt','txt',1700000000,12,0,1);
+             INSERT INTO files VALUES ('C:/Docs','Docs','',1700000000,0,1,1);
+             INSERT INTO files VALUES ('C:/Docs/b.pdf','b.pdf','pdf',1700000001,1200,0,1);",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn status_and_search_report_injected_index_count() {
+        let dir = scratch_dir("status-count");
+        let engine = make_engine(&dir, None);
+        let n = 7usize;
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(sample_entries(n));
+        // Deliberately do NOT touch the cached counter: status()/search() must
+        // read the index itself and heal the cache, so the footer can never
+        // show "0 items" while entries are searchable.
+        let status = engine.status();
+        assert_eq!(status.filename_entries, n as u64, "status count");
+        assert_eq!(
+            engine.filename_entries.load(Ordering::Relaxed),
+            n as u64,
+            "status heals the cached counter"
+        );
+        let resp = engine.search(&SearchRequest::new(1, "file"));
+        assert_eq!(indexed_files(resp.status), n as u64, "search status count");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn persisted_index_sets_counter_at_open() {
+        let dir = scratch_dir("open-count");
+        let index = FilenameIndex::from_entries(sample_entries(5));
+        index.save(&dir.join(INDEX_FILE)).unwrap();
+        let engine = make_engine(&dir, None);
+        assert_eq!(engine.status().filename_entries, 5, "loaded index count");
+        assert_eq!(engine.filename_entries.load(Ordering::Relaxed), 5);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn migration_publishes_filename_counter() {
+        let dir = scratch_dir("migration-count");
+        let v2 = dir.join("v2");
+        std::fs::create_dir_all(&v2).unwrap();
+        let legacy = dir.join("legacy.db");
+        make_legacy_fixture(&legacy);
+        let engine = make_engine(&v2, Some(legacy.clone()));
+        assert_eq!(engine.status().filename_entries, 0, "nothing loaded yet");
+        engine.migrate_legacy(&legacy);
+        assert_eq!(engine.index.read().unwrap().len(), 3);
+        assert_eq!(
+            engine.status().filename_entries,
+            3,
+            "migrated index must be counted immediately"
+        );
+        assert_eq!(engine.filename_entries.load(Ordering::Relaxed), 3);
+        assert!(engine.settings().legacy_migrated);
+        let resp = engine.search(&SearchRequest::new(2, "docs"));
+        assert_eq!(indexed_files(resp.status), 3);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn finish_background_always_marks_ready_and_syncs() {
+        let dir = scratch_dir("finalize");
+        let engine = Arc::new(make_engine(&dir, None));
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(sample_entries(4));
+        engine.set_state(STATE_INDEXING);
+        engine.set_phase("indexing content");
+        finish_background(&engine);
+        let status = engine.status();
+        assert_eq!(
+            status.state,
+            IndexerState::Ready,
+            "pipeline exit must not leave the UI on Indexing"
+        );
+        assert_eq!(status.filename_entries, 4);
+        // A paused pipeline finishes as Paused, never stuck on Indexing.
+        engine.paused.store(true, Ordering::SeqCst);
+        engine.set_state(STATE_INDEXING);
+        finish_background(&engine);
+        assert_eq!(engine.status().state, IndexerState::Paused);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rebuild_command_zeroes_count_and_status_stays_truthful() {
+        let dir = scratch_dir("rebuild");
+        let engine = make_engine(&dir, None);
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(sample_entries(6));
+        engine.sync_filename_entries();
+        assert_eq!(engine.status().filename_entries, 6);
+        engine.index_command(IndexCommand::Rebuild).unwrap();
+        assert_eq!(engine.index.read().unwrap().len(), 0);
+        assert_eq!(
+            engine.status().filename_entries,
+            0,
+            "rebuild clears the index, so the count must be 0"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn strip_imperative_verbs_helper() {
+        assert_eq!(strip_imperative_verbs("open chrome").as_ref(), "chrome");
+        assert_eq!(strip_imperative_verbs("Open Notepad").as_ref(), "Notepad");
+        assert_eq!(
+            strip_imperative_verbs("launch visual studio code").as_ref(),
+            "visual studio code"
+        );
+        assert_eq!(strip_imperative_verbs("go to downloads").as_ref(), "downloads");
+        assert_eq!(strip_imperative_verbs("switch to edge").as_ref(), "edge");
+        assert_eq!(strip_imperative_verbs("open notepad please").as_ref(), "notepad");
+        assert_eq!(strip_imperative_verbs("chrome please").as_ref(), "chrome");
+        // Only-a-verb / only-"please" queries stay literal.
+        assert_eq!(strip_imperative_verbs("open").as_ref(), "open");
+        assert_eq!(strip_imperative_verbs("open ").as_ref(), "open");
+        assert_eq!(strip_imperative_verbs("please").as_ref(), "please");
+        // Filters survive stripping.
+        assert_eq!(
+            strip_imperative_verbs("open report ext:pdf").as_ref(),
+            "report ext:pdf"
+        );
+    }
+
+    #[test]
+    fn imperative_verbs_are_stripped_for_apps_and_files() {
+        let dir = scratch_dir("verbs");
+        let engine = make_engine(&dir, None);
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![
+            ps_index::IndexEntry {
+                path: r"C:\docs\architecture notes.txt".into(),
+                name: "architecture notes.txt".into(),
+                ext: "txt".into(),
+                kind: EntryKind::File,
+                size: 10,
+                modified: 1,
+            },
+        ]);
+        engine.sync_filename_entries();
+        {
+            let mut sources = engine.sources.write().unwrap();
+            sources.apps = vec![
+                ps_sources::AppEntry {
+                    id: "chrome".into(),
+                    name: "Google Chrome".into(),
+                    target: "chrome.exe".into(),
+                    icon_path: None,
+                    keywords: Vec::new(),
+                },
+                ps_sources::AppEntry {
+                    id: "vscode".into(),
+                    name: "Visual Studio Code".into(),
+                    target: "code.exe".into(),
+                    icon_path: None,
+                    keywords: Vec::new(),
+                },
+                ps_sources::AppEntry {
+                    id: "notepad".into(),
+                    name: "Notepad".into(),
+                    target: "notepad.exe".into(),
+                    icon_path: None,
+                    keywords: Vec::new(),
+                },
+            ];
+        }
+        let has_app = |resp: &SearchResponse, needle: &str| {
+            resp.results.iter().any(|r| {
+                r.kind == SourceKind::Application && r.title.to_lowercase().contains(needle)
+            })
+        };
+        assert!(
+            has_app(&engine.search(&SearchRequest::new(20, "open chrome")), "chrome"),
+            "open chrome must find the Chrome app"
+        );
+        assert!(
+            has_app(
+                &engine.search(&SearchRequest::new(21, "launch visual studio code")),
+                "visual studio code"
+            ),
+            "launch visual studio code must find VS Code"
+        );
+        assert!(
+            has_app(&engine.search(&SearchRequest::new(22, "open notepad")), "notepad"),
+            "open notepad must find Notepad"
+        );
+        assert!(
+            has_app(
+                &engine.search(&SearchRequest::new(23, "open notepad please")),
+                "notepad"
+            ),
+            "trailing please must be stripped"
+        );
+
+        let file_resp = engine.search(&SearchRequest::new(24, "open architecture notes"));
+        assert!(
+            file_resp.results.iter().any(|r| r
+                .path
+                .as_deref()
+                .map(|p| p.ends_with("architecture notes.txt"))
+                .unwrap_or(false)),
+            "open architecture notes must find the file: {:?}",
+            file_resp
+                .results
+                .iter()
+                .map(|r| (&r.title, r.kind))
+                .collect::<Vec<_>>()
+        );
+
+        // A query that is only a verb must stay literal.
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![ps_index::IndexEntry {
+            path: r"C:\docs\open.txt".into(),
+            name: "open.txt".into(),
+            ext: "txt".into(),
+            kind: EntryKind::File,
+            size: 1,
+            modified: 1,
+        }]);
+        engine.sync_filename_entries();
+        let resp = engine.search(&SearchRequest::new(25, "open"));
+        assert!(
+            resp.results.iter().any(|r| r
+                .path
+                .as_deref()
+                .map(|p| p.ends_with("open.txt"))
+                .unwrap_or(false)),
+            "literal 'open' search must still work"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn migrated_rows_survive_restart_even_without_index_file() {
+        let dir = scratch_dir("migration-restart");
+        let v2 = dir.join("v2");
+        std::fs::create_dir_all(&v2).unwrap();
+        let legacy = dir.join("legacy.db");
+        make_legacy_fixture(&legacy);
+        {
+            let engine = make_engine(&v2, Some(legacy.clone()));
+            engine.migrate_legacy(&legacy);
+            assert_eq!(engine.status().filename_entries, 3);
+        }
+        // Migration persists the index for the next launch...
+        assert!(
+            v2.join(INDEX_FILE).is_file(),
+            "migration must persist the filename index"
+        );
+        // ...and even if that file is lost, open() recovers the migrated rows
+        // from the v2 database instead of starting at "0 items".
+        std::fs::remove_file(v2.join(INDEX_FILE)).unwrap();
+        let reopened = make_engine(&v2, None);
+        assert_eq!(
+            reopened.status().filename_entries,
+            3,
+            "restart must report migrated rows"
+        );
+        assert_eq!(reopened.index.read().unwrap().len(), 3);
+        let resp = reopened.search(&SearchRequest::new(3, "docs"));
+        assert_eq!(indexed_files(resp.status), 3);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

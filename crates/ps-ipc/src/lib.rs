@@ -173,8 +173,11 @@ pub struct TextRange {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum IconRef {
-    /// Cached PNG of a real Windows icon; path is absolute.
+    /// Cached PNG of a real Windows icon; path is absolute (asset protocol).
     AppIcon { path: String },
+    /// Real Windows icon as a self-contained PNG data URL. Used so the UI never
+    /// needs a filesystem/protocol scope to show application icons.
+    AppIconData { data: String },
     /// File-extension badge (UI draws a letter/monogram tile).
     FileType { ext: String },
     /// A monogram chosen by the UI from the title.
@@ -521,16 +524,104 @@ impl Default for PrivacySettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+/// Which optional agent runtime executes workflows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentRuntime {
+    /// Pi coding-agent CLI (https://pi.dev), spawned on demand as a subprocess.
+    #[default]
+    Pi,
+    /// Legacy embedded Pydantic AI sidecar (kept as an optional fallback).
+    Pydantic,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentSettings {
     pub enabled: bool,
+    #[serde(default)]
+    pub runtime: AgentRuntime,
+    /// Optional explicit path to the pi launcher (pi.cmd / pi executable).
+    #[serde(default)]
+    pub pi_path: Option<String>,
+    /// When false (default) Pi runs with read-only tools only.
+    #[serde(default)]
+    pub allow_writes: bool,
+    /// Working directory for Pi runs. None -> a dedicated workspace inside the
+    /// ProtonSearch data directory (never the user's whole home by default).
+    #[serde(default)]
+    pub workspace: Option<String>,
+    /// Optional Pi thinking level; None -> Pi default (env override supported).
+    #[serde(default)]
+    pub thinking: Option<String>,
     #[serde(default)]
     pub provider: Option<String>,
     #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]
     pub sidecar_path: Option<String>,
+}
+
+impl Default for AgentSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            runtime: AgentRuntime::Pi,
+            pi_path: None,
+            allow_writes: false,
+            workspace: None,
+            thinking: None,
+            provider: None,
+            model: None,
+            sidecar_path: None,
+        }
+    }
+}
+
+/// Search engine used for the "Search the web for ..." result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum WebSearchEngine {
+    #[default]
+    Google,
+    Bing,
+    DuckDuckGo,
+    YouTube,
+}
+
+impl WebSearchEngine {
+    pub fn label(self) -> &'static str {
+        match self {
+            WebSearchEngine::Google => "Google",
+            WebSearchEngine::Bing => "Bing",
+            WebSearchEngine::DuckDuckGo => "DuckDuckGo",
+            WebSearchEngine::YouTube => "YouTube",
+        }
+    }
+    pub fn search_url(self, query: &str) -> String {
+        let encoded = urlencode(query);
+        match self {
+            WebSearchEngine::Google => format!("https://www.google.com/search?q={encoded}"),
+            WebSearchEngine::Bing => format!("https://www.bing.com/search?q={encoded}"),
+            WebSearchEngine::DuckDuckGo => format!("https://duckduckgo.com/?q={encoded}"),
+            WebSearchEngine::YouTube => format!("https://www.youtube.com/results?search_query={encoded}"),
+        }
+    }
+}
+
+/// Minimal RFC 3986 query encoding (no external dependencies).
+pub fn urlencode(input: &str) -> String {
+    let mut out = String::with_capacity(input.len() * 3);
+    for byte in input.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char)
+            }
+            b' ' => out.push_str("%20"),
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -557,6 +648,11 @@ pub struct Settings {
     pub privacy: PrivacySettings,
     pub agent: AgentSettings,
     pub semantic: SemanticSettings,
+    /// "Search the web for ..." offer in the launcher (default on).
+    #[serde(default = "default_true")]
+    pub web_search_enabled: bool,
+    #[serde(default)]
+    pub web_search_engine: WebSearchEngine,
     pub onboarding_complete: bool,
     #[serde(default)]
     pub legacy_migrated: bool,
@@ -583,6 +679,8 @@ impl Default for Settings {
             privacy: PrivacySettings::default(),
             agent: AgentSettings::default(),
             semantic: SemanticSettings::default(),
+            web_search_enabled: true,
+            web_search_engine: WebSearchEngine::default(),
             onboarding_complete: false,
             legacy_migrated: false,
             result_limit: default_result_limit(),
@@ -614,6 +712,10 @@ pub struct SettingsPatch {
     pub agent: Option<AgentSettings>,
     #[serde(default)]
     pub semantic: Option<SemanticSettings>,
+    #[serde(default)]
+    pub web_search_enabled: Option<bool>,
+    #[serde(default)]
+    pub web_search_engine: Option<WebSearchEngine>,
     #[serde(default)]
     pub result_limit: Option<usize>,
 }
@@ -651,6 +753,12 @@ impl Settings {
         }
         if let Some(v) = &patch.semantic {
             self.semantic = v.clone();
+        }
+        if let Some(v) = patch.web_search_enabled {
+            self.web_search_enabled = v;
+        }
+        if let Some(v) = patch.web_search_engine {
+            self.web_search_engine = v;
         }
         if let Some(v) = patch.result_limit {
             self.result_limit = v.clamp(5, 100);

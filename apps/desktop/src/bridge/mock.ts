@@ -52,8 +52,10 @@ let settings: Settings = {
     gitIndexing: true,
     telemetry: false,
   },
-  agent: { enabled: false, provider: null, model: null, sidecarPath: null },
+  agent: { enabled: false, runtime: "pi", piPath: null, allowWrites: false, workspace: null, thinking: null, provider: null, model: null, sidecarPath: null },
   semantic: { enabled: false, model: null },
+  webSearchEnabled: true,
+  webSearchEngine: "google",
   onboardingComplete: !MOCK_ONBOARDING,
   legacyMigrated: false,
   resultLimit: 30,
@@ -265,6 +267,8 @@ export const mockBridge = {
       indexing: { ...settings.indexing, ...(patch.indexing ?? {}) },
       agent: { ...settings.agent, ...(patch.agent ?? {}) },
       semantic: { ...settings.semantic, ...(patch.semantic ?? {}) },
+      webSearchEnabled: patch.webSearchEnabled ?? settings.webSearchEnabled,
+      webSearchEngine: patch.webSearchEngine ?? settings.webSearchEngine,
     };
     return settings;
   },

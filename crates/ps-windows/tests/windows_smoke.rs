@@ -85,6 +85,10 @@ fn appsfolder_enumeration_reports_packaged_apps() {
                 eprintln!("  {} -> {}", entry.name, entry.aumid);
             }
             assert!(
+                !entries.is_empty(),
+                "the AppsFolder namespace must expose packaged apps on a desktop session"
+            );
+            assert!(
                 entries.iter().all(|e| !e.aumid.is_empty()),
                 "entries must carry an AUMID"
             );
@@ -94,6 +98,33 @@ fn appsfolder_enumeration_reports_packaged_apps() {
             eprintln!("AppsFolder enumeration unavailable: {error}");
         }
     }
+}
+
+
+#[test]
+fn extracts_icon_for_packaged_app_via_shell_item_factory() {
+    let Ok(entries) = ps_windows::list_appsfolder() else {
+        eprintln!("SKIP: AppsFolder enumeration unavailable");
+        return;
+    };
+    let Some(entry) = entries.first() else {
+        eprintln!("SKIP: no packaged apps on this host");
+        return;
+    };
+    let shell_path = format!("shell:AppsFolder\\{}", entry.aumid);
+    let cache = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("ps-windows-shell-icons");
+    let out = ps_windows::extract_icon_png(std::path::Path::new(&shell_path), 32, &cache)
+        .expect("packaged app icon extraction");
+    assert!(out.is_file(), "icon png missing: {}", out.display());
+    let image = image::open(&out).expect("decode packaged app icon");
+    assert_eq!((image.width(), image.height()), (32, 32));
+    let rgba = image.to_rgba8();
+    let first = rgba.get_pixel(0, 0);
+    assert!(
+        rgba.pixels().any(|pixel| pixel != first),
+        "packaged app icon decoded as a flat colour"
+    );
+    eprintln!("packaged app icon: {} (aumid {})", out.display(), entry.aumid);
 }
 
 #[test]

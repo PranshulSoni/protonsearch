@@ -173,7 +173,17 @@ pub fn v2_db_path() -> PathBuf {
 }
 
 /// Cache root for derived artefacts (icons, browser snapshots, clipboard images).
+///
+/// Honours PROTONSEARCH_DATA_DIR exactly like ps_core::paths: the override is the
+/// data base, so the cache is <override>/v2/cache. This keeps portable installs
+/// and the E2E/test harness (which cannot write %APPDATA%) working, and it is
+/// what makes the launcher's real app icons cache correctly under test.
 pub fn default_cache_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os("PROTONSEARCH_DATA_DIR") {
+        if !dir.is_empty() {
+            return PathBuf::from(dir).join("v2").join("cache");
+        }
+    }
     v2_data_dir().join("cache")
 }
 
@@ -183,4 +193,73 @@ pub fn default_icon_cache_dir() -> PathBuf {
 
 pub fn default_clipboard_images_dir() -> PathBuf {
     default_cache_dir().join("clipboard")
+}
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    /// Env vars are process-global; serialize the tests that mutate them.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    struct EnvGuard {
+        key: &'static str,
+        previous: Option<std::ffi::OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: &std::ffi::OsStr) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, previous }
+        }
+
+        fn remove(key: &'static str) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::remove_var(key);
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(value) => std::env::set_var(self.key, value),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
+    #[test]
+    fn cache_dir_honours_portable_data_dir_override() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        // Path comparison only (no IO): unit tests cannot rely on CARGO_TARGET_TMPDIR.
+        let base = std::env::temp_dir().join("protonsearch-test-portable-data");
+        let _guard = EnvGuard::set("PROTONSEARCH_DATA_DIR", base.as_os_str());
+        assert_eq!(default_cache_dir(), base.join("v2").join("cache"));
+        assert_eq!(default_icon_cache_dir(), base.join("v2").join("cache").join("icons"));
+        assert_eq!(
+            default_clipboard_images_dir(),
+            base.join("v2").join("cache").join("clipboard")
+        );
+    }
+
+    #[test]
+    fn cache_dir_falls_back_to_appdata_when_override_absent() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let _guard = EnvGuard::remove("PROTONSEARCH_DATA_DIR");
+        let cache = default_cache_dir();
+        assert!(
+            cache.ends_with(Path::new("v2").join("cache")),
+            "unexpected cache dir: {}",
+            cache.display()
+        );
+        assert!(default_icon_cache_dir().ends_with(Path::new("v2").join("cache").join("icons")));
+    }
+
+    #[test]
+    fn empty_override_is_ignored() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let _guard = EnvGuard::set("PROTONSEARCH_DATA_DIR", std::ffi::OsStr::new(""));
+        assert!(default_cache_dir().ends_with(Path::new("v2").join("cache")));
+    }
 }

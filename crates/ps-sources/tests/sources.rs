@@ -349,6 +349,83 @@ fn scans_real_installed_apps() {
     assert!(with_icons > 0, "at least some real icons must extract");
 }
 
+#[test]
+fn icon_cache_honours_portable_data_dir_and_populates_icons() {
+    let dir = workdir("icons-portable");
+    let data_dir = dir.join("portable-data");
+    let previous = std::env::var_os("PROTONSEARCH_DATA_DIR");
+    std::env::set_var("PROTONSEARCH_DATA_DIR", &data_dir);
+
+    // Always restore the environment, even if an assertion below fails.
+    let probe = std::panic::catch_unwind(|| {
+        let cache = ps_sources::default_icon_cache_dir();
+        assert_eq!(
+            cache,
+            data_dir.join("v2").join("cache").join("icons"),
+            "icon cache must live under <PROTONSEARCH_DATA_DIR>/v2/cache/icons"
+        );
+        let (apps, warnings) = ps_sources::apps::scan_with_icons(&cache);
+        (cache, apps, warnings)
+    });
+    match previous {
+        Some(value) => std::env::set_var("PROTONSEARCH_DATA_DIR", value),
+        None => std::env::remove_var("PROTONSEARCH_DATA_DIR"),
+    }
+    let (cache, apps, warnings) = probe.expect("icon scan must not panic");
+
+    let with_icons = apps.iter().filter(|app| app.icon_path.is_some()).count();
+    let uwp: Vec<_> = apps
+        .iter()
+        .filter(|app| app.keywords.iter().any(|keyword| keyword == "uwp"))
+        .collect();
+    let uwp_with = uwp.iter().filter(|app| app.icon_path.is_some()).count();
+    let classic_total = apps.len().saturating_sub(uwp.len());
+    let classic_with = with_icons.saturating_sub(uwp_with);
+    eprintln!(
+        "portable icon cache: apps={} with_icons={} classic={}/{} uwp={}/{} warnings={}",
+        apps.len(),
+        with_icons,
+        classic_with,
+        classic_total,
+        uwp_with,
+        uwp.len(),
+        warnings.len()
+    );
+
+    assert!(!apps.is_empty(), "expected installed apps on this host");
+    assert!(cache.is_dir(), "icon cache dir was not created: {}", cache.display());
+    assert!(with_icons > 0, "at least one app must get a real icon");
+    assert!(
+        classic_with > 0,
+        "Start-Menu .lnk apps must get real icons ({classic_with}/{classic_total})"
+    );
+    if !uwp.is_empty() {
+        assert!(
+            uwp_with > 0,
+            "packaged/UWP apps must get real icons ({uwp_with}/{}); shell item factory failed",
+            uwp.len()
+        );
+    }
+    // Every reported icon_path must be a decodable-looking PNG file.
+    for app in &apps {
+        let Some(path) = app.icon_path.as_deref() else {
+            continue;
+        };
+        let bytes = std::fs::read(path)
+            .unwrap_or_else(|error| panic!("icon_path {} unreadable: {error}", path));
+        assert!(
+            bytes.len() > 8 && bytes.starts_with(&[0x89, b'P', b'N', b'G']),
+            "icon_path {} is not a PNG",
+            path
+        );
+    }
+    let png_files = std::fs::read_dir(&cache)
+        .map(|entries| entries.flatten().count())
+        .unwrap_or(0);
+    eprintln!("portable icon cache files on disk: {png_files}");
+    assert!(png_files > 0, "no PNGs were written to the icon cache");
+}
+
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
