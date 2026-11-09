@@ -77,3 +77,16 @@ while keeping the overall look. Interpretation recorded here so later phases do 
   glyphs, providers, cards and actions as specified in the plan.
 - **Not a waiver** of IC-A native gates: N-A1..N-A6 remain unverified until `orca` is available
   or the user writes an explicit waiver.
+
+## M6 - Design revision of dock-editable.html (in progress)
+
+- [x] Anti-slop audit written: docs/design/design-slop-audit-2026-11-09.md (baseline: 11 gates fail)
+- [x] Design brief v2 written: docs/design/dock-design-brief-v2.md (tokens, bans, anatomy, icon/motion contracts)
+- [x] Acceptance checker: .agents/design/check-design.mjs (fails baseline, becomes the merge gate)
+- [ ] Style subagent -> .agents/design/out/dock-v2.css
+- [ ] Icon subagent -> .agents/design/out/icons.js + icon-sheet.md
+- [ ] Widget subagent -> .agents/design/out/widgets.md + widget-patches.md
+- [ ] Motion subagent -> .agents/design/out/motion.md + motion-patches.md
+- [ ] Lead integrates into dock-editable.html (style block, icons, widget content, motion, inline onclick removal)
+- [ ] Checker PASS + headless Edge screenshots + forensic audit
+- [ ] Commit on dock (design docs + revised HTML). Re-pin deferred until user approves the new authority.
