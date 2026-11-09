@@ -5,6 +5,9 @@ import type {
   AgentApprovalResponse,
   AgentRunRequest,
   AgentStatus,
+  AgentTask,
+  AgentTaskNode,
+  AgentPermissionState,
   DetectedAgent,
   MonitorInfo,
   ActivityItem,
@@ -44,6 +47,13 @@ type Bridge = {
   agentCancel(runId?: string | null): Promise<void>;
   agentApprove(response: AgentApprovalResponse): Promise<void>;
   agentStop(): Promise<void>;
+  agentTasks(limit?: number): Promise<AgentTask[]>;
+  agentTaskTree(limit?: number): Promise<AgentTaskNode[]>;
+  agentTask(taskId: string): Promise<AgentTask | null>;
+  agentPermissions(taskId: string): Promise<AgentPermissionState | null>;
+  agentStopAll(): Promise<AgentTask[]>;
+  agentPause(taskId: string): Promise<void>;
+  agentResume(taskId: string): Promise<void>;
   getActivity(query?: ActivityQuery): Promise<ActivityItem[]>;
   getOnboarding(): Promise<OnboardingState>;
   completeOnboarding(input: OnboardingInput): Promise<Settings>;
@@ -74,6 +84,13 @@ const tauriBridge: Bridge = {
   agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),
   agentApprove: (response) => invoke<void>("agent_approve", { response }),
   agentStop: () => invoke<void>("agent_stop"),
+  agentTasks: (limit) => invoke<AgentTask[]>("agent_tasks", { limit: limit ?? null }),
+  agentTaskTree: (limit) => invoke<AgentTaskNode[]>("agent_task_tree", { limit: limit ?? null }),
+  agentTask: (taskId) => invoke<AgentTask | null>("agent_task", { taskId }),
+  agentPermissions: (taskId) => invoke<AgentPermissionState | null>("agent_permissions", { taskId }),
+  agentStopAll: () => invoke<AgentTask[]>("agent_stop_all"),
+  agentPause: (taskId) => invoke<void>("agent_pause", { taskId }),
+  agentResume: (taskId) => invoke<void>("agent_resume", { taskId }),
   getActivity: (query) => invoke<ActivityItem[]>("get_activity", { query: query ?? null }),
   getOnboarding: () => invoke<OnboardingState>("get_onboarding"),
   completeOnboarding: (input) => invoke<Settings>("complete_onboarding", { input }),

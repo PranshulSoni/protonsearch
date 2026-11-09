@@ -430,6 +430,29 @@ export const mockBridge = {
     return [pi, codexMissing];
   },
 
+  async agentTasks(): Promise<import("./types").AgentTask[]> {
+    return [];
+  },
+
+  async agentTaskTree(): Promise<import("./types").AgentTaskNode[]> {
+    return [];
+  },
+
+  async agentTask(): Promise<import("./types").AgentTask | null> {
+    return null;
+  },
+
+  async agentPermissions(): Promise<import("./types").AgentPermissionState | null> {
+    return null;
+  },
+
+  async agentStopAll(): Promise<import("./types").AgentTask[]> {
+    return [];
+  },
+
+  async agentPause(): Promise<void> {},
+  async agentResume(): Promise<void> {},
+
   async agentStatus(): Promise<import("./types").AgentStatus> {
     return {
       state: "not_configured",

@@ -267,6 +267,17 @@ pub struct ResultMeta {
     pub snippet: Option<String>,
     #[serde(default)]
     pub source_label: Option<String>,
+    /// Clipboard image rows: bounded PNG thumbnail as a data URL (safe to render
+    /// without asset-protocol scopes) and the source image dimensions.
+    #[serde(default)]
+    pub thumbnail_data_url: Option<String>,
+    #[serde(default)]
+    pub image_width: Option<u32>,
+    #[serde(default)]
+    pub image_height: Option<u32>,
+    /// MIME type of the underlying item when known (e.g. image/png).
+    #[serde(default)]
+    pub mime: Option<String>,
 }
 
 /// One rendered result row.

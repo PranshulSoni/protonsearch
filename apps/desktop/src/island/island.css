@@ -7,41 +7,1002 @@ html[data-window="island"] #root {
   overflow: hidden;
 }
 
-/* Matches ISLAND_SHADOW_PAD in apps/desktop/src-tauri/src/main.rs. */
+:root {
+  --island-panel: #0d1012;
+  --island-border: #2e3538;
+  --island-text: #f6f7f8;
+  --island-muted: #9ba3ae;
+  --island-muted-2: #8b9aa3;
+  --island-accent: #98bbdb;
+  --island-dot-idle: #657176;
+  --island-dot-active: #c7dce7;
+  --island-footer: #101416;
+  --island-footer-border: #262c30;
+  --island-row-hover: #202d35;
+  --island-row-border: #334b5b;
+  --island-control-bg: #171e23;
+  --island-control-border: #34434a;
+  --island-control-on: #223a49;
+  --island-control-on-border: #416178;
+  --island-raised: #1c2931;
+  --island-icon: #bad2df;
+  --island-track: #27343d;
+  --island-track-fill: #a6c7d8;
+  --island-focus: #92bcd0;
+  --island-focus-input: #9abedd;
+  --island-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --island-dur-morph: 550ms;
+  --island-dur-radius: 500ms;
+  --island-dur-transform: 450ms;
+  --island-dur-out: 140ms;
+  --island-dur-in: 250ms;
+  --island-dot-dur: 300ms;
+  --island-dots-h: 31px;
+  --island-dots-h-compact: 38px;
+}
+
+/* The native island window adds 96 px transparent shadow padding on each side
+   (ISLAND_SHADOW_PAD); the surface itself is centred inside it. */
 .island-host {
-  display: inline-flex;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
   padding: 96px;
+  box-sizing: border-box;
   background: transparent;
 }
 
-/* Placeholder shell only; the V9 card surface replaces this. */
-.island-surface--placeholder {
+.island-surface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  box-sizing: border-box;
+  background: var(--island-panel);
+  border: 1px solid var(--island-border);
+  border-radius: 34px;
+  color: var(--island-text);
+  box-shadow:
+    0 26px 54px rgba(20, 32, 40, 0.25),
+    0 3px 8px rgba(27, 32, 32, 0.15);
+  overflow: hidden;
+  font-family: "Inter Variable", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: -0.015em;
+  transition:
+    width var(--island-dur-morph) var(--island-ease),
+    height var(--island-dur-morph) var(--island-ease),
+    border-radius var(--island-dur-radius) var(--island-ease),
+    transform var(--island-dur-transform) var(--island-ease),
+    opacity 220ms ease,
+    visibility var(--island-dur-transform);
+  outline: none;
+}
+
+.island-surface--compact {
+  border-radius: 999px;
+  cursor: text;
+}
+
+.island-surface--media {
+  border-radius: 41px;
+}
+
+.island-surface--expanded .island-inner {
+  height: calc(100% - var(--island-dots-h));
+}
+
+.island-inner {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.island-inner--compact {
+  height: 100%;
+}
+
+.island-surface--out .island-inner {
+  opacity: 0;
+  transform: translateY(-11px);
+  transition:
+    opacity var(--island-dur-out) ease,
+    transform 190ms var(--island-ease);
+}
+
+.island-surface--in .island-inner {
+  animation: island-card-in var(--island-dur-in) var(--island-ease);
+}
+
+@keyframes island-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(11px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.island-surface--closing {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-110px) scale(0.88);
+  transition:
+    opacity 200ms ease,
+    transform var(--island-dur-transform) var(--island-ease),
+    visibility var(--island-dur-transform);
+}
+
+/* ---------- Search ---------- */
+
+.island-search {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.island-search-row {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 520px;
-  height: 66px;
+  height: 65px;
   padding: 0 18px;
-  border-radius: 34px;
-  background: #0d1012;
-  border: 1px solid #2e3538;
-  color: #f6f7f8;
   box-sizing: border-box;
+}
+
+.island-search--compact .island-search-row {
+  padding: 0 124px 0 18px;
+  height: 100%;
 }
 
 .island-brand {
   display: grid;
   place-items: center;
+  flex: none;
   width: 27px;
   height: 27px;
-  border-radius: 8px;
-  background: #143356;
-  color: #dbe9f6;
-  font-weight: 750;
+  color: #dbe6ed;
   font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
 }
 
-.island-placeholder-text {
+/* V9 P mark fallback: three stacked facets, no raster. */
+.island-brand > span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
+  background:
+    linear-gradient(145deg, transparent 0 54%, rgba(219, 230, 237, 0.85) 54% 60%, transparent 60%),
+    linear-gradient(180deg, #102e55 0%, #1d5189 62%, #3173a8 100%);
+  font-size: 13px;
+  font-weight: 750;
+  color: #eaf2f8;
+  box-shadow: inset 0 0 0 1px rgba(219, 230, 237, 0.16);
+}
+
+.island-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--island-text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.island-search-input::placeholder {
+  color: #9ba0a4;
+}
+
+.island-search-input:focus-visible {
+  outline: 2px solid var(--island-focus-input);
+  outline-offset: 4px;
+  border-radius: 5px;
+}
+
+.island-search-row > svg {
+  color: var(--island-muted);
+  flex: none;
+}
+
+.island-filters {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 10px 7px;
+  border-top: 1px solid #24282b;
+  padding-top: 7px;
+}
+
+.island-filter {
+  border: 0;
+  background: transparent;
+  color: #a5adb0;
+  font: inherit;
+  font-size: 11px;
+  padding: 7px 8px;
+  min-height: 29px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.island-filter:hover {
+  background: var(--island-row-hover);
+  color: var(--island-text);
+}
+
+.island-filter.is-active {
+  background: #263b49;
+  color: #e3f0f7;
+}
+
+.island-filter:focus-visible {
+  outline: 2px solid var(--island-focus);
+  outline-offset: 1px;
+}
+
+.island-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 7px 11px;
+  box-sizing: border-box;
+}
+
+.island-result-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--island-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.island-result-row:hover,
+.island-result-row:focus-visible {
+  background: var(--island-row-hover);
+  border-color: var(--island-row-border);
+  outline: none;
+}
+
+.island-result-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: #253744;
+  color: var(--island-icon);
+}
+
+.island-result-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.island-result-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e8ebee;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-result-sub {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #99a6ad;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-result-meta {
+  flex: none;
+  font-size: 10px;
+  color: #87979c;
+}
+
+.island-result-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 33px;
+  padding: 8px 15px 9px;
+  box-sizing: border-box;
+  border-top: 1px solid #2c3034;
+  font-size: 10px;
+  color: #87979c;
+}
+
+.island-kbd-hints {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.island-kbd-hints kbd {
+  font: inherit;
+  font-size: 10px;
+  color: #d2dce1;
+  border: 1px solid #33434a;
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.island-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+}
+
+.island-skeleton-row {
+  height: 44px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #151c20, #1b242a, #151c20);
+  animation: island-skeleton 1.2s ease-in-out infinite;
+}
+
+@keyframes island-skeleton {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------- Shared cards ---------- */
+
+.island-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 17px 22px 14px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3c474a transparent;
+}
+
+.island-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.island-card::-webkit-scrollbar-thumb {
+  background: #3c474a;
+  border-radius: 999px;
+}
+
+.island-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-height: 42px;
+}
+
+.island-icon-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--island-raised);
+  color: var(--island-icon);
+}
+
+.island-card-heading {
+  min-width: 0;
+}
+
+.island-card-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 19.2px;
+  letter-spacing: -0.04em;
+  color: var(--island-text);
+}
+
+.island-card-heading p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 15.95px;
+  color: #9ba7ae;
+}
+
+.island-divider {
+  flex: none;
+  height: 1px;
+  background: #262b30;
+  margin: 13px 0;
+}
+
+.island-context-caps {
+  flex: none;
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #aab4b8;
+  margin-bottom: 7px;
+}
+
+.island-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 110px;
+  padding: 16px;
+  text-align: center;
   color: #9ba3ae;
-  font-size: 14px;
+}
+
+.island-empty strong {
+  font-size: 12px;
+  color: #e8ebee;
+  font-weight: 600;
+}
+
+.island-empty span {
+  font-size: 10px;
+  color: #8b9aa3;
+}
+
+/* ---------- Clipboard ---------- */
+
+.island-inline-nav {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  margin-bottom: 7px;
+}
+
+.island-nav-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #9daab0;
+  font: inherit;
+  font-size: 10px;
+  min-height: 29px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.island-nav-chip:hover:not(:disabled) {
+  background: var(--island-row-hover);
+  color: #d4e8f4;
+}
+
+.island-nav-chip.is-active {
+  background: #1c303c;
+  border-color: #304958;
+  color: #d4e8f4;
+}
+
+.island-nav-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.island-nav-count {
+  font-size: 9px;
+  color: #8b9aa3;
+}
+
+.island-clip-list {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 144px;
+  overflow-y: auto;
+}
+
+.island-clip-row {
+  width: 100%;
+  height: 48px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--island-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.island-clip-row.is-active,
+.island-clip-row:hover,
+.island-clip-row:focus-visible {
+  background: var(--island-row-hover);
+  border-color: var(--island-row-border);
+  outline: none;
+}
+
+.island-clip-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: #253744;
+  color: var(--island-icon);
+}
+
+.island-clip-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.island-clip-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #eef1f3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-clip-sub {
+  margin-top: 3px;
+  font-size: 10px;
+  color: #8a9aa4;
+}
+
+.island-check {
+  color: var(--island-accent);
+  flex: none;
+}
+
+.island-snippet {
+  flex: none;
+  max-height: 95px;
+  min-height: 48px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #131a1e;
+  border: 1px solid #242d32;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: #b8cbd4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* ---------- Agents ---------- */
+
+.island-agent-list {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.island-agent-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.island-agent-row:hover {
+  background: var(--island-row-hover);
+  border-color: var(--island-row-border);
+}
+
+.island-agent-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: #253744;
+  color: var(--island-icon);
+}
+
+.island-agent-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.island-agent-name {
+  font-size: 12px;
+  color: #eef1f3;
+}
+
+.island-agent-task {
+  margin-top: 3px;
+  font-size: 10px;
+  color: #8b9aa3;
+}
+
+.island-agent-badge {
+  flex: none;
+  font-size: 9px;
+  line-height: 1;
+  padding: 4px 7px;
+  border: 1px solid #354c59;
+  border-radius: 5px;
+  color: #b9cdd6;
+}
+
+.island-agent-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.island-agent-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 33px;
+  padding: 8px 11px;
+  border: 1px solid #34434a;
+  border-radius: 7px;
+  background: #171e23;
+  color: #d7e8ee;
+  font: inherit;
+  font-size: 11px;
+}
+
+.island-agent-button:disabled {
+  opacity: 0.5;
+}
+
+.island-honest-note {
+  margin: 9px 0 0;
+  font-size: 10px;
+  color: #8b9aa3;
+}
+
+/* ---------- Browser / Git ---------- */
+
+.island-choose-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.island-choose-row {
+  width: 100%;
+  min-height: 47px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--island-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.island-choose-row:hover,
+.island-choose-row:focus-visible {
+  background: var(--island-row-hover);
+  border-color: var(--island-row-border);
+  outline: none;
+}
+
+.island-choose-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--island-icon);
+}
+
+.island-choose-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.island-choose-title {
+  font-size: 12px;
+  color: #e9edf1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-choose-meta {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #8b9aa3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-choose-more {
+  flex: none;
+  color: #7d878d;
+}
+
+/* ---------- Unsupported cards ---------- */
+
+.island-unsupported {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  padding: 16px 8px;
+  text-align: center;
+  color: #9ba3ae;
+}
+
+.island-unsupported-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--island-raised);
+  color: var(--island-icon);
+}
+
+.island-unsupported strong {
+  font-size: 13px;
+  color: #e8ebee;
+}
+
+.island-unsupported span {
+  max-width: 300px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.island-unsupported-note {
+  color: #7d878d;
+}
+
+/* ---------- Page dots ---------- */
+
+.island-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--island-dots-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: var(--island-footer);
+  border-top: 1px solid var(--island-footer-border);
+  z-index: 3;
+}
+
+.island-dot-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 14px;
+  height: 30px;
+  padding: 9px 3px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Invisible hit padding: visual dot stays 5 px, target is >=24x24. */
+.island-dot-button::before {
+  content: "";
+  position: absolute;
+  inset: -6px -6px;
+}
+
+.island-dot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--island-dot-idle);
+  transition:
+    background 200ms,
+    width var(--island-dot-dur) var(--island-ease),
+    transform 220ms var(--island-ease);
+}
+
+.island-dot-button.is-active .island-dot {
+  width: 16px;
+  background: var(--island-dot-active);
+}
+
+.island-dot-button:hover .island-dot {
+  transform: scale(1.12);
+}
+
+.island-dot-button:focus-visible {
+  outline: 2px solid var(--island-focus);
+  outline-offset: -3px;
+  border-radius: 7px;
+}
+
+.island-dots--compact {
+  position: absolute;
+  top: 14px;
+  right: 15px;
+  left: auto;
+  bottom: auto;
+  height: var(--island-dots-h-compact);
+  gap: 1px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  z-index: 4;
+}
+
+.island-dots--compact .island-dot-button {
+  min-width: 10px;
+  height: 37px;
+  padding: 11px 0;
+}
+
+.island-dots--compact .island-dot {
+  width: 4px;
+  height: 4px;
+}
+
+.island-dots--compact .island-dot-button.is-active .island-dot {
+  width: 6px;
+  height: 4px;
+}
+
+/* ---------- Responsive (exactly 520 / 380) ---------- */
+
+@media (max-width: 520px) {
+  .island-search-row {
+    padding: 0 12px;
+    gap: 9px;
+  }
+
+  .island-search--compact .island-search-row {
+    padding-right: 112px;
+  }
+
+  .island-search-input {
+    font-size: 13px;
+  }
+
+  .island-card {
+    padding: 15px 15px 12px;
+  }
+
+  .island-card-heading h2 {
+    font-size: 15px;
+  }
+
+  .island-dots--compact {
+    right: 11px;
+  }
+
+  .island-inline-nav {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .island-nav-chip {
+    padding: 7px 7px;
+  }
+}
+
+@media (max-width: 380px) {
+  .island-card {
+    padding: 14px 13px 11px;
+  }
+
+  .island-search-row {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .island-search-input {
+    font-size: 12px;
+  }
+
+  .island-card-heading h2 {
+    font-size: 15px;
+  }
+
+  .island-card-heading p {
+    font-size: 10px;
+  }
+
+  .island-inline-nav {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .island-snippet {
+    max-height: 84px;
+  }
+
+  .island-kbd-hints span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .island-surface,
+  .island-surface .island-inner,
+  .island-dot,
+  .island-skeleton-row {
+    transition: none !important;
+    animation: none !important;
+  }
 }

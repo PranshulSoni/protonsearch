@@ -94,6 +94,10 @@ export interface ResultMeta {
   line?: number | null;
   snippet?: string | null;
   sourceLabel?: string | null;
+  thumbnailDataUrl?: string | null;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  mime?: string | null;
 }
 
 export interface SearchResult {
@@ -447,6 +451,80 @@ export type IndexCommand =
 export interface OpenOutcome {
   ok: boolean;
   message: string;
+}
+
+export type AgentTaskRuntime = "pi" | "pydantic" | "unknown";
+export type AgentTaskState =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "offline";
+export type AgentTaskProgressKind = "determinate" | "indeterminate";
+export type AgentTaskLogLevel = "info" | "warn" | "error";
+
+export interface AgentTaskProgress {
+  kind: AgentTaskProgressKind;
+  fraction: number | null;
+}
+
+export interface AgentTaskLogEntry {
+  at: number;
+  level: AgentTaskLogLevel;
+  message: string;
+}
+
+export interface AgentTaskErrorInfo {
+  code: string;
+  message: string;
+}
+
+export interface AgentPermissionState {
+  requested: string[];
+  granted: string[];
+  denied: string[];
+  pending: string | null;
+  readOnly: boolean;
+}
+
+export interface AgentTaskControls {
+  canCancel: boolean;
+  canPause: boolean;
+  canResume: boolean;
+  canRetry: boolean;
+}
+
+export interface AgentTaskRestart {
+  at: number;
+  reason: string;
+}
+
+export interface AgentTask {
+  id: string;
+  runtime: AgentTaskRuntime;
+  runtimeVersion: string | null;
+  parentId: string | null;
+  title: string;
+  promptSummary: string;
+  state: AgentTaskState;
+  progress: AgentTaskProgress;
+  createdAt: number;
+  startedAt: number | null;
+  endedAt: number | null;
+  updatedAt: number;
+  log: AgentTaskLogEntry[];
+  error: AgentTaskErrorInfo | null;
+  permissions: AgentPermissionState;
+  writeAccess: boolean;
+  controls: AgentTaskControls;
+  restarts: AgentTaskRestart[];
+  model: string | null;
+}
+
+export interface AgentTaskNode {
+  task: AgentTask;
+  children: AgentTaskNode[];
 }
 
 export interface DetectedAgent {
