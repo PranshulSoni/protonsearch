@@ -1,0 +1,353 @@
+/* ProtonSearch v2 design tokens — v1.0, landed from docs/design/DESIGN_SYSTEM.md.
+   Contract owner: L0 (Lead). Values are normative; components must not hard-code
+   colour/size literals. Legacy alias names (--ink, --panel, ...) are kept so view
+   CSS written against the scaffold continues to work; new code should prefer --ps-*. */
+
+:root {
+  color-scheme: light;
+
+  /* Typography */
+  --ps-font-ui: "Inter Variable", "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --ps-font-mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  --ps-fw-regular: 400;
+  --ps-fw-input: 430;
+  --ps-fw-semibold: 600;
+  --ps-fw-strong: 680;
+  --ps-fw-label: 750;
+
+  --ps-text-display: clamp(26px, 4vw, 41px);
+  --ps-text-h1-setup: 32px;
+  --ps-text-stat: 34px;
+  --ps-text-input: 21px;
+  --ps-text-body: 13px;
+  --ps-text-strong: 13px;
+  --ps-text-small: 12px;
+  --ps-text-meta: 11px;
+  --ps-text-micro: 10px;
+  --ps-text-section: 11px;
+  --ps-text-kbd: 10px;
+
+  /* Surfaces */
+  --ps-ground: #e8ebe8;
+  --ps-surface: #fbfcfa;
+  --ps-surface-raised: #ffffff;
+  --ps-surface-soft: #f2f5f1;
+  --ps-sidebar: #f3f6f2;
+
+  /* Lines */
+  --ps-line: #e0e5df;
+  --ps-line-soft: #e8ece7;
+  --ps-line-strong: #cdd5ce;
+  --ps-control-border: #d5dfd6;
+
+  /* Ink */
+  --ps-ink: #202b31;
+  --ps-ink-2: #5c6862;
+  --ps-ink-3: #68736d;
+
+  /* Accent */
+  --ps-accent: #285975;
+  --ps-accent-strong: #1e4158;
+  --ps-accent-soft: #e7eef2;
+  --ps-accent-border: #d6e2e9;
+  --ps-selected-bar: #285975;
+  --ps-focus: #5482a3;
+
+  /* Navigation / identity */
+  --ps-nav-active-bg: #e0eae8;
+  --ps-nav-active-ink: #234759;
+  --ps-avatar-bg: #dae7e8;
+  --ps-avatar-ink: #245168;
+
+  /* Controls */
+  --ps-primary-bg: #234a61;
+  --ps-primary-ink: #ffffff;
+  --ps-primary-hover: #335e75;
+
+  /* Semantic states */
+  --ps-positive: #247b50;
+  --ps-warning: #8a5a12;
+  --ps-negative: #a92a2f;
+  --ps-positive-pill-bg: #dcfae5;
+  --ps-positive-pill-ink: #04250e;
+  --ps-negative-pill-bg: #ffedea;
+  --ps-negative-pill-ink: #831c1e;
+  --ps-warning-pill-bg: #fffbeb;
+  --ps-warning-pill-ink: #92400e;
+  --ps-warning-pill-border: #fde68a;
+
+  --ps-kbd-bg: #f0f3ef;
+  --ps-kbd-border: #dbe2da;
+  --ps-kbd-ink: #5d6f65;
+  --ps-progress-track: #e5ebe5;
+  --ps-progress-fill: #407188;
+  --ps-scrollbar-thumb: #d9dfda;
+  --ps-scrim: rgba(32, 43, 49, 0.32);
+
+  /* Radii */
+  --ps-radius-kbd: 4px;
+  --ps-radius-control: 6px;
+  --ps-radius-field: 7px;
+  --ps-radius-row: 8px;
+  --ps-radius-segment: 9px;
+  --ps-radius-window: 12px;
+  --ps-radius-launcher: 14px;
+  --ps-radius-full: 999px;
+
+  /* Structure */
+  --ps-border: 1px;
+  --ps-focus-width: 2px;
+  --ps-focus-offset: 2px;
+  --ps-selected-bar-width: 2px;
+
+  /* Elevation: floating surfaces only */
+  --ps-shadow-launcher: 0 24px 56px rgba(36, 60, 43, 0.11), 0 2px 5px rgba(21, 44, 24, 0.04);
+  --ps-shadow-app: 0 18px 45px rgba(33, 59, 40, 0.08);
+  --ps-shadow-popover: 0 8px 24px rgba(32, 43, 49, 0.14), 0 1px 3px rgba(32, 43, 49, 0.06);
+  --ps-shadow-dialog: 0 24px 64px rgba(32, 43, 49, 0.2);
+
+  /* Motion */
+  --ps-dur-0: 0ms;
+  --ps-dur-fast: 90ms;
+  --ps-dur-base: 110ms;
+  --ps-dur-panel: 160ms;
+  --ps-dur-progress: 240ms;
+  --ps-dur-loop: 1200ms;
+  --ps-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ps-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ps-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ps-ease-linear: linear;
+
+  /* Density and layout */
+  --ps-row-launcher: 58px;
+  --ps-row-list: 64px;
+  --ps-row-nav: 40px;
+  --ps-control-height: 32px;
+  --ps-field-height: 38px;
+  --ps-content-max: 1040px;
+
+  /* Brand mark (light surface) */
+  --ps-brand-body: #102448;
+  --ps-brand-facet: #1d5189;
+
+  /* File-type badge tints (light) */
+  --ps-badge-word-bg: #e5eef5;
+  --ps-badge-word-ink: #285e8b;
+  --ps-badge-folder-bg: #eee9dc;
+  --ps-badge-folder-ink: #7d5a20;
+  --ps-badge-code-bg: #e9eee8;
+  --ps-badge-code-ink: #386d58;
+  --ps-badge-action-bg: #e7e9eb;
+  --ps-badge-action-ink: #436276;
+  --ps-badge-image-bg: #eae8ef;
+  --ps-badge-image-ink: #574f68;
+  --ps-badge-neutral-bg: #e8ece7;
+  --ps-badge-neutral-ink: #526a66;
+
+  /* ---- Legacy aliases used by the scaffold's view CSS ---- */
+  --stage: var(--ps-ground);
+  --panel: var(--ps-surface);
+  --panel-raised: var(--ps-surface-raised);
+  --sidebar: var(--ps-sidebar);
+  --soft: var(--ps-surface-soft);
+  --hover: #f0f3f0;
+  --selected: var(--ps-accent-soft);
+  --selected-border: var(--ps-accent-border);
+  --ink: var(--ps-ink);
+  --ink-strong: #16222a;
+  --muted: var(--ps-ink-2);
+  --quiet: var(--ps-ink-3);
+  --faint: #8a948e;
+  --line: var(--ps-line);
+  --line-strong: var(--ps-line-strong);
+  --control-border: var(--ps-control-border);
+  --blue: var(--ps-accent);
+  --blue-deep: var(--ps-accent-strong);
+  --blue-soft: var(--ps-accent-soft);
+  --focus: var(--ps-focus);
+  --ok: var(--ps-positive);
+  --ok-soft: var(--ps-positive-pill-bg);
+  --warn: var(--ps-warning);
+  --warn-soft: var(--ps-warning-pill-bg);
+  --danger: var(--ps-negative);
+  --danger-soft: var(--ps-negative-pill-bg);
+  --tile-bg: var(--ps-badge-neutral-bg);
+  --tile-ink: var(--ps-badge-neutral-ink);
+  --tile-word-bg: var(--ps-badge-word-bg);
+  --tile-word-ink: var(--ps-badge-word-ink);
+  --tile-folder-bg: var(--ps-badge-folder-bg);
+  --tile-folder-ink: var(--ps-badge-folder-ink);
+  --tile-code-bg: var(--ps-badge-code-bg);
+  --tile-code-ink: var(--ps-badge-code-ink);
+  --tile-action-bg: var(--ps-badge-action-bg);
+  --tile-action-ink: var(--ps-badge-action-ink);
+  --tile-image-bg: var(--ps-badge-image-bg);
+  --tile-image-ink: var(--ps-badge-image-ink);
+
+  --font-ui: var(--ps-font-ui);
+  --font-display: var(--ps-font-ui);
+  --font-mono: var(--ps-font-mono);
+  --text-xs: var(--ps-text-micro);
+  --text-sm: var(--ps-text-meta);
+  --text-base: var(--ps-text-body);
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: var(--ps-text-input);
+  --text-h1: var(--ps-text-display);
+  --leading-tight: 1.16;
+  --leading-body: 1.62;
+
+  --radius-sm: var(--ps-radius-kbd);
+  --radius-md: var(--ps-radius-row);
+  --radius-lg: var(--ps-radius-segment);
+  --radius-xl: var(--ps-radius-launcher);
+  --radius-pill: var(--ps-radius-full);
+
+  --dur-instant: var(--ps-dur-0);
+  --dur-fast: var(--ps-dur-fast);
+  --dur-select: var(--ps-dur-base);
+  --dur-med: var(--ps-dur-panel);
+  --ease-out: var(--ps-ease-out);
+  --ease-inout: var(--ps-ease-in-out);
+
+  --shadow-launcher: var(--ps-shadow-launcher);
+  --shadow-panel: var(--ps-shadow-app);
+  --shadow-popover: var(--ps-shadow-popover);
+
+  --launcher-width: 820px;
+  --launcher-width-preview: 1180px;
+  --searchline-height: 72px;
+  --result-height: var(--ps-row-launcher);
+  --result-height-compact: 48px;
+  --footer-height: 44px;
+  --sidebar-width: 190px;
+  --sidebar-width-narrow: 56px;
+
+  /* Spacing scale (4 px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 56px;
+  --space-11: 64px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ps-ground: #141513;
+  --ps-surface: #1c1e1a;
+  --ps-surface-raised: #242722;
+  --ps-surface-soft: #202320;
+  --ps-sidebar: #191b18;
+
+  --ps-line: #2e322c;
+  --ps-line-soft: #262923;
+  --ps-line-strong: #3d423a;
+  --ps-control-border: #666e63;
+
+  --ps-ink: #ecefe8;
+  --ps-ink-2: #b4bab0;
+  --ps-ink-3: #959b91;
+
+  --ps-accent: #8fb6cc;
+  --ps-accent-strong: #a8c9db;
+  --ps-accent-soft: #24333b;
+  --ps-accent-border: #4f7183;
+  --ps-selected-bar: #8fb6cc;
+  --ps-focus: #7fb0c9;
+
+  --ps-nav-active-bg: #2b3029;
+  --ps-nav-active-ink: #f2f5ef;
+  --ps-avatar-bg: #223038;
+  --ps-avatar-ink: #9ec5de;
+
+  --ps-primary-bg: #2f637e;
+  --ps-primary-ink: #f7f8f4;
+  --ps-primary-hover: #3a708c;
+
+  --ps-positive: #6fbf93;
+  --ps-warning: #d9b171;
+  --ps-negative: #e08a8a;
+  --ps-positive-pill-bg: #172a1d;
+  --ps-positive-pill-ink: #7fc99c;
+  --ps-negative-pill-bg: #2c1a1c;
+  --ps-negative-pill-ink: #e59a9a;
+  --ps-warning-pill-bg: #2a2317;
+  --ps-warning-pill-ink: #d9b171;
+  --ps-warning-pill-border: #4a3c20;
+
+  --ps-kbd-bg: #262a24;
+  --ps-kbd-border: #3a4038;
+  --ps-kbd-ink: #b0b7ad;
+  --ps-progress-track: #2b3029;
+  --ps-progress-fill: #8fb6cc;
+  --ps-scrollbar-thumb: #3f463d;
+  --ps-scrim: rgba(0, 0, 0, 0.5);
+
+  --ps-shadow-launcher: 0 24px 56px rgba(0, 0, 0, 0.55), 0 2px 5px rgba(0, 0, 0, 0.35);
+  --ps-shadow-app: 0 18px 45px rgba(0, 0, 0, 0.45);
+  --ps-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --ps-shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  /* Brand mark (dark surface; reconstructed on-dark variant) */
+  --ps-brand-body: #e3e9ee;
+  --ps-brand-facet: #5b93c4;
+
+  /* Dark badge tints */
+  --ps-badge-word-bg: #1c2a33;
+  --ps-badge-word-ink: #9ec5de;
+  --ps-badge-folder-bg: #2c2719;
+  --ps-badge-folder-ink: #d8b878;
+  --ps-badge-code-bg: #1c2a24;
+  --ps-badge-code-ink: #a6cdb5;
+  --ps-badge-action-bg: #212a30;
+  --ps-badge-action-ink: #b6c9d6;
+  --ps-badge-image-bg: #2a2430;
+  --ps-badge-image-ink: #c4b6d8;
+  --ps-badge-neutral-bg: #23291f;
+  --ps-badge-neutral-ink: #b9c4b3;
+
+  --hover: #232a2f;
+  --ink-strong: #f4f6f1;
+  --faint: #7c857b;
+}
+
+:root[data-density="compact"] {
+  --ps-row-launcher: 48px;
+  --ps-row-list: 52px;
+  --ps-row-nav: 34px;
+  --ps-control-height: 28px;
+  --ps-field-height: 32px;
+  --result-height: 48px;
+  --result-height-compact: 42px;
+}
+
+/* Reduced motion: all durations collapse to 0. */
+:root[data-motion="reduced"] {
+  --ps-dur-0: 0ms;
+  --ps-dur-fast: 0ms;
+  --ps-dur-base: 0ms;
+  --ps-dur-panel: 0ms;
+  --ps-dur-progress: 0ms;
+  --ps-dur-loop: 0ms;
+  --dur-fast: 0ms;
+  --dur-select: 0ms;
+  --dur-med: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ps-dur-0: 0ms;
+    --ps-dur-fast: 0ms;
+    --ps-dur-base: 0ms;
+    --ps-dur-panel: 0ms;
+    --ps-dur-progress: 0ms;
+    --ps-dur-loop: 0ms;
+  }
+}

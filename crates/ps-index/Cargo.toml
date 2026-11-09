@@ -1,0 +1,16 @@
+[package]
+name = "ps-index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+walkdir = { workspace = true }
+rayon = { workspace = true }
+memchr = "2"
+
+[dev-dependencies]
+# Examples/benches only; keeps the library dependency surface small.

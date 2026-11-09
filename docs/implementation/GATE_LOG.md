@@ -1,0 +1,44 @@
+# Gate Log — ProtonSearch v2 (Project Phoenix)
+
+Evidence-first record. Every entry: what was done, command/output proving it, owner, date.
+Status per gate lives in docs/implementation/WORK_BREAKDOWN.md.
+
+## Gate 0 — Reconnaissance
+
+- 2026-11-09 L0: baseline branch v2-phoenix + tag v1.1.1-v2-baseline created; working tree committed.
+- 2026-11-09 L0: legacy test suite: 85 passed, 0 failed, 1 ignored (cargo test --no-fail-fast in protonsearch/; log .agents/baseline-old-tests.log).
+- 2026-11-09 L0: forensic SQLite dump of the live legacy index (immutable read-only):
+  files 89,813 · files_fts 14,609 · browser_items 4,523 · memory_events 5,286 · git_repos 15 · git_commits 516 ·
+  git_todos 132 · quicklinks 4 · snippets 1 · settings_catalog_fts 238 · ai_settings 2 · clipboard_history 0 ·
+  timeline_events 0. DB size 149,372,928 bytes (+23.8 MB WAL).
+- Gate 0 deliverables (feature parity matrix with evidence, security register, research) assigned to rel-recon; **status: see reports**.
+- Missing artifacts (recorded, not silently ignored): assets/protonsearch-mark.svg, assets/protonsearch-logo-concept.png,
+  assets/original-logo-crop-reference.png do not exist in the workspace; the brand mark in the supplied HTML is the visual source.
+
+## Gate 1 — Architecture and contracts
+
+- Cargo workspace (crates/ps-ipc, ps-core, ps-index, ps-content, ps-sources, ps-windows, ps-ocr, ps-agent, ps-bench,
+  apps/desktop/src-tauri) committed; legacy proto crate excluded and left untouched.
+- IPC contract v1 frozen in crates/ps-ipc (PROTOCOL_VERSION=1, DATA_SCHEMA_VERSION=1) with serde round-trip tests;
+  TypeScript mirror in apps/desktop/src/bridge/types.ts; browser mock bridge for UI development.
+- ADR-0001..0006 written (Tauri migration, search core, FTS5 vs Tantivy, OCR engine, agent runtime, IPC).
+- Design system v1.0 (docs/design/DESIGN_SYSTEM.md) landed by design-spec; tokens.css v1.0 implemented by L0, Inter Variable bundled.
+- Build environment finding: host MSVC intermittently fails (cl D8050) writing /Z7 debug records for bundled SQLite;
+  fixed with workspace [profile.dev] debug = 0 (recorded in root Cargo.toml). Evidence: cargo check -p ps-content passes after fix.
+
+## Gate 2 — Engine (in progress)
+
+## Gate 3 — Launcher (in progress)
+
+## Gate 4 — Desktop app / onboarding (in progress)
+
+## Gate 5 — Rich search (pending)
+
+## Gate 6 — Agent sidecar (pending)
+
+## Gate 7 — Release candidate (pending)
+- Test-environment limitation recorded: processes launched by the agent harness cannot write %APPDATA%/%LOCALAPPDATA%
+  (access denied; the harness sandbox grants writes under the workspace only). The app therefore supports the
+  PROTONSEARCH_DATA_DIR override (also useful for portable installs); real-app E2E runs use .devdata/ inside the repo.
+  End-user default remains %APPDATA%\\protonsearch\\v2. Verified with a compiled probe: writes under the workspace succeed,
+  writes to %APPDATA%/%TEMP% fail with os error 5 from child executables while PowerShell itself is allowed.

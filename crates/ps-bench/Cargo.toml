@@ -1,0 +1,36 @@
+[package]
+name = "ps-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "ps_bench"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ps-bench"
+path = "src/main.rs"
+
+# NOTE: ps-core/ps-content/ps-ocr are added only when their v2 APIs are real.
+# This keeps the benchmark harness buildable while other crates are mid-flight,
+# and it makes the dependency direction obvious in review.
+[dependencies]
+ps-ipc = { path = "../ps-ipc" }
+ps-index = { path = "../ps-index" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+rusqlite = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Globalization",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage",
+    "Storage_Streams",
+    "Win32_System_Com",
+] }

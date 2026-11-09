@@ -60,3 +60,21 @@ icons/preview-images/demo.mp4
 
 # Agent design scratch
 .agents/design/
+
+# Benchmark scratch: generated datasets, raw run outputs, OCR corpus (reproducible via ps-bench)
+.bench/
+# v2 frontend / tooling
+apps/desktop/node_modules/
+apps/desktop/dist/
+tools/visual-qa/node_modules/
+tools/visual-qa/artifacts/
+# v2 local test/dev data (sandbox cannot write AppData)
+.devdata/
+agent-sidecar/.venv/
+agent-sidecar/.venv2/
+agent-sidecar/.venv-nanobot/
+.agents/*.exe
+.agents/*.pdb
+.agents/*.log
+.agents/notes/
+.agents/*.txt

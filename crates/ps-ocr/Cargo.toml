@@ -1,0 +1,21 @@
+[package]
+name = "ps-ocr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage",
+    "Storage_Streams",
+    "Globalization",
+] }
+
+[dependencies]
+serde = { workspace = true }
+anyhow = { workspace = true }
+rusqlite = { workspace = true }

@@ -1,0 +1,24 @@
+/* Shell-level states (boot / fatal). Owned by Lead. */
+
+.boot-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.boot-screen-error strong {
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.boot-detail {
+  max-width: 460px;
+  text-align: center;
+  line-height: 1.6;
+}

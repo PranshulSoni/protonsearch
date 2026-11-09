@@ -1,0 +1,12 @@
+{
+  "name": "protonsearch-visual-qa",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "shots": "node shots.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0"
+  }
+}

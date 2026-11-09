@@ -1,0 +1,24 @@
+[package]
+name = "protonsearch-v2"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "ProtonSearch v2 desktop shell (Tauri 2)"
+
+[[bin]]
+name = "ProtonSearch"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+ps-ipc = { path = "../../../crates/ps-ipc" }
+ps-core = { path = "../../../crates/ps-core" }
+ps-sources = { path = "../../../crates/ps-sources" }
