@@ -696,7 +696,8 @@ impl Engine {
                     return OpenOutcome {
                         ok: false,
                         message: format!(
-                            "Confirmation required for {command:?}. Ask again to execute."
+                            "Confirmation required to {}. Ask again to execute.",
+                            native_action_label(*command)
                         ),
                     };
                 }
@@ -2019,6 +2020,22 @@ fn describe_action(action: &ActionSpec) -> (ActivityKind, String, Option<String>
         ActionSpec::RunNative { command } => (ActivityKind::Workflow, format!("{command:?}"), None),
         ActionSpec::RunWorkflow { id } => (ActivityKind::Workflow, id.clone(), None),
         ActionSpec::None => (ActivityKind::System, "No action".into(), None),
+    }
+}
+
+fn native_action_label(command: NativeCommand) -> &'static str {
+    match command {
+        NativeCommand::LockWorkstation => "lock this PC",
+        NativeCommand::Sleep => "put this PC to sleep",
+        NativeCommand::Shutdown => "shut down this PC",
+        NativeCommand::Restart => "restart this PC",
+        NativeCommand::EmptyRecycleBin => "empty the Recycle Bin",
+        NativeCommand::OpenSettings => "open Windows Settings",
+        NativeCommand::OpenTaskManager => "open Task Manager",
+        NativeCommand::OpenTerminal => "open a terminal",
+        NativeCommand::ToggleDarkMode => "toggle the theme",
+        NativeCommand::PauseIndexing => "pause indexing",
+        NativeCommand::ResumeIndexing => "resume indexing",
     }
 }
 

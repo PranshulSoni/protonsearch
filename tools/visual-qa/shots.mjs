@@ -142,21 +142,29 @@ await shot("app-indexes-error", {
   actions: [{ type: "click", text: "Search & Indexes" }],
 });
 
-// ---- Onboarding ------------------------------------------------------------
-const onboardingSteps = ["Welcome", "Choose locations", "Search depth", "Launcher", "Ready"];
-for (let i = 0; i < onboardingSteps.length; i++) {
-  const actions = [];
-  for (let s = 0; s < i; s++) actions.push({ type: "click", text: "Continue" });
-  await shot("onboarding-step-" + (i + 1) + "-" + onboardingSteps[i].toLowerCase().replace(/\\s+/g, "-"), {
-    viewport: desktop,
-    url: "/?view=main&onboard=1",
-    actions,
-  });
-  await shot("onboarding-step-" + (i + 1) + "-dark", {
-    viewport: desktop,
-    url: "/?view=main&onboard=1&theme=dark",
-    actions,
-  });
+// ---- Onboarding (7 steps per docs/design/SCREENS.md) -----------------------
+// Advance with the footer primary button only: a text match on "Continue" also
+// hits the rail sentence "...continue later." and silently captures step 1.
+const onboardingViewports = [
+  ["1180x800", { width: 1180, height: 800 }],
+  ["900x660", { width: 900, height: 660 }],
+  ["560x480", { width: 560, height: 480 }],
+];
+for (const [label, viewport] of onboardingViewports) {
+  for (const theme of ["", "&theme=dark"]) {
+    for (let i = 0; i < 7; i++) {
+      const actions = [];
+      for (let step = 0; step < i; step++) {
+        actions.push({ type: "click", selector: ".setup-bottom .btn-primary" });
+        actions.push({ type: "wait", ms: 120 });
+      }
+      await shot("onboarding-" + label + (theme ? "-dark" : "-light") + "-step-" + (i + 1), {
+        viewport,
+        url: "/?view=main&onboard=1" + theme,
+        actions,
+      });
+    }
+  }
 }
 
 await browser.close();

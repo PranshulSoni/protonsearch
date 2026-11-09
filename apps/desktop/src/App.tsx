@@ -163,7 +163,9 @@ export default function App({ view }: { view: ViewKind }) {
 
   const openResult = useCallback(async (action: ActionSpec) => {
     const outcome = await api.openResult(action);
-    if (view === "launcher") {
+    // Only dismiss on a completed action: destructive commands first return a
+    // confirmation challenge (ok:false) and the launcher must stay open.
+    if (view === "launcher" && outcome.ok) {
       void api.hideLauncher();
     }
     return outcome;
