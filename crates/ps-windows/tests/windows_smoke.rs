@@ -196,6 +196,26 @@ fn packaged_app_icons_render_the_app_logo_not_a_generic_document() {
     );
 }
 
+
+#[test]
+fn clipboard_listener_can_restart_after_stop() {
+    // Regression: the window class stays registered for the process lifetime, so
+    // a second ClipboardListener::start() must tolerate ERROR_CLASS_ALREADY_EXISTS
+    // (1410). Without that, disabling and re-enabling clipboard history in the
+    // app broke capture until a restart.
+    for cycle in 0..3 {
+        let listener = ps_windows::ClipboardListener::start(|_snapshot| {})
+            .unwrap_or_else(|error| panic!("listener start failed on cycle {cycle}: {error}"));
+        ps_windows::set_clipboard_text(&format!("listener restart cycle {cycle}"))
+            .expect("set clipboard");
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        listener.stop();
+    }
+    // Dropping without an explicit stop must also be safe.
+    let listener = ps_windows::ClipboardListener::start(|_snapshot| {}).expect("start");
+    drop(listener);
+}
+
 #[test]
 fn resolves_a_generated_shortcut() {
     let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("ps-windows-test-lnk");

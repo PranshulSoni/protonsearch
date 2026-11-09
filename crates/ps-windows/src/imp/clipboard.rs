@@ -324,10 +324,13 @@ unsafe fn create_listener_window(_thread_id: u32) -> anyhow::Result<()> {
     };
     let atom = RegisterClassW(&window_class);
     if atom == 0 {
-        // May already be registered from a previous listener; continue.
+        // The window class stays registered for the process lifetime, so a
+        // stopped-then-restarted listener always sees ERROR_CLASS_ALREADY_EXISTS
+        // (1410 / 0x582). Tolerate exactly that; anything else is fatal.
+        const ERROR_CLASS_ALREADY_EXISTS: i32 = 1410;
         let error = windows::core::Error::from_win32();
-        if error.code().0 & 0xFFFF != 0x0583 {
-            // ERROR_CLASS_ALREADY_EXISTS (1410) is tolerable, anything else is not.
+        let code = (error.code().0 as u32 & 0xFFFF) as i32;
+        if code != ERROR_CLASS_ALREADY_EXISTS {
             return Err(anyhow!("RegisterClassW failed: {error}"));
         }
     }
