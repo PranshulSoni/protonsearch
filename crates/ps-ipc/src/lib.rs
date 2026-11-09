@@ -10,6 +10,10 @@
 //! - Field names are camelCase on the wire; enum variants are snake_case.
 //! - The TypeScript mirror lives in apps/desktop/src/bridge/types.ts.
 //!   Keep both in sync; contract tests below document the shape.
+//! - Agent task / detected-agent DTOs live in the agent_task module (V10 single
+//!   source of truth; ps-agent re-exports them for its public API).
+
+pub mod agent_task;
 
 use serde::{Deserialize, Serialize};
 
@@ -806,6 +810,11 @@ pub struct LauncherSettings {
     pub island: IslandSettings,
 }
 
+/// Clipboard capture gates: history is active only when BOTH
+/// privacy.clipboard_history (master opt-in) and !clipboard.pause are true.
+/// capture_text / capture_images select which formats are stored while the
+/// master gate is open. Images are additionally bounded by the engine's
+/// thumbnail/MIME/dimension limits.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClipboardSettings {
@@ -886,6 +895,15 @@ pub struct PreviewRange {
     pub end: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PreviewStatus {
+    #[default]
+    Ok,
+    Unsupported,
+    Error,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewPayload {
@@ -905,6 +923,16 @@ pub struct PreviewPayload {
     pub ocr_text: Option<String>,
     #[serde(default)]
     pub fields: Vec<PreviewField>,
+    #[serde(default)]
+    pub status: PreviewStatus,
+    /// True when text/snippet/image was capped by a size or time budget.
+    #[serde(default)]
+    pub truncated: bool,
+    /// Short human-readable error, only when status == Error.
+    #[serde(default)]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub image_mime: Option<String>,
     #[serde(default)]
     pub unsupported_reason: Option<String>,
 }

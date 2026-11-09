@@ -2,7 +2,7 @@
 
 Owner: L1-E (rel-recon). Status: Gate-0 seed. Update rule: a bug row is updated only with evidence
 (command output, log, screenshot, test ID). No fabricated reproductions. P0 items are the two bugs the
-user explicitly reported in the v10 handoff; G0-A (task-29) and G0-D (task-30) are reproducing them.
+user explicitly reported in the v10 handoff; G0-A (task-29) and G0-D (task-30) have reproduced them (see rows below for evidence/root causes).
 Fields: ID, severity (P0/P1/P2/P3), status (OPEN / REPRODUCING / REPRODUCED / FIXED-UNVERIFIED /
 VERIFIED / DEFERRED / CUT), symptom, expected, environment, reproduction steps, suspected area, owner,
 reviewer, gate, evidence, acceptance criteria.
@@ -10,7 +10,12 @@ reviewer, gate, evidence, acceptance criteria.
 ## 1. P0 bugs (user-reported; must be reproduced and fixed at Gate 2)
 
 ### BUG-P0-01 — File/text/document previews do not show
-- Severity: P0. Status: REPRODUCING (G0-A, task-29, owner engine-core; no reproduction log accepted yet).
+- Severity: P0. Status: REPRODUCED (G0-A/task-29 complete; evidence docs/qa/preview-audit/
+  PREVIEW_P0_REPORT.md + fixtures/payloads/screenshots). Root cause summary: the preview pipeline
+  does not exist end-to-end - no preview request/response in ps-ipc, no preview Tauri command and no
+  preview code in ps-core at reproduction time; filename/file rows carry meta.snippet=null and the
+  launcher renders the literal fallback, OCR text is dropped by ocr_result(), images/scanned PDFs
+  have no preview path. G2 task-37 (backend) and task-38 (UI) are implementing the repair.
 - Report: master prompt section 0 item 5 and section 7 ("file/text previews do not show currently"),
   handoff README. User-visible: selecting a search result yields no usable preview/snippet.
 - Expected: selecting a result shows verified correct preview for TXT/code/Markdown/HTML/JSON/CSV/
@@ -43,7 +48,13 @@ reviewer, gate, evidence, acceptance criteria.
 - Gate: G2 (must-fix before glamorous features). Reviewer: L0 + L1-E.
 
 ### BUG-P0-02 — Clipboard does not capture images
-- Severity: P0. Status: REPRODUCING (G0-D, task-30, owner sources-content; no reproduction log accepted yet).
+- Severity: P0. Status: REPRODUCED on real Windows (G0-D/task-30 complete; evidence
+  docs/qa/clipboard-audit/CLIPBOARD_IMAGE_P0_REPORT.md + evidence/logs + decoded PNGs). Root cause
+  summary: decoder accepts only CF_DIB with BI_RGB (compression 0), 24/32 bpp; real .NET/Paint-style
+  sources set BI_BITFIELDS (compression 3), so the decode returns None and the listener silently
+  suppresses the event. Secondary: no CF_DIBV5/CF_BITMAP/registered-PNG/OLE fallbacks, text
+  preference loses mixed copies, empty snapshots suppress the callback, no thumbnails/paste-back/
+  retention. G2 task-39 is implementing the repair.
 - Report: master prompt section 0 item 5 and section 8 ("clipboard does not capture images currently").
   User-visible: copying a bitmap (Paint/Snipping Tool/browser image) does not produce a clipboard image
   history item/thumbnail and cannot be pasted back through ProtonSearch.

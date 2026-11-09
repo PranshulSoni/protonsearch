@@ -16,18 +16,21 @@ path = "src/main.rs"
 # This keeps the benchmark harness buildable while other crates are mid-flight,
 # and it makes the dependency direction obvious in review.
 [features]
-default = ["engine", "content"]
+default = ["engine", "content", "ocr"]
 # Enables the filename-index and relevance harness (requires ps-index).
 # Content/OCR/realfiles tooling builds without it, so the harness stays usable
 # while ps-index is being edited by its owner.
 engine = ["dep:ps-index"]
 # Enables the v2 content benchmark through ps-content.
 content = ["dep:ps-content"]
+# Enables the OCR extraction + OcrIndex retrieval baseline through ps-ocr.
+ocr = ["dep:ps-ocr"]
 
 [dependencies]
 ps-ipc = { path = "../ps-ipc" }
 ps-index = { path = "../ps-index", optional = true }
 ps-content = { path = "../ps-content", optional = true }
+ps-ocr = { path = "../ps-ocr", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }

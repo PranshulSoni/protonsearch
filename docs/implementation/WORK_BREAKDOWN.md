@@ -59,8 +59,8 @@ with a single owner and an independent reviewer rather than pretending a larger 
 
 | Gate | Deliverable | Required evidence | Owner(s) | Status (Gate 0 snapshot) |
 |---|---|---|---|---|
-| G0 | Audit and baseline | forensic audit, P0 reproductions, feature/parity/status matrices, benchmark baseline, V9 reference inventory, data backup + rollback tag | L0 + L1-E (+G0-A/B/C/D tasks) | **IN PROGRESS** — this file/matrices/audit delivered; P0 reproductions in progress (task-29, task-30); V9 extraction in progress (task-28); benchmark plan in progress (task-31) |
-| G1 | Architecture/contracts/hierarchy | ADRs, Rust crate boundaries, typed IPC, settings schema + migration, ownership/reviewer map, test strategy | L0, L1-A, L1-E | TODO (inherits v2 frozen IPC v1 and ADR set; v10 additions: island placement/card settings schema, preview payloads, device adapter capabilities) |
+| G0 | Audit and baseline | forensic audit, P0 reproductions, feature/parity/status matrices, benchmark baseline, V9 reference inventory, data backup + rollback tag | L0 + L1-E (+G0-A/B/C/D tasks) | **G0-A/B/D COMPLETE** (preview + clipboard P0 reproductions/reports; V9 extraction delivered); G0-E audit/matrices accepted by L0; G0-C perf report pending separately; consolidated Gate-0 closure = L0 acceptance |
+| G1 | Architecture/contracts/hierarchy | ADRs, Rust crate boundaries, typed IPC, settings schema + migration, ownership/reviewer map, test strategy | L0, L1-A, L1-E | **IN PROGRESS** — G1 review delivered (CONDITIONAL PASS); L0 decisions recorded, ADR-0007..0012 + additive versioning policy written; shell fixes landed (validation/redactions/island clamp+generation/size clamp); re-review pending task-44 DTO move + task-37 preview command/image bounds |
 | G2 | Repair P0 bugs early | real preview pipeline for required formats; real clipboard bitmap capture/persistence/re-paste; Windows E2E evidence (Notepad/VS Code/Paint/Snipping Tool, PDF, DOCX) | L1-A (preview), L2-A (clipboard), reviewers L1-E + L0 | TODO — blocked on G0 reproductions |
 | G3 | Rust search & retrieval | filename + content + OCR + sources wired; before/after benchmarks; relevance/regression fixtures; preview extraction integrated | L1-A, L1-C, L2-A | PARTIAL (v2 engine exists; content p95 misses 30 ms target; OCR FTS integration pending — see BENCHMARKS) |
 | G4 | Normal Launcher production integration | centered multi-monitor window, All/Files/Folders/Apps filters, quick destinations, previews, keyboard/actions, real screenshots + E2E | L1-B + L2-B, review L1-E/L0 | PARTIAL (v2 launcher exists without v10 filter/quick-destination/parity acceptance) |
@@ -137,6 +137,15 @@ rollback. L0 re-runs verification before accepting.
 | 2026-11-10 | G0 | L0 ratified staffing: L0 + 5 L1 + 3 L2-scope = 9 members (8-teammate platform cap); no L3 workers | L0 | DONE | this section; L0 message 2026-11-10 |
 | 2026-11-10 | G0 | Gate-0 backup created (repo bundle + HEAD + AppData copy + legacy DB hash) | L0 | DONE | V10_GATE0_AUDIT section 4b; %USERPROFILE%\ProtonSearch-Backups\pre-v10-20261110-0205 |
 | 2026-11-10 | G0 | G0-E audit/program docs accepted by L0 | L0 | DONE | L0 message 2026-11-10 |
+| 2026-11-10 | G0 | G0-A preview P0 reproduction complete (pipeline absent end-to-end; report + fixtures) | L1-A | DONE | docs/qa/preview-audit/PREVIEW_P0_REPORT.md; BUG_LEDGER |
+| 2026-11-10 | G0 | G0-B V9 island + placement reference extraction delivered | L1-B | DONE | docs/design/ISLAND_V9_SPEC.md, ISLAND_V9_GAP_LIST.md, ISLAND_SETTINGS_SPEC.md |
+| 2026-11-10 | G0 | G0-D clipboard image P0 reproduced on real Windows; BI_BITFIELDS root cause | L2-A | DONE | docs/qa/clipboard-audit/CLIPBOARD_IMAGE_P0_REPORT.md; BUG_LEDGER |
+| 2026-11-10 | G1 | Architecture/contract review, ADR acceptance list, reviewer assignments; CONDITIONAL PASS | L1-E | DELIVERED | docs/implementation/V10_G1_ARCHITECTURE.md (task-36) |
+| 2026-11-10 | G1 | L0 G1 decisions accepted (DTO move task-44, no version bump policy, island clamp, clipboard gate/bounds, preview command, native milestones, agent writes closed) | L0 | DONE | Lead decision message; V10_G1_ARCHITECTURE section 9 |
+| 2026-11-10 | G1 | ADR-0007..0012 + IPC additive versioning/migration policy written | L1-E | DELIVERED | docs/adr/ADR-0007..0012, docs/adr/IPC_ADDITIVE_VERSIONING_POLICY.md (task-45) |
+| 2026-11-10 | G1 | Shell fixes verified (settings validation, agent redactions, island clamp/generation, size clamp, read-only agent gate) | L0/L1-E | VERIFIED | main.rs:605-635, 1303-1322, 196-320, 1253-1261, 1060-1075; V10_G1_ARCHITECTURE section 9 |
+| 2026-11-10 | G1 | Re-review pending: task-44 DTO move, task-37 preview command, task-39 image bounds | L1-E | BLOCKED (dependency) | tasks 44/37/39 |
+| 2026-11-10 | G2 | Preview backend/UI + clipboard images + island renderer + settings started in parallel | L1-A/L2-A/L1-B | IN PROGRESS | tasks 37-41 |
 
 ## 8. Prior program (superseded, evidence retained)
 

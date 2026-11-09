@@ -48,16 +48,46 @@ pub struct ClipboardImage {
 }
 
 /// One clipboard change captured by the listener.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+///
+/// A single copy event can expose several representations (for example text +
+/// bitmap). All of them are reported here so the persistence layer can keep one
+/// history item without losing the image, files, HTML or RTF alternatives.
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ClipboardSnapshot {
     pub text: Option<String>,
-    /// PNG encoded image, when the clipboard held a bitmap.
+    /// Best image representation, PNG encoded.
     pub png: Option<Vec<u8>>,
+    /// Original image dimensions (before PNG encoding).
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    /// Which clipboard format produced the image: "png" | "dibv5" | "dib" | "bitmap".
+    pub image_format: Option<String>,
+    /// MIME of the stored image payload (currently image/png).
+    pub mime: Option<String>,
+    /// File list from CF_HDROP (Explorer-style copy).
+    pub files: Vec<String>,
+    /// HTML fragment from the registered "HTML Format" clipboard format.
+    pub html: Option<String>,
+    /// RTF from the registered "Rich Text Format" clipboard format.
+    pub rtf: Option<String>,
+    /// Clipbord format names present for this copy (diagnostics/debugging).
+    pub formats: Vec<String>,
     /// Executable name (no path) of the app that was foreground when the
     /// clipboard changed, when it can be determined.
     pub source_app: Option<String>,
     /// Unix milliseconds at capture time.
     pub timestamp_ms: i64,
+}
+
+impl ClipboardSnapshot {
+    /// True when the copy event carried any content we can persist or preview.
+    pub fn has_content(&self) -> bool {
+        self.text.is_some()
+            || self.png.is_some()
+            || !self.files.is_empty()
+            || self.html.is_some()
+            || self.rtf.is_some()
+    }
 }
 
 /// Handle to the background clipboard listener thread.
@@ -250,6 +280,33 @@ pub fn set_clipboard_text(text: &str) -> anyhow::Result<()> {
     #[cfg(not(windows))]
     {
         let _ = text;
+        anyhow::bail!("clipboard is only supported on Windows")
+    }
+}
+
+/// Read the current clipboard as a full multi-representation snapshot
+/// (text, image, files, HTML, RTF). Used to seed clipboard history.
+pub fn read_clipboard_snapshot() -> ClipboardSnapshot {
+    #[cfg(windows)]
+    {
+        imp::clipboard::snapshot()
+    }
+    #[cfg(not(windows))]
+    {
+        ClipboardSnapshot::default()
+    }
+}
+
+/// Put a PNG image back on the clipboard as CF_DIB + CF_DIBV5 + registered PNG
+/// + CF_BITMAP, so Paint, Office and Snipping-style targets can paste it.
+pub fn set_clipboard_image(png_bytes: &[u8]) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::clipboard::set_image(png_bytes)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = png_bytes;
         anyhow::bail!("clipboard is only supported on Windows")
     }
 }

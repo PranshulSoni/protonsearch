@@ -10,6 +10,7 @@ import type {
   AgentPermissionState,
   DetectedAgent,
   MonitorInfo,
+  PreviewPayload,
   ActivityItem,
   ActivityQuery,
   AppInfo,
@@ -43,6 +44,7 @@ type Bridge = {
   showIsland(): Promise<void>;
   hideIsland(): Promise<void>;
   setIslandGeometry(width: number, height: number): Promise<void>;
+  perfMark(label: string, epochMs: number): Promise<void>;
   agentStart(request: AgentRunRequest): Promise<void>;
   agentCancel(runId?: string | null): Promise<void>;
   agentApprove(response: AgentApprovalResponse): Promise<void>;
@@ -59,6 +61,7 @@ type Bridge = {
   completeOnboarding(input: OnboardingInput): Promise<Settings>;
   indexCommand(command: IndexCommand): Promise<void>;
   setLauncherGeometry(height: number, preview: boolean): Promise<void>;
+  getPreview(resultId: string, maxChars?: number): Promise<PreviewPayload>;
   hideLauncher(): Promise<void>;
   showLauncher(): Promise<void>;
   showMain(): Promise<void>;
@@ -80,6 +83,11 @@ const tauriBridge: Bridge = {
   showIsland: () => invoke<void>("show_island"),
   hideIsland: () => invoke<void>("hide_island"),
   setIslandGeometry: (width, height) => invoke<void>("set_island_geometry", { width, height }),
+  getPreview: (resultId, maxChars) =>
+    invoke<PreviewPayload>("get_preview", {
+      req: { resultId, maxChars: maxChars ?? null },
+    }),
+  perfMark: (label, epochMs) => invoke<void>("perf_mark", { label, epochMs }),
   agentStart: (request) => invoke<void>("agent_start", { request }),
   agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),
   agentApprove: (response) => invoke<void>("agent_approve", { response }),

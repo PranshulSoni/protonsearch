@@ -1,0 +1,16 @@
+{
+  "name": "v9-island-card-switches",
+  "label": "v9-reference-cards",
+  "kind": "file",
+  "url": "../../../docs/reference/v10-handoff/protonsearch_dynamic_island_cards_v9_polished.html",
+  "viewport": { "width": 1440, "height": 900 },
+  "deviceScaleFactor": 1,
+  "setup": "click:#summon",
+  "switchKey": "Control+ArrowDown",
+  "switchNote": "Ctrl+ArrowDown is the V9 reference's own card-switch shortcut (window keydown handler -> switchCard(1)); each take switches to the next card.",
+  "warmup": 3,
+  "repeats": 24,
+  "measureMs": 650,
+  "transitionSelector": "#island",
+  "contentSelector": "#panel h2"
+}

@@ -16,11 +16,18 @@ use ps_index::{EntryKind, FilenameIndex};
 use crate::catalog;
 use crate::db::EngineDb;
 
+mod preview;
+
 pub const INDEX_FILE: &str = "filename-index.bin";
 const DB_FILE: &str = "index.db";
 const MAX_CONTENT_PER_PASS: usize = 4000;
 const MAX_OCR_PER_PASS: usize = 400;
 const MAX_WARNINGS: usize = 24;
+
+// -- Preview limits (Gate 2) --
+const PREVIEW_DEFAULT_CHARS: usize = 8_000;
+const PREVIEW_MAX_CHARS: usize = 32_000;
+const PREVIEW_MIN_CHARS: usize = 200;
 
 const STATE_STARTING: u8 = 0;
 const STATE_READY: u8 = 1;
@@ -96,6 +103,8 @@ struct Ranked {
     result: SearchResult,
 }
 
+use preview::{PreviewCache, ResultRegistry};
+
 pub struct Engine {
     config: EngineConfig,
     settings: RwLock<Settings>,
@@ -115,6 +124,10 @@ pub struct Engine {
     shutdown: AtomicBool,
     force_rescan: AtomicBool,
     legacy_summary: Mutex<Option<LegacySummary>>,
+    /// Recently returned results, so a preview request can resolve resultId -> row.
+    recent_results: Mutex<ResultRegistry>,
+    /// Bounded LRU of rendered preview payloads.
+    preview_cache: Mutex<PreviewCache>,
     /// Live Win32 clipboard listener (only one per process). Held so it can be
     /// stopped explicitly on shutdown or when the privacy setting is disabled.
     clipboard_listener: Mutex<Option<ClipboardHook>>,
@@ -210,6 +223,8 @@ impl Engine {
             shutdown: AtomicBool::new(false),
             force_rescan: AtomicBool::new(false),
             legacy_summary: Mutex::new(None),
+            recent_results: Mutex::new(ResultRegistry::default()),
+            preview_cache: Mutex::new(PreviewCache::default()),
             clipboard_listener: Mutex::new(None),
             pending_destructive: Mutex::new(None),
         })
@@ -300,6 +315,7 @@ impl Engine {
                     hits,
                 });
                 let results = finalize(ranked, limit);
+                self.remember_results(&results);
                 return self.response(req, query_text, results, timings, started, &settings);
             }
             let sources = self.sources.read().unwrap();
@@ -315,6 +331,7 @@ impl Engine {
             }
             drop(sources);
             let results = finalize(ranked, limit);
+            self.remember_results(&results);
             return self.response(req, query_text, results, timings, started, &settings);
         }
 
@@ -579,6 +596,7 @@ impl Engine {
         }
 
         let results = finalize(ranked, limit);
+        self.remember_results(&results);
         let response = self.response(req, query_text.clone(), results, timings, started, &settings);
         if settings.privacy.activity_history && !query_text.trim().is_empty() {
             let count = response.total;
@@ -631,6 +649,109 @@ impl Engine {
             timings,
             status,
         }
+    }
+
+    // -- preview -----------------------------------------------------------
+
+    fn remember_results(&self, results: &[SearchResult]) {
+        if let Ok(mut registry) = self.recent_results.lock() {
+            registry.remember(results);
+        }
+    }
+
+    /// Build a bounded, cached preview for a result id returned by search().
+    ///
+    /// Synchronous and bounded (extraction caps + LRU cache); the UI path must
+    /// call it from a blocking worker, never from the search hot path. Unknown
+    /// or expired ids return an honest payload instead of blank content.
+    pub fn preview(&self, req: &PreviewRequest) -> PreviewPayload {
+        let max_chars = req
+            .max_chars
+            .unwrap_or(PREVIEW_DEFAULT_CHARS)
+            .clamp(PREVIEW_MIN_CHARS, PREVIEW_MAX_CHARS);
+        let key = (req.result_id.clone(), max_chars);
+        if let Ok(mut cache) = self.preview_cache.lock() {
+            if let Some(payload) = cache.get(&key) {
+                return payload;
+            }
+        }
+        let payload = match self.resolve_result(&req.result_id) {
+            Some(result) => {
+                preview::build_preview(&result, max_chars, &self.db, &self.clipboard_db_path())
+            }
+            None => PreviewPayload {
+                result_id: req.result_id.clone(),
+                title: String::new(),
+                subtitle: String::new(),
+                format: "unavailable".to_string(),
+                text: None,
+                snippet: None,
+                highlight_ranges: Vec::new(),
+                image_data_url: None,
+                ocr_text: None,
+                fields: Vec::new(),
+                unsupported_reason: Some(
+                    "This result is no longer available. Run the search again.".to_string(),
+                ),
+                status: PreviewStatus::Unsupported,
+                truncated: false,
+                error: None,
+                image_mime: None,
+            },
+        };
+        if let Ok(mut cache) = self.preview_cache.lock() {
+            cache.put(key, payload.clone());
+        }
+        payload
+    }
+
+    #[cfg(test)]
+    pub(crate) fn preview_cache_len(&self) -> usize {
+        self.preview_cache
+            .lock()
+            .map(|cache| cache.len())
+            .unwrap_or(0)
+    }
+
+    /// Resolve a result id to the row the UI saw. The registry covers the normal
+    /// flow; the path-prefixed fallback keeps previews working across restarts
+    /// and re-searches for file/content/OCR rows.
+    fn resolve_result(&self, result_id: &str) -> Option<SearchResult> {
+        if let Ok(registry) = self.recent_results.lock() {
+            if let Some(result) = registry.get(result_id) {
+                return Some(result.clone());
+            }
+        }
+        for (prefix, kind) in [
+            ("file:", SourceKind::File),
+            ("content:", SourceKind::ContentMatch),
+            ("ocr:", SourceKind::OcrText),
+        ] {
+            if let Some(path) = result_id.strip_prefix(prefix) {
+                let name = Path::new(path)
+                    .file_name()
+                    .map(|name| name.to_string_lossy().to_string())
+                    .unwrap_or_else(|| path.to_string());
+                return Some(SearchResult {
+                    id: result_id.to_string(),
+                    kind,
+                    title: name,
+                    subtitle: String::new(),
+                    path: Some(path.to_string()),
+                    icon: IconRef::Monogram,
+                    score: 0.0,
+                    match_ranges: Vec::new(),
+                    meta: ResultMeta::default(),
+                    action: ActionSpec::OpenPath {
+                        path: path.to_string(),
+                        line: None,
+                        column: None,
+                    },
+                    actions: Vec::new(),
+                });
+            }
+        }
+        None
     }
 
     // -- status / settings -------------------------------------------------
@@ -1463,7 +1584,13 @@ fn root_modes(settings: &Settings) -> Vec<(String, u8)> {
         .iter()
         .filter(|root| root.enabled)
         .map(|root| {
-            let mut normalized = root.path.trim_end_matches(['\\', '/']).to_lowercase();
+            // Normalize every separator, not just the trailing one: a root
+            // configured with forward slashes must still enable content/OCR
+            // indexing for the native paths the scanner stores.
+            let mut normalized = root.path.replace('/', "\\").to_lowercase();
+            while normalized.ends_with('\\') {
+                normalized.pop();
+            }
             normalized.push('\\');
             let level = match root.mode {
                 RootMode::NamesOnly => 0,
@@ -1476,7 +1603,7 @@ fn root_modes(settings: &Settings) -> Vec<(String, u8)> {
 }
 
 fn mode_for(modes: &[(String, u8)], path: &str) -> u8 {
-    let lower = path.to_lowercase();
+    let lower = path.replace('/', "\\").to_lowercase();
     modes
         .iter()
         .filter(|(root, _)| lower.starts_with(root.as_str()))
@@ -1686,11 +1813,11 @@ fn scope_allows(scope: SearchScope, kind: SourceKind) -> bool {
     )
 }
 
+/// Content-FTS rows are DOCUMENTS, not FILES: the strict FILES chip must not
+/// mix document matches into a file list (task-37 decision; ContentMatch stays
+/// reachable through ALL and the content: prefix).
 fn content_scope_allows(scope: SearchScope) -> bool {
-    matches!(
-        scope,
-        SearchScope::All | SearchScope::Content | SearchScope::Files
-    )
+    matches!(scope, SearchScope::All | SearchScope::Content)
 }
 
 /// Delegate ordering, dedupe and truncation to the shared ranker (engine-core)
@@ -1710,6 +1837,15 @@ fn finalize(ranked: Vec<Ranked>, limit: usize) -> Vec<SearchResult> {
 
 /// Merge UI-supplied filters with filters parsed from the query text; both are
 /// restrictive, so a field present in either applies.
+/// Character-safe truncation for result snippets.
+fn truncate_chars(text: &str, max_chars: usize) -> String {
+    let mut out: String = text.chars().take(max_chars).collect();
+    if text.chars().count() > max_chars {
+        out.push('…');
+    }
+    out
+}
+
 fn merged_filters(parsed: &SearchFilters, request: &SearchFilters) -> SearchFilters {
     let mut merged = request.clone();
     if !parsed.kinds.is_empty() {
@@ -2134,13 +2270,34 @@ fn clip_category_label(category: ps_sources::ClipCategory) -> &'static str {
         ps_sources::ClipCategory::Path => "PATH",
         ps_sources::ClipCategory::Code => "CODE",
         ps_sources::ClipCategory::Image => "IMAGE",
+        ps_sources::ClipCategory::Files => "FILES",
         ps_sources::ClipCategory::Text => "TEXT",
     }
 }
 
 fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
+    let is_image_row = entry.category == ps_sources::ClipCategory::Image
+        || entry.image_path.is_some();
     let first_line = entry.text.lines().next().unwrap_or("").trim();
-    let title: String = first_line.chars().take(120).collect();
+    let mut title: String = first_line.chars().take(120).collect();
+    if is_image_row {
+        // Image rows carry a placeholder in text ("[image:<hash>]"); show a real
+        // title plus dimensions instead.
+        title = match (entry.width, entry.height) {
+            (Some(width), Some(height)) if width > 0 && height > 0 => {
+                format!("Image {width} x {height}")
+            }
+            _ => "Clipboard image".to_string(),
+        };
+    }
+    let thumbnail_data_url = if is_image_row {
+        preview::image_row_data_url(
+            entry.thumbnail_path.as_deref(),
+            entry.image_path.as_deref(),
+        )
+    } else {
+        None
+    };
     SearchResult {
         id: format!("clip:{}", entry.id),
         kind: SourceKind::Clipboard,
@@ -2161,19 +2318,50 @@ fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
                 base
             }
         },
-        path: None,
-        icon: IconRef::Monogram,
+        path: if is_image_row {
+            entry.image_path.clone()
+        } else {
+            None
+        },
+        icon: if is_image_row {
+            IconRef::FileType {
+                ext: "png".to_string(),
+            }
+        } else {
+            IconRef::Monogram
+        },
         score: 0.0,
         match_ranges: Vec::new(),
         meta: ResultMeta {
             modified: Some(entry.timestamp_ms),
             // Category drives the UI badge/filter: LINK, EMAIL, PATH, CODE,
-            // IMAGE or TEXT (pinned state is carried in the subtitle).
+            // IMAGE, FILES or TEXT (pinned state is carried in the subtitle).
             label: Some(clip_category_label(entry.category).to_string()),
+            thumbnail_data_url,
+            image_width: entry.width,
+            image_height: entry.height,
+            mime: entry.mime.clone().or_else(|| {
+                if is_image_row {
+                    Some("image/png".to_string())
+                } else {
+                    None
+                }
+            }),
             ..ResultMeta::default()
         },
-        action: ActionSpec::CopyText {
-            text: entry.text.clone(),
+        action: if is_image_row {
+            match entry.image_path.as_deref() {
+                Some(image_path) => ActionSpec::OpenPath {
+                    path: image_path.to_string(),
+                    line: None,
+                    column: None,
+                },
+                None => ActionSpec::None,
+            }
+        } else {
+            ActionSpec::CopyText {
+                text: entry.text.clone(),
+            }
         },
         actions: Vec::new(),
     }
@@ -2364,6 +2552,8 @@ fn ocr_result(hit: crate::db::OcrHit, settings: &Settings) -> SearchResult {
         meta: ResultMeta {
             line: hit.line,
             label: Some("Text in screenshot".into()),
+            // OCR text is the preview body: never drop it from the result.
+            snippet: Some(truncate_chars(&hit.text, 400)),
             ..ResultMeta::default()
         },
         action: ActionSpec::OpenPath {
@@ -3092,6 +3282,380 @@ mod tests {
         assert_eq!(reopened.index.read().unwrap().len(), 3);
         let resp = reopened.search(&SearchRequest::new(3, "docs"));
         assert_eq!(indexed_files(resp.status), 3);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // -- Gate-2 preview backend tests (task-37) -----------------------------
+
+    fn fixture(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("docs")
+            .join("qa")
+            .join("preview-audit")
+            .join("fixtures")
+            .join(name)
+    }
+
+    fn preview_result(id: &str, kind: SourceKind, path: Option<&str>) -> SearchResult {
+        let name = path
+            .and_then(|path| Path::new(path).file_name())
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_else(|| id.to_string());
+        SearchResult {
+            id: id.to_string(),
+            kind,
+            title: name,
+            subtitle: String::new(),
+            path: path.map(str::to_string),
+            icon: IconRef::Monogram,
+            score: 0.0,
+            match_ranges: Vec::new(),
+            meta: ResultMeta::default(),
+            action: path
+                .map(|path| ActionSpec::OpenPath {
+                    path: path.to_string(),
+                    line: None,
+                    column: None,
+                })
+                .unwrap_or(ActionSpec::None),
+            actions: Vec::new(),
+        }
+    }
+
+    fn preview_for(engine: &Engine, result: &SearchResult, max_chars: usize) -> PreviewPayload {
+        engine.remember_results(std::slice::from_ref(result));
+        engine.preview(&PreviewRequest {
+            result_id: result.id.clone(),
+            max_chars: Some(max_chars),
+        })
+    }
+
+    #[test]
+    fn preview_text_and_structured_formats_are_real() {
+        let dir = scratch_dir("preview-formats");
+        let engine = make_engine(&dir, None);
+        let cases = [
+            ("notes.txt", "ZEBRA-TXT-2026", "txt"),
+            ("readme.md", "UNICORN-MD-2026", "md"),
+            ("sample.rs", "PANDA-CODE-2026", "rs"),
+            ("report.pdf", "WALRUS-PDF-2026", "pdf"),
+            ("report.docx", "KOALA-DOCX-2026", "docx"),
+            ("sheet.xlsx", "TIGER-XLSX-2026", "xlsx"),
+        ];
+        for (name, token, format) in cases {
+            let path = fixture(name);
+            assert!(path.is_file(), "missing fixture {name}");
+            let result = preview_result(
+                &format!("file:{}", path.to_string_lossy().to_lowercase()),
+                SourceKind::File,
+                Some(&path.to_string_lossy()),
+            );
+            let payload = preview_for(&engine, &result, 4_000);
+            assert_eq!(payload.format, format, "{name} format");
+            assert_eq!(payload.status, PreviewStatus::Ok, "{name} status");
+            assert!(!payload.truncated, "{name} must not be truncated at 4k chars");
+            assert!(
+                payload.unsupported_reason.is_none(),
+                "{name} unexpectedly unsupported: {:?}",
+                payload.unsupported_reason
+            );
+            let text = payload.text.as_deref().unwrap_or("");
+            assert!(text.contains(token), "{name} preview text missing token: {text:?}");
+            assert!(payload.fields.iter().any(|field| field.label == "Size"));
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn preview_scanned_pdf_binary_and_unsupported_are_honest() {
+        let dir = scratch_dir("preview-honest");
+        let engine = make_engine(&dir, None);
+        for name in ["scanned.pdf", "blob.bin", "unknown.xyz"] {
+            let path = fixture(name);
+            assert!(path.is_file(), "missing fixture {name}");
+            let result = preview_result(
+                &format!("file:{}", path.to_string_lossy().to_lowercase()),
+                SourceKind::File,
+                Some(&path.to_string_lossy()),
+            );
+            let payload = preview_for(&engine, &result, 4_000);
+            assert!(
+                payload.unsupported_reason.is_some(),
+                "{name} must be an honest fallback, got text {:?}",
+                payload.text
+            );
+            assert!(payload.text.is_none() || payload.text.as_deref() == Some(""));
+            assert!(
+                payload.fields.iter().any(|field| field.label == "Size"),
+                "{name} keeps metadata"
+            );
+        }
+        // Scanned PDF specifically explains why there is no body.
+        let path = fixture("scanned.pdf");
+        let result = preview_result(
+            "file:scanned",
+            SourceKind::File,
+            Some(&path.to_string_lossy()),
+        );
+        let payload = preview_for(&engine, &result, 4_000);
+        assert!(payload
+            .unsupported_reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("text layer"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn preview_image_returns_thumbnail_and_indexed_ocr_text() {
+        let dir = scratch_dir("preview-image");
+        let engine = make_engine(&dir, None);
+        let path = fixture("diagram.png");
+        assert!(path.is_file());
+        let path_string = path.to_string_lossy().to_string();
+        engine
+            .db
+            .ocr_upsert(&path_string, "test-hash", "IMAGE-OCR-PROBE-2026 screenshot preview audit", "en", 900, 260)
+            .unwrap();
+        let result = preview_result(
+            &format!("file:{}", path_string.to_lowercase()),
+            SourceKind::File,
+            Some(&path_string),
+        );
+        let payload = preview_for(&engine, &result, 4_000);
+        let data_url = payload.image_data_url.as_deref().unwrap_or("");
+        assert!(data_url.starts_with("data:image/png;base64,"), "image data url");
+        assert!(data_url.len() > 100, "thumbnail must have bytes");
+        assert!(payload
+            .ocr_text
+            .as_deref()
+            .unwrap_or("")
+            .contains("IMAGE-OCR-PROBE-2026"));
+        assert!(payload
+            .fields
+            .iter()
+            .any(|field| field.label == "Dimensions" && field.value.contains('x')));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn preview_cache_is_bounded_and_reused() {
+        let dir = scratch_dir("preview-cache");
+        let engine = make_engine(&dir, None);
+        let path = fixture("notes.txt");
+        let result = preview_result(
+            "file:cache-probe",
+            SourceKind::File,
+            Some(&path.to_string_lossy()),
+        );
+        engine.remember_results(std::slice::from_ref(&result));
+        let request = PreviewRequest {
+            result_id: result.id.clone(),
+            max_chars: Some(2_000),
+        };
+        let first = engine.preview(&request);
+        assert_eq!(engine.preview_cache_len(), 1);
+        let second = engine.preview(&request);
+        assert_eq!(first, second, "cached payload must be identical");
+        assert_eq!(engine.preview_cache_len(), 1, "cache must not duplicate");
+        // A different maxChars is a different cache entry.
+        let wider = engine.preview(&PreviewRequest {
+            result_id: result.id.clone(),
+            max_chars: Some(4_000),
+        });
+        assert_eq!(engine.preview_cache_len(), 2);
+        assert!(wider.text.as_deref().unwrap_or("").len() >= first.text.as_deref().unwrap_or("").len());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn preview_unknown_result_is_honest_and_path_ids_resolve() {
+        let dir = scratch_dir("preview-unknown");
+        let engine = make_engine(&dir, None);
+        let payload = engine.preview(&PreviewRequest {
+            result_id: "unknown:42".to_string(),
+            max_chars: None,
+        });
+        assert!(payload
+            .unsupported_reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("no longer available"));
+        // Path-prefixed ids resolve even without a registry entry.
+        let path = fixture("notes.txt");
+        let id = format!("file:{}", path.to_string_lossy().to_lowercase());
+        let payload = engine.preview(&PreviewRequest {
+            result_id: id,
+            max_chars: None,
+        });
+        assert!(payload
+            .text
+            .as_deref()
+            .unwrap_or("")
+            .contains("ZEBRA-TXT-2026"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ocr_result_keeps_its_text_as_snippet() {
+        let hit = crate::db::OcrHit {
+            path: r"C:\shots\one.png".to_string(),
+            text: "IMAGE-OCR-PROBE-2026 screenshot preview audit".to_string(),
+            line: Some(1),
+        };
+        let result = ocr_result(hit, &Settings::default());
+        assert_eq!(result.kind, SourceKind::OcrText);
+        assert!(result
+            .meta
+            .snippet
+            .as_deref()
+            .unwrap_or("")
+            .contains("IMAGE-OCR-PROBE-2026"));
+        assert_eq!(result.meta.line, Some(1));
+    }
+
+    #[test]
+    fn root_modes_and_content_scope_are_strict() {
+        let mut settings = Settings::default();
+        settings.indexing.roots = vec![RootConfig {
+            path: "C:/Users/Example/Documents".to_string(),
+            mode: RootMode::Content,
+            enabled: true,
+        }];
+        let modes = root_modes(&settings);
+        assert_eq!(modes.len(), 1);
+        assert_eq!(modes[0].0, "c:\\users\\example\\documents\\");
+        assert_eq!(
+            mode_for(&modes, r"C:\Users\Example\Documents\a.txt"),
+            1,
+            "forward-slash roots must match native scanner paths"
+        );
+        assert!(!content_scope_allows(SearchScope::Files));
+        assert!(content_scope_allows(SearchScope::Content));
+        assert!(content_scope_allows(SearchScope::All));
+    }
+
+    #[test]
+    fn preview_clipboard_text_and_folder_are_honest() {
+        let dir = scratch_dir("preview-clip");
+        let engine = make_engine(&dir, None);
+        let mut clipboard = preview_result("clip:1", SourceKind::Clipboard, None);
+        clipboard.action = ActionSpec::CopyText {
+            text: "copied preview text".to_string(),
+        };
+        clipboard.title = "copied preview text".to_string();
+        let payload = preview_for(&engine, &clipboard, 2_000);
+        assert_eq!(payload.format, "clipboard");
+        assert!(payload.text.as_deref().unwrap_or("").contains("copied preview text"));
+        let folder = preview_result("file:folder", SourceKind::Folder, Some(r"C:\Users\Example"));
+        let payload = preview_for(&engine, &folder, 2_000);
+        assert_eq!(payload.format, "folder");
+        assert!(payload.unsupported_reason.is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn preview_marks_truncation_when_text_caps_apply() {
+        let dir = scratch_dir("preview-truncated");
+        let engine = make_engine(&dir, None);
+        let path = fixture("large.txt");
+        let result = preview_result(
+            "file:large-truncation",
+            SourceKind::File,
+            Some(&path.to_string_lossy()),
+        );
+        let payload = preview_for(&engine, &result, 500);
+        assert_eq!(payload.status, PreviewStatus::Ok);
+        assert!(payload.truncated, "a capped text body must set truncated");
+        let text = payload.text.as_deref().unwrap_or("");
+        assert!(text.chars().count() <= 501, "text respects maxChars");
+        assert!(payload
+            .fields
+            .iter()
+            .any(|field| field.label == "Note" && field.value.contains("truncated")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn preview_unavailable_and_unsupported_status_are_explicit() {
+        let dir = scratch_dir("preview-status");
+        let engine = make_engine(&dir, None);
+        let missing = engine.preview(&PreviewRequest {
+            result_id: "unknown:7".to_string(),
+            max_chars: None,
+        });
+        assert_eq!(missing.status, PreviewStatus::Unsupported);
+        assert!(missing.unsupported_reason.is_some());
+        let path = fixture("scanned.pdf");
+        let result = preview_result(
+            "file:scanned-status",
+            SourceKind::File,
+            Some(&path.to_string_lossy()),
+        );
+        let payload = preview_for(&engine, &result, 4_000);
+        assert_eq!(payload.status, PreviewStatus::Unsupported);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clipboard_image_result_carries_thumbnail_dimensions_and_preview() {
+        let dir = scratch_dir("clipboard-image");
+        let engine = make_engine(&dir, None);
+        let image_path = dir.join("full.png");
+        let thumbnail_path = dir.join("thumb.png");
+        image::RgbaImage::from_pixel(8, 4, image::Rgba([200, 10, 10, 255]))
+            .save(&image_path)
+            .unwrap();
+        image::RgbaImage::from_pixel(4, 2, image::Rgba([10, 10, 200, 255]))
+            .save(&thumbnail_path)
+            .unwrap();
+        let entry = ps_sources::ClipboardEntry {
+            id: 7,
+            text: "[image:abcdef]".to_string(),
+            timestamp_ms: 1_700_000_000_000,
+            source_app: "test-app".to_string(),
+            pinned: false,
+            category: ps_sources::ClipCategory::Image,
+            image_path: Some(image_path.to_string_lossy().to_string()),
+            width: Some(8),
+            height: Some(4),
+            thumbnail_path: Some(thumbnail_path.to_string_lossy().to_string()),
+            mime: Some("image/png".to_string()),
+            format: Some("png".to_string()),
+            ocr_text: None,
+        };
+        let result = clipboard_result(&entry);
+        assert_eq!(result.kind, SourceKind::Clipboard);
+        assert_eq!(result.meta.label.as_deref(), Some("IMAGE"));
+        assert_eq!(result.path.as_deref(), entry.image_path.as_deref());
+        assert_eq!(result.meta.image_width, Some(8));
+        assert_eq!(result.meta.image_height, Some(4));
+        assert_eq!(result.meta.mime.as_deref(), Some("image/png"));
+        let thumbnail = result
+            .meta
+            .thumbnail_data_url
+            .as_deref()
+            .unwrap_or("");
+        assert!(thumbnail.starts_with("data:image/png;base64,"));
+        assert!(
+            thumbnail.len() <= 128 * 1024,
+            "thumbnail data URL must stay within the 128 KB contract bound"
+        );
+        // The preview resolves the same row through the registry and renders the
+        // bounded thumbnail without decoding the full image.
+        let payload = preview_for(&engine, &result, 4_000);
+        assert_eq!(payload.format, "image");
+        assert!(payload
+            .image_data_url
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("data:image/png;base64,"));
+        assert!(payload
+            .fields
+            .iter()
+            .any(|field| field.label == "Dimensions" && field.value == "8 x 4"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

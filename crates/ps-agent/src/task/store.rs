@@ -37,6 +37,25 @@ struct StoreInner {
     tasks: Vec<AgentTask>,
 }
 
+/// DTO mutation policy stays in ps-agent: ps-ipc owns the wire types only.
+trait TaskMutation {
+    fn push_log(&mut self, level: AgentTaskLogLevel, message: String, at: i64);
+    fn refresh_controls(&mut self);
+}
+
+impl TaskMutation for AgentTask {
+    fn push_log(&mut self, level: AgentTaskLogLevel, message: String, at: i64) {
+        self.log.push(AgentTaskLogEntry { at, level, message });
+        while self.log.len() > MAX_LOG_ENTRIES {
+            self.log.remove(0);
+        }
+    }
+
+    fn refresh_controls(&mut self) {
+        self.controls = AgentTaskControls::for_state(self.state);
+    }
+}
+
 /// Persistent agent task store. Cheap to clone behind an Arc; all methods take
 /// &self and are internally synchronized.
 pub struct AgentTaskStore {

@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/inter";
 import App from "./App";
-import { isTauriRuntime } from "./bridge/api";
+import { api, isTauriRuntime } from "./bridge/api";
 import "./styles/base.css";
 import "./styles/shell.css";
 
@@ -26,6 +26,36 @@ function resolveView(): ViewKind {
 }
 
 const view = resolveView();
+
+// Opt-in performance instrumentation (PROTONSEARCH_PERF_HOOKS=1 in the shell):
+// mark first-paint after a launcher/island summon and after keyboard selection
+// paints, so the benchmark harness can split Win32-visible vs first-pixel time.
+if (isTauriRuntime()) {
+  void import("@tauri-apps/api/event")
+    .then(({ listen }) =>
+      listen<{ mode: string }>("perf:show", () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const label = view === "island" ? "island-first-paint" : "launcher-first-paint";
+            void api.perfMark(label, Date.now()).catch(() => undefined);
+          });
+        });
+      }),
+    )
+    .catch(() => undefined);
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (view !== "launcher") return;
+      if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter") {
+        requestAnimationFrame(() => {
+          void api.perfMark("launcher-selection-painted", Date.now()).catch(() => undefined);
+        });
+      }
+    },
+    true,
+  );
+}
 document.documentElement.dataset.window = view;
 document.documentElement.dataset.theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 document.documentElement.dataset.density = "comfortable";

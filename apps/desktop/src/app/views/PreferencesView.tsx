@@ -25,6 +25,8 @@ import {
   Switch,
   useSavedStamp,
 } from "../ui";
+import LauncherPreferences from "./LauncherPreferences";
+import IslandSettingsView from "./IslandSettingsView";
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "System" },
@@ -83,8 +85,10 @@ export default function PreferencesView({
     };
   }, []);
 
+  const [activeTab, setActiveTab] = useState<"general" | "launcher" | "island">("general");
+
   const apply = useCallback(
-    async function apply(patch: SettingsPatch, stamp: string) {
+    async (patch: SettingsPatch, stamp: string) => {
       setActionError(null);
       try {
         await updateSettings(patch);
@@ -130,11 +134,36 @@ export default function PreferencesView({
 
   return (
     <div className="view">
-      <RouteHeading eyebrow={SECTION_EYEBROWS.preferences}>Make it yours</RouteHeading>
-      <p className="page-lead">
-        Customize behavior, appearance and privacy independently of search performance.
-      </p>
+      {activeTab !== "island" ? (
+        <>
+          <RouteHeading eyebrow={SECTION_EYEBROWS.preferences}>Make it yours</RouteHeading>
+          <p className="page-lead">
+            Customize behavior, appearance and privacy independently of search performance.
+          </p>
+          <nav className="prefs-tabs" aria-label="Preferences sections">
+        {(
+          [
+            { id: "general", label: "General" },
+            { id: "launcher", label: "Launcher" },
+            { id: "island", label: "Dynamic Island" },
+          ] as const
+        ).map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            className={"prefs-tab" + (activeTab === entry.id ? " is-active" : "")}
+            aria-current={activeTab === entry.id ? "page" : undefined}
+            onClick={() => setActiveTab(entry.id)}
+          >
+            {entry.label}
+          </button>
+        ))}
+          </nav>
+        </>
+      ) : null}
 
+      {activeTab === "general" ? (
+        <>
       {actionError ? (
         <StateNotice
           role="alert"
@@ -543,6 +572,12 @@ export default function PreferencesView({
           </div>
         </section>
       </div>
+        </>
+      ) : activeTab === "launcher" ? (
+        <LauncherPreferences onNavigate={setActiveTab} />
+      ) : (
+        <IslandSettingsView onNavigate={setActiveTab} />
+      )}
     </div>
   );
 }

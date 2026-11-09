@@ -103,23 +103,257 @@ fn clipboard_records_dedupes_and_searches() {
     assert!(pinned_first[0].pinned);
 }
 
+/// Build a PNG with known dimensions and a gradient (test fixture).
+fn test_png(width: u32, height: u32) -> Vec<u8> {
+    let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
+    for y in 0..height {
+        for x in 0..width {
+            pixels.extend_from_slice(&[
+                (x % 256) as u8,
+                (y % 256) as u8,
+                ((x + y) % 256) as u8,
+                255,
+            ]);
+        }
+    }
+    let buffer = image::RgbaImage::from_raw(width, height, pixels).expect("rgba buffer");
+    let mut out = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut out);
+    image::DynamicImage::ImageRgba8(buffer)
+        .write_to(&mut cursor, image::ImageOutputFormat::Png)
+        .expect("png encode");
+    out
+}
+
 #[test]
 fn clipboard_image_is_stored_as_png() {
     let dir = workdir("clipboard-image");
     let db = dir.join("index.db");
     let images = dir.join("images");
-    // 1x1 transparent PNG.
-    let png: Vec<u8> = vec![
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
-        0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
-        0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78,
-        0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-        0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
-    ];
+    let png = test_png(32, 24);
     assert!(clipboard::record_image(&db, &png, "snippingtool", &images).unwrap());
     assert!(!clipboard::record_image(&db, &png, "snippingtool", &images).unwrap());
+    let entries = clipboard::list_recent(&db, 5);
+    assert_eq!(entries.len(), 1);
+    let entry = &entries[0];
+    assert_eq!(entry.category, ClipCategory::Image);
+    assert_eq!((entry.width, entry.height), (Some(32), Some(24)));
+    assert!(entry.image_path.as_deref().map(|p| Path::new(p).is_file()).unwrap_or(false));
+    let thumbnail = entry.thumbnail_path.as_deref().expect("thumbnail path");
+    assert!(Path::new(thumbnail).is_file(), "thumbnail missing: {thumbnail}");
+    let thumb = image::open(thumbnail).expect("decode thumbnail");
+    assert!(thumb.width() <= 256 && thumb.height() <= 256);
+    assert_eq!(entry.mime.as_deref(), Some("image/png"));
+    assert_eq!(entry.format.as_deref(), Some("png"));
     let files: Vec<_> = std::fs::read_dir(&images).unwrap().flatten().collect();
-    assert_eq!(files.len(), 1);
+    assert_eq!(files.len(), 2, "expected one full PNG and one thumbnail");
+}
+
+#[test]
+fn clipboard_image_metadata_survives_restart_and_copies_back() {
+    let _clip = CLIPBOARD_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let dir = workdir("clipboard-image-restart");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    let png = test_png(40, 30);
+    assert!(clipboard::record_image_captured(
+        &db, &png, 40, 30, "dib", "image/png", "paint", &images
+    )
+    .unwrap());
+
+    // Restart persistence: a fresh reconnect to the same DB returns the row and
+    // the payload files are still valid.
+    let entries = clipboard::list_recent(&db, 5);
+    assert_eq!(entries.len(), 1);
+    let entry = entries[0].clone();
+    assert_eq!(entry.category, ClipCategory::Image);
+    assert_eq!((entry.width, entry.height), (Some(40), Some(30)));
+    let stored = image::open(entry.image_path.as_deref().expect("image path")).expect("decode");
+    assert_eq!((stored.width(), stored.height()), (40, 30));
+
+    // Copy/paste-back: restore to the real OS clipboard and read it again.
+    clipboard::copy_to_clipboard(&db, entry.id).expect("copy image back to clipboard");
+    let pasted = ps_windows::get_clipboard_image_png().expect("clipboard image after copy_to_clipboard");
+    let pasted = image::load_from_memory(&pasted).expect("decode pasted png");
+    assert_eq!((pasted.width(), pasted.height()), (40, 30));
+}
+
+#[test]
+fn mixed_image_and_text_snapshot_is_one_image_item() {
+    let dir = workdir("clipboard-mixed");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    let png = test_png(16, 12);
+    let snapshot = ps_windows::ClipboardSnapshot {
+        text: Some("caption text from the same copy event".to_string()),
+        png: Some(png),
+        width: Some(16),
+        height: Some(12),
+        image_format: Some("dib".to_string()),
+        mime: Some("image/png".to_string()),
+        ..Default::default()
+    };
+    let ids = clipboard::record_snapshot(&db, &images, &snapshot).expect("record snapshot");
+    assert_eq!(ids.len(), 1, "one history item per copy event");
+    assert_eq!(clipboard::count(&db), 1);
+    let entries = clipboard::list_recent(&db, 5);
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].category, ClipCategory::Image);
+    assert_eq!(entries[0].width, Some(16));
+    assert_eq!(entries[0].height, Some(12));
+    assert!(entries[0].image_path.is_some());
+}
+
+#[test]
+fn files_snapshot_uses_files_category() {
+    let dir = workdir("clipboard-files");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    let snapshot = ps_windows::ClipboardSnapshot {
+        files: vec![r"C:\Windows\win.ini".to_string(), r"C:\Windows\notepad.exe".to_string()],
+        text: Some("C:\\Windows\\win.ini\r\nC:\\Windows\\notepad.exe".to_string()),
+        ..Default::default()
+    };
+    let ids = clipboard::record_snapshot(&db, &images, &snapshot).expect("record files");
+    assert_eq!(ids.len(), 1);
+    let entries = clipboard::list_recent(&db, 5);
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].category, ClipCategory::Files);
+    assert_eq!(entries[0].format.as_deref(), Some("hdrop"));
+    assert_eq!(entries[0].mime.as_deref(), Some("text/x-file-list"));
+    assert_eq!(clipboard::search(&db, "notepad.exe", 5).len(), 1);
+}
+
+#[test]
+fn clipboard_capture_options_filter_formats_not_master_gate() {
+    let dir = workdir("clipboard-capture-options");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    let snapshot = ps_windows::ClipboardSnapshot {
+        text: Some("caption for the image copy".to_string()),
+        png: Some(test_png(12, 10)),
+        width: Some(12),
+        height: Some(10),
+        image_format: Some("dib".to_string()),
+        mime: Some("image/png".to_string()),
+        ..Default::default()
+    };
+
+    let images_only = clipboard::filter_snapshot(
+        snapshot.clone(),
+        clipboard::ClipboardCaptureOptions {
+            capture_text: false,
+            capture_images: true,
+        },
+    );
+    assert!(images_only.png.is_some());
+    assert!(images_only.text.is_none(), "captureText=false must drop text alternatives");
+
+    let text_only = clipboard::filter_snapshot(
+        snapshot.clone(),
+        clipboard::ClipboardCaptureOptions {
+            capture_text: true,
+            capture_images: false,
+        },
+    );
+    assert!(text_only.png.is_none(), "captureImages=false must drop the image");
+    assert_eq!(text_only.text.as_deref(), Some("caption for the image copy"));
+
+    let ids = clipboard::record_snapshot(&db, &images, &text_only).expect("persist text-only");
+    assert_eq!(ids.len(), 1);
+    let entries = clipboard::list_recent(&db, 5);
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].category, ClipCategory::Text);
+    assert!(entries[0].image_path.is_none());
+}
+
+#[test]
+fn clipboard_thumbnail_is_within_ipc_contract() {
+    let dir = workdir("clipboard-thumb-contract");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    // Large enough that a naive thumbnail would be big.
+    let png = test_png(640, 480);
+    assert!(clipboard::record_image_captured(
+        &db, &png, 640, 480, "dib", "image/png", "paint", &images
+    )
+    .unwrap());
+    let entry = clipboard::list_recent(&db, 1).remove(0);
+    assert_eq!((entry.width, entry.height), (Some(640), Some(480)));
+    assert_eq!(entry.mime.as_deref(), Some("image/png"));
+    let thumbnail_path = entry.thumbnail_path.expect("thumbnail path");
+    let thumbnail_bytes = std::fs::read(&thumbnail_path).expect("thumbnail file");
+    assert!(
+        thumbnail_bytes.len() <= 128 * 1024,
+        "thumbnail payload exceeds 128 KiB: {} bytes",
+        thumbnail_bytes.len()
+    );
+    let thumbnail = image::open(&thumbnail_path).expect("decode thumbnail");
+    assert!(
+        thumbnail.width() <= 128 && thumbnail.height() <= 128,
+        "thumbnail exceeds 128px: {}x{}",
+        thumbnail.width(),
+        thumbnail.height()
+    );
+}
+
+#[test]
+fn clipboard_rejects_oversized_image_dimensions() {
+    let dir = workdir("clipboard-oversized");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    let png = test_png(4, 4);
+    let result = clipboard::record_image_captured(
+        &db, &png, 9000, 9000, "dib", "image/png", "test", &images,
+    );
+    assert!(result.is_err(), "dims above the IPC contract must be rejected");
+    assert_eq!(clipboard::count(&db), 0);
+}
+
+#[test]
+fn clipboard_copy_to_clipboard_text_roundtrip() {
+    let _clip = CLIPBOARD_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let dir = workdir("clipboard-copy-text");
+    let db = dir.join("index.db");
+    assert!(clipboard::record(&db, "copy-to-clipboard test 42", "test").unwrap());
+    let entry = clipboard::list_recent(&db, 1).remove(0);
+    clipboard::copy_to_clipboard(&db, entry.id).expect("copy text back");
+    assert_eq!(
+        ps_windows::get_clipboard_text().as_deref(),
+        Some("copy-to-clipboard test 42")
+    );
+}
+
+#[test]
+fn clipboard_delete_removes_image_files() {
+    let dir = workdir("clipboard-delete-image");
+    let db = dir.join("index.db");
+    let images = dir.join("images");
+    let png = test_png(8, 8);
+    assert!(clipboard::record_image_captured(&db, &png, 8, 8, "png", "image/png", "test", &images).unwrap());
+    let entry = clipboard::list_recent(&db, 1).remove(0);
+    let image_path = entry.image_path.clone().expect("image path");
+    let thumb = entry.thumbnail_path.clone().expect("thumbnail path");
+    assert!(clipboard::delete(&db, entry.id).unwrap());
+    assert!(!Path::new(&image_path).exists(), "full PNG not deleted");
+    assert!(!Path::new(&thumb).exists(), "thumbnail not deleted");
+    assert_eq!(clipboard::count(&db), 0);
+}
+
+#[test]
+fn clipboard_retention_keeps_history_bounded() {
+    let dir = workdir("clipboard-retention");
+    let db = dir.join("index.db");
+    let total = clipboard::MAX_HISTORY_ITEMS + 5;
+    for index in 0..total {
+        assert!(clipboard::record(&db, &format!("retention item {index}"), "test").unwrap());
+    }
+    let count = clipboard::count(&db);
+    assert!(
+        count <= clipboard::MAX_HISTORY_ITEMS,
+        "retention kept {count} rows, expected <= {}",
+        clipboard::MAX_HISTORY_ITEMS
+    );
 }
 
 #[test]

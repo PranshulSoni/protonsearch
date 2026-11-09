@@ -16,6 +16,8 @@ pub mod dataset;
 pub mod env;
 #[cfg(feature = "engine")]
 pub mod filenamebench;
+#[cfg(feature = "ocr")]
+pub mod ocrbaseline;
 pub mod ocrbench;
 pub mod queries;
 pub mod realfiles;

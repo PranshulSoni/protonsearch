@@ -31,6 +31,49 @@ const ISLAND_DEFAULT_HEIGHT: f64 = 66.0;
 /// Transparent room around the island surface so the V9 layered shadow is not
 /// clipped by native window edges (design G0-B gap: L0).
 const ISLAND_SHADOW_PAD: f64 = 96.0;
+
+/// Performance instrumentation is opt-in (zero cost when unset). Used by the
+/// benchmark harness to split Win32-visible, first-pixel and paint timings.
+static PERF_INVOKE_EPOCH_MS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+/// Cancels a pending island safety-hide when the island is re-summoned.
+static ISLAND_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn perf_hooks_enabled() -> bool {
+    std::env::var("PROTONSEARCH_PERF_HOOKS")
+        .map(|value| value == "1")
+        .unwrap_or(false)
+}
+
+fn epoch_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn perf_log_app(app: &AppHandle, label: &str, epoch: i64) {
+    if !perf_hooks_enabled() {
+        return;
+    }
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let path = state.data_dir.join("perf-marks.jsonl");
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        use std::io::Write;
+        let _ = writeln!(
+            file,
+            r#"{{"label":"{label}","epochMs":{epoch},"writtenAt":{}}}"#,
+            epoch_ms()
+        );
+    }
+}
+
+#[tauri::command]
+fn perf_mark(app: AppHandle, label: String, epoch_ms: i64) -> Result<(), String> {
+    perf_log_app(&app, &label, epoch_ms);
+    Ok(())
+}
 /// Incremented on every summon/dismiss; a pending safety-hide only runs when the
 /// generation is unchanged (design: re-summon must never be hidden mid-open).
 static LAUNCHER_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -101,6 +144,14 @@ fn show_launcher_window(app: &AppHandle) {
     place_launcher(app, &win, size.0, size.1);
     let _ = win.show();
     let _ = win.set_focus();
+    let invoke = PERF_INVOKE_EPOCH_MS.load(std::sync::atomic::Ordering::SeqCst);
+    if perf_hooks_enabled() {
+        perf_log_app(app, "launcher-window-shown", epoch_ms());
+        let _ = win.emit(
+            "perf:show",
+            serde_json::json!({ "mode": "launcher", "invokeEpochMs": invoke }),
+        );
+    }
     let _ = win.emit("launcher:summoned", ());
 }
 
@@ -167,8 +218,11 @@ fn place_island(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
     let pad = ISLAND_SHADOW_PAD;
     // The surface keeps its V9 size; the native window adds transparent padding
     // around it so the shadow renders instead of being cut at the window edge.
-    let surface_w = width;
-    let surface_h = height;
+    // Clamp the surface into the monitor so an oversized card cannot escape.
+    let max_surface_w = (mw / scale - 16.0).max(240.0);
+    let max_surface_h = (mh / scale - 16.0).max(40.0);
+    let surface_w = width.clamp(240.0, max_surface_w);
+    let surface_h = height.clamp(40.0, max_surface_h);
     let pw = surface_w * scale;
     let ph = surface_h * scale;
     let (fx, fy) = match placement.anchor {
@@ -186,14 +240,15 @@ fn place_island(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
     let off_y = placement.offset_y as f64 * scale;
     let mut surface_x = mx + ((mw - pw) * fx) + off_x;
     let mut surface_y = my + ((mh - ph) * fy) + off_y;
-    if placement.keep_in_work_area {
-        let min_x = mx + 8.0;
-        let max_x = (mx + mw - pw - 8.0).max(min_x);
-        let min_y = my + 8.0;
-        let max_y = (my + mh - ph - 8.0).max(min_y);
-        surface_x = surface_x.clamp(min_x, max_x);
-        surface_y = surface_y.clamp(min_y, max_y);
-    }
+    // Always keep the surface reachable: with keepInWorkArea the taskbar is
+    // excluded; without it the monitor bounds still apply (never unreachable).
+    let margin = if placement.keep_in_work_area { 8.0 } else { 0.0 };
+    let min_x = mx + margin;
+    let max_x = (mx + mw - pw - margin).max(min_x);
+    let min_y = my + margin;
+    let max_y = (my + mh - ph - margin).max(min_y);
+    surface_x = surface_x.clamp(min_x, max_x);
+    surface_y = surface_y.clamp(min_y, max_y);
     let pad_px = pad * scale;
     let window_w = surface_w + pad * 2.0;
     let window_h = surface_h + pad * 2.0;
@@ -215,6 +270,7 @@ fn show_island_window(app: &AppHandle) {
     let Some(win) = app.get_webview_window(ISLAND_LABEL) else {
         return;
     };
+    ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     hide_launcher_window(app);
     let scale = win.scale_factor().unwrap_or(1.0);
     let window_size = win
@@ -232,6 +288,14 @@ fn show_island_window(app: &AppHandle) {
     );
     let _ = win.show();
     let _ = win.set_focus();
+    let invoke = PERF_INVOKE_EPOCH_MS.load(std::sync::atomic::Ordering::SeqCst);
+    if perf_hooks_enabled() {
+        perf_log_app(app, "island-window-shown", epoch_ms());
+        let _ = win.emit(
+            "perf:show",
+            serde_json::json!({ "mode": "island", "invokeEpochMs": invoke }),
+        );
+    }
     let _ = win.emit("island:shown", ());
 }
 
@@ -242,11 +306,15 @@ fn toggle_island(app: &AppHandle) {
         if visible && focused {
             // Frontend plays the exit animation then calls hide_island.
             let _ = win.emit("island:dismiss", ());
+            let generation =
+                ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
             let handle = win.clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_millis(320));
-                let _ = handle.hide();
-                let _ = handle.emit("island:hidden", ());
+                if ISLAND_GENERATION.load(std::sync::atomic::Ordering::SeqCst) == generation {
+                    let _ = handle.hide();
+                    let _ = handle.emit("island:hidden", ());
+                }
             });
         } else {
             show_island_window(app);
@@ -255,6 +323,7 @@ fn toggle_island(app: &AppHandle) {
 }
 
 fn toggle_primary_launcher(app: &AppHandle) {
+    PERF_INVOKE_EPOCH_MS.store(epoch_ms(), std::sync::atomic::Ordering::SeqCst);
     let settings = app.state::<AppState>().engine.settings();
     if settings.launcher.primary_mode == LauncherMode::DynamicIsland
         && settings.launcher.island.enabled
@@ -532,6 +601,38 @@ fn get_settings(state: tauri::State<'_, AppState>) -> Settings {
     state.engine.settings()
 }
 
+fn validate_settings(settings: &Settings) -> Result<(), String> {
+    use std::collections::HashSet;
+    let island = &settings.launcher.island;
+    if island.cards.len() != 8 {
+        return Err("The island must keep exactly the 8 V9 cards.".into());
+    }
+    let mut seen = HashSet::new();
+    for card in &island.cards {
+        if !seen.insert(card.id) {
+            return Err("Duplicate island card in the card order.".into());
+        }
+    }
+    if !island
+        .cards
+        .iter()
+        .any(|card| card.id == island.default_card && card.enabled)
+    {
+        return Err("The default island card must be enabled.".into());
+    }
+    if island.placement.offset_x.abs() > 2000 || island.placement.offset_y.abs() > 2000 {
+        return Err("Island offsets must stay within +/-2000 px.".into());
+    }
+    let clipboard = &settings.clipboard;
+    if clipboard.retention_days > 3650 {
+        return Err("Clipboard retention must be 0-3650 days.".into());
+    }
+    if clipboard.max_items < 10 || clipboard.max_items > 100_000 {
+        return Err("Clipboard history must keep between 10 and 100000 items.".into());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn update_settings(
     app: AppHandle,
@@ -539,6 +640,9 @@ fn update_settings(
     patch: SettingsPatch,
 ) -> Result<Settings, String> {
     let previous = state.engine.settings();
+    let mut candidate = previous.clone();
+    candidate.apply(&patch);
+    validate_settings(&candidate)?;
     let settings = state
         .engine
         .update_settings(patch)
@@ -1072,6 +1176,14 @@ fn agent_stop(state: tauri::State<'_, AppState>) {
 }
 
 #[tauri::command]
+fn get_preview(
+    state: tauri::State<'_, AppState>,
+    req: ps_ipc::PreviewRequest,
+) -> ps_ipc::PreviewPayload {
+    state.engine.preview(&req)
+}
+
+#[tauri::command]
 fn agent_tasks(
     state: tauri::State<'_, AppState>,
     limit: Option<usize>,
@@ -1196,8 +1308,26 @@ fn main() {
             let config = engine_config(data_dir.clone());
             let engine = Arc::new(Engine::open(config).map_err(|e| format!("engine init: {e}"))?);
             let agent_task_app = app.handle().clone();
+            let mut agent_redactions: Vec<String> = Vec::new();
+            for key in [
+                "OPENAI_API_KEY",
+                "ANTHROPIC_API_KEY",
+                "GEMINI_API_KEY",
+                "GOOGLE_API_KEY",
+                "OPENROUTER_API_KEY",
+                "DEEPSEEK_API_KEY",
+                "AZURE_OPENAI_API_KEY",
+                "XAI_API_KEY",
+                "GROQ_API_KEY",
+            ] {
+                if let Ok(value) = std::env::var(key) {
+                    if value.len() >= 8 {
+                        agent_redactions.push(value);
+                    }
+                }
+            }
             let agent_tasks = Arc::new(
-                ps_agent::AgentTaskService::open(&data_dir, Vec::new())
+                ps_agent::AgentTaskService::open(&data_dir, agent_redactions)
                     .map_err(|e| format!("agent task store: {e}"))?
                     .with_listener(Arc::new(move |task: &ps_agent::AgentTask| {
                         let _ = agent_task_app.emit("agent:task", task);
@@ -1270,6 +1400,8 @@ fn main() {
             agent_cancel,
             agent_approve,
             agent_stop,
+            perf_mark,
+            get_preview,
             app_info,
         ])
         .build(tauri::generate_context!())

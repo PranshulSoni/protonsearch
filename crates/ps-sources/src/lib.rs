@@ -48,6 +48,8 @@ pub enum ClipCategory {
     Path,
     Code,
     Image,
+    /// One or more files/folders copied from Explorer (CF_HDROP).
+    Files,
     #[default]
     Text,
 }
@@ -61,6 +63,7 @@ impl ClipCategory {
             ClipCategory::Path => "path",
             ClipCategory::Code => "code",
             ClipCategory::Image => "image",
+            ClipCategory::Files => "files",
             ClipCategory::Text => "text",
         }
     }
@@ -73,6 +76,7 @@ impl ClipCategory {
             "path" => Some(ClipCategory::Path),
             "code" => Some(ClipCategory::Code),
             "image" => Some(ClipCategory::Image),
+            "files" => Some(ClipCategory::Files),
             "text" => Some(ClipCategory::Text),
             _ => None,
         }
@@ -87,10 +91,31 @@ pub struct ClipboardEntry {
     pub timestamp_ms: i64,
     pub source_app: String,
     pub pinned: bool,
-    /// Content category (link/email/path/code/image/text). Serialized with a
-    /// default so older consumers keep parsing.
+    /// Content category (link/email/path/code/image/files/text). Serialized
+    /// with a default so older consumers keep parsing.
     #[serde(default)]
     pub category: ClipCategory,
+    /// Absolute path of the stored full-resolution PNG for image entries.
+    #[serde(default)]
+    pub image_path: Option<String>,
+    /// Original image width in pixels (image entries).
+    #[serde(default)]
+    pub width: Option<u32>,
+    /// Original image height in pixels (image entries).
+    #[serde(default)]
+    pub height: Option<u32>,
+    /// Absolute path of a bounded PNG thumbnail (<=256 px) for image entries.
+    #[serde(default)]
+    pub thumbnail_path: Option<String>,
+    /// MIME type of the stored payload (image/png, text/plain, text/html, ...).
+    #[serde(default)]
+    pub mime: Option<String>,
+    /// Source clipboard format: png | dibv5 | dib | bitmap | hdrop | html | rtf | text.
+    #[serde(default)]
+    pub format: Option<String>,
+    /// OCR text for image entries once the OCR pipeline has indexed them.
+    #[serde(default)]
+    pub ocr_text: Option<String>,
 }
 
 /// Chromium/Firefox history or bookmark item.

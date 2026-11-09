@@ -91,6 +91,8 @@ html[data-window="island"] #root {
 
 .island-surface--expanded .island-inner {
   height: calc(100% - var(--island-dots-h));
+  flex: 0 0 calc(100% - var(--island-dots-h));
+  max-height: calc(100% - var(--island-dots-h));
 }
 
 .island-inner {
@@ -165,31 +167,25 @@ html[data-window="island"] #root {
 }
 
 .island-brand {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   width: 27px;
   height: 27px;
-  color: #dbe6ed;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  /* Authoritative V9 P-mark colours, scoped to the island only; the light facet
+     keeps the mark legible on the graphite surface. */
+  --ps-brand-body: #3173a8;
+  --ps-brand-facet: #dbe6ed;
 }
 
-/* V9 P mark fallback: three stacked facets, no raster. */
-.island-brand > span {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  border-radius: 7px;
-  background:
-    linear-gradient(145deg, transparent 0 54%, rgba(219, 230, 237, 0.85) 54% 60%, transparent 60%),
-    linear-gradient(180deg, #102e55 0%, #1d5189 62%, #3173a8 100%);
-  font-size: 13px;
-  font-weight: 750;
-  color: #eaf2f8;
-  box-shadow: inset 0 0 0 1px rgba(219, 230, 237, 0.16);
+.island-brand .logo,
+.island-brand svg {
+  width: 27px !important;
+  height: 27px !important;
+  min-width: 27px;
+  display: block;
+  flex: none;
 }
 
 .island-search-input {
@@ -210,9 +206,9 @@ html[data-window="island"] #root {
 }
 
 .island-search-input:focus-visible {
-  outline: 2px solid var(--island-focus-input);
-  outline-offset: 4px;
-  border-radius: 5px;
+  outline: 2px solid rgba(154, 190, 221, 0.55);
+  outline-offset: -3px;
+  border-radius: 6px;
 }
 
 .island-search-row > svg {
@@ -270,8 +266,9 @@ html[data-window="island"] #root {
   display: flex;
   align-items: center;
   gap: 10px;
+  height: 50px;
   min-height: 50px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -851,19 +848,14 @@ html[data-window="island"] #root {
   position: relative;
   display: grid;
   place-items: center;
-  min-width: 14px;
+  /* Visual dot stays 5 px; the button box gives a >=24x24 target without
+     overlapping its neighbours. */
+  min-width: 24px;
   height: 30px;
-  padding: 9px 3px;
+  padding: 9px 0;
   border: 0;
   background: transparent;
   cursor: pointer;
-}
-
-/* Invisible hit padding: visual dot stays 5 px, target is >=24x24. */
-.island-dot-button::before {
-  content: "";
-  position: absolute;
-  inset: -6px -6px;
 }
 
 .island-dot {
@@ -908,7 +900,7 @@ html[data-window="island"] #root {
 }
 
 .island-dots--compact .island-dot-button {
-  min-width: 10px;
+  min-width: 11px;
   height: 37px;
   padding: 11px 0;
 }
@@ -923,78 +915,72 @@ html[data-window="island"] #root {
   height: 4px;
 }
 
-/* ---------- Responsive (exactly 520 / 380) ---------- */
+/* ---------- Responsive (exactly 520 / 380 on the STAGE, not the padded
+   native window; classes are applied from the measured stage width) ---------- */
 
-@media (max-width: 520px) {
-  .island-search-row {
-    padding: 0 12px;
-    gap: 9px;
-  }
-
-  .island-search--compact .island-search-row {
-    padding-right: 112px;
-  }
-
-  .island-search-input {
-    font-size: 13px;
-  }
-
-  .island-card {
-    padding: 15px 15px 12px;
-  }
-
-  .island-card-heading h2 {
-    font-size: 15px;
-  }
-
-  .island-dots--compact {
-    right: 11px;
-  }
-
-  .island-inline-nav {
-    flex-wrap: nowrap;
-    overflow: hidden;
-  }
-
-  .island-nav-chip {
-    padding: 7px 7px;
-  }
+.island-surface--mid .island-search-row {
+  padding: 0 12px;
+  gap: 9px;
 }
 
-@media (max-width: 380px) {
-  .island-card {
-    padding: 14px 13px 11px;
-  }
+.island-surface--mid .island-search--compact .island-search-row,
+.island-surface--narrow .island-search--compact .island-search-row {
+  padding-right: 112px;
+}
 
-  .island-search-row {
-    padding: 0 12px;
-    gap: 8px;
-  }
+.island-surface--mid .island-search-input {
+  font-size: 13px;
+}
 
-  .island-search-input {
-    font-size: 12px;
-  }
+.island-surface--mid .island-card {
+  padding: 15px 15px 12px;
+}
 
-  .island-card-heading h2 {
-    font-size: 15px;
-  }
+.island-surface--mid .island-card-heading h2 {
+  font-size: 15px;
+}
 
-  .island-card-heading p {
-    font-size: 10px;
-  }
+.island-surface--mid .island-dots--compact {
+  right: 11px;
+}
 
-  .island-inline-nav {
-    flex-wrap: wrap;
-    row-gap: 4px;
-  }
+.island-surface--mid .island-nav-chip {
+  padding: 7px 7px;
+}
 
-  .island-snippet {
-    max-height: 84px;
-  }
+.island-surface--narrow .island-card {
+  padding: 14px 13px 11px;
+}
 
-  .island-kbd-hints span {
-    display: none;
-  }
+.island-surface--narrow .island-search-row {
+  padding: 0 12px;
+  gap: 8px;
+}
+
+.island-surface--narrow .island-search-input {
+  font-size: 12px;
+}
+
+.island-surface--narrow .island-card-heading h2 {
+  font-size: 15px;
+}
+
+.island-surface--narrow .island-card-heading p {
+  font-size: 10px;
+}
+
+.island-surface--narrow .island-inline-nav {
+  flex-wrap: wrap;
+  overflow: visible;
+  row-gap: 4px;
+}
+
+.island-surface--narrow .island-snippet {
+  max-height: 84px;
+}
+
+.island-surface--narrow .island-kbd-hints span {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

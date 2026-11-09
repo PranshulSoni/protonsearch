@@ -1,0 +1,2709 @@
+{
+  "data_dir": "docs/qa/preview-audit/data",
+  "fixtures_dir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures",
+  "searches": [
+    {
+      "query": "notes.txt",
+      "response": {
+        "protocol": 1,
+        "query": "notes.txt",
+        "requestId": 1,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=notes.txt"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"notes.txt\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "txt",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 9,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256354845,
+              "size": 197,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+            "score": 1.0,
+            "subtitle": "notes.txt",
+            "title": "notes.txt"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 1.0305780172348022
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.17334599792957306
+          },
+          {
+            "hits": 0,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.676762044429779
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.17334699630737305
+          }
+        ],
+        "tookMs": 2.308115005493164,
+        "total": 2
+      },
+      "took_ms": 2.519454
+    },
+    {
+      "query": "readme",
+      "response": {
+        "protocol": 1,
+        "query": "readme",
+        "requestId": 2,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=readme"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"readme\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 1,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "md",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 1",
+              "line": 1,
+              "modified": null,
+              "size": null,
+              "snippet": "# Preview Audit Readme\n\n## Markdown document\n\nThis markdown file carries the token UNICORN-MD-2026 so content search can find it.\n\n- bullet one\n- bullet two…",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+            "score": 0.0,
+            "subtitle": "readme.md",
+            "title": "readme"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "md",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 6,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256354846,
+              "size": 213,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+            "score": 0.9700000286102295,
+            "subtitle": "readme.md",
+            "title": "readme.md"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.9534040093421936
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.10329500585794449
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.3739999830722809
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.11873000115156174
+          }
+        ],
+        "tookMs": 1.6171050071716309,
+        "total": 3
+      },
+      "took_ms": 1.817759
+    },
+    {
+      "query": "sample",
+      "response": {
+        "protocol": 1,
+        "query": "sample",
+        "requestId": 3,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=sample"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"sample\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 3,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 3",
+              "line": 3,
+              "modified": null,
+              "size": null,
+              "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "score": 0.0,
+            "subtitle": "report.pdf",
+            "title": "report"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "rs",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "In document",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": "//! Preview audit code fixture.\n// Unique token: PANDA-CODE-2026\n\npub fn preview_probe(input: &str) -> usize {\n    let mut total = 0usize;\n    for ch in input…",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+            "score": 0.0,
+            "subtitle": "sample.rs",
+            "title": "sample"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "rs",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 6,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256354846,
+              "size": 243,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+            "score": 0.9700000286102295,
+            "subtitle": "sample.rs",
+            "title": "sample.rs"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.9260959625244141
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.07242600619792938
+          },
+          {
+            "hits": 2,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.2861400246620178
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.07123799622058868
+          }
+        ],
+        "tookMs": 1.4164509773254395,
+        "total": 4
+      },
+      "took_ms": 1.547054
+    },
+    {
+      "query": "report",
+      "response": {
+        "protocol": 1,
+        "query": "report",
+        "requestId": 4,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=report"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"report\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "docx",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "In document",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": "Preview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "score": 0.0,
+            "subtitle": "report.docx",
+            "title": "report"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "In document",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "score": 0.0,
+            "subtitle": "report.pdf",
+            "title": "report"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "docx",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 6,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256356463,
+              "size": 36690,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "score": 0.9700000286102295,
+            "subtitle": "report.docx",
+            "title": "report.docx"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 6,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256354846,
+              "size": 657,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "score": 0.9700000286102295,
+            "subtitle": "report.pdf",
+            "title": "report.pdf"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 1.0198920965194702
+          },
+          {
+            "hits": 4,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.09973300248384476
+          },
+          {
+            "hits": 2,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.27901601791381836
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.07005099952220917
+          }
+        ],
+        "tookMs": 1.5328069925308228,
+        "total": 5
+      },
+      "took_ms": 1.657473
+    },
+    {
+      "query": "sheet",
+      "response": {
+        "protocol": 1,
+        "query": "sheet",
+        "requestId": 5,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=sheet"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"sheet\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 2,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "xlsx",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 2",
+              "line": 2,
+              "modified": null,
+              "size": null,
+              "snippet": "Token\tMeaning\nTIGER-XLSX-2026\tspreadsheet preview audit",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+            "score": 0.0,
+            "subtitle": "sheet.xlsx",
+            "title": "sheet"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "xlsx",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 5,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256360823,
+              "size": 4881,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+            "score": 0.9700000286102295,
+            "subtitle": "sheet.xlsx",
+            "title": "sheet.xlsx"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.9391549825668335
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.07005099952220917
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.2517080008983612
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.07005099952220917
+          }
+        ],
+        "tookMs": 1.3843929767608643,
+        "total": 3
+      },
+      "took_ms": 1.510248
+    },
+    {
+      "query": "diagram",
+      "response": {
+        "protocol": 1,
+        "query": "diagram",
+        "requestId": 6,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=diagram"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"diagram\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "png",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 7,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256360882,
+              "size": 16631,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+            "score": 0.9700000286102295,
+            "subtitle": "diagram.png",
+            "title": "diagram.png"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.9593390226364136
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.06411399692296982
+          },
+          {
+            "hits": 0,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.17453299462795258
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.060552000999450684
+          }
+        ],
+        "tookMs": 1.3084059953689575,
+        "total": 2
+      },
+      "took_ms": 1.440197
+    },
+    {
+      "query": "scanned",
+      "response": {
+        "protocol": 1,
+        "query": "scanned",
+        "requestId": 7,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=scanned"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"scanned\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "In document",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": "",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+            "score": 0.0,
+            "subtitle": "scanned.pdf",
+            "title": "scanned"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 7,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256361607,
+              "size": 16503,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\scanned.pdf",
+            "score": 0.9700000286102295,
+            "subtitle": "scanned.pdf",
+            "title": "scanned.pdf"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.9332189559936523
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.07123799622058868
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.3265079855918884
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.07717499881982803
+          }
+        ],
+        "tookMs": 1.4591929912567139,
+        "total": 3
+      },
+      "took_ms": 1.7215880000000001
+    },
+    {
+      "query": "blob",
+      "response": {
+        "protocol": 1,
+        "query": "blob",
+        "requestId": 8,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=blob"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"blob\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "bin",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 4,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256361607,
+              "size": 4096,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\blob.bin",
+            "score": 0.9700000286102295,
+            "subtitle": "blob.bin",
+            "title": "blob.bin"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.49391698837280273
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.05105400085449219
+          },
+          {
+            "hits": 0,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.1567239910364151
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.039180997759103775
+          }
+        ],
+        "tookMs": 0.78718101978302,
+        "total": 2
+      },
+      "took_ms": 0.885727
+    },
+    {
+      "query": "unknown",
+      "response": {
+        "protocol": 1,
+        "query": "unknown",
+        "requestId": 9,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=unknown"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"unknown\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "xyz",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 7,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256361607,
+              "size": 35,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\unknown.xyz",
+            "score": 0.9700000286102295,
+            "subtitle": "unknown.xyz",
+            "title": "unknown.xyz"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.581777036190033
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.04511700198054314
+          },
+          {
+            "hits": 0,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.13297800719738007
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.03561899811029434
+          }
+        ],
+        "tookMs": 0.8334859609603882,
+        "total": 2
+      },
+      "took_ms": 0.927283
+    },
+    {
+      "query": "large",
+      "response": {
+        "protocol": 1,
+        "query": "large",
+        "requestId": 10,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=large"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"large\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 1,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "txt",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 1",
+              "line": 1,
+              "modified": null,
+              "size": null,
+              "snippet": "LARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line…",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+            "score": 0.0,
+            "subtitle": "large.txt",
+            "title": "large"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "txt",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 5,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256361610,
+              "size": 1260000,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+            "score": 0.9700000286102295,
+            "subtitle": "large.txt",
+            "title": "large.txt"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.5509079694747925
+          },
+          {
+            "hits": 1,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.045118000358343124
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 7696.44580078125
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.2398350089788437
+          }
+        ],
+        "tookMs": 7697.34716796875,
+        "total": 3
+      },
+      "took_ms": 7697.5419360000005
+    },
+    {
+      "query": "ZEBRA-TXT-2026",
+      "response": {
+        "protocol": 1,
+        "query": "ZEBRA-TXT-2026",
+        "requestId": 11,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=ZEBRA-TXT-2026"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"ZEBRA-TXT-2026\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 4,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "txt",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 4",
+              "line": 4,
+              "modified": null,
+              "size": null,
+              "snippet": "…file exists to test the file/text preview pipeline.\nUnique token: ZEBRA-TXT-2026.\nSecond paragraph with the same token repeated: ZEBRA-TXT-2026.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\notes.txt",
+            "score": 0.0,
+            "subtitle": "notes.txt",
+            "title": "notes"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.6601390242576599
+          },
+          {
+            "hits": 0,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.060552000999450684
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.7230669856071472
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.09260900318622589
+          }
+        ],
+        "tookMs": 1.6776570081710815,
+        "total": 2
+      },
+      "took_ms": 1.818947
+    },
+    {
+      "query": "UNICORN-MD-2026",
+      "response": {
+        "protocol": 1,
+        "query": "UNICORN-MD-2026",
+        "requestId": 12,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=UNICORN-MD-2026"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"UNICORN-MD-2026\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 5,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "md",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 5",
+              "line": 5,
+              "modified": null,
+              "size": null,
+              "snippet": "# Preview Audit Readme\n\n## Markdown document\n\nThis markdown file carries the token UNICORN-MD-2026 so content search can find it.\n\n- bullet one\n- bullet two…",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\readme.md",
+            "score": 0.0,
+            "subtitle": "readme.md",
+            "title": "readme"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.5995869636535645
+          },
+          {
+            "hits": 0,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.5497199892997742
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.3763740062713623
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.053429000079631805
+          }
+        ],
+        "tookMs": 1.6539109945297241,
+        "total": 2
+      },
+      "took_ms": 1.779766
+    },
+    {
+      "query": "PANDA-CODE-2026",
+      "response": {
+        "protocol": 1,
+        "query": "PANDA-CODE-2026",
+        "requestId": 13,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=PANDA-CODE-2026"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"PANDA-CODE-2026\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 2,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "rs",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 2",
+              "line": 2,
+              "modified": null,
+              "size": null,
+              "snippet": "//! Preview audit code fixture.\n// Unique token: PANDA-CODE-2026\n\npub fn preview_probe(input: &str) -> usize {\n    let mut total = 0usize;\n    for ch in input…",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sample.rs",
+            "score": 0.0,
+            "subtitle": "sample.rs",
+            "title": "sample"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.5615929961204529
+          },
+          {
+            "hits": 0,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.041554998606443405
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.30751100182533264
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.10923099517822266
+          }
+        ],
+        "tookMs": 1.0816320180892944,
+        "total": 2
+      },
+      "took_ms": 1.297721
+    },
+    {
+      "query": "WALRUS-PDF-2026",
+      "response": {
+        "protocol": 1,
+        "query": "WALRUS-PDF-2026",
+        "requestId": 14,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=WALRUS-PDF-2026"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"WALRUS-PDF-2026\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 3,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 3",
+              "line": 3,
+              "modified": null,
+              "size": null,
+              "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "score": 0.0,
+            "subtitle": "report.pdf",
+            "title": "report"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.5699049830436707
+          },
+          {
+            "hits": 0,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.034432001411914825
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.2837649881839752
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.04630499705672264
+          }
+        ],
+        "tookMs": 0.9854610562324524,
+        "total": 2
+      },
+      "took_ms": 1.097067
+    },
+    {
+      "query": "KOALA-DOCX-2026",
+      "response": {
+        "protocol": 1,
+        "query": "KOALA-DOCX-2026",
+        "requestId": 15,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=KOALA-DOCX-2026"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"KOALA-DOCX-2026\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 2,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "docx",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 2",
+              "line": 2,
+              "modified": null,
+              "size": null,
+              "snippet": "Preview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "score": 0.0,
+            "subtitle": "report.docx",
+            "title": "report"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.5794039964675903
+          },
+          {
+            "hits": 0,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.02968199923634529
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.26714301109313965
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.04274299740791321
+          }
+        ],
+        "tookMs": 0.9617140293121338,
+        "total": 2
+      },
+      "took_ms": 1.066197
+    },
+    {
+      "query": "TIGER-XLSX-2026",
+      "response": {
+        "protocol": 1,
+        "query": "TIGER-XLSX-2026",
+        "requestId": 16,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=TIGER-XLSX-2026"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"TIGER-XLSX-2026\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 2,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "xlsx",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 2",
+              "line": 2,
+              "modified": null,
+              "size": null,
+              "snippet": "Token\tMeaning\nTIGER-XLSX-2026\tspreadsheet preview audit",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\sheet.xlsx",
+            "score": 0.0,
+            "subtitle": "sheet.xlsx",
+            "title": "sheet"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.5437840223312378
+          },
+          {
+            "hits": 0,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.02730800025165081
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.26833000779151917
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.04036799818277359
+          }
+        ],
+        "tookMs": 0.9213460087776184,
+        "total": 2
+      },
+      "took_ms": 1.023454
+    },
+    {
+      "query": "IMAGE-OCR-PROBE-2026",
+      "response": {
+        "protocol": 1,
+        "query": "IMAGE-OCR-PROBE-2026",
+        "requestId": 17,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=IMAGE-OCR-PROBE-2026"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"IMAGE-OCR-PROBE-2026\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "png",
+              "type": "file_type"
+            },
+            "id": "ocr:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+            "kind": "ocr_text",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Text in screenshot",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\diagram.png",
+            "score": 0.0,
+            "subtitle": "diagram.png",
+            "title": "IMAGE-OCR-PROBE-2026 screenshot preview audit"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.691008985042572
+          },
+          {
+            "hits": 0,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.033243998885154724
+          },
+          {
+            "hits": 0,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.16978400945663452
+          },
+          {
+            "hits": 1,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.13060300052165985
+          }
+        ],
+        "tookMs": 1.0697590112686157,
+        "total": 2
+      },
+      "took_ms": 1.180178
+    },
+    {
+      "query": "LARGE-TXT-2026",
+      "response": {
+        "protocol": 1,
+        "query": "LARGE-TXT-2026",
+        "requestId": 18,
+        "results": [
+          {
+            "action": {
+              "type": "open_url",
+              "url": "https://www.google.com/search?q=LARGE-TXT-2026"
+            },
+            "actions": [],
+            "icon": {
+              "kind": "bookmark",
+              "type": "kind"
+            },
+            "id": "web-search:google",
+            "kind": "action",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "Web",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": null,
+            "score": 0.0,
+            "subtitle": "Direct search with Google",
+            "title": "Search the web for \"LARGE-TXT-2026\""
+          },
+          {
+            "action": {
+              "column": null,
+              "line": 1,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "txt",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 1",
+              "line": 1,
+              "modified": null,
+              "size": null,
+              "snippet": "LARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line…",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\large.txt",
+            "score": 0.0,
+            "subtitle": "large.txt",
+            "title": "large"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 1,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.5675299763679504
+          },
+          {
+            "hits": 0,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.029682999476790428
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 7662.70068359375
+          },
+          {
+            "hits": 0,
+            "label": "OCR text",
+            "tier": 2,
+            "tookMs": 0.2528949975967407
+          }
+        ],
+        "tookMs": 7663.62646484375,
+        "total": 2
+      },
+      "took_ms": 7664.035094
+    },
+    {
+      "query": "report",
+      "response": {
+        "protocol": 1,
+        "query": "report",
+        "requestId": 100,
+        "results": [
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "docx",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "In document",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": "Preview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "score": 0.0,
+            "subtitle": "report.docx",
+            "title": "report"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "In document",
+              "line": null,
+              "modified": null,
+              "size": null,
+              "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "score": 0.0,
+            "subtitle": "report.pdf",
+            "title": "report"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "docx",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 6,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256356463,
+              "size": 36690,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.docx",
+            "score": 0.9700000286102295,
+            "subtitle": "report.docx",
+            "title": "report.docx"
+          },
+          {
+            "action": {
+              "column": null,
+              "line": null,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+              "type": "open_path"
+            },
+            "actions": [
+              {
+                "action": {
+                  "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+                  "type": "reveal_path"
+                },
+                "destructive": false,
+                "id": "reveal",
+                "label": "Reveal in Explorer",
+                "shortcut": null
+              },
+              {
+                "action": {
+                  "text": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+                  "type": "copy_text"
+                },
+                "destructive": false,
+                "id": "copy-path",
+                "label": "Copy path",
+                "shortcut": "Ctrl+C"
+              }
+            ],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "file:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "kind": "file",
+            "matchRanges": [
+              {
+                "end": 6,
+                "start": 0
+              }
+            ],
+            "meta": {
+              "itemCount": null,
+              "label": null,
+              "line": null,
+              "modified": 1794256354846,
+              "size": 657,
+              "snippet": null,
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "score": 0.9700000286102295,
+            "subtitle": "report.pdf",
+            "title": "report.pdf"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 0,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.002374999923631549
+          },
+          {
+            "hits": 4,
+            "label": "filename index",
+            "tier": 1,
+            "tookMs": 0.16266100108623505
+          },
+          {
+            "hits": 2,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.47610798478126526
+          }
+        ],
+        "tookMs": 0.7408770322799683,
+        "total": 4
+      },
+      "scope": "Files"
+    },
+    {
+      "query": "WALRUS-PDF-2026",
+      "response": {
+        "protocol": 1,
+        "query": "WALRUS-PDF-2026",
+        "requestId": 101,
+        "results": [
+          {
+            "action": {
+              "column": null,
+              "line": 3,
+              "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+              "type": "open_path"
+            },
+            "actions": [],
+            "icon": {
+              "ext": "pdf",
+              "type": "file_type"
+            },
+            "id": "content:c:\\users\\pranshul\\documents\\projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "kind": "content_match",
+            "matchRanges": [],
+            "meta": {
+              "itemCount": null,
+              "label": "line 3",
+              "line": 3,
+              "modified": null,
+              "size": null,
+              "snippet": "WALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+              "sourceLabel": null
+            },
+            "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures\\report.pdf",
+            "score": 0.0,
+            "subtitle": "report.pdf",
+            "title": "report"
+          }
+        ],
+        "status": {
+          "content_docs": 8,
+          "indexed_files": 11,
+          "type": "ready"
+        },
+        "timings": [
+          {
+            "hits": 0,
+            "label": "exact + actions + apps",
+            "tier": 0,
+            "tookMs": 0.002374999923631549
+          },
+          {
+            "hits": 1,
+            "label": "indexed content",
+            "tier": 1,
+            "tookMs": 0.3787490129470825
+          }
+        ],
+        "tookMs": 0.4487999975681305,
+        "total": 1
+      },
+      "scope": "Content"
+    }
+  ],
+  "status_after_pipeline": {
+    "agent": {
+      "detail": "Optional Python sidecar is not configured.",
+      "model": null,
+      "runtime": null,
+      "state": "not_configured"
+    },
+    "contentDocuments": 8,
+    "filenameEntries": 11,
+    "lastUpdated": 1794256562676,
+    "ocrDocuments": 1,
+    "protocol": 1,
+    "roots": [
+      {
+        "enabled": true,
+        "errors": 0,
+        "indexed": 11,
+        "mode": "content_and_ocr",
+        "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\fixtures",
+        "state": "ready"
+      }
+    ],
+    "sources": [
+      {
+        "detail": null,
+        "enabled": true,
+        "id": "apps",
+        "itemCount": 180,
+        "label": "Applications",
+        "state": "ready"
+      },
+      {
+        "detail": null,
+        "enabled": false,
+        "id": "browser",
+        "itemCount": 0,
+        "label": "Browser history & bookmarks",
+        "state": "disabled"
+      },
+      {
+        "detail": null,
+        "enabled": false,
+        "id": "clipboard",
+        "itemCount": 0,
+        "label": "Clipboard",
+        "state": "disabled"
+      },
+      {
+        "detail": null,
+        "enabled": true,
+        "id": "recent",
+        "itemCount": 0,
+        "label": "Recent files",
+        "state": "ready"
+      },
+      {
+        "detail": null,
+        "enabled": false,
+        "id": "git",
+        "itemCount": 0,
+        "label": "Git repositories",
+        "state": "disabled"
+      }
+    ],
+    "state": "ready",
+    "version": "preview-audit",
+    "warnings": [
+      "icon Antigravity: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Antigravity IDE: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Apple Software Update: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Application Verifier (WOW): creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Application Verifier (X64): creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Character Map: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Cisco Packet Tracer: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Cline: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Cloudflare One Client: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Command Prompt: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Component Services: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon DeepSeek Harness: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon dfrgui: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Discord: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Disk Cleanup: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Docker Desktop: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Electron: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon emu8086: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Epic Games Launcher: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons",
+      "icon Everything: creating icon cache C:\\Users\\Pranshul\\AppData\\Roaming\\protonsearch\\v2\\cache\\icons"
+    ]
+  }
+}

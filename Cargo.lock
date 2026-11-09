@@ -3164,11 +3164,13 @@ name = "ps-sources"
 version = "2.0.0-alpha.1"
 dependencies = [
  "anyhow",
+ "image 0.24.9",
  "ps-ipc",
  "ps-windows",
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "walkdir",
  "winreg",
 ]

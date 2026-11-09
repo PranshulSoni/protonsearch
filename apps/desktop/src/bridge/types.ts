@@ -346,6 +346,10 @@ export interface PreviewPayload {
   imageDataUrl: string | null;
   ocrText: string | null;
   fields: PreviewField[];
+  status: "ok" | "unsupported" | "error";
+  truncated: boolean;
+  error: string | null;
+  imageMime: string | null;
   unsupportedReason: string | null;
 }
 

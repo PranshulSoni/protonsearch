@@ -1,0 +1,31 @@
+[package]
+name = "clipboard-audit"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Gate 0 audit harness for the ProtonSearch clipboard-image P0 (not part of the app)."
+
+[workspace]
+
+[dependencies]
+anyhow = "1"
+ps-windows = { path = "../../../../crates/ps-windows" }
+ps-sources = { path = "../../../../crates/ps-sources" }
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+image = "0.24"
+
+[profile.dev]
+opt-level = 1
+debug = 0
+
+[profile.release]
+opt-level = 2
+debug = 0

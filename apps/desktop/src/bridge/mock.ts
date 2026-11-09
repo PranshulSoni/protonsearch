@@ -25,6 +25,7 @@ const MOCK_SLOW_MS = params.get("slow") === "1" ? 1200 : 0;
 // Agent-catalog fixtures for visual QA: default = Pi detected + Codex missing,
 // ?agents=none = no runtimes, ?agents=multi = several CLIs including misses.
 const MOCK_AGENTS = params.get("agents") ?? "default";
+const MOCK_MONITORS = params.get("monitors") ?? "single";
 const USER = "C:\\Users\\Pranshul";
 
 let settings: Settings = {
@@ -359,14 +360,70 @@ export const mockBridge = {
     return { ok: false, message: "Browser preview: system actions are disabled." };
   },
   async listMonitors(): Promise<import("./types").MonitorInfo[]> {
-    return [
-      { id: "\\\\.\\DISPLAY1", name: "Built-in display", primary: true, x: 0, y: 0, width: 2560, height: 1600, workX: 0, workY: 0, workWidth: 2560, workHeight: 1560, scaleFactor: 1.5 },
-    ];
+    const builtIn = {
+      id: "\\\\.\\DISPLAY1",
+      name: "Built-in display",
+      primary: true,
+      x: 0,
+      y: 0,
+      width: 2560,
+      height: 1600,
+      workX: 0,
+      workY: 0,
+      workWidth: 2560,
+      workHeight: 1560,
+      scaleFactor: 1.5,
+    };
+    if (MOCK_MONITORS === "multi") {
+      return [
+        builtIn,
+        {
+          id: "\\\\.\\DISPLAY2",
+          name: "External display",
+          primary: false,
+          x: 2560,
+          y: 0,
+          width: 1920,
+          height: 1200,
+          workX: 2560,
+          workY: 0,
+          workWidth: 1920,
+          workHeight: 1160,
+          scaleFactor: 1,
+        },
+      ];
+    }
+    if (MOCK_MONITORS === "none") return [];
+    return [builtIn];
   },
 
   async showIsland(): Promise<void> {},
   async hideIsland(): Promise<void> {},
   async setIslandGeometry(): Promise<void> {},
+
+  async getPreview(resultId: string): Promise<import("./types").PreviewPayload> {
+    return {
+      resultId,
+      title: "architecture notes.md",
+      subtitle: "Projects / ProtonSearch / docs",
+      format: "markdown",
+      text: "# Architecture notes\n\nThe search pipeline uses a compact filename arena plus FTS5 content search.",
+      snippet: "The search pipeline uses a compact filename arena plus FTS5 content search.",
+      highlightRanges: [{ start: 4, end: 18 }],
+      imageDataUrl: null,
+      ocrText: null,
+      fields: [
+        { label: "Size", value: "12.4 KB" },
+        { label: "Modified", value: "2026-11-09" },
+      ],
+      status: "ok",
+      truncated: false,
+      error: null,
+      imageMime: null,
+      unsupportedReason: null,
+    };
+  },
+  async perfMark(): Promise<void> {},
 
   async detectAgents(): Promise<import("./types").DetectedAgent[]> {
     const pi = {

@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useApp } from "../App";
-import type { RootConfig, RootMode } from "../bridge/types";
+import type { LauncherMode, RootConfig, RootMode } from "../bridge/types";
 import { formatNumber } from "../lib/format";
 import { Logo } from "../components/Logo";
 import { parseHotkey } from "../app/hotkey";
@@ -101,6 +101,7 @@ export default function OnboardingView() {
   );
   const [stepIndex, setStepIndex] = useState(() => persisted?.stepIndex ?? 0);
   const [finishing, setFinishing] = useState(false);
+  const [launcherMode, setLauncherMode] = useState<LauncherMode>(settings.launcher.primaryMode);
   const [formError, setFormError] = useState<string | null>(null);
   const [finishFailed, setFinishFailed] = useState(false);
   const lastSkipRef = useRef(false);
@@ -188,6 +189,11 @@ export default function OnboardingView() {
       }
       if (!skipped && draft.launchAtLogin !== settings.launchAtLogin) {
         void updateSettings({ launchAtLogin: draft.launchAtLogin }).catch(() => undefined);
+      }
+      if (launcherMode !== settings.launcher.primaryMode) {
+        void updateSettings({
+          launcher: { ...settings.launcher, primaryMode: launcherMode },
+        }).catch(() => undefined);
       }
     };
 
@@ -471,6 +477,38 @@ export default function OnboardingView() {
                 setDraft((current) => ({ ...current, hotkey: display }));
               }}
             />
+            <div className="onboard-launcher-mode" role="radiogroup" aria-label="Primary launcher">
+              <p className="choice-name">Primary launcher for Alt + Space</p>
+              <label className="choice choice-single">
+                <input
+                  type="radio"
+                  name="onboarding-launcher-mode"
+                  checked={launcherMode === "dynamic_island"}
+                  onChange={() => setLauncherMode("dynamic_island")}
+                />
+                <span className="choice-text">
+                  <span className="choice-name">Dynamic Island</span>
+                  <span className="choice-hint">
+                    A compact island at the top of the screen with cards and dots.
+                  </span>
+                </span>
+              </label>
+              <label className="choice choice-single">
+                <input
+                  type="radio"
+                  name="onboarding-launcher-mode"
+                  checked={launcherMode === "normal"}
+                  onChange={() => setLauncherMode("normal")}
+                />
+                <span className="choice-text">
+                  <span className="choice-name">Normal Launcher</span>
+                  <span className="choice-hint">
+                    The familiar centred launcher window with the full result list.
+                  </span>
+                </span>
+              </label>
+              <p className="field-help">Change this later in Preferences → Launcher.</p>
+            </div>
             <label className="choice choice-single">
               <input
                 type="checkbox"

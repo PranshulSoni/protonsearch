@@ -205,6 +205,17 @@ impl EngineDb {
         Ok(())
     }
 
+    /// Indexed OCR text for one path (preview path; no extraction, no query).
+    pub fn ocr_text_for_path(&self, path: &str) -> Option<String> {
+        let conn = self.lock().ok()?;
+        conn.query_row(
+            "SELECT text FROM ocr_documents WHERE path = ?1 LIMIT 1",
+            params![path],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+    }
+
     pub fn ocr_search(&self, query: &str, limit: usize) -> anyhow::Result<Vec<OcrHit>> {
         let terms = ps_content::query_terms(query);
         if terms.is_empty() {

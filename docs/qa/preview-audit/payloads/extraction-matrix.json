@@ -1,0 +1,144 @@
+{
+  "fixtures_dir": "docs/qa/preview-audit/fixtures",
+  "ocr_available": true,
+  "rows": [
+    {
+      "detect_kind": "Other",
+      "error": "no extractor (Ok(None))",
+      "ext": "bin",
+      "extract_ok": true,
+      "file": "blob.bin",
+      "is_supported": false,
+      "ocr": null,
+      "text_chars": 0,
+      "text_head": "",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Other",
+      "error": "no extractor (Ok(None))",
+      "ext": "png",
+      "extract_ok": true,
+      "file": "diagram.png",
+      "is_supported": false,
+      "ocr": {
+        "available": true,
+        "confidence": 1.0,
+        "language": "en-GB",
+        "ok": true,
+        "text": "IMAGE-OCR-PROBE-2026 screenshot preview audit"
+      },
+      "text_chars": 0,
+      "text_head": "",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Text",
+      "error": null,
+      "ext": "txt",
+      "extract_ok": true,
+      "file": "large.txt",
+      "is_supported": true,
+      "ocr": null,
+      "text_chars": 499322,
+      "text_head": "LARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\nLARGE-TXT-2026 line\n",
+      "truncated": true
+    },
+    {
+      "detect_kind": "Text",
+      "error": null,
+      "ext": "txt",
+      "extract_ok": true,
+      "file": "notes.txt",
+      "is_supported": true,
+      "ocr": null,
+      "text_chars": 192,
+      "text_head": "Quarterly preview audit notes\n\nThis plain-text file exists to test the file/text preview pipeline.\nUnique token: ZEBRA-TXT-2026.\nSecond paragraph with the same token repeated: ZEBRA-TXT-2026.\n",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Markdown",
+      "error": null,
+      "ext": "md",
+      "extract_ok": true,
+      "file": "readme.md",
+      "is_supported": true,
+      "ocr": null,
+      "text_chars": 203,
+      "text_head": "# Preview Audit Readme\n\n## Markdown document\n\nThis markdown file carries the token UNICORN-MD-2026 so content search can find it.\n\n- bullet one\n- bullet two\n\n    fn demo() { println!(\"hello preview\"); }\n",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Docx",
+      "error": null,
+      "ext": "docx",
+      "extract_ok": true,
+      "file": "report.docx",
+      "is_supported": true,
+      "ocr": null,
+      "text_chars": 133,
+      "text_head": "Preview Audit DOCX\nThis Word document carries the token KOALA-DOCX-2026 for content search.\nSecond paragraph: KOALA-DOCX-2026 again.\n",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Pdf",
+      "error": null,
+      "ext": "pdf",
+      "extract_ok": true,
+      "file": "report.pdf",
+      "is_supported": true,
+      "ocr": null,
+      "text_chars": 83,
+      "text_head": "\n\nWALRUS-PDF-2026 preview audit sample document text. Second line: WALRUS-PDF-2026.",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Code",
+      "error": null,
+      "ext": "rs",
+      "extract_ok": true,
+      "file": "sample.rs",
+      "is_supported": true,
+      "ocr": null,
+      "text_chars": 233,
+      "text_head": "//! Preview audit code fixture.\n// Unique token: PANDA-CODE-2026\n\npub fn preview_probe(input: &str) -> usize {\n    let mut total = 0usize;\n    for ch in input.chars() {\n        if ch.is_alphabetic() { total += 1; }\n    }\n    total\n}\n",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Pdf",
+      "error": null,
+      "ext": "pdf",
+      "extract_ok": true,
+      "file": "scanned.pdf",
+      "is_supported": true,
+      "ocr": null,
+      "text_chars": 0,
+      "text_head": "",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Xlsx",
+      "error": null,
+      "ext": "xlsx",
+      "extract_ok": true,
+      "file": "sheet.xlsx",
+      "is_supported": true,
+      "ocr": null,
+      "text_chars": 56,
+      "text_head": "Token\tMeaning\nTIGER-XLSX-2026\tspreadsheet preview audit\n",
+      "truncated": false
+    },
+    {
+      "detect_kind": "Other",
+      "error": "no extractor (Ok(None))",
+      "ext": "xyz",
+      "extract_ok": true,
+      "file": "unknown.xyz",
+      "is_supported": false,
+      "ocr": null,
+      "text_chars": 0,
+      "text_head": "",
+      "truncated": false
+    }
+  ]
+}

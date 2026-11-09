@@ -16,3 +16,5 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 rusqlite = { workspace = true }
 sha2 = "0.10"
+# Preview thumbnails (bounded decode/resize; already in the workspace graph).
+image = { workspace = true }

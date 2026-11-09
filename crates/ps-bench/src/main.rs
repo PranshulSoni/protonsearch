@@ -10,6 +10,8 @@ use ps_bench::contentv2;
 use ps_bench::dataset::{self, DEFAULT_SEED};
 #[cfg(feature = "engine")]
 use ps_bench::filenamebench;
+#[cfg(feature = "ocr")]
+use ps_bench::ocrbaseline;
 use ps_bench::ocrbench;
 use ps_bench::queries;
 use ps_bench::realfiles;
@@ -58,6 +60,10 @@ fn run(cmd: &str, args: &Args) -> anyhow::Result<()> {
         }
         "ocr-corpus" => ocrbench::run_generate(args),
         "ocr" => ocrbench::run(args),
+        #[cfg(feature = "ocr")]
+        "ocr-baseline" => ocrbaseline::run(args),
+        #[cfg(feature = "ocr")]
+        "ocr-baseline-cold-child" => ocrbaseline::cold_child(args),
         other => {
             usage();
             anyhow::bail!("unknown subcommand {other}")
