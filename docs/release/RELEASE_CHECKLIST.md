@@ -12,7 +12,7 @@ without explicit user authorisation.
 | G1 | Workspace + IPC v1 + architecture + compile | **WIP** | cargo fmt --check red; cargo check intermittent while agents edit |
 | G2 | Index + content FTS + sources, tests + benchmarks | NOT STARTED | — |
 | G3 | Launcher wired + hotkey + perf | NOT STARTED | — |
-| G4 | Desktop app + onboarding + settings + migration | NOT STARTED (migration API BLOCKED) | tests/migration/README.md |
+| G4 | Desktop app + onboarding + settings + migration | **WIP** (migration API landed; 2/2 unit tests; contract probe wired; consent/rollback pending) | tests/migration/, docs/release/MIGRATION.md, docs/security/V2_SECURITY_REVIEW.md |
 | G5 | Previews/OCR/clipboard/browser/git/actions | NOT STARTED | — |
 | G6 | Agent sidecar opt-in | NOT STARTED | — |
 | G7 | Installer, updater, visual audit, RC | NOT STARTED | — |
@@ -23,7 +23,8 @@ without explicit user authorisation.
 - [ ] git status clean; Cargo.lock + apps/desktop/package-lock.json committed.
 - [ ] CI green on the release commit (fmt, clippy -D warnings, workspace tests, frontend build).
 - [ ] Security gate: legacy API key rotated (S-01); secret scan clean; no embedded/shared keys.
-- [ ] Migration test passes (needs ps_core::migration::migrate_legacy_db; currently BLOCKED).
+- [ ] Migration contract test passes (fixture + opt-in real-DB READ-ONLY dry run recorded).
+- [ ] Migration review must-fixes V2-01/V2-02/V2-03 addressed before G4 acceptance.
 - [ ] Known limitations reviewed and updated.
 - [ ] User/L0 authorises the build and (separately) any publication.
 

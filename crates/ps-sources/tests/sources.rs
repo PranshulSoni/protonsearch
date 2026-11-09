@@ -387,6 +387,42 @@ fn actions_dispatch_is_structured_and_safe() {
     let _ = outcome;
 }
 
+#[test]
+#[ignore = "invokes the real default file handler; run explicitly for E2E evidence"]
+fn open_path_action_really_invokes_shell() {
+    let dir = workdir("action-open-smoke");
+    let marker = dir.join("marker.txt");
+    let probe = dir.join("probe.cmd");
+    // ShellExecuteW opens .cmd with the system handler (console host). The
+    // script writes a marker file and exits immediately, proving invocation
+    // without leaving any GUI application running.
+    let script = format!(
+        "@echo off\r\necho shell-executed > \"{}\"\r\n",
+        marker.display()
+    );
+    std::fs::write(&probe, script).unwrap();
+    let outcome = ps_sources::actions::execute(&ps_ipc::ActionSpec::OpenPath {
+        path: probe.to_string_lossy().to_string(),
+        line: None,
+        column: None,
+    });
+    assert!(outcome.ok, "open_path action failed: {}", outcome.message);
+    let mut seen = false;
+    for _ in 0..50 {
+        if marker.is_file() {
+            seen = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert!(
+        seen,
+        "marker not written: ShellExecuteW did not run the default handler"
+    );
+    let _ = std::fs::remove_file(&probe);
+    let _ = std::fs::remove_file(&marker);
+}
+
 // ---------------------------------------------------------------------------
 // Aggregate load
 // ---------------------------------------------------------------------------

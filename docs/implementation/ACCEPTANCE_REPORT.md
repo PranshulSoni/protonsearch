@@ -151,3 +151,30 @@ Machine: AMD Ryzen AI 9 465 (10C/20T), 31.2 GB RAM, Windows 11 build 26300, WebV
 The core promise — press the shortcut, find what you remember, open it — is implemented and demonstrably works on real data.
 The remaining work to call this a finished product is finite and listed above; the largest items are source/action finalisation,
 OCR, the agent UI panel, signed packaging, and complete visual QA and release gating.
+## 11. Late-integration updates (same day, after §1-§10 were drafted)
+
+- SOURCES/ACTIONS: ps-sources, ps-windows and ps-content are integrated; the real launcher now shows real installed
+  applications (Start Menu/UWP scan), browser history/bookmarks (Chromium/Firefox profiles, read-only snapshots), recent
+  files, clipboard (opt-in) and Git results, and executes open/reveal/launch actions through structured ActionSpecs.
+  Evidence: docs/qa/visual/app-captures/real-launcher-long-list.png (real application results, dark theme) and the
+  updated captures list.
+- OCR: the ps-ocr pipeline is implemented (Windows.Media.Ocr bitmap decode, pixel caps, text store, tests). The native
+  engine was independently measured by perf-bench (244 img/s warm, p50 3.6 ms, 92.4% char accuracy on the synthetic
+  English corpus). End-to-end screenshot indexing through the running app is settings-gated and has not yet been
+  exercised in a UI session; OCR results are therefore reported as implemented + unit/integration tested, not as
+  user-validated.
+- SECURITY: docs/security/V2_SECURITY_REVIEW.md findings addressed in code: destructive native commands now require a
+  server-side 15 s one-shot confirmation handshake (engine + Tauri command + bridge + launcher confirm bar); CDP is
+  debug-build only; clipboard history defaults OFF; migration marks success only on success, hashes DB+WAL+SHM and
+  reports imported (not source) row counts; legacy URI is percent-encoded. Lower-risk items (clipboard source-app
+  exclusions/TTL, code signing, app-target allowlisting) remain open and are listed in docs/release/KNOWN_LIMITATIONS.md.
+- INSTALLER: a real release build produces target/release/ProtonSearch.exe (~17.9 MB) and an NSIS installer
+  (ProtonSearch_2.0.0-alpha.1_x64-setup.exe, ~4.7 MiB, unsigned). The final hashes/checksums are produced by
+  scripts/build-installer.ps1 into dist-installer/SHA256SUMS.txt; no signing certificate is available, so SmartScreen
+  warnings are expected (documented).
+- RELEASE BUILD UI LATENCY: the release binary intentionally disables the CDP test hook, so the E2E latency harness
+  cannot drive release builds. End-to-end latency evidence therefore remains debug-build (production JS) only; engine
+  numbers remain release-build. This limitation is deliberate (security) and recorded rather than worked around.
+- COMPETITOR COMPARISON: not published. Everything 1.4.1 is installed but its HTTP/ETP interface and CLI are absent;
+  Kensaku 1.0.16 has no CLI; PowerToys is present; Flow Launcher absent. Scope mismatch makes any single-number
+  comparison misleading; docs/performance/BENCHMARKS.md documents what was and was not measured.

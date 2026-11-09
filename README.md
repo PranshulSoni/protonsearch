@@ -18,7 +18,9 @@ Measured and captured with the real app over a real user profile (131,199 indexe
 | Filename/folder search, exact + prefix + fuzzy, grouped results | Works | 50 real matches for "arch"; 8.4–12.6 ms warm input-to-visible (debug build) |
 | Calculator ("2+2", "15% of 340", unit conversion) | Works | engine tier 0; unit-tested in crates/ps-sources |
 | Native actions (lock, sleep, shutdown, restart, empty bin, Settings, Task Manager, Terminal) | Results + engine wiring work; execution lands with ps-windows actions | crates/ps-core catalog + ps-sources actions |
-| Document/code content search (PDF, DOCX, XLSX, text, Markdown, source) | Works when content indexing is enabled | crates/ps-content FTS5 + extractors (16 tests) |
+| Document/code content search (PDF, DOCX, XLSX, text, Markdown, source) | Works when content indexing is enabled; retrieval speed target not met yet | crates/ps-content FTS5 + extractors (16 tests); docs/performance |
+| Applications, browser history/bookmarks, recent files, Git, clipboard sources | Implemented and visible with real data | real-launcher-long-list.png; crates/ps-sources |
+| Screenshot OCR search | Pipeline implemented (Windows.Media.Ocr); native engine measured; end-to-end UI run pending | crates/ps-ocr; docs/performance/BENCHMARKS.md |
 | Legacy v1 migration (settings, 89,813 file rows, 14,609 document texts) | Works, source read-only and hash-verified | docs/implementation/GATE_LOG.md; migration tests |
 | Desktop app (Home / Search & Indexes / Activity / Workflows / Preferences), onboarding, dark mode, hotkey capture | Works | real-app-*.png; 136 frontend tests |
 | Optional Python agent sidecar (Pydantic AI, on-demand, approval-gated) | Sidecar + Rust client + shell commands work; Workflows panel integration in progress | crates/ps-agent (14 tests), agent-sidecar (18 tests) |

@@ -41,6 +41,7 @@ interface Harness {
   pending: DeferredResponse[];
   search: ReturnType<typeof vi.fn>;
   openResult: ReturnType<typeof vi.fn>;
+  confirmNativeAction: ReturnType<typeof vi.fn>;
   hideLauncher: ReturnType<typeof vi.fn>;
   showMain: ReturnType<typeof vi.fn>;
   onGeometry: ReturnType<typeof vi.fn>;
@@ -95,6 +96,7 @@ function setup(options?: { workArea?: WorkAreaSize; status?: EngineStatus }): Ha
   const openResult = vi.fn(
     async (_action: ActionSpec): Promise<OpenOutcome> => ({ ok: true, message: "ok" }),
   );
+  const confirmNativeAction = vi.fn(async () => ({ ok: true, message: "executed" }));
   const hideLauncher = vi.fn();
   const showMain = vi.fn();
   const onGeometry = vi.fn();
@@ -105,6 +107,7 @@ function setup(options?: { workArea?: WorkAreaSize; status?: EngineStatus }): Ha
         ref={ref}
         search={search}
         openResult={openResult}
+        confirmNativeAction={confirmNativeAction}
         hideLauncher={hideLauncher}
         showMain={showMain}
         status={options?.status ?? READY}
@@ -120,6 +123,7 @@ function setup(options?: { workArea?: WorkAreaSize; status?: EngineStatus }): Ha
     pending,
     search,
     openResult,
+    confirmNativeAction,
     hideLauncher,
     showMain,
     onGeometry,
@@ -595,6 +599,75 @@ describe("preview pane", () => {
       text: "C:\\docs\\search-architecture.md",
     });
     expect(harness.hideLauncher).not.toHaveBeenCalled();
+  });
+});
+
+describe("destructive native command confirmation (V2-04)", () => {
+  const shutdown = result({
+    id: "action:shutdown",
+    title: "Shut down",
+    kind: "action",
+    icon: { type: "kind", kind: "action" },
+    action: { type: "run_native", command: "shutdown" },
+  });
+
+  async function openConfirmBar(harness: Harness): Promise<void> {
+    harness.openResult.mockResolvedValueOnce({
+      ok: false,
+      message: "Confirmation required for Shutdown. Ask again to execute.",
+    });
+    await resolveSearch(harness, 0, [shutdown]);
+    await press(inputOf(harness), "Enter");
+  }
+
+  it("shows the inline confirmation bar instead of hiding or executing", async () => {
+    const harness = setup();
+    await openConfirmBar(harness);
+    const bar = harness.container.querySelector('[data-testid="confirm-bar"]');
+    expect(bar).not.toBeNull();
+    expect(bar?.textContent).toContain("Confirmation required for Shutdown");
+    expect(bar?.getAttribute("role")).toBe("alertdialog");
+    expect(harness.openResult).toHaveBeenCalledWith({ type: "run_native", command: "shutdown" });
+    expect(harness.confirmNativeAction).not.toHaveBeenCalled();
+    expect(harness.hideLauncher).not.toHaveBeenCalled();
+    // Safe default focus is Cancel; the result selection is preserved.
+    expect(document.activeElement?.textContent).toBe("Cancel");
+    expect(selectedId(harness)).toBe("action:shutdown");
+  });
+
+  it("cancels with Esc, keeps the selection and returns focus to the input", async () => {
+    const harness = setup();
+    await openConfirmBar(harness);
+    await press(document.activeElement, "Escape");
+    expect(harness.container.querySelector('[data-testid="confirm-bar"]')).toBeNull();
+    expect(harness.confirmNativeAction).not.toHaveBeenCalled();
+    expect(harness.hideLauncher).not.toHaveBeenCalled();
+    expect(selectedId(harness)).toBe("action:shutdown");
+    expect(document.activeElement).toBe(inputOf(harness));
+  });
+
+  it("runs the action only after the explicit confirm button", async () => {
+    const harness = setup();
+    await openConfirmBar(harness);
+    const runButton = harness.container.querySelector<HTMLButtonElement>(".confirm-run");
+    await act(async () => {
+      runButton?.click();
+      await Promise.resolve();
+    });
+    expect(harness.confirmNativeAction).toHaveBeenCalledWith("shutdown");
+    expect(harness.container.querySelector('[data-testid="confirm-bar"]')).toBeNull();
+    expect(harness.hideLauncher).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps non-destructive Enter unchanged (no confirmation bar)", async () => {
+    const harness = setup();
+    const plain = result({ id: "plain", title: "Plain.txt", action: { type: "open_path", path: "C:\\docs\\plain.txt" } });
+    await resolveSearch(harness, 0, [plain]);
+    await press(inputOf(harness), "Enter");
+    expect(harness.container.querySelector('[data-testid="confirm-bar"]')).toBeNull();
+    expect(harness.openResult).toHaveBeenCalledWith({ type: "open_path", path: "C:\\docs\\plain.txt" });
+    expect(harness.confirmNativeAction).not.toHaveBeenCalled();
+    expect(harness.hideLauncher).toHaveBeenCalledTimes(1);
   });
 });
 

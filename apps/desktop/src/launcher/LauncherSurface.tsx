@@ -16,6 +16,7 @@ import type {
   ActionSpec,
   Density,
   EngineStatus,
+  NativeCommand,
   OpenOutcome,
   SearchRequest,
   SearchResponse,
@@ -68,6 +69,8 @@ export interface LauncherSurfaceProps {
   hideLauncher: () => void;
   showMain: () => void;
   status: EngineStatus | null;
+  /** Server-side confirmation for destructive native commands (V2-04). */
+  confirmNativeAction?: (command: NativeCommand) => Promise<OpenOutcome>;
   density?: Density;
   /** Overridable for tests; defaults to the screen work area. */
   workArea?: WorkAreaSize;
@@ -241,11 +244,16 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
     const [notice, setNotice] = useState<string | null>(null);
     const [announcement, setAnnouncement] = useState("");
     const [listScrollTop, setListScrollTop] = useState(0);
+    const [pendingConfirmation, setPendingConfirmation] = useState<{
+      command: NativeCommand;
+      message: string;
+    } | null>(null);
 
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
     const footerRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
+    const confirmCancelRef = useRef<HTMLButtonElement>(null);
 
     const requestIdRef = useRef(0);
     const epochRef = useRef(0);
@@ -298,9 +306,10 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
           groupRowCounts,
           density,
           previewOpen,
+          confirmOpen: pendingConfirmation !== null,
           workArea,
         }),
-      [groupRowCounts, density, previewOpen, workArea],
+      [groupRowCounts, density, previewOpen, pendingConfirmation, workArea],
     );
 
     const flatEntries = useMemo(
@@ -374,6 +383,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         setPending(true);
         setSearchError(null);
         setNotice(null);
+        setPendingConfirmation(null);
         try {
           const next = await props.search({ requestId, query: nextQuery, limit: SEARCH_LIMIT });
           // Drop stale responses: only the newest request may render.
@@ -410,6 +420,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       setSearchError(null);
       setNotice(null);
       setMenuOpen(false);
+      setPendingConfirmation(null);
     }, []);
 
     const summon = useCallback(() => {
@@ -493,12 +504,39 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       [currentIndex, selectIndex],
     );
 
+    const showConfirmation = useCallback((command: NativeCommand, message: string) => {
+      setMenuOpen(false);
+      setPendingConfirmation({ command, message });
+    }, []);
+
+    const cancelConfirmation = useCallback(() => {
+      setPendingConfirmation(null);
+      announce("Action cancelled");
+      focusInput();
+    }, [announce, focusInput]);
+
     const runOpenAction = useCallback(
       async (action: ActionSpec, successNotice?: string) => {
         if (action.type === "none") return;
-        if (hidesLauncher(action)) props.hideLauncher();
+        // Native commands answer with a confirmation challenge instead of
+        // executing destructively; keep the window visible until confirmed.
+        const deferHide = action.type === "run_native";
+        if (!deferHide && hidesLauncher(action)) props.hideLauncher();
         try {
-          await props.openResult(action);
+          const outcome = await props.openResult(action);
+          if (
+            !outcome.ok &&
+            action.type === "run_native" &&
+            outcome.message.startsWith("Confirmation required")
+          ) {
+            showConfirmation(action.command, outcome.message);
+            return;
+          }
+          if (!outcome.ok) {
+            showNotice(outcome.message || "The action could not be completed.", false);
+            return;
+          }
+          if (deferHide) props.hideLauncher();
           if (action.type === "copy_text") showNotice(successNotice ?? "Copied");
         } catch (error) {
           showNotice(
@@ -507,8 +545,45 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
           );
         }
       },
-      [props.hideLauncher, props.openResult, showNotice],
+      [props.hideLauncher, props.openResult, showConfirmation, showNotice],
     );
+
+    const confirmPendingAction = useCallback(async () => {
+      const pending = pendingConfirmation;
+      if (!pending) return;
+      setPendingConfirmation(null);
+      const confirm = props.confirmNativeAction;
+      if (!confirm) {
+        showNotice("Confirmation is not available in this build.", false);
+        focusInput();
+        return;
+      }
+      try {
+        const outcome = await confirm(pending.command);
+        if (outcome.ok) {
+          props.hideLauncher();
+        } else {
+          showNotice(outcome.message || "The action could not be completed.", false);
+          focusInput();
+        }
+      } catch (error) {
+        showNotice(
+          "Couldn't confirm action: " + (error instanceof Error ? error.message : String(error)),
+          false,
+        );
+        focusInput();
+      }
+    }, [
+      pendingConfirmation,
+      props.confirmNativeAction,
+      props.hideLauncher,
+      showNotice,
+      focusInput,
+    ]);
+
+    useEffect(() => {
+      if (pendingConfirmation) confirmCancelRef.current?.focus();
+    }, [pendingConfirmation]);
 
     const commitIsCurrent = useCallback(() => {
       const committed = committedRef.current;
@@ -702,6 +777,10 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
       (event: ReactKeyboardEvent<HTMLDivElement>) => {
         if (event.key !== "Escape") return;
         event.preventDefault();
+        if (pendingConfirmation) {
+          cancelConfirmation();
+          return;
+        }
         if (menuOpen) {
           closeMenu();
           return;
@@ -720,7 +799,18 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         }
         props.hideLauncher();
       },
-      [announce, closeMenu, focusInput, menuOpen, previewOpen, props.hideLauncher, resetState, runSearch],
+      [
+        announce,
+        cancelConfirmation,
+        closeMenu,
+        focusInput,
+        menuOpen,
+        pendingConfirmation,
+        previewOpen,
+        props.hideLauncher,
+        resetState,
+        runSearch,
+      ],
     );
 
     const onFooterKeyDown = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -971,6 +1061,37 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
             <ResultPreview result={selectedResult} model={menuModel} onRun={runMenuAction} />
           ) : null}
         </div>
+
+        {pendingConfirmation ? (
+          <div
+            className="launcher-confirm"
+            role="alertdialog"
+            aria-label="Confirm system action"
+            aria-describedby="launcher-confirm-message"
+            data-testid="confirm-bar"
+          >
+            <span className="launcher-confirm-text" id="launcher-confirm-message" title={pendingConfirmation.message}>
+              {pendingConfirmation.message}
+            </span>
+            <div className="launcher-confirm-actions">
+              <button
+                ref={confirmCancelRef}
+                type="button"
+                className="confirm-button confirm-cancel"
+                onClick={cancelConfirmation}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="confirm-button confirm-run"
+                onClick={() => void confirmPendingAction()}
+              >
+                Run action
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="footer" data-testid="launcher-footer">
           <div className="leftfoot">

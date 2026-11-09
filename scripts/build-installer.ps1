@@ -107,16 +107,32 @@ try {
 
 Write-Step 'Collect artifacts'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$bundleDir = Join-Path $TauriDir 'target\release\bundle\nsis'
+# Tauri/Cargo may place artifacts under the workspace target dir or the
+# per-app target dir depending on how the CLI resolves the workspace root.
+$bundleCandidates = @(
+    (Join-Path $Root 'target\release\bundle\nsis'),
+    (Join-Path $TauriDir 'target\release\bundle\nsis')
+)
+$bundleDir = $bundleCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $bundleDir) {
+    throw ('No NSIS bundle dir found; checked: ' + ($bundleCandidates -join ', '))
+}
+Write-Host ('  bundle dir: ' + $bundleDir)
 $installer = Get-ChildItem -LiteralPath $bundleDir -Filter '*.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $installer) { throw ('No NSIS installer found under ' + $bundleDir) }
-$exe = Join-Path $TauriDir 'target\release\ProtonSearch.exe'
+$exeCandidates = @(
+    (Join-Path $Root 'target\release\ProtonSearch.exe'),
+    (Join-Path $TauriDir 'target\release\ProtonSearch.exe')
+)
+$exe = $exeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 $copied = @()
 Copy-Item -LiteralPath $installer.FullName -Destination (Join-Path $OutDir $installer.Name) -Force
 $copied += (Join-Path $OutDir $installer.Name)
-if (Test-Path -LiteralPath $exe) {
+if ($exe) {
     Copy-Item -LiteralPath $exe -Destination (Join-Path $OutDir 'ProtonSearch.exe') -Force
     $copied += (Join-Path $OutDir 'ProtonSearch.exe')
+} else {
+    Write-Warn2 'ProtonSearch.exe not found in a known target dir; installer copied without bare exe.'
 }
 
 Write-Step 'Checksums + build info'

@@ -18,10 +18,12 @@ limitation at the time of writing (2026-11-09); remove an entry only with eviden
 6. **winget manifests are stale** (legacy OmniSearch 1.0.0) and must not be used for v2.
 
 ## Migration
-7. **BLOCKED:** no v2 migration API exists (ps_core::migration::migrate_legacy_db is a
-   proposal). The fixture + contract test prove only read-only behaviour; import correctness is
-   untested. See docs/release/MIGRATION.md and tests/migration/README.md.
-8. **WAL replay untested** against the real 23.8 MB un-checkpointed WAL.
+7. **Migration API landed** (ps_core::migration::migrate_legacy_db; 2 unit tests pass) and the
+   contract test calls it via tests/migration/harness. Onboarding/consent/rollback and real-DB
+   acceptance remain G4 work (see docs/release/MIGRATION.md).
+8. **WAL replay not exercised** on the real 23.8 MB un-checkpointed WAL. The contract now
+   fingerprints DB+WAL+SHM before/after and sets wal_or_shm_changed (V2-02 fixed); a real import
+   (non-dry-run) against a WAL-heavy legacy DB is still untested.
 9. **AI keys are not migrated** (by design); no consent UI yet. Legacy keys must be rotated.
 
 ## Features / runtime
@@ -35,8 +37,9 @@ limitation at the time of writing (2026-11-09); remove an entry only with eviden
     logs exist locally; the directory is excluded from the workspace). pydantic-ai is installed
     in that local venv (2.66.0, MIT) but there is no committed pyproject.toml yet.
 14. **AI is opt-in and not wired** in v2; no embedded/shared keys will ship.
-15. **Clipboard capture is not implemented**; the design requirement is opt-in/off by default
-    with source-app exclusions, TTL and encryption.
+15. **Clipboard capture is opt-in/off by default** (privacy.clipboard_history=false). Capture,
+    search and image storage exist in ps-sources/ps-windows, but source-app exclusions, TTL,
+    DPAPI encryption and the capture UI are follow-ups.
 16. **OCR pipeline** (Windows.Media.Ocr) is planned (G5); no v2 OCR evidence yet.
 17. **No telemetry/crash reporting** — intentionally absent; support relies on local logs that
     must be redacted before sharing.
@@ -50,3 +53,21 @@ limitation at the time of writing (2026-11-09); remove an entry only with eviden
 
 ## Release process
 20. No public release, no pushes, no tag for v2 yet. Do not distribute these artifacts.
+
+## Alpha cuts (deliberate, not shipped in v2.0.0-alpha.1)
+
+- No AI sidecar is bundled and no API keys are embedded; AI/Hermes is opt-in and not shipped.
+- No self-updater and no code signing; the installer is unsigned (see Below).
+- No plugin/extension ecosystem (internal ps-sources only).
+- No privileged USN/MFT volume indexer; v2 indexes user-selected roots in user space.
+- No Google Lens/circle-to-search, voice input, Steam games, notes, focus sessions, window
+  controls, process kill, or semantic/vector search in the alpha (legacy features remain in the
+  parity matrix as PLANNED-V2/CUT).
+- OCR pipeline exists (Windows.Media.Ocr) but has not passed an end-to-end acceptance run.
+
+## Residual security risks (post-review)
+
+See docs/security/V2_SECURITY_REVIEW.md "Resolved in tree": V2-01/02/03/04/05/06/09 are fixed or
+mitigated; residual items are V2-07 (clipboard DIB pixel cap, assigned), V2-08 (app-target
+validation depth), V2-10 (activity-log retention UX). Legacy release gates remain: rotate the
+leaked AI key (S-01) and replace the unsigned updater (S-02) before any public build.

@@ -88,6 +88,32 @@ pub(crate) fn starts_with_ci(hay: &str, needle: &str) -> bool {
     false
 }
 
+/// Does hay end with needle case-insensitively?
+pub(crate) fn ends_with_ci(hay: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    if hay.len() < needle.len() {
+        return false;
+    }
+    let hb = &hay.as_bytes()[hay.len() - needle.len()..];
+    if eq_ci_bytes(hb, needle.as_bytes()) {
+        return true;
+    }
+    if !hay.is_ascii() || !needle.is_ascii() {
+        let hc: Vec<char> = hay.chars().collect();
+        let nc: Vec<char> = needle.chars().collect();
+        if nc.len() > hc.len() {
+            return false;
+        }
+        return hc[hc.len() - nc.len()..]
+            .iter()
+            .zip(nc.iter())
+            .all(|(a, b)| char_eq_ci(*a, *b));
+    }
+    false
+}
+
 /// Find needle (expected lower-case) inside hay, case-insensitively.
 pub(crate) fn find_ci(hay: &str, needle: &str) -> Option<(usize, usize)> {
     find_ci_from(hay, needle, 0)

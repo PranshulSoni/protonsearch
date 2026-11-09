@@ -312,7 +312,11 @@ fn caps_extracted_text_and_flags_truncation() {
 /// panics internally on this class of input (InvalidContentStream), which used
 /// to kill the extraction worker noisily; the pipeline must contain it.
 fn pdf_with_invalid_content_stream() -> Vec<u8> {
-    let content: Vec<u8> = b"BT ((( /F1 12 Tf 72 720 Td (broken) Tj ET \xFF\xFE\x00\x01 garbage ) Tj".to_vec();
+    // Payload verified to panic pdf-extract 0.10.0 at lib.rs:1578
+    // (Content::decode(...).unwrap() on Parse(InvalidContentStream)); see the
+    // probe in the commit history. A malformed escape in the content stream is
+    // what makes lopdf's content parser return None.
+    let content: Vec<u8> = b"BT (hi) Tj ET\n%\xFF\xFE".to_vec();
     let objects: Vec<(String, Vec<u8>)> = vec![
         ("<< /Type /Catalog /Pages 2 0 R >>".to_string(), Vec::new()),
         ("<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(), Vec::new()),
@@ -355,6 +359,19 @@ fn pdf_with_invalid_content_stream() -> Vec<u8> {
         .as_bytes(),
     );
     pdf
+}
+
+#[test]
+fn malformed_pdf_fixture_actually_panics_pdf_extract() {
+    // Evidence that the regression fixture exercises the real pdf-extract 0.10
+    // panic path (lib.rs:1578 unwrap on InvalidContentStream), and that our
+    // extraction API contains it instead of propagating it.
+    let bytes = pdf_with_invalid_content_stream();
+    let direct = std::panic::catch_unwind(|| pdf_extract::extract_text_from_mem(&bytes));
+    assert!(
+        direct.is_err(),
+        "expected pdf-extract 0.10 to panic on the malformed fixture"
+    );
 }
 
 #[test]
@@ -448,6 +465,30 @@ fn skips_unchanged_files_and_reindexes_changed_ones() {
     );
     let hits = index.search("ranking", 10).unwrap();
     assert_eq!(hits.len(), 1);
+}
+
+#[test]
+fn snippet_line_scan_is_bounded_for_huge_documents() {
+    let dir = workdir("snippet-bounded");
+    let db = dir.join("index.db");
+    let index = ContentIndex::open(&db).unwrap();
+    let mut text = String::new();
+    text.push_str("early needle here\n");
+    text.push_str(&"filler line\n".repeat(20_000)); // ~240 KB total
+    text.push_str("late needle here\n");
+    let path = write_file(&dir, "huge.txt", text.as_bytes());
+    assert!(index.index_file(&path, DEFAULT_MAX_BYTES).unwrap());
+
+    let hits = index.search("needle", 10).unwrap();
+    assert_eq!(hits.len(), 1);
+    // First occurrence is on line 1, inside the bounded scan window.
+    assert_eq!(hits[0].snippet_line, Some(1));
+
+    // "late" only occurs after the 128 KB scan window: line lookup is bounded
+    // and reports None instead of scanning the full document on every query.
+    let hits = index.search("late", 10).unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].snippet_line, None);
 }
 
 #[test]

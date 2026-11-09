@@ -29,8 +29,9 @@ above are the reproducibility record for this workspace as of Gate 0.
 
 | File | Size | Git state at audit | Rule |
 |---|---:|---|---|
-| Cargo.lock (workspace root) | 130,348 B | **untracked** (git status: ?? Cargo.lock) | must be committed; CI uses the resolved graph |
-| apps/desktop/package-lock.json | 59,942 B | untracked only because apps/ is not yet committed | must be committed; CI uses npm ci |
+| Cargo.lock (workspace root) | 138,226 B | **committed** | CI uses the resolved graph |
+| apps/desktop/package-lock.json | 59,942 B | **committed** | CI uses npm ci |
+| tools/visual-qa/package-lock.json | 1,210 B | **committed** | visual-QA tooling (dev-only) |
 | protonsearch/Cargo.lock (legacy) | 168,711 B | tracked in the legacy tree | legacy only, not part of v2 build |
 
 .gitignore excludes target/, apps/desktop/node_modules/, apps/desktop/dist/ but does **not**
@@ -82,6 +83,8 @@ agent-sidecar\.venv\Scripts\python.exe -m unittest discover -s tests/migration -
 - rust (windows-latest): cargo fmt --all -- --check, cargo clippy --workspace --all-targets
   -- -D warnings, cargo test --workspace --no-fail-fast.
 - frontend (ubuntu-latest): npm ci, npm test (vitest), npm run build (tsc --noEmit + vite build).
+- migration (windows-latest): generates the synthetic legacy fixture, builds the dev-only probe
+  and calls ps_core::migration::migrate_legacy_db; uploads evidence. No real user data in CI.
 - tauri-build (manual workflow_dispatch only): builds the unsigned NSIS bundle and uploads it
   as a 7-day artifact. No secrets, permissions: contents: read, never publishes.
 

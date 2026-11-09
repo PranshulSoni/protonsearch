@@ -153,7 +153,17 @@ is opt-in/stubbed. G7 packaging must exclude both (sidecar only with explicit co
 
 ## Migration dry-run evidence (real DB, READ-ONLY)
 
-REAL_DRY_RUN_RESULT_PLACEHOLDER
+Real baseline DB (no copy; opened read-only by the probe; dry_run=true only):
+- report: files=59,526, dirs=30,287, content_docs=14,609, browser_items=4,523, quicklinks=4,
+  snippets=1, memory_events=5,286; skipped_tables = [clipboard_history, timeline_events,
+  ai_settings]; source_unchanged = true; warnings = [].
+- legacy DB SHA-256 before == after == 58249f011a045e74f02582f50722c80699e28bd6edbe99073f567d386f361809
+  (matches the Gate-0 baseline). WAL and SHM hashes unchanged; dir_new_files=[]; v2_exists_after=false.
+- probe elapsed 24,641 ms (dominated by hashing the 149 MB DB twice, plus read-only queries).
+- Test run: 6/6 contract tests OK (test_real_legacy_db_dry_run_is_read_only); command recorded in
+  docs/release/MIGRATION.md section 4b.
+- Note on V2-02: this run observed no WAL/SHM modification, but the API guarantee at review time
+  hashed only the main .db; the probe (not the API) proved all three files unchanged here.
 
 ## Recommended actions before G4/G5
 
@@ -163,3 +173,27 @@ REAL_DRY_RUN_RESULT_PLACEHOLDER
 4. V2-02/V2-03 migration contract hardening + imported counts (should-fix; G4).
 5. V2-05 CDP debug-gate (should-fix; release build).
 6. V2-07/V2-08/V2-09/V2-10/V2-11 hardening (nice-to-have; can follow RC).
+
+## Resolved in tree (post-review hardening, 2026-11-09)
+
+Status legend: FIXED = code changed and statically verified; MITIGATED = risk reduced but residual
+work tracked. Findings above keep their original severity for audit history.
+
+| ID | Status | Fix (verified by static read of the working tree) |
+|---|---|---|
+| V2-01 | **FIXED** | engine only persists legacy_migrated=true on success; failure keeps false, logs/warns and retries next launch (crates/ps-core/src/engine.rs:905, 952, 957; success branch :957, failure comment :952). |
+| V2-02 | **FIXED** | migration now fingerprints db+wal+shm before/after (sidecar_fingerprint, migration.rs:77, 194, 291-293); MigrationReport.wal_or_shm_changed (:51); source_unchanged = main-db identical AND sidecars unchanged (:293). Documented as the true invariant. |
+| V2-03 | **FIXED** | report carries imported counts: files/content_docs from the import summary (:269-272), browser/quicklinks/snippets from actual INSERT counts (:274-282); warns if source rows exist but none imported (:283-287); import_ai_keys/import_clipboard always warn that those are never imported (:229-238). |
+| V2-04 | **FIXED (server-side)** | engine requires a 15 s one-shot confirmation handshake for Shutdown/Restart/EmptyRecycleBin (engine.rs:677-707, confirm_destructive :742+); open_result on a destructive command returns ok:false "Confirmation required..." and stores the pending command; new Tauri command confirm_native_action (apps/desktop/src-tauri/src/main.rs:286, registered :599) executes only the exact command within 15 s. UI confirm bar is landing; without it destructive commands are non-executable (safe default). |
+| V2-05 | **FIXED** | cdp_browser_args returns None unless cfg!(debug_assertions) (main.rs:169); release binaries never expose CDP. Release rebuild required after this change. |
+| V2-06 | **FIXED (default)** / residual | privacy.clipboard_history now defaults to FALSE (crates/ps-ipc/src/lib.rs:516), making capture opt-in; source-app exclusions/TTL/DPAPI remain sources-content follow-up (KNOWN_LIMITATIONS). |
+| V2-07 | **MITIGATED** | DIB pixel cap assigned to sources-content (not in tree yet); listener remains the only consumer and is opt-in. |
+| V2-08 | **MITIGATED** | destructive/launch authorisation now gated by V2-04; target validation against the app index is on the roadmap. |
+| V2-09 | **FIXED** | migration read-only URI percent-encodes %, #, ?, space (migration.rs:64-74). |
+| V2-10 | **ACCEPTED** | activity log retained as an explicit feature with documented 20k-row cap; add clear/opt-out UX and retention note before RC. |
+| V2-11 | **FIXED** | migration test dirs now unique workspace paths (unit tests 2/2 pass); no predictable remove_dir_all in temp. |
+| V2-12 | **ACCEPTED** | ps-bench/ps-agent are dev-only and must not be bundled; G7 packaging checklist enforces exclusion. |
+
+Residual risks after these fixes: V2-07 (DIB cap), V2-08 (target validation depth), V2-10
+(activity retention UX), plus the legacy exposures S-01 (key rotation) and S-02 (signed updater)
+which are still release gates.

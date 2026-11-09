@@ -512,7 +512,8 @@ impl Default for PrivacySettings {
     fn default() -> Self {
         Self {
             activity_history: true,
-            clipboard_history: true,
+            // Clipboard contents can include passwords and secrets: opt-in only.
+            clipboard_history: false,
             browser_history: false,
             git_indexing: false,
             telemetry: false,

@@ -66,3 +66,18 @@ Status per gate lives in docs/implementation/WORK_BREAKDOWN.md.
   (agent_status/start/cancel/approve/stop) with events forwarded on agent:event. The sidecar is never started at setup/search.
 - 2026-11-09: ps-ipc AgentEvent payload fields corrected to camelCase (rename_all_fields) + contract test; ADR-0005 accepted
   (Pydantic AI 2.66.0 over Nanobot 0.4.1, measured).
+## Gate 7 — release candidate artifacts (evidence)
+
+- 2026-11-09: release build succeeds: target/release/ProtonSearch.exe (17.9 MB) + NSIS installer
+  target/release/bundle/nsis/ProtonSearch_2.0.0-alpha.1_x64-setup.exe (4.69 MiB; unsigned).
+  SHA-256 of the first installer build: 2D82B2E8542BBD6AFD72CAA0858ED1C48D408E314A6BC2444EF381D1AA0C548C.
+  It is rebuilt after the v2 security-review fixes; the final artifact plus checksums is recorded in
+  dist-installer/SHA256SUMS.txt by scripts/build-installer.ps1.
+- 2026-11-09: security review docs/security/V2_SECURITY_REVIEW.md reviewed; actionable items fixed:
+  migration retry semantics + WAL/SHM sidecar hashing + imported counts, server-side destructive-action
+  confirmation handshake (engine + Tauri command + bridge), CDP gated to debug builds only, clipboard history
+  default OFF, migration URI percent-encoding. Remaining lower-risk items tracked in docs/release/KNOWN_LIMITATIONS.md.
+- 2026-11-09: OCR pipeline implemented in ps-ocr (Windows.Media.Ocr platform + text store + tests); the engine
+  owns OCR text storage/search. perf-bench measured the native OCR engine at 244 images/s (p50 3.6 ms, English
+  char accuracy 92.4% on the synthetic corpus; CJK unverified). End-to-end screenshot indexing through the app
+  still needs an exercised run (settings-gated; stated in the acceptance report).

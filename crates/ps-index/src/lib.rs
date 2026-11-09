@@ -35,9 +35,10 @@ pub use scan::{
 };
 
 use matching::{
-    bloom_add, cmp_ci, eq_ci, find_ci, match_name_into, score_for_segment, segment_level,
-    segment_level_multi, starts_with_ci, to_utf16_ranges, typo_only_match, QueryPlan, PATH_MAX_SCORE,
-    SCORE_PREFIX, SCORE_SCALE, SCORE_SPANNING, SCORE_TYPO,
+    bloom_add, cmp_ci, ends_with_ci, eq_ci, find_ci, match_name_into, score_for_segment,
+    segment_level, segment_level_multi, starts_with_ci, to_utf16_ranges, typo_only_match, QueryPlan,
+    PATH_MAX_SCORE, SCORE_EXACT_NAME, SCORE_PREFIX, SCORE_SCALE, SCORE_SPANNING, SCORE_SUBSTRING,
+    SCORE_TYPO,
 };
 
 /// Below this many entries the rayon wake-up cost dominates, so scans run
@@ -570,6 +571,18 @@ impl FilenameIndex {
         self.rec(i).map(|r| r.modified).unwrap_or(0)
     }
 
+    /// Write the full path of an entry into a reusable buffer.
+    fn write_path_into(&self, i: usize, out: &mut String) {
+        out.clear();
+        let Some(r) = self.rec(i) else { return };
+        let dir = self.dir_path_slice(r.dir as usize);
+        out.push_str(dir);
+        if !out.is_empty() && !out.ends_with('\\') && !out.ends_with('/') {
+            out.push(std::path::MAIN_SEPARATOR);
+        }
+        out.push_str(self.arena_str(r.name_off, r.name_len));
+    }
+
     /// Full path of an entry. Allocates; use only for the results you render.
     pub fn entry_path(&self, i: usize) -> Cow<'_, str> {
         let Some(r) = self.rec(i) else {
@@ -581,11 +594,7 @@ impl FilenameIndex {
             return Cow::Borrowed(name);
         }
         let mut out = String::with_capacity(dir.len() + 1 + name.len());
-        out.push_str(dir);
-        if !out.ends_with('\\') && !out.ends_with('/') {
-            out.push(std::path::MAIN_SEPARATOR);
-        }
-        out.push_str(name);
+        self.write_path_into(i, &mut out);
         Cow::Owned(out)
     }
 
@@ -1136,21 +1145,164 @@ impl FilenameIndex {
         self.merge_candidates(partials, limit)
     }
 
-    /// Bounded fallback for queries that contain a path separator (spanning a
-    /// directory boundary). Deterministic: scans the first N entries in index
-    /// order and stops; documented limitation for very large indexes.
+    /// Full-path queries (containing a path separator). Anchors on the basename
+    /// through the bloom-filtered name scan, verifies candidates against the
+    /// whole path, then falls back to a directory-anchored pass and finally a
+    /// complete full-path scan. There is no arbitrary index cap: an anchor near
+    /// the end of a 1M-entry index is still found.
     fn search_spanning(
         &self,
         plan: &QueryPlan,
         limit: usize,
         filter: &EntryFilter<'_>,
     ) -> Vec<FileHit> {
-        const MAX_SPAN_ENTRIES: usize = 250_000;
+        let q = normalize_seps(&plan.lower);
+        let sep = std::path::MAIN_SEPARATOR;
+        let trimmed = q.trim_end_matches(sep);
+        let trailing_sep = trimmed.len() != q.len();
+        let (_, name_q) = match trimmed.rfind(sep) {
+            Some(i) => (&trimmed[..i], &trimmed[i + 1..]),
+            None => ("", trimmed),
+        };
+        let mut out: Vec<FileHit> = Vec::new();
+        if !name_q.is_empty() && !trailing_sep {
+            let name_plan = QueryPlan::new(name_q);
+            let generous = limit.saturating_mul(16).max(64).min(2_000);
+            let name_hits = self.scan_name_phase(&name_plan, generous, filter);
+            out = self.verify_full_path(&name_hits, &q, limit);
+        }
+        // An exact full-path hit is the strongest possible signal; filling the
+        // remaining slots with directory-prefix matches would be noise (and a
+        // 1M-entry dir scan). Only widen the search when it is not exact.
+        let has_exact = out
+            .first()
+            .map(|h| h.score >= SCORE_EXACT_NAME - 1e-4)
+            .unwrap_or(false);
+        if !has_exact && out.len() < limit {
+            let dir_hits = self.search_dir_anchor(trimmed, trailing_sep, limit, filter);
+            out = self.merge_hits(out, dir_hits, limit);
+        }
+        if out.is_empty() {
+            // Correctness backstop: complete scan of reconstructed full paths.
+            out = self.scan_full_paths(&q, limit, filter);
+        }
+        out
+    }
+
+    /// Keep only name-scan hits whose reconstructed full path contains the
+    /// full-path query; score exact matches at the exact-name tier.
+    fn verify_full_path(&self, hits: &[FileHit], q: &str, limit: usize) -> Vec<FileHit> {
+        if hits.is_empty() {
+            return Vec::new();
+        }
+        let mut cands: Vec<Candidate> = Vec::with_capacity(hits.len());
+        let mut buf = String::with_capacity(192);
+        for hit in hits {
+            let i = hit.entry_index;
+            if !self.is_live(i) {
+                continue;
+            }
+            self.write_path_into(i, &mut buf);
+            let Some((start, end)) = find_ci(&buf, q) else {
+                continue;
+            };
+            let exact = start == 0 && end == buf.len();
+            let score = if exact { SCORE_EXACT_NAME } else { SCORE_SUBSTRING };
+            let name = self.entry_name(i);
+            let ranges = if exact {
+                vec![(0, name.encode_utf16().count())]
+            } else {
+                Vec::new()
+            };
+            cands.push(Candidate {
+                idx: i as u32,
+                score: (score * SCORE_SCALE) as i64,
+                name_len: self.entries[i].name_len,
+                modified: self.entries[i].modified,
+                ranges,
+            });
+        }
+        self.finish_candidates(cands, limit)
+    }
+
+    /// Directory-anchored pass: entries whose directory path equals, starts
+    /// with, or ends with the query path. Covers trailing-separator listings
+    /// and queries that point at a folder path.
+    fn search_dir_anchor(
+        &self,
+        trimmed: &str,
+        exact_only: bool,
+        limit: usize,
+        filter: &EntryFilter<'_>,
+    ) -> Vec<FileHit> {
+        if trimmed.is_empty() || self.dirs.is_empty() {
+            return Vec::new();
+        }
+        let nd = self.dirs.len();
+        const DIR_CHUNK: usize = 65_536;
+        let parts: Vec<Vec<u8>> = parallel_chunks(nd, DIR_CHUNK, |c| {
+            let start = c * DIR_CHUNK;
+            let end = ((c + 1) * DIR_CHUNK).min(nd);
+            let mut out = Vec::with_capacity(end - start);
+            for d in start..end {
+                let path = self.dir_path_slice(d);
+                let hit = if path.is_empty() {
+                    false
+                } else if exact_only {
+                    // Trailing-separator listing: only the directory itself and
+                    // its descendants (no sibling-prefix false positives).
+                    is_under(path, trimmed)
+                } else {
+                    eq_ci(path, trimmed)
+                        || starts_with_ci(path, trimmed)
+                        || ends_with_ci(path, trimmed)
+                };
+                out.push(hit as u8);
+            }
+            out
+        });
+        let mut dir_hit = Vec::with_capacity(nd);
+        for mut part in parts {
+            dir_hit.append(&mut part);
+        }
         let under = self.compute_under(filter);
-        let n = self.entries.len().min(MAX_SPAN_ENTRIES);
+        let n = self.entries.len();
         let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
             let mut top = TopK::new(self, limit);
-            let mut buf = String::with_capacity(160);
+            let start = c * SCAN_CHUNK;
+            let end = ((c + 1) * SCAN_CHUNK).min(n);
+            for i in start..end {
+                let r = &self.entries[i];
+                if r.kind == KIND_TOMBSTONE {
+                    continue;
+                }
+                if dir_hit.get(r.dir as usize).copied().unwrap_or(0) == 0 {
+                    continue;
+                }
+                if !self.filter_pass(filter, i, under.as_deref()) {
+                    continue;
+                }
+                top.push(Candidate {
+                    idx: i as u32,
+                    score: (SCORE_SPANNING * SCORE_SCALE) as i64,
+                    name_len: r.name_len,
+                    modified: r.modified,
+                    ranges: Vec::new(),
+                });
+            }
+            top.items
+        });
+        self.merge_candidates(partials, limit)
+    }
+
+    /// Complete scan over reconstructed full paths (no index cap). Only used as
+    /// a correctness backstop when the anchored passes find nothing.
+    fn scan_full_paths(&self, q: &str, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
+        let under = self.compute_under(filter);
+        let n = self.entries.len();
+        let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
+            let mut top = TopK::new(self, limit);
+            let mut buf = String::with_capacity(192);
             let start = c * SCAN_CHUNK;
             let end = ((c + 1) * SCAN_CHUNK).min(n);
             for i in start..end {
@@ -1161,25 +1313,33 @@ impl FilenameIndex {
                 if !self.filter_pass(filter, i, under.as_deref()) {
                     continue;
                 }
-                buf.clear();
-                buf.push_str(self.dir_path_slice(r.dir as usize));
-                if !buf.is_empty() && !buf.ends_with('\\') && !buf.ends_with('/') {
-                    buf.push(std::path::MAIN_SEPARATOR);
+                self.write_path_into(i, &mut buf);
+                let Some((start, end)) = find_ci(&buf, q) else {
+                    continue;
+                };
+                let exact = start == 0 && end == buf.len();
+                let score = if exact { SCORE_EXACT_NAME } else { SCORE_SPANNING };
+                if !top.would_accept(score, r.name_len, r.modified, i as u32) {
+                    continue;
                 }
-                buf.push_str(self.arena_str(r.name_off, r.name_len));
-                if find_ci(&buf, &plan.lower).is_some() {
-                    top.push(Candidate {
-                        idx: i as u32,
-                        score: (SCORE_SPANNING * SCORE_SCALE) as i64,
-                        name_len: r.name_len,
-                        modified: r.modified,
-                        ranges: Vec::new(),
-                    });
-                }
+                top.push(Candidate {
+                    idx: i as u32,
+                    score: (score * SCORE_SCALE) as i64,
+                    name_len: r.name_len,
+                    modified: r.modified,
+                    ranges: Vec::new(),
+                });
             }
             top.items
         });
         self.merge_candidates(partials, limit)
+    }
+
+    fn finish_candidates(&self, mut cands: Vec<Candidate>, limit: usize) -> Vec<FileHit> {
+        cands.sort_unstable_by(|a, b| self.cand_cmp(a, b));
+        cands.dedup_by_key(|c| c.idx);
+        cands.truncate(limit);
+        cands.into_iter().map(|c| self.hit_from_candidate(c)).collect()
     }
 
     // -- incremental updates ------------------------------------------------
@@ -1375,6 +1535,15 @@ impl FilenameIndex {
     /// Per-root entry counts (aligned with roots()).
     pub fn root_counts(&self) -> &[u64] {
         &self.root_counts
+    }
+}
+
+/// Normalize path separators in a query to the platform separator.
+pub(crate) fn normalize_seps(s: &str) -> String {
+    if std::path::MAIN_SEPARATOR == '\\' {
+        s.replace('/', "\\")
+    } else {
+        s.replace('\\', "/")
     }
 }
 

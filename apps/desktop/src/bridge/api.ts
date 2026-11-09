@@ -12,6 +12,7 @@ import type {
   IndexCommand,
   OnboardingInput,
   OnboardingState,
+  NativeCommand,
   OpenOutcome,
   SearchRequest,
   SearchResponse,
@@ -30,6 +31,7 @@ type Bridge = {
   getSettings(): Promise<Settings>;
   updateSettings(patch: SettingsPatch): Promise<Settings>;
   setHotkey(hotkey: string): Promise<Settings>;
+  confirmNativeAction(command: NativeCommand): Promise<OpenOutcome>;
   agentStatus(): Promise<AgentStatus>;
   agentStart(request: AgentRunRequest): Promise<void>;
   agentCancel(runId?: string | null): Promise<void>;
@@ -54,6 +56,7 @@ const tauriBridge: Bridge = {
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (patch) => invoke<Settings>("update_settings", { patch }),
   setHotkey: (hotkey) => invoke<Settings>("set_hotkey", { hotkey }),
+  confirmNativeAction: (command) => invoke<OpenOutcome>("confirm_native_action", { command }),
   agentStatus: () => invoke<AgentStatus>("agent_status"),
   agentStart: (request) => invoke<void>("agent_start", { request }),
   agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),

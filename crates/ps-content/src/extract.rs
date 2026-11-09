@@ -755,3 +755,28 @@ fn extract_xml_text(
     }
     out
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn catch_unwind_result_converts_panics_to_errors() {
+        let result = catch_unwind_result(|| panic!("pdf-extract simulated panic"));
+        let error = result.expect_err("panic must become an error");
+        assert!(
+            error.to_string().contains("panicked"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn catch_unwind_result_passes_through_ok_values() {
+        let document = ExtractedDocument {
+            kind: DocKind::Text,
+            text: "hello".to_string(),
+            truncated: false,
+        };
+        let result = catch_unwind_result(|| Ok(document.clone())).unwrap();
+        assert_eq!(result, document);
+    }
+}

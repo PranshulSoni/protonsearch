@@ -310,6 +310,9 @@ export const mockBridge = {
     return settings;
   },
   async indexCommand(_command: IndexCommand): Promise<void> {},
+  async confirmNativeAction(): Promise<OpenOutcome> {
+    return { ok: false, message: "Browser preview: system actions are disabled." };
+  },
   async agentStatus(): Promise<import("./types").AgentStatus> {
     return {
       state: "not_configured",

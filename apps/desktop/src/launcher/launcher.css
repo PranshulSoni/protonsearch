@@ -564,6 +564,60 @@
   background: var(--ps-surface-soft);
 }
 
+/* ---------- Inline destructive-action confirmation (V2-04) ---------- */
+
+.launcher-confirm {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 7px 16px;
+  border-top: 1px solid var(--ps-line);
+  background: var(--ps-surface-soft);
+}
+
+.launcher-confirm-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ps-text-meta);
+  color: var(--ps-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.launcher-confirm-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confirm-button {
+  min-height: 28px;
+  padding: 5px 12px;
+  border: 1px solid var(--ps-line-strong);
+  border-radius: var(--ps-radius-control);
+  background: var(--ps-surface-raised);
+  color: var(--ps-ink);
+  font-size: var(--ps-text-meta);
+  font-weight: var(--ps-fw-label);
+}
+
+.confirm-cancel:hover {
+  background: var(--hover);
+}
+
+.confirm-run {
+  border-color: var(--ps-negative);
+  color: var(--ps-negative);
+}
+
+.confirm-run:hover {
+  background: var(--ps-negative-pill-bg);
+}
+
 /* ---------- Footer ---------- */
 
 .footer {
@@ -821,7 +875,9 @@
 
   .actions-menu,
   .preview,
-  .preview-action {
+  .preview-action,
+  .launcher-confirm,
+  .confirm-button {
     border-color: CanvasText;
     box-shadow: none;
   }

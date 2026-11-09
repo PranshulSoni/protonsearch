@@ -43,7 +43,12 @@ pub struct MigrationReport {
     pub snippets: u64,
     pub memory_events: u64,
     pub skipped_tables: Vec<&'static str>,
+    /// True when the main database file is byte-identical afterwards.
     pub source_unchanged: bool,
+    /// True when the related -wal/-shm sidecar files changed. SQLite can touch
+    /// these even for read-only opens, so this is reported separately instead
+    /// of being hidden inside "source unchanged".
+    pub wal_or_shm_changed: bool,
     pub duration_ms: u64,
     pub warnings: Vec<String>,
 }
@@ -56,7 +61,42 @@ fn read_only_uri(path: &Path) -> anyhow::Result<String> {
     // reject that as an authority component, so normalise to file:///C:/...
     let normalized = canonical.to_string_lossy().replace('\\', "/");
     let stripped = normalized.strip_prefix("//?/").unwrap_or(&normalized);
-    Ok(format!("file:///{stripped}?mode=ro"))
+    let mut encoded = String::with_capacity(stripped.len() + 16);
+    for ch in stripped.chars() {
+        match ch {
+            '%' => encoded.push_str("%25"),
+            '#' => encoded.push_str("%23"),
+            '?' => encoded.push_str("%3F"),
+            ' ' => encoded.push_str("%20"),
+            other => encoded.push(other),
+        }
+    }
+    Ok(format!("file:///{encoded}?mode=ro"))
+}
+
+fn sidecar_fingerprint(db: &Path) -> anyhow::Result<String> {
+    let mut hasher = Sha256::new();
+    for suffix in ["", "-wal", "-shm"] {
+        let path = if suffix.is_empty() {
+            db.to_path_buf()
+        } else {
+            let mut name = db.as_os_str().to_owned();
+            name.push(suffix);
+            std::path::PathBuf::from(name)
+        };
+        match std::fs::read(&path) {
+            Ok(bytes) => {
+                hasher.update(suffix.as_bytes());
+                hasher.update(&(bytes.len() as u64).to_le_bytes());
+                hasher.update(&bytes);
+            }
+            Err(_) => {
+                hasher.update(suffix.as_bytes());
+                hasher.update(b"absent");
+            }
+        }
+    }
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn sha256_file(path: &Path) -> anyhow::Result<String> {
@@ -151,6 +191,7 @@ pub fn migrate_legacy_db(
 ) -> anyhow::Result<MigrationReport> {
     let started = std::time::Instant::now();
     let before = sha256_file(legacy_db)?;
+    let sidecars_before = sidecar_fingerprint(legacy_db)?;
     let uri = read_only_uri(legacy_db)?;
 
     // ps-content owns the documents/files import (idempotent, read-only ATTACH).
@@ -182,12 +223,18 @@ pub fn migrate_legacy_db(
     report.snippets = count_rows(&source, "snippets");
     report.memory_events = count_rows(&source, "memory_events");
 
-    if !opts.import_clipboard {
-        report.skipped_tables.push("clipboard_history");
-        report.skipped_tables.push("timeline_events");
+    report.skipped_tables.push("clipboard_history");
+    report.skipped_tables.push("timeline_events");
+    report.skipped_tables.push("ai_settings");
+    if opts.import_clipboard {
+        report.warnings.push(
+            "clipboard import is never performed by the migration API; enable clipboard capture in settings instead".into(),
+        );
     }
-    if !opts.import_ai_keys {
-        report.skipped_tables.push("ai_settings");
+    if opts.import_ai_keys {
+        report.warnings.push(
+            "AI keys are never imported from legacy storage; configure the provider again explicitly".into(),
+        );
     }
 
     if !opts.dry_run {
@@ -220,13 +267,30 @@ pub fn migrate_legacy_db(
                 .push("clipboard_history exists but v2 clipboard import is owned by ps-sources; not copied".into());
         }
         if let Some(summary) = &import_summary {
+            report.files = summary.files_copied;
+            report.content_docs = summary.content_documents;
             report.warnings.extend(summary.warnings.iter().cloned());
         }
-        let _ = copied;
+        if let Some(count) = copied.get("browser_items") {
+            report.browser_items = *count;
+        }
+        if let Some(count) = copied.get("quicklinks") {
+            report.quicklinks = *count;
+        }
+        if let Some(count) = copied.get("snippets") {
+            report.snippets = *count;
+        }
+        if report.quicklinks > 0 && copied.get("quicklinks").copied().unwrap_or(0) == 0 {
+            report
+                .warnings
+                .push("legacy quicklinks exist but none could be imported".into());
+        }
     }
 
     let after = sha256_file(legacy_db)?;
-    report.source_unchanged = before == after;
+    let sidecars_after = sidecar_fingerprint(legacy_db)?;
+    report.wal_or_shm_changed = sidecars_before != sidecars_after;
+    report.source_unchanged = before == after && !report.wal_or_shm_changed;
     if !report.source_unchanged {
         return Err(anyhow::anyhow!(
             "legacy database changed during migration; aborting (investigate immediately)"
@@ -290,6 +354,7 @@ mod tests {
         let before = sha256_file(&legacy).unwrap();
         let report = migrate_legacy_db(&legacy, &v2, &MigrationOptions::default()).unwrap();
         assert!(report.source_unchanged);
+        assert!(!report.wal_or_shm_changed);
         assert_eq!(report.files, 2);
         assert_eq!(report.dirs, 1);
         assert_eq!(report.content_docs, 1);

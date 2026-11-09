@@ -25,19 +25,28 @@ Internal Gate-0/Gate-1 scaffold. No installer, no signed artifacts, no public re
   pipeline currently expected red while G1 lands.
 - scripts/build-installer.ps1: dry-run-by-default unsigned NSIS wrapper with preflight, artifact
   copy, SHA-256 checksums and BUILD_INFO.txt; -Execute gated on Lead approval.
-- tests/migration/: deterministic synthetic legacy DB fixture + read-only contract tests
-  (4 pass, 1 skipped) + Rust skeleton documenting the missing ps_core::migration API.
+- tests/migration/: deterministic synthetic legacy DB fixture, read-only contract tests, and a
+  dev-only Rust probe (tests/migration/harness) that calls ps_core::migration::migrate_legacy_db
+  (migration unit tests 2/2 pass).
+- docs/security/V2_SECURITY_REVIEW.md: security review of migration, engine, Tauri command
+  surface, ps-windows and ps-content (V2-01...V2-12; no criticals; must-fixes listed).
 - Release documentation set: BUILD, MIGRATION, SECURITY, KNOWN_LIMITATIONS,
   THIRD_PARTY_LICENSES, RELEASE_CHECKLIST, CHANGELOG (this file).
 
 ### Security
+- Post-review hardening applied (docs/security/V2_SECURITY_REVIEW.md, "Resolved in tree"):
+  migration retry on failure (V2-01), DB+WAL+SHM source fingerprint (V2-02), imported-count
+  reporting (V2-03), server-side 15 s confirmation for destructive native actions (V2-04),
+  CDP disabled in release builds (V2-05), clipboard capture opt-in/off by default (V2-06),
+  migration URI percent-encoding (V2-09).
 - **Action required:** rotate the AI API key leaked in legacy git history (S-01). Do not reuse
   it. v2 ships no embedded/shared keys.
 - v2 update design is gated on signed manifest + Authenticode + SHA-256 (S-02); updater not
   implemented in this alpha.
 
 ### Known issues
-- Migration is **BLOCKED** on the engine API; import correctness is untested.
+- Migration API landed; consent/rollback flow and imported-count reporting remain G4 work
+  (review V2-01/V2-02/V2-03).
 - No v2 artifact built/run; installer unsigned; lockfiles untracked; CI red by design.
 - Frontend vitest suites are landing with the UI work; no E2E/coverage gate yet; transient TS errors while UI agents edit.
 - Agent sidecar is not yet a committed manifest-managed component.

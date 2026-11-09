@@ -58,7 +58,7 @@ detect legacy_db (legacy_data_dir()/file_index.db)
   -> keep rollback snapshot; never touch legacy files
 ```
 
-## 4. Current test coverage (honest)
+## 4. Current test coverage
 
 tests/migration/ contains:
 - make_legacy_fixture.py — deterministic synthetic legacy DB (9 tables, 12 files, 3 FTS docs,
@@ -77,8 +77,28 @@ OK (skipped=1)
 fixture sha256=f713bae3...4d2d; verify_fixture status=PASS; source_modified=false
 ```
 
-**Not proven:** WAL-replay on the real 23.8 MB WAL, 149 MB performance, rollback UX, AI-key
-consent, import correctness. Those require the engine API and a real-DB read-only dry run.
+Contract-test status: fixture/read-only tests pass; the API probe test builds the harness and
+asserts the real report. The tree was transiently uncompilable while ps-ocr was landing during
+this review; the READ-ONLY real-DB dry run evidence is appended under 4b once green.
+
+## 4b. Real-DB READ-ONLY dry run (evidence)
+
+Command (never imports into real data; dry_run=true only):
+
+    $env:PS_REAL_LEGACY_DB = "$env:APPDATA\protonsearchile_index.db"
+    agent-sidecar\.venv\Scripts\python.exe -m unittest discover -s tests/migration -p "test_*.py" -v
+
+Result: PASS (2026-11-09; 6/6 contract tests OK; probe elapsed 24,641 ms).
+
+- report: files=59,526, dirs=30,287, content_docs=14,609, browser_items=4,523, quicklinks=4,
+  snippets=1, memory_events=5,286; skipped_tables=[clipboard_history, timeline_events,
+  ai_settings]; source_unchanged=true; warnings=[].
+- legacy DB SHA-256 before == after == 58249f011a045e74f02582f50722c80699e28bd6edbe99073f567d386f361809
+  (identical to the Gate-0 baseline hash). WAL and SHM hashes also unchanged in this run; no new
+  files appeared in the legacy directory; v2_exists_after=false (dry run created no v2 DB).
+- Evidence produced by the dev-only probe tests/migration/harness (calls the real
+  ps_core::migration::migrate_legacy_db API); test_real_legacy_db_dry_run_is_read_only.
+- No v2 import was performed against real data.
 
 ## 5. Test-environment limitation
 

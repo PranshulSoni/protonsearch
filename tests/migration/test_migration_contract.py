@@ -37,6 +37,11 @@ def run_probe(legacy_db: str, v2_db: str, dry_run: bool = True) -> dict:
         raise unittest.SkipTest("cargo not available; migration probe cannot build")
     env = dict(os.environ)
     env.setdefault("CARGO_TARGET_DIR", os.path.join(HERE, "harness", "target"))
+    link_tmp = os.path.join(HERE, "harness", "target", "tmp")
+    os.makedirs(link_tmp, exist_ok=True)
+    env.setdefault("TMP", link_tmp)
+    env.setdefault("TEMP", link_tmp)
+    env.setdefault("TMPDIR", link_tmp)
     cmd = [
         cargo_exe, "run", "--quiet", "--manifest-path", PROBE_MANIFEST, "--",
         "--legacy", legacy_db, "--v2", v2_db,

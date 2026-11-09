@@ -378,3 +378,63 @@ fn performance_smoke_10k_prints_timings() {
         assert!(per < 50_000.0, "search {q} took {per} us");
     }
 }
+#[test]
+fn full_path_query_finds_anchor_beyond_old_scan_cap() {
+    // Regression: separator-containing queries used to scan only the first
+    // 250k entries, so a full-path query for an entry near the end of a 1M
+    // index returned 0 results. Scaled analogue: 260k entries + anchor last.
+    const N: usize = 260_000;
+    let anchor = r"C:\Users\Pranshul\Documents\Archive\2026\Q3\Backups\Projects\protonsearch\apps\desktop\src\components\internal\generated\very_long_anchor_filename_for_path_length_testing_0001.json";
+    let mut entries: Vec<IndexEntry> = Vec::with_capacity(N + 1);
+    for i in 0..N {
+        entries.push(entry(
+            &format!(r"C:\data\d{}\file{}.txt", i % 1000, i),
+            EntryKind::File,
+            1,
+            i as i64,
+        ));
+    }
+    entries.push(entry(anchor, EntryKind::File, 2, 999_999));
+    let index = FilenameIndex::from_entries(entries);
+    assert_eq!(index.len(), N + 1);
+
+    let hits = index.search(anchor, 10);
+    assert_eq!(hits.len(), 1, "full-path query must find the anchor at the end of the index");
+    assert_eq!(index.entry_path(hits[0].entry_index), anchor);
+    assert!((hits[0].score - 1.0).abs() < 1e-6);
+
+    // Case-insensitive and forward-slash variants must also find it.
+    let hits = index.search(&anchor.to_uppercase(), 10);
+    assert_eq!(hits.len(), 1, "case-insensitive full-path query");
+    let hits = index.search(&anchor.replace('\\', "/"), 10);
+    assert_eq!(hits.len(), 1, "forward-slash full-path query");
+
+    // Trailing-separator directory listing.
+    let hits = index.search(r"C:\data\d5\", 10);
+    assert!(!hits.is_empty(), "trailing-separator directory query");
+    assert!(hits
+        .iter()
+        .all(|h| index.entry_path(h.entry_index).starts_with(r"C:\data\d5\")));
+}
+
+#[test]
+fn full_path_query_falls_back_when_basename_is_common() {
+    // The anchored fast path only verifies the top name candidates; if the
+    // basename is extremely common the target may not be among them, so the
+    // complete full-path scan backstop must still find it.
+    let anchor = r"C:\very\deep\target\folder\index.js";
+    let mut entries: Vec<IndexEntry> = Vec::with_capacity(3_001);
+    for i in 0..3_000 {
+        entries.push(entry(
+            &format!(r"C:\src\pkg{}\index.js", i),
+            EntryKind::File,
+            1,
+            i as i64,
+        ));
+    }
+    entries.push(entry(anchor, EntryKind::File, 2, 999_999));
+    let index = FilenameIndex::from_entries(entries);
+    let hits = index.search(anchor, 10);
+    assert_eq!(hits.len(), 1, "full-path fallback scan must find the anchor");
+    assert_eq!(index.entry_path(hits[0].entry_index), anchor);
+}

@@ -14,8 +14,8 @@ use ps_agent::{AgentClient, AgentEvent};
 use ps_core::{Engine, EngineConfig};
 use ps_ipc::{
     ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentState,
-    AgentStatus, EngineStatus, IndexCommand, OnboardingInput, OnboardingState, OpenOutcome,
-    SearchRequest, SearchResponse, Settings, SettingsPatch,
+    AgentStatus, EngineStatus, IndexCommand, NativeCommand, OnboardingInput, OnboardingState,
+    OpenOutcome, SearchRequest, SearchResponse, Settings, SettingsPatch,
 };
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -165,6 +165,10 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 /// renderer opens a loopback DevTools socket so the E2E harness can drive the
 /// real app (screenshots + latency). Not set in production; loopback only.
 fn cdp_browser_args() -> Option<String> {
+    // Debug builds only: a release binary must never expose a CDP socket.
+    if !cfg!(debug_assertions) {
+        return None;
+    }
     std::env::var("PROTONSEARCH_CDP_PORT")
         .ok()
         .filter(|port| port.chars().all(|c| c.is_ascii_digit()) && !port.is_empty())
@@ -274,6 +278,16 @@ async fn open_result(
     Ok(tauri::async_runtime::spawn_blocking(move || engine.execute_action(action))
         .await
         .map_err(|e| format!("action task failed: {e}"))?)
+}
+
+/// Second step of the destructive-action confirmation handshake. The engine
+/// only accepts the command it asked about within 15 seconds.
+#[tauri::command]
+fn confirm_native_action(
+    state: tauri::State<'_, AppState>,
+    command: NativeCommand,
+) -> OpenOutcome {
+    state.engine.confirm_destructive(command)
 }
 
 #[tauri::command]
@@ -582,6 +596,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             search,
             open_result,
+            confirm_native_action,
             get_status,
             get_settings,
             update_settings,

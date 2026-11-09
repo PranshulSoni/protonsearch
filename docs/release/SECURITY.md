@@ -1,8 +1,9 @@
 # Security — ProtonSearch v2 (consolidated release view)
 
-This is the release-facing summary. The full threat model, evidence and remediation tracking
-live in **docs/security/SECURITY_RISK_REGISTER.md** (Gate 0, commit de0ef19). Nothing here
-replaces that register.
+This is the release-facing summary. The full legacy threat model is in
+**docs/security/SECURITY_RISK_REGISTER.md** (Gate 0, commit de0ef19); the v2 code review is in
+**docs/security/V2_SECURITY_REVIEW.md** (no criticals; must-fixes listed). Nothing here replaces
+those documents.
 
 ## 1. Legacy exposure that must be handled before any v2 release
 
@@ -17,6 +18,16 @@ replaces that register.
 | S-07 | HIGH | Legacy clipboard capture + Windows-history import persists secrets/screenshots without opt-in (main.rs:1937-1999,11704-11826). | v2 clipboard capture opt-in/off by default, source-app exclusions, TTL; never send clipboard to AI implicitly. |
 
 Other findings (S-08...S-20) and positive controls are in the register.
+
+## 1b. v2 code review status (2026-11-09)
+
+docs/security/V2_SECURITY_REVIEW.md reviewed migration, engine, Tauri command surface,
+ps-windows and ps-content. No criticals were found. Post-review fixes verified: migration retry
+state (V2-01), DB+WAL+SHM fingerprinting (V2-02), imported-count reporting (V2-03), server-side
+15 s confirmation handshake for destructive native actions (V2-04), CDP disabled in release
+builds (V2-05), clipboard opt-in by default (V2-06), migration URI encoding (V2-09). Residual
+risks: clipboard DIB pixel cap (V2-07), app-target validation depth (V2-08), activity-log
+retention UX (V2-10). See the review document for file:line evidence.
 
 ## 2. v2 security requirements (release gates)
 

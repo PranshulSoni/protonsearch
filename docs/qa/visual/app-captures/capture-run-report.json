@@ -1,12 +1,14 @@
 {
- "capturedAt": "2026-11-09T12:00:55.309Z",
- "launcher": [
+ "capturedAt": "2026-11-09T12:10:16.593Z",
+ "states": [
   {
    "name": "real-launcher-empty",
+   "input": "",
    "count": "",
    "options": 0,
    "preview": false,
    "menu": false,
+   "confirm": null,
    "width": 820,
    "height": 256,
    "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close",
@@ -14,21 +16,25 @@
   },
   {
    "name": "real-launcher-architecture",
+   "input": "arch",
    "count": "50 matches",
    "options": 50,
    "preview": false,
    "menu": false,
+   "confirm": null,
    "width": 820,
-   "height": 256,
+   "height": 480,
    "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
    "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-architecture.png"
   },
   {
    "name": "real-launcher-preview",
-   "count": "19 matches",
-   "options": 19,
+   "input": "arch",
+   "count": "50 matches",
+   "options": 50,
    "preview": true,
    "menu": false,
+   "confirm": null,
    "width": 1180,
    "height": 480,
    "footer": "Indexing…·1,31,199 items·Open ProtonSearchCtrl+Space Close previewEsc Close",
@@ -36,21 +42,25 @@
   },
   {
    "name": "real-launcher-context-menu",
-   "count": "No matches",
-   "options": 0,
+   "input": "arch",
+   "count": "50 matches",
+   "options": 50,
    "preview": false,
-   "menu": false,
+   "menu": true,
+   "confirm": null,
    "width": 820,
-   "height": 256,
-   "footer": "Indexing…·1,31,199 items·Open ProtonSearchEsc Clear",
+   "height": 480,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
    "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-context-menu.png"
   },
   {
    "name": "real-launcher-zero",
+   "input": "zzzzzz-no-such-file",
    "count": "No matches",
    "options": 0,
    "preview": false,
    "menu": false,
+   "confirm": null,
    "width": 820,
    "height": 256,
    "footer": "Indexing…·1,31,199 items·Open ProtonSearchEsc Clear",
@@ -58,10 +68,12 @@
   },
   {
    "name": "real-launcher-one-match",
+   "input": "ARCHITECTURE-091877e3.json",
    "count": "1 match",
    "options": 1,
    "preview": false,
    "menu": false,
+   "confirm": null,
    "width": 820,
    "height": 256,
    "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
@@ -69,10 +81,12 @@
   },
   {
    "name": "real-launcher-long-list",
+   "input": "a",
    "count": "50 matches",
    "options": 50,
    "preview": false,
    "menu": false,
+   "confirm": null,
    "width": 820,
    "height": 480,
    "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
@@ -82,28 +96,48 @@
  "latencies": [
   {
    "query": "arch",
-   "tookMs": 26.299999997019768,
+   "tookMs": 39.899999998509884,
    "options": 50
   },
   {
    "query": "readme",
-   "tookMs": 23,
+   "tookMs": 35.79999999701977,
    "options": 50
   },
   {
    "query": "protonserch",
-   "tookMs": 23.19999999552965,
+   "tookMs": 35.100000001490116,
    "options": 19
   },
   {
-   "query": "zzzzzz-no-such-file",
-   "tookMs": null,
-   "options": 0
-  },
-  {
    "query": "a",
-   "tookMs": 24.19999999552965,
+   "tookMs": 40.899999998509884,
    "options": 50
   }
- ]
+ ],
+ "confirmProbe": {
+  "query": "shutdown",
+  "before": {
+   "input": "shutdown",
+   "count": "50 matches",
+   "options": 50,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 480,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear"
+  },
+  "afterEnter": {
+   "input": "",
+   "count": "",
+   "options": 0,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 256,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close"
+  }
+ }
 }

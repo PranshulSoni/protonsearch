@@ -335,10 +335,15 @@ impl ContentIndex {
             .join(" ");
         let limit = limit.clamp(1, 200);
         let conn = self.lock()?;
+        // Perf note: snippet_line is computed from a bounded prefix of the
+        // document text. Fetching full 512 KB texts for 30 hits dominated query
+        // latency (p95 > 60 ms); 128 KB keeps line numbers for the vast
+        // majority of real documents while bounding the scan.
         let mut statement = conn.prepare(
             "SELECT d.path, d.title, \
                     snippet(documents_fts, 2, '', '', '…', 24) AS snip, \
-                    bm25(documents_fts) AS rank, d.text \
+                    bm25(documents_fts) AS rank, \
+                    CASE WHEN LENGTH(d.text) <= 131072 THEN d.text ELSE SUBSTR(d.text, 1, 131072) END \
              FROM documents_fts \
              JOIN documents d ON d.id = documents_fts.rowid \
              WHERE documents_fts MATCH ?1 \
@@ -404,6 +409,26 @@ impl ContentIndex {
                 "INSERT OR REPLACE INTO content_errors(path, error, at) VALUES(?1, ?2, ?3)",
                 params![path, message, now_ms()],
             );
+        }
+    }
+
+    /// Most recent extraction errors (path, message), newest first.
+    pub fn recent_errors(&self, limit: usize) -> Vec<(String, String)> {
+        let Ok(conn) = self.lock() else {
+            return Vec::new();
+        };
+        let mut statement = match conn
+            .prepare("SELECT path, error FROM content_errors ORDER BY at DESC LIMIT ?1")
+        {
+            Ok(statement) => statement,
+            Err(_) => return Vec::new(),
+        };
+        let rows = statement.query_map([limit.max(1) as i64], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        });
+        match rows {
+            Ok(rows) => rows.flatten().collect(),
+            Err(_) => Vec::new(),
         }
     }
 
@@ -505,6 +530,10 @@ fn hash_text(text: &str) -> String {
 }
 
 /// 1-based line number of the first query-term match, or None.
+///
+/// The caller passes at most a bounded prefix of the document text, so this is
+/// a linear scan with a first-byte fast path (no allocation, ASCII case fold;
+/// non-ASCII terms match exactly).
 pub fn find_line_of_first_term(text: &str, terms: &[String]) -> Option<u32> {
     let haystack = text.as_bytes();
     let mut best: Option<usize> = None;
@@ -513,15 +542,20 @@ pub fn find_line_of_first_term(text: &str, terms: &[String]) -> Option<u32> {
         if needle.is_empty() || needle.len() > haystack.len() {
             continue;
         }
-        let mut found = None;
-        for index in 0..=haystack.len() - needle.len() {
-            if haystack[index..index + needle.len()].eq_ignore_ascii_case(needle) {
-                found = Some(index);
+        let first = needle[0];
+        let last_start = haystack.len() - needle.len();
+        let mut index = 0usize;
+        while index <= last_start {
+            if haystack[index].eq_ignore_ascii_case(&first)
+                && haystack[index..index + needle.len()].eq_ignore_ascii_case(needle)
+            {
+                best = Some(best.map_or(index, |current: usize| current.min(index)));
                 break;
             }
+            index += 1;
         }
-        if let Some(index) = found {
-            best = Some(best.map_or(index, |current: usize| current.min(index)));
+        if best == Some(0) {
+            break;
         }
     }
     best.map(|index| {

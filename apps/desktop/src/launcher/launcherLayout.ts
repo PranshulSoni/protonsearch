@@ -15,6 +15,8 @@ export const SEARCHLINE_HEIGHT = 72;
 /** SCREENS §6.1: the search row shrinks to 61 px on a narrow surface (≤700 px). */
 export const SEARCHLINE_HEIGHT_NARROW = 61;
 export const FOOTER_HEIGHT = 44;
+/** Inline destructive-action confirmation row above the footer (V2-04). */
+export const CONFIRM_BAR_HEIGHT = 44;
 /** Results container padding: 10 px top + 13 px bottom (reference:34). */
 export const RESULTS_PADDING = 23;
 export const GROUP_LABEL_HEIGHT = 34;
@@ -75,6 +77,8 @@ export interface LauncherMetricsInput {
   groupRowCounts: readonly number[];
   density?: Density;
   previewOpen: boolean;
+  /** The inline confirm bar is visible and consumes a row above the footer. */
+  confirmOpen?: boolean;
   workArea: WorkAreaSize;
 }
 
@@ -89,6 +93,8 @@ export interface LauncherMetrics {
   baseHeight: number;
   /** Actual window height to request (includes a bottom preview drawer). */
   totalHeight: number;
+  /** Inline confirmation bar height included in the window (0 when hidden). */
+  confirmHeight: number;
   /** Height available to the scrolling results list. */
   listViewport: number;
   previewMode: PreviewMode;
@@ -111,9 +117,16 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     (sum, rows) => sum + labelHeight + rows * rowHeight,
     0,
   );
-  // The window height must include the footer and its own 1 px borders
-  // (B2 / SCREENS §2.1); without them a 2 px overflow forces a scrollbar.
-  const raw = searchlineHeight + RESULTS_PADDING + content + FOOTER_HEIGHT + WINDOW_BORDER;
+  const confirmHeight = input.confirmOpen ? CONFIRM_BAR_HEIGHT : 0;
+  // The window height must include the footer, the confirm row and its own 1 px
+  // borders (B2 / SCREENS §2.1); otherwise content overflows and scrolls.
+  const raw =
+    searchlineHeight +
+    RESULTS_PADDING +
+    content +
+    FOOTER_HEIGHT +
+    confirmHeight +
+    WINDOW_BORDER;
   const baseHeight = snapTo2(
     Math.min(MAX_LAUNCHER_HEIGHT, Math.max(MIN_LAUNCHER_HEIGHT, raw)),
   );
@@ -130,7 +143,7 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     0,
     Math.min(
       MAX_RESULTS_VIEWPORT,
-      baseHeight - searchlineHeight - FOOTER_HEIGHT - WINDOW_BORDER,
+      baseHeight - searchlineHeight - FOOTER_HEIGHT - confirmHeight - WINDOW_BORDER,
     ),
   );
   return {
@@ -138,6 +151,7 @@ export function computeLauncherMetrics(input: LauncherMetricsInput): LauncherMet
     labelHeight,
     searchlineHeight,
     surfaceWidth,
+    confirmHeight,
     baseHeight,
     totalHeight,
     listViewport,

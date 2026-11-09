@@ -82,6 +82,9 @@ pub struct Engine {
     shutdown: AtomicBool,
     force_rescan: AtomicBool,
     legacy_summary: Mutex<Option<LegacySummary>>,
+    /// One-shot confirmation state for destructive native commands: a request
+    /// must be repeated through confirm_destructive within 15 seconds.
+    pending_destructive: Mutex<Option<(NativeCommand, i64)>>,
 }
 
 impl Engine {
@@ -147,6 +150,7 @@ impl Engine {
             shutdown: AtomicBool::new(false),
             force_rescan: AtomicBool::new(false),
             legacy_summary: Mutex::new(None),
+            pending_destructive: Mutex::new(None),
         })
     }
 
@@ -673,6 +677,34 @@ impl Engine {
     pub fn execute_action(&self, action: ActionSpec) -> OpenOutcome {
         let settings = self.settings_snapshot();
         let (kind, title, path) = describe_action(&action);
+        // Server-side authorisation for destructive commands: the WebView (or any
+        // other caller of the invoke surface) cannot one-shot power off the PC.
+        if let ActionSpec::RunNative { command } = &action {
+            if is_destructive(*command) {
+                let pending = self
+                    .pending_destructive
+                    .lock()
+                    .ok()
+                    .and_then(|guard| *guard);
+                let confirmed = pending
+                    .map(|(pending_command, at)| pending_command == *command && now_ms() - at < 15_000)
+                    .unwrap_or(false);
+                if !confirmed {
+                    if let Ok(mut guard) = self.pending_destructive.lock() {
+                        *guard = Some((*command, now_ms()));
+                    }
+                    return OpenOutcome {
+                        ok: false,
+                        message: format!(
+                            "Confirmation required for {command:?}. Ask again to execute."
+                        ),
+                    };
+                }
+                if let Ok(mut guard) = self.pending_destructive.lock() {
+                    *guard = None;
+                }
+            }
+        }
         let outcome = match &action {
             ActionSpec::RunNative { command } => match command {
                 NativeCommand::PauseIndexing => {
@@ -700,6 +732,44 @@ impl Engine {
                 Some(&outcome.message),
                 path.as_deref(),
             );
+        }
+        outcome
+    }
+
+    /// Execute a previously requested destructive command after the user
+    /// confirmed it. Only the command that was requested within the last 15 s
+    /// is accepted; everything else is rejected.
+    pub fn confirm_destructive(&self, command: NativeCommand) -> OpenOutcome {
+        if !is_destructive(command) {
+            return OpenOutcome {
+                ok: false,
+                message: "That action does not require confirmation.".into(),
+            };
+        }
+        let accepted = self
+            .pending_destructive
+            .lock()
+            .ok()
+            .and_then(|mut guard| guard.take())
+            .map(|(pending, at)| pending == command && now_ms() - at < 15_000)
+            .unwrap_or(false);
+        if !accepted {
+            return OpenOutcome {
+                ok: false,
+                message: "Confirmation expired or did not match. Ask again.".into(),
+            };
+        }
+        let outcome = ps_sources::actions::run_native(command);
+        if outcome.ok {
+            let settings = self.settings_snapshot();
+            if settings.privacy.activity_history {
+                let _ = self.db.log_activity(
+                    ActivityKind::Workflow,
+                    &format!("{command:?}"),
+                    Some(&outcome.message),
+                    None,
+                );
+            }
         }
         outcome
     }
@@ -1950,6 +2020,13 @@ fn describe_action(action: &ActionSpec) -> (ActivityKind, String, Option<String>
         ActionSpec::RunWorkflow { id } => (ActivityKind::Workflow, id.clone(), None),
         ActionSpec::None => (ActivityKind::System, "No action".into(), None),
     }
+}
+
+fn is_destructive(command: NativeCommand) -> bool {
+    matches!(
+        command,
+        NativeCommand::Shutdown | NativeCommand::Restart | NativeCommand::EmptyRecycleBin
+    )
 }
 
 fn indexer_state(state: u8) -> IndexerState {

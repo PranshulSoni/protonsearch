@@ -1,0 +1,386 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1794226021593,
+  "projectRoot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Rust",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "Cargo.toml"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "cargo",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cargo build",
+    "testCommand": "cargo test",
+    "lintCommand": "cargo clippy",
+    "devCommand": "cargo run",
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "assets",
+      "docs",
+      "scripts",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "agent-sidecar": {
+      "path": "agent-sidecar",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1794226021460,
+      "keyFiles": [
+        "README.md",
+        "requirements.lock.txt",
+        "requirements.txt"
+      ]
+    },
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021461,
+      "keyFiles": []
+    },
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1794226021463,
+      "keyFiles": [
+        "catalog.bin"
+      ]
+    },
+    "crates": {
+      "path": "crates",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021465,
+      "keyFiles": []
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1794226021466,
+      "keyFiles": []
+    },
+    "icons": {
+      "path": "icons",
+      "purpose": null,
+      "fileCount": 35,
+      "lastAccessed": 1794226021467,
+      "keyFiles": [
+        "agent-history.ico",
+        "AgentChat.ico",
+        "AgentLogo.ico",
+        "AgentLogo.png",
+        "AgentLogo_small.png"
+      ]
+    },
+    "launcher_source_icons": {
+      "path": "launcher_source_icons",
+      "purpose": null,
+      "fileCount": 22,
+      "lastAccessed": 1794226021468,
+      "keyFiles": [
+        "agent-history.png",
+        "all.png",
+        "browser-bookmarks.png",
+        "browser-history.png",
+        "clipboard-history.png"
+      ]
+    },
+    "ocr-tmp": {
+      "path": "ocr-tmp",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1794226021469,
+      "keyFiles": [
+        "img_000_ui_light.png",
+        "manifest.jsonl"
+      ]
+    },
+    "packaging": {
+      "path": "packaging",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021470,
+      "keyFiles": []
+    },
+    "protonsearch": {
+      "path": "protonsearch",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1794226021472,
+      "keyFiles": [
+        "build.rs",
+        "Cargo.lock",
+        "Cargo.toml",
+        "installer.iss",
+        "test_ai_prefixes.db"
+      ]
+    },
+    "ps-migration-fixture-0xkhdylt": {
+      "path": "ps-migration-fixture-0xkhdylt",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021473,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-2hzraxw_": {
+      "path": "ps-migration-fixture-2hzraxw_",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021474,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-2m5gy5aa": {
+      "path": "ps-migration-fixture-2m5gy5aa",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021475,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-37xmg0hw": {
+      "path": "ps-migration-fixture-37xmg0hw",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021476,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-3kh6q3d0": {
+      "path": "ps-migration-fixture-3kh6q3d0",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021477,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-3uav_sgw": {
+      "path": "ps-migration-fixture-3uav_sgw",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021478,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-6myd3jkw": {
+      "path": "ps-migration-fixture-6myd3jkw",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021479,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-a3nf8thn": {
+      "path": "ps-migration-fixture-a3nf8thn",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021479,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-ax_dn9wq": {
+      "path": "ps-migration-fixture-ax_dn9wq",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021480,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-b7hr28c8": {
+      "path": "ps-migration-fixture-b7hr28c8",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021481,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-dhpp25sl": {
+      "path": "ps-migration-fixture-dhpp25sl",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021482,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-eyaa8ywa": {
+      "path": "ps-migration-fixture-eyaa8ywa",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021483,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-fqwcq7fy": {
+      "path": "ps-migration-fixture-fqwcq7fy",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021484,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-f_fx_4ah": {
+      "path": "ps-migration-fixture-f_fx_4ah",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021485,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-hcezp_8g": {
+      "path": "ps-migration-fixture-hcezp_8g",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021486,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-j4f39rn_": {
+      "path": "ps-migration-fixture-j4f39rn_",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021487,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-jgii0kop": {
+      "path": "ps-migration-fixture-jgii0kop",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021488,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-juhk161t": {
+      "path": "ps-migration-fixture-juhk161t",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021489,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-l4_dxwlq": {
+      "path": "ps-migration-fixture-l4_dxwlq",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021490,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-otdkrwxq": {
+      "path": "ps-migration-fixture-otdkrwxq",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021490,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-pqxvg7wn": {
+      "path": "ps-migration-fixture-pqxvg7wn",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021491,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-q9zolgyr": {
+      "path": "ps-migration-fixture-q9zolgyr",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021492,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-rkx7832t": {
+      "path": "ps-migration-fixture-rkx7832t",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021493,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-s7yj4owq": {
+      "path": "ps-migration-fixture-s7yj4owq",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794226021494,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 7,
+      "lastAccessed": 1794226021495,
+      "keyFiles": [
+        "benchmark_embeddings.py",
+        "build-installer.ps1",
+        "convert_logos.py",
+        "embed_catalog.py",
+        "export_bge_base.py"
+      ]
+    },
+    "target": {
+      "path": "target",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1794226021496,
+      "keyFiles": [
+        "CACHEDIR.TAG"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1794226021497,
+      "keyFiles": []
+    },
+    "tools": {
+      "path": "tools",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1794226021497,
+      "keyFiles": [
+        "capture-app.ps1"
+      ]
+    },
+    "agent-sidecar\\scripts": {
+      "path": "agent-sidecar\\scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1794226021499,
+      "keyFiles": [
+        "measure_import.py",
+        "measure_sidecar.py"
+      ]
+    },
+    "agent-sidecar\\tests": {
+      "path": "agent-sidecar\\tests",
+      "purpose": "Test files",
+      "fileCount": 2,
+      "lastAccessed": 1794226021500,
+      "keyFiles": [
+        "test_protocol.py",
+        "test_scripted_sidecar.py"
+      ]
+    },
+    "protonsearch\\src": {
+      "path": "protonsearch\\src",
+      "purpose": "Source code",
+      "fileCount": 16,
+      "lastAccessed": 1794226021506,
+      "keyFiles": [
+        "ai.rs",
+        "applog.rs",
+        "browser_indexer.rs"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

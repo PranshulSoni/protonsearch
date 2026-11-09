@@ -103,6 +103,20 @@ describe("computeLauncherMetrics", () => {
     expect(metrics.listViewport).toBe(362);
   });
 
+  it("reserves 44 px for the inline confirmation bar above the footer", () => {
+    const metrics = computeLauncherMetrics({
+      groupRowCounts: [1],
+      density: "comfortable",
+      previewOpen: false,
+      confirmOpen: true,
+      workArea: WORK_AREA,
+    });
+    // 72 + 23 + (34 + 58) + 44 footer + 44 confirm + 2 border = 277 -> 278.
+    expect(metrics.confirmHeight).toBe(44);
+    expect(metrics.baseHeight).toBe(278);
+    expect(metrics.listViewport).toBe(116);
+  });
+
   it("grows for a bottom preview drawer but not a side panel", () => {
     const side = computeLauncherMetrics({
       groupRowCounts: [2],

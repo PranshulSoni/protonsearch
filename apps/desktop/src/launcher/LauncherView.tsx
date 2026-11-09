@@ -9,7 +9,7 @@ import LauncherSurface, { type LauncherSurfaceHandle } from "./LauncherSurface";
  * so it can be tested against a mock bridge.
  */
 export default function LauncherView() {
-  const { status, settings, openResult, hideLauncher, showMain } = useApp();
+  const { status, settings, hideLauncher, showMain } = useApp();
   const surfaceRef = useRef<LauncherSurfaceHandle>(null);
 
   useEffect(() => {
@@ -50,7 +50,11 @@ export default function LauncherView() {
     <LauncherSurface
       ref={surfaceRef}
       search={api.search}
-      openResult={openResult}
+      /* Use the bridge directly: App.openResult hides the launcher even when the
+         engine returns a confirmation challenge, which would hide this bar. The
+         surface owns hide-after-execute for every action type. */
+      openResult={api.openResult}
+      confirmNativeAction={api.confirmNativeAction}
       hideLauncher={hideLauncher}
       showMain={showMain}
       status={status}
