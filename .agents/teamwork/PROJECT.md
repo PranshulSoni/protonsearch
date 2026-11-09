@@ -83,10 +83,18 @@ while keeping the overall look. Interpretation recorded here so later phases do 
 - [x] Anti-slop audit written: docs/design/design-slop-audit-2026-11-09.md (baseline: 11 gates fail)
 - [x] Design brief v2 written: docs/design/dock-design-brief-v2.md (tokens, bans, anatomy, icon/motion contracts)
 - [x] Acceptance checker: .agents/design/check-design.mjs (fails baseline, becomes the merge gate)
-- [ ] Style subagent -> .agents/design/out/dock-v2.css
-- [ ] Icon subagent -> .agents/design/out/icons.js + icon-sheet.md
-- [ ] Widget subagent -> .agents/design/out/widgets.md + widget-patches.md
-- [ ] Motion subagent -> .agents/design/out/motion.md + motion-patches.md
-- [ ] Lead integrates into dock-editable.html (style block, icons, widget content, motion, inline onclick removal)
-- [ ] Checker PASS + headless Edge screenshots + forensic audit
-- [ ] Commit on dock (design docs + revised HTML). Re-pin deferred until user approves the new authority.
+- [x] Style subagent -> .agents/design/out/dock-v2.css
+- [x] Icon subagent -> .agents/design/out/icons.js + icon-sheet.md
+- [x] Widget subagent -> .agents/design/out/widgets.md + widget-patches.md
+- [x] Motion subagent -> .agents/design/out/motion.md + motion-patches.md
+- [x] Lead integrated into dock-editable.html (style block, icons, widget content, motion, inline handlers, toast/focus fixes)
+- [x] Checker PASS 16/16 + jsdom smoke + Chromium screenshots (Edge failed on this host; Chrome used)
+- [x] Committed on dock (design docs + revised HTML + screenshots). Re-pin deferred until user approves the new authority.
+
+## Final state - 2026-11-09 (design revision)
+
+`dock-editable.html` is fully revised: new token-based stylesheet, 63-icon set, honest widget
+content, wired controls, tokenised motion, responsive + reduced-motion, accessibility pass.
+Checker PASS 16/16; jsdom interaction smoke clean; Chromium screenshots under
+docs/design/revision-2026-11-09/. The native Tauri app is unchanged; re-pinning the HTML
+authority waits for user approval of this revision.
