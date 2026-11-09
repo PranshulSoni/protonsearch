@@ -15,6 +15,15 @@ pub enum AgentError {
     #[error("agent sidecar is not running")]
     NotRunning,
 
+    /// A run is already active for this client (one run at a time).
+    #[error("an agent run is already active")]
+    Busy,
+
+    /// A Pi invocation could not be built or launched (bad settings, rejected
+    /// argument, missing workspace).
+    #[error("pi runtime error: {0}")]
+    Pi(String),
+
     /// A protocol frame would exceed the hard line bound.
     #[error("protocol frame is {actual} bytes; the limit is {limit} bytes")]
     LineTooLong { actual: usize, limit: usize },

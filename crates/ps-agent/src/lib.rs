@@ -1,21 +1,22 @@
-//! Optional Python agent sidecar client (Gate 6). OWNER: agent-sidecar.
+//! Agent runtime clients (Gate 6). OWNER: agent-sidecar.
 //!
-//! The sidecar is a Pydantic AI agent process (agent-sidecar/ in the repo)
-//! that is launched on demand, speaks versioned JSON Lines over stdio, and is
-//! never started for search or launch. No credentials are bundled; the user
-//! configures a model and the model key lives in the environment or the OS
-//! secret store.
+//! Two interchangeable backends map their native event stream onto the frozen
+//! ps-ipc [`AgentEvent`] contract:
 //!
-//! This crate owns: process lifecycle (CREATE_NO_WINDOW, piped stdio, stderr
-//! drain), JSONL framing with a hard line bound, event streaming, cancel,
-//! approval responses, configurable idle-timeout kill, crash detection with at
-//! most one automatic restart, and a non-spawning capability probe.
+//! * [`pi`] — the default runtime: the installed Pi coding-agent CLI
+//!   (`@earendil-works/pi-coding-agent`, spawned as `pi --mode json`). One
+//!   process per run, read-only tools by default, opt-in writes, idle/run
+//!   timeouts and tree-wide cancellation. See `docs/agent/PI_INTEGRATION.md`.
+//! * The legacy embedded Python sidecar ([crate::AgentClient], Pydantic AI) is
+//!   kept as an optional fallback; see `docs/agent/INTEGRATION.md`.
 //!
-//! Integration contract for the Tauri shell: docs/agent/INTEGRATION.md.
+//! Nothing here runs on the search path: clients are created lazily when a
+//! workflow starts. The Pi probe never makes a model call.
 
 mod client;
 pub mod config;
 mod error;
+pub mod pi;
 mod protocol;
 
 pub use client::{AgentClient, EventCallback, MAX_RESTARTS, SHUTDOWN_GRACE};
@@ -24,6 +25,10 @@ pub use config::{
     DEFAULT_IDLE_TIMEOUT,
 };
 pub use error::AgentError;
+pub use pi::{
+    build_pi_run_args, locate_pi, pi_safety_preamble, pi_tool_allowlist, probe_pi, PiAgentClient,
+    PiAgentConfig, PiInfo, PiRunArgsSpec, DEFAULT_MAX_RUN_DURATION, DEFAULT_PI_IDLE_TIMEOUT,
+};
 pub use ps_ipc::{AgentApprovalResponse, AgentEvent, AgentRunRequest};
 
 /// Agent protocol version spoken by the sidecar (frozen ps-ipc version).

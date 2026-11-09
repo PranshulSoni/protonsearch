@@ -1,4 +1,12 @@
-# Agent sidecar integration contract (for the Tauri shell)
+# Agent runtime integration — legacy Pydantic sidecar fallback
+
+> **Default runtime changed (2026-11-09):** the user selected the installed Pi
+> coding-agent CLI as the v2 agent runtime (ps-ipc `AgentSettings.runtime`
+> defaults to `pi`). That backend is documented in
+> [`PI_INTEGRATION.md`](PI_INTEGRATION.md) and is what the Tauri shell should
+> wire for `AgentRuntime::Pi`. This document remains the contract for the
+> optional `AgentRuntime::Pydantic` fallback (the Python sidecar), which is
+> kept and not deleted.
 
 - Date: 2026-11-09
 - Owner: L2-A4 (agent sidecar); wiring owner: L0 (apps/desktop/src-tauri is
@@ -7,7 +15,7 @@
 - Runtime crate: `crates/ps-agent`; process: `agent-sidecar` (Python)
 
 The sidecar is **optional and on-demand**: never create it in `setup()`, never
-touch it on the search path. Search works with the Python runtime absent.
+touch it on the search path. Search works with the runtime absent.
 
 ## 1. Crate dependency
 

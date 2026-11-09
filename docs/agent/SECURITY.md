@@ -7,6 +7,10 @@
   contract described in `docs/agent/INTEGRATION.md`.
 - Status: implemented for protocol v1; residual risks are listed at the end
   and are not silently accepted.
+- Scope note (2026-11-09): this document covers the **legacy Pydantic sidecar**
+  fallback. The default Pi runtime's security model (read-only default tools,
+  opt-in writes, no per-tool approval, no OS sandbox) is documented in
+  [`PI_INTEGRATION.md`](PI_INTEGRATION.md) §6.
 
 ## 1. Assets and trust boundaries
 

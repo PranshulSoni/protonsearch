@@ -1,5 +1,12 @@
 # Agent runtime evaluation — Pydantic AI vs Nanobot
 
+> **Addendum (2026-11-09, after this spike):** the user subsequently chose the
+> installed **Pi coding-agent CLI 1.5.0** as the v2 agent runtime for agentic
+> workflows (Hermes dropped). The Pydantic AI sidecar evaluated here is kept as
+> an optional fallback. The Pi runtime contract, mapping, security model and
+> tests are in [`PI_INTEGRATION.md`](PI_INTEGRATION.md); the measurements below
+> remain the evidence for the fallback decision.
+
 - Date: 2026-11-09
 - Owner: L2-A4 (agent sidecar); decision wired by L1-A / L0
 - Gate: G6 (optional Python agent sidecar)

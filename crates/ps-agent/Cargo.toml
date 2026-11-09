@@ -10,3 +10,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
+
+# Offline test/support executable that emulates the Pi JSONL stream for
+# integration tests. Never used by the app; see docs/agent/PI_INTEGRATION.md.
+[[bin]]
+name = "ps_agent_fake_pi"
+path = "src/bin/ps_agent_fake_pi.rs"
