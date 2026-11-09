@@ -5935,12 +5935,23 @@ mod tests {
         assert_eq!(workday_memory_query_days("open chrome yesterday"), None);
     }
 
+    /// Scratch DBs live inside the crate's target dir, not the process temp
+    /// dir: some Windows sandboxes and AV policies block SQLite from creating
+    /// files in %TEMP%, which made these tests environment-dependent.
+    fn test_scratch_dir() -> std::path::PathBuf {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("test-scratch");
+        let _ = std::fs::create_dir_all(&dir);
+        dir
+    }
+
     fn unique_test_db(name: &str) -> std::path::PathBuf {
         let stamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        std::env::temp_dir().join(format!("protonsearch_{name}_{stamp}.db"))
+        test_scratch_dir().join(format!("protonsearch_{name}_{stamp}.db"))
     }
 
     #[test]
@@ -6489,6 +6500,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "integration test: requires a real %APPDATA% index DB and the ONNX model"]
     fn test_search_file() {
         let db_path = match std::env::var("APPDATA") {
             Ok(d) => {

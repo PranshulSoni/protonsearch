@@ -1303,6 +1303,17 @@ mod tests {
 
     static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+    /// Test config dirs live under the crate target dir so SQLite can create
+    /// files even when the host blocks %TEMP%.
+    fn test_scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("test-scratch")
+            .join(name);
+        let _ = std::fs::create_dir_all(&dir);
+        dir
+    }
+
     #[test]
     fn test_html_to_text() {
         let html = "<html><head><style>p{color:red}</style></head><body><p>Hello &amp; <b>world</b></p><script>alert(1)</script></body></html>";
@@ -1314,7 +1325,7 @@ mod tests {
         let _guard = TEST_LOCK.lock().unwrap();
         // Isolate APPDATA to a temporary path to avoid reading host DB/configs
         let old_appdata = std::env::var("APPDATA").ok();
-        let temp_dir = std::env::temp_dir().join("protonsearch-test-appdata");
+        let temp_dir = test_scratch_dir("appdata");
         let _ = std::fs::remove_dir_all(&temp_dir); // Clean any stale database/directory
         let _ = std::fs::create_dir_all(&temp_dir);
         std::env::set_var("APPDATA", &temp_dir);
@@ -1359,7 +1370,7 @@ mod tests {
     fn hermes_falls_back_to_opencode_key_when_gateway_is_down() {
         let _guard = TEST_LOCK.lock().unwrap();
         let old_appdata = std::env::var("APPDATA").ok();
-        let temp_dir = std::env::temp_dir().join("protonsearch-test-hermes-fallback");
+        let temp_dir = test_scratch_dir("hermes-fallback");
         let _ = std::fs::remove_dir_all(&temp_dir); // Clean any stale database/directory
         let app_dir = temp_dir.join("protonsearch");
         let _ = std::fs::create_dir_all(&app_dir);
