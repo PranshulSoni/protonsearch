@@ -89,3 +89,21 @@ Remaining blockers to G2/G4/G5 closure are listed in V10_G1_ARCHITECTURE.md sect
 preview UI; app-process clipboard GUI matrix; island card completeness + task-35 adapters + native
 visual/frame-pacing evidence; design-spec micro-spec sync; single-monitor/no-signing-cert/no-non-Pi-
 credentials environment gaps; content p95 task-42).
+
+
+## 7. G8 round 1 verdict and sign-off requirements (task-50, 2026-11-10)
+
+Verdict: **PARTIAL - NOT SIGNED.** Positive: frontend 18 files/237 tests pass + build 0; targeted Rust
+ps-ipc 17/17 and ps-agent 100/100; live P0-1 preview payloads/screenshots (TXT/PDF/DOCX/PNG+OCR/
+binary/truncation); live P0-2 real .NET clipboard image -> island Images thumbnails -> restart
+persistence. Blocking-for-sign-off: full cargo workspace currently fails to compile on task-35
+uncommitted ps-windows changes; pairwise matrix only partially executed; native adapter cards
+Media/Controls/Notifications honest-disabled; island/launcher native DPI/High Contrast/frame-pacing
+evidence missing; paste-back through the island UI not verified; several preview formats not executed;
+environment (single monitor, no signing certificate, no non-Pi credentials); official content p95
+target not yet reproduced.
+
+Sign-off sequence: (1) rerun on a green commit with cargo test --workspace + frontend suites pass;
+(2) execute the G8 sign-off list in docs/implementation/V10_G8_VERIFICATION_ROUND1.md section 7;
+(3) independent reviewer (L1-E) re-runs a sample and records it; (4) L0 accepts; no gate is signed on
+this round's partial evidence.

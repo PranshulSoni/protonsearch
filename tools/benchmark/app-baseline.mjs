@@ -209,6 +209,36 @@ async function waitIndexReady(launcher) {
   }).catch(() => ({ state: "unavailable", entries: 0 }));
 }
 
+// Wrap the Tauri invoke surface so the in-app search call made by a real input
+// event can be timed: engine Wall = IPC + engine; tookMs = engine-only (from the
+// response); the remainder of input->visible is React commit + paint.
+async function installSearchTimingHook(launcher) {
+  return await launcher.evaluate(() => {
+    if (window.__SEARCH_TIMING__) return "already-installed";
+    const internals = window.__TAURI_INTERNALS__;
+    if (!internals || typeof internals.invoke !== "function") return "no-tauri-internals";
+    const original = internals.invoke.bind(internals);
+    const state = { last: null };
+    internals.invoke = function (cmd, payload) {
+      if (cmd !== "search") return original(cmd, payload);
+      const started = performance.now();
+      return original(cmd, payload).then(
+        (response) => {
+          state.last = {
+            wallMs: performance.now() - started,
+            tookMs: response && typeof response.tookMs === "number" ? response.tookMs : null,
+            requestId: response ? response.requestId : null,
+          };
+          return response;
+        },
+        (error) => { state.last = { wallMs: performance.now() - started, error: String(error) }; throw error; },
+      );
+    };
+    window.__SEARCH_TIMING__ = state;
+    return "installed";
+  }).catch((error) => "hook-error: " + String(error));
+}
+
 async function measureInputToVisible(launcher, takes, warmup) {
   const samples = [];
   for (let i = 0; i < warmup + takes; i++) {
@@ -234,7 +264,14 @@ async function measureInputToVisible(launcher, takes, warmup) {
       while (performance.now() < deadline) {
         if (signature() !== baseline) {
           await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
-          return { start, visibleAt: performance.now(), rows: document.querySelectorAll(listSelector).length };
+          const timing = window.__SEARCH_TIMING__ ? window.__SEARCH_TIMING__.last : null;
+          return {
+            start,
+            visibleAt: performance.now(),
+            rows: document.querySelectorAll(listSelector).length,
+            engineWallMs: timing && timing.wallMs != null ? timing.wallMs : null,
+            engineTookMs: timing && timing.tookMs != null ? timing.tookMs : null,
+          };
         }
         await new Promise((res) => setTimeout(res, 4));
       }
@@ -242,8 +279,26 @@ async function measureInputToVisible(launcher, takes, warmup) {
     }, query);
     samples.push({ take: i, warmup: i < warmup, query, ...r, ms: r.visibleAt != null ? +(r.visibleAt - r.start).toFixed(2) : null });
   }
-  const measured = samples.filter((s) => !s.warmup && s.ms != null).map((s) => s.ms);
-  return { takes: takes, warmup, measured: measured.length, ms: summarize(measured), samples };
+  const measuredRows = samples.filter((s) => !s.warmup && s.ms != null);
+  const measured = measuredRows.map((s) => s.ms);
+  const engineWall = measuredRows.map((s) => s.engineWallMs).filter((v) => v != null);
+  const engineTook = measuredRows.map((s) => s.engineTookMs).filter((v) => v != null);
+  const ipcOverhead = measuredRows.filter((s) => s.engineWallMs != null && s.engineTookMs != null).map((s) => s.engineWallMs - s.engineTookMs);
+  const uiAfterEngine = measuredRows.filter((s) => s.ms != null && s.engineWallMs != null).map((s) => s.ms - s.engineWallMs);
+  return {
+    takes,
+    warmup,
+    measured: measured.length,
+    ms: summarize(measured),
+    split: {
+      engineWallMs: summarize(engineWall),
+      engineTookMs: summarize(engineTook),
+      ipcOverheadMs: summarize(ipcOverhead),
+      postEngineUiMs: summarize(uiAfterEngine),
+      note: "engineWall = Tauri invoke wall for the app's own search call (IPC + engine); engineTook = Rust SearchResponse.took_ms; ipcOverhead = engineWall - engineTook; postEngineUi = input->visible DOM paint - engineWall (React commit + paint + observer/polling).",
+    },
+    samples,
+  };
 }
 
 async function measureEngineIpc(launcher, takes) {
@@ -485,6 +540,7 @@ async function main() {
     // --- input -> first visible result ---
     try { await launcher.evaluate(() => window.__TAURI_INTERNALS__.invoke("show_launcher")); } catch { /* ignore */ }
     await sleep(500);
+    results.measurements.searchTimingHook = await installSearchTimingHook(launcher);
     await launcher.evaluate(() => document.querySelector("input")?.focus()).catch(() => {});
     results.measurements.inputToVisible = await measureInputToVisible(launcher, takesInput, 3);
     results.measurements.engineIpc = await measureEngineIpc(launcher, Math.max(10, Math.floor(takesInput / 2)));
@@ -514,7 +570,12 @@ async function main() {
   const i = results.measurements.inputToVisible;
   const a = results.measurements.launcherActivation;
   console.log("app baseline: status=" + results.status);
-  if (i) console.log("  input->first visible result: p50=" + i.ms.p50 + "ms p95=" + i.ms.p95 + "ms n=" + i.measured + "/" + i.takes);
+  if (i) {
+    console.log("  input->first visible result: p50=" + i.ms.p50 + "ms p95=" + i.ms.p95 + "ms n=" + i.measured + "/" + i.takes);
+    if (i.split) {
+      console.log("  split: engine-only p50=" + i.split.engineTookMs.p50 + " p95=" + i.split.engineTookMs.p95 + "ms | invoke wall p50=" + i.split.engineWallMs.p50 + " p95=" + i.split.engineWallMs.p95 + "ms | IPC p50=" + i.split.ipcOverheadMs.p50 + " p95=" + i.split.ipcOverheadMs.p95 + "ms | post-engine UI p50=" + i.split.postEngineUiMs.p50 + " p95=" + i.split.postEngineUiMs.p95 + "ms");
+    }
+  }
   if (a) console.log("  launcher activation (hotkey): visible p50=" + a.visibleMs.p50 + "ms p95=" + a.visibleMs.p95 + "ms focused p50=" + a.focusedMs.p50 + "ms paint-total p50=" + a.paintTotalMs.p50 + "ms n=" + a.measured + "/" + a.takes);
   const sp = results.measurements.selectionPaint;
   if (sp) console.log("  selection highlight (marks): p50=" + sp.ms.p50 + "ms p95=" + sp.ms.p95 + "ms n=" + sp.measured + "/" + sp.takes);

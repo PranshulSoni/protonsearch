@@ -1361,3 +1361,65 @@ html[data-window="island"] #root {
 .island-dismiss-button:not(:disabled) {
   cursor: pointer;
 }
+
+/* Compact visible zero-results state inside the canonical 185 px search card. */
+.island-empty--compact {
+  min-height: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 4px 2px;
+  gap: 2px;
+}
+
+.island-empty--compact strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.island-empty--compact span {
+  font-size: 10px;
+}
+
+/* V9 2x2 capability tiles keep the fixed-height controls card on its grid. */
+.island-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.island-control-tile {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 61px;
+  padding: 9px 11px;
+  border: 1px solid var(--island-control-border);
+  border-radius: 10px;
+  background: var(--island-control-bg);
+  color: var(--island-icon);
+  box-sizing: border-box;
+}
+
+.island-control-tile-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 5px;
+}
+
+.island-control-tile-label {
+  font-size: 11px;
+  color: #d6e0e3;
+}
+
+.island-control-tile-value {
+  font-size: 10px;
+  color: #a5b5be;
+}
+
+.island-dismiss-button:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}

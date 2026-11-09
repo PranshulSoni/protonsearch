@@ -52,17 +52,18 @@ public static class PsHotkeyWin32 {
         return result.ToArray();
     }
 
-    // First visible window larger than minW x minH for the PID, or empty.
-    public static string FirstVisible(int pid, int minW, int minH) {
+    // Visible top-level windows larger than minW x minH for the PID.
+    public static string[] VisibleWindows(int pid, int minW, int minH) {
+        var result = new List<string>();
         foreach (var line in Windows(pid)) {
             var parts = line.Split('|');
             if (parts.Length < 7) continue;
             if (parts[1] != "1") continue;
             int w = int.Parse(parts[2]);
             int h = int.Parse(parts[3]);
-            if (w >= minW && h >= minH) return line;
+            if (w >= minW && h >= minH) result.Add(line);
         }
-        return "";
+        return result.ToArray();
     }
 
     public static void SendAltSpace() {
@@ -83,7 +84,13 @@ if ($Mode -eq "send") {
     [pscustomobject]@{ pid = $ProcessId; mode = "send"; sentAtUtc = $sendAt } | ConvertTo-Json -Compress
     exit 0
 }
-$before = [PsHotkeyWin32]::FirstVisible($ProcessId, 80, 40)
+# Windows that are already visible before the hotkey are NOT the launcher we just
+# summoned (e.g. the main app window can stay visible in some builds); exclude
+# their hwnds so a hotkey->visible reading is not a false positive.
+$beforeSet = @{}
+foreach ($line in [PsHotkeyWin32]::VisibleWindows($ProcessId, 80, 40)) {
+    $beforeSet[($line.Split('|')[0])] = $true
+}
 if ($Mode -eq "show") {
     [PsHotkeyWin32]::SendAltSpace()
 }
@@ -97,7 +104,11 @@ $nextEnum = 0L
 while ($stopwatch.ElapsedMilliseconds -lt $TimeoutMs) {
     if ($stopwatch.ElapsedMilliseconds -ge $nextEnum) {
         $nextEnum = $stopwatch.ElapsedMilliseconds + 1
-        $found = [PsHotkeyWin32]::FirstVisible($ProcessId, 80, 40)
+        $found = ""
+        foreach ($candidate in [PsHotkeyWin32]::VisibleWindows($ProcessId, 80, 40)) {
+            $hwnd = $candidate.Split('|')[0]
+            if (-not $beforeSet.ContainsKey($hwnd)) { $found = $candidate; break }
+        }
         if ($found -ne "") {
             $line = $found
             if ($null -eq $visibleMs) {
@@ -125,5 +136,6 @@ $parts = if ($line) { $line.Split('|') } else { @() }
     title = if ($parts.Length -ge 7) { $parts[6] } else { $null }
     rect = if ($parts.Length -ge 7) { @{ width = [int]$parts[2]; height = [int]$parts[3]; left = [int]$parts[4]; top = [int]$parts[5] } } else { $null }
     timedOut = $timedOut
-    visibleBefore = if ($before -ne "") { $true } else { $false }
+    visibleBefore = if ($beforeSet.Count -gt 0) { $true } else { $false }
+    visibleBeforeCount = $beforeSet.Count
 } | ConvertTo-Json -Compress

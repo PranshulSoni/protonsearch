@@ -175,6 +175,29 @@ describe("V9 island surface", () => {
     expect(element.querySelector(".island-result-foot")?.textContent).toContain("local results");
   });
 
+  it("renders compact visible copy for the canonical 185 px zero-results card", async () => {
+    const element = await renderIsland();
+    await waitFor(() => element.querySelector(".island-search-input") !== null);
+    const input = element.querySelector(".island-search-input") as HTMLInputElement;
+    await act(async () => {
+      input.focus();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    });
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    await act(async () => {
+      setter.call(input, "zzzz no match");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    await waitFor(() => element.querySelector(".island-empty--compact") !== null);
+    const surface = element.querySelector(".island-surface") as HTMLElement;
+    expect(surface.style.height).toBe("185px");
+    expect(element.querySelector(".island-result-foot")).toBeNull();
+    expect(element.querySelector(".island-empty--compact")?.textContent).toContain(
+      "No matching results.",
+    );
+  });
+
   it("switches card with the dots and exposes real clipboard tabs", async () => {
     const element = await renderIsland();
     await waitFor(() => element.querySelectorAll(".island-dot-button").length === 8);

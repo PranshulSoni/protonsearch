@@ -233,3 +233,21 @@ show disabled reason. (4) agents-1150/520/335 are stale and still show “1 TASK
 live-shots remain outside ui-launcher write scope.
 **Verdict:** geometry/motion unchanged PASS; G5 stays conditional on the fixes above.
 
+## E6. G5 final blockers fixed (task-52)
+
+1. **Controls fit:** the fixed 516×376 card keeps the V9 first paint — volume/mute and brightness slider rows plus
+   the 2×2 capability tiles (Wi-Fi, Bluetooth, Airplane mode, Energy saver) all render above the page-dot footer with
+   no clipped tile row. Audio output was removed from the Quick Settings first paint and remains in the Media card's
+   output section (real `audioOutputs` / `setAudioOutput`), per the design's "move to Media output drill-down" option.
+2. **Zero-results:** the canonical 185 px search card now renders visible compact copy ("No matching results." +
+   "Try another word or filter." for a query; "Start typing to search." otherwise) inside the available results
+   area; the clipped centred block and the result foot are removed for this state. Card height stays 185 px.
+3. **Notifications:** the test-only "Test local toast" control is gated by both `import.meta.env.DEV` and
+   `toastCapability.supported` (hidden in normal states); each item's X is enabled and calls
+   `api.notificationsDismiss(id)`; Clear all remains wired to `api.notificationsClear()`; disabled dismissal has a
+   distinct 0.32-opacity/not-allowed style. No test-only control appears in the refreshed captures.
+4. **Captures refreshed:** zero-results-1150/860/430, controls-1150/430, notifications-1150/430, agents-1150/520/335
+   (now "1 TASK" / "1 permission granted" and no ambiguous disabled Pause/Resume pair). Remaining island card shots
+   were refreshed by the same matrix run; compact 11×37 dot target remains the documented WCAG deviation.
+5. Build/tests: npm run build exit 0; full suite 18 files / 241 tests green (island 15 tests incl. compact
+   zero-results and notification dismiss/clear).

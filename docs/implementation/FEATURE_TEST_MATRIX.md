@@ -122,3 +122,27 @@ pipeline reproduction is recorded in BUG_LEDGER.**
 Rows above are planned acceptance criteria. At Gate 0 only environment/repository/data work and
 documentation are complete; every code-behavior row remains unverified until its owner produces the
 required evidence and L1-E/L0 re-runs it. Do not quote a row as passing because it appears here.
+
+
+## G8 round 1 executed evidence (2026-11-10, task-50)
+
+Statuses are an honest evidence snapshot for the first G8 sweep; the plan rows above remain the
+acceptance checklist. Full details: docs/implementation/V10_G8_VERIFICATION_ROUND1.md.
+
+| Matrix ID | Round-1 status | Evidence (short) |
+|---|---|---|
+| FT-L02 Normal Launcher filters | PASS (implemented, 4 visible filters + prefix access; design-spec micro-spec sync pending) | live screenshots docs/qa/g8-verify/e2e-launcher/, launcher tests |
+| FT-L03 Quick destinations | PASS (implemented, honest off states) | real-launcher-empty.png; addendum C2 |
+| FT-L04 Dynamic Island mode | PARTIAL (renderer/cards/dots/motion; native adapters + agent hierarchy + pinning incomplete) | island audits + live-shots |
+| FT-L05 Primary launcher scoping | PARTIAL (settings/onboarding implemented; live mode-switch E2E not executed) | task-40 evidence |
+| FT-S01 Files/folders | PARTIAL (live filename search works; full source matrix not executed) | e2e-drive latency + 10 screenshots |
+| FT-S03 Full-text content | PARTIAL (fixtures search/preview work; official p95 target unconfirmed) | perf JSON, preview evidence |
+| FT-S10 Clipboard text/categories | PARTIAL (image rows/categories visible live; text/pin/delete matrix not executed) | island Images tab + IPC rows |
+| FT-S11 Clipboard images (P0-2) | PASS (live .NET capture, thumbnails, restart; paste-back UI + GUI matrix follow-ups) | g8 doc section 3.3 |
+| FT-P01 TXT preview | PASS (API payload) | p0-1-preview-evidence.json |
+| FT-P05 PDF text preview | PASS (API payload) | p0-1-preview-evidence.json |
+| FT-P07 DOCX/Office preview | PASS (live launcher UI) | p0-1-preview-report.png |
+| FT-P08 Image preview | PASS (payload + OCR text + highlight count; screenshot not re-captured) | p0-1-preview-evidence.json |
+| FT-P09 Binary/unsupported | PASS (live launcher UI) | p0-1-preview-blob.png |
+| FT-P02/P03/P04/P06/P10 | NOT EXECUTED this round | G8 sign-off item |
+| FT-S12 Agents | BLOCKED/PARTIAL (no Pi credentials live; read-only alpha gate) | PI security review |

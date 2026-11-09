@@ -275,31 +275,21 @@ export function ControlsCard({
           />
         )}
       </div>
-      <div className="island-context-caps">AUDIO OUTPUT</div>
-      <AudioOutputs
-        outputs={status.audioOutputs}
-        defaultId={status.defaultAudioId}
-        onSelect={(deviceId) => {
-          void api.setAudioOutput(deviceId).then(refresh).catch(() => undefined);
-        }}
-      />
-      <div className="island-divider" />
-      <div className="island-control-list">
-        <CapabilityRow
+      <div className="island-control-grid">
+        <CapabilityTile
           icon="wifi"
           label="Wi-Fi"
           capability={status.wifi}
           value={wifiEnabled == null ? null : wifiEnabled ? "On" : "Off"}
         />
-        <CapabilityRow
+        <CapabilityTile
           icon="bluetooth"
           label="Bluetooth"
           capability={status.bluetooth}
           value={bluetoothEnabled == null ? null : bluetoothEnabled ? "On" : "Off"}
         />
-        <CapabilityRow icon="airplane" label="Airplane mode" capability={status.airplaneMode} />
-        <CapabilityRow icon="brightness" label="Night light" capability={status.nightLight} />
-        <CapabilityRow icon="bolt" label="Energy saver" capability={status.energySaver} />
+        <CapabilityTile icon="airplane" label="Airplane mode" capability={status.airplaneMode} />
+        <CapabilityTile icon="bolt" label="Energy saver" capability={status.energySaver} />
       </div>
     </div>
   );
@@ -335,6 +325,38 @@ function CapabilityRow({
       >
         {capability.supported ? "Toggle" : "Unavailable"}
       </button>
+    </div>
+  );
+}
+
+export function CapabilityTile({
+  icon,
+  label,
+  capability,
+  value,
+}: {
+  icon: "wifi" | "bluetooth" | "airplane" | "bolt";
+  label: string;
+  capability: ControlCapability;
+  value?: string | null;
+}) {
+  return (
+    <div
+      className="island-control-tile"
+      aria-disabled="true"
+      title={
+        capability.supported
+          ? "This toggle isn't exposed by the controls API yet."
+          : capability.reason || "Not supported by Windows in this build."
+      }
+    >
+      <IslandIcon name={icon} size={19} />
+      <span className="island-control-tile-body">
+        <span className="island-control-tile-label">{label}</span>
+        <span className="island-control-tile-value">
+          {capability.supported ? value ?? "Available" : "Unsupported"}
+        </span>
+      </span>
     </div>
   );
 }
@@ -377,25 +399,20 @@ export function NotificationsCard({
           </span>
           <strong>Notifications aren't available yet</strong>
           <span>{status.notifications.reason || "Notification history isn't wired in this build."}</span>
-          <button
-            type="button"
-            className="island-agent-button"
-            disabled={!status.toastCapability.supported}
-            title={
-              status.toastCapability.supported
-                ? "Store a local notification and attempt a Windows toast"
-                : status.toastCapability.reason ||
-                  "Windows toast notifications need an app identity."
-            }
-            onClick={() => {
-              void api
-                .showLocalToast("ProtonSearch island", "Local notification test")
-                .then(refresh)
-                .catch(() => undefined);
-            }}
-          >
-            Test local toast
-          </button>
+          {import.meta.env.DEV && status.toastCapability.supported ? (
+            <button
+              type="button"
+              className="island-agent-button"
+              onClick={() => {
+                void api
+                  .showLocalToast("ProtonSearch island", "Local notification test")
+                  .then(refresh)
+                  .catch(() => undefined);
+              }}
+            >
+              Test local toast
+            </button>
+          ) : null}
         </div>
       ) : status.notificationItems.length === 0 ? (
         <EmptyState title="All caught up" hint="No recent notifications." />
@@ -447,25 +464,21 @@ export function NotificationsCard({
         >
           Clear all
         </button>
-        <button
-          type="button"
-          className="island-agent-button"
-          disabled={!status.toastCapability.supported}
-          title={
-            status.toastCapability.supported
-              ? "Store a local notification and attempt a Windows toast"
-              : status.toastCapability.reason ||
-                "Windows toast notifications need an app identity."
-          }
-          onClick={() => {
-            void api
-              .showLocalToast("ProtonSearch island", "Local notification test")
-              .then(refresh)
-              .catch(() => undefined);
-          }}
-        >
-          Test local toast
-        </button>
+        {import.meta.env.DEV && status.toastCapability.supported ? (
+          <button
+            type="button"
+            className="island-agent-button"
+            title="Store a local notification and attempt a Windows toast"
+            onClick={() => {
+              void api
+                .showLocalToast("ProtonSearch island", "Local notification test")
+                .then(refresh)
+                .catch(() => undefined);
+            }}
+          >
+            Test local toast
+          </button>
+        ) : null}
       </div>
     </div>
   );

@@ -117,13 +117,13 @@ describe("island cards real data", () => {
     expect(element.textContent).toContain("62%");
     expect(element.textContent).toContain("80%");
     expect(element.querySelectorAll(".island-setting-slider").length).toBe(2);
-    expect(element.textContent).toContain("Laptop speakers");
-    expect(element.textContent).toContain("External display");
-    const unsupportedRow = [...element.querySelectorAll(".island-control-row")].find((row) =>
-      row.textContent?.includes("Bluetooth"),
+    expect(element.querySelectorAll(".island-control-tile").length).toBe(4);
+    const unsupportedTile = [...element.querySelectorAll(".island-control-tile")].find((tile) =>
+      tile.textContent?.includes("Bluetooth"),
     );
-    expect(unsupportedRow?.textContent).toContain("Unsupported");
-    expect(unsupportedRow?.querySelector("button")?.disabled).toBe(true);
+    expect(unsupportedTile?.textContent).toContain("Unsupported");
+    expect(unsupportedTile?.getAttribute("aria-disabled")).toBe("true");
+    expect(unsupportedTile?.getAttribute("title")).toContain("Bluetooth adapter isn't wired.");
   });
 
   it("shows the notification capability reason and a local toast test", async () => {
@@ -154,7 +154,8 @@ describe("island cards real data", () => {
       <NotificationsCard status={status} pending={false} error={null} refresh={() => undefined} />,
     );
     expect(element.textContent).toContain("Local notification history isn't available yet.");
-    expect(element.textContent).toContain("Test local toast");
+    // Test-only controls are gated out of normal states (toastCapability false here).
+    expect(element.textContent).not.toContain("Test local toast");
   });
 
   it("dismisses one notification and clears all through the bridge", async () => {

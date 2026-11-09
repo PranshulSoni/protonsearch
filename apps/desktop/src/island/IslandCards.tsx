@@ -116,6 +116,9 @@ export function SearchCard({
     const result = results[activeIndex];
     if (result) onOpen(result);
   };
+  // The canonical zero-results card is 185 px tall; render a compact visible
+  // state inside the results area instead of a centred block that gets clipped.
+  const zeroResults = !pending && !error && results.length === 0;
   const filters: Array<{ id: SearchScope; label: string }> = [
     { id: "all", label: "All" },
     { id: "files", label: "Files" },
@@ -188,11 +191,17 @@ export function SearchCard({
               </div>
             ) : error ? (
               <EmptyState title="Search is unavailable." hint={error} />
-            ) : results.length === 0 ? (
-              <EmptyState
-                title={query.trim() ? "No matching results." : "Start typing to search."}
-                hint={query.trim() ? "Try another word or filter." : "Files, folders, apps and more."}
-              />
+            ) : zeroResults ? (
+              <div className="island-empty island-empty--compact" role="status">
+                <strong>
+                  {query.trim() ? "No matching results." : "Start typing to search."}
+                </strong>
+                <span>
+                  {query.trim()
+                    ? "Try another word or filter."
+                    : "Files, folders, apps and actions."}
+                </span>
+              </div>
             ) : (
               results.slice(0, 5).map((result) => (
                 <button
@@ -229,16 +238,18 @@ export function SearchCard({
               ))
             )}
           </div>
-          <footer className="island-result-foot">
-            <span>{total} local results</span>
-            <span className="island-kbd-hints">
-              <kbd>↑</kbd>
-              <kbd>↓</kbd>
-              <span>navigate</span>
-              <kbd>Enter</kbd>
-              <span>open</span>
-            </span>
-          </footer>
+          {!zeroResults ? (
+            <footer className="island-result-foot">
+              <span>{total} local results</span>
+              <span className="island-kbd-hints">
+                <kbd>↑</kbd>
+                <kbd>↓</kbd>
+                <span>navigate</span>
+                <kbd>Enter</kbd>
+                <span>open</span>
+              </span>
+            </footer>
+          ) : null}
         </>
       ) : null}
     </div>

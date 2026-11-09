@@ -149,6 +149,9 @@ rollback. L0 re-runs verification before accepting.
 | 2026-11-10 | G2 | R2 preview backend/command/bridge verified: get_preview registered, resultId-only, bounds/cache, ps-core 48/48 | L1-E | PASS (backend); UI task-38 in progress | V10_G1_ARCHITECTURE 10.2 |
 | 2026-11-10 | G2 | R3 clipboard images independently verified: tests + rebuilt harness + real .NET SetImage + paste-back | L1-E | PASS (module/real-Windows); app GUI matrix follow-up | INDEPENDENT_REREVIEW_R3_2026-11-10.md |
 | 2026-11-10 | G4/G5 | UI spec review: island PARTIAL (mock evidence/card gaps), launcher CONDITIONAL (design-spec sync + native DPI) | L1-E | CONDITIONAL | SPEC_REVIEW_G2_G4_G5_2026-11-10.md |
+| 2026-11-10 | G8 | Round 1: frontend 237/237 + build 0; targeted Rust ps-ipc 17/17, ps-agent 100/100; full workspace blocked by in-flight task-35 | L1-E | PARTIAL | V10_G8_VERIFICATION_ROUND1.md; .agents/notes/g8-*.log |
+| 2026-11-10 | G8 | Live P0-1 previews and P0-2 clipboard images through the real app (payloads, screenshots, restart) | L1-E | PASS (partial matrix) | docs/qa/g8-verify/ |
+| 2026-11-10 | G8 | Pairwise round 1: P-03/P-07/P-10/P-13/P-26 partial; P-06/P-09/P-17 blocked; G8 NOT SIGNED | L1-E | PARTIAL | CROSS_FEATURE_PAIRWISE_MATRIX section 6 |
 | 2026-11-10 | G2 | Preview backend/UI + clipboard images + island renderer + settings started in parallel | L1-A/L2-A/L1-B | IN PROGRESS | tasks 37-41 |
 
 ## 8. Prior program (superseded, evidence retained)

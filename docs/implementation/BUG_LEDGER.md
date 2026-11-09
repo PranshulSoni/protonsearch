@@ -10,7 +10,7 @@ reviewer, gate, evidence, acceptance criteria.
 ## 1. P0 bugs (user-reported; must be reproduced and fixed at Gate 2)
 
 ### BUG-P0-01 — File/text/document previews do not show
-- Severity: P0. Status: FIXED + VERIFIED (backend/contract) on 2026-11-10; UI task-38 in progress.
+- Severity: P0. Status: FIXED + VERIFIED (backend/contract + live launcher UI) on 2026-11-10; full format/both-launcher matrix remains a G8 sign-off item.
   PREVIEW_P0_REPORT.md + fixtures/payloads/screenshots). Root cause summary: the preview pipeline
   does not exist end-to-end - no preview request/response in ps-ipc, no preview Tauri command and no
   preview code in ps-core at reproduction time; filename/file rows carry meta.snippet=null and the
@@ -48,7 +48,7 @@ reviewer, gate, evidence, acceptance criteria.
 - Gate: G2 (must-fix before glamorous features). Reviewer: L0 + L1-E.
 
 ### BUG-P0-02 — Clipboard does not capture images
-- Severity: P0. Status: FIXED + VERIFIED (independent module-level and real .NET reproduction) on 2026-11-10; app-process GUI matrix follow-up.
+- Severity: P0. Status: FIXED + VERIFIED (independent module-level, real .NET and live app UI capture/thumbnails/restart) on 2026-11-10; UI re-paste + Paint/Snipping/browser GUI matrix remain sign-off items.
   docs/qa/clipboard-audit/CLIPBOARD_IMAGE_P0_REPORT.md + evidence/logs + decoded PNGs). Root cause
   summary: decoder accepts only CF_DIB with BI_RGB (compression 0), 24/32 bpp; real .NET/Paint-style
   sources set BI_BITFIELDS (compression 3), so the decode returns None and the listener silently
@@ -140,3 +140,20 @@ and image OCR text remain follow-ups.
 
 Verdict: both P0s are no longer open defects in the product code path; they remain G2 acceptance items
 only where UI/app-level evidence is still pending (preview UI task-38; interactive clipboard GUI matrix).
+
+
+## 5. G8 round 1 live verification (task-50, 2026-11-10)
+
+- P0-1 previews: live app, portable profile, CDP: get_preview payloads verified for notes.txt (txt, 191
+  chars), report.pdf (pdf, 83 chars), diagram.png (png, imageDataUrl 26,746 chars, OCR 45 chars, 1
+  highlight), blob.bin (unsupported with explicit reason), large.txt (truncated true); live launcher
+  screenshots show a real DOCX preview and the binary unsupported state. Evidence:
+  docs/qa/g8-verify/p0-1-preview-evidence.json, p0-1-preview-report.png, p0-1-preview-blob.png.
+- P0-2 clipboard images: live app with clipboard history enabled; real .NET Clipboard.SetImage 320x200
+  copied while running -> clipboard source count 3; IPC row clip:3 "Image 320 x 200" with
+  thumbnailDataUrl 4,918 chars, imageWidth/Height 320/200, mime image/png; island Images tab shows
+  real thumbnails; restart persistence verified (same row/thumbnail after restart). Evidence:
+  docs/qa/g8-verify/p0-2-island-images.png, p0-2-island-images-after-restart.png.
+- Open sign-off items: UI paste-back path, full format matrix, both-launcher preview parity, app GUI
+  clipboard matrix, native adapter/DPI/frame-pacing evidence. Full report:
+  docs/implementation/V10_G8_VERIFICATION_ROUND1.md.
