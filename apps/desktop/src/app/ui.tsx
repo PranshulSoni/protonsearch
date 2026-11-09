@@ -368,6 +368,62 @@ export function Callout({
   );
 }
 
+export type StateTone = "neutral" | "warn" | "error";
+
+/**
+ * Quiet state notice (task-7): human sentence first, optional sanitized
+ * Details disclosure, one specific action. Raw error text/stack/IDs must never
+ * be passed here — callers translate engine/bridge failures to product copy.
+ */
+export function StateNotice({
+  tone = "neutral",
+  title,
+  body,
+  details,
+  actionLabel,
+  onAction,
+  role = "status",
+  className,
+}: {
+  tone?: StateTone;
+  title: string;
+  body?: string;
+  details?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  role?: "status" | "alert";
+  className?: string;
+}) {
+  return (
+    <div
+      className={"state state--" + tone + (className ? " " + className : "")}
+      role={role}
+      aria-live={role === "status" ? "polite" : undefined}
+    >
+      <span className="state-icon" aria-hidden="true">
+        <Icon name={tone === "neutral" ? "shield" : "alert"} size={20} />
+      </span>
+      <div className="state-content">
+        <p className="state-title">{title}</p>
+        {body ? <p className="state-body">{body}</p> : null}
+        {details ? (
+          <details className="state-details">
+            <summary>Details</summary>
+            <p>{details}</p>
+          </details>
+        ) : null}
+        {actionLabel && onAction ? (
+          <div className="state-actions">
+            <button type="button" className="btn" onClick={onAction}>
+              {actionLabel}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function EmptyState({
   title,
   body,

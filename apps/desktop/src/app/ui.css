@@ -33,14 +33,14 @@
 
 .panel {
   margin-top: var(--space-6);
-  padding: var(--space-5);
+  padding: var(--ps-app-card-pad);
   border: var(--ps-border) solid var(--ps-line);
   border-radius: var(--ps-radius-window);
   background: var(--ps-surface);
 }
 
 .panel:first-of-type {
-  margin-top: var(--space-4);
+  margin-top: 0;
 }
 
 .panel-head {
@@ -53,7 +53,8 @@
 .panel-head h2 {
   margin: 0;
   font-size: var(--ps-text-section);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  line-height: var(--ps-leading-micro);
   text-transform: uppercase;
   font-weight: var(--ps-fw-label);
   color: var(--ps-ink-2);
@@ -62,8 +63,8 @@
 .panel-hint {
   margin: var(--space-2) 0 0;
   max-width: 72ch;
-  font-size: var(--ps-text-meta);
-  line-height: 1.6;
+  font-size: var(--ps-text-small);
+  line-height: var(--ps-leading-small);
   color: var(--ps-ink-2);
 }
 
@@ -84,13 +85,13 @@
 }
 
 .seg {
-  min-height: 28px;
-  padding: 5px 9px;
+  min-height: 30px;
+  padding: 5px 10px;
   border: 0;
   border-radius: var(--ps-radius-control);
   background: transparent;
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-meta);
+  font-size: var(--ps-text-control, var(--ps-text-meta));
   font-weight: var(--ps-fw-semibold);
   white-space: nowrap;
 }
@@ -123,13 +124,13 @@
 }
 
 .filter-btn {
-  min-height: 28px;
-  padding: 5px 9px;
+  min-height: 30px;
+  padding: 5px 10px;
   border: 0;
   border-radius: var(--ps-radius-control);
   background: transparent;
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-meta);
+  font-size: var(--ps-text-control, var(--ps-text-meta));
   font-weight: var(--ps-fw-semibold);
 }
 
@@ -236,13 +237,13 @@
   align-items: baseline;
   gap: var(--space-2);
   margin-top: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: var(--ps-border) solid var(--ps-line);
   border-radius: var(--ps-radius-row);
   background: var(--ps-surface-soft);
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-meta);
-  line-height: 1.6;
+  font-size: var(--ps-text-small);
+  line-height: var(--ps-leading-small);
 }
 
 .callout-warn {
@@ -276,8 +277,9 @@
   border-radius: var(--ps-radius-control);
   background: transparent;
   color: var(--ps-accent);
-  font-size: var(--ps-text-meta);
+  font-size: var(--ps-text-control, var(--ps-text-meta));
   font-weight: var(--ps-fw-semibold);
+  line-height: var(--ps-leading-small);
 }
 
 .linkbtn:hover {
@@ -295,7 +297,7 @@
   display: block;
   margin: 0 0 var(--space-2);
   font-size: var(--ps-text-micro);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   font-weight: var(--ps-fw-label);
   color: var(--ps-ink-2);
@@ -369,17 +371,18 @@
 
 .empty-title {
   margin: 0;
-  font-size: var(--ps-text-small);
-  font-weight: var(--ps-fw-strong);
   color: var(--ps-ink);
+  font-size: var(--ps-text-lead);
+  font-weight: var(--ps-fw-semibold);
+  line-height: var(--ps-leading-lead);
 }
 
 .empty-body {
   margin: var(--space-2) 0 0;
   max-width: 60ch;
-  font-size: var(--ps-text-meta);
-  line-height: 1.55;
   color: var(--ps-ink-2);
+  font-size: var(--ps-text-body);
+  line-height: var(--ps-leading-body);
 }
 
 .empty-action {
@@ -398,11 +401,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  min-height: var(--ps-app-metric-row, 44px);
   margin: 0;
-  padding: var(--space-2) 0;
+  padding: var(--space-1) 0;
   border-bottom: var(--ps-border) solid var(--ps-line-soft);
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-meta);
+  font-size: var(--ps-text-small);
+  line-height: var(--ps-leading-small);
 }
 
 .metric-row:last-child {
@@ -421,6 +426,7 @@
   min-height: var(--ps-control-height);
   margin: 0;
   color: var(--ps-ink);
+  font-size: var(--ps-text-body);
   font-weight: var(--ps-fw-semibold);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -523,6 +529,115 @@
   font-size: var(--ps-text-small);
   line-height: 1.65;
   color: var(--ps-ink-2);
+}
+
+/* Quiet state block (task-7/8): human sentence first, no raw errors on the
+   surface; neutral/warn/error tones without alarm fills. */
+.state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding: 20px 24px;
+  border: var(--ps-border) solid var(--ps-line);
+  border-radius: var(--ps-radius-window);
+  background: var(--ps-surface);
+}
+
+.state-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: var(--ps-ink-2);
+}
+
+.state-content {
+  min-width: 0;
+}
+
+.state-title {
+  margin: 0;
+  color: var(--ps-ink);
+  font-size: var(--ps-text-lead);
+  font-weight: var(--ps-fw-semibold);
+  line-height: var(--ps-leading-lead);
+}
+
+.state-body {
+  max-width: 60ch;
+  margin: 6px 0 0;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-body);
+  line-height: var(--ps-leading-body);
+}
+
+.state-details {
+  margin-top: 12px;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-small);
+}
+
+.state-details summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+  font-weight: var(--ps-fw-semibold);
+  cursor: pointer;
+}
+
+.state-details p {
+  max-width: 60ch;
+  margin: 6px 0 0;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
+}
+
+.state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 16px;
+}
+
+.state--warn {
+  border-color: var(--ps-warning-pill-border);
+}
+
+.state-warn .state-icon {
+  color: var(--ps-warning);
+}
+
+.state--error {
+  border-color: var(--ps-negative-pill-bg);
+}
+
+.state-error .state-icon {
+  color: var(--ps-negative);
+}
+
+.state-inline {
+  margin-top: 12px;
+  padding: 16px 20px;
+}
+
+.row-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-small);
+  line-height: var(--ps-leading-small);
+}
+
+.row-error svg {
+  flex: none;
+  color: var(--ps-warning);
 }
 
 .hotkey-control {

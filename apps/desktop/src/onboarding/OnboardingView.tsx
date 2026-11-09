@@ -11,7 +11,14 @@ import { parseHotkey } from "../app/hotkey";
 import { HotkeyCapture } from "../app/HotkeyInput";
 import { api } from "../bridge/api";
 import { rootDisplayName, samePath, validateRootPath } from "../app/roots";
-import { Callout, Icon, SegmentedControl } from "../app/ui";
+import { Callout, Icon, SegmentedControl, StateNotice } from "../app/ui";
+import {
+  beginOnboardingCrossfade,
+  endOnboardingCrossfade,
+  nextPaint,
+  prefersReducedMotion,
+  supportsViewTransition,
+} from "../app/transition";
 import {
   DEPTH_LABEL,
   DEPTH_SUMMARY_LABEL,
@@ -95,6 +102,8 @@ export default function OnboardingView() {
   const [stepIndex, setStepIndex] = useState(() => persisted?.stepIndex ?? 0);
   const [finishing, setFinishing] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [finishFailed, setFinishFailed] = useState(false);
+  const lastSkipRef = useRef(false);
   const [addingRoot, setAddingRoot] = useState(false);
   const [rootDraft, setRootDraft] = useState("");
   const [rootError, setRootError] = useState<string | null>(null);
@@ -163,9 +172,12 @@ export default function OnboardingView() {
 
   const finish = async (skipped: boolean) => {
     if (finishing) return;
+    lastSkipRef.current = skipped;
     setFinishing(true);
     setFormError(null);
-    try {
+    setFinishFailed(false);
+
+    const complete = async () => {
       await completeOnboarding(
         skipped ? buildSkippedOnboardingInput(draft) : buildOnboardingInput(draft),
       );
@@ -177,8 +189,47 @@ export default function OnboardingView() {
       if (!skipped && draft.launchAtLogin !== settings.launchAtLogin) {
         void updateSettings({ launchAtLogin: draft.launchAtLogin }).catch(() => undefined);
       }
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : String(err));
+    };
+
+    // Onboarding → DesktopApp: a 160 ms root crossfade via the View Transition
+    // API when available; falls back to the app shell's own 160 ms fade.
+    const runCompletion = async () => {
+      if (!supportsViewTransition() || prefersReducedMotion()) {
+        await complete();
+        return;
+      }
+      let completionError: unknown = null;
+      beginOnboardingCrossfade();
+      try {
+        let transition: ViewTransition | null = null;
+        try {
+          transition = document.startViewTransition(async () => {
+            try {
+              await complete();
+              await nextPaint();
+            } catch (err) {
+              completionError = err;
+              throw err;
+            }
+          });
+        } catch {
+          // A transition could not start (e.g. one is already active): finish
+          // without it rather than blocking setup.
+          endOnboardingCrossfade();
+          await complete();
+          return;
+        }
+        await transition.finished.catch(() => undefined);
+        if (completionError) throw completionError;
+      } finally {
+        endOnboardingCrossfade();
+      }
+    };
+
+    try {
+      await runCompletion();
+    } catch {
+      setFinishFailed(true);
       setFinishing(false);
     }
   };
@@ -374,9 +425,7 @@ export default function OnboardingView() {
         return chosen.length === 0 ? (
           <>
             <p className="empty-title">No locations selected.</p>
-            <p className="field-help">
-              Filename search has nothing to scan until you choose a folder.
-            </p>
+            <p className="field-help">Go back to add at least one folder.</p>
             <button type="button" className="btn" onClick={() => setStepIndex(2)}>
               Back to locations
             </button>
@@ -589,9 +638,19 @@ export default function OnboardingView() {
             {renderStep()}
           </div>
           {formError ? (
-            <Callout tone="danger" role="alert">
+            <p className="field-error" role="alert">
               {formError}
-            </Callout>
+            </p>
+          ) : null}
+          {finishFailed ? (
+            <StateNotice
+              tone="error"
+              role="alert"
+              title="Couldn't finish setup."
+              body="Your choices are saved on this PC."
+              actionLabel="Try again"
+              onAction={() => void finish(lastSkipRef.current)}
+            />
           ) : null}
           <div className="setup-bottom">
             <div className="setup-bottom-left">

@@ -11,6 +11,7 @@ import ActivityView from "./views/ActivityView";
 import WorkflowsView from "./views/WorkflowsView";
 import PreferencesView from "./views/PreferencesView";
 import { SECTION_TITLES, type Section } from "./sections";
+import { takeOnboardingCrossfade } from "./transition";
 import { Icon, type IconName } from "./ui";
 import "./desktop.css";
 
@@ -33,11 +34,36 @@ export default function DesktopApp() {
   const [section, setSection] = useState<Section>("home");
   const [pendingSource, setPendingSource] = useState<string | null>(null);
   const [navFocus, setNavFocus] = useState(0);
+  // 160 ms fade/raise when the main window is shown (app start, tray "Open
+  // ProtonSearch", launcher footer). Route changes never replay it.
+  const [opening, setOpening] = useState(() => !takeOnboardingCrossfade());
   const navRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const mainRef = useRef<HTMLElement>(null);
 
   const userName = settings.userName?.trim() || null;
   const initial = userName ? userName.charAt(0).toUpperCase() : null;
+
+  useEffect(() => {
+    if (!opening) return;
+    // animationend normally clears this; the timer is the reduced-motion /
+    // no-animation-environment fallback so the class never sticks.
+    const timer = window.setTimeout(() => setOpening(false), 240);
+    return () => window.clearTimeout(timer);
+  }, [opening]);
+
+  useEffect(() => {
+    let hidden = document.visibilityState === "hidden";
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (hidden) setOpening(true);
+        hidden = false;
+      } else {
+        hidden = true;
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
 
   useEffect(() => {
     document.title = SECTION_TITLES[section] + " — ProtonSearch";
@@ -67,7 +93,12 @@ export default function DesktopApp() {
   };
 
   return (
-    <div className="app-shell">
+    <div
+      className={"app-shell" + (opening ? " is-opening" : "")}
+      onAnimationEnd={(event) => {
+        if (event.target === event.currentTarget) setOpening(false);
+      }}
+    >
       <a
         className="skip-link"
         href="#main"
@@ -118,7 +149,7 @@ export default function DesktopApp() {
         <div className="sidebar-foot">
           <div className="userfoot">
             <span className="avatar" aria-hidden="true">
-              {initial ?? <Icon name="person" size={14} />}
+              {initial ?? <Icon name="person" size={16} />}
             </span>
             <span className="user-name">{userName ?? "This PC"}</span>
           </div>

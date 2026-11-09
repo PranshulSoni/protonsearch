@@ -79,13 +79,22 @@ function BootScreen() {
 }
 
 function FatalScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
+  // Quiet presentation: the user sees what happened and what to do next; the
+  // technical detail lives in a native disclosure for support/diagnostics.
   return (
     <div className="boot-screen boot-screen-error" role="alert">
       <Logo size={34} />
-      <strong>ProtonSearch could not start</strong>
-      <span className="boot-detail">{message}</span>
+      <strong>ProtonSearch couldn't start</strong>
+      <span className="boot-detail">
+        Your files and settings on this PC were not touched. Try again — if it keeps happening, open
+        ProtonSearch's data folder and check that it is writable.
+      </span>
+      <details className="boot-details">
+        <summary>Technical details</summary>
+        <code>{message}</code>
+      </details>
       <button className="btn" onClick={onRetry}>
-        Retry
+        Try again
       </button>
     </div>
   );

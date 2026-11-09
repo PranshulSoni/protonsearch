@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   EngineStatus,
   PrivacySettings,
+  RootStatus,
   Settings,
   SourceStatus,
 } from "../bridge/types";
@@ -31,11 +32,15 @@ export function indexHealth(status: EngineStatus | null): IndexHealth {
       detail: "The local engine has not reported its state yet.",
     };
   }
-  const warning = status.warnings[0];
+  const warning = status.warnings.length > 0;
   switch (status.state) {
     case "ready":
       return warning
-        ? { tone: "warn", label: "Needs attention", detail: warning }
+        ? {
+            tone: "warn",
+            label: "Needs attention",
+            detail: "Some items couldn't be indexed. Search still works with what is available.",
+          }
         : {
             tone: "ok",
             label: "Index ready",
@@ -67,7 +72,7 @@ export function indexHealth(status: EngineStatus | null): IndexHealth {
       return {
         tone: "error",
         label: "Index error",
-        detail: warning ?? "The index reported an error; some results may be missing.",
+        detail: "New files aren't being added. Existing search still works.",
       };
     default:
       return {
@@ -307,6 +312,60 @@ export function formatClock(timestamp: number): string {
 /* Home / index aggregates                                                   */
 /* ------------------------------------------------------------------------- */
 
+
+/* ------------------------------------------------------------------------- */
+/* Indexed-count truthfulness (task-2)                                       */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * True only once the engine has reported its first real filename count.
+ * "Starting…" is reserved for before the first status / while the first scan
+ * has not produced entries; a numeric 0 is shown once the engine reports 0.
+ */
+export function hasIndexCount(status: EngineStatus | null): boolean {
+  if (!status) return false;
+  return !(status.state === "starting" && status.filenameEntries === 0);
+}
+
+/** The only app-level indexed-item count: EngineStatus.filenameEntries. */
+export function indexCountText(status: EngineStatus | null): string {
+  if (!hasIndexCount(status) || status === null) return "Starting…";
+  return formatNumber(status.filenameEntries);
+}
+
+/** Source row count text; never "0 items" before a source reports. */
+export function sourceStatusText(source: SourceStatus, enabled: boolean): string {
+  if (!enabled) return "Off";
+  if (source.state === "starting" && source.itemCount === 0) return "Starting…";
+  return formatNumber(source.itemCount) + " items · " + stateLabel(source.state);
+}
+
+export interface WarningSummary {
+  body: string;
+  details: string;
+}
+
+/**
+ * Engine content warnings can arrive as many per-file strings (e.g. malformed
+ * PDFs). The surface shows one human notice; raw strings may contain paths, so
+ * only an aggregate count is exposed in the Details disclosure (task-7/lead).
+ */
+export function summarizeWarnings(warnings: string[]): WarningSummary | null {
+  if (warnings.length === 0) return null;
+  return {
+    body: "Some items couldn't be indexed. Search still works with what is available.",
+    details:
+      warnings.length +
+      " item(s) could not be read during the last index update. They are retried automatically on the next update; malformed documents are skipped so they cannot block other results.",
+  };
+}
+
+/** Root row text; "Starting…" instead of "0 items" before the root reports. */
+export function rootStatusText(root: RootStatus): string {
+  if (root.state === "starting" && root.indexed === 0) return "Starting…";
+  return stateLabel(root.state) + " · " + formatNumber(root.indexed) + " items";
+}
+
 export interface IndexCounts {
   total: number;
   documents: number;
@@ -383,8 +442,8 @@ export function describeAgent(
   if (state === "error") {
     return {
       tone: "error",
-      stateLabel: "Couldn't start",
-      detail: detailText ?? "The agent runtime couldn't start. Search is unaffected.",
+      stateLabel: "Unavailable",
+      detail: "Search still works. The optional runtime didn't start.",
       runtime,
       model,
       installed: true,
@@ -404,10 +463,8 @@ export function describeAgent(
   }
   return {
     tone: "off",
-    stateLabel: "Not set up",
-    detail:
-      detailText ??
-      "Agent workflows are off. ProtonSearch works fully without them; the runtime starts only when you run a workflow.",
+    stateLabel: "Off",
+    detail: "ProtonSearch works fully without them.",
     runtime,
     model,
     installed: false,

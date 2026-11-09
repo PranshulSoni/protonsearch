@@ -81,6 +81,58 @@ describe("desktop app shell smoke", () => {
     }
   });
 
+  it("plays the window-open animation once and not on route changes", async () => {
+    await act(async () => {
+      root.render(<App view="main" />);
+    });
+    await flush(8);
+    const shell = container.querySelector<HTMLElement>(".app-shell");
+    expect(shell?.classList.contains("is-opening")).toBe(true);
+
+    // animationend normally clears the class; wait past the 240 ms fallback
+    // timer so this also covers environments where the event is not fired.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 280));
+    });
+    await flush(2);
+    expect(container.querySelector(".app-shell")?.classList.contains("is-opening")).toBe(false);
+
+    await act(async () => {
+      container.querySelectorAll<HTMLButtonElement>(".navbtn")[2].click();
+    });
+    await flush(3);
+    expect(container.querySelector(".app-shell")?.classList.contains("is-opening")).toBe(false);
+  });
+
+  it("renders the engine filename count rather than a transient zero", async () => {
+    await act(async () => {
+      root.render(<App view="main" />);
+    });
+    await flush(8);
+    const indexStat = container.querySelector(".index-stat");
+    expect(indexStat?.textContent).not.toBe("0");
+    expect(indexStat?.textContent).toMatch(/\d/);
+  });
+
+  it("exposes web-search engine settings in Preferences", async () => {
+    await act(async () => {
+      root.render(<App view="main" />);
+    });
+    await flush(8);
+    await act(async () => {
+      container.querySelectorAll<HTMLButtonElement>(".navbtn")[4].click();
+    });
+    await flush(4);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Offer web search results");
+    expect(text).toContain("DuckDuckGo");
+    expect(text).toContain("Opens the result in your browser");
+    const radios = [...container.querySelectorAll('[role="radio"]')].map((node) =>
+      node.textContent?.trim(),
+    );
+    expect(radios).toEqual(expect.arrayContaining(["Google", "Bing", "DuckDuckGo", "YouTube"]));
+  });
+
   it("keeps the first focusable element a skip link and the route h1 focusable", async () => {
     await act(async () => {
       root.render(<App view="main" />);

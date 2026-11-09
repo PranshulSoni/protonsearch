@@ -12,8 +12,13 @@ import {
   greetingForTimestamp,
   greetingLine,
   groupActivityByDay,
+  hasIndexCount,
+  indexCountText,
   indexCounts,
   indexHealth,
+  rootStatusText,
+  sourceStatusText,
+  summarizeWarnings,
   recentAccessed,
   relativeTime,
   stateLabel,
@@ -47,6 +52,8 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     semantic: { enabled: false, model: null },
     onboardingComplete: true,
     legacyMigrated: false,
+    webSearchEnabled: true,
+    webSearchEngine: "google",
     resultLimit: 30,
     ...overrides,
   };
@@ -93,10 +100,11 @@ describe("indexHealth", () => {
 
   it("uses the first engine warning without inventing one", () => {
     const health = indexHealth(
-      makeStatus({ warnings: ["Pictures root is unavailable (device disconnected)"] }),
+      makeStatus({ warnings: ["C:\\private\\bad.pdf: extraction failed"] }),
     );
     expect(health).toMatchObject({ tone: "warn", label: "Needs attention" });
-    expect(health.detail).toContain("Pictures root");
+    expect(health.detail).toContain("Search still works");
+    expect(health.detail).not.toContain("C:\\");
   });
 
   it("handles a missing status", () => {
@@ -265,7 +273,8 @@ describe("indexCounts", () => {
 describe("describeAgent", () => {
   it("never pretends the runtime exists when it is not configured", () => {
     const view = describeAgent(null, makeSettings());
-    expect(view).toMatchObject({ tone: "off", stateLabel: "Not set up", installed: false });
+    expect(view).toMatchObject({ tone: "off", stateLabel: "Off", installed: false });
+    expect(view.detail).toMatch(/works fully without/);
   });
 
   it("warns when the preference is saved but no runtime is installed", () => {
@@ -284,6 +293,95 @@ describe("describeAgent", () => {
 
     expect(
       describeAgent({ state: "error", detail: "Sidecar exited with code 1" }, makeSettings()),
-    ).toMatchObject({ tone: "error", stateLabel: "Couldn't start" });
+    ).toMatchObject({ tone: "error", stateLabel: "Unavailable" });
+    expect(
+      describeAgent({ state: "error", detail: "Sidecar exited with code 1" }, makeSettings()).detail,
+    ).not.toMatch(/Sidecar exited/);
+  });
+});
+
+describe("indexed-count truthfulness", () => {
+  it("shows Starting… only before the first real status", () => {
+    expect(hasIndexCount(null)).toBe(false);
+    expect(indexCountText(null)).toBe("Starting…");
+    expect(indexCountText(makeStatus({ state: "starting", filenameEntries: 0 }))).toBe("Starting…");
+  });
+
+  it("never hides entries behind Starting…", () => {
+    const startingWithEntries = makeStatus({ state: "starting", filenameEntries: 131199 });
+    expect(hasIndexCount(startingWithEntries)).toBe(true);
+    expect(indexCountText(startingWithEntries)).toBe((131199).toLocaleString());
+    expect(indexCountText(makeStatus({ state: "indexing", filenameEntries: 42018 }))).toBe(
+      (42018).toLocaleString(),
+    );
+  });
+
+  it("shows a real zero once the engine reports zero", () => {
+    expect(hasIndexCount(makeStatus({ filenameEntries: 0 }))).toBe(true);
+    expect(indexCountText(makeStatus({ filenameEntries: 0 }))).toBe("0");
+  });
+
+  it("formats source counts without a transient 0-items state", () => {
+    expect(
+      sourceStatusText(
+        { id: "apps", label: "Applications", enabled: true, itemCount: 0, state: "starting" },
+        true,
+      ),
+    ).toBe("Starting…");
+    expect(
+      sourceStatusText(
+        { id: "apps", label: "Applications", enabled: true, itemCount: 126, state: "ready" },
+        true,
+      ),
+    ).toBe("126 items · Ready");
+    expect(
+      sourceStatusText(
+        { id: "browser", label: "Browser", enabled: false, itemCount: 0, state: "ready" },
+        false,
+      ),
+    ).toBe("Off");
+  });
+
+  it("formats root statuses with filename counts", () => {
+    expect(
+      rootStatusText({
+        path: "C:\\Docs",
+        mode: "content",
+        enabled: true,
+        indexed: 0,
+        errors: 0,
+        state: "starting",
+      }),
+    ).toBe("Starting…");
+    expect(
+      rootStatusText({
+        path: "C:\\Docs",
+        mode: "content",
+        enabled: true,
+        indexed: 130975,
+        errors: 0,
+        state: "ready",
+      }),
+    ).toBe("Ready · " + (130975).toLocaleString() + " items");
+  });
+});
+
+describe("warning aggregation", () => {
+  it("returns null with no warnings", () => {
+    expect(summarizeWarnings([])).toBeNull();
+  });
+
+  it("aggregates many engine strings into one human notice and a safe detail", () => {
+    const summary = summarizeWarnings([
+      "C:\\secret\\bad.pdf: extraction failed",
+      "C:\\Users\\me\\broken.docx: malformed",
+      "C:\\private\\scan.png: OCR skipped",
+    ]);
+    expect(summary?.body).toBe(
+      "Some items couldn't be indexed. Search still works with what is available.",
+    );
+    expect(summary?.details).toContain("3 item(s)");
+    expect(summary?.details).not.toContain("secret");
+    expect(summary?.details).not.toContain("C:\\");
   });
 });

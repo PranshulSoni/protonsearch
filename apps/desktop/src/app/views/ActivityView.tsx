@@ -5,14 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../../App";
 import type { ActivityItem, ActivityKind } from "../../bridge/types";
 import { ACTIVITY_KIND_LABEL, formatClock, groupActivityByDay } from "../describe";
-import { errorMessage } from "../hooks";
 import { SECTION_EYEBROWS } from "../sections";
 import {
-  Callout,
   EmptyState,
   FilterBar,
   Icon,
   RouteHeading,
+  StateNotice,
   Switch,
   type IconName,
 } from "../ui";
@@ -50,17 +49,21 @@ function matchesFilter(item: ActivityItem, filter: ActivityFilter): boolean {
   return item.kind === "open" || item.kind === "launch";
 }
 
-function emptyFilterCopy(filter: ActivityFilter): string {
-  if (filter === "searches") return "No searches in this view.";
-  if (filter === "launches") return "No launches in this view.";
+function emptyFilterTitle(filter: ActivityFilter): string {
+  if (filter === "searches") return "No searches here.";
+  if (filter === "launches") return "No launches here.";
   return "No activity yet.";
 }
 
 export default function ActivityView() {
   const { settings, getActivity, updateSettings, openResult } = useApp();
   const [items, setItems] = useState<ActivityItem[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [actionError, setActionError] = useState<{
+    title: string;
+    body: string;
+    retry?: () => void;
+  } | null>(null);
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const [busy, setBusy] = useState(false);
 
@@ -69,10 +72,10 @@ export default function ActivityView() {
     try {
       const next = await getActivity({ limit: 100 });
       setItems(next);
-      setLoadError(null);
-    } catch (err) {
+      setLoadError(false);
+    } catch {
       setItems([]);
-      setLoadError(errorMessage(err));
+      setLoadError(true);
     } finally {
       setBusy(false);
     }
@@ -88,8 +91,12 @@ export default function ActivityView() {
     setActionError(null);
     try {
       await updateSettings({ privacy: { ...settings.privacy, activityHistory: !nextPaused } });
-    } catch (err) {
-      setActionError(errorMessage(err));
+    } catch {
+      setActionError({
+        title: "Couldn't save that change.",
+        body: "Your previous setting is still active.",
+        retry: () => void setPaused(nextPaused),
+      });
     }
   };
 
@@ -99,10 +106,19 @@ export default function ActivityView() {
     setActionError(null);
     try {
       const outcome = await openResult({ type: "open_path", path });
-      if (!outcome.ok) setActionError(outcome.message);
-      else void load();
-    } catch (err) {
-      setActionError(errorMessage(err));
+      if (!outcome.ok) {
+        setActionError({
+          title: "Couldn't open “" + item.title + "”.",
+          body: "It may have been moved or deleted.",
+        });
+      } else {
+        void load();
+      }
+    } catch {
+      setActionError({
+        title: "Couldn't open “" + item.title + "”.",
+        body: "It may have been moved or deleted.",
+      });
     }
   };
 
@@ -115,7 +131,7 @@ export default function ActivityView() {
     const content = (
       <>
         <span className="activity-icon" aria-hidden="true">
-          <Icon name={kindIcon(item.kind)} size={15} />
+          <Icon name={kindIcon(item.kind)} size={16} />
         </span>
         <span className="activity-main">
           <span className="activity-title">{item.title}</span>
@@ -151,12 +167,13 @@ export default function ActivityView() {
       <p className="page-lead">A local history of recent searches, launches, and optional workflows.</p>
 
       {actionError ? (
-        <Callout tone="danger">
-          {actionError}
-          <button type="button" className="linkbtn" onClick={() => setActionError(null)}>
-            Dismiss
-          </button>
-        </Callout>
+        <StateNotice
+          role="alert"
+          title={actionError.title}
+          body={actionError.body}
+          actionLabel={actionError.retry ? "Try again" : undefined}
+          onAction={actionError.retry}
+        />
       ) : null}
 
       <section className="privacy-strip" aria-labelledby="activity-privacy">
@@ -178,12 +195,13 @@ export default function ActivityView() {
       </section>
 
       {paused ? (
-        <Callout tone="warn" role="status">
-          Activity recording is paused. Existing entries remain readable.
-          <button type="button" className="linkbtn" onClick={() => void setPaused(false)}>
-            Resume
-          </button>
-        </Callout>
+        <StateNotice
+          tone="warn"
+          title="Activity recording is paused."
+          body="Existing entries remain readable."
+          actionLabel="Resume"
+          onAction={() => void setPaused(false)}
+        />
       ) : null}
 
       <div className="toolbar">
@@ -200,19 +218,27 @@ export default function ActivityView() {
           ))}
         </div>
       ) : loadError ? (
-        <Callout tone="danger">
-          {loadError}
-          <button type="button" className="linkbtn" onClick={() => void load()}>
-            Retry
-          </button>
-        </Callout>
+        <StateNotice
+          title="Couldn't load activity."
+          body="Your history stays on this PC."
+          actionLabel="Try again"
+          onAction={() => void load()}
+        />
       ) : !hasAny ? (
         <EmptyState
           title="No activity yet."
-          body="Searches and launches appear here while recording is on."
+          body="Searches and launches will appear here while recording is on."
         />
       ) : filtered.length === 0 ? (
-        <EmptyState title={emptyFilterCopy(filter)} body="Try a different filter." />
+        <EmptyState
+          title={emptyFilterTitle(filter)}
+          body="Try another filter or show everything."
+          action={
+            <button type="button" className="btn" onClick={() => setFilter("all")}>
+              Show all
+            </button>
+          }
+        />
       ) : (
         <div className="activity-groups">
           {days.map((day) => (

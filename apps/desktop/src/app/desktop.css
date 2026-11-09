@@ -1,13 +1,51 @@
+@import "./app-scale.css";
+
 /* Full desktop application layout. Colours/type/motion from tokens.css.
    Sidebar: 220 (>=1100), 190 (820-1099), 56 icon rail (<=819). */
 
+/* Window-open motion: 160 ms fade + 4 px raise when the main window is shown.
+   Applied to the shell only, so route changes stay instant (task-2). */
+.app-shell.is-opening {
+  animation: app-window-in var(--ps-dur-panel) var(--ps-ease-out);
+}
+
+@keyframes app-window-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .app-shell {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: var(--ps-app-sidebar) minmax(0, 1fr);
   height: 100vh;
   background: var(--ps-surface);
   color: var(--ps-ink);
   overflow: hidden;
+}
+
+.app-shell .btn,
+.onboarding-stage .btn {
+  min-height: var(--ps-control-height);
+  padding: 7px 14px;
+  font-size: var(--ps-text-control, var(--ps-text-small));
+  line-height: var(--ps-leading-small);
+}
+
+.app-shell .input,
+.onboarding-stage .input,
+.onboarding-stage .field {
+  font-size: var(--ps-text-body);
+}
+
+.app-shell .input-xs {
+  height: var(--ps-control-height);
 }
 
 .skip-link {
@@ -32,7 +70,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: var(--space-5) var(--space-3) var(--space-4);
+  padding: 20px var(--space-3) var(--space-4);
   border-right: var(--ps-border) solid var(--ps-line);
   background: var(--ps-sidebar);
 }
@@ -99,7 +137,7 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 19px;
+  width: 20px;
   color: currentColor;
 }
 
@@ -150,20 +188,38 @@
 }
 
 .workspace {
-  max-width: var(--ps-content-max);
-  padding: 36px 40px 64px;
+  max-width: calc(var(--ps-content-max) + 2 * var(--ps-app-margin));
+  padding: var(--ps-app-margin);
+  padding-bottom: 64px;
 }
 
 .page-head {
   margin: 0 0 var(--space-3);
 }
 
+/* Top-level notices sit on the page-header rhythm, not double-spaced. */
+.view > .callout,
+.view > .state {
+  margin-top: 0;
+}
+
+.view > .callout + .panel,
+.view > .state + .panel {
+  margin-top: var(--space-6);
+}
+
+.launcher-entry + .state,
+.launcher-entry + .callout {
+  margin-top: var(--space-6);
+}
+
 .eyebrow {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 8px;
   color: var(--ps-ink-2);
   font-size: var(--ps-text-micro);
   font-weight: var(--ps-fw-label);
   letter-spacing: 0.14em;
+  line-height: var(--ps-leading-micro);
   text-transform: uppercase;
 }
 
@@ -172,8 +228,8 @@
   color: var(--ps-ink);
   font-size: var(--ps-text-display);
   font-weight: var(--ps-fw-semibold);
-  letter-spacing: -0.065em;
-  line-height: 1.11;
+  letter-spacing: -0.04em;
+  line-height: var(--ps-leading-display);
 }
 
 /* Route h1 is a programmatic focus target for screen readers; the heading is
@@ -184,11 +240,11 @@
 }
 
 .page-lead {
-  max-width: 54ch;
-  margin: 0 0 var(--space-6);
+  max-width: 60ch;
+  margin: 0 0 var(--ps-app-section-gap);
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-body);
-  line-height: 1.66;
+  font-size: var(--ps-text-lead);
+  line-height: var(--ps-leading-lead);
 }
 
 .launcher-entry {
@@ -196,7 +252,7 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: 48px;
+  min-height: 52px;
   padding: 0 var(--space-4);
   border: var(--ps-border) solid var(--ps-line-strong);
   border-radius: var(--ps-radius-row);
@@ -231,8 +287,8 @@
 
 .home-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr);
-  gap: 38px;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--ps-app-gutter);
   margin-top: var(--space-8);
 }
 
@@ -253,7 +309,8 @@
   color: var(--ps-ink-2);
   font-size: var(--ps-text-section);
   font-weight: var(--ps-fw-label);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  line-height: var(--ps-leading-micro);
   text-transform: uppercase;
 }
 
@@ -275,7 +332,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) 0;
+  min-height: var(--ps-row-list);
+  padding: var(--space-2) 0;
   border-bottom: var(--ps-border) solid var(--ps-line-soft);
 }
 
@@ -307,7 +365,8 @@
   overflow: hidden;
   color: var(--ps-ink);
   font-size: var(--ps-text-strong);
-  font-weight: var(--ps-fw-strong);
+  font-weight: var(--ps-fw-semibold);
+  line-height: var(--ps-leading-small);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -316,6 +375,7 @@
   overflow: hidden;
   color: var(--ps-ink-2);
   font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -338,8 +398,8 @@
   margin: var(--space-3) 0 0;
   color: var(--ps-ink);
   font-size: var(--ps-text-stat);
-  font-weight: var(--ps-fw-strong);
-  letter-spacing: -0.075em;
+  font-weight: 650;
+  letter-spacing: -0.05em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -357,7 +417,7 @@
 }
 
 .home-sources {
-  margin-top: var(--space-8);
+  margin-top: var(--ps-app-section-gap);
 }
 
 .source-list {
@@ -372,6 +432,7 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
+  min-height: var(--ps-app-metric-row, 44px);
   padding: var(--space-2) 0;
   border: 0;
   border-bottom: var(--ps-border) solid var(--ps-line-soft);
@@ -425,7 +486,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3) var(--space-4);
-  align-items: start;
+  align-items: center;
   padding: var(--space-3) 0;
   border-bottom: var(--ps-border) solid var(--ps-line-soft);
 }
@@ -568,17 +629,17 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin: var(--space-4) 0 var(--space-3);
+  margin: 24px 0 16px;
 }
 
 .privacy-strip {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-top: var(--space-5);
-  padding: var(--space-4);
+  margin-top: 0;
+  padding: var(--ps-app-card-pad);
   border: var(--ps-border) solid var(--ps-line);
   border-radius: var(--ps-radius-window);
   background: var(--ps-surface);
@@ -595,8 +656,8 @@
   max-width: 68ch;
   margin: var(--space-2) 0 0;
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-meta);
-  line-height: 1.6;
+  font-size: var(--ps-text-small);
+  line-height: var(--ps-leading-small);
 }
 
 .privacy-control {
@@ -643,7 +704,8 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-3) 0;
+  min-height: var(--ps-row-list);
+  padding: var(--space-2) 0;
   border: 0;
   background: transparent;
   color: var(--ps-ink);
@@ -744,7 +806,7 @@
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: var(--space-3);
-  align-items: start;
+  align-items: center;
   padding: var(--space-3) 0;
   border-bottom: var(--ps-border) solid var(--ps-line-soft);
 }
@@ -786,14 +848,14 @@
 .settings-grid {
   display: flex;
   flex-direction: column;
-  gap: var(--space-7);
-  margin-top: var(--space-6);
+  gap: var(--ps-app-section-gap);
+  margin-top: 0;
 }
 
 .settings-section {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: var(--space-6);
+  grid-template-columns: var(--ps-app-label-col) minmax(0, 1fr);
+  gap: var(--ps-app-gutter);
   align-items: start;
 }
 
@@ -801,7 +863,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding-top: var(--space-3);
+  padding-top: var(--ps-app-card-pad);
 }
 
 .settings-label h2 {
@@ -809,7 +871,8 @@
   color: var(--ps-ink-2);
   font-size: var(--ps-text-section);
   font-weight: var(--ps-fw-label);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  line-height: var(--ps-leading-micro);
   text-transform: uppercase;
 }
 
@@ -819,10 +882,11 @@
 
 .pref-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-3) 0;
+  min-height: var(--ps-app-metric-row, 44px);
+  padding: var(--space-2) 0;
   border-bottom: var(--ps-border) solid var(--ps-line-soft);
 }
 
@@ -874,19 +938,7 @@
 }
 
 /* Responsive shell: 190 px sidebars on smaller desktops, 56 px rail below 820. */
-@media (max-width: 1099px) {
-  .app-shell {
-    grid-template-columns: 190px minmax(0, 1fr);
-  }
-
-  .workspace {
-    padding: 32px 32px 56px;
-  }
-
-  .home-columns {
-    gap: 32px;
-  }
-
+@media (max-width: 1023px) {
   .settings-section {
     grid-template-columns: 1fr;
     gap: var(--space-2);
@@ -898,10 +950,6 @@
 }
 
 @media (max-width: 819px) {
-  .app-shell {
-    grid-template-columns: 56px minmax(0, 1fr);
-  }
-
   .sidebar {
     align-items: center;
     padding: var(--space-4) var(--space-2);
@@ -941,10 +989,6 @@
     padding: 0;
   }
 
-  .workspace {
-    padding: 31px 24px 48px;
-  }
-
   .home-columns {
     grid-template-columns: 1fr;
     gap: var(--space-6);
@@ -961,9 +1005,6 @@
 }
 
 @media (max-width: 700px) {
-  .workspace {
-    padding: 31px 18px 44px;
-  }
 
   .source-main {
     flex-direction: column;

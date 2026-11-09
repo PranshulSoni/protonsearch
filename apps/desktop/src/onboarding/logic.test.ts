@@ -44,6 +44,8 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     semantic: { enabled: false, model: null },
     onboardingComplete: false,
     legacyMigrated: false,
+    webSearchEnabled: true,
+    webSearchEngine: "google",
     resultLimit: 30,
     ...overrides,
   };

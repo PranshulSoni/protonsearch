@@ -12,8 +12,17 @@ import type {
   SourceStatus,
 } from "../../bridge/types";
 import { formatNumber } from "../../lib/format";
-import { describeSource, indexHealth, relativeTime, stateLabel, type SourceInfo } from "../describe";
-import { errorMessage } from "../hooks";
+import {
+  describeSource,
+  indexCountText,
+  indexHealth,
+  relativeTime,
+  rootStatusText,
+  sourceStatusText,
+  stateLabel,
+  summarizeWarnings,
+  type SourceInfo,
+} from "../describe";
 import {
   removeRoot,
   rootDisplayName,
@@ -32,6 +41,7 @@ import {
   Icon,
   Panel,
   RouteHeading,
+  StateNotice,
   SavedStamp,
   SegmentedControl,
   Switch,
@@ -76,7 +86,11 @@ function rootTone(root: RootStatus): "ok" | "busy" | "warn" | "error" {
 export default function IndexesView({ focusSource }: { focusSource?: string | null }) {
   const { settings, status, onboarding, updateSettings, indexCommand, refreshStatus } = useApp();
   const { savedKey, markSaved } = useSavedStamp();
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{
+    title: string;
+    body: string;
+    retry?: () => void;
+  } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -94,6 +108,7 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
   const health = indexHealth(status);
   const paused = settings.indexing.paused || status?.state === "paused";
   const sources = status?.sources ?? [];
+  const warningSummary = summarizeWarnings(status?.warnings ?? []);
   const unavailableRoots = (status?.roots ?? []).filter(
     (root) => root.enabled && !HEALTHY_ROOT_STATES.has(root.state),
   );
@@ -114,8 +129,12 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       try {
         await updateSettings({ indexing: { ...settings.indexing, ...patch } });
         markSaved(stamp);
-      } catch (err) {
-        setActionError(errorMessage(err));
+      } catch {
+        setActionError({
+          title: "Couldn't save that change.",
+          body: "Your previous setting is still active.",
+          retry: () => void patchIndexing(patch, stamp),
+        });
       }
     },
     [settings.indexing, updateSettings, markSaved],
@@ -169,8 +188,12 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
         indexing: { ...settings.indexing, roots: removeRoot(roots, removeTarget) },
       });
       markSaved("locations");
-    } catch (err) {
-      setActionError(errorMessage(err));
+    } catch {
+      setActionError({
+        title: "Couldn't save that change.",
+        body: "Your previous setting is still active.",
+        retry: () => void confirmRemove(),
+      });
     } finally {
       setBusy(null);
       closeRemoveConfirm();
@@ -207,8 +230,12 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       await indexCommand(paused ? "resume" : "pause");
       await updateSettings({ indexing: { ...settings.indexing, paused: !paused } });
       markSaved("status");
-    } catch (err) {
-      setActionError(errorMessage(err));
+    } catch {
+      setActionError({
+        title: "Couldn't reach the local engine.",
+        body: "Indexing state is unchanged.",
+        retry: () => void togglePaused(),
+      });
     } finally {
       setBusy(null);
     }
@@ -223,8 +250,11 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       await indexCommand(rebuildTarget);
       setNotice("Rebuild requested from the local engine.");
       markSaved("status");
-    } catch (err) {
-      setActionError(errorMessage(err));
+    } catch {
+      setActionError({
+        title: "Couldn't start the rebuild.",
+        body: "Your existing index is unchanged.",
+      });
     } finally {
       setBusy(null);
       closeRebuildConfirm();
@@ -246,8 +276,12 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
     try {
       await updateSettings({ privacy: { ...settings.privacy, [key]: !settings.privacy[key] } });
       markSaved("sources");
-    } catch (err) {
-      setActionError(errorMessage(err));
+    } catch {
+      setActionError({
+        title: "Couldn't save that change.",
+        body: "Your previous setting is still active.",
+        retry: () => void toggleSource(info),
+      });
     }
   };
 
@@ -262,12 +296,13 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       </Callout>
 
       {actionError ? (
-        <Callout tone="danger">
-          {actionError}
-          <button type="button" className="linkbtn" onClick={() => setActionError(null)}>
-            Dismiss
-          </button>
-        </Callout>
+        <StateNotice
+          role="alert"
+          title={actionError.title}
+          body={actionError.body}
+          actionLabel={actionError.retry ? "Try again" : undefined}
+          onAction={actionError.retry}
+        />
       ) : null}
 
       <Panel
@@ -278,8 +313,13 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       >
         {roots.length === 0 ? (
           <EmptyState
-            title="No locations selected."
-            body="Locations you add stay on this PC. Filename search will cover applications and actions until you add folders."
+            title="No locations yet."
+            body="Add a folder so ProtonSearch can find your files."
+            action={
+              <button type="button" className="btn" onClick={() => setAdding(true)}>
+                Add location
+              </button>
+            }
           />
         ) : null}
         <div className="config-list">
@@ -296,7 +336,7 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                     {live ? (
                       <>
                         <Dot tone={rootTone(live)} />
-                        {stateLabel(live.state)} · {formatNumber(live.indexed)} items
+                        {rootStatusText(live)}
                         {live.errors > 0 ? " · " + formatNumber(live.errors) + " errors" : ""}
                       </>
                     ) : root.enabled === false ? (
@@ -496,11 +536,19 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                 Refresh
               </button>
             </div>
-            <p className="muted">{health.detail}</p>
+            <p className="muted">
+              {status.state === "error"
+                ? "New files aren't being added. Existing search still works."
+                : status.state === "paused"
+                  ? "Existing results stay searchable, but new files are not being picked up."
+                  : status.state === "starting"
+                    ? "The local engine is warming up."
+                    : "Everything you enabled is searchable on this device."}
+            </p>
             <dl className="metric-list">
               <div className="metric-row">
                 <dt>Files</dt>
-                <dd>{formatNumber(status.filenameEntries)}</dd>
+                <dd>{indexCountText(status)}</dd>
               </div>
               <div className="metric-row">
                 <dt>Documents</dt>
@@ -515,23 +563,26 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                 <dd>{formatNumber(status.sources.length)}</dd>
               </div>
             </dl>
-            {status.warnings.length > 0 ? (
-              <Callout tone="warn" role="status">
-                <ul className="notice-list">
-                  {status.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              </Callout>
+            {warningSummary ? (
+              <StateNotice
+                tone="warn"
+                title="Index needs attention."
+                body={warningSummary.body}
+                details={warningSummary.details}
+                actionLabel="Review locations"
+                onAction={() =>
+                  document.getElementById("indexes-locations")?.scrollIntoView({ block: "start" })
+                }
+              />
             ) : null}
           </>
         ) : (
-          <Callout tone="danger">
-            Couldn&apos;t read the index status.
-            <button type="button" className="linkbtn" onClick={() => void refreshStatus()}>
-              Retry
-            </button>
-          </Callout>
+          <StateNotice
+            title="Couldn't read the index status."
+            body="The local search engine didn't respond. Your settings are unaffected."
+            actionLabel="Try again"
+            onAction={() => void refreshStatus()}
+          />
         )}
 
         <div className="btn-row">
@@ -685,7 +736,10 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
         actions={<SavedStamp show={savedKey === "sources"} />}
       >
         {sources.length === 0 ? (
-          <p className="muted">No sources configured.</p>
+          <EmptyState
+            title="No sources reporting."
+            body="The local engine will list them when available."
+          />
         ) : (
           <div className="config-list">
             {sources.map((source: SourceStatus) => {
@@ -702,18 +756,22 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                   <div className="config-main">
                     <div className="config-title">
                       <span className="source-icon" aria-hidden="true">
-                        <Icon name={sourceIconName(source.id)} size={15} />
+                        <Icon name={sourceIconName(source.id)} size={16} />
                       </span>
                       {info.title}
                       <Dot tone={info.tone} />
                     </div>
-                    <div className="config-sub">
-                      {info.enabled
-                        ? formatNumber(source.itemCount) + " items · " + info.stateLabel
-                        : "Off"}
-                    </div>
+                    <div className="config-sub">{sourceStatusText(source, info.enabled)}</div>
                     <p className="config-desc">{info.description}</p>
-                    {source.detail ? <p className="field-help">{source.detail}</p> : null}
+                    {source.state === "error" ? (
+                      <p className="row-state">
+                        <Icon name="alert" size={16} />
+                        Couldn&apos;t read {info.title}. ProtonSearch will try again
+                        automatically.
+                      </p>
+                    ) : source.detail ? (
+                      <p className="field-help">{source.detail}</p>
+                    ) : null}
                   </div>
                   {info.privacyKey ? (
                     <Switch
@@ -743,16 +801,18 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                 <span className="config-path" title={root.path}>
                   {root.path}
                 </span>
-                <span className="config-sub">
-                  <Dot tone={rootTone(root)} />
+                <span className="row-state">
+                  <Icon name="alert" size={16} />
                   {root.state === "unavailable"
-                    ? "Unavailable — network location disconnected"
-                    : stateLabel(root.state)}
+                    ? "Network location unavailable."
+                    : "Couldn't read this location."}
                 </span>
               </li>
             ))}
           </ul>
-          <p className="field-help">Retry arrives with the engine&apos;s per-root scan controls.</p>
+          <p className="field-help">
+            Local files are still searchable. Reconnect the drive to index it again.
+          </p>
         </Panel>
       ) : null}
 
@@ -764,7 +824,7 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
         <dl className="metric-list">
           <div className="metric-row">
             <dt>Filename entries</dt>
-            <dd>{formatNumber(status?.filenameEntries ?? 0)}</dd>
+            <dd>{indexCountText(status)}</dd>
           </div>
           <div className="metric-row">
             <dt>Document texts</dt>

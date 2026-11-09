@@ -11,17 +11,17 @@ import type {
   MotionPreference,
   SettingsPatch,
   ThemeMode,
+  WebSearchEngine,
 } from "../../bridge/types";
 import { formatNumber } from "../../lib/format";
-import { relativeTime, stateLabel } from "../describe";
-import { errorMessage } from "../hooks";
+import { indexCountText, relativeTime, stateLabel, summarizeWarnings } from "../describe";
 import { HotkeyCapture } from "../HotkeyInput";
 import { SECTION_EYEBROWS, type Section } from "../sections";
 import {
-  Callout,
   RouteHeading,
   SavedStamp,
   SegmentedControl,
+  StateNotice,
   Switch,
   useSavedStamp,
 } from "../ui";
@@ -37,6 +37,13 @@ const DENSITY_OPTIONS: { value: Density; label: string }[] = [
   { value: "compact", label: "Compact" },
 ];
 
+const WEB_SEARCH_ENGINES: { value: WebSearchEngine; label: string }[] = [
+  { value: "google", label: "Google" },
+  { value: "bing", label: "Bing" },
+  { value: "duck_duck_go", label: "DuckDuckGo" },
+  { value: "you_tube", label: "YouTube" },
+];
+
 const MOTION_OPTIONS: { value: MotionPreference; label: string }[] = [
   { value: "system", label: "System" },
   { value: "full", label: "Full" },
@@ -50,9 +57,14 @@ export default function PreferencesView({
 }) {
   const { settings, status, updateSettings, refreshStatus } = useApp();
   const { savedKey, markSaved } = useSavedStamp();
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{
+    title: string;
+    body: string;
+    retry?: () => void;
+  } | null>(null);
   const [limitDraft, setLimitDraft] = useState(String(settings.resultLimit));
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const warningSummary = summarizeWarnings(status?.warnings ?? []);
 
   useEffect(() => {
     setLimitDraft(String(settings.resultLimit));
@@ -72,13 +84,17 @@ export default function PreferencesView({
   }, []);
 
   const apply = useCallback(
-    async (patch: SettingsPatch, stamp: string) => {
+    async function apply(patch: SettingsPatch, stamp: string) {
       setActionError(null);
       try {
         await updateSettings(patch);
         markSaved(stamp);
-      } catch (err) {
-        setActionError(errorMessage(err));
+      } catch {
+        setActionError({
+          title: "Couldn't save that change.",
+          body: "Your previous setting is still active.",
+          retry: () => void apply(patch, stamp),
+        });
       }
     },
     [updateSettings, markSaved],
@@ -120,12 +136,13 @@ export default function PreferencesView({
       </p>
 
       {actionError ? (
-        <Callout tone="danger">
-          {actionError}
-          <button type="button" className="linkbtn" onClick={() => setActionError(null)}>
-            Dismiss
-          </button>
-        </Callout>
+        <StateNotice
+          role="alert"
+          title={actionError.title}
+          body={actionError.body}
+          actionLabel={actionError.retry ? "Try again" : undefined}
+          onAction={actionError.retry}
+        />
       ) : null}
 
       <div className="settings-grid">
@@ -178,6 +195,47 @@ export default function PreferencesView({
             <p className="field-help">
               Between 5 and 100 results. Larger lists take longer to render; the engine stays the
               same.
+            </p>
+          </div>
+        </section>
+
+
+
+        <section className="settings-section" aria-labelledby="prefs-search">
+          <div className="settings-label">
+            <h2 id="prefs-search">Search</h2>
+            <SavedStamp show={savedKey === "search"} />
+          </div>
+          <div className="panel">
+            <div className="pref-row">
+              <div className="pref-copy">
+                <span className="pref-title">Offer web search results</span>
+                <span className="pref-desc">
+                  Adds a “Search the web for …” action to launcher results. Nothing is sent until
+                  you choose it.
+                </span>
+              </div>
+              <Switch
+                checked={settings.webSearchEnabled}
+                label="Offer web search results"
+                onChange={(next) => void apply({ webSearchEnabled: next }, "search")}
+              />
+            </div>
+            <div className="pref-row">
+              <div className="pref-copy">
+                <span className="pref-title">Default search engine</span>
+                <span className="pref-desc">Used by the “Search the web for …” result.</span>
+              </div>
+              <SegmentedControl
+                label="Default web search engine"
+                value={settings.webSearchEngine}
+                options={WEB_SEARCH_ENGINES}
+                disabled={!settings.webSearchEnabled}
+                onChange={(engine) => void apply({ webSearchEngine: engine }, "search")}
+              />
+            </div>
+            <p className="field-help">
+              Opens the result in your browser; nothing is sent until you choose it.
             </p>
           </div>
         </section>
@@ -427,7 +485,7 @@ export default function PreferencesView({
               </div>
               <div className="metric-row">
                 <dt>Filename entries</dt>
-                <dd>{formatNumber(status?.filenameEntries ?? 0)}</dd>
+                <dd>{indexCountText(status)}</dd>
               </div>
               <div className="metric-row">
                 <dt>Document texts</dt>
@@ -442,14 +500,15 @@ export default function PreferencesView({
                 <dd>{relativeTime(status?.lastUpdated)}</dd>
               </div>
             </dl>
-            {status && status.warnings.length > 0 ? (
-              <Callout tone="warn" role="status">
-                <ul className="notice-list">
-                  {status.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              </Callout>
+            {warningSummary ? (
+              <StateNotice
+                tone="warn"
+                title="Index needs attention."
+                body={warningSummary.body}
+                details={warningSummary.details}
+                actionLabel="Open Search & indexes"
+                onAction={() => onNavigate("indexes")}
+              />
             ) : null}
             <div className="section-actions">
               <button type="button" className="btn" onClick={() => void refreshStatus()}>

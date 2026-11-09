@@ -8,17 +8,21 @@ import { formatNumber } from "../../lib/format";
 import {
   describeSource,
   greetingLine,
+  hasIndexCount,
   indexCounts,
   indexHealth,
+  indexCountText,
   recentAccessed,
   relativeTime,
+  sourceStatusText,
+  summarizeWarnings,
 } from "../describe";
 import { useOpenLauncher } from "../hooks";
 import { displayHotkey } from "../hotkey";
 import type { Section } from "../sections";
 import { SECTION_EYEBROWS } from "../sections";
 import { sourceIconName } from "../sourceIcons";
-import { Callout, Dot, EmptyState, Icon, RouteHeading } from "../ui";
+import { Dot, EmptyState, Icon, RouteHeading, StateNotice } from "../ui";
 
 export default function HomeView({
   onNavigate,
@@ -28,16 +32,16 @@ export default function HomeView({
   const { settings, status, getActivity, refreshStatus } = useApp();
   const openLauncher = useOpenLauncher();
   const [recent, setRecent] = useState<ActivityItem[] | null>(null);
-  const [activityError, setActivityError] = useState<string | null>(null);
+  const [activityError, setActivityError] = useState(false);
 
   const loadActivity = useCallback(async () => {
     try {
       const items = await getActivity({ limit: 40 });
       setRecent(items);
-      setActivityError(null);
-    } catch (err) {
+      setActivityError(false);
+    } catch {
       setRecent([]);
-      setActivityError(err instanceof Error ? err.message : String(err));
+      setActivityError(true);
     }
   }, [getActivity]);
 
@@ -51,6 +55,7 @@ export default function HomeView({
   const userName = settings.userName?.trim() || null;
   const sources = status?.sources ?? [];
   const shortcut = displayHotkey(settings.hotkey);
+  const warningSummary = summarizeWarnings(status?.warnings ?? []);
 
   return (
     <div className="view">
@@ -63,18 +68,34 @@ export default function HomeView({
         onClick={openLauncher}
         title={shortcut ? "Open the launcher (" + shortcut + ")" : "Open the launcher"}
       >
-        <Icon name="search" size={18} className="launcher-entry-glyph" />
+        <Icon name="search" size={16} className="launcher-entry-glyph" />
         <span className="launcher-entry-text">Find a file, open an app, or run an action…</span>
-        <Icon name="arrowUpRight" size={15} className="launcher-entry-arrow" />
+        <Icon name="arrowUpRight" size={16} className="launcher-entry-arrow" />
       </button>
 
-      {status && (status.state === "paused" || status.state === "error") ? (
-        <Callout tone={status.state === "error" ? "danger" : "warn"} role="status">
-          <span>{health.detail}</span>
-          <button type="button" className="linkbtn" onClick={() => onNavigate("indexes")}>
-            Open Search &amp; indexes
-          </button>
-        </Callout>
+      {status &&
+      (status.state === "paused" ||
+        status.state === "error" ||
+        status.warnings.length > 0) ? (
+        <StateNotice
+          tone={status.state === "error" ? "error" : "warn"}
+          role={status.state === "error" ? "alert" : "status"}
+          title={
+            status.state === "error"
+              ? "Indexing stopped."
+              : status.state === "paused"
+                ? "Indexing is paused."
+                : "Index needs attention."
+          }
+          body={
+            status.state === "error" || status.state === "paused"
+              ? "New files aren't being added. Existing search still works."
+              : warningSummary?.body
+          }
+          details={status.state === "ready" ? warningSummary?.details : undefined}
+          actionLabel="Open Search & indexes"
+          onAction={() => onNavigate("indexes")}
+        />
       ) : null}
 
       <div className="home-columns">
@@ -88,8 +109,8 @@ export default function HomeView({
             </p>
           ) : accessed.length === 0 ? (
             <EmptyState
-              title="No recent items yet."
-              body="Files and apps you open from the launcher appear here. Nothing leaves this device."
+              title="Nothing opened recently."
+              body="Files and apps you open from the launcher will appear here."
               action={
                 <button type="button" className="btn" onClick={openLauncher}>
                   Open the launcher
@@ -101,7 +122,7 @@ export default function HomeView({
               {accessed.map((item) => (
                 <li className="recent-row" key={item.id}>
                   <span className="recent-icon" aria-hidden="true">
-                    <Icon name={item.kind === "launch" ? "grid" : "folder"} size={15} />
+                    <Icon name={item.kind === "launch" ? "grid" : "folder"} size={16} />
                   </span>
                   <span className="recent-text">
                     <span className="recent-title">{item.title}</span>
@@ -115,12 +136,12 @@ export default function HomeView({
             </ul>
           )}
           {activityError ? (
-            <Callout tone="danger">
-              {activityError}
-              <button type="button" className="linkbtn" onClick={() => void loadActivity()}>
-                Retry
-              </button>
-            </Callout>
+            <StateNotice
+              title="Couldn't load activity."
+              body="Your history stays on this PC."
+              actionLabel="Try again"
+              onAction={() => void loadActivity()}
+            />
           ) : null}
           <div className="section-actions">
             <button type="button" className="btn" onClick={() => onNavigate("indexes")}>
@@ -140,31 +161,39 @@ export default function HomeView({
             ) : null}
           </div>
           {status === null ? (
-            <Callout tone="danger">
-              Couldn&apos;t read the index status.
-              <button type="button" className="linkbtn" onClick={() => void refreshStatus()}>
-                Retry
-              </button>
-            </Callout>
+            <StateNotice
+              title="Couldn't read the index status."
+              body="The local search engine didn't respond. Your settings are unaffected."
+              actionLabel="Try again"
+              onAction={() => void refreshStatus()}
+            />
+          ) : !hasIndexCount(status) ? (
+            <>
+              <p className="index-stat">{indexCountText(status)}</p>
+              <p className="index-stat-sub">The local index is warming up.</p>
+              <p className="index-state-note">
+                Indexed counts appear as soon as the engine reports them.
+              </p>
+            </>
           ) : counts.total === 0 ? (
             <EmptyState
               title="Nothing indexed yet."
-              body="Add a location to start building the index; it stays on this PC."
+              body="Add a folder to start building the index. It stays on this PC."
               action={
                 <button type="button" className="btn" onClick={() => onNavigate("indexes")}>
-                  Set up indexing
+                  Add location
                 </button>
               }
             />
           ) : (
             <>
-              <p className="index-stat">{formatNumber(counts.total)}</p>
+              <p className="index-stat">{indexCountText(status)}</p>
               <p className="index-stat-sub">items indexed on this PC</p>
               <p className="index-state-note">
                 {status.state === "indexing"
                   ? "Indexing in the background"
                   : health.tone === "error"
-                    ? health.label
+                    ? "Existing results stay searchable"
                     : "Updated " + relativeTime(status.lastUpdated)}
               </p>
               <dl className="metric-list">
@@ -211,14 +240,12 @@ export default function HomeView({
                     onClick={() => onNavigate("indexes", source.id)}
                   >
                     <span className="source-icon" aria-hidden="true">
-                      <Icon name={sourceIconName(source.id)} size={15} />
+                      <Icon name={sourceIconName(source.id)} size={16} />
                     </span>
                     <span className="source-main">
                       <span className="source-title">{info.title}</span>
                       <span className="source-meta">
-                        {info.enabled
-                          ? formatNumber(source.itemCount) + " items · " + info.stateLabel
-                          : "Off"}
+                        {sourceStatusText(source, info.enabled)}
                       </span>
                     </span>
                     <Dot tone={info.tone} />

@@ -4,6 +4,7 @@
 // rejection text inline. Escape cancels; Tab moves focus without disarming.
 
 import { useEffect, useRef, useState } from "react";
+import { StateNotice } from "./ui";
 import {
   DEFAULT_HOTKEY,
   HOTKEY_CONFLICT_NOTE,
@@ -26,6 +27,7 @@ export function HotkeyCapture({ value, onCommit, help, disabled }: HotkeyCapture
   const [capturing, setCapturing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [commitFailed, setCommitFailed] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [liveMessage, setLiveMessage] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -50,6 +52,7 @@ export function HotkeyCapture({ value, onCommit, help, disabled }: HotkeyCapture
     if (disabled || applying) return;
     setCapturing(true);
     setError(null);
+    setCommitFailed(false);
     setStatus(null);
     setLiveMessage("Press the shortcut you want. Press Escape to cancel.");
     triggerRef.current?.focus();
@@ -58,6 +61,7 @@ export function HotkeyCapture({ value, onCommit, help, disabled }: HotkeyCapture
   const cancelCapture = () => {
     setCapturing(false);
     setError(null);
+    setCommitFailed(false);
     setLiveMessage("Shortcut capture cancelled.");
     triggerRef.current?.focus();
   };
@@ -71,14 +75,14 @@ export function HotkeyCapture({ value, onCommit, help, disabled }: HotkeyCapture
     }
     setApplying(true);
     setError(null);
+    setCommitFailed(false);
     try {
       await commitRef.current(accelerator, display);
       setStatus("Shortcut applied and active now.");
       setLiveMessage("Shortcut applied and active now.");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      setLiveMessage(message);
+    } catch {
+      setCommitFailed(true);
+      setLiveMessage("That shortcut isn't available.");
     } finally {
       setApplying(false);
       triggerRef.current?.focus();
@@ -172,11 +176,31 @@ export function HotkeyCapture({ value, onCommit, help, disabled }: HotkeyCapture
         </p>
       ) : null}
       {error ? (
-        <p className="field-error" role="alert">
-          {error}
-        </p>
+        <StateNotice
+          className="state-inline"
+          role="alert"
+          title={
+            /reserved by Windows/i.test(error)
+              ? "That shortcut isn't available."
+              : "That shortcut isn't valid."
+          }
+          body={
+            /reserved by Windows/i.test(error)
+              ? "Another app is already using it. Choose a different combination."
+              : "Use at least one of Ctrl, Alt, Shift, or Win."
+          }
+        />
       ) : null}
-      {!capturing && !error ? <p className="field-help">{HOTKEY_CONFLICT_NOTE}</p> : null}
+      {commitFailed ? (
+        <StateNotice
+          className="state-inline"
+          title="That shortcut isn't available."
+          body="Another app is already using it. Choose a different combination."
+        />
+      ) : null}
+      {!capturing && !error && !commitFailed ? (
+        <p className="field-help">{HOTKEY_CONFLICT_NOTE}</p>
+      ) : null}
     </div>
   );
 }

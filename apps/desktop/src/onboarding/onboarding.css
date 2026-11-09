@@ -1,3 +1,5 @@
+@import "../app/app-scale.css";
+
 /* First-run onboarding. Colours/type/motion from tokens.css.
    Rail 240 px at desktop widths; hidden <=760; card min-height 560. */
 
@@ -6,7 +8,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: 26px;
+  padding: 24px;
   background: var(--ps-ground);
   overflow-y: auto;
 }
@@ -15,12 +17,24 @@
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   width: min(100%, 900px);
-  min-height: 560px;
+  /* L6: fill the window instead of floating in a black void. */
+  min-height: min(620px, calc(100vh - 48px));
   overflow: hidden;
-  border: var(--ps-border) solid var(--ps-line-strong);
+  border: var(--ps-border) solid var(--ps-line);
   border-radius: var(--ps-radius-window);
   background: var(--ps-surface);
-  box-shadow: var(--ps-shadow-app);
+  /* L6 prescribed elevation (REVIEW_1 §8.2): layered, extent <= stage pad.
+     Values come from the design review until/if they become tokens. */
+  box-shadow:
+    0 2px 6px rgba(36, 60, 43, 0.08),
+    0 8px 16px rgba(36, 60, 43, 0.06);
+}
+
+:root[data-theme="dark"] .onboarding {
+  /* Dark surfaces need more lift: the ground-to-card step alone is ~1.09:1. */
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.3),
+    0 8px 16px rgba(0, 0, 0, 0.28);
 }
 
 .setup-rail {
@@ -55,10 +69,11 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 8px 0;
+  padding: 7px 0;
   color: var(--ps-ink-3);
   font-size: var(--ps-text-small);
   font-weight: var(--ps-fw-semibold);
+  line-height: var(--ps-leading-small);
 }
 
 .step-num {
@@ -102,7 +117,7 @@
   border-top: var(--ps-border) solid var(--ps-line);
   color: var(--ps-ink-2);
   font-size: var(--ps-text-meta);
-  line-height: 1.7;
+  line-height: var(--ps-leading-meta);
 }
 
 .setup-foot p {
@@ -137,8 +152,8 @@
   color: var(--ps-ink);
   font-size: var(--ps-text-h1-setup);
   font-weight: var(--ps-fw-semibold);
-  letter-spacing: -0.05em;
-  line-height: 1.15;
+  letter-spacing: -0.04em;
+  line-height: var(--ps-leading-setup);
 }
 
 /* Programmatic announcement target, not an interactive control. */
@@ -148,11 +163,11 @@
 }
 
 .setup-lead {
-  max-width: 420px;
+  max-width: 480px;
   margin: 0 0 var(--space-5);
   color: var(--ps-ink-2);
-  font-size: var(--ps-text-body);
-  line-height: 1.68;
+  font-size: var(--ps-text-lead);
+  line-height: var(--ps-leading-lead);
 }
 
 .step-content {
@@ -196,7 +211,7 @@
 .value-desc {
   color: var(--ps-ink-2);
   font-size: var(--ps-text-small);
-  line-height: 1.55;
+  line-height: var(--ps-leading-small);
 }
 
 .legacy-note {
@@ -325,7 +340,7 @@
 .choice-hint {
   color: var(--ps-ink-2);
   font-size: var(--ps-text-meta);
-  line-height: 1.5;
+  line-height: var(--ps-leading-meta);
 }
 
 .choice-single {
@@ -453,10 +468,12 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
+  min-height: var(--ps-app-metric-row, 44px);
   padding: 9px 0;
   border-bottom: var(--ps-border) solid var(--ps-line-soft);
   color: var(--ps-ink-2);
   font-size: var(--ps-text-small);
+  line-height: var(--ps-leading-small);
 }
 
 .summary-row:last-child {
@@ -550,10 +567,6 @@
     padding: 14px;
   }
 
-  .onboarding {
-    min-height: 0;
-  }
-
   .setup-rail {
     padding: 20px;
   }
@@ -588,6 +601,25 @@
   .setup-bottom {
     flex-wrap: wrap;
   }
+}
+
+/* Onboarding → app crossfade (View Transition API); --ps-dur-panel = 160 ms. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--ps-dur-panel);
+  animation-timing-function: var(--ps-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0ms;
+  }
+}
+
+:root[data-motion="reduced"]::view-transition-old(root),
+:root[data-motion="reduced"]::view-transition-new(root) {
+  animation-duration: 0ms;
 }
 
 @media (forced-colors: active) {

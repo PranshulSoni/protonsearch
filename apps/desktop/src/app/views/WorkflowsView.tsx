@@ -5,15 +5,14 @@
 import { useState } from "react";
 import { useApp } from "../../App";
 import { describeAgent } from "../describe";
-import { errorMessage } from "../hooks";
 import { SECTION_EYEBROWS } from "../sections";
 import {
-  Callout,
   Dot,
   Icon,
   Panel,
   RouteHeading,
   SavedStamp,
+  StateNotice,
   Switch,
   useSavedStamp,
   type IconName,
@@ -122,7 +121,11 @@ const COMMAND_GROUPS: CommandGroup[] = [
 export default function WorkflowsView() {
   const { settings, status, updateSettings } = useApp();
   const { savedKey, markSaved } = useSavedStamp();
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{
+    title: string;
+    body: string;
+    retry?: () => void;
+  } | null>(null);
   const agent = describeAgent(status?.agent, settings);
   const provider = settings.agent.provider ?? "No provider configured";
   const model = settings.agent.model ?? "No model configured";
@@ -133,8 +136,12 @@ export default function WorkflowsView() {
     try {
       await updateSettings({ agent: { ...settings.agent, enabled: next } });
       markSaved("agent");
-    } catch (err) {
-      setActionError(errorMessage(err));
+    } catch {
+      setActionError({
+        title: "Couldn't save that change.",
+        body: "Your previous setting is still active.",
+        retry: () => void toggleAgent(next),
+      });
     }
   };
 
@@ -147,12 +154,13 @@ export default function WorkflowsView() {
       </p>
 
       {actionError ? (
-        <Callout tone="danger">
-          {actionError}
-          <button type="button" className="linkbtn" onClick={() => setActionError(null)}>
-            Dismiss
-          </button>
-        </Callout>
+        <StateNotice
+          role="alert"
+          title={actionError.title}
+          body={actionError.body}
+          actionLabel={actionError.retry ? "Try again" : undefined}
+          onAction={actionError.retry}
+        />
       ) : null}
 
       <Panel
@@ -167,7 +175,7 @@ export default function WorkflowsView() {
               {group.rows.map((row) => (
                 <li className="command-row" key={row.label}>
                   <span className="command-icon" aria-hidden="true">
-                    <Icon name={row.icon} size={15} />
+                    <Icon name={row.icon} size={16} />
                   </span>
                   <span className="command-main">
                     <span className="command-title">{row.label}</span>
@@ -198,7 +206,7 @@ export default function WorkflowsView() {
               <Dot tone={agent.tone} />
               {agent.stateLabel}
             </div>
-            <p className="config-desc">{agent.detail}</p>
+            {agent.tone !== "off" ? <p className="config-desc">{agent.detail}</p> : null}
           </div>
           <Switch
             checked={settings.agent.enabled}
@@ -206,6 +214,13 @@ export default function WorkflowsView() {
             onChange={(next) => void toggleAgent(next)}
           />
         </div>
+        {agent.tone === "off" ? (
+          <StateNotice
+            className="state-inline"
+            title="Agent workflows are off."
+            body="ProtonSearch works fully without them."
+          />
+        ) : null}
         <dl className="metric-list">
           <div className="metric-row">
             <dt>Runtime</dt>
@@ -221,15 +236,19 @@ export default function WorkflowsView() {
           </div>
         </dl>
         {settings.agent.enabled && !agent.installed ? (
-          <Callout tone="warn" role="status">
-            Your preference is saved, but no agent runtime is installed in this build. Nothing was
-            downloaded or started.
-          </Callout>
+          <StateNotice
+            tone="warn"
+            title="Agent workflows aren't set up."
+            body="Your preference is saved, but no runtime is installed in this build. Nothing was downloaded or started."
+          />
         ) : null}
         {agent.tone === "error" ? (
-          <Callout tone="danger">
-            The agent runtime couldn&apos;t start. Search is unaffected.
-          </Callout>
+          <StateNotice
+            tone="error"
+            role="alert"
+            title="Agent workflows are unavailable."
+            body="Search still works. The optional runtime didn't start."
+          />
         ) : null}
         <p className="field-help">
           No models are downloaded automatically. Installing and configuring the runtime is not

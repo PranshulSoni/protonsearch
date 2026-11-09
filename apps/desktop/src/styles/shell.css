@@ -22,3 +22,29 @@
   text-align: center;
   line-height: 1.6;
 }
+.boot-details {
+  max-width: 460px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.boot-details summary {
+  cursor: pointer;
+  color: var(--blue);
+  font-weight: 650;
+}
+
+.boot-details code {
+  display: block;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--soft);
+  color: var(--ink-2);
+  font-family: var(--ps-font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
