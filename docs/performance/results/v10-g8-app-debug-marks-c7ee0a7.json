@@ -1,0 +1,1562 @@
+{
+  "schema": "ps-app-baseline/1",
+  "kind": "app-launcher-baseline",
+  "status": "ok",
+  "capturedAt": "2026-11-09T21:10:41.012Z",
+  "host": {
+    "hostname": "PranshulAsus",
+    "platform": "win32"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe",
+    "exeBytes": 19729920,
+    "exeMtime": "2026-11-09T21:04:56.524Z",
+    "frontendDistIndex": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\apps\\desktop\\dist\\index.html",
+    "frontendDistMtime": "2026-11-09T21:05:11.932Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "cdpPort": 9222,
+    "launchArgs": [],
+    "node": "v26.7.0",
+    "gitHead": "c7ee0a73652255dd7539d1277dd095914a5c0f8b",
+    "gitDirty": 18,
+    "appPid": 31616,
+    "pages": [
+      {
+        "kind": "main",
+        "url": "http://localhost:5173/"
+      },
+      {
+        "kind": "launcher",
+        "url": "http://localhost:5173/"
+      },
+      {
+        "kind": "island",
+        "url": "http://localhost:5173/"
+      }
+    ],
+    "devicePixelRatio": 1.5,
+    "windowKind": "launcher"
+  },
+  "measurements": {
+    "indexReady": {
+      "state": "ready",
+      "entries": 131199,
+      "contentDocuments": 0
+    },
+    "memoryIdle": {
+      "label": "idle-hidden",
+      "mode": "memory",
+      "rootPid": 31616,
+      "capturedAtUtc": 1794258645784,
+      "processCount": 9,
+      "totalWorkingSetBytes": 760475648,
+      "totalPrivateBytes": 504016896,
+      "processes": [
+        {
+          "pid": 31616,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 63995904
+        },
+        {
+          "pid": 39312,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 142864384
+        },
+        {
+          "pid": 23840,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 14012416
+        },
+        {
+          "pid": 11716,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 227794944
+        },
+        {
+          "pid": 10980,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 45264896
+        },
+        {
+          "pid": 33500,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23269376
+        },
+        {
+          "pid": 21708,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 86511616
+        },
+        {
+          "pid": 23956,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 82227200
+        },
+        {
+          "pid": 37968,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 74534912
+        }
+      ],
+      "cpuSecondsTotal": 4.719,
+      "totalWorkingSetMiB": 725.2,
+      "totalPrivateMiB": 480.7
+    },
+    "idleCpu": {
+      "mode": "cpu",
+      "rootPid": 31616,
+      "sampleSeconds": 10.025,
+      "processCount": 9,
+      "cpuSecondsDelta": 0.547,
+      "logicalCores": 20,
+      "cpuPctOfOneCore": 5.46,
+      "cpuPctOfMachine": 0.27
+    },
+    "inputToVisible": {
+      "takes": 20,
+      "warmup": 3,
+      "measured": 20,
+      "ms": {
+        "count": 20,
+        "p50": 15.2,
+        "p95": 38.7,
+        "p99": 45.8,
+        "min": 4.8,
+        "max": 45.8,
+        "mean": 22.46
+      },
+      "samples": [
+        {
+          "take": 0,
+          "warmup": true,
+          "query": "arch",
+          "start": 14774.79999999702,
+          "visibleAt": 14780.90000000596,
+          "rows": 0,
+          "ms": 6.1
+        },
+        {
+          "take": 1,
+          "warmup": true,
+          "query": "readme",
+          "start": 14790.09999999404,
+          "visibleAt": 14829.09999999404,
+          "rows": 50,
+          "ms": 39
+        },
+        {
+          "take": 2,
+          "warmup": true,
+          "query": "proton",
+          "start": 14834.5,
+          "visibleAt": 14845.90000000596,
+          "rows": 50,
+          "ms": 11.4
+        },
+        {
+          "take": 3,
+          "warmup": false,
+          "query": "index",
+          "start": 14848.59999999404,
+          "visibleAt": 14879.5,
+          "rows": 50,
+          "ms": 30.9
+        },
+        {
+          "take": 4,
+          "warmup": false,
+          "query": "report",
+          "start": 14882.09999999404,
+          "visibleAt": 14895.70000000298,
+          "rows": 50,
+          "ms": 13.6
+        },
+        {
+          "take": 5,
+          "warmup": false,
+          "query": "screenshot",
+          "start": 14898.59999999404,
+          "visibleAt": 14926.79999999702,
+          "rows": 50,
+          "ms": 28.2
+        },
+        {
+          "take": 6,
+          "warmup": false,
+          "query": "会議",
+          "start": 14930.09999999404,
+          "visibleAt": 14951.70000000298,
+          "rows": 50,
+          "ms": 21.6
+        },
+        {
+          "take": 7,
+          "warmup": false,
+          "query": "café",
+          "start": 14965.90000000596,
+          "visibleAt": 14970.70000000298,
+          "rows": 1,
+          "ms": 4.8
+        },
+        {
+          "take": 8,
+          "warmup": false,
+          "query": "zzzz-no-match",
+          "start": 14976.59999999404,
+          "visibleAt": 15004.09999999404,
+          "rows": 1,
+          "ms": 27.5
+        },
+        {
+          "take": 9,
+          "warmup": false,
+          "query": "pdf",
+          "start": 15006.29999999702,
+          "visibleAt": 15020.79999999702,
+          "rows": 1,
+          "ms": 14.5
+        },
+        {
+          "take": 10,
+          "warmup": false,
+          "query": "arch",
+          "start": 15023,
+          "visibleAt": 15050,
+          "rows": 50,
+          "ms": 27
+        },
+        {
+          "take": 11,
+          "warmup": false,
+          "query": "readme",
+          "start": 15055.70000000298,
+          "visibleAt": 15070.90000000596,
+          "rows": 50,
+          "ms": 15.2
+        },
+        {
+          "take": 12,
+          "warmup": false,
+          "query": "proton",
+          "start": 15075.09999999404,
+          "visibleAt": 15120.90000000596,
+          "rows": 50,
+          "ms": 45.8
+        },
+        {
+          "take": 13,
+          "warmup": false,
+          "query": "index",
+          "start": 15123.5,
+          "visibleAt": 15137.40000000596,
+          "rows": 50,
+          "ms": 13.9
+        },
+        {
+          "take": 14,
+          "warmup": false,
+          "query": "report",
+          "start": 15140.5,
+          "visibleAt": 15179.09999999404,
+          "rows": 50,
+          "ms": 38.6
+        },
+        {
+          "take": 15,
+          "warmup": false,
+          "query": "screenshot",
+          "start": 15181.70000000298,
+          "visibleAt": 15196,
+          "rows": 50,
+          "ms": 14.3
+        },
+        {
+          "take": 16,
+          "warmup": false,
+          "query": "会議",
+          "start": 15198.79999999702,
+          "visibleAt": 15229.09999999404,
+          "rows": 1,
+          "ms": 30.3
+        },
+        {
+          "take": 17,
+          "warmup": false,
+          "query": "café",
+          "start": 15232,
+          "visibleAt": 15245.70000000298,
+          "rows": 1,
+          "ms": 13.7
+        },
+        {
+          "take": 18,
+          "warmup": false,
+          "query": "zzzz-no-match",
+          "start": 15248.40000000596,
+          "visibleAt": 15262.5,
+          "rows": 1,
+          "ms": 14.1
+        },
+        {
+          "take": 19,
+          "warmup": false,
+          "query": "pdf",
+          "start": 15265.40000000596,
+          "visibleAt": 15304.09999999404,
+          "rows": 50,
+          "ms": 38.7
+        },
+        {
+          "take": 20,
+          "warmup": false,
+          "query": "arch",
+          "start": 15308.90000000596,
+          "visibleAt": 15320.90000000596,
+          "rows": 50,
+          "ms": 12
+        },
+        {
+          "take": 21,
+          "warmup": false,
+          "query": "readme",
+          "start": 15323.70000000298,
+          "visibleAt": 15354.09999999404,
+          "rows": 50,
+          "ms": 30.4
+        },
+        {
+          "take": 22,
+          "warmup": false,
+          "query": "proton",
+          "start": 15356.59999999404,
+          "visibleAt": 15370.70000000298,
+          "rows": 50,
+          "ms": 14.1
+        }
+      ]
+    },
+    "engineIpc": {
+      "takes": 10,
+      "wallMs": {
+        "count": 10,
+        "p50": 15.9,
+        "p95": 19.6,
+        "p99": 19.6,
+        "min": 14.1,
+        "max": 19.6,
+        "mean": 16.34
+      },
+      "engineTookMs": {
+        "count": 10,
+        "p50": 11.421,
+        "p95": 14.952,
+        "p99": 14.952,
+        "min": 9.939,
+        "max": 14.952,
+        "mean": 11.673
+      },
+      "samples": [
+        {
+          "take": 0,
+          "query": "arch",
+          "wallMs": 16.5,
+          "tookMs": 11.542948,
+          "results": 50
+        },
+        {
+          "take": 1,
+          "query": "readme",
+          "wallMs": 16.399999991059303,
+          "tookMs": 11.240186,
+          "results": 50
+        },
+        {
+          "take": 2,
+          "query": "proton",
+          "wallMs": 19.600000008940697,
+          "tookMs": 14.951691,
+          "results": 50
+        },
+        {
+          "take": 3,
+          "query": "index",
+          "wallMs": 16.5,
+          "tookMs": 12.027366,
+          "results": 50
+        },
+        {
+          "take": 4,
+          "query": "report",
+          "wallMs": 17.700000002980232,
+          "tookMs": 12.641202,
+          "results": 50
+        },
+        {
+          "take": 5,
+          "query": "screenshot",
+          "wallMs": 15.900000005960464,
+          "tookMs": 9.938903,
+          "results": 50
+        },
+        {
+          "take": 6,
+          "query": "会議",
+          "wallMs": 15.599999994039536,
+          "tookMs": 11.46696,
+          "results": 1
+        },
+        {
+          "take": 7,
+          "query": "café",
+          "wallMs": 14.100000008940697,
+          "tookMs": 10.105124,
+          "results": 1
+        },
+        {
+          "take": 8,
+          "query": "zzzz-no-match",
+          "wallMs": 15.300000011920929,
+          "tookMs": 11.420655,
+          "results": 1
+        },
+        {
+          "take": 9,
+          "query": "pdf",
+          "wallMs": 15.799999997019768,
+          "tookMs": 11.39691,
+          "results": 50
+        }
+      ]
+    },
+    "selectionPaint": {
+      "takes": 20,
+      "measured": 20,
+      "ms": {
+        "count": 20,
+        "p50": 5,
+        "p95": 7,
+        "p99": 7,
+        "min": 3,
+        "max": 7,
+        "mean": 5
+      },
+      "note": "t0 = page Date.now() immediately before Playwright ArrowUp/Down; mark = launcher-selection-painted epoch (Date.now at one rAF after the keydown handler). Includes CDP key dispatch and IPC/file write are excluded (epoch captured in page).",
+      "samples": [
+        {
+          "take": 0,
+          "startEpoch": 1794258658746,
+          "markEpoch": 1794258658753,
+          "ms": 7,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 1,
+          "startEpoch": 1794258658990,
+          "markEpoch": 1794258658996,
+          "ms": 6,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 2,
+          "startEpoch": 1794258659232,
+          "markEpoch": 1794258659239,
+          "ms": 7,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 3,
+          "startEpoch": 1794258659471,
+          "markEpoch": 1794258659477,
+          "ms": 6,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 4,
+          "startEpoch": 1794258659714,
+          "markEpoch": 1794258659718,
+          "ms": 4,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 5,
+          "startEpoch": 1794258659948,
+          "markEpoch": 1794258659953,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 6,
+          "startEpoch": 1794258660185,
+          "markEpoch": 1794258660189,
+          "ms": 4,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 7,
+          "startEpoch": 1794258660422,
+          "markEpoch": 1794258660426,
+          "ms": 4,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 8,
+          "startEpoch": 1794258660661,
+          "markEpoch": 1794258660666,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 9,
+          "startEpoch": 1794258660902,
+          "markEpoch": 1794258660905,
+          "ms": 3,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 10,
+          "startEpoch": 1794258661145,
+          "markEpoch": 1794258661150,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 11,
+          "startEpoch": 1794258661385,
+          "markEpoch": 1794258661389,
+          "ms": 4,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 12,
+          "startEpoch": 1794258661628,
+          "markEpoch": 1794258661632,
+          "ms": 4,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 13,
+          "startEpoch": 1794258661868,
+          "markEpoch": 1794258661873,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 14,
+          "startEpoch": 1794258662112,
+          "markEpoch": 1794258662117,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 15,
+          "startEpoch": 1794258662356,
+          "markEpoch": 1794258662361,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 16,
+          "startEpoch": 1794258662589,
+          "markEpoch": 1794258662594,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 17,
+          "startEpoch": 1794258662829,
+          "markEpoch": 1794258662835,
+          "ms": 6,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 18,
+          "startEpoch": 1794258663067,
+          "markEpoch": 1794258663072,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        },
+        {
+          "take": 19,
+          "startEpoch": 1794258663306,
+          "markEpoch": 1794258663311,
+          "ms": 5,
+          "labels": [
+            "launcher-selection-painted"
+          ]
+        }
+      ]
+    },
+    "memoryVisibleResults": {
+      "label": "visible-results",
+      "mode": "memory",
+      "rootPid": 31616,
+      "capturedAtUtc": 1794258664101,
+      "processCount": 9,
+      "totalWorkingSetBytes": 817618944,
+      "totalPrivateBytes": 513921024,
+      "processes": [
+        {
+          "pid": 31616,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 67088384
+        },
+        {
+          "pid": 39312,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 145559552
+        },
+        {
+          "pid": 23840,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 14012416
+        },
+        {
+          "pid": 11716,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 222576640
+        },
+        {
+          "pid": 10980,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 45346816
+        },
+        {
+          "pid": 33500,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23269376
+        },
+        {
+          "pid": 21708,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 85606400
+        },
+        {
+          "pid": 23956,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 142004224
+        },
+        {
+          "pid": 37968,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 72155136
+        }
+      ],
+      "cpuSecondsTotal": 9.234,
+      "totalWorkingSetMiB": 779.7,
+      "totalPrivateMiB": 490.1
+    },
+    "launcherActivation": {
+      "takes": 20,
+      "measured": 20,
+      "visibleMs": {
+        "count": 20,
+        "p50": 7.969,
+        "p95": 10.89,
+        "p99": 12.539,
+        "min": 6.252,
+        "max": 12.539,
+        "mean": 8.214
+      },
+      "focusedMs": {
+        "count": 20,
+        "p50": 25.458,
+        "p95": 32.53,
+        "p99": 42.16,
+        "min": 20.195,
+        "max": 42.16,
+        "mean": 26.059
+      },
+      "paintTotalMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null,
+        "mean": null
+      },
+      "marks": {
+        "measuredSendToShown": 20,
+        "measuredShownToPaint": 20,
+        "measuredSendToPaint": 20,
+        "sendToShownMs": {
+          "count": 20,
+          "p50": 50,
+          "p95": 68,
+          "p99": 70,
+          "min": 41,
+          "max": 70,
+          "mean": 52.1
+        },
+        "shownToPaintMs": {
+          "count": 20,
+          "p50": 6,
+          "p95": 11,
+          "p99": 12,
+          "min": 4,
+          "max": 12,
+          "mean": 7.4
+        },
+        "sendToPaintMs": {
+          "count": 20,
+          "p50": 56,
+          "p95": 75,
+          "p99": 76,
+          "min": 48,
+          "max": 76,
+          "mean": 59.5
+        },
+        "note": "Rust launcher-window-shown (SystemTime epoch) -> frontend launcher-first-paint (double rAF epoch). t0 is the PowerShell SendInput timestamp on the same wall clock (ms resolution)."
+      },
+      "samples": [
+        {
+          "take": 0,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258665338,
+            "visibleMs": 9.357,
+            "focusedMs": 30.222,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 44,
+            "shownToPaintMs": 8,
+            "sendToPaintMs": 52,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 9.357,
+          "focusMs": 30.222,
+          "paintTotalMs": null
+        },
+        {
+          "take": 1,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258667151,
+            "visibleMs": 10.89,
+            "focusedMs": 32.53,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 56,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 62,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 10.89,
+          "focusMs": 32.53,
+          "paintTotalMs": null
+        },
+        {
+          "take": 2,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258669095,
+            "visibleMs": 9.782,
+            "focusedMs": 28.362,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 53,
+            "shownToPaintMs": 9,
+            "sendToPaintMs": 62,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 9.782,
+          "focusMs": 28.362,
+          "paintTotalMs": null
+        },
+        {
+          "take": 3,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258670875,
+            "visibleMs": 7.969,
+            "focusedMs": 27.272,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 59,
+            "shownToPaintMs": 11,
+            "sendToPaintMs": 70,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 7.969,
+          "focusMs": 27.272,
+          "paintTotalMs": null
+        },
+        {
+          "take": 4,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258672617,
+            "visibleMs": 8.125,
+            "focusedMs": 29.089,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 59,
+            "shownToPaintMs": 11,
+            "sendToPaintMs": 70,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 8.125,
+          "focusMs": 29.089,
+          "paintTotalMs": null
+        },
+        {
+          "take": 5,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258674356,
+            "visibleMs": 8.081,
+            "focusedMs": 25.938,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 58,
+            "shownToPaintMs": 5,
+            "sendToPaintMs": 63,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 8.081,
+          "focusMs": 25.938,
+          "paintTotalMs": null
+        },
+        {
+          "take": 6,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258676285,
+            "visibleMs": 12.539,
+            "focusedMs": 42.16,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 68,
+            "shownToPaintMs": 7,
+            "sendToPaintMs": 75,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 12.539,
+          "focusMs": 42.16,
+          "paintTotalMs": null
+        },
+        {
+          "take": 7,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258678269,
+            "visibleMs": 9.127,
+            "focusedMs": 30.391,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 60,
+            "shownToPaintMs": 5,
+            "sendToPaintMs": 65,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 9.127,
+          "focusMs": 30.391,
+          "paintTotalMs": null
+        },
+        {
+          "take": 8,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258680174,
+            "visibleMs": 9.84,
+            "focusedMs": 31.095,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 70,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 76,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 9.84,
+          "focusMs": 31.095,
+          "paintTotalMs": null
+        },
+        {
+          "take": 9,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258681983,
+            "visibleMs": 9.597,
+            "focusedMs": 32.339,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 62,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 68,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 9.597,
+          "focusMs": 32.339,
+          "paintTotalMs": null
+        },
+        {
+          "take": 10,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258683770,
+            "visibleMs": 8.004,
+            "focusedMs": 25.458,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 50,
+            "shownToPaintMs": 4,
+            "sendToPaintMs": 54,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 8.004,
+          "focusMs": 25.458,
+          "paintTotalMs": null
+        },
+        {
+          "take": 11,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258685432,
+            "visibleMs": 6.252,
+            "focusedMs": 20.195,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 41,
+            "shownToPaintMs": 9,
+            "sendToPaintMs": 50,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 6.252,
+          "focusMs": 20.195,
+          "paintTotalMs": null
+        },
+        {
+          "take": 12,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258687084,
+            "visibleMs": 6.743,
+            "focusedMs": 20.612,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 44,
+            "shownToPaintMs": 12,
+            "sendToPaintMs": 56,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 6.743,
+          "focusMs": 20.612,
+          "paintTotalMs": null
+        },
+        {
+          "take": 13,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258688725,
+            "visibleMs": 6.658,
+            "focusedMs": 20.824,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 42,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 48,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 6.658,
+          "focusMs": 20.824,
+          "paintTotalMs": null
+        },
+        {
+          "take": 14,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258690381,
+            "visibleMs": 6.581,
+            "focusedMs": 20.663,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 45,
+            "shownToPaintMs": 4,
+            "sendToPaintMs": 49,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 6.581,
+          "focusMs": 20.663,
+          "paintTotalMs": null
+        },
+        {
+          "take": 15,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258692045,
+            "visibleMs": 7.308,
+            "focusedMs": 21.082,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 50,
+            "shownToPaintMs": 11,
+            "sendToPaintMs": 61,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 7.308,
+          "focusMs": 21.082,
+          "paintTotalMs": null
+        },
+        {
+          "take": 16,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258693719,
+            "visibleMs": 7.025,
+            "focusedMs": 20.954,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 41,
+            "shownToPaintMs": 10,
+            "sendToPaintMs": 51,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 7.025,
+          "focusMs": 20.954,
+          "paintTotalMs": null
+        },
+        {
+          "take": 17,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258695362,
+            "visibleMs": 6.797,
+            "focusedMs": 20.857,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 46,
+            "shownToPaintMs": 4,
+            "sendToPaintMs": 50,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 6.797,
+          "focusMs": 20.857,
+          "paintTotalMs": null
+        },
+        {
+          "take": 18,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258696984,
+            "visibleMs": 6.774,
+            "focusedMs": 20.562,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 46,
+            "shownToPaintMs": 6,
+            "sendToPaintMs": 52,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 6.774,
+          "focusMs": 20.562,
+          "paintTotalMs": null
+        },
+        {
+          "take": 19,
+          "win32": {
+            "pid": 31616,
+            "mode": "show",
+            "sendAtUtc": 1794258698637,
+            "visibleMs": 6.829,
+            "focusedMs": 20.566,
+            "hwnd": 47711496,
+            "title": "ProtonSearch",
+            "rect": {
+              "left": 522,
+              "width": 876,
+              "height": 486,
+              "top": 192
+            },
+            "timedOut": false,
+            "visibleBefore": false
+          },
+          "page": {
+            "visible": null,
+            "paint": null,
+            "focus": null,
+            "paintAfterVisibleMs": null,
+            "marks": []
+          },
+          "markDeltas": {
+            "sendToShownMs": 48,
+            "shownToPaintMs": 8,
+            "sendToPaintMs": 56,
+            "labels": [
+              "launcher-window-shown",
+              "launcher-first-paint",
+              "launcher-first-paint"
+            ]
+          },
+          "activationMs": 6.829,
+          "focusMs": 20.566,
+          "paintTotalMs": null
+        }
+      ]
+    }
+  },
+  "blocked": [],
+  "limitations": [
+    "Debug Rust build + production frontend via vite preview; release-build comparison pending.",
+    "Windows display used for hotkey activation test; DPI/refresh recorded per run.",
+    "Other agents may be active on the machine; build/CPU contention is not controlled.",
+    "Playwright/CDP only measures the WebView page; native window visibility comes from Win32 polling in PowerShell.",
+    "Perf marks are opt-in (PROTONSEARCH_PERF_HOOKS=1) and written to <data_dir>/perf-marks.jsonl: launcher-window-shown (Rust), launcher-first-paint and launcher-selection-painted (frontend, via perf_mark). Epochs are same-machine wall clock (ms resolution).",
+    "Hotkey activation uses SendInput via PowerShell and Win32 window polling at ~1ms; page paint delta comes from WebView visibilitychange + double rAF."
+  ]
+}

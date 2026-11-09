@@ -48,7 +48,7 @@ html[data-window="island"] #root {
   align-items: flex-start;
   justify-content: center;
   width: 100%;
-  padding: 96px;
+  padding: 112px;
   box-sizing: border-box;
   background: transparent;
 }
@@ -206,9 +206,19 @@ html[data-window="island"] #root {
 }
 
 .island-search-input:focus-visible {
-  outline: 2px solid rgba(154, 190, 221, 0.55);
-  outline-offset: -3px;
-  border-radius: 6px;
+  outline: none;
+}
+
+/* Borderless V9 search: focus is indicated at row/island level, not as a box. */
+.island-search-row:focus-within {
+  box-shadow: inset 0 -2px 0 rgba(154, 190, 221, 0.68);
+}
+
+.island-surface--compact:focus-within {
+  box-shadow:
+    0 26px 54px rgba(20, 32, 40, 0.25),
+    0 3px 8px rgba(27, 32, 32, 0.15),
+    inset 0 0 0 1px rgba(154, 190, 221, 0.55);
 }
 
 .island-search-row > svg {
@@ -572,6 +582,15 @@ html[data-window="island"] #root {
   border-radius: 7px;
   background: #253744;
   color: var(--island-icon);
+  overflow: hidden;
+}
+
+.island-clip-thumb {
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
 }
 
 .island-clip-body {
@@ -693,6 +712,45 @@ html[data-window="island"] #root {
   margin-top: 10px;
 }
 
+.island-progress-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  font-size: 10px;
+  color: #8b9aa3;
+}
+
+.island-progress-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--island-track);
+  overflow: hidden;
+}
+
+.island-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--island-track-fill);
+  transition: width 300ms var(--island-ease);
+}
+
+.island-progress-track--indeterminate .island-progress-fill {
+  width: 35% !important;
+  animation: island-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes island-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
 .island-agent-button {
   display: inline-flex;
   align-items: center;
@@ -784,9 +842,26 @@ html[data-window="island"] #root {
   white-space: nowrap;
 }
 
-.island-choose-more {
+.island-choose-more,
+.island-choose-tail {
   flex: none;
   color: #7d878d;
+}
+
+.island-context-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #aab4b8;
+  margin: 2px 0 7px;
+}
+
+.island-context-row + .island-choose-list {
+  margin-bottom: 8px;
 }
 
 /* ---------- Unsupported cards ---------- */
@@ -849,14 +924,24 @@ html[data-window="island"] #root {
   position: relative;
   display: grid;
   place-items: center;
-  /* Visual dot stays 5 px; the button box gives a >=24x24 target without
-     overlapping its neighbours. */
-  min-width: 24px;
+  /* V9 visual pitch is 14px + 5px gap; the invisible 24x30 hit area is centred
+     on the dot without widening the row. */
+  min-width: 14px;
   height: 30px;
-  padding: 9px 0;
+  padding: 9px 3px;
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.island-dot-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 24px;
+  transform: translateX(-50%);
 }
 
 .island-dot {

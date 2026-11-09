@@ -10,7 +10,7 @@ reviewer, gate, evidence, acceptance criteria.
 ## 1. P0 bugs (user-reported; must be reproduced and fixed at Gate 2)
 
 ### BUG-P0-01 — File/text/document previews do not show
-- Severity: P0. Status: REPRODUCED (G0-A/task-29 complete; evidence docs/qa/preview-audit/
+- Severity: P0. Status: FIXED + VERIFIED (backend/contract) on 2026-11-10; UI task-38 in progress.
   PREVIEW_P0_REPORT.md + fixtures/payloads/screenshots). Root cause summary: the preview pipeline
   does not exist end-to-end - no preview request/response in ps-ipc, no preview Tauri command and no
   preview code in ps-core at reproduction time; filename/file rows carry meta.snippet=null and the
@@ -48,7 +48,7 @@ reviewer, gate, evidence, acceptance criteria.
 - Gate: G2 (must-fix before glamorous features). Reviewer: L0 + L1-E.
 
 ### BUG-P0-02 — Clipboard does not capture images
-- Severity: P0. Status: REPRODUCED on real Windows (G0-D/task-30 complete; evidence
+- Severity: P0. Status: FIXED + VERIFIED (independent module-level and real .NET reproduction) on 2026-11-10; app-process GUI matrix follow-up.
   docs/qa/clipboard-audit/CLIPBOARD_IMAGE_P0_REPORT.md + evidence/logs + decoded PNGs). Root cause
   summary: decoder accepts only CF_DIB with BI_RGB (compression 0), 24/32 bpp; real .NET/Paint-style
   sources set BI_BITFIELDS (compression 3), so the decode returns None and the listener silently
@@ -117,3 +117,26 @@ reviewer, gate, evidence, acceptance criteria.
    FEATURE_TEST_MATRIX/CROSS_FEATURE_PAIRWISE rows pass.
 4. G0-A/G0-D outputs are appended here with their evidence links; until then the P0 rows stay
    REPRODUCING and may not be treated as confirmed root causes.
+
+
+## 4. Re-review evidence (task-46, 2026-11-10)
+
+P0-1 (previews): backend fixed and verified - Tauri get_preview command registered (main.rs:1166-1172,
+1392), resultId-only PreviewRequest, bounded cached engine preview with status/truncated/error/imageMime
+(ps-ipc:872-934; engine.rs:667-719; crates/ps-core/src/engine/preview.rs), bridge getPreview (api.ts:64,86),
+ResultPreview renders text/image/unsupported states; ps-core 48/48 tests incl 8 preview tests. UI task-38
+still in_progress: final acceptance requires fresh native screenshots and both-launcher parity. Evidence:
+docs/qa/preview-audit/PREVIEW_P0_REPORT.md (G0), V10_G1_ARCHITECTURE section 10.2, SPEC_REVIEW doc.
+
+P0-2 (clipboard images): fixed and independently verified - decoder tests cover BI_BITFIELDS/DIBV5/
+CF_BITMAP/registered PNG/24-32bpp/palette/top-down/paste round-trip; ps-windows 18/18 and ps-sources 49
+(1 pre-existing ignored) pass; rebuilt audit harness + real .NET Clipboard.SetImage through the production
+listener produced an Image row (PNG 6,315 B, thumbnail 3,671 B, 320x200, format dibv5) and paste-back
+wrote a 320x200 PNG to the clipboard, matching BOOT evidence. Bounds (thumbnail <=128 px/<=128 KiB,
+dims <=8192, MIME allowlist), master gate (privacy.clipboard_history AND !clipboard.pause) and format
+toggles are covered by tests. Evidence: docs/qa/clipboard-audit/BOOT_P0_REPAIR_EVIDENCE.md and
+INDEPENDENT_REREVIEW_R3_2026-11-10.md; full app GUI matrix (Snipping/Paint/browser), OLE-only sources
+and image OCR text remain follow-ups.
+
+Verdict: both P0s are no longer open defects in the product code path; they remain G2 acceptance items
+only where UI/app-level evidence is still pending (preview UI task-38; interactive clipboard GUI matrix).

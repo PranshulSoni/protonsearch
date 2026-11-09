@@ -1,186 +1,118 @@
-import { useEffect, useState } from "react";
-import type { SearchResult } from "../bridge/types";
-import { formatBytes } from "../lib/format";
-import { formatFullDate, formatRecency } from "./launcherFormat";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../bridge/api";
+import type { PreviewPayload, SearchResult } from "../bridge/types";
 
 /**
- * Preview client seam for the Normal Launcher. The panel only consumes the
- * PreviewPayload below; when the Gate-2 preview IPC lands, replace the default
- * provider (or call setPreviewProvider) and the panel wiring is unchanged.
- *
- * Today the provider exposes only what SearchResult already carries (metadata +
- * snippet). It never invents preview text: unsupported bodies are an explicit
- * "note" payload.
+ * Preview client seam. The panel only consumes the engine's PreviewPayload;
+ * requests are debounced, cached by result id, and guarded by a request token so
+ * a late response can never replace the currently selected row's preview.
  */
 
-export interface PreviewFact {
-  label: string;
-  value: string;
-  title?: string;
+const DEFAULT_MAX_CHARS = 12_000;
+const DEBOUNCE_MS = 120;
+
+export type PreviewLoader = (resultId: string, maxChars: number) => Promise<PreviewPayload>;
+
+let loader: PreviewLoader = (resultId, maxChars) => api.getPreview(resultId, maxChars);
+const cache = new Map<string, PreviewPayload>();
+
+function cacheKey(resultId: string, maxChars: number): string {
+  return resultId + "::" + maxChars;
 }
 
-export type PreviewBody =
-  | { kind: "snippet"; text: string; line: number | null }
-  | { kind: "text"; text: string; label: string }
-  | { kind: "url"; text: string }
-  | { kind: "summary"; text: string; label: string }
-  | { kind: "note"; text: string };
-
-export interface PreviewPayload {
-  resultId: string;
-  title: string;
-  kindLabel: string;
-  path: string | null;
-  body: PreviewBody;
-  facts: PreviewFact[];
+/** Test / Gate-wiring seam. Pass null to restore the bridge loader. */
+export function setPreviewLoader(next: PreviewLoader | null): void {
+  loader = next ?? ((resultId, maxChars) => api.getPreview(resultId, maxChars));
 }
 
-export interface PreviewProvider {
-  load(result: SearchResult, signal: AbortSignal): Promise<PreviewPayload | null>;
+export function primePreviewCache(resultId: string, payload: PreviewPayload, maxChars = DEFAULT_MAX_CHARS): void {
+  cache.set(cacheKey(resultId, maxChars), payload);
 }
 
-const KIND_LABELS: Record<string, string> = {
-  application: "Application",
-  file: "File",
-  folder: "Folder",
-  document: "Document",
-  content_match: "Match in document",
-  ocr_text: "Match in screenshot text",
-  clipboard: "Clipboard",
-  browser_history: "Browser history",
-  bookmark: "Bookmark",
-  recent: "Recent item",
-  action: "Action",
-  command: "Command",
-  calculator: "Calculator",
-  quicklink: "Workflow",
-  snippet: "Snippet",
-  git_commit: "Git commit",
-  git_repository: "Git repository",
-  git_todo: "Git TODO",
-  setting: "Setting",
-  window: "Window",
-  agent: "Agent",
-  system: "System",
-};
-
-function kindLabel(result: SearchResult): string {
-  return KIND_LABELS[result.kind] ?? result.kind;
-}
-
-function bodyFor(result: SearchResult): PreviewBody {
-  const meta = result.meta;
-  if (meta?.snippet) {
-    return { kind: "snippet", text: meta.snippet, line: meta.line ?? null };
-  }
-  switch (result.kind) {
-    case "clipboard":
-    case "snippet":
-      return { kind: "text", label: "Text", text: result.title };
-    case "browser_history":
-    case "bookmark":
-      return { kind: "url", text: result.path ?? result.subtitle };
-    case "application":
-    case "action":
-    case "command":
-    case "calculator":
-    case "window":
-    case "setting":
-    case "agent":
-      return { kind: "summary", label: kindLabel(result), text: result.subtitle || result.title };
-    case "content_match":
-    case "ocr_text":
-    case "document":
-    case "file":
-    case "recent":
-    case "folder":
-    case "git_commit":
-    case "git_repository":
-    case "git_todo":
-      return { kind: "note", text: "Preview not available — press Enter to open." };
-    default:
-      return { kind: "note", text: "No preview for this item." };
-  }
-}
-
-export function buildMetadataPreview(result: SearchResult): PreviewPayload {
-  const meta = result.meta;
-  const facts: PreviewFact[] = [];
-  const size = formatBytes(meta?.size);
-  const modified = formatRecency(meta?.modified);
-  if (size) facts.push({ label: "Size", value: size });
-  if (modified) {
-    facts.push({ label: "Modified", value: modified, title: formatFullDate(meta?.modified) });
-  }
-  if (meta?.itemCount != null) {
-    facts.push({ label: "Contents", value: meta.itemCount.toLocaleString() + " items" });
-  }
-  if (meta?.line != null) facts.push({ label: "Line", value: String(meta.line) });
-  return {
-    resultId: result.id,
-    title: result.title,
-    kindLabel: kindLabel(result),
-    path: result.path ?? null,
-    body: bodyFor(result),
-    facts,
-  };
-}
-
-const metadataProvider: PreviewProvider = {
-  async load(result) {
-    return buildMetadataPreview(result);
-  },
-};
-
-let activeProvider: PreviewProvider = metadataProvider;
-
-/** Gate-2 wiring point: swap this provider when the preview IPC lands. */
-export function setPreviewProvider(provider: PreviewProvider | null): void {
-  activeProvider = provider ?? metadataProvider;
+export function clearPreviewCache(): void {
+  cache.clear();
 }
 
 export interface LauncherPreviewState {
-  status: "idle" | "loading" | "ready" | "unavailable";
+  status: "idle" | "loading" | "ready" | "unsupported" | "error";
   payload: PreviewPayload | null;
+  error: string | null;
+  reload: () => void;
 }
 
-/** Request/selection plumbing: cancels stale requests when the selection moves. */
+function statusFor(payload: PreviewPayload): LauncherPreviewState["status"] {
+  if (payload.status === "unsupported") return "unsupported";
+  if (payload.status === "error") return "error";
+  return "ready";
+}
+
 export function useLauncherPreview(
   result: SearchResult | null,
   enabled: boolean,
+  maxChars = DEFAULT_MAX_CHARS,
 ): LauncherPreviewState {
-  const [state, setState] = useState<LauncherPreviewState>({
-    status: "idle",
+  const [nonce, setNonce] = useState(0);
+  const [state, setState] = useState<Omit<LauncherPreviewState, "reload">>({
+    status: enabled && result ? "loading" : "idle",
     payload: null,
+    error: null,
   });
+  const tokenRef = useRef(0);
 
   useEffect(() => {
     if (!enabled || !result) {
-      setState({ status: "idle", payload: null });
+      setState({ status: "idle", payload: null, error: null });
       return;
     }
-    const controller = new AbortController();
-    let cancelled = false;
-    setState({ status: "loading", payload: null });
-    activeProvider
-      .load(result, controller.signal)
-      .then((payload) => {
-        if (cancelled || controller.signal.aborted) return;
-        setState(
-          payload
-            ? { status: "ready", payload }
-            : { status: "unavailable", payload: null },
-        );
-      })
-      .catch(() => {
-        if (cancelled || controller.signal.aborted) return;
-        setState({ status: "unavailable", payload: null });
+    const key = cacheKey(result.id, maxChars);
+    const cached = cache.get(key);
+    if (cached) {
+      setState({
+        status: statusFor(cached),
+        payload: cached,
+        error: cached.error,
       });
+      return;
+    }
+    const token = ++tokenRef.current;
+    setState({ status: "loading", payload: null, error: null });
+    const timer = window.setTimeout(() => {
+      loader(result.id, maxChars)
+        .then((payload) => {
+          if (token !== tokenRef.current) return;
+          cache.set(key, payload);
+          setState({
+            status: statusFor(payload),
+            payload,
+            error: payload.error,
+          });
+        })
+        .catch((error: unknown) => {
+          if (token !== tokenRef.current) return;
+          setState({
+            status: "error",
+            payload: null,
+            error: error instanceof Error ? error.message : "Preview is unavailable right now.",
+          });
+        });
+    }, DEBOUNCE_MS);
     return () => {
-      cancelled = true;
-      controller.abort();
+      window.clearTimeout(timer);
+      tokenRef.current += 1;
     };
-  }, [enabled, result]);
+  }, [enabled, result, maxChars, nonce]);
 
-  return state;
+  const key = enabled && result ? cacheKey(result.id, maxChars) : null;
+  const cached = key ? cache.get(key) : undefined;
+  const visible = cached
+    ? { status: statusFor(cached), payload: cached, error: cached.error }
+    : state;
+
+  return {
+    ...visible,
+    reload: () => {
+      if (key) cache.delete(key);
+      setNonce((value) => value + 1);
+    },
+  };
 }

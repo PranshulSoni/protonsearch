@@ -527,7 +527,10 @@ fn first_term_position(text: &str, terms: &[String]) -> Option<usize> {
         if term.is_empty() {
             continue;
         }
-        if let Some(position) = find_ci_bytes(bytes, term.as_bytes()) {
+        // Match case-insensitively: the needle is folded to lower case and the
+        // haystack bytes are folded per candidate (CJK bytes stay exact).
+        let needle = term.to_ascii_lowercase();
+        if let Some(position) = find_ci_bytes(bytes, needle.as_bytes()) {
             best = Some(best.map_or(position, |current| current.min(position)));
         }
     }

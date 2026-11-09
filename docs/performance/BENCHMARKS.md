@@ -340,3 +340,45 @@ Conditions: engine rows are release-profile `crates/ps-bench` on the working tre
 7. **Instrumentation request (Lead):** debug-only marks for (a) launcher first paint after show, (b) selection highlight paint. Without them, hotkey->paint and input->highlight remain unmeasured (plan section 6).
 
 Raw files: [results/](./results/) - v10-g0-filename-* , v10-g0-content-v2-* , v10-g0-ocr-baseline-* , v10-g0-app-debug-4c93d21.json , frame-pacing-v9-reference-*.json.
+
+### 14.2 G8 perf-hook verification — release activation, idle/memory, debug marks (task-43)
+
+Builds/conditions: release exe built 02:36:28 IST from commit **c7ee0a7** (9 dirty files at run time); debug exe built 02:34:56 from the same commit (18 dirty files). Perf hooks verified on this commit: `PROTONSEARCH_PERF_HOOKS=1` writes JSONL to `<data_dir>/v2/perf-marks.jsonl` (labels `launcher-window-shown`, `launcher-first-paint`, `launcher-selection-painted`; the harness truncates the file per session and kills any stale single-instance app first). Release build cannot expose CDP by design, so the release harness is black-box: SendInput Alt+Space + Win32 EnumWindows/IsWindowVisible/GetForegroundWindow at `1 ms.
+
+**Release activation (30/30 trials, commit c7ee0a7):**
+
+| Metric | p50 | p95 | p99 | min | max |
+|---|---:|---:|---:|---:|---:|
+| Window visible after hotkey | **6.974 ms** | **9.105 ms** | 10.158 ms | 6.150 ms | 10.158 ms |
+| Window foreground after hotkey | 21.457 ms | **28.994 ms** | 30.802 ms | 18.902 ms | 30.802 ms |
+
+Cold first summon after process start: visible p50 6.198 ms; warm summons: visible p50 7.029 ms (window is pre-created hidden, so "cold" is process-cold, not window-cold). **T5 target p95 <= 50 ms: MET on the release build, single 120 Hz/150% display.** Raw: [v10-g8-release-activation-c7ee0a7.json](./results/v10-g8-release-activation-c7ee0a7.json).
+
+**Perf marks in the same release run (30/30 measured):** Rust `launcher-window-shown` is written after `win.show() + win.set_focus() + placement`, so it reads send->shown p50 46 / p95 59 ms even though Win32 already sees the window at p95 9.1 ms; the frontend `launcher-first-paint` (double rAF after `perf:show`) adds p50 8 / p95 18 ms, giving send->"post-focus paint mark" p50 56 / p95 71 ms. **This is not hotkey->first-pixel**: the Rust mark is post-focus bookkeeping and the frontend event is emitted after it. Hotkey->first-pixel remains unmeasured until a `launcher-show-begin` mark is added immediately after `win.show()` and before `set_focus()` (request to Lead, plan section 6). No hotkey->paint claim is published from these marks.
+
+**Release idle (60 s, launcher hidden, commit c7ee0a7):**
+
+| Metric | Measured |
+|---|---:|
+| Process-tree Working Set | **786.9 MiB** = ProtonSearch.exe 70.9 MiB + 8 msedgewebview2 processes 716.0 MiB |
+| Process-tree private bytes | 486.0 MiB |
+| Process count | 9 (1 app + 8 WebView2), no python process |
+| CPU over 60 s | 2.266 CPU-seconds = **0.19% of machine / 3.78% of one core** |
+
+The ADR-0001 investigation budget (`150 MB tree idle) is **MISSED by `5x** on this release build - reported as a genuine release miss. Idle CPU is low as a share of the machine but still `3.8% of one core while hidden; no claim of "near-zero" is made beyond the measured number. Raw: [v10-g8-release-activation-c7ee0a7.json](./results/v10-g8-release-activation-c7ee0a7.json).
+
+**Debug build with marks (commit c7ee0a7, hooks on, production JS, dpr 1.5):**
+
+| Measurement | p50 | p95 | p99 | n | Verdict |
+|---|---:|---:|---:|---:|---|
+| Input -> first-visible result | 15.2 ms | **38.7 ms** | 45.8 ms | 20 (+3 warmup) | **NOT MET** vs 30 ms p95 (debug) |
+| Hotkey -> window visible (Win32) | 7.969 ms | 10.890 ms | - | 20 | debug reference |
+| Hotkey -> foreground (Win32) | 25.458 ms | - | - | 20 | debug reference |
+| Input -> selection painted (mark) | **5 ms** | **7 ms** | 7 ms | 20/20 | **MET** under one 120 Hz frame (8.3 ms) and one 60 Hz frame |
+| shown-mark -> first-paint (mark) | 6 ms | 11 ms | 12 ms | 20 | post-focus caveat as above |
+
+Selection mark latency uses same-clock `Date.now()` marks (captured in-page immediately before Playwright dispatches ArrowUp/Down; mark epoch is in the page at one rAF after the keydown handler), so it excludes IPC/file-write. Debug idle over 10 s: 0.27% of machine / 5.46% of one core; memory with results visible 779.7 MiB tree. Raw: [v10-g8-app-debug-marks-c7ee0a7.json](./results/v10-g8-app-debug-marks-c7ee0a7.json).
+
+**Quiet-window 1M filename re-run (release ps-bench, commit 4c93d21 working tree):** p50 **2.680 ms**, p95 **7.504 ms**, p99 8.210 ms (max 9.108, n=660, 20/22 queries with results, deterministic); from_entries build 4.27 s with machine CPU at 23.2% at start (lower-contention, not fully idle); cold binary load 449.5 / 583.9 ms, first query 3.94 / 4.15 ms. **T2 target p95 <= 15 ms: MET.** Raw: [v10-g0b-filename-1m-quiet-4c93d21-20261109T2100Z.json](./results/v10-g0b-filename-1m-quiet-4c93d21-20261109T2100Z.json).
+
+Read together: filename and hotkey-activation targets are met on release; selection highlight is met in debug; input->first-visible is NOT met in debug (p95 38.7 ms); idle memory misses budget; content p95 remains task-42/engine-core; multi-monitor and hotkey->first-pixel remain unmeasured (single monitor; hook ordering).

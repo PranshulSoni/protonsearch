@@ -1,6 +1,6 @@
 import type {
   AgentStatus,
-  DetectedAgent,
+  AgentTask,
   IslandCardId,
   SearchResult,
   SearchScope,
@@ -8,9 +8,30 @@ import type {
 import { useEffect, useState } from "react";
 import { Logo } from "../components/Logo";
 import { IslandIcon, type IslandIconName } from "./IslandIcon";
-import { relativeTime, type ClipTab, CLIP_TABS, clipboardKind } from "./islandData";
+import {
+  relativeTime,
+  type ClipTab,
+  CLIP_TABS,
+  clipboardKind,
+  filterClipboard,
+} from "./islandData";
 
 /** V9 card views. All rows come from real bridge data; unsupported cards say so. */
+
+function clipLabel(kind: string): string {
+  switch (kind) {
+    case "links":
+      return "Link";
+    case "code":
+      return "Code";
+    case "images":
+      return "Image";
+    case "files":
+      return "File";
+    default:
+      return "Text";
+  }
+}
 
 function rowsPerPage(count: number): number {
   return Math.max(1, Math.min(count, 5));
@@ -71,6 +92,7 @@ export function SearchCard({
   onOpen,
   onFocus,
   inputRef,
+  placeholder,
 }: {
   compact: boolean;
   query: string;
@@ -84,6 +106,7 @@ export function SearchCard({
   onOpen: (result: SearchResult) => void;
   onFocus: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
+  placeholder: string;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   useEffect(() => {
@@ -98,6 +121,7 @@ export function SearchCard({
     { id: "files", label: "Files" },
     { id: "folders", label: "Folders" },
     { id: "apps", label: "Apps" },
+    { id: "actions", label: "Actions" },
   ];
   return (
     <div className={"island-search" + (compact ? " island-search--compact" : " island-search--expanded")}>
@@ -129,7 +153,7 @@ export function SearchCard({
               openActive();
             }
           }}
-          placeholder="Search anything…"
+          placeholder={placeholder}
           aria-label="Search"
           role="combobox"
           aria-expanded={!compact}
@@ -201,7 +225,6 @@ export function SearchCard({
                     <span className="island-result-title">{result.title}</span>
                     <span className="island-result-sub">{result.subtitle}</span>
                   </span>
-                  <span className="island-result-meta">{result.meta?.label ?? ""}</span>
                 </button>
               ))
             )}
@@ -224,7 +247,6 @@ export function SearchCard({
 
 export function ClipboardCard({
   results,
-  total,
   pending,
   error,
   tab,
@@ -232,21 +254,20 @@ export function ClipboardCard({
   onOpen,
 }: {
   results: SearchResult[];
-  total: number;
   pending: boolean;
   error: string | null;
   tab: ClipTab;
   onTab: (tab: ClipTab) => void;
   onOpen: (result: SearchResult) => void;
 }) {
-  const visible = tab === "pinned" ? [] : results;
+  const visible = filterClipboard(results, tab);
   const selected = visible[0] ?? null;
   return (
     <div className="island-card island-clipboard">
       <CardHead
         card="clipboard"
         title="Clipboard"
-        subtitle={pending ? "Reading clipboard history…" : total + " recent clips captured locally"}
+        subtitle={pending ? "Reading your recent copies…" : "Your recent copies"}
       />
       <div className="island-divider" />
       <div className="island-inline-nav" role="tablist" aria-label="Clipboard categories">
@@ -266,7 +287,6 @@ export function ClipboardCard({
               </button>
             );
           }
-          const count = entry.id === "all" ? results.length : results.filter((r) => clipboardKind(r) === entry.id).length;
           return (
             <button
               key={entry.id}
@@ -277,7 +297,6 @@ export function ClipboardCard({
               onClick={() => onTab(entry.id)}
             >
               {entry.label}
-              {count > 0 ? <span className="island-nav-count">{count}</span> : null}
             </button>
           );
         })}
@@ -313,15 +332,25 @@ export function ClipboardCard({
               onClick={() => onOpen(result)}
             >
               <span className="island-clip-icon">
-                <IslandIcon
-                  name={clipboardKind(result) === "links" ? "link" : clipboardKind(result) === "code" ? "code" : clipboardKind(result) === "images" ? "image" : clipboardKind(result) === "files" ? "file" : "text"}
-                  size={18}
-                />
+                {result.meta?.thumbnailDataUrl ? (
+                  <img
+                    className="island-clip-thumb"
+                    src={result.meta.thumbnailDataUrl}
+                    alt=""
+                  />
+                ) : (
+                  <IslandIcon
+                    name={clipboardKind(result) === "links" ? "link" : clipboardKind(result) === "code" ? "code" : clipboardKind(result) === "images" ? "image" : clipboardKind(result) === "files" ? "file" : "text"}
+                    size={18}
+                  />
+                )}
               </span>
               <span className="island-clip-body">
                 <span className="island-clip-title">{result.title}</span>
                 <span className="island-clip-sub">
-                  {(result.meta?.label ?? clipboardKind(result)) + " · " + relativeTime(result.meta?.modified)}
+                  {clipLabel(clipboardKind(result)) +
+                    " · " +
+                    (relativeTime(result.meta?.modified) || "Local clip")}
                 </span>
               </span>
               {index === 0 ? <IslandIcon name="check" size={16} className="island-check" /> : null}
@@ -339,19 +368,26 @@ export function ClipboardCard({
 }
 
 export function AgentsCard({
-  agents,
   status,
+  tasks,
+  onPause,
+  onResume,
 }: {
-  agents: DetectedAgent[];
   status: AgentStatus | null;
+  tasks: AgentTask[];
+  onPause: (taskId: string) => void;
+  onResume: (taskId: string) => void;
 }) {
   const configured = status != null && status.state !== "not_configured";
+  const selected = tasks[0] ?? null;
+  const selectedProgress =
+    selected && selected.progress.kind === "determinate" ? selected.progress.fraction : null;
   return (
     <div className="island-card island-agent">
       <CardHead
         card="agent"
         title="Agents"
-        subtitle={configured ? status?.runtime ?? "Agent runtime" : "Agent runtime isn't configured"}
+        subtitle={configured ? "Tasks and active subagents" : "Agent runtime isn't configured"}
       />
       <div className="island-divider" />
       {!configured ? (
@@ -362,40 +398,87 @@ export function AgentsCard({
       ) : (
         <>
           <div className="island-context-caps">
-            {"CURRENT WORKSPACE · " + agents.filter((agent) => agent.available).length + " AGENTS"}
+            {"CURRENT WORKSPACE · " + tasks.length + " TASKS"}
           </div>
           <div className="island-agent-list">
-            {agents.length === 0 ? (
-              <EmptyState title="No agents detected." hint="Install a supported agent runtime to continue." />
+            {tasks.length === 0 ? (
+              <EmptyState
+                title="No agent tasks yet."
+                hint="Launch a task from Workflows and it will appear here."
+              />
             ) : (
-              agents.map((agent) => (
-                <div className="island-agent-row" key={agent.id}>
+              tasks.slice(0, 3).map((task) => (
+                <div className="island-agent-row" key={task.id}>
                   <span className="island-agent-icon">
                     <IslandIcon name="agent" size={18} />
                   </span>
                   <span className="island-agent-body">
-                    <span className="island-agent-name">{agent.name}</span>
+                    <span className="island-agent-name">{task.title}</span>
                     <span className="island-agent-task">
-                      {agent.kind}
-                      {agent.version ? " · v" + agent.version : ""}
+                      {task.promptSummary || task.runtime + " · " + task.state}
                     </span>
                   </span>
-                  <span className="island-agent-badge">
-                    {agent.available ? "READY" : "UNAVAILABLE"}
-                  </span>
+                  <span className="island-agent-badge">{task.state.toUpperCase()}</span>
                 </div>
               ))
             )}
           </div>
+          {selected && selected.progress.kind === "determinate" ? (
+            <div className="island-progress-row">
+              <span>Progress</span>
+              <span>{selectedProgress != null ? Math.round(selectedProgress * 100) + "%" : "—"}</span>
+              <span className="island-progress-track" aria-hidden="true">
+                <span
+                  className="island-progress-fill"
+                  style={{ width: (selectedProgress ?? 0) * 100 + "%" }}
+                />
+              </span>
+            </div>
+          ) : null}
+          {selected && selected.progress.kind === "indeterminate" ? (
+            <div className="island-progress-row">
+              <span>Progress</span>
+              <span>Working…</span>
+              <span className="island-progress-track island-progress-track--indeterminate" aria-hidden="true">
+                <span className="island-progress-fill" />
+              </span>
+            </div>
+          ) : null}
           <div className="island-agent-actions">
-            <button type="button" className="island-agent-button" disabled title="Agent task hierarchy API isn't wired yet.">
+            <button
+              type="button"
+              className="island-agent-button"
+              disabled={!selected?.controls.canPause}
+              title={
+                selected?.controls.canPause
+                  ? "Pause this task"
+                  : "This task can't be paused from the island."
+              }
+              onClick={() => selected && onPause(selected.id)}
+            >
               <IslandIcon name="pause" size={14} /> Pause
             </button>
-            <button type="button" className="island-agent-button" disabled title="Agent logs API isn't wired yet.">
-              Details
+            <button
+              type="button"
+              className="island-agent-button"
+              disabled={!selected?.controls.canResume}
+              title={
+                selected?.controls.canResume
+                  ? "Resume this task"
+                  : "This task can't be resumed from the island."
+              }
+              onClick={() => selected && onResume(selected.id)}
+            >
+              <IslandIcon name="play" size={14} /> Resume
             </button>
           </div>
-          <p className="island-honest-note">Task hierarchy, progress and logs appear once the agent task API lands.</p>
+          {selected?.permissions ? (
+            <p className="island-honest-note">
+              {selected.writeAccess ? "Write access" : "Read-only"}
+              {" · " + selected.permissions.granted.length + " permissions granted"}
+              {selected.log.length > 0 ? " · " + selected.log[selected.log.length - 1].message : ""}
+            </p>
+          ) : null}
         </>
       )}
     </div>
@@ -478,20 +561,57 @@ export function BrowserCard(props: {
 }) {
   const bookmarks = props.results.filter((result) => result.kind === "bookmark");
   const history = props.results.filter((result) => result.kind === "browser_history");
-  const rows = [...bookmarks.slice(0, 2), ...history.slice(0, 1)];
+  const chooseRow = (result: SearchResult) => (
+    <button
+      type="button"
+      className="island-choose-row"
+      key={result.id}
+      onClick={() => props.onOpen(result)}
+    >
+      <span className="island-choose-icon">
+        <IslandIcon name={result.kind === "bookmark" ? "link" : "browser"} size={18} />
+      </span>
+      <span className="island-choose-body">
+        <span className="island-choose-title">{result.title}</span>
+        <span className="island-choose-meta">
+          {relativeTime(result.meta?.modified) || result.subtitle}
+        </span>
+      </span>
+      <IslandIcon name="chevron" size={16} className="island-choose-tail" />
+    </button>
+  );
   return (
-    <ResultListCard
-      card="browser"
-      title="Browser"
-      subtitle="Bookmarks and recent history"
-      caps={bookmarks.length > 0 ? "BOOKMARKS · SAVED PAGES" : "RECENT HISTORY · LOCAL"}
-      results={rows}
-      pending={props.pending}
-      error={props.error}
-      onOpen={props.onOpen}
-      emptyTitle="No browser history yet."
-      emptyHint="Bookmarks and history appear after the browser source is indexed."
-    />
+    <div className="island-card island-result-card">
+      <CardHead card="browser" title="Browser" subtitle="Bookmarks & history" />
+      <div className="island-divider" />
+      {props.error ? (
+        <EmptyState title="This source is unavailable." hint={props.error} />
+      ) : props.pending && props.results.length === 0 ? (
+        <div className="island-skeleton" aria-hidden="true">
+          {[0, 1, 2].map((row) => (
+            <span className="island-skeleton-row" key={row} />
+          ))}
+        </div>
+      ) : props.results.length === 0 ? (
+        <EmptyState
+          title="No browser history yet."
+          hint="Bookmarks and history appear after the browser source is indexed."
+        />
+      ) : (
+        <>
+          <div className="island-context-row">
+            <span>BOOKMARKS</span>
+            <span>Saved pages</span>
+          </div>
+          <div className="island-choose-list">{bookmarks.slice(0, 2).map(chooseRow)}</div>
+          <div className="island-context-row">
+            <span>RECENT HISTORY</span>
+            <span>Local</span>
+          </div>
+          <div className="island-choose-list">{history.slice(0, 1).map(chooseRow)}</div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -505,7 +625,7 @@ export function GitCard(props: {
     <ResultListCard
       card="git"
       title="Git"
-      subtitle="Recent commits and repositories"
+      subtitle="Recent commits · ProtonSearch"
       caps="RECENT COMMITS · LOCAL"
       results={props.results}
       pending={props.pending}

@@ -91,87 +91,71 @@ fn main() -> anyhow::Result<()> {
         index.search(query, limit).map(|hits| hits.len()).unwrap_or(0)
     });
 
-    // Raw SQL variants against a read-only connection.
+    // Interleaved A/B: the pre-task-42 implementation (FTS5 snippet() + 128 KB
+    // text fetch + lowercase line scan) versus the current ContentIndex::search.
+    // Alternating per iteration cancels machine-load drift.
     let conn = rusqlite::Connection::open_with_flags(
         db,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
     )?;
     conn.busy_timeout(std::time::Duration::from_millis(2000))?;
-
-    let terms_for = |query: &str| -> String {
-        ps_content::query_terms(query)
-            .iter()
-            .map(|term| format!("\"{term}\""))
-            .collect::<Vec<_>>()
-            .join(" ")
-    };
-
-    bench("SQL rank only", &queries, iters, |query| {
-        let expr = terms_for(query);
-        if expr.is_empty() {
-            return 0;
+    let mut old_samples = Vec::new();
+    let mut new_samples = Vec::new();
+    for q in &queries {
+        for _ in 0..2 {
+            let _ = index.search(&q.query, limit);
+            let _ = old_search(&conn, &q.query, limit);
         }
-        let mut stmt = conn
-            .prepare("SELECT d.path FROM documents_fts JOIN documents d ON d.id = documents_fts.rowid WHERE documents_fts MATCH ?1 ORDER BY bm25(documents_fts) LIMIT ?2")
-            .unwrap();
-        stmt.query_map(rusqlite::params![expr, limit as i64], |row| row.get::<_, String>(0))
-            .unwrap()
-            .count()
-    });
-
-    bench("SQL rank + fts snippet", &queries, iters, |query| {
-        let expr = terms_for(query);
-        if expr.is_empty() {
-            return 0;
+        for _ in 0..iters {
+            let start = Instant::now();
+            let _ = old_search(&conn, &q.query, limit);
+            old_samples.push(start.elapsed().as_secs_f64() * 1000.0);
+            let start = Instant::now();
+            let _ = index.search(&q.query, limit).map(|hits| hits.len()).unwrap_or(0);
+            new_samples.push(start.elapsed().as_secs_f64() * 1000.0);
         }
-        let mut stmt = conn
-            .prepare("SELECT d.path, snippet(documents_fts, 2, '', '', '…', 24) FROM documents_fts JOIN documents d ON d.id = documents_fts.rowid WHERE documents_fts MATCH ?1 ORDER BY bm25(documents_fts) LIMIT ?2")
-            .unwrap();
-        stmt.query_map(rusqlite::params![expr, limit as i64], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .unwrap()
-        .count()
-    });
-
-    for prefix_kb in [8usize, 32, 64, 128] {
-        let label = format!("SQL rank + {prefix_kb}KB text");
-        bench(&label, &queries, iters, |query| {
-            let expr = terms_for(query);
-            if expr.is_empty() {
-                return 0;
-            }
-            let mut stmt = conn
-                .prepare(
-                    "SELECT d.path, d.title, bm25(documents_fts), \
-                     CASE WHEN LENGTH(d.text) <= ?3 THEN d.text ELSE SUBSTR(d.text, 1, ?3) END \
-                     FROM documents_fts JOIN documents d ON d.id = documents_fts.rowid \
-                     WHERE documents_fts MATCH ?1 ORDER BY bm25(documents_fts) LIMIT ?2",
-                )
-                .unwrap();
-            let bytes = (prefix_kb * 1024) as i64;
-            let rows = stmt
-                .query_map(rusqlite::params![expr, limit as i64, bytes], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, f64>(2)?,
-                        row.get::<_, String>(3)?,
-                    ))
-                })
-                .unwrap();
-            let terms = ps_content::query_terms(query);
-            let mut count = 0usize;
-            for row in rows.flatten() {
-                let (_path, _title, _rank, text) = row;
-                let _line = find_line(&text, &terms);
-                let _snippet = make_snippet(&text, &terms);
-                count += 1;
-            }
-            count
-        });
     }
+    let (op50, op95, op99) = summarize(&mut old_samples);
+    let (np50, np95, np99) = summarize(&mut new_samples);
+    println!("A/B old (snippet()+128KB text)  n={} p50={op50:7.2} p95={op95:7.2} p99={op99:7.2} ms", iters * queries.len());
+    println!("A/B new (Rust snippet, 32KB)    n={} p50={np50:7.2} p95={np95:7.2} p99={np99:7.2} ms", iters * queries.len());
     Ok(())
+}
+
+/// Faithful copy of the pre-task-42 search hot path for A/B comparison.
+fn old_search(conn: &rusqlite::Connection, query: &str, limit: usize) -> anyhow::Result<usize> {
+    let terms = ps_content::query_terms(query);
+    if terms.is_empty() {
+        return Ok(0);
+    }
+    let match_expression = terms
+        .iter()
+        .map(|term| format!("\"{term}\""))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut statement = conn.prepare(
+        "SELECT d.path, d.title, bm25(documents_fts), \
+                snippet(documents_fts, 2, '', '', '…', 24), \
+                CASE WHEN LENGTH(d.text) <= 131072 THEN d.text ELSE SUBSTR(d.text, 1, 131072) END \
+         FROM documents_fts JOIN documents d ON d.id = documents_fts.rowid \
+         WHERE documents_fts MATCH ?1 ORDER BY bm25(documents_fts) LIMIT ?2",
+    )?;
+    let rows = statement.query_map(rusqlite::params![match_expression, limit as i64], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, f64>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+    let mut count = 0usize;
+    for row in rows.flatten() {
+        let (_path, _title, _rank, _snippet, text) = row;
+        let _line = find_line(&text, &terms);
+        count += 1;
+    }
+    Ok(count)
 }
 
 fn find_line(text: &str, terms: &[String]) -> Option<u32> {

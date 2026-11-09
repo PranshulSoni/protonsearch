@@ -48,14 +48,30 @@ enum ClipboardHook {
     Fake,
 }
 
+/// Format toggles for the clipboard hook (captureText/captureImages are format
+/// toggles only; the master gate is privacy.clipboard_history && !clipboard.pause).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ClipboardCapture {
+    capture_text: bool,
+    capture_images: bool,
+}
+
 impl ClipboardHook {
-    fn start(db_path: PathBuf, image_dir: PathBuf) -> anyhow::Result<Self> {
+    fn start(
+        db_path: PathBuf,
+        image_dir: PathBuf,
+        capture: ClipboardCapture,
+    ) -> anyhow::Result<Self> {
         #[cfg(test)]
         if FAKE_CLIPBOARD_HOOK.load(Ordering::Relaxed) {
             return Ok(ClipboardHook::Fake);
         }
+        let options = ps_sources::clipboard::ClipboardCaptureOptions {
+            capture_text: capture.capture_text,
+            capture_images: capture.capture_images,
+        };
         Ok(ClipboardHook::Real(
-            ps_sources::clipboard::start_listener(db_path, image_dir)?,
+            ps_sources::clipboard::start_listener_with_options(db_path, image_dir, options)?,
         ))
     }
 
@@ -109,7 +125,9 @@ pub struct Engine {
     config: EngineConfig,
     settings: RwLock<Settings>,
     index: RwLock<FilenameIndex>,
-    content: Mutex<Option<ps_content::ContentIndex>>,
+    /// Content index handle. Arc so a query never holds the engine lock while
+    /// the background indexer is extracting a document (task-42 p95).
+    content: RwLock<Option<Arc<ps_content::ContentIndex>>>,
     db: EngineDb,
     sources: RwLock<ps_sources::Sources>,
     state: AtomicU8,
@@ -130,7 +148,7 @@ pub struct Engine {
     preview_cache: Mutex<PreviewCache>,
     /// Live Win32 clipboard listener (only one per process). Held so it can be
     /// stopped explicitly on shutdown or when the privacy setting is disabled.
-    clipboard_listener: Mutex<Option<ClipboardHook>>,
+    clipboard_listener: Mutex<Option<(ClipboardHook, ClipboardCapture)>>,
     /// One-shot confirmation state for destructive native commands: a request
     /// must be repeated through confirm_destructive within 15 seconds.
     pending_destructive: Mutex<Option<(NativeCommand, i64)>>,
@@ -208,7 +226,7 @@ impl Engine {
             config,
             settings: RwLock::new(settings),
             index: RwLock::new(index),
-            content: Mutex::new(content),
+            content: RwLock::new(content.map(Arc::new)),
             db,
             sources: RwLock::new(ps_sources::Sources::default()),
             state: AtomicU8::new(initial_state),
@@ -488,7 +506,8 @@ impl Engine {
         if settings.indexing.content_enabled && content_scope_allows(scope) {
             let tier_start = Instant::now();
             let mut hits = 0usize;
-            if let Some(result) = self.with_content(|content| content.search(intent_text.as_ref(), 12)) {
+            if let Some(content) = self.content_handle() {
+                let result = content.search(intent_text.as_ref(), 12);
                 match result {
                     Ok(content_hits) => {
                         for hit in content_hits {
@@ -812,16 +831,20 @@ impl Engine {
                 label: "Clipboard".into(),
                 enabled: settings.privacy.clipboard_history,
                 item_count: clipboard_items,
-                state: if settings.privacy.clipboard_history {
-                    "ready"
-                } else {
+                state: if !settings.privacy.clipboard_history {
                     "disabled"
+                } else if settings.clipboard.pause {
+                    "paused"
+                } else {
+                    "ready"
                 }
                 .into(),
-                detail: if settings.privacy.clipboard_history {
-                    Some("capturing clipboard updates".into())
-                } else {
+                detail: if !settings.privacy.clipboard_history {
                     None
+                } else if settings.clipboard.pause {
+                    Some("capture paused".into())
+                } else {
+                    Some("capturing clipboard updates".into())
                 },
             },
             SourceStatus {
@@ -886,8 +909,8 @@ impl Engine {
         };
         if changed {
             self.save_settings(&next)?;
-            if patch.privacy.is_some() {
-                // Enabling/disabling clipboard history must take effect at once.
+            if patch.privacy.is_some() || patch.clipboard.is_some() {
+                // Enabling/disabling/pausing clipboard capture takes effect at once.
                 self.sync_clipboard_listener();
             }
             if patch.indexing.is_some() || patch.privacy.is_some() {
@@ -1093,7 +1116,9 @@ impl Engine {
                 self.set_state(STATE_STARTING);
             }
             IndexCommand::RebuildContent => {
-                let _ = self.with_content(|content| content.clear());
+                if let Some(content) = self.content_handle() {
+                    let _ = content.clear();
+                }
                 self.content_documents.store(0, Ordering::SeqCst);
                 self.force_rescan.store(true, Ordering::SeqCst);
             }
@@ -1136,11 +1161,11 @@ impl Engine {
         Ok(())
     }
 
-    /// Run a closure with the content index, if it is available. The lock is
-    /// held only for the duration of the call (search/extraction are bounded).
-    fn with_content<R>(&self, f: impl FnOnce(&ps_content::ContentIndex) -> R) -> Option<R> {
-        let guard = self.content.lock().ok()?;
-        guard.as_ref().map(f)
+    /// Clone the content index handle. The engine lock is released before the
+    /// caller runs search/extraction, so a slow document extraction in the
+    /// background indexer can never block a query.
+    fn content_handle(&self) -> Option<Arc<ps_content::ContentIndex>> {
+        self.content.read().ok().and_then(|guard| guard.clone())
     }
 
     fn set_state(&self, state: u8) {
@@ -1180,41 +1205,65 @@ impl Engine {
         self.config.data_dir.join(DB_FILE)
     }
 
-    /// Start or stop the Win32 clipboard listener to match the privacy setting.
-    /// Idempotent: never creates a second listener and never leaks the hook
-    /// thread when disabled (ClipboardListener has no Drop impl; stop() joins).
+    /// Master gate for clipboard capture: privacy.clipboard_history must be on
+    /// AND clipboard.pause off; captureText/captureImages are format toggles.
+    /// Idempotent: never creates a second listener, restarts only when the
+    /// capture options change, and always stops the hook thread when disabled.
     fn sync_clipboard_listener(&self) {
-        let enabled = self.settings_snapshot().privacy.clipboard_history;
+        let settings = self.settings_snapshot();
+        let desired = if settings.privacy.clipboard_history && !settings.clipboard.pause {
+            Some(ClipboardCapture {
+                capture_text: settings.clipboard.capture_text,
+                capture_images: settings.clipboard.capture_images,
+            })
+        } else {
+            None
+        };
         let mut guard = match self.clipboard_listener.lock() {
             Ok(guard) => guard,
             Err(_) => return,
         };
-        if enabled {
-            if guard.is_some() {
-                return;
-            }
-            let db_path = self.clipboard_db_path();
-            let image_dir = self.config.data_dir.join("clipboard-images");
-            match ClipboardHook::start(db_path, image_dir) {
-                Ok(listener) => *guard = Some(listener),
-                Err(err) => {
+        match desired {
+            None => {
+                if let Some((hook, _)) = guard.take() {
                     drop(guard);
-                    self.push_warning(format!(
-                        "clipboard listener unavailable ({err}); history shows imported items only"
-                    ));
+                    hook.stop();
                 }
             }
-        } else if let Some(listener) = guard.take() {
-            drop(guard);
-            listener.stop();
+            Some(capture) => {
+                if let Some((_, current)) = guard.as_ref() {
+                    if *current == capture {
+                        return;
+                    }
+                }
+                if let Some((hook, _)) = guard.take() {
+                    drop(guard);
+                    hook.stop();
+                    guard = match self.clipboard_listener.lock() {
+                        Ok(guard) => guard,
+                        Err(_) => return,
+                    };
+                }
+                let db_path = self.clipboard_db_path();
+                let image_dir = self.config.data_dir.join("clipboard-images");
+                match ClipboardHook::start(db_path, image_dir, capture) {
+                    Ok(hook) => *guard = Some((hook, capture)),
+                    Err(err) => {
+                        drop(guard);
+                        self.push_warning(format!(
+                            "clipboard listener unavailable ({err}); history shows imported items only"
+                        ));
+                    }
+                }
+            }
         }
     }
 
     fn stop_clipboard_listener(&self) {
         if let Ok(mut guard) = self.clipboard_listener.lock() {
-            if let Some(listener) = guard.take() {
+            if let Some((hook, _)) = guard.take() {
                 drop(guard);
-                listener.stop();
+                hook.stop();
             }
         }
     }
@@ -1314,7 +1363,8 @@ impl Engine {
                     }
                 }
                 let documents = self
-                    .with_content(|content| content.stats().documents)
+                    .content_handle()
+                    .map(|content| content.stats().documents)
                     .unwrap_or(0);
                 self.content_documents.store(documents, Ordering::SeqCst);
             }
@@ -1490,25 +1540,22 @@ fn index_content(engine: &Arc<Engine>, roots: &[PathBuf]) {
     if candidates.is_empty() {
         return;
     }
-    if engine.with_content(|_| ()).is_none() {
+    let Some(content) = engine.content_handle() else {
         return;
-    }
+    };
     let mut written = 0usize;
     for path in candidates {
         if engine.shutdown.load(Ordering::SeqCst) || engine.paused.load(Ordering::SeqCst) {
             break;
         }
-        match engine.with_content(|content| content.index_file(&path, ps_content::DEFAULT_MAX_BYTES)) {
-            Some(Ok(true)) => written += 1,
-            Some(Ok(false)) => {}
-            Some(Err(err)) => engine
+        match content.index_file(&path, ps_content::DEFAULT_MAX_BYTES) {
+            Ok(true) => written += 1,
+            Ok(false) => {}
+            Err(err) => engine
                 .push_warning(format!("content extraction failed for {}: {err}", path.display())),
-            None => break,
         }
     }
-    let documents = engine
-        .with_content(|content| content.stats().documents)
-        .unwrap_or(0);
+    let documents = content.stats().documents;
     engine.content_documents.store(documents, Ordering::SeqCst);
     let _ = roots;
     engine.last_updated.store(now_ms(), Ordering::SeqCst);
@@ -3165,6 +3212,47 @@ mod tests {
             })
             .unwrap();
         let restarted = engine.clipboard_listener.lock().unwrap().is_some();
+        // Pausing capture stops the hook even though privacy stays on.
+        let mut settings = engine.settings();
+        settings.clipboard.pause = true;
+        engine
+            .update_settings(SettingsPatch {
+                clipboard: Some(settings.clipboard),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(
+            engine.clipboard_listener.lock().unwrap().is_none(),
+            "pause must stop the clipboard hook"
+        );
+        // Unpausing restarts it; changing a format toggle restarts with the new
+        // capture options (captureImages off).
+        let mut settings = engine.settings();
+        settings.clipboard.pause = false;
+        engine
+            .update_settings(SettingsPatch {
+                clipboard: Some(settings.clipboard),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(engine.clipboard_listener.lock().unwrap().is_some());
+        let mut settings = engine.settings();
+        settings.clipboard.capture_images = false;
+        engine
+            .update_settings(SettingsPatch {
+                clipboard: Some(settings.clipboard),
+                ..Default::default()
+            })
+            .unwrap();
+        let capture = engine.clipboard_listener.lock().unwrap().as_ref().map(|(_, capture)| *capture);
+        assert_eq!(
+            capture,
+            Some(ClipboardCapture {
+                capture_text: true,
+                capture_images: false
+            }),
+            "format toggles must reach the running hook"
+        );
         engine.stop_clipboard_listener();
         assert!(engine.clipboard_listener.lock().unwrap().is_none());
         if started != restarted {

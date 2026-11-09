@@ -6,6 +6,9 @@
 //! - COM is initialised per call on the calling thread (STA) and balanced.
 //! - Caches (icons) are written atomically (temp file + rename).
 
+pub(crate) mod audio;
+pub(crate) mod brightness;
+pub(crate) mod capabilities;
 pub(crate) mod clipboard;
 pub(crate) mod icons;
 pub(crate) mod native;

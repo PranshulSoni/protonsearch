@@ -164,7 +164,7 @@ describe("V9 island surface", () => {
       await new Promise((resolve) => setTimeout(resolve, 120));
     });
     await waitFor(() => element.querySelector(".island-surface--expanded") !== null);
-    expect(element.querySelectorAll(".island-filter").length).toBe(4);
+    expect(element.querySelectorAll(".island-filter").length).toBe(5);
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
     await act(async () => {
       setter.call(input, "architecture");

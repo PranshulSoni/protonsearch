@@ -73,3 +73,49 @@ Directory: `docs/qa/visual/screenshots/island-v9/`
    this pass is Chromium/mock evidence. Compact dot hit area deviation documented above.
 6. Motion was verified by CSS token inspection and the reduced-motion test; formal 550/500/450/220 ms timing
    evidence belongs to the performance harness (task-31).
+
+---
+
+# Addendum — task-38 preview wiring + task-41 design-review deltas
+
+## D1. Preview panel wired to the real get_preview IPC (task-38)
+
+- `launcher/previewClient.ts` now calls `api.getPreview(resultId, 12000)` with a 120 ms debounce, a cache keyed by
+  result id + max chars, and a request token so a late response for a previous row can never replace the current
+  row. `setPreviewLoader`/prime/clear exist as test seams; the bridge is the default loader.
+- `ResultPreview` renders the bridge `PreviewPayload` directly: loading skeleton; extracted text with real
+  `highlightRanges` (clamped/sorted `<mark>`); bounded `object-contain` image from a validated data URL; separate
+  OCR section; status/format/subtitle fields; metadata; "Truncated — showing the first N characters" banner; explicit
+  unsupported reason; error state with Retry; declared actions unchanged. No blank panel and no placeholder body.
+- Tests: launcher suite 83 tests incl. primed text/code payloads, image + OCR, highlight/truncation, unsupported,
+  error; `previewClient.test.tsx` covers debounce/cache and late-response rejection. Full suite 18 files / 237 tests.
+- Screenshots (launcher 1180 card, light/dark): `launcher-task38-preview-{text,code,pdf,image,unsupported}-{light,dark}.png`
+  in docs/qa/visual/screenshots. Capture payloads were injected into the browser mock at capture time; the app code
+  only uses the real bridge.
+- Limitations: extraction fidelity is engine-side; real Windows payload proof remains QA; preview geometry uses the
+  existing launcher shadow-padded contract with no layout-shift changes.
+
+## D2. Design-review deltas (task-41 follow-up)
+
+1. **Dots pitch:** expanded buttons are back to the V9 14 px + 5 px gap pitch; a centred invisible 24×30 pseudo-element
+   preserves the hit target without widening the row. Compact keeps the accepted 11×37 visual/hit box
+   (24 px would overlap the input at 315 px; recorded a11y deviation, showDots opt-out + keyboard/wheel alternatives).
+2. **Search focus:** removed the input field box; focus is now an inset accent line on the search row (compact: inset
+   island ring). V9 captures no longer show a bordered field.
+3. **Search copy:** placeholder is "Search files, folders, apps and actions…" (≤380: "Search…"); Actions filter
+   added (All/Files/Folders/Apps/Actions); row recency meta removed (title + path only).
+4. **Clipboard:** tab counts removed; subtitle "Your recent copies"; row sub is neutral sentence-case type + time.
+5. **Card subtitles:** Clipboard "Your recent copies"; Controls "Your PC, one gesture away"; Browser
+   "Bookmarks & history"; Git "Recent commits · ProtonSearch"; Notifications "Recent activity"; Agents "Tasks and
+   active subagents" with the offline/empty reason in the body.
+6. **Browser:** two-end context rows (BOOKMARKS / Saved pages, RECENT HISTORY / Local) and 16 px chevron tails.
+7. **Agents real data:** bootstrap now calls `api.agentTasks(50)`; card shows flat Pi tasks (no fabricated tree),
+   real state/progress (determinate or indeterminate), permissions/log summary, and Pause/Resume wired to
+   `api.agentPause/agentResume` gated by `task.controls`; honest empty/offline states. Clipboard Images renders
+   real `meta.thumbnailDataUrl` thumbnails (34 px object-cover) when present.
+8. **Native shadow:** `ISLAND_SHADOW_PAD=96` vs the 107 px shadow extent is an L0/native. `main.rs` is outside this
+   task's scope; flagged for L0 (raise to 112 or offset/reduce shadow) then recheck placement.
+
+Screenshots refreshed: island compact/search/clipboard/agents at 1150, 520, 335; `clipboard-images-1150.png`
+(real thumbnail + filtered tab); media/controls/browser/git/notifications at 1150. Design review known gaps: no
+zero-results/reduced-motion/media-controls drilldown captures yet because adapters aren't present.

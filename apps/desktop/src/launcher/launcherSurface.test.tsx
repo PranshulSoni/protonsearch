@@ -1,6 +1,6 @@
 import { act, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ActionSpec,
   EngineStatus,
@@ -11,6 +11,7 @@ import type {
 } from "../bridge/types";
 import LauncherSurface, { type LauncherSurfaceHandle } from "./LauncherSurface";
 import type { WorkAreaSize } from "./launcherLayout";
+import { clearPreviewCache, primePreviewCache } from "./previewClient";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -563,6 +564,32 @@ describe("preview pane", () => {
     ],
   });
 
+  const previewPayload = {
+    resultId: previewResult.id,
+    title: "search-architecture.md",
+    subtitle: "Projects / ProtonSearch / docs",
+    format: "markdown",
+    text: null,
+    snippet: "The filename arena keeps warm queries under a millisecond.",
+    highlightRanges: [{ start: 4, end: 22 }],
+    imageDataUrl: null,
+    ocrText: null,
+    fields: [
+      { label: "Size", value: "180 KB" },
+      { label: "Modified", value: "Yesterday" },
+    ],
+    status: "ok" as const,
+    truncated: false,
+    error: null,
+    imageMime: null,
+    unsupportedReason: null,
+  };
+
+  beforeEach(() => {
+    clearPreviewCache();
+    primePreviewCache(previewResult.id, previewPayload);
+  });
+
   it("toggles with Ctrl+Space and reports geometry to the shell", async () => {
     const harness = setup();
     await resolveSearch(harness, 0, [previewResult, result({ id: "r2", title: "Other.txt" })]);
@@ -615,6 +642,120 @@ describe("preview pane", () => {
       text: "C:\\docs\\search-architecture.md",
     });
     expect(harness.hideLauncher).not.toHaveBeenCalled();
+  });
+
+  it("renders bounded images and OCR text from the real payload", async () => {
+    const imageResult = result({
+      id: "image:diagram",
+      title: "diagram.png",
+      kind: "file",
+      icon: { type: "file_type", ext: "png" },
+      action: { type: "open_path", path: "C:\\Pictures\\diagram.png" },
+    });
+    primePreviewCache(imageResult.id, {
+      ...previewPayload,
+      resultId: imageResult.id,
+      title: "diagram.png",
+      format: "image",
+      text: null,
+      snippet: null,
+      highlightRanges: [],
+      imageDataUrl:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n0kAAAAASUVORK5CYII=",
+      ocrText: "Quarterly launch checklist",
+      fields: [{ label: "Dimensions", value: "1280 × 720" }],
+    });
+    const harness = setup();
+    await resolveSearch(harness, 0, [imageResult]);
+    await press(inputOf(harness), " ", { ctrlKey: true });
+    const panel = harness.container.querySelector('[data-testid="preview-panel"]');
+    expect(panel?.querySelector(".preview-image")?.getAttribute("src")).toContain("data:image/png");
+    expect(panel?.querySelector('[data-testid="preview-ocr"]')?.textContent).toContain(
+      "Quarterly launch checklist",
+    );
+  });
+
+  it("renders highlighted extracted text and truncation", async () => {
+    const textResult = result({
+      id: "file:long",
+      title: "large.txt",
+      kind: "file",
+      icon: { type: "file_type", ext: "txt" },
+      action: { type: "open_path", path: "C:\\docs\\large.txt" },
+    });
+    primePreviewCache(textResult.id, {
+      ...previewPayload,
+      resultId: textResult.id,
+      title: "large.txt",
+      format: "text",
+      text: "The filename arena keeps warm queries under a millisecond.",
+      snippet: null,
+      highlightRanges: [{ start: 4, end: 22 }],
+      truncated: true,
+    });
+    const harness = setup();
+    await resolveSearch(harness, 0, [textResult]);
+    await press(inputOf(harness), " ", { ctrlKey: true });
+    const panel = harness.container.querySelector('[data-testid="preview-panel"]');
+    expect(panel?.querySelector("mark.preview-highlight")?.textContent).toBe("filename arena kee");
+    expect(panel?.querySelector('[data-testid="preview-truncated"]')).not.toBeNull();
+  });
+
+  it("shows unsupported and error fallbacks instead of a blank panel", async () => {
+    const unsupportedResult = result({
+      id: "file:blob",
+      title: "blob.bin",
+      kind: "file",
+      icon: { type: "file_type", ext: "bin" },
+      action: { type: "open_path", path: "C:\\docs\\blob.bin" },
+    });
+    primePreviewCache(unsupportedResult.id, {
+      ...previewPayload,
+      resultId: unsupportedResult.id,
+      title: "blob.bin",
+      format: "binary",
+      text: null,
+      snippet: null,
+      highlightRanges: [],
+      fields: [],
+      status: "unsupported",
+      unsupportedReason: "No preview for this item.",
+    });
+    const harness = setup();
+    await resolveSearch(harness, 0, [unsupportedResult]);
+    await press(inputOf(harness), " ", { ctrlKey: true });
+    expect(
+      harness.container.querySelector('[data-testid="preview-unsupported"]')?.textContent,
+    ).toContain("No preview for this item.");
+
+    const errorResult = result({
+      id: "file:broken",
+      title: "broken.pdf",
+      kind: "file",
+      icon: { type: "file_type", ext: "pdf" },
+      action: { type: "open_path", path: "C:\\docs\\broken.pdf" },
+    });
+    primePreviewCache(errorResult.id, {
+      ...previewPayload,
+      resultId: errorResult.id,
+      title: "broken.pdf",
+      format: "pdf",
+      text: null,
+      snippet: null,
+      highlightRanges: [],
+      fields: [],
+      status: "error",
+      error: "Preview extraction failed.",
+    });
+    const errorHarness = setup();
+    await resolveSearch(errorHarness, 0, [errorResult]);
+    await press(inputOf(errorHarness), " ", { ctrlKey: true });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(
+      errorHarness.container.querySelector('[data-testid="preview-error"]')?.textContent,
+    ).toContain("Preview is unavailable right now.");
   });
 });
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../bridge/api";
 import type {
   AgentStatus,
+  AgentTask,
   DetectedAgent,
   EngineStatus,
   IslandSettings,
@@ -19,6 +20,7 @@ export interface IslandBootstrap {
   monitors: MonitorInfo[];
   agents: DetectedAgent[];
   agentStatus: AgentStatus | null;
+  agentTasks: AgentTask[];
   ready: boolean;
 }
 
@@ -28,6 +30,7 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   const [agents, setAgents] = useState<DetectedAgent[]>([]);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
+  const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
   const [ready, setReady] = useState(false);
   const [nonce, setNonce] = useState(0);
 
@@ -39,6 +42,7 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
       api.listMonitors(),
       api.detectAgents(),
       api.agentStatus(),
+      api.agentTasks(50),
     ]).then((results) => {
       if (cancelled) return;
       if (results[0].status === "fulfilled") setSettings(results[0].value);
@@ -46,6 +50,7 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
       if (results[2].status === "fulfilled") setMonitors(results[2].value);
       if (results[3].status === "fulfilled") setAgents(results[3].value);
       if (results[4].status === "fulfilled") setAgentStatus(results[4].value);
+      if (results[5]?.status === "fulfilled") setAgentTasks(results[5].value);
       setReady(true);
     });
     return () => {
@@ -59,7 +64,16 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
     return () => window.removeEventListener("focus", refresh);
   }, []);
 
-  return { settings, status, monitors, agents, agentStatus, ready, refresh: () => setNonce((v) => v + 1) };
+  return {
+    settings,
+    status,
+    monitors,
+    agents,
+    agentStatus,
+    agentTasks,
+    ready,
+    refresh: () => setNonce((v) => v + 1),
+  };
 }
 
 export interface ScopedSearchState {

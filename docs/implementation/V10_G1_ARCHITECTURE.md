@@ -317,3 +317,81 @@ Remaining re-review conditions:
 Updated verdict: G1 decisions are implemented/documented except the delegated DTO move (task-44) and
 the in-flight preview command/image-bounds work. **G1 remains CONDITIONAL PASS until the R1-R3
 re-review; G2 acceptance must include R1-R3 as gate conditions.** No code was edited for this task.
+
+
+## 10. G2 P0 re-review (task-46, 2026-11-10): R1-R3 + UI spec review + reviewer sign-off
+
+Snapshot: HEAD 93f84d1 (v10 checkpoint: preview backend+IPC command/bridge, agent DTO move
+preparation, G1 contract fixes, island/settings WIP, clipboard image fix WIP) plus working tree.
+No code was edited for this review. Independent commands were run where possible; app-process GUI
+capture was not re-run for every surface (noted per item).
+
+### 10.1 R1 - agent task DTO move to ps-ipc: PASS
+
+| Check | Result |
+|---|---|
+| Canonical types in ps-ipc | PASS - crates/ps-ipc/src/agent_task.rs (18,446 B) defines AgentTask, AgentTaskNode, AgentTaskActivity, DetectedAgent, progress/permissions/controls/log/error/restart types; ps-ipc/src/lib.rs exposes the module |
+| No duplicate local DTOs | PASS - grep over crates/ps-agent and apps/desktop/src-tauri finds no struct AgentTask/AgentTaskNode/DetectedAgent definitions outside ps-ipc; ps-agent/src/task/model.rs re-exports ps_ipc::agent_task; Tauri imports ps_ipc::agent_task::DetectedAgent (main.rs:15) and task commands return the ps-ipc-backed ps_agent aliases (main.rs:1178-1207) |
+| Byte-identical fixtures | PASS - tests agent_task_fixture_is_byte_identical, full_agent_task_fixture_is_byte_identical and detected_agent_fixture_is_stable pin the exact JSON strings (agent_task.rs:331-412,483-500); older optional-field records still parse |
+| Independent test run | PASS - cargo test -p ps-ipc: 17 passed, 0 failed (includes the 4 agent-task contract/fixture tests; .agents/notes/g2-rereview-tests.log) |
+| TS mirror | PASS per L0 decision - bridge/types.ts remains the documented mirror ("TypeScript mirror of crates/ps-ipc/src/lib.rs (protocol v1). Keep this file in sync...") and is not machine-checked. Policy requires a schema check at G8; task-44 marked complete. |
+| Residue | None blocking R1. Risk: manual TS mirror drift; tracked by docs/adr/IPC_ADDITIVE_VERSIONING_POLICY.md. |
+
+### 10.2 R2 - preview command/bounds/cache + bridge: PASS (backend/contract); UI acceptance pending task-38
+
+| Check | Result |
+|---|---|
+| Tauri command | PASS - get_preview registered in the invoke_handler (main.rs:1166-1172; registration main.rs:1392); argument is ps_ipc::PreviewRequest |
+| resultId-only / no raw paths | PASS - PreviewRequest contains only resultId + optional maxChars (ps-ipc:872-878); the engine resolves the id through its result registry and returns an honest Unsupported payload for unknown ids (engine.rs:667-711); the UI never passes filesystem paths |
+| Payload fields | PASS - PreviewPayload carries status (ok/unsupported/error), truncated, error, imageMime, unsupportedReason, text/snippet/highlights/imageDataUrl/ocrText/fields (ps-ipc:880-934); producer sanitizes/truncates text |
+| Bounds/cache | PASS - maxChars clamped in engine.preview (engine.rs:672-711); PreviewCache is a bounded LRU-like cache keyed by resultId+maxChars (crates/ps-core/src/engine/preview.rs:63-110); image data URLs come from the bounded clipboard thumbnail path; cache test preview_cache_is_bounded_and_reused passes |
+| Engine tests | PASS - cargo test -p ps-core: 48 passed, 0 failed, including 8 preview tests (text/structured formats, scanned PDF/binary/unsupported honesty, image thumbnail + indexed OCR text, unknown id, cache bounds/truncation, clipboard text/folder honesty) |
+| Bridge | PASS - api.getPreview(resultId, maxChars?) typed in bridge/api.ts:64,86; ResultPreview renders imageDataUrl (validated against an image-data URL pattern), unsupported/error states and snippet/text; launcher tests prime a real PreviewPayload (launcherSurface.test.tsx preview pane suite) |
+| UI final acceptance | PENDING - task-38 (G2-PREVIEW UI) is still in_progress; the task-32 preview screenshot shows the pre-fix fallback and must not be used as evidence against the new pipeline. Fresh native screenshots (light/dark, 100/125/150/200% DPI, regular+narrow) and both-launcher parity are G2/G8 acceptance items. |
+| App-level preview E2E | NOT INDEPENDENTLY RE-RUN in this pass (engine/command/bridge verified); G0-A fixture corpus and the engine tests cover the payload path. |
+
+### 10.3 R3 - clipboard image P0, real-Windows matrix, bounds/gate/paste-back: PASS (independent reproduction)
+
+| Check | Result |
+|---|---|
+| Independent tests | PASS - cargo test -p ps-windows: 7 unit + 11 integration = 18 passed; cargo test -p ps-sources: 18 unit + 31 integration (1 pre-existing ignored action-smoke) = 49 passed; all in .agents/notes/g2-rereview-tests.log |
+| Format coverage tests | PASS - decoder tests: BI_BITFIELDS DIB, DIBV5 BI_BITFIELDS, 24/32 bpp, palette, top-down, malformed/oversized rejection, paste-payload round-trip; ps-sources tests: image stored as PNG, dedupe, categories, thumbnail-within-IPC-contract, oversized dimensions rejected, capture options vs master gate, restart/paste-back, retention, delete cleanup |
+| Independent real .NET SetImage | PASS - rebuilt the audit harness from the current tree (docs/qa/clipboard-audit/harness; build exit 0), started the production listener (db_audit --listen-external) and copied a real System.Windows.Forms.Clipboard.SetImage 320x200 bitmap from a separate STA PowerShell process: listener count 1 -> 2, new row category=Image, PNG 6,315 B, thumbnail 3,671 B (128x80), format=dibv5, imageWidth/Height=320x200. These bytes match the BOOT evidence exactly, independently corroborating docs/qa/clipboard-audit/BOOT_P0_REPAIR_EVIDENCE.md |
+| Paste-back | PASS - db_audit --paste-latest wrote the 320x200 PNG back to the clipboard (format dibv5 row; 6,315 bytes) |
+| Bounds / master gate | PASS (code + tests + BOOT matrix) - master gate privacy.clipboard_history AND !clipboard.pause; captureText/captureImages are format toggles applied inside the gate; thumbnails <=128 px and <=128 KiB, source dims <=8192, MIME image/png allowlist; UI receives bounded thumbnailDataUrl/dims/mime only |
+| Caveats | The synthetic scoped matrix through the listener showed ordering/baseline artifacts for some scenarios (e.g. first scenario has a pre-existing seeded row); the direct capture_current path, unit/integration tests and the real .NET external capture all pass, so the synthetic artifacts are test-harness sequencing, not production defects. Full app-process clipboard GUI E2E (interactive Snipping Tool/Paint/browser copy) remains a G2 acceptance item per BOOT "Remaining / not yet verified" (OLE-only sources and image OCR text also future work). |
+
+Independent evidence files: docs/qa/clipboard-audit/INDEPENDENT_REREVIEW_R3_2026-11-10.md;
+logs .agents/notes/clipboard-rereview-matrix.log and clipboard-rereview-external.log;
+DB/PNGs under docs/qa/clipboard-audit/evidence/runtime/rereview-external/.
+
+### 10.4 UI spec review (island renderer + normal launcher v2)
+
+| Surface | Verdict | Findings / spec-level regressions |
+|---|---|---|
+| Dynamic Island renderer | PARTIAL - not signable at G5 | Geometry/type/dot/motion tokens match ISLAND_V9_SPEC (islandCardDims table, expandedSearchHeight 185+53*min(n,5), 550/500/450/220 ms motion, reduced-motion instant; island tests). Screenshots are Chromium mock, not native Windows: expanded cards only captured at 1150/520/335 (860/430 missing), and native DPI/taskbar/fullscreen/High Contrast/frame pacing are unmeasured (VISUAL_AUDIT_ISLAND gaps 5-6). Card completeness still below spec: Pinned disabled (spec requires pinning), clipboard Images rows do not render the now-available thumbnailDataUrl, Agent card does not use the now-available agent_tasks/agent_task_tree APIs (audit gap 2/3 is stale after task-44/R3), Media/Controls/Notifications disabled pending task-35 (honest, but still spec-incomplete). No fake data - good. |
+| Normal Launcher v2 | CONDITIONAL | Implementation matches Lead G4 addendum C1/C2 (4 chips ALL/FILES/FOLDERS/APPS, quick destinations Browser Bookmarks/Browser History/Clipboard History/Agents + Git history/Agent History, honest off states). However the binding design docs still specify 7 chips (SCREENS section 2.11: ALL/FILES/FOLDERS/APPS/CLIPBOARD/WEB/ACTIONS) and a recents-only empty state (SCREENS section 2.4); the task-32 addendum explicitly says "frozen until design-spec's Normal Launcher micro-spec lands". Therefore this is a documented pending design-spec sync, not an unrecorded code regression - G4 sign-off requires the micro-spec update (4 chips + quick destinations + prefix reachability) and a revision of SCREENS 2.6 preview alpha text after R2. Evidence is browser mock only; native Windows screenshots at 100/125/150/200% DPI, dark/light and 560 narrow are still required. Row anatomy/groups/footer maths match the screenshots inspected. |
+
+Screens inspected: island compact-1150 (520x66, 8 dots), island search-1150 (550x397, filters+4 results+foot+dots), island clipboard-1150 (510x391, 7 tabs, Pinned disabled), launcher task32-1180-results-dark (4 chips, grouped rows, footer), launcher task32-1180-preview-dark (pre-fix fallback panel - superseded by R2), task40-launcher-dark (Preferences/launcher mode page).
+
+### 10.5 Reviewer sign-off table (G1/G2/G4/G5 status as of 2026-11-10)
+
+| Area | Reviewer | Verdict | Evidence | Conditions / blockers | Gate |
+|---|---|---|---|---|---|
+| R1 agent DTO move | L1-E (rel-recon) | PASS | canonical agent_task.rs, re-exports, no duplicates, byte-identical fixtures, ps-ipc 17/17 | bridge mirror stays documented/manual; add automated TS check by G8 | G1 |
+| R2 preview backend/contract | L1-E | PASS (backend/contract) | get_preview registered, resultId-only, bounds/cache/status, ps-core 48/48, bridge getPreview + ResultPreview | task-38 UI final screenshots/E2E; both-launcher parity at G8 | G2 |
+| R3 clipboard images | L1-E | PASS (module + real-Windows harness) | ps-windows 18/18, ps-sources 49 (1 ignored), independent .NET SetImage -> row/PNG/thumb, paste-back | full app GUI matrix (Snipping/Paint/browser) and OLE-only/OCR text follow-ups | G2 |
+| G1 overall | L1-E | **CLOSED (recommend)** | R1 PASS, R2 backend PASS, R3 PASS, ADR/policy done, shell fixes verified | preview UI and app-level clipboard E2E belong to G2 acceptance | G1 |
+| G2 P0-1 previews | L1-E | CONDITIONAL | backend/command/bridge PASS; engine tests PASS | task-38 in progress; fresh native screenshots + both launchers | G2 |
+| G2 P0-2 clipboard | L1-E | CONDITIONAL PASS | independent module-level + real .NET reproduction; BOOT evidence | app-process GUI matrix; OLE fallback; image OCR text | G2 |
+| G4 normal launcher v2 | L1-E | CONDITIONAL | 4 chips + quick destinations + row/footer anatomy match Lead addendum | design-spec micro-spec sync (7->4 chips, quick destinations, SCREENS 2.6 preview update); native DPI screenshots | G4 |
+| G5 island renderer | L1-E | PARTIAL - NOT SIGNED | geometry/motion/dots match spec; mock screenshots; honest disabled cards | thumbnails, pinning, agent hierarchy wiring, task-35 adapters, native DPI/frame pacing, expanded 860/430 captures | G5 |
+
+### 10.6 Remaining blockers after this re-review
+
+1. G2-P0-1: task-38 preview UI final acceptance (fresh native screenshots, both launcher presentations, stale/cancel states) - open.
+2. G2-P0-2: full app-process clipboard GUI E2E (interactive Snipping Tool/Paint/browser) and OLE-only sources/image OCR text - documented follow-ups; module-level and real .NET harness evidence pass.
+3. G5: wire clipboard image thumbnails and the new agent_tasks APIs into the island cards; implement Pinning or formally cut it; task-35 native adapters for Media/Controls/Notifications; native Windows DPI/frame-pacing evidence; expanded-card captures at 860/430.
+4. G4: design-spec micro-spec update to match the Lead-directed 4-chip + quick-destinations model, and SCREENS 2.6 preview text update after R2; native Windows DPI/dark/narrow screenshots.
+5. G1 policy: bridge/types.ts mirror remains manual; add an automated Rust<->TS schema check at G8.
+6. Environment/other gates unchanged: single monitor (dual/mixed-DPI blocked), no signing certificate, no non-Pi provider credentials, content p95 <30 ms (task-42) remains the top perf gap.

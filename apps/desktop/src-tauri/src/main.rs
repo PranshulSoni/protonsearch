@@ -31,7 +31,7 @@ const ISLAND_DEFAULT_WIDTH: f64 = 520.0;
 const ISLAND_DEFAULT_HEIGHT: f64 = 66.0;
 /// Transparent room around the island surface so the V9 layered shadow is not
 /// clipped by native window edges (design G0-B gap: L0).
-const ISLAND_SHADOW_PAD: f64 = 96.0;
+const ISLAND_SHADOW_PAD: f64 = 112.0;
 
 /// Performance instrumentation is opt-in (zero cost when unset). Used by the
 /// benchmark harness to split Win32-visible, first-pixel and paint timings.
@@ -144,7 +144,8 @@ fn show_launcher_window(app: &AppHandle) {
         .unwrap_or((launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT)));
     place_launcher(app, &win, size.0, size.1);
     let _ = win.show();
-    let _ = win.set_focus();
+    // Mark the Win32-visible instant before focus/placement bookkeeping so the
+    // benchmark harness can measure hotkey->first-pixel honestly.
     let invoke = PERF_INVOKE_EPOCH_MS.load(std::sync::atomic::Ordering::SeqCst);
     if perf_hooks_enabled() {
         perf_log_app(app, "launcher-window-shown", epoch_ms());
@@ -153,6 +154,7 @@ fn show_launcher_window(app: &AppHandle) {
             serde_json::json!({ "mode": "launcher", "invokeEpochMs": invoke }),
         );
     }
+    let _ = win.set_focus();
     let _ = win.emit("launcher:summoned", ());
 }
 
@@ -288,7 +290,7 @@ fn show_island_window(app: &AppHandle) {
         (window_size.1 - ISLAND_SHADOW_PAD * 2.0).max(40.0),
     );
     let _ = win.show();
-    let _ = win.set_focus();
+    // Mark the Win32-visible instant before focus bookkeeping.
     let invoke = PERF_INVOKE_EPOCH_MS.load(std::sync::atomic::Ordering::SeqCst);
     if perf_hooks_enabled() {
         perf_log_app(app, "island-window-shown", epoch_ms());
@@ -297,6 +299,7 @@ fn show_island_window(app: &AppHandle) {
             serde_json::json!({ "mode": "island", "invokeEpochMs": invoke }),
         );
     }
+    let _ = win.set_focus();
     let _ = win.emit("island:shown", ());
 }
 

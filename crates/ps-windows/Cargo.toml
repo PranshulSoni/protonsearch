@@ -25,6 +25,17 @@ windows = { workspace = true, features = [
     "Win32_System_Shutdown",
     "Win32_System_Power",
     "Win32_UI_HiDpi",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_Devices_Display",
+    "Win32_NetworkManagement_WiFi",
+    "Win32_System_WinRT",
+    "Foundation",
+    "Foundation_Collections",
+    "Media_Control",
+    "Devices_Radios",
+    "UI_Notifications",
+    "Data_Xml_Dom",
 ] }
 
 [dependencies]

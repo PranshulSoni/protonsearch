@@ -927,6 +927,138 @@ pub struct PreviewPayload {
     pub unsupported_reason: Option<String>,
 }
 
+// ---------------------------------------------------------------------------
+// v10 native controls / Quick Settings / media / notifications (read models)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlCapability {
+    pub supported: bool,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+impl ControlCapability {
+    pub fn supported() -> Self {
+        Self { supported: true, reason: None }
+    }
+    pub fn unsupported(reason: &str) -> Self {
+        Self { supported: false, reason: Some(reason.to_string()) }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaSessionInfo {
+    pub title: String,
+    pub artist: String,
+    #[serde(default)]
+    pub album: Option<String>,
+    #[serde(default)]
+    pub artwork_data_url: Option<String>,
+    pub playing: bool,
+    #[serde(default)]
+    pub position_ms: Option<u64>,
+    #[serde(default)]
+    pub duration_ms: Option<u64>,
+    #[serde(default)]
+    pub can_seek: bool,
+    #[serde(default)]
+    pub can_shuffle: bool,
+    #[serde(default)]
+    pub shuffle: bool,
+    #[serde(default)]
+    pub can_repeat: bool,
+    #[serde(default)]
+    pub repeat: bool,
+    #[serde(default)]
+    pub app_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioDeviceInfo {
+    pub id: String,
+    pub name: String,
+    pub is_default: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WifiNetworkInfo {
+    pub ssid: String,
+    pub signal: u8,
+    pub secure: bool,
+    pub connected: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BluetoothDeviceInfo {
+    pub id: String,
+    pub name: String,
+    pub connected: bool,
+    pub paired: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppNotification {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub source: String,
+    pub created_at: i64,
+    pub read: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlsStatus {
+    #[serde(default)]
+    pub media: Option<MediaSessionInfo>,
+    #[serde(default)]
+    pub audio_outputs: Vec<AudioDeviceInfo>,
+    #[serde(default)]
+    pub default_audio_id: Option<String>,
+    #[serde(default)]
+    pub volume_percent: Option<u8>,
+    #[serde(default)]
+    pub muted: Option<bool>,
+    #[serde(default)]
+    pub brightness_percent: Option<u8>,
+    pub wifi: ControlCapability,
+    #[serde(default)]
+    pub wifi_enabled: Option<bool>,
+    #[serde(default)]
+    pub wifi_networks: Vec<WifiNetworkInfo>,
+    pub bluetooth: ControlCapability,
+    #[serde(default)]
+    pub bluetooth_enabled: Option<bool>,
+    #[serde(default)]
+    pub bluetooth_devices: Vec<BluetoothDeviceInfo>,
+    pub airplane_mode: ControlCapability,
+    pub night_light: ControlCapability,
+    pub energy_saver: ControlCapability,
+    pub notifications: ControlCapability,
+    #[serde(default)]
+    pub notification_items: Vec<AppNotification>,
+}
+
+/// Actions accepted by the media/controls commands (validated server-side).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaAction {
+    Play,
+    Pause,
+    PlayPause,
+    Next,
+    Previous,
+    Shuffle,
+    Repeat,
+}
+
 /// Persisted user settings (v2). Stored as JSON in %APPDATA%/protonsearch/v2/settings.json.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

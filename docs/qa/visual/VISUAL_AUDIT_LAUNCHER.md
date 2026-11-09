@@ -389,3 +389,19 @@ chip-row draft (user rejected "filters on filters"); SCREENS §2.11/§2.12 are w
   (3) the Gate-2 preview IPC is not wired yet — the provider seam is in place.
 - **Dynamic Island:** ISLAND_V9_SPEC.md + reference manifest have landed; renderer work is next and deliberately not
   started in this slice. Current island remains the 520×66 placeholder until that task is claimed.
+
+---
+
+# Addendum — task-38 real preview wiring (G2-PREVIEW UI)
+
+- `launcher/previewClient.ts` calls the engine `get_preview` bridge (`api.getPreview(resultId, 12000)`),
+  debounced 120 ms, cached by result id + max chars, with a request token rejecting stale responses. The old
+  metadata-only provider is now only a test seam.
+- `ResultPreview` renders the real payload: loading skeleton, extracted text with clamped/sorted highlight ranges,
+  bounded image from a validated data URL, OCR section, fields, truncation banner, explicit unsupported reason, and
+  an error state with Retry. Preview actions and Ctrl+Space/Esc/geometry behaviour are unchanged; no blank panel.
+- Tests: full suite 18 files / 237 passed; launcher 83 tests incl. primed text/image+OCR/highlight/truncation/
+  unsupported/error; `previewClient.test.tsx` covers debounce, cache and late-response rejection.
+- Screenshots light+dark (1180 launcher card): `launcher-task38-preview-text-*`, `-code-*`, `-pdf-*`, `-image-*`,
+  `-unsupported-*`. Payloads injected at capture time; app code talks only to the bridge. Extraction fidelity and
+  native Windows evidence remain engine/QA-owned.

@@ -7,14 +7,14 @@ without being stated plainly.
 
 ## 1. Gate definitions and exit criteria
 
-| Gate | Opens when | Exit criteria (evidence) | Status at Gate 0 |
+| Gate | Opens when | Exit criteria (evidence) | Status (2026-11-10 re-review) |
 |---|---|---|---|
-| G0 Audit/baseline | handoff package read; tree clean at `pre-v10-handoff` | V10_GATE0_AUDIT with environment/repo/legal/data/backup; FEATURE_PARITY_MATRIX/FEATURE_TEST_MATRIX/CROSS_FEATURE_PAIRWISE/BUG_LEDGER/RELEASE_GATES/BENCHMARK_PLAN present; P0-1/P0-2 reproductions recorded or explicitly in progress; V9 reference inventory; baseline benchmark status | **IN PROGRESS** (docs delivered; reproductions tasks 29/30 in progress; V9 extraction 28; perf plan 31) |
-| G1 Architecture/contracts | G0 accepted | ADRs for one core/two launchers/optional agents, preview payload, island settings schema, device capability model; typed IPC version/migration plan; owner/reviewer map; test strategy | TODO |
-| G2 P0 repair | G0 reproductions complete | BUG-P0-01 fixed: real previews for required formats with matched-term highlight, fallbacks, tests/screenshots, both launchers once island exists; BUG-P0-02 fixed: real bitmap capture/classification/persistence/re-paste, real Windows copy/paste tests; independent review | TODO |
-| G3 Search/retrieval | G1 accepted | filename + content + OCR + sources wired; before/after benchmarks; relevance/regression gates; no fake counts; content p95 target addressed or honest gap accepted | PARTIAL (v2 engine; content target missed; OCR FTS pending) |
-| G4 Normal Launcher | G3 search path usable | centered multi-monitor/DPI window, All/Files/Folders/Apps filters, quick destinations, previews/actions, keyboard/a11y, E2E evidence | PARTIAL |
-| G5 Dynamic Island | G1 contracts + V9 extraction | all 8 cards, V9 geometry/motion fidelity, clickable dots, scroll/swipe vs inner scroll, real data, no clipping, 100-200% DPI screenshots/video, frame-pacing measurements | NOT STARTED |
+| G0 Audit/baseline | handoff package read; tree clean at `pre-v10-handoff` | V10_GATE0_AUDIT with environment/repo/legal/data/backup; FEATURE_PARITY_MATRIX/FEATURE_TEST_MATRIX/CROSS_FEATURE_PAIRWISE/BUG_LEDGER/RELEASE_GATES/BENCHMARK_PLAN present; P0-1/P0-2 reproductions recorded or explicitly in progress; V9 reference inventory; baseline benchmark status | **G0-A/B/D COMPLETE + G0-E accepted by L0 (2026-11-10)**; G0-C perf report pending separately; consolidated Gate-0 closure = L0 acceptance |
+| G1 Architecture/contracts | G0 accepted | ADRs for one core/two launchers/optional agents, preview payload, island settings schema, device capability model; typed IPC version/migration plan; owner/reviewer map; test strategy | **CLOSED (L1-E recommendation, 2026-11-10)** - R1 DTO move PASS, R2 preview backend/command/bridge PASS, R3 clipboard images PASS (module + real .NET), ADR-0007..0012 + additive policy, shell fixes verified; preview UI/app GUI clipboard E2E moved to G2 acceptance |
+| G2 P0 repair | G0 reproductions complete | BUG-P0-01 fixed: real previews for required formats with matched-term highlight, fallbacks, tests/screenshots, both launchers once island exists; BUG-P0-02 fixed: real bitmap capture/classification/persistence/re-paste, real Windows copy/paste tests; independent review | **CONDITIONAL** - P0-2 clipboard PASS (tests + independent real .NET capture; app GUI matrix/OLE/OCR-text follow-ups); P0-1 preview backend/command/bridge PASS, UI task-38 in progress; G2 not closed until preview UI + both-launcher E2E |
+| G3 Search/retrieval | G1 accepted | filename + content + OCR + sources wired; before/after benchmarks; relevance/regression gates; no fake counts; content p95 target addressed or honest gap accepted | PARTIAL (v2 engine; content p95 43 ms vs 30 ms target - task-42; OCR FTS integration pending) |
+| G4 Normal Launcher | G3 search path usable | centered multi-monitor/DPI window, All/Files/Folders/Apps filters, quick destinations, previews/actions, keyboard/a11y, E2E evidence | **CONDITIONAL** - 4-chip/quick-destinations model matches Lead addendum C1/C2; design-spec micro-spec sync (SCREENS 2.4/2.11) + native Windows DPI screenshots pending |
+| G5 Dynamic Island | G1 contracts + V9 extraction | all 8 cards, V9 geometry/motion fidelity, clickable dots, scroll/swipe vs inner scroll, real data, no clipping, 100-200% DPI screenshots/video, frame-pacing measurements | **PARTIAL / NOT SIGNED** - renderer geometry/motion/dots match spec in mock; clipboard thumbnails, agent hierarchy, pinning, task-35 adapters, native DPI/frame pacing, expanded 860/430 captures pending |
 | G6 Desktop settings/onboarding | G4+G5 surfaces exist | home/greeting/onboarding primary-launcher choice, placement editor (drag/presets/offsets/taskbar/safe clamp/apply-cancel-reset/test/recovery), card manager (order/enable/pin/default/live dots/undo), persistence/migration, screenshots | PARTIAL |
 | G7 Agents/native integrations | G1 agent contracts, capability-gated adapters | Pi sidecar on demand, provider config/keys in OS store, permissions/approvals, honest pause/cancel semantics, agent status/history both surfaces; media/output/Wi-Fi/Bluetooth/brightness/volume/notifications with capability probes and honest disabled states | PARTIAL (Pi hardened; write-consent server gate open; agents card/media/controls not started) |
 | G8 Cross-feature verification | feature sets exist | FEATURE_TEST_MATRIX executed; CROSS_FEATURE_PAIRWISE pair rows executed (critical pairs on real Windows); security audit; perf/CPU/memory/frame-pacing report; fixes verified; no P0/P1 open without accepted rationale | TODO |
@@ -66,3 +66,26 @@ L0 owns final acceptance. Each gate review uses the exec summary in the gate's e
 links; reviewers must re-run at least the representative commands. For every specialty workstream the
 independent reviewer is named in WORK_BREAKDOWN/handoffs. A failed gate returns to the owner with a
 defect ID in BUG_LEDGER; no gate is closed by majority or by time pressure.
+
+
+## 6. Reviewer sign-off (task-46 re-review, 2026-11-10)
+
+Reviewer: L1-E (rel-recon). Evidence: docs/implementation/V10_G1_ARCHITECTURE.md section 10,
+docs/qa/clipboard-audit/INDEPENDENT_REREVIEW_R3_2026-11-10.md,
+docs/qa/visual/SPEC_REVIEW_G2_G4_G5_2026-11-10.md, .agents/notes/g2-rereview-tests.log.
+
+| Area | Verdict | Evidence | Conditions / blockers | Gate |
+|---|---|---|---|---|
+| R1 agent DTO move to ps-ipc | PASS | canonical agent_task.rs; ps-agent re-exports; shell imports ps_ipc DetectedAgent; byte-identical fixtures; cargo test -p ps-ipc 17/17 | TS mirror remains manual; automate schema check at G8 | G1 |
+| R2 preview backend/contract | PASS (backend/contract) | get_preview registered; resultId-only; bounds/cache/status/truncated/error; cargo test -p ps-core 48/48 incl 8 preview tests; bridge getPreview + ResultPreview | task-38 UI final screenshots/E2E; both-launcher parity at G8 | G2 |
+| R3 clipboard images | PASS (module + real-Windows harness) | ps-windows 18/18; ps-sources 49 (1 pre-existing ignored); independent .NET SetImage -> Image row, PNG 6,315 B, thumb 3,671 B, paste-back | full app GUI matrix (Snipping/Paint/browser), OLE-only sources, image OCR text | G2 |
+| G1 overall | CLOSED (recommend) | R1/R2/R3 + ADR/policy + shell fixes | preview UI and app-level clipboard E2E belong to G2 | G1 |
+| G2 P0-1 previews | CONDITIONAL | backend/command/bridge/engine tests PASS | task-38 in progress; fresh native screenshots + both launchers | G2 |
+| G2 P0-2 clipboard | CONDITIONAL PASS | independent module-level + real .NET reproduction; BOOT evidence | app-process GUI matrix; OLE fallback; image OCR text | G2 |
+| G4 normal launcher v2 | CONDITIONAL | 4 chips + quick destinations + row/footer anatomy match Lead addendum | design-spec micro-spec sync (SCREENS 2.4/2.11, preview 2.6); native DPI screenshots | G4 |
+| G5 island renderer | PARTIAL - NOT SIGNED | geometry/motion/dots match spec; mock screenshots; honest disabled cards | thumbnails, pinning, agent hierarchy, task-35 adapters, native DPI/frame pacing, 860/430 captures | G5 |
+
+Remaining blockers to G2/G4/G5 closure are listed in V10_G1_ARCHITECTURE.md section 10.6 (task-38
+preview UI; app-process clipboard GUI matrix; island card completeness + task-35 adapters + native
+visual/frame-pacing evidence; design-spec micro-spec sync; single-monitor/no-signing-cert/no-non-Pi-
+credentials environment gaps; content p95 task-42).

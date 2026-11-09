@@ -39,12 +39,12 @@ const HIDDEN_CARDS: Record<string, { title: string; subtitle: string; reason: st
   },
   controls: {
     title: "Quick Settings",
-    subtitle: "Wi-Fi, Bluetooth, display and sound",
+    subtitle: "Your PC, one gesture away",
     reason: "Wi-Fi, Bluetooth, brightness and volume need the native adapter and permissions.",
   },
   bell: {
     title: "Notifications",
-    subtitle: "Recent notifications",
+    subtitle: "Recent activity",
     reason: "Notification sources need the native Windows adapter, which isn't wired yet.",
   },
 };
@@ -351,6 +351,11 @@ export default function IslandView() {
               if (compact) setCompact(false);
             }}
             inputRef={inputRef}
+            placeholder={
+              stageWidth <= 380
+                ? "Search…"
+                : "Search files, folders, apps and actions…"
+            }
           />
         );
       case "clipboard": {
@@ -362,7 +367,6 @@ export default function IslandView() {
         return (
           <ClipboardCard
             results={clipboardRows}
-            total={clipboardRows.length}
             pending={clipboardState.pending}
             error={clipboardState.error}
             tab={clipTab}
@@ -372,7 +376,20 @@ export default function IslandView() {
         );
       }
       case "agent":
-        return <AgentsCard agents={bootstrap.agents} status={bootstrap.agentStatus} />;
+        return (
+          <AgentsCard
+            status={bootstrap.agentStatus}
+            tasks={bootstrap.agentTasks}
+            onPause={(taskId) => {
+              void api.agentPause(taskId).catch(() => undefined);
+              bootstrap.refresh();
+            }}
+            onResume={(taskId) => {
+              void api.agentResume(taskId).catch(() => undefined);
+              bootstrap.refresh();
+            }}
+          />
+        );
       case "browser":
         return (
           <BrowserCard
