@@ -557,6 +557,7 @@ optional only when the state will resolve itself; otherwise every error/empty st
 | Engine status load fails (Home, Indexes, Preferences) | "Couldn't read the index status." | "The local search engine didn't respond. Your settings are unaffected." | Try again | status |
 | `EngineStatus.warnings` non-empty | "Index needs attention." | "Some items couldn't be indexed. Search still works with what is available." | Open Search & indexes | status |
 | Indexer state `error` | "Indexing stopped." | "New files aren't being added. Existing search still works." | Open Search & indexes | alert |
+| Indexer paused (Home / Indexes) | "Indexing is paused." | "New files aren't being added. Existing search still works." | Resume indexing (Indexes) · Open Search & indexes (Home) | status |
 | Settings load fails | "Couldn't load settings." | "Defaults are shown. Changes can't be saved until settings load." | Try again | status |
 | Settings save fails (any toggle/field) | "Couldn't save that change." | "Your previous setting is still active." | Try again | alert |
 | Hotkey invalid format | "That shortcut isn't valid." | "Use at least one of Ctrl, Alt, Shift, or Win." | (edit field) | alert |
@@ -564,6 +565,7 @@ optional only when the state will resolve itself; otherwise every error/empty st
 | Activity load fails | "Couldn't load activity." | "Your history stays on this PC." | Try again | status |
 | Activity row open fails | "Couldn't open “{name}”." | "It may have been moved or deleted." | Remove from history? no — none | alert |
 | Agent runtime fails to start | "Agent workflows are unavailable." | "Search still works. The optional runtime didn't start." | Try again | alert |
+| Agent not set up (preference enabled, no runtime in this build) | "Agent workflows aren't set up." | "Your preference is saved, but no runtime is installed in this build. Nothing was downloaded or started." | none | status |
 | Agent provider unreachable / offline (post-alpha: no provider can be configured in this build) | "Can't reach the provider." | "Check your connection, then try again. Local search still works." | Try again | status |
 | Source read fails (browser/clipboard/git) | "Couldn't read {source}." | "ProtonSearch will try again automatically." | Try again | status (row) |
 | Network location unavailable | "Network location unavailable." | "Local files are still searchable. Reconnect the drive to index it again." | Try again (post-alpha; alpha shows the reconnect copy only) | status |

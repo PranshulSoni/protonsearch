@@ -113,3 +113,34 @@ Task-7 is **accepted** as a strong implementation of the readability/grid/quiet-
 quiet-state claim: **F1, F2, F3** (small, contained fixes) and the audit correction. F4–F6 are follow-up polish;
 F8 is an L0 copy/sanitisation task; F5/F6/F9 can trail. After F1–F3, re-capture one error and one empty state per
 theme at 1180×800 and re-run the 560×480 @200 % canary.
+
+## 5. Re-check (2026-11-10) — ui-app task-15 fixes
+
+**Independently verified:** `npm test` → **11 files / 174 tests passed** (00:02); `npx tsc --noEmit` clean.
+Reviewed the new captures: `task15-state-error-home-light.png`, `task15-state-warn-indexes-light.png`,
+`task15-state-empty-indexes-light.png`, `task15-states-gallery-{light,dark}.png`; audit §11.3 correction +
+§12.
+
+**Closed**
+| Finding | Verification |
+|---|---|
+| F1 raw engine/source detail | `describeAgent` no longer forwards `agent.detail` (product copy for running/stopped/error/not-configured, `describe.ts:418-476`); `describeSource` fallback is the generic “Reported by the local engine.” and never injects `source.detail` (`:150-156`); Indexes no longer renders `source.detail`. Poisoned-detail tests at `describe.test.ts:409-421` assert the secret/path is absent from all agent states, source descriptions and warning details. |
+| F2 offline/empty variants | `StateTone = neutral | warn | error | offline | empty` (`ui.tsx:378`); cloud-off icon (`ui.tsx:414`); `.state--offline`/`.state--empty` rules with base 12 px radius / 20-24 padding / 20 px icon (`ui.css:606-622`); `EmptyState` renders `.state.state--empty` with the same anatomy (`ui.tsx:445-466`); `.empty-block` is gone from CSS and DOM. Gallery + empty-route capture confirm the visual. |
+| F3 severity icon colour | Selectors now `.state--warn .state-icon` / `.state--error .state-icon` (`ui.css:590-600`); gallery shows amber warning and red error icons; `ui.test.tsx:57-69` asserts the canonical selectors and the absence of the old ones. |
+| F5/F6/F9 + plural | `.home-columns` margin 32 (`desktop.css:287-292`); onboarding step circle 28 / comment ≤700 (`onboarding.css:3,83`); `.state--neutral` rule added (`ui.css:602-604`); `summarizeWarnings` uses `Intl.PluralRules` (“1 item / 2 items”, `describe.ts:356`). |
+| F4 docs rows | SCREENS §3.7 now includes the paused and agent-not-set-up rows (this pass); provider/network rows already marked post-alpha. |
+
+**Still open (non-blocking)**
+- **F7 was not actually fixed:** `hooks.ts:24` still exports the unused `errorMessage()` while audit §12 says
+  “Removed from hooks.ts; grep shows no usages”. Remove the function or correct the audit line. (Dead code only.)
+- **F8 (L0):** `App.tsx:81-101` still shows the raw bootstrap `message` inside Technical details; sanitize it or show a
+  reference id. The settings-load copy path in §3.7 remains unused for bootstrap failures.
+- **Offline variant has no product call site yet** (network roots stay a `row-state`, provider-unreachable is post-alpha);
+  keep `.state--offline` as the reserved post-alpha variant or wire it when per-root/provider states land. Audit §12
+  already notes this honestly.
+- **Nit:** `.row-state svg` uses `--ps-warning` (`ui.css:638-641`); row-level failures are error/negative in §3.7.
+  Either make the auto-retry row neutral/warn deliberately and document it, or switch to `--ps-negative`.
+
+**Re-check verdict:** F1–F3 are closed; the quiet-state family is now consistent (error/warn/offline/empty, same anatomy,
+correct severity colour, no raw detail paths). Task-7 is **approved**; only the F7 cleanup/claim correction and the L0
+F8 sanitisation remain, plus the TEMP app-scale block moving into `tokens.css` before release.

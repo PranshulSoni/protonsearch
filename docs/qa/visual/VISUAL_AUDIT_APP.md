@@ -366,6 +366,10 @@ Build/tests after the fixes: **11 files / 174 tests green**.
 component gallery of warn/error/offline/empty in `task15-states-gallery-{light,dark}.png` (same `ui.css` build,
 explicitly labelled not a product route; offline/empty have no product path in the current mock).
 
+**Row-state tone (REVIEW_2 nit):** `.row-state` uses the warning colour deliberately: these rows are auto-retry
+states (“ProtonSearch will try again automatically” / reconnectable network root), not blocking failures. Blocking
+failures use `.state--error` with the negative colour. This is documented in `ui.css` next to the selector.
+
 **Audit correction:** §11.3 above was overstated at the time and is now corrected by this table; it is safe to treat
 §11.3 + §12 as the current quiet-state record. Not verified here: real WebView2 screenshots of the states, Windows
 high-contrast, screen-reader announcements (browser-rendered/computed evidence only).
