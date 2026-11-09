@@ -87,3 +87,6 @@ dist-installer/
 .devdata-mig/
 .devdata-mig2/
 .omc/
+
+# local dev/test data (never commit)
+.devdata*/
