@@ -380,8 +380,43 @@ describe("warning aggregation", () => {
     expect(summary?.body).toBe(
       "Some items couldn't be indexed. Search still works with what is available.",
     );
-    expect(summary?.details).toContain("3 item(s)");
+    expect(summary?.details).toContain("3 items");
     expect(summary?.details).not.toContain("secret");
     expect(summary?.details).not.toContain("C:\\");
+  });
+});
+
+describe("raw engine detail never reaches the surface", () => {
+  const secret = "C:\\Users\\private\\engine-trace.log: ENOENT/provider stack";
+
+  it("describeSource drops the engine detail for unknown sources", () => {
+    const info = describeSource(
+      {
+        id: "custom",
+        label: "Custom source",
+        enabled: true,
+        itemCount: 0,
+        state: "error",
+        detail: secret,
+      },
+      makeSettings(),
+    );
+    expect(info.description).not.toContain(secret);
+    expect(info.description).not.toContain("C:\\");
+    expect(info.description).toBe("Reported by the local engine.");
+  });
+
+  it("describeAgent never forwards engine detail strings", () => {
+    for (const state of ["running", "stopped", "error", "not_configured"] as const) {
+      const view = describeAgent({ state, detail: secret }, makeSettings());
+      expect(view.detail).not.toContain(secret);
+      expect(view.detail).not.toContain("C:\\");
+    }
+  });
+
+  it("summarizeWarnings pluralises without raw strings", () => {
+    expect(summarizeWarnings([secret])?.details).toContain("1 item");
+    expect(summarizeWarnings([secret, secret])?.details).toContain("2 items");
+    expect(summarizeWarnings([secret])?.details).not.toContain("C:\\");
   });
 });

@@ -9,10 +9,10 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use ps_agent::{AgentClient, AgentEvent};
+use ps_agent::{AgentClient, AgentEvent, PiAgentClient, PiAgentConfig};
 use ps_core::{Engine, EngineConfig};
 use ps_ipc::{
-    ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentState,
+    ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentRuntime, AgentState,
     AgentStatus, EngineStatus, IndexCommand, NativeCommand, OnboardingInput, OnboardingState,
     OpenOutcome, SearchRequest, SearchResponse, Settings, SettingsPatch,
 };
@@ -45,6 +45,8 @@ struct AppState {
     /// Optional Python agent sidecar. Created only when a workflow is started;
     /// never touched by search, startup or settings.
     agent: Mutex<Option<AgentClient>>,
+    /// Pi CLI agent (default runtime). Spawned only when a workflow starts.
+    pi_agent: Mutex<Option<PiAgentClient>>,
 }
 
 /// Position the frameless launcher near the top-center of the monitor under the
@@ -490,6 +492,43 @@ fn set_hotkey(
 // ---------------------------------------------------------------------------
 
 fn probe_agent_status(state: &AppState) -> AgentStatus {
+    let settings = state.engine.settings();
+    if settings.agent.runtime == AgentRuntime::Pi {
+        let probed =
+            ps_agent::probe_pi(settings.agent.pi_path.as_deref().map(std::path::Path::new));
+        let running = state
+            .pi_agent
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().map(|client| client.is_running()))
+            .unwrap_or(false);
+        return match probed {
+            Some(info) => AgentStatus {
+                state: if running {
+                    AgentState::Running
+                } else {
+                    AgentState::Stopped
+                },
+                runtime: Some(format!("Pi {}", info.version)),
+                model: settings.agent.model.clone(),
+                detail: Some(if settings.agent.allow_writes {
+                    "Read-only tools plus edits and shell for this run."
+                } else {
+                    "Read-only tools for this run."
+                }
+                .to_string()),
+            },
+            None => AgentStatus {
+                state: AgentState::NotConfigured,
+                runtime: Some("Pi".into()),
+                model: None,
+                detail: Some(
+                    "The Pi CLI agent was not found. Install it from pi.dev or set its path in Preferences."
+                        .into(),
+                ),
+            },
+        };
+    }
     let config = ps_agent::default_config(&state.data_dir);
     let running = state
         .agent
@@ -532,8 +571,32 @@ fn agent_start(
     state: tauri::State<'_, AppState>,
     request: AgentRunRequest,
 ) -> Result<(), String> {
-    if !state.engine.settings().agent.enabled {
+    let settings = state.engine.settings();
+    if !settings.agent.enabled {
         return Err("Agent workflows are disabled in Preferences.".into());
+    }
+    if settings.agent.runtime == AgentRuntime::Pi {
+        let config = PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
+            "The Pi CLI agent is not available. Install it from pi.dev or set its path in Preferences."
+                .to_string()
+        })?;
+        let mut slot = state.pi_agent.lock().map_err(|e| e.to_string())?;
+        if slot.is_none() {
+            let handle = app.clone();
+            let client = PiAgentClient::spawn(config, move |event: &AgentEvent| {
+                let _ = handle.emit("agent:event", event);
+            })
+            .map_err(|_| "The Pi CLI agent could not be started.".to_string())?;
+            *slot = Some(client);
+        }
+        return slot
+            .as_ref()
+            .ok_or_else(|| "The Pi CLI agent is unavailable.".to_string())?
+            .send_run(&request)
+            .map_err(|err| match err {
+                ps_agent::AgentError::Busy => "A workflow is already running.".to_string(),
+                _ => "The Pi workflow could not be started.".to_string(),
+            });
     }
     let mut slot = state.agent.lock().map_err(|e| e.to_string())?;
     let needs_spawn = slot
@@ -559,6 +622,15 @@ fn agent_start(
 
 #[tauri::command]
 fn agent_cancel(state: tauri::State<'_, AppState>, run_id: Option<String>) -> Result<(), String> {
+    if state.engine.settings().agent.runtime == AgentRuntime::Pi {
+        let slot = state.pi_agent.lock().map_err(|e| e.to_string())?;
+        return match slot.as_ref() {
+            Some(client) => client
+                .cancel()
+                .map_err(|_| "The Pi workflow could not be cancelled.".to_string()),
+            None => Ok(()),
+        };
+    }
     let slot = state.agent.lock().map_err(|e| e.to_string())?;
     match slot.as_ref() {
         Some(client) => client.cancel(run_id.as_deref()).map_err(|e| e.to_string()),
@@ -571,6 +643,12 @@ fn agent_approve(
     state: tauri::State<'_, AppState>,
     response: AgentApprovalResponse,
 ) -> Result<(), String> {
+    if state.engine.settings().agent.runtime == AgentRuntime::Pi {
+        return Err(
+            "Pi runs do not ask for per-tool approval; file edits and shell access are opted in before the run."
+                .into(),
+        );
+    }
     let slot = state.agent.lock().map_err(|e| e.to_string())?;
     match slot.as_ref() {
         Some(client) => client.approve(&response).map_err(|e| e.to_string()),
@@ -580,6 +658,11 @@ fn agent_approve(
 
 #[tauri::command]
 fn agent_stop(state: tauri::State<'_, AppState>) {
+    if let Ok(mut slot) = state.pi_agent.lock() {
+        if let Some(client) = slot.take() {
+            client.shutdown();
+        }
+    }
     if let Ok(mut slot) = state.agent.lock() {
         if let Some(client) = slot.take() {
             client.shutdown();
@@ -624,7 +707,12 @@ fn main() {
             let data_dir = ps_core::paths::v2_data_dir();
             let config = engine_config(data_dir.clone());
             let engine = Arc::new(Engine::open(config).map_err(|e| format!("engine init: {e}"))?);
-            app.manage(AppState { engine: engine.clone(), data_dir, agent: Mutex::new(None) });
+            app.manage(AppState {
+                engine: engine.clone(),
+                data_dir,
+                agent: Mutex::new(None),
+                pi_agent: Mutex::new(None),
+            });
 
             step("windows: creating");
             create_windows(app.handle())?;
@@ -674,6 +762,22 @@ fn main() {
             agent_stop,
             app_info,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running ProtonSearch");
+        .build(tauri::generate_context!())
+        .expect("error while building ProtonSearch")
+        .run(|app_handle, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                if let Some(state) = app_handle.try_state::<AppState>() {
+                    if let Ok(mut slot) = state.pi_agent.lock() {
+                        if let Some(client) = slot.take() {
+                            client.shutdown();
+                        }
+                    }
+                    if let Ok(mut slot) = state.agent.lock() {
+                        if let Some(client) = slot.take() {
+                            client.shutdown();
+                        }
+                    }
+                }
+            }
+        });
 }

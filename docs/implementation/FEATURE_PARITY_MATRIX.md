@@ -25,7 +25,7 @@ Status values: **LEGACY-WORKING** (verified by code + tests/DB), **LEGACY-PARTIA
 | 15 | Quicklinks & snippets | **LEGACY-WORKING** (4 / 1 rows; keyword triggers) | `search.rs:776-820,10271-10301,10591-10649` | Preserved | V2-WIP |
 | 16 | Web search / Google Lens circle-to-search | **LEGACY-PARTIAL** — code exists, 0 tests; uploads screenshot to Google Lens via temp HTML | `circle_to_search.rs:410-448`; `main.rs:6537` | Preserved (explicit user action only; add egress consent) | PLANNED-V2 |
 | 17 | Window controls (snap/move/resize/virtual desktops via winvd) | **LEGACY-WORKING (code only, 0 tests)** | `launcher.rs:752-830`; snap catalog `search.rs:8450-8545` | Preserved subset with safe API | PLANNED-V2 |
-| 18 | AI chat / Hermes agent integration | **LEGACY-PARTIAL / UNVERIFIED end-to-end** — client + gateway code; external `hermes` binary present on host, but baseline DB has **no `api_key` row** | `ai.rs:139-264,345-480,548-622,703-1070`; `settings_ui.rs:1093-1163`; DB ai_settings §Gate-0 | Replaced by existing Python runtime sidecar (opt-in) + migration of settings | V2-WIP |
+| 18 | AI agent runtime (legacy Hermes; Pi in v2) | **LEGACY-PARTIAL / UNVERIFIED end-to-end** — Hermes client + gateway code; external hermes binary present on host, but baseline DB has **no api_key row** | ai.rs:139-264,345-480,548-622,703-1070; settings_ui.rs:1093-1163; DB ai_settings §Gate-0 | **Hermes dropped; Pi coding-agent CLI is the default agent runtime** (read-only tools by default, writes/shell opt-in; Pydantic sidecar kept as optional fallback) | V2-WIP | docs/security/PI_AGENT_SECURITY.md; crates/ps-agent/src/pi/**; docs/agent/PI_INTEGRATION.md |
 | 19 | Voice input | **NOT-PRESENT** — Cargo feature `Media_SpeechRecognition` enabled (`Cargo.toml:48`) but no implementation in `src/` | grep SpeechRecognizer|Media_Speech|voice → no matches in `protonsearch/src/*.rs` | Defer/cut unless evidence + real test | CUT (recommended) |
 | 20 | Notes (create/edit/search) | **LEGACY-PARTIAL** — code exists, `notes/` dir empty (0 notes) | `main.rs:13016-13068`; `search.rs:10650-10700` | Preserved | PLANNED-V2 |
 | 21 | Steam library games | **LEGACY-BROKEN/PARTIAL** — only 3 hardcoded `steamapps` paths; no `libraryfolders.vdf` parsing; 0 tests | `search.rs:10481-10545` | Preserved or CUT; if kept, parse `libraryfolders.vdf` | PLANNED-V2 |
@@ -47,6 +47,8 @@ Status values: **LEGACY-WORKING** (verified by code + tests/DB), **LEGACY-PARTIA
 | 37 | AI provider browser prefix (`chatgpt:`) | **LEGACY-WORKING (code only)** — builds provider URL with encoded prompt | `search.rs:4286-4322` | Preserved (explicit action) | PLANNED-V2 |
 | 38 | Settings persistence (exe-dir-first JSON, AppData fallback) | **LEGACY-WORKING (code only)** — portable-first; corrupt file kept as .bak | `settings.rs:192-268` | Replaced by v2 `v2/settings.json` | V2-DONE |
 | 39 | Multi-monitor / DPI-aware placement | **LEGACY-WORKING (code + geometry tests)** — per-monitor-v2 DPI, cursor-monitor placement | `main.rs:3997-4220,711`; tests `launcher_width_honors_setting_and_small_screens` etc. | Preserved | V2-DONE |
+
+**Runtime substitution note (2026-11-09):** legacy Hermes agent integration (row 18) is dropped in v2. The installed Pi coding-agent CLI is the default agent runtime; Pi runs on demand with a read-only tool allowlist by default and explicit opt-in for writes/shell, and the embedded Pydantic AI sidecar is kept as an optional fallback. Security review and release gates: docs/security/PI_AGENT_SECURITY.md.
 
 ## User data that must survive (verified at baseline)
 
@@ -100,7 +102,7 @@ repo-relative; line numbers move as agents edit, so file-level references are us
 | 13 | V2-WIP | `crates/ps-core/src/db.rs` activity table; Tauri get_activity; Activity view WIP |
 | 14 | V2-WIP | `crates/ps-core/src/catalog.rs`; engine catalog::match_actions |
 | 15 | V2-WIP | `crates/ps-sources/src/quicklinks.rs` |
-| 18 | V2-WIP | `crates/ps-agent/**` shell wiring; opt-in, not shipped |
+| 18 | V2-WIP | Pi backend: crates/ps-agent/src/pi/**; docs/agent/PI_INTEGRATION.md; security review docs/security/PI_AGENT_SECURITY.md (must-fixes PI-SEC-01..06 pending; Tauri wiring pending) |
 | 24 | V2-WIP | `apps/desktop/src/app/**` (DesktopApp, PreferencesView, activity/search pages) |
 | 25 | V2-DONE | `apps/desktop/src-tauri/src/main.rs:112 build_tray` + tray menu actions |
 | 26 | V2-WIP | `apps/desktop/src/launcher/ResultPreview.tsx` |

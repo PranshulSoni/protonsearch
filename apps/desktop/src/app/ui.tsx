@@ -32,7 +32,8 @@ export type IconName =
   | "git"
   | "pause"
   | "play"
-  | "shield";
+  | "shield"
+  | "cloudOff";
 
 const PATHS: Record<IconName, ReactNode> = {
   home: <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" />,
@@ -151,6 +152,12 @@ const PATHS: Record<IconName, ReactNode> = {
   pause: <path d="M9 5v14M15 5v14" />,
   play: <path d="M8 5.5v13l10-6.5z" />,
   shield: <path d="M12 3.5 19 6v5.5c0 4.2-2.9 7.4-7 9-4.1-1.6-7-4.8-7-9V6z" />,
+  cloudOff: (
+    <>
+      <path d="M7 18h9.3a3.6 3.6 0 0 0 .6-7.15A5.4 5.4 0 0 0 7.2 9.7 4.2 4.2 0 0 0 7 18Z" />
+      <path d="m4 4 16 16" />
+    </>
+  ),
 };
 
 export function Icon({
@@ -368,7 +375,7 @@ export function Callout({
   );
 }
 
-export type StateTone = "neutral" | "warn" | "error";
+export type StateTone = "neutral" | "warn" | "error" | "offline" | "empty";
 
 /**
  * Quiet state notice (task-7): human sentence first, optional sanitized
@@ -401,7 +408,18 @@ export function StateNotice({
       aria-live={role === "status" ? "polite" : undefined}
     >
       <span className="state-icon" aria-hidden="true">
-        <Icon name={tone === "neutral" ? "shield" : "alert"} size={20} />
+        <Icon
+          name={
+            tone === "offline"
+              ? "cloudOff"
+              : tone === "empty"
+                ? "folder"
+                : tone === "neutral"
+                  ? "shield"
+                  : "alert"
+          }
+          size={20}
+        />
       </span>
       <div className="state-content">
         <p className="state-title">{title}</p>
@@ -434,10 +452,15 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="empty-block">
-      <p className="empty-title">{title}</p>
-      {body ? <p className="empty-body">{body}</p> : null}
-      {action ? <div className="empty-action">{action}</div> : null}
+    <div className="state state--empty" role="status">
+      <span className="state-icon" aria-hidden="true">
+        <Icon name="folder" size={20} />
+      </span>
+      <div className="state-content">
+        <p className="state-title">{title}</p>
+        {body ? <p className="state-body">{body}</p> : null}
+        {action ? <div className="state-actions">{action}</div> : null}
+      </div>
     </div>
   );
 }

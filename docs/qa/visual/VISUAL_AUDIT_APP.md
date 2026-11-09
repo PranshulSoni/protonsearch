@@ -307,6 +307,10 @@ Fixed inconsistent label-column/panel alignment, double spacing above first pane
 notice-after-search spacing. No overflow at 560/720/820/1000/1180.
 
 ### 11.3 Quiet state components and copy (SCREENS §3.7)
+
+> **Correction (2026-11-10, REVIEW_2 follow-up):** at the time of this pass the “offline/empty variants implemented”
+> and “no raw engine strings” claims below were overstated. The missing variants, the direct `agent.detail`/`source.detail`
+> renders and the severity-selector typo were fixed in task-15; see §12 for the corrected status and evidence.
 New `StateNotice` (`.state/.state--warn/.state--error/.state--offline`, 20 px icon, title 15/600, body 14/21 max 60 ch,
 native `Details` disclosure, one action) and `.row-state` for one failing row/source. Raw `err.message`/engine
 warning strings are no longer rendered anywhere in app views (grep-verified); `errorMessage` helper removed.
@@ -337,3 +341,31 @@ engine can keep capping/aggregating upstream — UI never prints individual warn
   renderer canary only).
 - Task-13 (Pi agent panel) could not be claimed: blocked by task-11 and the shared task board rejects claiming an
   unready task. Ready when the Pi backend lands.
+
+---
+
+## 12. REVIEW_2 follow-up / task-15 — quiet-states must-fix (2026-11-10)
+
+Source: design-spec REVIEW_2 (F1–F9). Scope: app/** + onboarding/**; `tokens.css` and `App.tsx` untouched (L0 items).
+Build/tests after the fixes: **11 files / 174 tests green**.
+
+| Item | Status | Evidence |
+|---|---|---|
+| **F1 MAJOR** raw engine/source detail on the surface | **Fixed** | `describeAgent` no longer forwards `agent.detail` (product copy for running/stopped/error/not-configured); `describeSource` no longer injects `source.detail` into descriptions; IndexesView no longer renders `source.detail`; poisoned-detail regression tests in `describe.test.ts` (path “C:\\Users\\…/ENOENT/provider stack” asserted absent from all product copy, incl. per-state agent coverage). |
+| **F2 MAJOR** missing `.state--offline`/`.state--empty` | **Fixed** | `StateTone = neutral/warn/error/offline/empty`; cloud-off icon added; `.state--offline`/`.state--empty` styles (12 px radius, 20/24 padding, 20 px icon, title 15/600, body 14/21); `EmptyState` migrated to the shared `.state .state--empty` anatomy (old `.empty-block` CSS removed). Verified: empty block radius **12 px**, padding **20/24**, icon **20 px**; gallery below. |
+| **F3 MEDIUM** severity icons always grey | **Fixed + asserted** | CSS selectors now target `.state--warn .state-icon` / `.state--error .state-icon` (dead `.state-warn/.state-error/.row-error` selectors removed). Computed colours in-browser: error **rgb(169,42,47)** (negative), warn **rgb(138,90,18)** (warning), not `--ps-ink-2` grey. `ui.test.tsx` asserts the selectors and the emitted classes; `EmptyState`/tone markup covered too. |
+| F4 copy gaps / pluralisation | Fixed | `summarizeWarnings` uses `Intl.PluralRules` (“1 item / 2 items”); paused (“Indexing is paused.”) and agent-not-set-up (“Agent workflows aren’t set up.”) surfaces carry product copy. Docs rows are design-spec-owned. |
+| F5 Home margin-top 40→32 | Fixed | `.home-columns` margin-top `var(--ps-app-section-gap)` (32 px). |
+| F6 onboarding step circle/pitch + stale comment | Fixed | 28 px circle, 56 px step pitch per DESIGN row 27; header comment now “hidden ≤700”. |
+| F7 dead `errorMessage` helper | Fixed | Removed from `hooks.ts`; `grep` shows no usages. |
+| F8 App.tsx raw Technical details | L0-owned | Not edited; Lead is sanitizing. Still the only raw-detail surface. |
+| F9 `.state--neutral` with no CSS | Fixed | Explicit neutral rule added; all five variants covered by `ui.test.tsx`. |
+
+**State screenshots:** `task15-state-error-home-light.png` (error/alert), `task15-state-warn-indexes-light.png`
+(aggregated engine warnings; amber icon), `task15-state-empty-indexes-light.png` (migrated EmptyState), and a
+component gallery of warn/error/offline/empty in `task15-states-gallery-{light,dark}.png` (same `ui.css` build,
+explicitly labelled not a product route; offline/empty have no product path in the current mock).
+
+**Audit correction:** §11.3 above was overstated at the time and is now corrected by this table; it is safe to treat
+§11.3 + §12 as the current quiet-state record. Not verified here: real WebView2 screenshots of the states, Windows
+high-contrast, screen-reader announcements (browser-rendered/computed evidence only).

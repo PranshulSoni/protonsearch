@@ -676,7 +676,10 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
         actions={<SavedStamp show={savedKey === "exclusions"} />}
       >
         {excludedPaths.length === 0 ? (
-          <p className="muted">No exclusions. Everything in your locations is indexed.</p>
+          <EmptyState
+            title="No exclusions."
+            body="Everything in your locations is indexed."
+          />
         ) : (
           <ul className="path-list">
             {excludedPaths.map((path) => (
@@ -769,8 +772,6 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                         Couldn&apos;t read {info.title}. ProtonSearch will try again
                         automatically.
                       </p>
-                    ) : source.detail ? (
-                      <p className="field-help">{source.detail}</p>
                     ) : null}
                   </div>
                   {info.privacyKey ? (

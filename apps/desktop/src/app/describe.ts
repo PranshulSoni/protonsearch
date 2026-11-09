@@ -151,7 +151,7 @@ export function describeSource(source: SourceStatus, settings: Settings): Source
   const meta: SourceMeta =
     SOURCE_META[source.id] ?? {
       title: source.label,
-      description: source.detail ?? "Reported by the local engine.",
+      description: "Reported by the local engine.",
       privacyKey: null,
     };
   const enabled = meta.privacyKey ? settings.privacy[meta.privacyKey] && source.enabled : source.enabled;
@@ -352,11 +352,16 @@ export interface WarningSummary {
  */
 export function summarizeWarnings(warnings: string[]): WarningSummary | null {
   if (warnings.length === 0) return null;
+  const count = warnings.length;
+  const plural = new Intl.PluralRules(undefined, { type: "cardinal" }).select(count);
+  const unit = plural === "one" ? "item" : "items";
   return {
     body: "Some items couldn't be indexed. Search still works with what is available.",
     details:
-      warnings.length +
-      " item(s) could not be read during the last index update. They are retried automatically on the next update; malformed documents are skipped so they cannot block other results.",
+      count +
+      " " +
+      unit +
+      " could not be read during the last index update. They are retried automatically on the next update; malformed documents are skipped so they cannot block other results.",
   };
 }
 
@@ -415,15 +420,16 @@ export function describeAgent(
   settings: Settings,
 ): AgentView {
   const state = agent?.state ?? "not_configured";
+  // Engine detail strings are never rendered: they can contain paths, codes or
+  // provider traces. The UI shows product copy only (SCREENS §3.7 / REVIEW_2 F1).
   const runtime = agent?.runtime ?? "Not installed";
   const model = agent?.model ?? "Not configured";
-  const detailText = agent?.detail ?? null;
 
   if (state === "running") {
     return {
       tone: "ok",
       stateLabel: "Running",
-      detail: detailText ?? "The sidecar is running for the current workflow only.",
+      detail: "The sidecar is running for the current workflow only.",
       runtime,
       model,
       installed: true,
@@ -433,7 +439,7 @@ export function describeAgent(
     return {
       tone: "ok",
       stateLabel: "Configured, idle",
-      detail: detailText ?? "The runtime is installed and starts only when you run a workflow.",
+      detail: "The runtime is installed and starts only when you run a workflow.",
       runtime,
       model,
       installed: true,
@@ -454,7 +460,6 @@ export function describeAgent(
       tone: "warn",
       stateLabel: "Not set up",
       detail:
-        detailText ??
         "Your preference is saved, but no agent runtime is installed in this build. Nothing was downloaded or started.",
       runtime,
       model,
