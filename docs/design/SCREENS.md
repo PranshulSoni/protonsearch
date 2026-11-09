@@ -564,9 +564,9 @@ optional only when the state will resolve itself; otherwise every error/empty st
 | Activity load fails | "Couldn't load activity." | "Your history stays on this PC." | Try again | status |
 | Activity row open fails | "Couldn't open “{name}”." | "It may have been moved or deleted." | Remove from history? no — none | alert |
 | Agent runtime fails to start | "Agent workflows are unavailable." | "Search still works. The optional runtime didn't start." | Try again | alert |
-| Agent provider unreachable / offline | "Can't reach the provider." | "Check your connection, then try again. Local search still works." | Try again | status |
+| Agent provider unreachable / offline (post-alpha: no provider can be configured in this build) | "Can't reach the provider." | "Check your connection, then try again. Local search still works." | Try again | status |
 | Source read fails (browser/clipboard/git) | "Couldn't read {source}." | "ProtonSearch will try again automatically." | Try again | status (row) |
-| Network location unavailable | "Network location unavailable." | "Local files are still searchable. Reconnect the drive to index it again." | Try again | status |
+| Network location unavailable | "Network location unavailable." | "Local files are still searchable. Reconnect the drive to index it again." | Try again (post-alpha; alpha shows the reconnect copy only) | status |
 | Onboarding finish fails | "Couldn't finish setup." | "Your choices are saved on this PC." | Try again | alert |
 | Launcher failure states | launcher final spec (§2.3) unchanged | — | — | — |
 

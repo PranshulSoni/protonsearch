@@ -78,6 +78,15 @@ function BootScreen() {
   );
 }
 
+/// Technical details are for support/diagnostics: strip absolute user paths and
+/// cap the length so no secrets or full directory layout leaks onto the surface.
+function sanitizeBootDetail(message: string): string {
+  return message
+    .replace(/[A-Za-z]:\\Users\\[^\\\s]+(?:\\[^\s:;,"')]+)*/g, "<user path>")
+    .replace(/\\\\(?:\?\\)?[^\s:;,"')]+/g, "<path>")
+    .slice(0, 600);
+}
+
 function FatalScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
   // Quiet presentation: the user sees what happened and what to do next; the
   // technical detail lives in a native disclosure for support/diagnostics.
@@ -91,7 +100,7 @@ function FatalScreen({ message, onRetry }: { message: string; onRetry: () => voi
       </span>
       <details className="boot-details">
         <summary>Technical details</summary>
-        <code>{message}</code>
+        <code>{sanitizeBootDetail(message)}</code>
       </details>
       <button className="btn" onClick={onRetry}>
         Try again

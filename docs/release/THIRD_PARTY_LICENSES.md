@@ -88,6 +88,18 @@ is used to build the bundle; confirm what the Tauri bundler embeds at G7.
   pyproject.toml/requirements** (only local venvs/logs/scripts). Licence obligations must be
   re-verified when the sidecar ships (G6). Do not distribute pydantic-ai code before then.
 
+## 4b. Pi coding-agent CLI (external runtime, NOT bundled)
+
+- Package: @earendil-works/pi-coding-agent **1.5.0**, license field **MIT** (verified from the
+  installed package.json on this host). Homepage: https://pi.dev / npm.
+- ProtonSearch does not bundle Pi: it is an external prerequisite the user installs, and the app
+  only launches the resolved launcher. Therefore no Pi code is redistributed by our installer;
+  if that changes, the MIT notice must be included.
+- Runtime prerequisite: Node.js >= 22.19.0 (Pi requirement; verified host Node v26.7.0).
+- Pi's own transitive npm dependencies are managed by its installer and are outside our
+  distribution; do not list them as bundled components.
+- Security review and residual risks: docs/security/PI_AGENT_SECURITY.md.
+
 ## 5. Repo licence
 
 - LICENSE (repo root): **MIT** (legacy ProtonSearch project licence; retained).

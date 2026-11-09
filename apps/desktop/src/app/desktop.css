@@ -1,4 +1,3 @@
-@import "./app-scale.css";
 
 /* Full desktop application layout. Colours/type/motion from tokens.css.
    Sidebar: 220 (>=1100), 190 (820-1099), 56 icon rail (<=819). */
@@ -289,7 +288,7 @@
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
   gap: var(--ps-app-gutter);
-  margin-top: var(--space-8);
+  margin-top: var(--ps-app-section-gap);
 }
 
 .home-section {

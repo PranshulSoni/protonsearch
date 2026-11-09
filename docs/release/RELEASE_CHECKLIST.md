@@ -14,7 +14,7 @@ without explicit user authorisation.
 | G3 | Launcher wired + hotkey + perf | NOT STARTED | — |
 | G4 | Desktop app + onboarding + settings + migration | **WIP** (migration API landed; 2/2 unit tests; contract probe wired; consent/rollback pending) | tests/migration/, docs/release/MIGRATION.md, docs/security/V2_SECURITY_REVIEW.md |
 | G5 | Previews/OCR/clipboard/browser/git/actions | NOT STARTED | — |
-| G6 | Agent sidecar opt-in | NOT STARTED | — |
+| G6 | Agent runtime (Pi CLI; replaces Hermes) | **WIP** — Pi backend landed; security review complete (docs/security/PI_AGENT_SECURITY.md); Tauri wiring + Workflows UI pending; must-fixes PI-SEC-01..06 open | crates/ps-agent/src/pi/**, docs/agent/PI_INTEGRATION.md, docs/security/PI_AGENT_SECURITY.md |
 | G7 | Installer, updater, visual audit, RC | NOT STARTED | — |
 
 ## 1. Preconditions (all must be true before building a release)
@@ -23,6 +23,7 @@ without explicit user authorisation.
 - [ ] git status clean; Cargo.lock + apps/desktop/package-lock.json committed.
 - [ ] CI green on the release commit (fmt, clippy -D warnings, workspace tests, frontend build).
 - [ ] Security gate: legacy API key rotated (S-01); secret scan clean; no embedded/shared keys.
+- [ ] Pi must-fixes PI-SEC-01..06 closed and Tauri wiring reviewed before enabling agent workflows.
 - [ ] Migration contract test passes (fixture + opt-in real-DB READ-ONLY dry run recorded).
 - [ ] Migration review must-fixes V2-01/V2-02/V2-03 addressed before G4 acceptance.
 - [ ] Known limitations reviewed and updated.
@@ -54,6 +55,9 @@ without explicit user authorisation.
 - [ ] No AI keys imported without consent; no logs/clipboard migrated silently.
 
 ## 5. Security and privacy
+- [ ] Pi: read-only default verified in argv; --no-mcp/--no-extensions/--no-skills/
+      --no-prompt-templates/--no-context-files defaults applied; final Output redacted; minimal
+      child env; UI discloses no per-tool approval / no sandbox / provider egress.
 
 - [ ] cargo audit / cargo deny clean or documented exceptions.
 - [ ] Secret scan clean; no secrets in artifacts/logs.

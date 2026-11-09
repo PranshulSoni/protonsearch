@@ -1,7 +1,6 @@
-@import "../app/app-scale.css";
 
 /* First-run onboarding. Colours/type/motion from tokens.css.
-   Rail 240 px at desktop widths; hidden <=760; card min-height 560. */
+   Rail 240 px at desktop widths; hidden <=700; card min-height clamps to the window. */
 
 .onboarding-stage {
   display: flex;
@@ -69,7 +68,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 7px 0;
+  min-height: 56px;
+  padding: 0;
   color: var(--ps-ink-3);
   font-size: var(--ps-text-small);
   font-weight: var(--ps-fw-semibold);
@@ -80,8 +80,8 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 25px;
-  height: 25px;
+  width: 28px;
+  height: 28px;
   border: var(--ps-border) solid var(--ps-line-strong);
   border-radius: var(--ps-radius-full);
   color: var(--ps-ink-2);

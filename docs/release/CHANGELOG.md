@@ -30,6 +30,11 @@ Internal Gate-0/Gate-1 scaffold. No installer, no signed artifacts, no public re
   (migration unit tests 2/2 pass).
 - docs/security/V2_SECURITY_REVIEW.md: security review of migration, engine, Tauri command
   surface, ps-windows and ps-content (V2-01...V2-12; no criticals; must-fixes listed).
+- Pi coding-agent CLI backend (crates/ps-agent/src/pi): one-shot pi --mode json runs, read-only
+  tool allowlist by default, writes/shell opt-in, timeouts/tree kill, redaction, offline tests.
+  Legacy Hermes runtime dropped; Pydantic sidecar kept as optional fallback (G6 WIP).
+- docs/security/PI_AGENT_SECURITY.md: Pi threat model, code-verified controls and release gates
+  (PI-SEC-01..15; must-fix items before UI enablement).
 - Release documentation set: BUILD, MIGRATION, SECURITY, KNOWN_LIMITATIONS,
   THIRD_PARTY_LICENSES, RELEASE_CHECKLIST, CHANGELOG (this file).
 
@@ -49,7 +54,8 @@ Internal Gate-0/Gate-1 scaffold. No installer, no signed artifacts, no public re
   (review V2-01/V2-02/V2-03).
 - No v2 artifact built/run; installer unsigned; lockfiles untracked; CI red by design.
 - Frontend vitest suites are landing with the UI work; no E2E/coverage gate yet; transient TS errors while UI agents edit.
-- Agent sidecar is not yet a committed manifest-managed component.
+- Pi backend is not yet wired into the Tauri shell at review time (PI-SEC-10); must-fixes
+  PI-SEC-01..06 pending (MCP/extensions/context, final-Output redaction, env, UI disclosure).
 - Sandbox test environment requires PROTONSEARCH_DATA_DIR (see BUILD.md section 3).
 
 ### Notes

@@ -33,16 +33,43 @@ limitation at the time of writing (2026-11-09); remove an entry only with eviden
     performance claims. Legacy baseline numbers only (docs/audit/GATE0_BASELINE.md).
 12. **Legacy app runtime was not exercised** (GUI not launched by rule); legacy "working"
     claims are code/test/DB evidence only.
-13. **Agent sidecar** is not committed as a manifest-managed component (agent-sidecar/.venv and
-    logs exist locally; the directory is excluded from the workspace). pydantic-ai is installed
-    in that local venv (2.66.0, MIT) but there is no committed pyproject.toml yet.
-14. **AI is opt-in and not wired** in v2; no embedded/shared keys will ship.
+13. **Agent runtime:** Pi backend landed (crates/ps-agent/src/pi; read-only default, writes
+    opt-in) and the security review is docs/security/PI_AGENT_SECURITY.md. At review time the
+    Tauri shell still ran the legacy Pydantic client, so Pi was not yet reachable from the UI.
+    Pi must-fixes PI-SEC-01..06 are pending (see below). The legacy Pydantic sidecar remains an
+    optional fallback with no committed pyproject.toml.
+14. **AI/agent is opt-in** (settings.agent.enabled default false) and no embedded/shared keys
+    ship. Pi is an external prerequisite (installed CLI, Node >= 22.19); it is not bundled.
 15. **Clipboard capture is opt-in/off by default** (privacy.clipboard_history=false). Capture,
     search and image storage exist in ps-sources/ps-windows, but source-app exclusions, TTL,
     DPAPI encryption and the capture UI are follow-ups.
 16. **OCR pipeline** (Windows.Media.Ocr) is planned (G5); no v2 OCR evidence yet.
 17. **No telemetry/crash reporting** — intentionally absent; support relies on local logs that
     must be redacted before sharing.
+
+## Pi agent runtime (G6) — limitations and residual risks
+
+- **External prerequisite:** Pi CLI is the user's installed @earendil-works/pi-coding-agent
+  (verified 1.5.0, MIT) with Node >= 22.19; it is not bundled. Resolution prefers settings.pi_path
+  / PROTONSEARCH_PI_PATH / ~/.pi/agent/bin/pi.cmd, then PATH.
+- **No OS sandbox and no per-tool approval** (Pi design): the allowlist limits which tools are
+  offered, not what the process can reach; writes are all-or-nothing opt-in; a prompt-injected
+  model can read any readable file (and edit/run commands when writes are enabled). Container/VM/
+  dedicated account is recommended for high assurance.
+- **Not yet wired into the Tauri shell at review time** (PI-SEC-10); Workflows UI enablement waits
+  for reviewed wiring + must-fixes.
+- **Pending must-fixes (PI_AGENT_SECURITY.md):** --no-mcp (MCP tools survive the allowlist),
+  --no-extensions/--no-skills/--no-prompt-templates (user extensions execute in-process),
+  --no-context-files (AGENTS.md/CLAUDE.md load despite --no-approve), final-Output redaction,
+  minimal child environment (unrelated credentials inherited), startup network/telemetry flags.
+- **Sessions/logs:** --no-session is passed (no Pi session files); support files live under
+  <data_dir>/agent. Pi's own auth store/caches (~/.pi/agent) are outside v2 data management and
+  are neither read nor written by ProtonSearch.
+- **Real model/provider path UNVERIFIED:** no credentials on the audit host (auth.json empty);
+  tests use an offline fake Pi JSONL stream. Provider auth, MCP, extension and telemetry behavior
+  beyond Pi docs are unverified.
+- **maxSteps is ignored** (Pi has no equivalent); runs are bounded by idle/run timeouts instead.
+- **Test-only binary:** crates/ps-agent/src/bin/ps_agent_fake_pi.rs must not ship (G7 packaging).
 
 ## Environment
 18. **Sandbox %APPDATA% constraint (test environment only):** child processes cannot write
@@ -56,7 +83,8 @@ limitation at the time of writing (2026-11-09); remove an entry only with eviden
 
 ## Alpha cuts (deliberate, not shipped in v2.0.0-alpha.1)
 
-- No AI sidecar is bundled and no API keys are embedded; AI/Hermes is opt-in and not shipped.
+- No AI agent runtime is bundled and no API keys are embedded; the Pi CLI is an external,
+   opt-in prerequisite (legacy Hermes dropped; Pydantic sidecar kept as fallback).
 - No self-updater and no code signing; the installer is unsigned (see Below).
 - No plugin/extension ecosystem (internal ps-sources only).
 - No privileged USN/MFT volume indexer; v2 indexes user-selected roots in user space.
@@ -69,5 +97,6 @@ limitation at the time of writing (2026-11-09); remove an entry only with eviden
 
 See docs/security/V2_SECURITY_REVIEW.md "Resolved in tree": V2-01/02/03/04/05/06/09 are fixed or
 mitigated; residual items are V2-07 (clipboard DIB pixel cap, assigned), V2-08 (app-target
-validation depth), V2-10 (activity-log retention UX). Legacy release gates remain: rotate the
-leaked AI key (S-01) and replace the unsigned updater (S-02) before any public build.
+validation depth), V2-10 (activity-log retention UX). Pi must-fixes are listed in
+PI_AGENT_SECURITY.md and the Pi section above. Legacy release gates remain: rotate the leaked AI
+key (S-01) and replace the unsigned updater (S-02) before any public build.

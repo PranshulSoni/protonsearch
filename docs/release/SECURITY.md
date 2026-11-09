@@ -29,6 +29,35 @@ builds (V2-05), clipboard opt-in by default (V2-06), migration URI encoding (V2-
 risks: clipboard DIB pixel cap (V2-07), app-target validation depth (V2-08), activity-log
 retention UX (V2-10). See the review document for file:line evidence.
 
+## 1c. Pi agent runtime — replaces legacy Hermes (G6)
+
+The v2 agent runtime is the installed Pi coding-agent CLI (replaces Hermes; the embedded
+Pydantic AI sidecar is kept as an optional fallback). Full review:
+docs/security/PI_AGENT_SECURITY.md. Code-verified controls: read-only tool allowlist by default
+(read,grep,find,ls), writes/shell only with persisted settings.agent.allow_writes, prompt sent
+via stdin (never the command line), CREATE_NO_WINDOW, 4 MiB JSONL cap, idle 120 s / max 15 min
+timeouts, taskkill /T tree cancellation, redacted stderr/tool previews, no API keys read by
+ProtonSearch.
+
+Must-fix before Pi is reachable from the Workflows UI or any public build (details and
+file:line in the review):
+1. PI-SEC-01 (HIGH): pass --no-mcp (and mcp__* exclusion); Pi keeps MCP tools otherwise, so the
+   read-only contract is currently incomplete on machines with MCP servers configured.
+2. PI-SEC-02: pass --no-extensions --no-skills --no-prompt-templates by default; user-level
+   extensions execute in-process with user permissions.
+3. PI-SEC-04: redact the final assistant Output (currently only previews/stderr/errors are
+   redacted) and broaden secret shapes.
+4. PI-SEC-05: inherit a minimal child environment (provider vars + system essentials) or
+   explicitly warn; unrelated credentials are currently inherited.
+5. PI-SEC-11: disclose in the UI that Pi has no per-tool approval and no OS sandbox; writes are
+   all-or-nothing opt-in; provider data leaves the machine when a workflow runs.
+6. PI-SEC-10: review the Tauri wiring when it lands and enforce persisted allow_writes only.
+
+Should-fix: PI-SEC-03 (--no-context-files), PI-SEC-06 (PI_OFFLINE/PI_SKIP_VERSION_CHECK/
+PI_TELEMETRY=0), PI-SEC-07 (launcher path policy), PI-SEC-08 (probe cache/capture cap),
+PI-SEC-09 (Job Object kill-on-close). High assurance: run Pi in a container/VM or dedicated
+account (Pi docs containerization.md).
+
 ## 2. v2 security requirements (release gates)
 
 1. **No secrets in the repo or build artifacts.** CI secret scan must pass. No embedded or
