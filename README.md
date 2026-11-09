@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/brand/protonsearch-mark.svg" width="96" height="96" alt="ProtonSearch logo" /></p>
+
 # ProtonSearch
 
 **Find anything on your PC from one keyboard shortcut — files, folders, documents, apps, actions, clipboard, browser history, Git activity and (optionally) text inside screenshots.**
@@ -60,6 +62,16 @@ ProtonSearch.exe (Tauri 2 host, Rust)
 ```
 
 Design decisions and trade-offs are recorded in `docs/adr/`. The interface follows `protonsearch-v2-ui-reference.html` and `docs/design/` (tokens, screens, keyboard/accessibility).
+
+## Brand assets (single source of truth)
+
+Every ProtonSearch logo — exe/taskbar/tray icon, window icon, installer icon, installer header/sidebar artwork, WebView favicons and the in-app mark — is generated from `assets/brand/protonsearch-mark.svg`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-brand-assets.ps1
+```
+
+That script renders the app icon source, regenerates all platform icon sizes (`npx tauri icon`), creates the favicons and the NSIS installer artwork, and installs `favicon.ico`. Re-run it and rebuild to update the logo *everywhere*; no other file needs to be edited.
 
 ## Build and run (Windows)
 

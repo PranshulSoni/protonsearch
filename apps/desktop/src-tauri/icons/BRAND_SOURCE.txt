@@ -1,0 +1,1 @@
+Rendered from assets/brand/protonsearch-mark.svg by tools/brand/render-brand-assets.mjs

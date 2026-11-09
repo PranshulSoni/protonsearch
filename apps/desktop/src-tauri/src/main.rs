@@ -22,10 +22,22 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow, Webvie
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 const LAUNCHER_LABEL: &str = "launcher";
+/// Incremented on every summon/dismiss; a pending safety-hide only runs when the
+/// generation is unchanged (design: re-summon must never be hidden mid-open).
+static LAUNCHER_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 const MAIN_LABEL: &str = "main";
-const LAUNCHER_WIDTH: f64 = 820.0;
-const LAUNCHER_PREVIEW_WIDTH: f64 = 1180.0;
+const LAUNCHER_CARD_WIDTH: f64 = 820.0;
+const LAUNCHER_PREVIEW_CARD_WIDTH: f64 = 1180.0;
 const LAUNCHER_DEFAULT_HEIGHT: f64 = 520.0;
+/// Transparent breathing room around the launcher card so the CSS shadow is
+/// never clipped by the native window edge. 28 logical px on every side.
+const LAUNCHER_SHADOW_PAD: f64 = 28.0;
+fn launcher_window_width(preview: bool) -> f64 {
+    (if preview { LAUNCHER_PREVIEW_CARD_WIDTH } else { LAUNCHER_CARD_WIDTH }) + LAUNCHER_SHADOW_PAD * 2.0
+}
+fn launcher_window_height(content_height: f64) -> f64 {
+    content_height + LAUNCHER_SHADOW_PAD * 2.0
+}
 
 struct AppState {
     engine: Arc<Engine>,
@@ -64,16 +76,37 @@ fn show_launcher_window(app: &AppHandle) {
     let Some(win) = app.get_webview_window(LAUNCHER_LABEL) else {
         return;
     };
+    // Cancel any pending dismissal from a previous close animation.
+    LAUNCHER_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let scale = win.scale_factor().unwrap_or(1.0);
     let size = win
         .inner_size()
-        .map(|s| (s.width as f64 / win.scale_factor().unwrap_or(1.0), s.height as f64 / win.scale_factor().unwrap_or(1.0)))
-        .unwrap_or((LAUNCHER_WIDTH, LAUNCHER_DEFAULT_HEIGHT));
+        .map(|s| (s.width as f64 / scale, s.height as f64 / scale))
+        .unwrap_or((launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT)));
     place_launcher(app, &win, size.0, size.1);
     let _ = win.show();
     let _ = win.set_focus();
     let _ = win.emit("launcher:summoned", ());
 }
 
+/// Ask the launcher to play its exit animation; the frontend calls
+/// hide_launcher once the animation finished (0 ms in reduced motion).
+fn dismiss_launcher(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(LAUNCHER_LABEL) {
+        let generation = LAUNCHER_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+        let _ = win.emit("launcher:dismiss", ());
+        // Safety net: if the renderer is wedged the window must still disappear,
+        // but never hide a launcher that was re-summoned in the meantime.
+        let handle = win.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            if LAUNCHER_GENERATION.load(std::sync::atomic::Ordering::SeqCst) == generation {
+                let _ = handle.hide();
+                let _ = handle.emit("launcher:hidden", ());
+            }
+        });
+    }
+}
 fn hide_launcher_window(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(LAUNCHER_LABEL) {
         let _ = win.hide();
@@ -86,7 +119,8 @@ fn toggle_launcher(app: &AppHandle) {
         let visible = win.is_visible().unwrap_or(false);
         let focused = win.is_focused().unwrap_or(false);
         if visible && focused {
-            hide_launcher_window(app);
+            // Let the UI play its exit animation before the window disappears.
+            dismiss_launcher(app);
         } else {
             show_launcher_window(app);
         }
@@ -110,13 +144,15 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit ProtonSearch", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &search, &pause, &resume, &sep, &quit])?;
 
-    let mut builder = TrayIconBuilder::with_id("protonsearch-tray")
+    // Explicit tray icon: never depend on default_window_icon(), which can be
+    // absent and would silently produce an invisible tray entry.
+    let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
+        .map_err(|err| tauri::Error::AssetNotFound(err.to_string()))?;
+    let builder = TrayIconBuilder::with_id("protonsearch-tray")
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("ProtonSearch");
-    if let Some(icon) = app.default_window_icon().cloned() {
-        builder = builder.icon(icon);
-    }
+        .tooltip("ProtonSearch — Alt+Space to search")
+        .icon(tray_icon);
     builder
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_main_window(app),
@@ -156,6 +192,13 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 /// Test-only escape hatch: when PROTONSEARCH_CDP_PORT is set the WebView2
 /// renderer opens a loopback DevTools socket so the E2E harness can drive the
 /// real app (screenshots + latency). Not set in production; loopback only.
+/// The embedded app icon (PNG). Used for both windows so the title bar and
+/// taskbar entries are never blank, independent of bundle icon resolution.
+fn window_icon() -> tauri::Result<tauri::image::Image<'static>> {
+    tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
+        .map_err(|err| tauri::Error::AssetNotFound(err.to_string()))
+}
+
 fn cdp_browser_args() -> Option<String> {
     // Debug builds only: a release binary must never expose a CDP socket.
     if !cfg!(debug_assertions) {
@@ -195,6 +238,18 @@ fn create_windows(app: &AppHandle) -> tauri::Result<()> {
             main_builder = main_builder.data_directory(dir.clone());
         }
         let main = main_builder.build()?;
+        let _ = main.set_icon(window_icon()?);
+        // Clamp the desktop window to the current monitor (design review L5):
+        // never let the caption buttons or bottom edge fall outside the work area.
+        if let Ok(Some(monitor)) = main.current_monitor() {
+            let scale = monitor.scale_factor();
+            let mw = monitor.size().width as f64 / scale;
+            let mh = monitor.size().height as f64 / scale;
+            let width = 1180.0_f64.min(mw - 48.0).max(560.0);
+            let height = 800.0_f64.min(mh - 96.0).max(480.0);
+            let _ = main.set_size(tauri::LogicalSize::new(width, height));
+            let _ = main.center();
+        }
         let win = main.clone();
         main.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -212,7 +267,7 @@ fn create_windows(app: &AppHandle) -> tauri::Result<()> {
             tauri::WebviewUrl::App("index.html".into()),
         )
         .title("ProtonSearch")
-        .inner_size(LAUNCHER_WIDTH, LAUNCHER_DEFAULT_HEIGHT)
+        .inner_size(launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT))
         .min_inner_size(560.0, 160.0)
         .decorations(false)
         .transparent(true)
@@ -228,12 +283,12 @@ fn create_windows(app: &AppHandle) -> tauri::Result<()> {
             launcher_builder = launcher_builder.data_directory(dir.clone());
         }
         let launcher = launcher_builder.build()?;
-        place_launcher(app, &launcher, LAUNCHER_WIDTH, LAUNCHER_DEFAULT_HEIGHT);
+        let _ = launcher.set_icon(window_icon()?);
+        place_launcher(app, &launcher, launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT));
         let launcher_for_focus = launcher.clone();
         launcher.on_window_event(move |event| {
             if let tauri::WindowEvent::Focused(false) = event {
-                let _ = launcher_for_focus.hide();
-                let _ = launcher_for_focus.emit("launcher:hidden", ());
+                let _ = launcher_for_focus.emit("launcher:dismiss", ());
             }
         });
     }
@@ -363,17 +418,26 @@ fn set_launcher_geometry(
     height: f64,
     preview: bool,
 ) -> Result<(), String> {
-    let width = if preview { LAUNCHER_PREVIEW_WIDTH } else { LAUNCHER_WIDTH };
-    let height = height.clamp(160.0, 760.0);
+    // `height` is the CARD content height reported by the UI; the native window
+    // adds transparent padding for the shadow.
+    let content_height = height.clamp(160.0, 760.0);
+    let width = launcher_window_width(preview);
+    let window_height = launcher_window_height(content_height);
     window
-        .set_size(tauri::LogicalSize::new(width, height))
+        .set_size(tauri::LogicalSize::new(width, window_height))
         .map_err(|e| e.to_string())?;
-    place_launcher(&app, &window, width, height);
+    place_launcher(&app, &window, width, window_height);
     Ok(())
 }
 
 #[tauri::command]
 fn hide_launcher(app: AppHandle) {
+    hide_launcher_window(&app);
+}
+
+/// The UI finished its close animation (or reduced motion is on).
+#[tauri::command]
+fn launcher_hidden(app: AppHandle) {
     hide_launcher_window(&app);
 }
 
@@ -598,6 +662,7 @@ fn main() {
             index_command,
             set_launcher_geometry,
             hide_launcher,
+            launcher_hidden,
             show_launcher,
             show_main,
             quit_app,
