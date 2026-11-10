@@ -504,3 +504,18 @@ Raw JSON: [task64-payload-split-617b6df.json](./results/task64-payload-split-617
 | payloadChars p50 | 46,342 | 46,342 (unchanged) |
 
 The debounce fix **materially improved typing**: per-keystroke tail dropped from ~106-108 ms to ~42-56 ms (~50-60% faster), and single-input-event latency halved (p50 15.8 -> 8.5 ms). Remaining ~40-50 ms per steady-state keystroke is still dominated by UI-side work (24 ms debounce + IPC ~7-9 ms + full result-list commit/paint); two of fourteen rows still show no result-signature change within 500 ms when a prefix does not change the result set (measurement caveat, not a regression). Raw JSON: [task64-payload-split-364be8a.json](./results/task64-payload-split-364be8a.json). Card press>0 rows in this run are still probe artifacts (350 ms switch guard vs 300 ms spacing) - ignored per engine-core.
+
+**Update 2: debounce removed + memoized rows + single shown listener (commit dee5617, final).** Re-measured with the final frontend dist (debug+CDP for typing; forced-fresh native release for marks/frames):
+
+| Measurement | 364be8a (24 ms debounce) | dee5617 (no debounce, memoized rows) |
+|---|---:|---:|
+| Single input event input->first-visible | p50 8.5 / p95 16.9 ms | **p50 8.8 / p95 20.5 ms (n=12, min 7.7)** |
+| Steady-state subsequent keystroke (50 ms spacing) | ~42-56 ms (change ~36-45 ms) | **~24-26 ms (change ~10-14 ms)**; first char 8.3-17.4 ms |
+| island-typing frontend marks | 32.7-49.0 ms | **4-28.7 ms (mostly 4-12 ms after the first)** |
+| direct invoke wall / engine took_ms | 9.0 / ~1.2 ms p50 | 6.7 / ~1.2 ms p50 (payload p50 46,344 chars, unchanged) |
+
+The steady-state typing tail is now **~24-26 ms per keystroke, down from ~106-108 ms at 617b6df (-77%)** and matches the predicted IPC+render range. Two of fourteen rows still show no result-signature change within 500 ms when the prefix does not change the result set (caveat).
+
+**Native release mark verification (dee5617, forced-fresh release build):** the earlier "no frontend marks" report was **stale embedded assets** - removing target/release/build/protonsearch-v2-* and the release exe and relinking produced a build with frontend marks. Verified in a release session: exactly **1 island-open mark per open** (n=50, p50 8.3 / p95 8.5 / p99 41.5 / drop 1 / long 0), one **island-typing** mark 17.2 ms, and one **island-switch** mark per switch: search>media p50 8.3/p95 8.5/drop 1, media>clipboard 8.3/8.5/drop 1, clipboard>agent 8.3/8.5/drop 1. No duplicate marks (the old 10-20 duplicates per open are gone). Native release open latency: win32 visible 18.2 ms, island-open frame mark p50 8.3 ms; one **ui-stall-54ms** still appears on the open path. This run's app process was torn down externally before the close/memory sections (memory snapshots returned 0 procs), so close-mark and memory numbers are not from this run - use the 617b6df memory table above (memory code path unchanged) and re-verify close mark separately.
+
+**Release-build embedding caveat (for the installer):** a plain rebuild after a frontend change may keep STALE embedded assets (we reproduced the missing-marks state twice); forcing removal of target/release/build/protonsearch-v2-* and the release exe (plus a main.rs touch / clean of the app crate) was required before frontend marks appeared. The installer build should force that or verify a frontend mark in a release run.

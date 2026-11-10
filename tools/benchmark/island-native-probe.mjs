@@ -84,6 +84,13 @@ function setPrimary(mode) {
   writeFileSync(p, JSON.stringify(d, null, 2));
 }
 function pidTreeRoot() { return report.conditions.appPid; }
+function isAlive(pid) { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (e) { return Boolean(e && e.code === "EPERM"); } }
+function readAllMarks() {
+  let text = ""; try { text = readFileSync(MARKS, "utf8"); } catch (e) { return []; }
+  const out = [];
+  for (const line of text.split(/\r?\n/)) { if (!line.trim()) continue; try { out.push(JSON.parse(line)); } catch (e) { /* partial */ } }
+  return out;
+}
 
 const report = {
   schema: "ps-island-native/1",
@@ -128,9 +135,13 @@ async function main() {
       win32VisibleMs: openWin && openWin.visibleMs != null ? openWin.visibleMs : null,
       marks: openMarks.map((m) => m.label),
       frame: openMarks.map((m) => parseFrameMark(m.label)).find((p) => p.name === "island-open") || null,
+      islandOpenMarkCount: openMarks.filter((m) => m.label.startsWith("island-open")).length,
       windowShown: openMarks.filter((m) => m.label === "island-window-shown").length,
+      firstPaint: openMarks.filter((m) => m.label === "island-first-paint").length,
+      uiStalls: openMarks.filter((m) => m.label.startsWith("ui-stall")).map((m) => m.label),
     };
     report.measurements.memoryVisible = await memorySnapshot(app.pid, "visible-after-open");
+    report.aliveAfterOpen = isAlive(app.pid);
 
     // Typing latency inside the island search card. Click the compact search
     // area first: SendKeys goes to the focused control, and after a hotkey show
@@ -142,7 +153,7 @@ async function main() {
     await sendKeys("arch");
     await sleep(700);
     const typingMarks = readMarksSince().concat(beforeTyping).filter((m) => m.label.startsWith("island-typing"));
-    report.measurements.typing = { marks: typingMarks.map((m) => m.label), ms: typingMarks.map((m) => { const mm = m.label.match(/ms=([0-9.]+)/); return mm ? +mm[1] : null; }).filter((v) => v != null) };
+    report.measurements.typing = { marks: typingMarks.map((m) => m.label), markCount: typingMarks.length, ms: typingMarks.map((m) => { const mm = m.label.match(/ms=([0-9.]+)/); return mm ? +mm[1] : null; }).filter((v) => v != null), msSummary: summarize(typingMarks.map((m) => { const mm = m.label.match(/ms=([0-9.]+)/); return mm ? +mm[1] : null; }).filter((v) => v != null)) };
 
     // Card switch sweep: Ctrl+ArrowDown through the ordered cards.
     const sweep = [];
@@ -156,7 +167,9 @@ async function main() {
       const parsed = parseFrameMark(m.label);
       sweep.push({ switch: parsed.name, stats: parsed.kv, epochMs: m.epochMs });
     }
+    report.aliveAfterSweep = isAlive(app.pid);
     report.measurements.cardSwitchSweep = sweep;
+    report.measurements.cardSwitchSweepCount = { marks: sweep.length, switches: sweep.map((s) => s.switch), p50Values: sweep.map((s) => s.stats && s.stats.p50), p95Values: sweep.map((s) => s.stats && s.stats.p95), dropValues: sweep.map((s) => s.stats && s.stats.drop), longValues: sweep.map((s) => s.stats && s.stats.long) };
 
     // Esc chain: expanded card -> compact search -> hide (two presses when a
     // non-search card is active; harmless extra press if already compact).
@@ -172,6 +185,7 @@ async function main() {
     };
     await sleep(trimWaitMs);
     report.measurements.memoryHiddenAfterUseTrim = await memorySnapshot(app.pid, "hidden-after-use-trim-wait");
+    report.aliveAfterClose = isAlive(app.pid);
 
     // 20x open/close/switch growth.
     const growth = [];
@@ -189,6 +203,17 @@ async function main() {
     report.measurements.openCloseSwitchGrowth = { cycles, snapshots: growth, growthMiB: first != null && last != null ? +((last - first) / 1048576).toFixed(1) : null };
     report.measurements.uiStalls = readMarksSince().filter((m) => m.label.startsWith("ui-stall")).map((m) => ({ label: m.label, epochMs: m.epochMs }));
     report.measurements.memoryFinal = await memorySnapshot(app.pid, "final-after-growth");
+    report.aliveAtEnd = isAlive(app.pid);
+    const allMarks = readAllMarks();
+    report.measurements.uiStallsAll = allMarks.filter((m) => String(m.label).startsWith("ui-stall")).map((m) => ({ label: m.label, epochMs: m.epochMs }));
+    report.measurements.frontendMarkCounts = {
+      opens: allMarks.filter((m) => String(m.label).startsWith("island-open")).length,
+      shown: allMarks.filter((m) => m.label === "island-window-shown").length,
+      firstPaint: allMarks.filter((m) => m.label === "island-first-paint").length,
+      switches: allMarks.filter((m) => String(m.label).startsWith("island-switch")).length,
+      typing: allMarks.filter((m) => String(m.label).startsWith("island-typing")).length,
+      closes: allMarks.filter((m) => String(m.label).startsWith("island-close")).length,
+    };
     report.status = "ok";
   } catch (e) {
     report.status = "blocked"; report.blocked.push(String(e && e.stack ? e.stack : e));
@@ -200,12 +225,13 @@ async function main() {
   const cold = report.measurements.memoryColdIdle;
   if (cold) console.log("  cold idle (island prewarmed hidden): " + cold.totalWorkingSetMiB + " MiB WS / " + cold.totalPrivateMiB + " MiB private, " + cold.processCount + " procs");
   const open = report.measurements.open;
-  if (open) console.log("  open: win32 visible=" + open.win32VisibleMs + "ms; island-open frame=" + JSON.stringify(open.frame && open.frame.kv));
-  if (report.measurements.typing) console.log("  typing marks: " + JSON.stringify(report.measurements.typing.marks));
+  if (open) console.log("  open: win32 visible=" + open.win32VisibleMs + "ms; island-open marks=" + open.islandOpenMarkCount + " frame=" + JSON.stringify(open.frame && open.frame.kv) + " windowShown=" + open.windowShown + " uistalls=" + JSON.stringify(open.uiStalls));
+  if (report.measurements.typing) console.log("  typing marks (" + report.measurements.typing.markCount + "): " + JSON.stringify(report.measurements.typing.marks) + " summary=" + JSON.stringify(report.measurements.typing.msSummary));
   if (report.measurements.cardSwitchSweep) console.log("  card switches: " + report.measurements.cardSwitchSweep.length + " marks: " + JSON.stringify(report.measurements.cardSwitchSweep.map((s) => ({ s: s.switch, p50: s.stats.p50, p95: s.stats.p95, drop: s.stats.drop, long: s.stats.long }))));
   if (report.measurements.close) console.log("  close frame: " + JSON.stringify(report.measurements.close.frame && report.measurements.close.frame.kv));
   if (report.measurements.memoryHiddenAfterUseTrim) console.log("  hidden after use + trim: " + report.measurements.memoryHiddenAfterUseTrim.totalWorkingSetMiB + " MiB WS / " + report.measurements.memoryHiddenAfterUseTrim.totalPrivateMiB + " MiB private");
   if (report.measurements.openCloseSwitchGrowth) console.log("  20x open/close/switch growth: " + report.measurements.openCloseSwitchGrowth.growthMiB + " MiB");
+  if (report.measurements.uiStallsAll) console.log("  all ui-stalls (" + report.measurements.uiStallsAll.length + "): " + JSON.stringify(report.measurements.uiStallsAll.map((s) => s.label)) + " alive(open/sweep/close/end)=" + report.aliveAfterOpen + "/" + report.aliveAfterSweep + "/" + report.aliveAfterClose + "/" + report.aliveAtEnd + " marks=" + JSON.stringify(report.measurements.frontendMarkCounts));
   if (report.blocked.length) console.log("  blocked: " + report.blocked.join(" | "));
   console.log("  results: " + outPath);
 }

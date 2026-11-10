@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../bridge/api";
 import { SEARCH_LIMIT } from "../launcher/launcherLayout";
 import type {
@@ -59,11 +59,11 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
     };
   }, [nonce]);
 
-  useEffect(() => {
-    const refresh = () => setNonce((value) => value + 1);
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
-  }, []);
+  // Do not refresh the entire bootstrap on every island focus: that fired six
+  // IPC calls + React commits during the open path and showed up as a 30-54 ms
+  // ui-stall. Explicit card actions still refresh via the returned callback.
+
+  const refresh = useCallback(() => setNonce((value) => value + 1), []);
 
   return {
     settings,
@@ -73,7 +73,7 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
     agentStatus,
     agentTasks,
     ready,
-    refresh: () => setNonce((v) => v + 1),
+    refresh,
   };
 }
 

@@ -1,0 +1,474 @@
+{
+  "schema": "ps-island-native/1",
+  "kind": "island-native-release-before-after",
+  "status": "ok",
+  "capturedAt": "2026-11-10T08:16:08.220Z",
+  "host": {
+    "hostname": "PranshulAsus",
+    "platform": "win32"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe",
+    "exeBytes": 21529600,
+    "exeMtime": "2026-11-10T08:15:11.923Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "cycles": 5,
+    "trimWaitMs": 6000,
+    "coldWaitMs": 12000,
+    "gitHead": "dee56170dbe458fcf72223adef9a5e79aa28ff60",
+    "gitDirty": 1,
+    "appPid": 40304
+  },
+  "measurements": {
+    "memoryColdIdle": {
+      "label": "cold-idle-island-prewarmed-hidden",
+      "mode": "memory",
+      "rootPid": 40304,
+      "capturedAtUtc": 1794298584224,
+      "processCount": 7,
+      "totalWorkingSetBytes": 466423808,
+      "totalPrivateBytes": 228245504,
+      "processes": [
+        {
+          "pid": 40304,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 54173696,
+          "privateBytes": 21671936,
+          "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe"
+        },
+        {
+          "pid": 35736,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 127356928,
+          "privateBytes": 38633472,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-"
+        },
+        {
+          "pid": 11940,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 13983744,
+          "privateBytes": 2928640,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+        },
+        {
+          "pid": 28552,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 142209024,
+          "privateBytes": 119275520,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+        },
+        {
+          "pid": 30428,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 43094016,
+          "privateBytes": 12079104,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+        },
+        {
+          "pid": 26640,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23220224,
+          "privateBytes": 8077312,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+        },
+        {
+          "pid": 31256,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 62386176,
+          "privateBytes": 25579520,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-req"
+        }
+      ],
+      "cpuSecondsTotal": 6.438,
+      "totalWorkingSetMiB": 444.8,
+      "totalPrivateMiB": 217.7
+    },
+    "coldMarks": [
+      {
+        "label": "ui-stall-1318ms",
+        "epochMs": 1794298571496,
+        "writtenAt": 1794298571496
+      }
+    ],
+    "open": {
+      "win32VisibleMs": 20.442,
+      "marks": [
+        "island-window-shown",
+        "ui-stall-54ms"
+      ],
+      "frame": null,
+      "islandOpenMarkCount": 0,
+      "windowShown": 1,
+      "firstPaint": 0,
+      "uiStalls": [
+        "ui-stall-54ms"
+      ]
+    },
+    "memoryVisible": {
+      "label": "visible-after-open",
+      "mode": "memory",
+      "rootPid": 40304,
+      "capturedAtUtc": 1794298587456,
+      "processCount": 7,
+      "totalWorkingSetBytes": 470978560,
+      "totalPrivateBytes": 229011456,
+      "processes": [
+        {
+          "pid": 40304,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 58023936,
+          "privateBytes": 22011904,
+          "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe"
+        },
+        {
+          "pid": 35736,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 127811584,
+          "privateBytes": 38920192,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-"
+        },
+        {
+          "pid": 11940,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 13983744,
+          "privateBytes": 2928640,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+        },
+        {
+          "pid": 28552,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 142225408,
+          "privateBytes": 119275520,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+        },
+        {
+          "pid": 30428,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 43094016,
+          "privateBytes": 12079104,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+        },
+        {
+          "pid": 26640,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23220224,
+          "privateBytes": 8077312,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+        },
+        {
+          "pid": 31256,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 62619648,
+          "privateBytes": 25718784,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-req"
+        }
+      ],
+      "cpuSecondsTotal": 6.562,
+      "totalWorkingSetMiB": 449.2,
+      "totalPrivateMiB": 218.4
+    },
+    "typing": {
+      "marks": [],
+      "markCount": 0,
+      "ms": [],
+      "msSummary": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null
+      }
+    },
+    "cardSwitchSweep": [],
+    "cardSwitchSweepCount": {
+      "marks": 0,
+      "switches": [],
+      "p50Values": [],
+      "p95Values": [],
+      "dropValues": [],
+      "longValues": []
+    },
+    "close": {
+      "frame": null,
+      "marks": []
+    },
+    "memoryHiddenAfterUseTrim": {
+      "label": "hidden-after-use-trim-wait",
+      "mode": "memory",
+      "rootPid": 40304,
+      "capturedAtUtc": 1794298605128,
+      "processCount": 7,
+      "totalWorkingSetBytes": 469532672,
+      "totalPrivateBytes": 212287488,
+      "processes": [
+        {
+          "pid": 40304,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 58040320,
+          "privateBytes": 21975040,
+          "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe"
+        },
+        {
+          "pid": 35736,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 132640768,
+          "privateBytes": 39452672,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-"
+        },
+        {
+          "pid": 11940,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 22532096,
+          "privateBytes": 3903488,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+        },
+        {
+          "pid": 28552,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 125423616,
+          "privateBytes": 100745216,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+        },
+        {
+          "pid": 30428,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 43024384,
+          "privateBytes": 11984896,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+        },
+        {
+          "pid": 26640,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23220224,
+          "privateBytes": 8077312,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+        },
+        {
+          "pid": 31256,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 64651264,
+          "privateBytes": 26148864,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-req"
+        }
+      ],
+      "cpuSecondsTotal": 7.812,
+      "totalWorkingSetMiB": 447.8,
+      "totalPrivateMiB": 202.5
+    },
+    "openCloseSwitchGrowth": {
+      "cycles": 5,
+      "snapshots": [
+        {
+          "cycle": 0,
+          "label": "growth-base",
+          "mode": "memory",
+          "rootPid": 40304,
+          "capturedAtUtc": 1794298605897,
+          "processCount": 7,
+          "totalWorkingSetBytes": 469532672,
+          "totalPrivateBytes": 212287488,
+          "processes": [
+            {
+              "pid": 40304,
+              "name": "ProtonSearch.exe",
+              "wsBytes": 58040320,
+              "privateBytes": 21975040,
+              "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe"
+            },
+            {
+              "pid": 35736,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 132640768,
+              "privateBytes": 39452672,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-"
+            },
+            {
+              "pid": 11940,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 22532096,
+              "privateBytes": 3903488,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+            },
+            {
+              "pid": 28552,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 125423616,
+              "privateBytes": 100745216,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+            },
+            {
+              "pid": 30428,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 43024384,
+              "privateBytes": 11984896,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+            },
+            {
+              "pid": 26640,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 23220224,
+              "privateBytes": 8077312,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+            },
+            {
+              "pid": 31256,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 64651264,
+              "privateBytes": 26148864,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-req"
+            }
+          ],
+          "cpuSecondsTotal": 7.812,
+          "totalWorkingSetMiB": 447.8,
+          "totalPrivateMiB": 202.5
+        },
+        {
+          "cycle": 5,
+          "label": "growth-5",
+          "mode": "memory",
+          "rootPid": 40304,
+          "capturedAtUtc": 1794298655923,
+          "processCount": 7,
+          "totalWorkingSetBytes": 136151040,
+          "totalPrivateBytes": 207286272,
+          "processes": [
+            {
+              "pid": 40304,
+              "name": "ProtonSearch.exe",
+              "wsBytes": 58347520,
+              "privateBytes": 21983232,
+              "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe"
+            },
+            {
+              "pid": 35736,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 40189952,
+              "privateBytes": 41099264,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-"
+            },
+            {
+              "pid": 11940,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 17387520,
+              "privateBytes": 3551232,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+            },
+            {
+              "pid": 28552,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 10149888,
+              "privateBytes": 96727040,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+            },
+            {
+              "pid": 30428,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 2826240,
+              "privateBytes": 11726848,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+            },
+            {
+              "pid": 26640,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 929792,
+              "privateBytes": 7913472,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+            },
+            {
+              "pid": 31256,
+              "name": "msedgewebview2.exe",
+              "wsBytes": 6320128,
+              "privateBytes": 24285184,
+              "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-req"
+            }
+          ],
+          "cpuSecondsTotal": 13.016,
+          "totalWorkingSetMiB": 129.8,
+          "totalPrivateMiB": 197.7
+        }
+      ],
+      "growthMiB": -317.9
+    },
+    "uiStalls": [
+      {
+        "label": "ui-stall-34ms",
+        "epochMs": 1794298619603
+      },
+      {
+        "label": "ui-stall-30ms",
+        "epochMs": 1794298637688
+      }
+    ],
+    "memoryFinal": {
+      "label": "final-after-growth",
+      "mode": "memory",
+      "rootPid": 40304,
+      "capturedAtUtc": 1794298656649,
+      "processCount": 7,
+      "totalWorkingSetBytes": 136699904,
+      "totalPrivateBytes": 207826944,
+      "processes": [
+        {
+          "pid": 40304,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 58347520,
+          "privateBytes": 21983232,
+          "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe"
+        },
+        {
+          "pid": 35736,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 40693760,
+          "privateBytes": 41639936,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-"
+        },
+        {
+          "pid": 11940,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 17387520,
+          "privateBytes": 3551232,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+        },
+        {
+          "pid": 28552,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 10158080,
+          "privateBytes": 96727040,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+        },
+        {
+          "pid": 30428,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 2842624,
+          "privateBytes": 11726848,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+        },
+        {
+          "pid": 26640,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 942080,
+          "privateBytes": 7913472,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+        },
+        {
+          "pid": 31256,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 6328320,
+          "privateBytes": 24285184,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-req"
+        }
+      ],
+      "cpuSecondsTotal": 13.188,
+      "totalWorkingSetMiB": 130.4,
+      "totalPrivateMiB": 198.2
+    }
+  },
+  "blocked": [],
+  "limitations": [
+    "Native RELEASE run: no CDP. Frame stats come from the app's own perf marks (perfProbe.recordFrames: island-open/island-switch:*/island-close) written when PROTONSEARCH_PERF_HOOKS=1; labels carry n/p50/p95/p99/max/drop(>1.5x median)/long(>50ms).",
+    "Card switching is driven by real SendKeys Ctrl+ArrowDown on the focused island (same handler as user input); typing by SendKeys into the focused search input.",
+    "Layout/Recalc/Script attribution is NOT available natively; the BEFORE build has no frame marks at all, so BEFORE frame pacing is measured in the debug build via CDP and labelled debug. AFTER native attribution is inferred from drop/long counts + ui-stall marks.",
+    "Memory is CIM process-tree Working Set + private bytes with command lines; WebView2 roles from command lines."
+  ]
+}

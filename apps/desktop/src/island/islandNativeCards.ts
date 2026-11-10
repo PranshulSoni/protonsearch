@@ -49,12 +49,8 @@ export function useIslandControls(enabled: boolean): IslandControlsState {
     };
   }, [enabled, nonce]);
 
-  useEffect(() => {
-    if (!enabled) return;
-    const refresh = () => setNonce((value) => value + 1);
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
-  }, [enabled]);
+  // No focus-refresh: controls are probed once (prefetched) and refreshed only
+  // after explicit setters or card retry, avoiding open-path IPC work.
 
   const refresh = useCallback(() => setNonce((value) => value + 1), []);
 

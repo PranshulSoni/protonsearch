@@ -83,7 +83,6 @@ export default function IslandView() {
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const typedAtRef = useRef(0);
   const hideRef = useRef<() => void>(() => undefined);
-  const refreshRef = useRef<() => void>(() => undefined);
 
   const searchState = useIslandSearch(
     "all",
@@ -181,7 +180,6 @@ export default function IslandView() {
   }, [visibility]);
 
   hideRef.current = requestHide;
-  refreshRef.current = bootstrap.refresh;
 
   const switchCard = useCallback(
     (card: IslandCardId, nextVariant: IslandVariant = "default") => {
@@ -291,7 +289,6 @@ export default function IslandView() {
           setPhase("idle");
           setVisibility("opening");
           window.setTimeout(() => setVisibility("shown"), 180);
-          refreshRef.current();
           window.setTimeout(() => inputRef.current?.focus(), 190);
         });
         addListener(offShown);
