@@ -486,6 +486,7 @@ fn build_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let main = builder.build()?;
     let _ = main.set_icon(window_icon()?);
     set_webview_memory_level(&main, true);
+    schedule_hidden_trim(app, MAIN_LABEL);
     if let Ok(Some(monitor)) = main.current_monitor() {
         let scale = monitor.scale_factor();
         let mw = monitor.size().width as f64 / scale;
@@ -611,18 +612,37 @@ fn ensure_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     build_island_window(app)
 }
 
+/// Hidden windows warm their WebView but must not keep desktop-sized caches.
+/// Re-apply the LOW target shortly after creation (WebView2 may ignore it
+/// before the CoreWebView2 is fully initialized) so a tray-idle app settles at
+/// the trimmed working set instead of the warm one.
+fn schedule_hidden_trim(app: &AppHandle, label: &'static str) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(2500));
+        if let Some(win) = app.get_webview_window(label) {
+            if !win.is_visible().unwrap_or(false) {
+                set_webview_memory_level(&win, true);
+            }
+        }
+    });
+}
+
 /// Memory: prewarm ONLY the user's primary floating launcher. The desktop app
 /// and the alternative launcher are created lazily on first use, so an idle
 /// tray session keeps one WebView alive instead of three.
 fn create_windows(app: &AppHandle) -> tauri::Result<()> {
     let settings = app.state::<AppState>().engine.settings();
-    if settings.launcher.primary_mode == LauncherMode::DynamicIsland
+    let label = if settings.launcher.primary_mode == LauncherMode::DynamicIsland
         && settings.launcher.island.enabled
     {
         let _ = ensure_island_window(app)?;
+        ISLAND_LABEL
     } else {
         let _ = ensure_launcher_window(app)?;
-    }
+        LAUNCHER_LABEL
+    };
+    schedule_hidden_trim(app, label);
     Ok(())
 }
 
@@ -756,23 +776,17 @@ fn update_settings(
         if settings.launcher.primary_mode != previous.launcher.primary_mode {
             hide_launcher_window(&app);
             hide_island_window(&app);
+            // Create the new primary window now so the next hotkey is warm.
+            // The previous launcher window is only hidden, never destroyed:
+            // destroying a WebView2 sibling at runtime can leave the freshly
+            // created window blank on some Tauri/WebView2 builds (BUG-R3-01),
+            // and on a lazy-window build it could also be the last window.
             let wants_island = settings.launcher.primary_mode == LauncherMode::DynamicIsland
                 && settings.launcher.island.enabled;
-            // Create the new primary window BEFORE destroying the old one: in
-            // the lazy-window world the old window can be the last one alive,
-            // so destroying it first would quit the app.
             if wants_island {
                 let _ = ensure_island_window(&app);
             } else {
                 let _ = ensure_launcher_window(&app);
-            }
-            let inactive = if wants_island {
-                LAUNCHER_LABEL
-            } else {
-                ISLAND_LABEL
-            };
-            if let Some(win) = app.get_webview_window(inactive) {
-                let _ = win.destroy();
             }
         }
     }

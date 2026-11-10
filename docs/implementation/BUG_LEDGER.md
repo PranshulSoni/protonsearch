@@ -172,3 +172,17 @@ only where UI/app-level evidence is still pending (preview UI task-38; interacti
   thumbnailDataUrl 4,918 chars, image/png, 320x200; island Images tab shows real thumbnail; restart
   persistence verified). UI paste-back path remains a G8 sign-off item (harness-level paste-back
   verified).
+
+
+## 7. Round-3 observation (HEAD 5142a25, 2026-11-10)
+
+- BUG-R3-01 (P1, OPEN/TRIAGE): lazily-created Dynamic Island WebView reports about:blank and renders no
+  island UI in the debug/CDP environment on HEAD 5142a25; show_island does not navigate the island
+  target to the app UI. Desktop capture with a text window behind the island region shows no island
+  surface. Consequence: round-3 opacity/animation/notifications/Quick Settings/island-search checks are
+  blocked. Evidence: docs/qa/g8-verify-round3/ (V10_G8_VERIFICATION_ROUND3.md,
+  opacity-island-over-text.png, e2e-round3.mjs). Owner: shell/lazy-window owner; confirm natively and
+  fix or document if automation-only.
+- Positive round-3 evidence: suites green (311 Rust / 242 frontend); memory-after improved to
+  431.7 MiB WS / 203.4 MiB private idle (from 783.2 MiB before), hidden trim 238.2 to 215.5 MiB;
+  mode-switch attempt did not exit the app (full two-way confirmation pending).

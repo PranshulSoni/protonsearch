@@ -273,9 +273,10 @@ async function memoryOnlyRun() {
     await sleep(800);
     const visible = await memorySnapshot("launcher-visible");
     const marks = readMarksSince().marks.concat(since.marks);
-    const shown = markEpochs(marks, "launcher-window-shown").filter((v) => v >= ((win && win.sendAtUtc) || 0) - 400).slice(-1)[0] ?? null;
-    const paint = markEpochs(marks, "launcher-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
-    report.measurements.activationLauncher = {
+    const primaryLabel = settingsPrimary === "dynamic_island" ? "island" : "launcher";
+    const shown = markEpochs(marks, primaryLabel + "-window-shown").filter((v) => v >= ((win && win.sendAtUtc) || 0) - 400).slice(-1)[0] ?? null;
+    const paint = markEpochs(marks, primaryLabel + "-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
+    report.measurements["activation_" + settingsPrimary] = {
       win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
       win32FocusedMs: win && win.focusedMs != null ? win.focusedMs : null,
       sendToShownMs: shown != null ? +(shown - win.sendAtUtc).toFixed(2) : null,
@@ -300,7 +301,8 @@ async function memoryOnlyRun() {
   if (idle && idle.totalWorkingSetMiB != null) console.log("  idle launcher-only tree: " + idle.totalWorkingSetMiB + " MiB WS / " + idle.totalPrivateMiB + " MiB private across " + idle.processCount + " processes");
   const vt = report.measurements.visibleVsHiddenTrim;
   if (vt && vt.delta) console.log("  visible->hidden+trim: tree " + vt.visible.totalWorkingSetMiB + " -> " + vt.hiddenTrimmed.totalWorkingSetMiB + " MiB (" + vt.delta.totalDeltaMiB + " MiB), trimmed=" + vt.delta.trimmedCount);
-  if (report.measurements.activationLauncher) console.log("  launcher activation: visible p50 raw=" + report.measurements.activationLauncher.win32VisibleMs + "ms send->paint=" + report.measurements.activationLauncher.sendToPaintMs + "ms");
+  const actAny = report.measurements["activation_" + settingsPrimary];
+  if (actAny) console.log("  " + settingsPrimary + " activation: visible=" + actAny.win32VisibleMs + "ms send->paint=" + actAny.sendToPaintMs + "ms");
   if (report.blocked.length) console.log("  blocked: " + report.blocked.join(" | "));
   console.log("  results: " + outPath);
 }
@@ -636,6 +638,39 @@ async function main() {
       growthMiB: first != null && last != null ? +((last - first) / 1048576).toFixed(1) : null,
       note: "Working-set snapshot every 5 cycles; a leak is only declared if growth is monotonic and >20 MiB over 20 cycles after the first snapshot.",
     };
+    // --- Section 8: runtime primary-mode switch verification (bug-fix probe) ---
+    // The pre-fix build exited when update_settings destroyed the inactive window.
+    // The fix creates the target window first; this probe records whether the app
+    // survives a runtime switch and whether the hotkey then opens the island.
+    const switchProbe = { attempted: true };
+    try {
+      switchProbe.updateSettings = await launcher.evaluate(async () => {
+        const settings = await window.__TAURI_INTERNALS__.invoke("get_settings");
+        settings.launcher.primaryMode = "dynamic_island";
+        await window.__TAURI_INTERNALS__.invoke("update_settings", { patch: { launcher: settings.launcher } });
+        return "ok";
+      });
+      await sleep(600);
+      const since = readMarksSince();
+      let win = null;
+      try { win = await runPs(HOTKEY_PS, ["-ProcessId", String(report.conditions.appPid), "-TimeoutMs", "8000", "-Mode", "show"], 30000); } catch (e) { switchProbe.hotkeyError = String(e.message); }
+      await sleep(300);
+      const marks = readMarksSince().marks.concat(since.marks);
+      const shown = win ? (markEpochs(marks, "island-window-shown").filter((v) => v >= (win.sendAtUtc || 0) - 400).slice(-1)[0] ?? null) : null;
+      const paint = markEpochs(marks, "island-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
+      const islandPage = await waitWindow("island", 5000);
+      switchProbe.hotkey = {
+        win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
+        sendToShownMs: shown != null && win ? +(shown - win.sendAtUtc).toFixed(2) : null,
+        shownToPaintMs: shown != null && paint != null ? +(paint - shown).toFixed(2) : null,
+        sendToPaintMs: shown != null && paint != null && win ? +(paint - win.sendAtUtc).toFixed(2) : null,
+        islandPageFound: islandPage != null,
+        note: "Runtime switch to island-primary then real hotkey; pre-fix this exited the app before show_island could run.",
+      };
+    } catch (e) {
+      switchProbe.error = String(e && e.message ? e.message : e);
+    }
+    report.measurements.runtimeModeSwitch = switchProbe;
     report.measurements.memoryFinal = await memorySnapshot("final-visible-results");
     report.status = "ok";
   } catch (e) {
@@ -667,6 +702,8 @@ async function main() {
   if (typing) console.log("  island typing->results: p50=" + typing.ms.p50 + "ms p95=" + typing.ms.p95 + "ms n=" + typing.measured + "/" + typing.takes);
   const sw = report.measurements.cardSwitch;
   if (sw) console.log("  card switch: p50=" + sw.switchMs.p50 + "ms p95=" + sw.switchMs.p95 + "ms | layout=" + sw.perfAverages.layoutSec + "s recalc=" + sw.perfAverages.recalcSec + "s script=" + sw.perfAverages.scriptSec + "s resizeEvents/switch=" + sw.avgResizeEventsPerSwitch + " | attribution: " + sw.attribution);
+  const ms = report.measurements.runtimeModeSwitch;
+  if (ms) console.log("  runtime mode switch: updateSettings=" + ms.updateSettings + " hotkey visible=" + (ms.hotkey && ms.hotkey.win32VisibleMs) + "ms send->paint=" + (ms.hotkey && ms.hotkey.sendToPaintMs) + "ms islandPage=" + (ms.hotkey && ms.hotkey.islandPageFound) + (ms.error ? (" ERROR=" + ms.error) : ""));
   const lk = report.measurements.openCloseLeak;
   if (lk) console.log("  open/close leak: " + lk.cycles + "x growth=" + lk.growthMiB + " MiB, pages=" + lk.pagesAfter);
   if (report.blocked.length) console.log("  blocked: " + report.blocked.join(" | "));

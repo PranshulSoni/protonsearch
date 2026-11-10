@@ -124,3 +124,21 @@ this round's partial evidence.
   the matched-term preview highlight condition open.
 - Next: sign + verify, run installer drill on a clean VM, close highlight/UI parity and memory/input
   budgets, execute remaining pairwise/list items, then L0 public-release acceptance.
+
+
+## 9. G8 round 3 on HEAD 5142a25 (mode-switch fix) - 2026-11-10
+
+Verdict: PARTIAL. On a rebuilt HEAD: cargo workspace 311 passed / 0 failed (32 binaries, 312 running
+incl 1 pre-existing ignored); frontend 18 files / 242 tests passed; idle launcher-only memory improved
+from 783.2 MiB WS before to 431.7 MiB WS (203.4 MiB private, 7 procs; hidden trim 238.2 to 215.5 MiB)
+but remains above the ~150 MB budget (NOT MET, improved). Mode-switch no-exit was partially observed
+(app stayed alive when switching primary mode over IPC) but full two-way and hotkey-lazy-window paths
+were not conclusively verified.
+
+BLOCKER: island UI checks (opacity over text, enter/exit animation frames, notifications, Quick
+Settings, island search parity/icons) could not execute because the lazily-created island WebView
+reported about:blank and no island surface rendered in the desktop capture. Treat as a triage item
+before any installer sign-off; re-run round 3 island checks after fix/confirmation. Evidence:
+docs/qa/g8-verify-round3/V10_G8_VERIFICATION_ROUND3.md and memory-after-5142a25.json.
+
+G8 status remains conditional for local/internal alpha; do NOT sign a new installer on this round.
