@@ -100,30 +100,35 @@ export function useIslandSearch(
   useEffect(() => {
     if (!enabled) return;
     const token = ++tokenRef.current;
-    setState((current) => ({ ...current, pending: true, error: null }));
-    const timer = window.setTimeout(() => {
-      void api
-        .search({ requestId: Date.now() + token, query, scope, limit: SEARCH_LIMIT })
-        .then((response) => {
-          if (token !== tokenRef.current) return;
-          setState({
-            results: response.results,
-            total: response.total,
-            pending: false,
-            error: null,
-          });
-        })
-        .catch((error: unknown) => {
-          if (token !== tokenRef.current) return;
-          setState({
-            results: [],
-            total: 0,
-            pending: false,
-            error: error instanceof Error ? error.message : "Search is unavailable right now.",
-          });
+    // Keystroke path: no artificial debounce (the launcher searches immediately).
+    // Keep the previous rows on screen while the next response is in flight; a
+    // pending-only state update is avoided when results already exist, which
+    // removes a full list unmount/remount per keystroke.
+    setState((current) =>
+      current.pending || current.results.length > 0
+        ? current
+        : { ...current, pending: true, error: null },
+    );
+    void api
+      .search({ requestId: Date.now() + token, query, scope, limit: SEARCH_LIMIT })
+      .then((response) => {
+        if (token !== tokenRef.current) return;
+        setState({
+          results: response.results,
+          total: response.total,
+          pending: false,
+          error: null,
         });
-    }, 24);
-    return () => window.clearTimeout(timer);
+      })
+      .catch((error: unknown) => {
+        if (token !== tokenRef.current) return;
+        setState({
+          results: [],
+          total: 0,
+          pending: false,
+          error: error instanceof Error ? error.message : "Search is unavailable right now.",
+        });
+      });
   }, [enabled, scope, query]);
 
   return state;

@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEvent } from "react";
+import { memo, type KeyboardEvent, type MouseEvent } from "react";
 import type { SearchResult } from "../bridge/types";
 import { Highlight } from "../components/Highlight";
 import { resultMetaText } from "./resultMeta";
@@ -26,7 +26,7 @@ export interface SharedResultRowProps {
   onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
 }
 
-export function SharedResultRow({
+function SharedResultRowBase({
   result,
   selected,
   optionId,
@@ -81,3 +81,56 @@ export function SharedResultRow({
     </div>
   );
 }
+
+function rangesEqual(
+  a?: Array<{ start: number; end: number }>,
+  b?: Array<{ start: number; end: number }>,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((range, index) => range.start === b[index].start && range.end === b[index].end);
+}
+
+function areEqual(prev: SharedResultRowProps, next: SharedResultRowProps): boolean {
+  if (
+    prev.selected !== next.selected ||
+    prev.optionId !== next.optionId ||
+    prev.descriptionId !== next.descriptionId ||
+    prev.metaId !== next.metaId ||
+    prev.className !== next.className ||
+    prev.ariaLabel !== next.ariaLabel ||
+    prev.ariaDescribedBy !== next.ariaDescribedBy ||
+    prev.testId !== next.testId
+  ) {
+    return false;
+  }
+  const a = prev.result;
+  const b = next.result;
+  if (
+    a.id !== b.id ||
+    a.title !== b.title ||
+    a.subtitle !== b.subtitle ||
+    a.path !== b.path ||
+    a.kind !== b.kind ||
+    a.icon.type !== b.icon.type ||
+    a.icon.type === "file_type" && b.icon.type === "file_type" && a.icon.ext !== b.icon.ext ||
+    a.icon.type === "app_icon_data" && b.icon.type === "app_icon_data" && a.icon.data !== b.icon.data ||
+    a.icon.type === "app_icon" && b.icon.type === "app_icon" && a.icon.path !== b.icon.path
+  ) {
+    return false;
+  }
+  if (!rangesEqual(a.matchRanges, b.matchRanges)) return false;
+  const am = a.meta;
+  const bm = b.meta;
+  return (
+    am?.label === bm?.label &&
+    am?.size === bm?.size &&
+    am?.modified === bm?.modified &&
+    am?.itemCount === bm?.itemCount &&
+    am?.line === bm?.line &&
+    am?.sourceLabel === bm?.sourceLabel
+  );
+}
+
+/** Memoized so typing only re-renders changed rows, not the whole 30-row list. */
+export const SharedResultRow = memo(SharedResultRowBase, areEqual);

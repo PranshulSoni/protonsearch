@@ -5,7 +5,7 @@ import type {
   SearchResult,
   SearchScope,
 } from "../bridge/types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Logo } from "../components/Logo";
 import { groupResults } from "../lib/results";
 import { SharedResultRow } from "../launcher/SharedResultRow";
@@ -113,24 +113,28 @@ export function SearchCard({
   const [activeIndex, setActiveIndex] = useState(0);
   useEffect(() => {
     setActiveIndex(0);
-  }, [results]);
+  }, [results.length]);
   const hasQuery = query.trim().length > 0;
   const zeroResults = hasQuery && !pending && !error && results.length === 0;
   // Same pure grouping/order as the Normal Launcher; labels scroll with rows.
-  const groupedResults = groupResults(results);
-  const orderedResults = groupedResults.flatMap((group) =>
-    group.items.map((item) => item.result),
+  const groupedResults = useMemo(() => groupResults(results), [results]);
+  const orderedResults = useMemo(
+    () => groupedResults.flatMap((group) => group.items.map((item) => item.result)),
+    [groupedResults],
   );
-  let remainingRows = 5;
-  const visibleGroups = groupedResults
-    .map((group) => {
-      const items = group.items.slice(0, Math.max(0, remainingRows));
-      remainingRows -= items.length;
-      return { ...group, items };
-    })
-    .filter((group) => group.items.length > 0);
-  const rowIndexById = new Map(
-    orderedResults.map((result, index) => [result.id, index] as const),
+  const visibleGroups = useMemo(() => {
+    let remainingRows = 5;
+    return groupedResults
+      .map((group) => {
+        const items = group.items.slice(0, Math.max(0, remainingRows));
+        remainingRows -= items.length;
+        return { ...group, items };
+      })
+      .filter((group) => group.items.length > 0);
+  }, [groupedResults]);
+  const rowIndexById = useMemo(
+    () => new Map(orderedResults.map((result, index) => [result.id, index] as const)),
+    [orderedResults],
   );
   const openActive = () => {
     const result = orderedResults[activeIndex];
