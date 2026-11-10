@@ -1997,4 +1997,136 @@ html[data-window="island"] #root {
   display: grid;
   place-items: center;
   width: 28px;
-  height: 28px;
+  height: 28px;  border: 1px solid var(--island-control-border);
+  border-radius: 7px;
+  background: transparent;
+  color: #9ba3ae;
+}
+
+.island-clear-button:hover {
+  background: var(--island-row-hover);
+  color: #e9edf1;
+}
+
+.island-notification-list {
+  gap: 6px;
+  padding-right: 8px;
+  max-height: 156px;
+}
+
+.island-notif-empty {
+  min-height: 0;
+  flex: 1;
+  padding-top: 24px;
+  justify-content: flex-start;
+}
+
+.island-notif-empty strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e9edf1;
+}
+
+.island-controls-card .island-card-head {
+  min-height: 56px;
+  align-items: center;
+}
+
+.island-setting-row {
+  min-height: 36px;
+  height: 36px;
+}
+
+.island-mute-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #9daab0;
+}
+
+.island-mute-button[aria-pressed="true"] {
+  background: var(--island-control-on);
+  color: #e3f0f7;
+}
+
+.island-mute-button:disabled {
+  opacity: 0.4;
+}
+
+.island-control-tile {
+  display: flex;
+  align-items: stretch;
+  min-height: 56px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.island-tile-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 19px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--island-icon);
+  font: inherit;
+  text-align: left;
+}
+
+.island-tile-main:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.island-tile-label {
+  font-size: 11px;
+  color: #d6e0e3;
+}
+
+.island-tile-state {
+  font-size: 10px;
+  color: #a5b5be;
+}
+
+.island-tile-chevron {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  border: 0;
+  border-left: 1px solid var(--island-control-border);
+  background: transparent;
+  color: #9daab0;
+}
+
+.island-tile-chevron:hover {
+  background: var(--island-row-hover);
+}
+
+.island-settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9daab0;
+  font: inherit;
+  font-size: 10px;
+}
+
+.island-settings-link:hover {
+  color: #d7e8ee;
+  text-decoration: underline;
+}
