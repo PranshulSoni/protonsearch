@@ -351,11 +351,67 @@ async function main() {
       return "ok";
     }).catch((e) => "error: " + String(e));
 
-    // --- Section 3: first (lazy) island open vs warm opens, via the real hotkey ---
+    // --- Section 3: activation trade-off (lazy island window creation) ---
+    // Finding to verify: with the lazy-window refactor the island window does not
+    // exist until the first show. toggle_island only handles an EXISTING window
+    // ("if let Some(win) = app.get_webview_window(ISLAND_LABEL)"), so a hotkey
+    // while the island window is absent is expected to be a no-op. Prove/measure:
+    //   (a) hotkey with no island window -> expect no window / no page;
+    //   (b) first open through the show_island command -> includes WebView creation;
+    //   (c) warm hotkey opens once the window exists.
+    const hotkeyWithoutIsland = [];
+    for (let i = 0; i < 2; i++) {
+      const had = (await findWindow(await collectPages(), "island")) != null;
+      if (had) break;
+      const since = readMarksSince();
+      let win = null;
+      try { win = await runPs(HOTKEY_PS, ["-ProcessId", String(report.conditions.appPid), "-TimeoutMs", "2500", "-Mode", "show"], 25000); } catch (e) { hotkeyWithoutIsland.push({ attempt: i, error: String(e.message) }); continue; }
+      await sleep(300);
+      const islandPage = await findWindow(await collectPages(), "island");
+      const marks = readMarksSince().marks.concat(since.marks);
+      hotkeyWithoutIsland.push({
+        attempt: i,
+        win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
+        timedOut: win ? win.timedOut : null,
+        islandPageFound: islandPage != null,
+        islandWindowShownMarks: markEpochs(marks, "island-window-shown").length,
+        note: "No island window exists yet (lazy refactor); a visible window here would be the launcher, not the island.",
+      });
+      await sleep(300);
+    }
+
     const activationSamples = [];
+    let lazyFirstOpen = null;
+    const islandBeforeLazy = (await findWindow(await collectPages(), "island")) != null;
+    if (!islandBeforeLazy) {
+      const since = readMarksSince();
+      const invokeResult = await launcher.evaluate(async () => {
+        const t0 = Date.now();
+        const perfStart = performance.now();
+        await window.__TAURI_INTERNALS__.invoke("show_island");
+        const t1 = Date.now();
+        return { t0, t1, invokeMs: performance.now() - perfStart };
+      }).catch((e) => ({ error: String(e) }));
+      await sleep(300);
+      const islandPage = await waitWindow("island", 8000);
+      const marks = readMarksSince().marks.concat(since.marks);
+      const shown = markEpochs(marks, "island-window-shown").slice(-1)[0] ?? null;
+      const paint = markEpochs(marks, "island-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
+      lazyFirstOpen = {
+        path: "show_island command (hotkey path is a no-op while the island window is absent)",
+        invokeMs: invokeResult && invokeResult.invokeMs != null ? +invokeResult.invokeMs.toFixed(2) : null,
+        createShowMs: shown != null && invokeResult.t0 != null ? +(shown - invokeResult.t0).toFixed(2) : null,
+        shownToPaintMs: shown != null && paint != null ? +(paint - shown).toFixed(2) : null,
+        commandToPaintMs: paint != null && invokeResult.t0 != null ? +(paint - invokeResult.t0).toFixed(2) : null,
+        islandPageFound: islandPage != null,
+      };
+      if (islandPage) { try { await islandPage.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")); } catch { /* ignore */ } }
+      await sleep(600);
+    }
+
     for (let i = 0; i < openTakes; i++) {
-      const hadIslandBefore = (await findWindow(await collectPages(), "island")) != null;
-      if (hadIslandBefore) { try { const islandPage = await findWindow(await collectPages(), "island"); await islandPage.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")); } catch { /* ignore */ } await sleep(500); }
+      let islandPage = await findWindow(await collectPages(), "island");
+      if (islandPage) { try { await islandPage.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")); } catch { /* ignore */ } await sleep(400); }
       const since = readMarksSince();
       let win = null;
       try { win = await runPs(HOTKEY_PS, ["-ProcessId", String(report.conditions.appPid), "-TimeoutMs", "8000", "-Mode", "show"], 30000); } catch (e) { activationSamples.push({ take: i, error: String(e.message) }); continue; }
@@ -363,9 +419,9 @@ async function main() {
       const marks = readMarksSince().marks.concat(since.marks);
       const shown = markEpochs(marks, "island-window-shown").filter((v) => v >= (win.sendAtUtc || 0) - 400).slice(-1)[0] ?? null;
       const paint = markEpochs(marks, "island-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
-      const islandPage = await waitWindow("island", 4000);
+      islandPage = await waitWindow("island", 4000);
       activationSamples.push({
-        take: i, lazyCreation: !hadIslandBefore,
+        take: i, lazyCreation: false,
         win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
         win32FocusedMs: win && win.focusedMs != null ? win.focusedMs : null,
         sendToShownMs: shown != null ? +(shown - win.sendAtUtc).toFixed(2) : null,
@@ -377,14 +433,13 @@ async function main() {
       readMarksSince();
       await sleep(400);
     }
+    report.measurements.hotkeyWithoutIslandWindow = { attempts: hotkeyWithoutIsland.length, samples: hotkeyWithoutIsland, note: "Lazy-window regression probe: hotkey while the island window does not exist." };
     report.measurements.activation = {
-      trials: activationSamples.length,
-      lazy: activationSamples.filter((s) => s.lazyCreation),
-      warm: activationSamples.filter((s) => !s.lazyCreation),
-      lazyVisibleMs: summarize(activationSamples.filter((s) => s.lazyCreation).map((s) => s.win32VisibleMs).filter((v) => v != null)),
-      warmVisibleMs: summarize(activationSamples.filter((s) => !s.lazyCreation).map((s) => s.win32VisibleMs).filter((v) => v != null)),
-      lazySendToPaintMs: summarize(activationSamples.filter((s) => s.lazyCreation).map((s) => s.sendToPaintMs).filter((v) => v != null)),
-      warmSendToPaintMs: summarize(activationSamples.filter((s) => !s.lazyCreation).map((s) => s.sendToPaintMs).filter((v) => v != null)),
+      lazyFirstOpen,
+      warmTrials: activationSamples.length,
+      warmVisibleMs: summarize(activationSamples.map((s) => s.win32VisibleMs).filter((v) => v != null)),
+      warmSendToShownMs: summarize(activationSamples.map((s) => s.sendToShownMs).filter((v) => v != null)),
+      warmSendToPaintMs: summarize(activationSamples.map((s) => s.sendToPaintMs).filter((v) => v != null)),
       samples: activationSamples,
     };
 
@@ -602,7 +657,12 @@ async function main() {
   const itrim = report.measurements.islandTrim;
   if (itrim && itrim.delta) console.log("  island hide-trim: tree " + itrim.visible.totalWorkingSetMiB + " -> " + itrim.hiddenAfterTrim.totalWorkingSetMiB + " MiB (" + itrim.delta.totalDeltaMiB + " MiB), trimmed=" + itrim.delta.trimmedCount + ", pageWarm=" + itrim.islandPageStillPresent);
   const act = report.measurements.activation;
-  if (act) console.log("  activation: lazy visible p50=" + act.lazyVisibleMs.p50 + "ms n=" + act.lazy.length + " | warm visible p50=" + act.warmVisibleMs.p50 + "ms n=" + act.warm.length + " | lazy send->paint p50=" + act.lazySendToPaintMs.p50);
+  if (act) {
+    if (act.lazyFirstOpen) console.log("  lazy first open (show_island cmd): create+show=" + act.lazyFirstOpen.createShowMs + "ms shown->paint=" + act.lazyFirstOpen.shownToPaintMs + "ms total=" + act.lazyFirstOpen.commandToPaintMs + "ms pageFound=" + act.lazyFirstOpen.islandPageFound);
+    console.log("  warm hotkey opens: visible p50=" + act.warmVisibleMs.p50 + "ms p95=" + act.warmVisibleMs.p95 + "ms n=" + act.warmTrials + " | send->shown p50=" + act.warmSendToShownMs.p50 + " | send->paint p50=" + act.warmSendToPaintMs.p50);
+  }
+  const hw = report.measurements.hotkeyWithoutIslandWindow;
+  if (hw) console.log("  hotkey with NO island window: attempts=" + hw.attempts + " timeouts=" + hw.samples.filter((s) => s.timedOut).length + " islandPages=" + hw.samples.filter((s) => s.islandPageFound).length + " (lazy-window regression probe)");
   const ofp = report.measurements.openFramePacing;
   if (ofp) console.log("  open frames: p50=" + ofp.aggregate.frameMs.p50 + "ms p95=" + ofp.aggregate.frameMs.p95 + "ms p99=" + ofp.aggregate.frameMs.p99 + " dropped=" + ofp.aggregate.droppedPct + "% longTasks=" + ofp.aggregate.longTasksTotal + " n=" + ofp.trials);
   const cfp = report.measurements.closeFramePacing;

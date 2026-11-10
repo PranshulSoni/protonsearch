@@ -98,9 +98,21 @@ enter/exit 180/120 ms transform-only, fixed-grid notifications, usable Quick Set
 island Search parity with Normal Launcher). ISLAND_V9_SPEC §12 records the override; SCREENS §2.13, DESIGN_SYSTEM and
 KEYBOARD are synced.
 
-**G5 status: BLOCKED for re-sign** until ui-launcher delivers before/after captures over a light/text window and the
-fixes are reviewed: (a) no desktop text/previous card visible inside the island bbox at any animation keyframe; (b)
-notifications 0/1/3 without overlap; (c) Quick Settings usable with real controls + fallback, no "Unsupported"; (d) island
-search same filters/group order/labels/icons/empty copy as Normal Launcher. Existing conditional items remain. G4 status
-unchanged; this is an island (G5) quality gate.
+**Task-56 visual/UX gate: PASS (reviewed 2026-11-10; notes closed by ui-launcher task-54 follow-up).** After set at 1150/860/430 over a white Notepad/text
+window verifies: (a) fully opaque island surface — no desktop text/previous-card bleed inside the bbox at rest or during
+the captured enter/exit frames; (b) notifications 0/1/3 use the fixed 18/1fr/30 grid with 52 px rows, reserved dismiss,
+fixed footer and no overlap; (c) Quick Settings is usable — volume 62 %/mute, brightness 80 %, audio output, split
+Wi-Fi/Bluetooth tiles with drill-downs, real "Open Windows settings" fallback, no "Unsupported"; (d) island search shows
+the same four filters, shared group labels/order/icons and canonical empty copy as Normal Launcher. Enter/exit CSS values
+(180 ms / 120 ms transform-only, opacity constant 1) are verified in code and by the 0 ms frames.
+
+**Notes closed:** paused enter 90 ms / exit 60 ms captures now show real mid-frames distinct from endpoints (interior
+sampled opaque #0d1012; no bleed); forced-fixture brightness-unsupported capture shows the reason + Open display settings
+fallback; Quick Settings Airplane/Night light/Energy saver now carry external chevrons and “Open Windows settings for …”
+labels, audio-output row is labelled, Wi-Fi/Bluetooth split-tile deviation is recorded in VISUAL_AUDIT_ISLAND E9.
+Harness verified 18 files / 242 tests green. The only remaining task-56-era note is the recorded split-tile presentation
+deviation (usable, no dead control).
+
+**G5 overall remains CONDITIONAL on pre-existing evidence:** Media adapter and media/Wi-Fi/BT drill-down captures, and real
+Windows/DPI/frame-pacing visual evidence (task-31/L0). These are not task-56 regressions. G4 status unchanged.
 

@@ -306,5 +306,6 @@ conflicts with §5/§6 here (surface opacity, enter/exit, notifications, Quick S
 wins. Summary: fully opaque surface (no opacity/fade), enter 180 ms / exit 120 ms transform-only, fixed-grid notifications
 with non-overlapping dismiss/footer, usable Quick Settings (volume/brightness/audio + split Wi-Fi/Bluetooth + Windows
 settings fallback instead of "Unsupported"), and island Search using the same four filters, group order, icons and empty
-copy as Normal Launcher. G5 re-sign is blocked until the before/after evidence exists.
+copy as Normal Launcher. The before/after evidence was reviewed on 2026-11-10: task-56 visual gate **PASS** (notes closed);
+remaining G5 conditions are Media/real-Windows evidence items, not surface-quality regressions (see REVIEW_3 §6).
 

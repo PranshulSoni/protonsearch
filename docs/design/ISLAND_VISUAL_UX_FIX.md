@@ -103,3 +103,29 @@ Quick Settings idle + Wi-Fi/Bluetooth drill-downs + fallback; enter at 0/90/180 
 reduced motion. Inside the island bounding box there must be no desktop text, previous-card ghost or opacity fade;
 notifications must not overlap; Quick Settings must be usable and never say "Unsupported"; search must visibly match the
 Normal Launcher order/labels/icons/empty copy. Before/after captures go in docs/qa/visual/live-shots with a manifest.
+
+## 7. Review result — task-54 after set (2026-11-10)
+
+**Verdict: PASS (notes closed after task-54 follow-up).** Reviewed the 33 after captures at 1150/860/430 over a white Notepad/text window plus the
+before set. Opaque island surface inside the bbox (no desktop text/ghost bleed) verified; notifications 0/1/3 show the
+18/1fr/30 grid, 52 px rows, reserved dismiss and fixed footer without overlap; Quick Settings renders volume 62 %/mute,
+brightness 80 %, audio output, split Wi-Fi/Bluetooth tiles, drill-downs and a real “Open Windows settings” fallback with
+no “Unsupported”; island search shows four filters, group labels/order, shared rows/icons and canonical empty copy.
+Enter/exit CSS values are correct (180/120 ms transform-only, opacity constant 1); the 0 ms frame differs from final.
+Notes: animation 90/180 ms and exit 60/120 ms screenshots are identical to endpoints due capture timing (add paused/clip
+evidence); unsupported-brightness fallback is code-tested but not captured on this host (forced fixture requested);
+Quick Settings’ Airplane/Night light/Energy saver compact buttons are real ms-settings actions but read like stateful
+tiles — add an external/chevron cue or fold into fallback; split Wi-Fi/Bluetooth tiles use a separate On/Off pill plus
+chevron rather than the spec's whole-left toggle. These are non-blocking polish/evidence items. Full G5 still has
+pre-existing Media/real-Windows conditions.
+
+
+
+### Follow-up closure (2026-11-10)
+
+All five notes were addressed: Airplane/Night light/Energy saver now carry external chevrons + “Open Windows settings
+for …” titles/aria; Wi-Fi/Bluetooth split-tile deviation recorded in VISUAL_AUDIT_ISLAND E9; audio-output row labelled
+“Audio output” + device; paused enter 90 ms / exit 60 ms captures are real mid-frames distinct from endpoints and sample
+opaque inside the bbox; forced-fixture brightness fallback capture shows reason + Open display settings. Manifest now 44
+captures (8 before + 36 after); app suite 18 files / 242 tests green.
+

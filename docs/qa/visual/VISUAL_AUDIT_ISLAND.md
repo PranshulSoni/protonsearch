@@ -281,3 +281,39 @@ live-shots remain outside ui-launcher write scope.
 - Evidence: docs/qa/visual/live-shots/task54-evidence-manifest.json (8 before + 33 after captures at 1150/860/430;
   Wi-Fi and Bluetooth drilldown screenshots now show the real mock networks/devices and actions).
 - Build: 18 files / 242 tests passed; npm run build exit 0.
+
+## D5. Task-54 visual/UX review — PASS WITH NOTES (2026-11-10)
+
+Reviewed 33 after captures + 8 before captures at 1150/860/430 over a white Notepad/text window
+(docs/qa/visual/live-shots/task54-evidence-manifest.json).
+**Verified:** opaque island surface (no bleed/desktop text inside bbox), no surface opacity/fade; enter/exit CSS
+180/120 ms transform-only (0 ms frames differ; 90/180 and 60/120 identical due capture timing — evidence note); notifications
+0/1/3 fixed 18/1fr/30 grid, 52 px rows, 156 px list, reserved 30×30 dismiss, fixed footer and Clear all, no overlap;
+Quick Settings volume 62 %/mute, brightness 80 %, audio output, Wi-Fi/Bluetooth split tiles + drilldowns with Connect/Open
+network settings/Manage, Airplane/Night light/Energy saver real ms-settings actions, real "Open Windows settings" fallback,
+no "Unsupported", fits 515×376/430; Search parity four filters All/Files/Folders/Apps, shared grouped order/labels
+(FOLDERS/DOCUMENTS visible), shared rows/icons, canonical empty copy.
+**Notes:** Quick Settings compact Airplane/Night light/Energy saver buttons should look like external actions (chevron/
+external cue) or move under the fallback row; split tiles use a separate On/Off pill + chevron (usable deviation); add a
+forced unsupported-brightness capture and an animation-paused/clip evidence capture. No blocking visual delta.
+
+## E9. Design review polish (task-54 notes)
+
+- Airplane mode / Night light / Energy saver buttons now carry an external chevron cue and explicit 'Open Windows settings for …' titles/aria-labels, making them read as shortcuts rather than stateful toggles.
+- The audio-output row now shows an explicit 'Audio output' label ahead of the device name.
+- The split Wi-Fi/Bluetooth tiles keep the On/Off pill + chevron targets as the reviewed usable deviation from the whole-left toggle; recorded here for the design system.
+- Animation evidence now includes paused frames: task54-after-enter-90ms-paused.png (CSS animation paused at -90ms delay) and task54-after-exit-60ms-paused.png (Web Animations currentTime=60ms), in addition to the 0/90/180 and 0/60/120 captures.
+- Forced-fixture capture task54-after-controls-brightness-fallback-1150.png shows brightnessCapability.supported=false with the reason row and working Open display settings fallback.
+- Manifest regenerated: docs/qa/visual/live-shots/task54-evidence-manifest.json includes all before/after captures (including these three new images).
+- Build/tests: npm run build exit 0; 18 files / 242 tests pass.
+
+## D6. Task-54 follow-up — notes closed (2026-11-10)
+
+All D5 notes are addressed and re-checked: (1) paused enter 90 ms and exit 60 ms captures are distinct mid-frames from
+their endpoints; interior pixels at the island surface are opaque #0d1012 and no desktop text/bleed is visible; (2)
+forced-fixture brightness-unsupported capture task54-after-controls-brightness-fallback-1150.png shows the honest
+reason + Open display settings fallback; (3) Airplane/Night light/Energy saver buttons now show external chevrons and
+"Open Windows settings for …" labels/aria; (4) audio-output row is labelled "Audio output" + device; (5) Wi-Fi/Bluetooth
+split-tile presentation deviation is recorded (E9), no dead control. Manifest regenerated at 44 captures (8 before + 36
+after); app suite 18 files / 242 tests green. **Review verdict: PASS** for the task-56 surface-quality gate; full G5
+remains conditional only on the pre-existing Media adapter and real Windows/DPI/frame-pacing evidence.

@@ -21,7 +21,14 @@ capability adapters, IPC gaps and evidence/a11y polish. No fake data is accepted
 
 ## Remaining gaps
 
-## P0 — user-rejection quality fixes (task-56, open)
+## P0 — user-rejection quality fixes (task-56, reviewed 2026-11-10: PASS — notes closed)
+
+After set at docs/qa/visual/live-shots/task54-after-* (1150/860/430 over a white Notepad/text window) verified: opaque
+surface (no bleed), notifications 0/1/3 without overlap, usable Quick Settings + real Open Windows settings fallback
+(no "Unsupported"), island search parity (four filters, group labels/order, shared rows/icons, empty copy), enter/exit
+transform-only CSS. Notes closed: paused animation frames and forced brightness fallback captured; Quick Settings Airplane/Night light/Energy saver compact buttons should gain an external/chevron cue or move
+under the fallback row; split Wi-Fi/Bluetooth tile uses a separate On/Off pill + chevron (usable deviation). Full G5 still
+conditional on Media adapter and real Windows/DPI evidence, not on these surface fixes.
 
 | # | Issue | Required |
 |---|---|---|

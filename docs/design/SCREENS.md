@@ -423,8 +423,9 @@ The V9 Dynamic Island is bound by `ISLAND_V9_SPEC.md` plus `ISLAND_VISUAL_UX_FIX
    drill-downs + "Open Windows settings" fallback row; never render "Unsupported" or a dead tile; real setters only.
 5. **Search parity:** island expanded search uses the same four filters All/Files/Folders/Apps, groupResults order/labels,
    ResultIcon source and empty copy as the Normal Launcher; no separate Actions chip; shared pure search model.
-Full values and evidence requirements: `ISLAND_VISUAL_UX_FIX.md`. This blocks G5 re-sign until before/after captures
-over a light/text window are reviewed.
+Full values and evidence requirements: `ISLAND_VISUAL_UX_FIX.md`. The before/after captures over a light/text window
+were reviewed on 2026-11-10 and the task-56 visual/UX gate passes with notes (see REVIEW_3 §6); remaining G5 conditions are
+pre-existing Media/real-Windows evidence items, not surface-quality regressions.
 
 ---
 

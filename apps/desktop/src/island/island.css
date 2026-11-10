@@ -1900,3 +1900,20 @@ html[data-window="island"] #root {
 .island-drilldown-back:hover {
   color: #d7e8ee;
 }
+.island-audio-label {
+  flex: none;
+  font-size: 10px;
+  color: #8b9aa3;
+}
+
+.island-audio-device {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-settings-actions button > svg:last-child {
+  margin-left: auto;
+  color: #7d878d;
+}

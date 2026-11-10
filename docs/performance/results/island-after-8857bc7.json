@@ -1,0 +1,519 @@
+{
+  "schema": "ps-island-perf/1",
+  "kind": "island-performance",
+  "status": "blocked",
+  "capturedAt": "2026-11-10T05:20:23.210Z",
+  "host": {
+    "hostname": "PranshulAsus",
+    "platform": "win32"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe",
+    "exeBytes": 20377088,
+    "exeMtime": "2026-11-10T05:16:43.931Z",
+    "frontendDistMtime": "2026-11-10T05:16:02.979Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "port": 9222,
+    "assumedRefreshHz": 120,
+    "cycles": 20,
+    "takes": 20,
+    "openTakes": 8,
+    "attachOnly": false,
+    "gitHead": "8857bc792d582d307d0438d86acff3f9b6d592e0",
+    "gitDirty": 0,
+    "appPid": 33380,
+    "initialWindows": 1
+  },
+  "measurements": {
+    "indexReady": {
+      "state": "ready",
+      "entries": 131199
+    },
+    "initialPages": [
+      {
+        "url": "http://localhost:5173/",
+        "kind": "launcher"
+      }
+    ],
+    "memoryIdleLauncherOnly": {
+      "label": "idle-launcher-only",
+      "mode": "memory",
+      "rootPid": 33380,
+      "capturedAtUtc": 1794288028581,
+      "processCount": 7,
+      "totalWorkingSetBytes": 461041664,
+      "totalPrivateBytes": 216342528,
+      "processes": [
+        {
+          "pid": 33380,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 64237568,
+          "privateBytes": 26361856,
+          "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe"
+        },
+        {
+          "pid": 27824,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 134213632,
+          "privateBytes": 40996864,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --remote-debugging-port=9222 --lang=en-US --mojo-name"
+        },
+        {
+          "pid": 872,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 13991936,
+          "privateBytes": 2936832,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+        },
+        {
+          "pid": 42920,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 117932032,
+          "privateBytes": 85835776,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+        },
+        {
+          "pid": 23796,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 45109248,
+          "privateBytes": 13398016,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+        },
+        {
+          "pid": 29412,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23228416,
+          "privateBytes": 8699904,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+        },
+        {
+          "pid": 14976,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 62328832,
+          "privateBytes": 38113280,
+          "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --remote-debugging-port=9222 --video-"
+        }
+      ],
+      "cpuSecondsTotal": 2.984,
+      "totalWorkingSetMiB": 439.7,
+      "totalPrivateMiB": 206.3
+    },
+    "idleCpuLauncherOnly": {
+      "mode": "cpu",
+      "rootPid": 33380,
+      "sampleSeconds": 20.009,
+      "processCount": 7,
+      "cpuSecondsDelta": 1.125,
+      "logicalCores": 20,
+      "cpuPctOfOneCore": 5.62,
+      "cpuPctOfMachine": 0.28
+    },
+    "memoryTrim": {
+      "waitMs": 8000,
+      "visibleIdle": {
+        "label": "idle-launcher-only",
+        "mode": "memory",
+        "rootPid": 33380,
+        "capturedAtUtc": 1794288028581,
+        "processCount": 7,
+        "totalWorkingSetBytes": 461041664,
+        "totalPrivateBytes": 216342528,
+        "processes": [
+          {
+            "pid": 33380,
+            "name": "ProtonSearch.exe",
+            "wsBytes": 64237568,
+            "privateBytes": 26361856,
+            "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe"
+          },
+          {
+            "pid": 27824,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 134213632,
+            "privateBytes": 40996864,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --remote-debugging-port=9222 --lang=en-US --mojo-name"
+          },
+          {
+            "pid": 872,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 13991936,
+            "privateBytes": 2936832,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+          },
+          {
+            "pid": 42920,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 117932032,
+            "privateBytes": 85835776,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+          },
+          {
+            "pid": 23796,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 45109248,
+            "privateBytes": 13398016,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+          },
+          {
+            "pid": 29412,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 23228416,
+            "privateBytes": 8699904,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+          },
+          {
+            "pid": 14976,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 62328832,
+            "privateBytes": 38113280,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --remote-debugging-port=9222 --video-"
+          }
+        ],
+        "cpuSecondsTotal": 2.984,
+        "totalWorkingSetMiB": 439.7,
+        "totalPrivateMiB": 206.3
+      },
+      "afterHideTrim": {
+        "label": "launcher-hidden-after-trim-wait",
+        "mode": "memory",
+        "rootPid": 33380,
+        "capturedAtUtc": 1794288058687,
+        "processCount": 7,
+        "totalWorkingSetBytes": 126619648,
+        "totalPrivateBytes": 200359936,
+        "processes": [
+          {
+            "pid": 33380,
+            "name": "ProtonSearch.exe",
+            "wsBytes": 64188416,
+            "privateBytes": 26259456,
+            "commandLine": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe"
+          },
+          {
+            "pid": 27824,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 14974976,
+            "privateBytes": 41377792,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --embedded-browser-webview=1 --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --remote-debugging-port=9222 --lang=en-US --mojo-name"
+          },
+          {
+            "pid": 872,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 22544384,
+            "privateBytes": 3907584,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=crashpad-handler --user-data-dir=C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView /prefetch:4 /pfhostedapp:0e29717a6d4ae630093afa7a40cf4c70d7d78cba --monitor-self-annotation=ptype=crashpad-handler --user-stream-region=348,65568 --database=C:\\Users\\Pranshul\\Documents\\Proje"
+          },
+          {
+            "pid": 42920,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 2359296,
+            "privateBytes": 68079616,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=gpu-process --gpu-recent-crash-count=0 --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --gpu-p"
+          },
+          {
+            "pid": 23796,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 438272,
+            "privateBytes": 13389824,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US --service-sandbox-type=none --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-we"
+          },
+          {
+            "pid": 29412,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 0,
+            "privateBytes": 8699904,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=service --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser"
+          },
+          {
+            "pid": 14976,
+            "name": "msedgewebview2.exe",
+            "wsBytes": 22114304,
+            "privateBytes": 38645760,
+            "commandLine": "\"C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\157.0.4341.42\\msedgewebview2.exe\" --type=renderer --noerrdialogs --user-data-dir=\"C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata\\webview2\\EBWebView\" --webview-exe-name=ProtonSearch.exe --webview-exe-version=2.0.0-alpha.1 --embedded-browser-webview=1 --embedded-browser-webview-dpi-awareness=2 --remote-debugging-port=9222 --video-"
+          }
+        ],
+        "cpuSecondsTotal": 4.734,
+        "totalWorkingSetMiB": 120.8,
+        "totalPrivateMiB": 191.1
+      },
+      "delta": {
+        "rows": [
+          {
+            "pid": 33380,
+            "name": "ProtonSearch.exe",
+            "wsBeforeMiB": 61.3,
+            "wsAfterMiB": 61.2,
+            "deltaMiB": 0,
+            "trimmed": false
+          },
+          {
+            "pid": 27824,
+            "name": "msedgewebview2.exe",
+            "wsBeforeMiB": 128,
+            "wsAfterMiB": 14.3,
+            "deltaMiB": -113.7,
+            "trimmed": true
+          },
+          {
+            "pid": 872,
+            "name": "msedgewebview2.exe",
+            "wsBeforeMiB": 13.3,
+            "wsAfterMiB": 21.5,
+            "deltaMiB": 8.2,
+            "trimmed": false
+          },
+          {
+            "pid": 42920,
+            "name": "msedgewebview2.exe",
+            "wsBeforeMiB": 112.5,
+            "wsAfterMiB": 2.3,
+            "deltaMiB": -110.2,
+            "trimmed": true
+          },
+          {
+            "pid": 23796,
+            "name": "msedgewebview2.exe",
+            "wsBeforeMiB": 43,
+            "wsAfterMiB": 0.4,
+            "deltaMiB": -42.6,
+            "trimmed": true
+          },
+          {
+            "pid": 29412,
+            "name": "msedgewebview2.exe",
+            "wsBeforeMiB": 22.2,
+            "wsAfterMiB": 0,
+            "deltaMiB": -22.2,
+            "trimmed": true
+          },
+          {
+            "pid": 14976,
+            "name": "msedgewebview2.exe",
+            "wsBeforeMiB": 59.4,
+            "wsAfterMiB": 21.1,
+            "deltaMiB": -38.4,
+            "trimmed": true
+          }
+        ],
+        "trimmedCount": 5,
+        "totalDeltaMiB": -318.9
+      },
+      "note": "Launcher is hidden in both snapshots; afterHideTrim is taken 8000 ms later so any WebView2 SetMemoryUsageTargetLevel(LOW) trim is visible as a per-process WS drop. A process with >=5 MiB drop is marked trimmed; warm-process retention is checked later by reopening."
+    },
+    "switchToIslandMode": "ok",
+    "activation": {
+      "trials": 8,
+      "lazy": [
+        {
+          "take": 0,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 1,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 2,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 3,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 4,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 5,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 6,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 7,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        }
+      ],
+      "warm": [],
+      "lazyVisibleMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null,
+        "mean": null
+      },
+      "warmVisibleMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null,
+        "mean": null
+      },
+      "lazySendToPaintMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null,
+        "mean": null
+      },
+      "warmSendToPaintMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null,
+        "mean": null
+      },
+      "samples": [
+        {
+          "take": 0,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 1,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 2,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 3,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 4,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 5,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 6,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        },
+        {
+          "take": 7,
+          "lazyCreation": true,
+          "win32VisibleMs": null,
+          "win32FocusedMs": null,
+          "sendToShownMs": null,
+          "shownToPaintMs": null,
+          "sendToPaintMs": null,
+          "islandPageFound": false
+        }
+      ]
+    }
+  },
+  "blocked": [
+    "Error: island page never appeared (lazy window creation failed or mode switch failed)\n    at main (file:///C:/Users/Pranshul/Documents/Projects/protonsearch/tools/benchmark/island-perf.mjs:398:24)"
+  ],
+  "limitations": [
+    "Debug build + CDP drive the real island WebView; headless frame counting is not used - WebView2 runs on the real display.",
+    "Frame interval p50/p95/p99 are rAF intervals inside the island page during a 900-1000 ms window; dropped = interval > 1.5 x assumed refresh period (default 120 Hz for this host, period 8.333 ms).",
+    "Activation first-open vs warm-open is measured with the real global hotkey (SendInput) and perf marks; the lazy window creation cost is isolated by whether the island page existed before the hotkey.",
+    "Process-tree memory is PowerShell/CIM Working Set + private bytes with command lines; WebView2 child roles are inferred from command lines, not guessed.",
+    "Root-cause attribution is evidence-based (CDP Performance Layout/Recalc/Script/Task durations + page resize events + long tasks), not a visual guess."
+  ]
+}

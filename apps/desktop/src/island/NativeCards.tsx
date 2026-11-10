@@ -391,7 +391,8 @@ export function ControlsCard({
             onClick={() => setAudioOpen((open) => !open)}
           >
             <IslandIcon name="output" size={16} />
-            <span>{output?.name ?? "Audio output"}</span>
+            <span className="island-audio-label">Audio output</span>
+            <span className="island-audio-device">{output?.name ?? "Choose output"}</span>
             <IslandIcon name="chevron" size={16} />
           </button>
           {audioOpen ? (
@@ -514,15 +515,33 @@ export function ControlsCard({
         </div>
       ) : null}
 
-      <div className="island-settings-actions">
-        <button type="button" onClick={() => openSettings("airplane_mode")}>
+      <div className="island-settings-actions" aria-label="Open Windows settings shortcuts">
+        <button
+          type="button"
+          title="Open Windows settings for Airplane mode"
+          aria-label="Open Windows settings for Airplane mode"
+          onClick={() => openSettings("airplane_mode")}
+        >
           <IslandIcon name="airplane" size={14} /> Airplane
+          <IslandIcon name="chevron" size={11} />
         </button>
-        <button type="button" onClick={() => openSettings("night_light")}>
+        <button
+          type="button"
+          title="Open Windows settings for Night light"
+          aria-label="Open Windows settings for Night light"
+          onClick={() => openSettings("night_light")}
+        >
           <IslandIcon name="brightness" size={14} /> Night light
+          <IslandIcon name="chevron" size={11} />
         </button>
-        <button type="button" onClick={() => openSettings("energy_saver")}>
+        <button
+          type="button"
+          title="Open Windows settings for Energy saver"
+          aria-label="Open Windows settings for Energy saver"
+          onClick={() => openSettings("energy_saver")}
+        >
           <IslandIcon name="bolt" size={14} /> Energy saver
+          <IslandIcon name="chevron" size={11} />
         </button>
       </div>
       <button type="button" className="island-control-settings" onClick={() => openSettings("display")}>

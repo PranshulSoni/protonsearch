@@ -1,8 +1,8 @@
 {
- "task": "task-54 island quality fixes + milestone-2 native controls",
- "capturedAt": "2026-11-10T05:14:50.276Z",
+ "task": "task-54 island quality fixes + design-review polish",
+ "capturedAt": "2026-11-10T05:24:21.472Z",
  "beforeBuild": "pre task-54 dist (vite preview)",
- "afterBuild": "task-54 final build with milestone-2 controls",
+ "afterBuild": "task-54 final build with milestone-2 controls + polish",
  "background": "synthetic white Notepad-like text window",
  "captures": [
   {
@@ -24,6 +24,11 @@
    "file": "task54-after-compact-860.png",
    "phase": "after",
    "state": "compact-860"
+  },
+  {
+   "file": "task54-after-controls-brightness-fallback-1150.png",
+   "phase": "after",
+   "state": "controls-brightness-fallback-1150"
   },
   {
    "file": "task54-after-controls-bt-1150.png",
@@ -81,6 +86,11 @@
    "state": "enter-180ms"
   },
   {
+   "file": "task54-after-enter-90ms-paused.png",
+   "phase": "after",
+   "state": "enter-90ms-paused"
+  },
+  {
    "file": "task54-after-enter-90ms.png",
    "phase": "after",
    "state": "enter-90ms"
@@ -94,6 +104,11 @@
    "file": "task54-after-exit-120ms.png",
    "phase": "after",
    "state": "exit-120ms"
+  },
+  {
+   "file": "task54-after-exit-60ms-paused.png",
+   "phase": "after",
+   "state": "exit-60ms-paused"
   },
   {
    "file": "task54-after-exit-60ms.png",
@@ -212,9 +227,9 @@
   }
  ],
  "notes": [
-  "No desktop text/ghost card inside island bbox; only native shadow pad transparent.",
-  "After captures include Wi-Fi/Bluetooth drilldowns with real mock networks/devices, Connect/Open network settings/Manage actions.",
-  "Quick Settings volume 62%/mute, brightness 80% (slider shown only when supported), audio output, split radio tiles, airplane/night light/energy saver ms-settings actions, Open Windows settings fallback.",
-  "Notifications 0/1/3, enter/exit transform frames, card switch, reduced motion."
+  "After captures include paused enter 90ms / exit 60ms frames (animationPlayState paused / Web Animations currentTime=60) in addition to 0/90/180 and 0/60/120 endpoint timing shots.",
+  "Quick Settings captures now show the labelled Audio output row and external chevron cues on Airplane/Night light/Energy saver; forced-fixture brightness-unsupported capture shows the reason + Open display settings fallback.",
+  "Wi-Fi and Bluetooth drilldowns use real mock networks/devices with Connect/Open network settings/Manage.",
+  "No desktop text or ghost card inside the island bbox; only native shadow pad transparent."
  ]
 }
