@@ -25,6 +25,6 @@ for ($try = 0; ; $try++) {
     try { Copy-Item -LiteralPath $exe -Destination $run -Force; break }
     catch { if ($try -ge 20) { throw }; Start-Sleep -Milliseconds 250 }
 }
-Start-Process -FilePath $run -WorkingDirectory $dir
+Start-Process explorer.exe -ArgumentList $run
 Write-Host ('Started ' + $run + ' (built ' + (Get-Item -LiteralPath $exe).LastWriteTime + ')')
 
