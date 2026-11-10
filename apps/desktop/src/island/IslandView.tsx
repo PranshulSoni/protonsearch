@@ -95,13 +95,21 @@ export default function IslandView() {
   const typedAtRef = useRef(0);
   const hideRef = useRef<() => void>(() => undefined);
 
+  const [clipboardRevision, setClipboardRevision] = useState(0);
+
+  useEffect(() => {
+    if (activeCard === "clipboard") {
+      setClipboardRevision((r) => r + 1);
+    }
+  }, [activeCard]);
+
   const searchState = useIslandSearch(
     scope,
     query,
     bootstrap.ready && activeCard === "search",
   );
   // Warm every card's data in parallel while the compact pill is shown.
-  const clipboardState = useIslandSearch("clipboard", "", bootstrap.ready);
+  const clipboardState = useIslandSearch("clipboard", "", bootstrap.ready, clipboardRevision);
   const browserState = useIslandSearch("browser", "", bootstrap.ready);
   const gitState = useIslandSearch("git", "", bootstrap.ready);
 
@@ -350,6 +358,7 @@ export default function IslandView() {
         // Listen exactly once: re-subscribing on every render previously caused
         // duplicate island:shown handlers and duplicate island-open perf marks.
         const offShown = await listen("island:shown", () => {
+          setClipboardRevision((r) => r + 1);
           tokenRef.current += 1;
           if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
           switchTimerRef.current = null;
@@ -374,6 +383,10 @@ export default function IslandView() {
           inputRef.current?.focus();
         });
         addListener(offShown);
+        const offClip = await listen("clipboard:change", () => {
+          setClipboardRevision((r) => r + 1);
+        });
+        addListener(offClip);
         const offDismiss = await listen("island:dismiss", () => {
           hideRef.current();
         });

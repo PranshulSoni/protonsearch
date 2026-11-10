@@ -179,11 +179,9 @@ expect(element.textContent).not.toContain("Changed mute.");
 setMuted.mockRestore();
   });
 
-  it("wires real Wi-Fi/Bluetooth toggles and Wi-Fi connect/fallbacks", async () => {
+  it("wires real Wi-Fi/Bluetooth toggles and fallbacks", async () => {
     const setWifi = vi.spyOn(api, "setWifi").mockResolvedValue();
     const setBluetooth = vi.spyOn(api, "setBluetooth").mockResolvedValue();
-    const connectWifi = vi.spyOn(api, "connectWifi").mockResolvedValue();
-    const openSettings = vi.spyOn(api, "openSettings").mockResolvedValue();
     const status: ControlsStatus = {
       mediaCapability: { supported: false, reason: "n/a" },
       media: null,
@@ -196,17 +194,11 @@ setMuted.mockRestore();
       brightnessMonitors: [],
       wifi: { supported: true, reason: null },
       wifiEnabled: true,
-      wifiNetworks: [
-        { ssid: "Home-5G", signal: 87, security: "WPA3", connected: true, hasProfile: true, connectable: true },
-        { ssid: "Cafe", signal: 40, security: "Open", connected: false, hasProfile: false, connectable: false },
-        { ssid: "Guest", signal: 55, security: "WPA2", connected: false, hasProfile: true, connectable: true },
-      ],
+      wifiNetworks: [],
       wifiError: null,
       bluetooth: { supported: true, reason: null },
       bluetoothEnabled: false,
-      bluetoothDevices: [
-        { id: "bt-1", name: "Pods", connected: true, paired: true },
-      ],
+      bluetoothDevices: [],
       bluetoothError: null,
       airplaneMode: { supported: false, reason: "n/a" },
       nightLight: { supported: false, reason: "n/a" },
@@ -237,76 +229,33 @@ setMuted.mockRestore();
     expect(setWifi).toHaveBeenCalledWith(false);
     expect(setBluetooth).toHaveBeenCalledWith(true);
     expect(element.querySelector('[role="status"]')?.textContent).toContain("Changed Bluetooth.");
-
-    await act(async () => {
-      (tiles[0].querySelector(".island-tile-chevron") as HTMLButtonElement).click();
-      await Promise.resolve();
-    });
-    const connect = [...element.querySelectorAll<HTMLButtonElement>(".island-drilldown-action")].find(
-      (button) => button.textContent === "Connect",
-    );
-    expect(connect).not.toBeNull();
-    expect([...element.querySelectorAll<HTMLButtonElement>(".island-drilldown-action")].find(
-      (button) => button.textContent === "Connected",
-    )?.disabled).toBe(true);
-    await act(async () => {
-      connect?.click();
-      await Promise.resolve();
-    });
-    expect(connectWifi).toHaveBeenCalledWith("Guest");
-    expect(element.querySelector('[role="status"]')?.textContent).toContain("Changed Wi-Fi.");
-    const fallback = [...element.querySelectorAll<HTMLButtonElement>(".island-drilldown-action")].find(
-      (button) => button.textContent === "Open network settings",
-    );
-    expect(fallback).not.toBeNull();
-    await act(async () => {
-      fallback?.click();
-      await Promise.resolve();
-    });
-    expect(openSettings).toHaveBeenCalledWith("wifi");
-    await act(async () => {
-      element.querySelector<HTMLButtonElement>(".island-drilldown-back")?.click();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      element.querySelector<HTMLButtonElement>('[aria-label="Show Bluetooth devices"]')?.click();
-      await Promise.resolve();
-    });
-    expect(element.textContent).toContain("Open Bluetooth settings");
     setWifi.mockRestore();
     setBluetooth.mockRestore();
-    connectWifi.mockRestore();
-    openSettings.mockRestore();
   });
 
-  it("shows Wi-Fi action progress and the rejection reason in the detail view", async () => {
-    let rejectConnect!: (reason: string) => void;
-    const connectWifi = vi.spyOn(api, "connectWifi").mockImplementation(
-      () => new Promise<void>((_resolve, reject) => { rejectConnect = reject; }),
+  it("shows Wi-Fi action progress and the rejection reason", async () => {
+    let rejectSetWifi!: (reason: string) => void;
+    const setWifi = vi.spyOn(api, "setWifi").mockImplementation(
+      () => new Promise<void>((_resolve, reject) => { rejectSetWifi = reject; }),
     );
     const status: ControlsStatus = {
       mediaCapability: { supported: false, reason: "n/a" }, media: null, audioOutputs: [], defaultAudioId: null,
       volumePercent: null, muted: null, brightnessCapability: { supported: false, reason: "n/a" },
       brightnessPercent: null, brightnessMonitors: [], wifi: { supported: true, reason: null }, wifiEnabled: true,
-      wifiNetworks: [{ ssid: "Home", signal: 90, security: "WPA2", connected: false, hasProfile: true, connectable: true }],
-      wifiError: null, bluetooth: { supported: false, reason: "n/a" }, bluetoothEnabled: null,
+      wifiNetworks: [], wifiError: null, bluetooth: { supported: false, reason: "n/a" }, bluetoothEnabled: null,
       bluetoothDevices: [], bluetoothError: null, airplaneMode: { supported: false, reason: "n/a" },
       nightLight: { supported: false, reason: "n/a" }, energySaver: { supported: false, reason: "n/a" },
       notifications: { supported: false, reason: "n/a" }, toastCapability: { supported: false, reason: "n/a" },
       notificationUnread: 0, notificationItems: [],
     };
     const element = await mount(<ControlsCard status={status} pending={false} error={null} refresh={() => undefined} />);
-    await act(async () => {
-      element.querySelector<HTMLButtonElement>('[aria-label="Show Wi-Fi networks"]')!.click();
-    });
-    const connect = element.querySelector<HTMLButtonElement>(".island-drilldown-action")!;
-    await act(async () => { connect.click(); });
+    const wifiToggle = element.querySelector<HTMLButtonElement>(".island-tile-main")!;
+    await act(async () => { wifiToggle.click(); });
     expect(element.textContent).toContain("Updating Wi-Fi…");
-    expect(connect.disabled).toBe(true);
-    await act(async () => { rejectConnect("Access denied by system"); await Promise.resolve(); });
+    await act(async () => { rejectSetWifi("Access denied by system"); await Promise.resolve(); });
     expect(element.textContent).toContain("Access denied by system");
     expect(element.querySelector('[role="alert"]')).not.toBeNull();
-    connectWifi.mockRestore();
+    setWifi.mockRestore();
   });
 
   it("shows the notification capability reason and a local toast test", async () => {

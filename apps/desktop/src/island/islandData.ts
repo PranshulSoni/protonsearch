@@ -88,6 +88,7 @@ export function useIslandSearch(
   scope: SearchScope,
   query: string,
   enabled: boolean,
+  revision = 0,
 ): ScopedSearchState {
   const [state, setState] = useState<ScopedSearchState & { scope: SearchScope }>({
     scope,
@@ -132,7 +133,7 @@ export function useIslandSearch(
           error: error instanceof Error ? error.message : "Search is unavailable right now.",
         });
       });
-  }, [enabled, scope, query]);
+  }, [enabled, scope, query, revision]);
 
   return state.scope === scope ? state : { results: [], total: 0, pending: enabled, error: null };
 }

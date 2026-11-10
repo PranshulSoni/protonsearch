@@ -20,15 +20,15 @@ html[data-window="island"] #root {
   --island-footer-border: #262c30;
   --island-row-hover: #202d35;
   --island-row-border: #334b5b;
-  --island-control-bg: #171e23;
-  --island-control-border: #34434a;
-  --island-control-on: #223a49;
-  --island-control-on-border: #416178;
-  --island-raised: #1c2931;
-  --island-icon: #bad2df;
-  --island-track: #27343d;
-  --island-track-fill: #a6c7d8;
-  --island-focus: #92bcd0;
+  --island-control-bg: rgba(255, 255, 255, 0.05);
+  --island-control-border: rgba(255, 255, 255, 0.09);
+  --island-control-on: rgba(255, 255, 255, 0.16);
+  --island-control-on-border: rgba(255, 255, 255, 0.25);
+  --island-raised: #1c1c1c;
+  --island-icon: #9ca3af;
+  --island-track: #262626;
+  --island-track-fill: #e5e5e5;
+  --island-focus: #a3a3a3;
   --island-focus-input: #9abedd;
   --island-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --island-dur-morph: 550ms;
@@ -1578,44 +1578,61 @@ html[data-window="island"] #root {
 .island-notification-list {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 156px;
+  max-height: 230px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  scrollbar-width: thin;
+  gap: 8px;
+  padding-right: 4px;
+  scroll-behavior: smooth;
 }
 
 .island-notification-row {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 30px;
-  align-items: start;
-  gap: 8px;
-  height: 52px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   box-sizing: border-box;
-  padding: 9px 8px;
-  border-radius: 8px;
-  color: var(--island-icon);
+  transition: all 0.15s ease;
+}
+
+.island-notification-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .island-notification-row > svg {
+  flex: none;
   margin-top: 2px;
+  color: #9ca3af;
+}
+
+.island-notification-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .island-notification-title {
   font-size: 12px;
   font-weight: 600;
-  color: #e9edf1;
+  color: #ffffff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .island-notification-text {
-  margin-top: 3px;
-  font-size: 10px;
+  margin-top: 1px;
+  font-size: 11px;
   line-height: 1.4;
-  color: #97a6ae;
+  color: #9ca3af;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1624,13 +1641,28 @@ html[data-window="island"] #root {
 
 .island-notification-source {
   font-size: 10px;
-  color: #7d878d;
+  color: #6b7280;
+  margin-top: 2px;
 }
 
 .island-dismiss-button {
-  width: 30px;
-  height: 30px;
-  align-self: center;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.island-dismiss-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
 }
 
 .island-notification-footer {
@@ -2080,9 +2112,9 @@ html[data-window="island"] #root {
 }
 
 .island-notification-list {
-  gap: 6px;
-  padding-right: 8px;
-  max-height: 156px;
+  gap: 8px;
+  padding-right: 4px;
+  max-height: 230px;
 }
 
 .island-notif-empty {
@@ -2104,25 +2136,38 @@ html[data-window="island"] #root {
 }
 
 .island-setting-row {
-  min-height: 36px;
-  height: 36px;
+  min-height: 38px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 6px 10px;
+  box-sizing: border-box;
 }
 
 .island-mute-button {
   flex: none;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #9daab0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.island-mute-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
 }
 
 .island-mute-button[aria-pressed="true"] {
-  background: var(--island-control-on);
-  color: #e3f0f7;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
 }
 
 .island-mute-button:disabled {
@@ -2132,70 +2177,92 @@ html[data-window="island"] #root {
 .island-control-tile {
   display: flex;
   align-items: stretch;
-  min-height: 56px;
+  min-height: 52px;
   padding: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.island-control-tile:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .island-tile-main {
   flex: 1;
+  width: 100%;
   min-width: 0;
-  display: grid;
-  grid-template-columns: 19px 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 10px;
+  padding: 10px 14px;
   border: 0;
   background: transparent;
-  color: var(--island-icon);
+  color: #9ca3af;
   font: inherit;
   text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .island-tile-main:disabled {
-  opacity: 0.62;
+  opacity: 0.5;
   cursor: not-allowed;
 }
+
 .island-tile-main[aria-checked="true"] {
-  background: var(--island-control-on);
-  color: #c7e2f3;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
 }
-.island-tile-main[aria-checked="true"] .island-tile-label,
-.island-tile-main[aria-checked="true"] .island-tile-state {
-  color: #dceef8;
+
+.island-control-tile:has(.island-tile-main[aria-checked="true"]) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
 }
-.island-tile-main:hover:not(:disabled) { background: #25343e; }
-.island-tile-main[aria-checked="true"]:hover:not(:disabled) { background: #2c4b5d; }
+
+.island-control-tile:has(.island-tile-main[aria-checked="true"]):hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
 .island-tile-main:focus-visible,
-.island-tile-chevron:focus-visible,
 .island-mute-button:focus-visible {
   outline: 2px solid var(--island-focus);
-  outline-offset: -3px;
+  outline-offset: -2px;
 }
 
 .island-tile-label {
+  flex: 1;
   font-size: 11px;
-  color: #d6e0e3;
+  font-weight: 500;
+  color: #d1d5db;
+}
+
+.island-tile-main[aria-checked="true"] .island-tile-label {
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .island-tile-state {
   font-size: 10px;
-  color: #a5b5be;
+  font-weight: 500;
+  color: #6b7280;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.island-tile-main[aria-checked="true"] .island-tile-state {
+  color: #111827;
+  background: #ffffff;
+  font-weight: 600;
 }
 
 .island-tile-chevron {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  border: 0;
-  border-left: 1px solid var(--island-control-border);
-  background: transparent;
-  color: #9daab0;
-}
-
-.island-tile-chevron:hover {
-  background: var(--island-row-hover);
+  display: none;
 }
 
 .island-settings-link {
@@ -2203,17 +2270,41 @@ html[data-window="island"] #root {
   align-items: center;
   gap: 6px;
   align-self: flex-start;
-  min-height: 32px;
+  min-height: 28px;
   margin-top: 6px;
   padding: 0;
   border: 0;
   background: transparent;
-  color: #9daab0;
+  color: #6b7280;
   font: inherit;
   font-size: 10px;
 }
 
 .island-settings-link:hover {
-  color: #d7e8ee;
+  color: #d1d5db;
   text-decoration: underline;
+}
+
+/* Custom smooth dark-mode scrollbar */
+.island-scrollable::-webkit-scrollbar {
+  width: 4px;
+}
+
+.island-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.island-scrollable::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+  transition: background 0.15s ease;
+}
+
+.island-scrollable::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.island-scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
 }
