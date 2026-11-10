@@ -287,7 +287,6 @@ export function ClipboardCard({
   onOpen: (result: SearchResult) => void;
 }) {
   const visible = filterClipboard(results, tab);
-  const selected = visible[0] ?? null;
   return (
     <div className="island-card island-clipboard">
       <CardHead
