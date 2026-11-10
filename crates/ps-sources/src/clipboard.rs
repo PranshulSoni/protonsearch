@@ -131,11 +131,26 @@ pub fn start_listener_with_options(
     image_dir: PathBuf,
     options: ClipboardCaptureOptions,
 ) -> Result<ps_windows::ClipboardListener> {
+    start_listener_with_callback(db_path, image_dir, options, None)
+}
+
+pub fn start_listener_with_callback(
+    db_path: PathBuf,
+    image_dir: PathBuf,
+    options: ClipboardCaptureOptions,
+    on_change: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
+) -> Result<ps_windows::ClipboardListener> {
     let _ = capture_current_with_options(&db_path, &image_dir, options);
     let listener = ps_windows::ClipboardListener::start(move |snapshot| {
         let snapshot = filter_snapshot(snapshot, options);
         if snapshot.has_content() {
-            let _ = record_snapshot(&db_path, &image_dir, &snapshot);
+            if let Ok(ids) = record_snapshot(&db_path, &image_dir, &snapshot) {
+                if !ids.is_empty() {
+                    if let Some(cb) = on_change.as_ref() {
+                        cb();
+                    }
+                }
+            }
         }
     })?;
     Ok(listener)

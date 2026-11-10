@@ -62,6 +62,7 @@ impl ClipboardHook {
         db_path: PathBuf,
         image_dir: PathBuf,
         capture: ClipboardCapture,
+        on_change: Option<Arc<dyn Fn() + Send + Sync>>,
     ) -> anyhow::Result<Self> {
         #[cfg(test)]
         if FAKE_CLIPBOARD_HOOK.load(Ordering::Relaxed) {
@@ -72,7 +73,7 @@ impl ClipboardHook {
             capture_images: capture.capture_images,
         };
         Ok(ClipboardHook::Real(
-            ps_sources::clipboard::start_listener_with_options(db_path, image_dir, options)?,
+            ps_sources::clipboard::start_listener_with_callback(db_path, image_dir, options, on_change)?,
         ))
     }
 
@@ -150,6 +151,7 @@ pub struct Engine {
     /// Live Win32 clipboard listener (only one per process). Held so it can be
     /// stopped explicitly on shutdown or when the privacy setting is disabled.
     clipboard_listener: Mutex<Option<(ClipboardHook, ClipboardCapture)>>,
+    clipboard_callback: Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
     /// One-shot confirmation state for destructive native commands: a request
     /// must be repeated through confirm_destructive within 15 seconds.
     pending_destructive: Mutex<Option<(NativeCommand, i64)>>,
@@ -223,7 +225,7 @@ impl Engine {
         let needs_work = legacy_pending || (settings.onboarding_complete && has_roots);
         let initial_state = if needs_work { STATE_STARTING } else { STATE_READY };
 
-        Ok(Self {
+        let this = Self {
             config,
             settings: RwLock::new(settings),
             index: RwLock::new(index),
@@ -245,8 +247,11 @@ impl Engine {
             recent_results: Mutex::new(ResultRegistry::default()),
             preview_cache: Mutex::new(PreviewCache::default()),
             clipboard_listener: Mutex::new(None),
+            clipboard_callback: Mutex::new(None),
             pending_destructive: Mutex::new(None),
-        })
+        };
+        this.sync_clipboard_listener();
+        Ok(this)
     }
 
     pub fn version(&self) -> &str {
@@ -255,6 +260,13 @@ impl Engine {
 
     pub fn data_dir(&self) -> &Path {
         &self.config.data_dir
+    }
+
+    pub fn set_clipboard_change_callback(&self, cb: Arc<dyn Fn() + Send + Sync>) {
+        if let Ok(mut slot) = self.clipboard_callback.lock() {
+            *slot = Some(cb);
+        }
+        self.sync_clipboard_listener();
     }
 
     /// Start background indexing. Fast, idempotent and never blocks the caller.
@@ -1276,7 +1288,8 @@ impl Engine {
                 }
                 let db_path = self.clipboard_db_path();
                 let image_dir = self.config.data_dir.join("clipboard-images");
-                match ClipboardHook::start(db_path, image_dir, capture) {
+                let on_change = self.clipboard_callback.lock().ok().and_then(|g| g.clone());
+                match ClipboardHook::start(db_path, image_dir, capture, on_change) {
                     Ok(hook) => *guard = Some((hook, capture)),
                     Err(err) => {
                         drop(guard);

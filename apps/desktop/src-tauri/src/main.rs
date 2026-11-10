@@ -1879,6 +1879,20 @@ dispatch_window_action(app, toggle_primary_launcher);
             let data_dir = ps_core::paths::v2_data_dir();
             let config = engine_config(data_dir.clone());
             let engine = Arc::new(Engine::open(config).map_err(|e| format!("engine init: {e}"))?);
+            let clip_app = app.handle().clone();
+            engine.set_clipboard_change_callback(Arc::new(move || {
+                let _ = clip_app.emit("clipboard:change", ());
+            }));
+            let settings = engine.settings();
+            if settings.launcher.island.cards.iter().any(|c| c.id == ps_ipc::IslandCardId::Clipboard && c.enabled)
+                && !settings.privacy.clipboard_history
+            {
+                let mut privacy = settings.privacy;
+                privacy.clipboard_history = true;
+                let mut patch = ps_ipc::SettingsPatch::default();
+                patch.privacy = Some(privacy);
+                let _ = engine.update_settings(patch);
+            }
             let agent_task_app = app.handle().clone();
             let mut agent_redactions: Vec<String> = Vec::new();
             for key in [
