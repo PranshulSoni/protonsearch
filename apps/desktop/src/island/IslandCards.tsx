@@ -384,11 +384,6 @@ export function ClipboardCard({
           ))
         )}
       </div>
-      {selected ? (
-        <div className="island-snippet" aria-label="Selected clip text">
-          {selected.title}
-        </div>
-      ) : null}
     </div>
   );
 }

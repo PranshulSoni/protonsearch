@@ -167,9 +167,9 @@ export function clipboardKind(result: SearchResult): Exclude<ClipTab, "all" | "p
 }
 
 export function filterClipboard(results: SearchResult[], tab: ClipTab): SearchResult[] {
-  if (tab === "all") return results;
-  if (tab === "pinned") return [];
-  return results.filter((result) => clipboardKind(result) === tab);
+  const filtered =
+    tab === "all" ? results : tab === "pinned" ? [] : results.filter((result) => clipboardKind(result) === tab);
+  return [...filtered].sort((a, b) => (b.meta?.modified ?? 0) - (a.meta?.modified ?? 0));
 }
 
 export function relativeTime(timestamp?: number | null): string {

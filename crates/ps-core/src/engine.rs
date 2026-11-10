@@ -331,11 +331,11 @@ impl Engine {
                 let mut hits = 0usize;
                 if settings.privacy.clipboard_history {
                     let db_path = self.clipboard_db_path();
-                    for entry in ps_sources::clipboard::list_recent(&db_path, 8) {
+                    for (i, entry) in ps_sources::clipboard::list_recent(&db_path, 20).into_iter().enumerate() {
                         ranked.push(Ranked {
                             tier: 0,
                             priority: 8,
-                            score: 400.0,
+                            score: 1000.0 - (i as f32 * 1.0),
                             result: clipboard_result(&entry),
                         });
                         hits += 1;
@@ -572,14 +572,15 @@ impl Engine {
             } else {
                 filename_query.as_str()
             };
-            for entry in ps_sources::clipboard::search(&db_path, query, 8)
+            for (i, entry) in ps_sources::clipboard::search(&db_path, query, 20)
                 .into_iter()
-                .take(4)
+                .take(10)
+                .enumerate()
             {
                 ranked.push(Ranked {
                     tier: 1,
                     priority: 8,
-                    score: 400.0,
+                    score: 1000.0 - (i as f32 * 1.0),
                     result: clipboard_result(&entry),
                 });
                 source_hits += 1;

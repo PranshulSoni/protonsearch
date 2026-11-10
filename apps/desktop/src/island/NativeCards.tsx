@@ -81,7 +81,15 @@ export function MediaCard({
   if (!media) {
     return (
       <div className="island-card island-media-card">
-        <CardHead card="media" title="Media" subtitle="Now playing" />
+        <header className="island-card-head island-media-head">
+          <span className="island-icon-tile">
+            <IslandIcon name="media" size={22} />
+          </span>
+          <div className="island-card-heading">
+            <h2>Media</h2>
+            <p>Nothing playing</p>
+          </div>
+        </header>
         <div className="island-divider" />
         <EmptyState title="Nothing is playing right now." hint="Start playback and the current session appears here." />
       </div>
@@ -89,14 +97,31 @@ export function MediaCard({
   }
   return (
     <div className="island-card island-media-card">
-      <CardHead card="media" title="Media" subtitle="Now playing" />
+      <header className="island-card-head island-media-head">
+        <span className="island-icon-tile">
+          <IslandIcon name="media" size={22} />
+        </span>
+        <div className="island-card-heading">
+          <h2>Media</h2>
+          <p>{media.playing ? "Now playing" : "Paused"}</p>
+        </div>
+        {media.playing ? (
+          <div className="island-sound-bars" aria-label="Playing">
+            <span className="island-bar" />
+            <span className="island-bar" />
+            <span className="island-bar" />
+            <span className="island-bar" />
+          </div>
+        ) : null}
+      </header>
       <div className="island-divider" />
       <div className="island-media-body">
-        <div className="island-media-label">CURRENT SESSION</div>
-        <div className="island-media-title">{media.title}</div>
-        <div className="island-media-artist">
-          {media.artist}
-          {media.album ? " · " + media.album : ""}
+        <div className="island-media-info">
+          <div className="island-media-title">{media.title}</div>
+          <div className="island-media-artist">
+            {media.artist}
+            {media.album ? " · " + media.album : ""}
+          </div>
         </div>
         <div className="island-media-progress" aria-hidden="true">
           <span
@@ -114,33 +139,39 @@ export function MediaCard({
           <span>{formatTime(media.durationMs)}</span>
         </div>
         <div className="island-media-actions">
-          {(["prev", "play", "next"] as const).map((action) => (
-            <button
-              key={action}
-              type="button"
-              className="island-media-button"
-              title="Control the current media session"
-              onClick={() => {
-                void api
-                  .mediaCommand(
-                  action === "play"
-                    ? media.playing
-                      ? "pause"
-                      : "play"
-                    : action === "prev"
-                      ? "previous"
-                      : action,
-                )
-                  .then(refresh)
-                  .catch(() => undefined);
-              }}
-            >
-              <IslandIcon
-                name={action === "prev" ? "prev" : action === "next" ? "next" : media.playing ? "pause" : "play"}
-                size={action === "play" ? 20 : 18}
-              />
-            </button>
-          ))}
+          <button
+            type="button"
+            className="island-media-button island-media-prev"
+            title="Previous track"
+            aria-label="Previous track"
+            onClick={() => {
+              void api.mediaCommand("previous").then(refresh).catch(() => undefined);
+            }}
+          >
+            <IslandIcon name="prev" size={17} />
+          </button>
+          <button
+            type="button"
+            className="island-media-button island-media-play"
+            title={media.playing ? "Pause" : "Play"}
+            aria-label={media.playing ? "Pause" : "Play"}
+            onClick={() => {
+              void api.mediaCommand(media.playing ? "pause" : "play").then(refresh).catch(() => undefined);
+            }}
+          >
+            <IslandIcon name={media.playing ? "pause" : "play"} size={22} />
+          </button>
+          <button
+            type="button"
+            className="island-media-button island-media-next"
+            title="Next track"
+            aria-label="Next track"
+            onClick={() => {
+              void api.mediaCommand("next").then(refresh).catch(() => undefined);
+            }}
+          >
+            <IslandIcon name="next" size={17} />
+          </button>
         </div>
         {status.audioOutputs.length > 0 ? (
           <AudioOutputs
@@ -165,24 +196,43 @@ function AudioOutputs({
   defaultId: string | null;
   onSelect: (deviceId: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const active = outputs.find((o) => o.id === defaultId || o.isDefault) ?? outputs[0] ?? null;
   return (
-    <div className="island-media-outputs">
-      <span className="island-context-caps">OUTPUT</span>
-      {outputs.map((output) => {
-        const active = output.isDefault || output.id === defaultId;
-        return (
-          <button
-            type="button"
-            className={"island-media-output" + (active ? " is-active" : "")}
-            key={output.id}
-            onClick={() => onSelect(output.id)}
-          >
-            <IslandIcon name="output" size={16} />
-            <span>{output.name}</span>
-            {active ? <IslandIcon name="check" size={14} /> : null}
-          </button>
-        );
-      })}
+    <div className="island-media-output-picker">
+      <button
+        type="button"
+        className="island-media-output-btn"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <IslandIcon name="output" size={14} />
+        <span className="island-media-output-name">{active?.name ?? "Select output"}</span>
+        <IslandIcon name="chevron" size={13} />
+      </button>
+      {open ? (
+        <div className="island-media-output-menu" role="listbox">
+          {outputs.map((output) => {
+            const isCur = output.id === defaultId || output.isDefault;
+            return (
+              <button
+                key={output.id}
+                type="button"
+                role="option"
+                aria-selected={isCur}
+                className={"island-media-output-item" + (isCur ? " is-active" : "")}
+                onClick={() => {
+                  onSelect(output.id);
+                  setOpen(false);
+                }}
+              >
+                <span>{output.name}</span>
+                {isCur ? <IslandIcon name="check" size={13} /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -219,7 +269,10 @@ export function ControlsCard({
     setControlSuccess(null);
     void action()
       .then(() => refresh())
-      .then(() => setControlSuccess("Changed " + label + "."))
+      .then(() => {
+        setControlSuccess("Changed " + label + ".");
+        setTimeout(() => setControlSuccess(null), 2200);
+      })
       .catch((reason: unknown) => {
         const message = reason instanceof Error ? reason.message : typeof reason === "string" ? reason : "";
         setVolume(status?.volumePercent ?? 0);
@@ -347,16 +400,18 @@ export function ControlsCard({
             role="switch"
             aria-checked={status.wifiEnabled === true}
             aria-label="Wi-Fi"
-            className="island-tile-main"
+            className={"island-tile-main" + (status.wifiEnabled ? " is-on" : "")}
             disabled={!status.wifi.supported || status.wifiEnabled == null || controlPending != null}
             title={status.wifi.supported ? "Toggle Wi-Fi" : status.wifi.reason || "Wi-Fi can't be changed here."}
             onClick={() => runControl("Wi-Fi", () => api.setWifi(!(status.wifiEnabled === true)), "wifi")}
           >
-            <IslandIcon name="wifi" size={19} />
-            <span className="island-tile-label">Wi-Fi</span>
-            <span className="island-tile-state">
-              {status.wifi.supported ? (status.wifiEnabled == null ? "—" : status.wifiEnabled ? "On" : "Off") : "Can't change"}
+            <span className="island-tile-icon-box">
+              <IslandIcon name="wifi" size={17} />
             </span>
+            <span className="island-tile-label">Wi-Fi</span>
+            {!status.wifi.supported ? (
+              <span className="island-tile-state">Can't change</span>
+            ) : null}
           </button>
         </div>
         <div className="island-control-tile">
@@ -365,16 +420,18 @@ export function ControlsCard({
             role="switch"
             aria-checked={status.bluetoothEnabled === true}
             aria-label="Bluetooth"
-            className="island-tile-main"
+            className={"island-tile-main" + (status.bluetoothEnabled ? " is-on" : "")}
             disabled={!status.bluetooth.supported || status.bluetoothEnabled == null || controlPending != null}
             title={status.bluetooth.supported ? "Toggle Bluetooth" : status.bluetooth.reason || "Bluetooth can't be changed here."}
             onClick={() => runControl("Bluetooth", () => api.setBluetooth(!(status.bluetoothEnabled === true)), "bluetooth")}
           >
-            <IslandIcon name="bluetooth" size={19} />
-            <span className="island-tile-label">Bluetooth</span>
-            <span className="island-tile-state">
-              {status.bluetooth.supported ? (status.bluetoothEnabled == null ? "—" : status.bluetoothEnabled ? "On" : "Off") : "Can't change"}
+            <span className="island-tile-icon-box">
+              <IslandIcon name="bluetooth" size={17} />
             </span>
+            <span className="island-tile-label">Bluetooth</span>
+            {!status.bluetooth.supported ? (
+              <span className="island-tile-state">Can't change</span>
+            ) : null}
           </button>
         </div>
       </div>
@@ -449,27 +506,33 @@ export function NotificationsCard({
         <div className="island-notification-list island-scrollable" role="list" aria-label="Notifications">
           {status.notificationItems.map((item) => (
             <div className="island-notification-row" key={item.id}>
-              <IslandIcon name="bell" size={18} />
-              <span className="island-notification-body">
-                <span className="island-notification-title">{item.title}</span>
-                <span className="island-notification-text">{item.body}</span>
-                <span className="island-notification-source">
-                  {item.source}
-                  {item.createdAt ? " · " + relativeTime(item.createdAt) : ""}
-                </span>
+              <span className="island-notif-app-icon">
+                <IslandIcon name="bell" size={15} />
               </span>
-              <button
-                type="button"
-                className="island-dismiss-button"
-                disabled={!supported}
-                title="Dismiss this notification"
-                aria-label={"Dismiss " + item.title}
-                onClick={() => {
-                  void api.notificationsDismiss(item.id).then(refresh).catch(() => undefined);
-                }}
-              >
-                <IslandIcon name="dismiss" size={15} />
-              </button>
+              <div className="island-notification-body">
+                <div className="island-notification-header-line">
+                  <span className="island-notification-source">{item.source || "System"}</span>
+                  {item.createdAt ? (
+                    <span className="island-notification-dot-time">
+                      {" · " + relativeTime(item.createdAt)}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="island-dismiss-button"
+                    disabled={!supported}
+                    title="Dismiss this notification"
+                    aria-label={"Dismiss " + item.title}
+                    onClick={() => {
+                      void api.notificationsDismiss(item.id).then(refresh).catch(() => undefined);
+                    }}
+                  >
+                    <IslandIcon name="dismiss" size={13} />
+                  </button>
+                </div>
+                <div className="island-notification-title">{item.title}</div>
+                {item.body ? <div className="island-notification-text">{item.body}</div> : null}
+              </div>
             </div>
           ))}
         </div>

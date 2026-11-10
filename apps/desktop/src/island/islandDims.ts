@@ -33,7 +33,7 @@ const NOMINAL_WIDTH: Record<IslandCardId, number> = {
 
 const HEIGHTS: Record<IslandCardView, { wide: number; mid: number; narrow: number }> = {
   search: { wide: 66, mid: 66, narrow: 66 },
-  media: { wide: 286, mid: 286, narrow: 286 },
+  media: { wide: 350, mid: 360, narrow: 360 },
   clipboard: { wide: 391, mid: 416, narrow: 446 },
   agent: { wide: 411, mid: 445, narrow: 445 },
   controls: { wide: 376, mid: 400, narrow: 483 },

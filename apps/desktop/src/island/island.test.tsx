@@ -94,7 +94,7 @@ describe("V9 island geometry", () => {
       [{ card: "agent", stageWidth: 335, compact: false }, { w: 315, h: 445 }],
       [{ card: "controls", stageWidth: 1150, compact: false }, { w: 515, h: 376 }],
       [{ card: "controls", stageWidth: 335, compact: false }, { w: 315, h: 483 }],
-      [{ card: "media", stageWidth: 1150, compact: false }, { w: 490, h: 286 }],
+      [{ card: "media", stageWidth: 1150, compact: false }, { w: 490, h: 350 }],
       [{ card: "git", stageWidth: 520, compact: false }, { w: 500, h: 355 }],
       [{ card: "browser", stageWidth: 335, compact: false }, { w: 315, h: 408 }],
       [{ card: "bell", stageWidth: 1150, compact: false }, { w: 500, h: 345 }],
@@ -471,7 +471,7 @@ await new Promise((resolve) => setTimeout(resolve, 50));
 (element.querySelector('.island-dot-button[aria-label="Go to Search card"]') as HTMLButtonElement).click();
 await new Promise((resolve) => setTimeout(resolve, 350));
 });
-expect(calls.at(-1)).toEqual({ w: 550, h: 286 });
+expect(calls.at(-1)).toEqual({ w: 550, h: 350 });
 await act(async () => {
 await new Promise((resolve) => setTimeout(resolve, 250));
 });
