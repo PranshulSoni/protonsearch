@@ -444,9 +444,13 @@ return;
     focus_window(&win);
 }
 
-fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+fn build_tray(app: &AppHandle, active_hotkey: &str) -> tauri::Result<()> {
+    if app.tray_by_id("protonsearch-tray").is_some() {
+        return Ok(());
+    }
     let open = MenuItem::with_id(app, "open", "Open ProtonSearch", true, None::<&str>)?;
-    let search = MenuItem::with_id(app, "search", "Search (Alt+Space)", true, None::<&str>)?;
+    let search_label = format!("Search ({active_hotkey})");
+    let search = MenuItem::with_id(app, "search", &search_label, true, None::<&str>)?;
     let pause = MenuItem::with_id(app, "pause", "Pause indexing", true, None::<&str>)?;
     let resume = MenuItem::with_id(app, "resume", "Resume indexing", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
@@ -457,15 +461,16 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     // absent and would silently produce an invisible tray entry.
     let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
         .map_err(|err| tauri::Error::AssetNotFound(err.to_string()))?;
+    let tooltip = format!("ProtonSearch — {active_hotkey} to search");
     let builder = TrayIconBuilder::with_id("protonsearch-tray")
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("ProtonSearch — Alt+Space to search")
+        .tooltip(&tooltip)
         .icon(tray_icon);
     builder
         .on_menu_event(|app, event| match event.id.as_ref() {
-"open" => dispatch_window_action(app, show_main_window),
-"search" => dispatch_window_action(app, show_primary_launcher),
+            "open" => dispatch_window_action(app, show_main_window),
+            "search" => dispatch_window_action(app, show_primary_launcher),
             "pause" => {
                 if let Some(state) = app.try_state::<AppState>() {
                     let _ = state.engine.index_command(IndexCommand::Pause);
@@ -491,7 +496,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 ..
             } = event
             {
-dispatch_window_action(tray.app_handle(), toggle_primary_launcher);
+                dispatch_window_action(tray.app_handle(), toggle_primary_launcher);
             }
         })
         .build(app)?;
@@ -1912,23 +1917,47 @@ dispatch_window_action(app, toggle_primary_launcher);
                 start_ui_stall_probe(app.handle());
             }
 
-            step("tray: building");
-            build_tray(app.handle())?;
-
             step("hotkey: registering");
             let shortcut = app.state::<AppState>().engine.settings().hotkey;
+            let mut active_hotkey = shortcut.clone();
             if let Err(err) = app.global_shortcut().register(shortcut.as_str()) {
                 eprintln!("[setup] global shortcut '{shortcut}' could not be registered: {err}");
+                let fallbacks = ["Alt+Shift+Space", "Ctrl+Alt+Space"];
+                let mut registered = false;
+                for fallback in fallbacks {
+                    if app.global_shortcut().register(fallback).is_ok() {
+                        active_hotkey = fallback.to_string();
+                        registered = true;
+                        eprintln!("[setup] registered fallback global shortcut: {fallback}");
+                        break;
+                    }
+                }
+                if registered {
+                    let _ = ps_windows::show_toast(
+                        "ProtonSearch",
+                        &format!("'{shortcut}' is in use by another app (e.g. PowerToys). Press '{active_hotkey}' to search."),
+                    );
+                }
+            } else {
+                let _ = app.global_shortcut().register("Alt+Shift+Space");
             }
+
+            step("tray: building");
+            if let Err(err) = build_tray(app.handle(), &active_hotkey) {
+                eprintln!("[setup] warning: could not create system tray icon: {err}");
+            }
+
             step("windows: creating in background");
             let window_app = app.handle().clone();
             let first_run = !engine.settings().onboarding_complete;
             std::thread::spawn(move || {
                 if first_run {
                     show_main_window(&window_app);
-                }
-                if let Err(err) = create_windows(&window_app) {
-                    eprintln!("[setup] failed to create launcher window: {err}");
+                    if let Err(err) = create_windows(&window_app) {
+                        eprintln!("[setup] failed to create launcher window: {err}");
+                    }
+                } else {
+                    show_primary_launcher(&window_app);
                 }
             });
             step("setup: complete");
