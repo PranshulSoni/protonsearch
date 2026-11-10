@@ -2581,10 +2581,8 @@ fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
         },
         action: if is_image_row {
             match entry.image_path.as_deref() {
-                Some(image_path) => ActionSpec::OpenPath {
+                Some(image_path) => ActionSpec::CopyImage {
                     path: image_path.to_string(),
-                    line: None,
-                    column: None,
                 },
                 None => ActionSpec::None,
             }
@@ -2834,6 +2832,7 @@ fn describe_action(action: &ActionSpec) -> (ActivityKind, String, Option<String>
         ActionSpec::OpenUrl { url } => (ActivityKind::Open, url.clone(), None),
         ActionSpec::LaunchApp { app_id, .. } => (ActivityKind::Launch, app_id.clone(), None),
         ActionSpec::CopyText { text } => (ActivityKind::Open, text.chars().take(80).collect(), None),
+        ActionSpec::CopyImage { path } => (ActivityKind::Open, format!("Copied image: {path}"), Some(path.clone())),
         ActionSpec::RunNative { command } => (ActivityKind::Workflow, format!("{command:?}"), None),
         ActionSpec::RunWorkflow { id } => (ActivityKind::Workflow, id.clone(), None),
         ActionSpec::None => (ActivityKind::System, "No action".into(), None),

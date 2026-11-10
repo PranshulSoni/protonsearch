@@ -46,6 +46,22 @@ pub fn execute_with(action: &ActionSpec, v2_db: Option<&Path>) -> OpenOutcome {
         ActionSpec::CopyText { text } => {
             ps_windows::set_clipboard_text(text).map(|_| "Copied to clipboard".to_string())
         }
+        ActionSpec::CopyImage { path } => {
+            let target = Path::new(path);
+            if !target.is_file() {
+                return OpenOutcome {
+                    ok: false,
+                    message: format!("image file does not exist: {path}"),
+                };
+            }
+            match std::fs::read(target) {
+                Ok(bytes) => match ps_windows::set_clipboard_image(&bytes) {
+                    Ok(()) => Ok("Copied image to clipboard".to_string()),
+                    Err(e) => Err(anyhow::anyhow!("failed to set clipboard image: {e}")),
+                },
+                Err(e) => Err(anyhow::anyhow!("failed to read image file: {e}")),
+            }
+        }
         ActionSpec::RunNative { command } => return run_native(*command),
         ActionSpec::RunWorkflow { id } => run_workflow(id, v2_db),
         ActionSpec::None => {

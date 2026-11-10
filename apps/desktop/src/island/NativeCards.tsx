@@ -252,7 +252,6 @@ export function ControlsCard({
   const [brightness, setBrightness] = useState(status?.brightnessPercent ?? 0);
   const [audioOpen, setAudioOpen] = useState(false);
   const [controlError, setControlError] = useState<string | null>(null);
-  const [controlSuccess, setControlSuccess] = useState<string | null>(null);
   const [controlErrorPage, setControlErrorPage] = useState<string>("display");
   const [controlPending, setControlPending] = useState<string | null>(null);
   const controlPendingRef = useRef(false);
@@ -266,13 +265,8 @@ export function ControlsCard({
     controlPendingRef.current = true;
     setControlPending(label);
     setControlError(null);
-    setControlSuccess(null);
     void action()
       .then(() => refresh())
-      .then(() => {
-        setControlSuccess("Changed " + label + ".");
-        setTimeout(() => setControlSuccess(null), 2200);
-      })
       .catch((reason: unknown) => {
         const message = reason instanceof Error ? reason.message : typeof reason === "string" ? reason : "";
         setVolume(status?.volumePercent ?? 0);
@@ -292,12 +286,12 @@ export function ControlsCard({
   const openSettings = (page: string) => {
     void api.openSettings(page).catch(() => undefined);
   };
-  const feedback = controlPending || controlError || controlSuccess ? (
-    <div className={"island-control-feedback" + (controlError ? " is-error" : controlPending ? " is-pending" : " is-success")} role={controlError ? "alert" : "status"}>
-      <span>{controlPending ? "Updating " + controlPending + "…" : controlError ?? controlSuccess}</span>
-      {controlError ? <button type="button" className="island-control-link" onClick={() => openSettings(controlErrorPage)}>
+  const feedback = controlError ? (
+    <div className="island-control-feedback is-error" role="alert">
+      <span>{controlError}</span>
+      <button type="button" className="island-control-link" onClick={() => openSettings(controlErrorPage)}>
         Open Windows settings
-      </button> : null}
+      </button>
     </div>
   ) : null;
 
@@ -314,7 +308,8 @@ export function ControlsCard({
     <div className="island-card island-controls-card">
       <CardHead card="controls" title="Quick Settings" subtitle="Your PC, one gesture away" />
 
-      <div className="island-setting-row">
+      <div className="island-controls-body">
+        <div className="island-setting-row">
         <IslandIcon name="volume" size={18} />
         <span className="island-setting-label">Volume</span>
         <input
@@ -436,12 +431,15 @@ export function ControlsCard({
         </div>
       </div>
 
-      {feedback}
+        {feedback}
+      </div>
 
-      <button type="button" className="island-settings-link" onClick={() => openSettings("display")}>
-        <IslandIcon name="controls" size={16} />
-        Open Windows settings
-      </button>
+      <div className="island-controls-footer">
+        <button type="button" className="island-settings-link" onClick={() => openSettings("display")}>
+          <IslandIcon name="controls" size={16} />
+          Open Windows settings
+        </button>
+      </div>
     </div>
   );
 }
@@ -504,37 +502,46 @@ export function NotificationsCard({
         </div>
       ) : (
         <div className="island-notification-list island-scrollable" role="list" aria-label="Notifications">
-          {status.notificationItems.map((item) => (
-            <div className="island-notification-row" key={item.id}>
-              <span className="island-notif-app-icon">
-                <IslandIcon name="bell" size={15} />
-              </span>
-              <div className="island-notification-body">
-                <div className="island-notification-header-line">
-                  <span className="island-notification-source">{item.source || "System"}</span>
-                  {item.createdAt ? (
-                    <span className="island-notification-dot-time">
-                      {" · " + relativeTime(item.createdAt)}
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="island-dismiss-button"
-                    disabled={!supported}
-                    title="Dismiss this notification"
-                    aria-label={"Dismiss " + item.title}
-                    onClick={() => {
-                      void api.notificationsDismiss(item.id).then(refresh).catch(() => undefined);
-                    }}
-                  >
-                    <IslandIcon name="dismiss" size={13} />
-                  </button>
+          {status.notificationItems.map((item) => {
+            const appName = item.source?.trim() || "System";
+            const titleTrim = (item.title || "").trim();
+            const bodyTrim = (item.body || "").trim();
+            const isTitleSameAsSource = titleTrim.toLowerCase() === appName.toLowerCase();
+            const displayTitle = isTitleSameAsSource ? (bodyTrim || titleTrim) : titleTrim;
+            const displayBody = isTitleSameAsSource ? null : (bodyTrim || null);
+            return (
+              <div className="island-notification-row" key={item.id}>
+                <span className="island-notif-app-icon">
+                  <IslandIcon name="bell" size={16} />
+                </span>
+                <div className="island-notification-body">
+                  <div className="island-notification-title">{displayTitle}</div>
+                  {displayBody ? <div className="island-notification-text">{displayBody}</div> : null}
+                  <div className="island-notification-meta">
+                    <span className="island-notification-source">{appName}</span>
+                    {item.createdAt ? (
+                      <span className="island-notification-dot-time">
+                        {" · " + relativeTime(item.createdAt)}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="island-notification-title">{item.title}</div>
-                {item.body ? <div className="island-notification-text">{item.body}</div> : null}
+                <button
+                  type="button"
+                  className="island-dismiss-button"
+                  disabled={!supported}
+                  title="Dismiss this notification"
+                  aria-label={"Dismiss " + item.title}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void api.notificationsDismiss(item.id).then(refresh).catch(() => undefined);
+                  }}
+                >
+                  <IslandIcon name="dismiss" size={14} />
+                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

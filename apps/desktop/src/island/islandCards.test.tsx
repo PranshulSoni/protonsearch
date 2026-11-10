@@ -228,12 +228,13 @@ setMuted.mockRestore();
     });
     expect(setWifi).toHaveBeenCalledWith(false);
     expect(setBluetooth).toHaveBeenCalledWith(true);
-    expect(element.querySelector('[role="status"]')?.textContent).toContain("Changed Bluetooth.");
+    // Silent success - no noisy status banner per user requirement
+    expect(element.querySelector(".island-control-feedback")).toBeNull();
     setWifi.mockRestore();
     setBluetooth.mockRestore();
   });
 
-  it("shows Wi-Fi action progress and the rejection reason", async () => {
+  it("shows rejection reason on failure without noisy update text", async () => {
     let rejectSetWifi!: (reason: string) => void;
     const setWifi = vi.spyOn(api, "setWifi").mockImplementation(
       () => new Promise<void>((_resolve, reject) => { rejectSetWifi = reject; }),
@@ -251,7 +252,6 @@ setMuted.mockRestore();
     const element = await mount(<ControlsCard status={status} pending={false} error={null} refresh={() => undefined} />);
     const wifiToggle = element.querySelector<HTMLButtonElement>(".island-tile-main")!;
     await act(async () => { wifiToggle.click(); });
-    expect(element.textContent).toContain("Updating Wi-Fi…");
     await act(async () => { rejectSetWifi("Access denied by system"); await Promise.resolve(); });
     expect(element.textContent).toContain("Access denied by system");
     expect(element.querySelector('[role="alert"]')).not.toBeNull();

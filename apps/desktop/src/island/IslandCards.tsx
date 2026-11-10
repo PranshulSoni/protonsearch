@@ -286,6 +286,7 @@ export function ClipboardCard({
   onTab: (tab: ClipTab) => void;
   onOpen: (result: SearchResult) => void;
 }) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const visible = filterClipboard(results, tab);
   return (
     <div className="island-card island-clipboard">
@@ -326,7 +327,7 @@ export function ClipboardCard({
           );
         })}
       </div>
-      <div className="island-clip-list" role="listbox" aria-label="Clipboard history">
+      <div className="island-clip-list island-scrollable" role="listbox" aria-label="Clipboard history">
         {error ? (
           <EmptyState title="Clipboard history is unavailable." hint={error} />
         ) : pending && results.length === 0 ? (
@@ -347,40 +348,47 @@ export function ClipboardCard({
             }
           />
         ) : (
-          visible.slice(0, 3).map((result, index) => (
-            <button
-              type="button"
-              role="option"
-              aria-selected={index === 0}
-              key={result.id}
-              className={"island-clip-row" + (index === 0 ? " is-active" : "")}
-              onClick={() => onOpen(result)}
-            >
-              <span className="island-clip-icon">
-                {result.meta?.thumbnailDataUrl ? (
-                  <img
-                    className="island-clip-thumb"
-                    src={result.meta.thumbnailDataUrl}
-                    alt=""
-                  />
-                ) : (
-                  <IslandIcon
-                    name={clipboardKind(result) === "links" ? "link" : clipboardKind(result) === "code" ? "code" : clipboardKind(result) === "images" ? "image" : clipboardKind(result) === "files" ? "file" : "text"}
-                    size={18}
-                  />
-                )}
-              </span>
-              <span className="island-clip-body">
-                <span className="island-clip-title">{result.title}</span>
-                <span className="island-clip-sub">
-                  {clipLabel(clipboardKind(result)) +
-                    " · " +
-                    (relativeTime(result.meta?.modified) || "Local clip")}
+          visible.map((result, index) => {
+            const isCopied = copiedId === result.id || (copiedId === null && index === 0);
+            return (
+              <button
+                type="button"
+                role="option"
+                aria-selected={index === 0}
+                key={result.id}
+                className={"island-clip-row" + (index === 0 ? " is-active" : "")}
+                onClick={() => {
+                  setCopiedId(result.id);
+                  setTimeout(() => setCopiedId((cur) => cur === result.id ? null : cur), 1500);
+                  onOpen(result);
+                }}
+              >
+                <span className="island-clip-icon">
+                  {result.meta?.thumbnailDataUrl ? (
+                    <img
+                      className="island-clip-thumb"
+                      src={result.meta.thumbnailDataUrl}
+                      alt=""
+                    />
+                  ) : (
+                    <IslandIcon
+                      name={clipboardKind(result) === "links" ? "link" : clipboardKind(result) === "code" ? "code" : clipboardKind(result) === "images" ? "image" : clipboardKind(result) === "files" ? "file" : "text"}
+                      size={18}
+                    />
+                  )}
                 </span>
-              </span>
-              {index === 0 ? <IslandIcon name="check" size={16} className="island-check" /> : null}
-            </button>
-          ))
+                <span className="island-clip-body">
+                  <span className="island-clip-title">{result.title || "Clipboard item"}</span>
+                  <span className="island-clip-sub">
+                    {clipLabel(clipboardKind(result)) +
+                      " · " +
+                      (relativeTime(result.meta?.modified) || "Local clip")}
+                  </span>
+                </span>
+                {isCopied ? <IslandIcon name="check" size={16} className="island-check" /> : null}
+              </button>
+            );
+          })
         )}
       </div>
     </div>

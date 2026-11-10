@@ -186,7 +186,7 @@ function useThrottledLiveText(text: string, delayMs = 300): string {
 }
 
 function hidesLauncher(action: ActionSpec): boolean {
-  return action.type !== "none" && action.type !== "copy_text";
+  return action.type !== "none" && action.type !== "copy_text" && action.type !== "copy_image";
 }
 
 function countTextFor(

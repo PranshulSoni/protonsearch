@@ -57,6 +57,9 @@ fn describe(item: &UserNotification) -> Option<SystemNotification> {
     if lines.is_empty() {
         return None;
     }
+    if lines.len() > 1 && lines[0].eq_ignore_ascii_case(&app) {
+        lines.remove(0);
+    }
     Some(SystemNotification {
         id,
         app,

@@ -74,6 +74,7 @@ export type ActionSpec =
   | { type: "open_url"; url: string }
   | { type: "launch_app"; appId: string; target?: string | null }
   | { type: "copy_text"; text: string }
+  | { type: "copy_image"; path: string }
   | { type: "run_native"; command: NativeCommand }
   | { type: "run_workflow"; id: string }
   | { type: "none" };

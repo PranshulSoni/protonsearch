@@ -602,12 +602,13 @@ html[data-window="island"] #root {
 }
 
 .island-clip-list {
-  flex: none;
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  max-height: 144px;
+  gap: 4px;
   overflow-y: auto;
+  padding-bottom: 4px;
 }
 
 .island-clip-row {
@@ -2003,24 +2004,23 @@ html[data-window="island"] #root {
   color: #8b9aa3;
 }
 
-/* task-54: keep notification rows from colliding with the fixed footer. */
-.island-notification-row {
-  overflow: hidden;
+.island-controls-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 auto;
 }
 
-.island-notification-title {
-  line-height: 14px;
+.island-controls-footer {
+  margin-top: auto;
+  padding-top: 10px;
 }
 
-.island-notification-text {
+.island-notification-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   margin-top: 2px;
-  line-height: 1.25;
-  -webkit-line-clamp: 1;
-}
-
-.island-notification-source {
-  line-height: 12px;
-  margin-top: 1px;
 }
 
 .island-controls-card {
@@ -2035,7 +2035,7 @@ html[data-window="island"] #root {
   margin-top: 6px;
 }
 
-/* task-54: card/row shells are always opaque; alpha is only shadow/border/focus. */
+/* card/row shells are always opaque; alpha is only shadow/border/focus. */
 .island-surface,
 .island-inner,
 .island-card,
@@ -2047,25 +2047,6 @@ html[data-window="island"] #root {
 .island-control-row,
 .island-control-tile {
   background-clip: padding-box;
-}
-
-/* task-54: fit notification row content in the fixed 52 px row. */
-.island-notification-row {
-  padding: 7px 8px;
-}
-
-.island-notification-title {
-  line-height: 13px;
-}
-
-.island-notification-text {
-  line-height: 1.15;
-  margin-top: 1px;
-}
-
-.island-notification-source {
-  line-height: 11px;
-  margin-top: 1px;
 }
 
 .island-control-link {
@@ -2233,8 +2214,10 @@ html[data-window="island"] #root {
 
 /* ---------- task-62 exact anatomy ---------- */
 .island-notifications-card,
-.island-controls-card {
+.island-controls-card,
+.island-clipboard {
   padding: 17px 20px 14px;
+  overflow-y: hidden;
 }
 
 .island-notifications-card .island-notif-head {
@@ -2270,7 +2253,8 @@ html[data-window="island"] #root {
   display: grid;
   place-items: center;
   width: 28px;
-  height: 28px;  border: 1px solid var(--island-control-border);
+  height: 28px;
+  border: 1px solid var(--island-control-border);
   border-radius: 7px;
   background: transparent;
   color: #9ba3ae;
@@ -2282,9 +2266,13 @@ html[data-window="island"] #root {
 }
 
 .island-notification-list {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding-right: 4px;
-  max-height: 230px;
+  overflow-y: auto;
 }
 
 .island-notif-empty {

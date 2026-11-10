@@ -214,6 +214,8 @@ pub enum ActionSpec {
     },
     /// Copy a string to the clipboard.
     CopyText { text: String },
+    /// Copy an image file to the clipboard.
+    CopyImage { path: String },
     /// Run one of the built-in, reviewed native commands.
     RunNative { command: NativeCommand },
     /// Execute the action described by a quicklink/snippet entry.
