@@ -186,15 +186,16 @@ fn hide_launcher_window(app: &AppHandle) {
 }
 
 fn toggle_launcher(app: &AppHandle) {
-    if let Some(win) = app.get_webview_window(LAUNCHER_LABEL) {
-        let visible = win.is_visible().unwrap_or(false);
-        let focused = win.is_focused().unwrap_or(false);
-        if visible && focused {
-            // Let the UI play its exit animation before the window disappears.
-            dismiss_launcher(app);
-        } else {
-            show_launcher_window(app);
-        }
+    let Ok(win) = ensure_launcher_window(app) else {
+        return;
+    };
+    let visible = win.is_visible().unwrap_or(false);
+    let focused = win.is_focused().unwrap_or(false);
+    if visible && focused {
+        // Let the UI play its exit animation before the window disappears.
+        dismiss_launcher(app);
+    } else {
+        show_launcher_window(app);
     }
 }
 
@@ -307,26 +308,27 @@ fn show_island_window(app: &AppHandle) {
 }
 
 fn toggle_island(app: &AppHandle) {
-    if let Some(win) = app.get_webview_window(ISLAND_LABEL) {
-        let visible = win.is_visible().unwrap_or(false);
-        let focused = win.is_focused().unwrap_or(false);
-        if visible && focused {
-            // Frontend plays the exit animation then calls hide_island.
-            let _ = win.emit("island:dismiss", ());
-            let generation =
-                ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-            let handle = win.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(600));
-                if ISLAND_GENERATION.load(std::sync::atomic::Ordering::SeqCst) == generation {
-                    set_webview_memory_level(&handle, true);
-                    let _ = handle.hide();
-                    let _ = handle.emit("island:hidden", ());
-                }
-            });
-        } else {
-            show_island_window(app);
-        }
+    let Ok(win) = ensure_island_window(app) else {
+        return;
+    };
+    let visible = win.is_visible().unwrap_or(false);
+    let focused = win.is_focused().unwrap_or(false);
+    if visible && focused {
+        // Frontend plays the exit animation then calls hide_island.
+        let _ = win.emit("island:dismiss", ());
+        let generation =
+            ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+        let handle = win.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(600));
+            if ISLAND_GENERATION.load(std::sync::atomic::Ordering::SeqCst) == generation {
+                set_webview_memory_level(&handle, true);
+                let _ = handle.hide();
+                let _ = handle.emit("island:hidden", ());
+            }
+        });
+    } else {
+        show_island_window(app);
     }
 }
 
@@ -754,8 +756,17 @@ fn update_settings(
         if settings.launcher.primary_mode != previous.launcher.primary_mode {
             hide_launcher_window(&app);
             hide_island_window(&app);
-            // Free the inactive launcher's WebView; it is re-created lazily.
-            let inactive = if settings.launcher.primary_mode == LauncherMode::DynamicIsland {
+            let wants_island = settings.launcher.primary_mode == LauncherMode::DynamicIsland
+                && settings.launcher.island.enabled;
+            // Create the new primary window BEFORE destroying the old one: in
+            // the lazy-window world the old window can be the last one alive,
+            // so destroying it first would quit the app.
+            if wants_island {
+                let _ = ensure_island_window(&app);
+            } else {
+                let _ = ensure_launcher_window(&app);
+            }
+            let inactive = if wants_island {
                 LAUNCHER_LABEL
             } else {
                 ISLAND_LABEL

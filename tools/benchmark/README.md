@@ -52,3 +52,10 @@ Usage:
 Requirements/caveats: debug build with CDP (WEBVIEW2 CDP is debug-only), vite preview on 5173 for the debug devUrl, PROTONSEARCH_PERF_HOOKS=1 marks in <data_dir>/v2/perf-marks.jsonl, single-instance app (the harness kills stale ProtonSearch processes before launch and leaves none running). Assumed refresh 120 Hz by default (--hz); per-trial percentiles are pooled as a mean of per-trial percentiles, so aggregate p95 is an estimate - per-trial rows are kept in the JSON.
 
 Raw JSON includes every sample so a reviewer can re-derive the numbers.
+### island-hotkey.mjs
+
+Companion harness for the island-primary profile: start the app with `launcher.primaryMode=dynamic_island` (only the island window prewarmed, hidden), then measure the real global-hotkey path (`island-window-shown` -> `island-first-paint`, Win32 visible) and the island-primary memory profile (prewarmed hidden / visible / hidden+trim, per-process).
+
+    node tools/benchmark/island-hotkey.mjs --exe target/release/ProtonSearch.exe --data-dir .devdata --out docs/performance/results/island-hotkey.json
+
+Why two profiles: switching primary_mode at runtime through `update_settings` currently exits the app (it destroys the inactive window; destroying the last window exits Tauri), so island-perf.mjs keeps the normal profile and measures lazy WebView creation through the `show_island` command, while island-hotkey.mjs covers the hotkey path from a fresh island-primary launch. Both truncate perf marks per session and leave no app running.

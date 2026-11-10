@@ -19,7 +19,7 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { existsSync, mkdirSync, writeFileSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, statSync, openSync } from "node:fs";
 import { spawn, execFile, execFileSync } from "node:child_process";
 import { hostname } from "node:os";
 
@@ -76,6 +76,7 @@ const noServe = Boolean(args["no-serve"]);
 const idleSeconds = Number(args["idle-seconds"] || 20);
 const trimWaitMs = Number(args["trim-wait-ms"] || 8000);
 const memoryOnly = Boolean(args["memory-only"]);
+const settingsPrimary = args["settings-primary"] === "island" ? "dynamic_island" : (args["settings-primary"] || "normal");
 const HOTKEY_PS = resolve(__dirname, "hotkey-activate.ps1");
 const METRICS_PS = resolve(__dirname, "process-metrics.ps1");
 const MARKS_FILE = resolve(dataDir, "v2", "perf-marks.jsonl");
@@ -90,6 +91,25 @@ function readMarksSince() {
   marksOffset = buf.length; return { marks, offset: marksOffset };
 }
 function markEpochs(marks, label) { return marks.filter((m) => m.label === label).map((m) => m.epochMs).sort((a, b) => a - b); }
+
+// The harness switches primary_mode at runtime; a previous run persists
+// dynamic_island in the scratch data dir. Normalise the scratch profile before
+// launch so the run always starts from the "primary launcher prewarmed" state
+// that section 1 is defined against.
+function normalizeScratchSettings(primaryMode) {
+  const p = resolve(dataDir, "v2", "settings.json");
+  const mode = primaryMode || "normal";
+  try {
+    if (!existsSync(p)) return "no-settings";
+    const data = JSON.parse(readFileSync(p, "utf8"));
+    if (data && data.launcher) {
+      data.launcher.primaryMode = mode;
+      writeFileSync(p, JSON.stringify(data, null, 2));
+      return "normalised-to-" + mode;
+    }
+    return "no-launcher-settings";
+  } catch (e) { return "normalise-error: " + String(e); }
+}
 
 const report = {
   schema: "ps-island-perf/1",
@@ -106,9 +126,19 @@ const report = {
     "Activation first-open vs warm-open is measured with the real global hotkey (SendInput) and perf marks; the lazy window creation cost is isolated by whether the island page existed before the hotkey.",
     "Process-tree memory is PowerShell/CIM Working Set + private bytes with command lines; WebView2 child roles are inferred from command lines, not guessed.",
     "Root-cause attribution is evidence-based (CDP Performance Layout/Recalc/Script/Task durations + page resize events + long tasks), not a visual guess.",
+    "KNOWN v10 BUG (found by this harness): switching launcher.primary_mode at runtime through update_settings exits the app. update_settings destroys the inactive window with win.destroy(); when the launcher is the only window this is the last window, so Tauri exits (observed code 0 plus 'Error removing system tray icon'). Lazy island activation is therefore measured through the show_island command (same ensure_island_window path); hotkey->island is measured in island-hotkey.mjs from an island-primary profile.",
   ],
 };
 let app = null; let server = null; let browser = null; let cdpClient = null;
+function step(name) { try { console.error("[island-perf] " + name + " @ " + ((Date.now() / 1000) % 100000).toFixed(1)); } catch { /* ignore */ } }
+function appLogFiles() {
+  try {
+    mkdirSync(resolve(repoRoot, ".bench"), { recursive: true });
+    const outFd = openSync(resolve(repoRoot, ".bench", "island-app-stdout.log"), "w");
+    const errFd = openSync(resolve(repoRoot, ".bench", "island-app-stderr.log"), "w");
+    return { outFd, errFd };
+  } catch { return null; }
+}
 
 async function waitForFrontend() {
   const deadline = Date.now() + 40000;
@@ -226,6 +256,7 @@ async function memoryOnlyRun() {
   report.conditions = { exe, exeBytes: statSync(exe).size, exeMtime: statSync(exe).mtime.toISOString(), dataDir, memoryOnly: true, assumedRefreshHz: hz };
   try { report.conditions.gitHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot }).toString().trim(); report.conditions.gitDirty = execFileSync("git", ["status", "--porcelain"], { cwd: repoRoot }).toString().trim().split(/\r?\n/).filter(Boolean).length; } catch { /* ignore */ }
   try {
+    report.measurements.scratchSettings = normalizeScratchSettings(settingsPrimary);
     truncateMarks();
     app = spawn(exe, [], { env: { ...process.env, PROTONSEARCH_DATA_DIR: dataDir, PROTONSEARCH_PERF_HOOKS: "1", WEBVIEW2_USER_DATA_FOLDER: resolve(dataDir, "webview2") }, stdio: "ignore" });
     report.conditions.appPid = app.pid;
@@ -296,15 +327,20 @@ async function main() {
       if (!(await waitForFrontend())) throw new Error("frontend preview server did not start on 5173");
     }
     if (!attachOnly) {
+      report.measurements.scratchSettings = normalizeScratchSettings("normal");
       truncateMarks();
+      const logs = appLogFiles();
       app = spawn(exe, [], {
         env: { ...process.env, PROTONSEARCH_DATA_DIR: dataDir, PROTONSEARCH_PERF_HOOKS: "1", PROTONSEARCH_CDP_PORT: String(port), WEBVIEW2_USER_DATA_FOLDER: resolve(dataDir, "webview2") },
-        stdio: "ignore",
+        stdio: logs ? ["ignore", logs.outFd, logs.errFd] : "ignore",
       });
       report.conditions.appPid = app.pid;
     }
+    step("launching");
     browser = await connectCdp(pw);
+    step("cdp-connected");
     const launcher = await waitWindow("launcher", 60000);
+    step("launcher-found");
     if (!launcher) throw new Error("no launcher page found");
     report.conditions.initialWindows = (await collectPages()).length;
     report.measurements.indexReady = await launcher.evaluate(async () => {
@@ -319,6 +355,7 @@ async function main() {
       return { state: "timeout" };
     }).catch(() => ({ state: "unavailable" }));
 
+    step("index-ready:" + JSON.stringify(report.measurements.indexReady));
     // --- Section 1: idle memory with only the primary launcher prewarmed ---
     await launcher.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_launcher")).catch(() => {});
     await sleep(1500);
@@ -328,7 +365,9 @@ async function main() {
       const entry = report.measurements.initialPages.find((x) => x.url === p.url());
       if (entry) entry.kind = kind;
     }
+    step("memory-idle");
     report.measurements.memoryIdleLauncherOnly = await memorySnapshot("idle-launcher-only");
+    step("cpu-idle");
     report.measurements.idleCpuLauncherOnly = await runPs(METRICS_PS, ["-ProcessId", String(report.conditions.appPid), "-Mode", "cpu", "-SampleSeconds", String(idleSeconds)], (idleSeconds + 40) * 1000).catch((e) => ({ error: String(e.message) }));
     // WebView2 memory-target trim check: the launcher window is already hidden; wait
     // for any SetMemoryUsageTargetLevel(LOW) trim and compare per-process memory.
@@ -343,114 +382,65 @@ async function main() {
       note: "Launcher is hidden in both snapshots; afterHideTrim is taken " + trimWaitMs + " ms later so any WebView2 SetMemoryUsageTargetLevel(LOW) trim is visible as a per-process WS drop. A process with >=5 MiB drop is marked trimmed; warm-process retention is checked later by reopening.",
     };
 
-    // --- Section 2: switch primary mode to island (lazy window creation path) ---
-    report.measurements.switchToIslandMode = await launcher.evaluate(async () => {
-      const settings = await window.__TAURI_INTERNALS__.invoke("get_settings");
-      settings.launcher.primaryMode = "dynamic_island";
-      await window.__TAURI_INTERNALS__.invoke("update_settings", { patch: { launcher: settings.launcher } });
-      return "ok";
-    }).catch((e) => "error: " + String(e));
-
-    // --- Section 3: activation trade-off (lazy island window creation) ---
-    // Finding to verify: with the lazy-window refactor the island window does not
-    // exist until the first show. toggle_island only handles an EXISTING window
-    // ("if let Some(win) = app.get_webview_window(ISLAND_LABEL)"), so a hotkey
-    // while the island window is absent is expected to be a no-op. Prove/measure:
-    //   (a) hotkey with no island window -> expect no window / no page;
-    //   (b) first open through the show_island command -> includes WebView creation;
-    //   (c) warm hotkey opens once the window exists.
-    const hotkeyWithoutIsland = [];
-    for (let i = 0; i < 2; i++) {
-      const had = (await findWindow(await collectPages(), "island")) != null;
-      if (had) break;
-      const since = readMarksSince();
-      let win = null;
-      try { win = await runPs(HOTKEY_PS, ["-ProcessId", String(report.conditions.appPid), "-TimeoutMs", "2500", "-Mode", "show"], 25000); } catch (e) { hotkeyWithoutIsland.push({ attempt: i, error: String(e.message) }); continue; }
-      await sleep(300);
-      const islandPage = await findWindow(await collectPages(), "island");
-      const marks = readMarksSince().marks.concat(since.marks);
-      hotkeyWithoutIsland.push({
-        attempt: i,
-        win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
-        timedOut: win ? win.timedOut : null,
-        islandPageFound: islandPage != null,
-        islandWindowShownMarks: markEpochs(marks, "island-window-shown").length,
-        note: "No island window exists yet (lazy refactor); a visible window here would be the launcher, not the island.",
-      });
-      await sleep(300);
-    }
-
-    const activationSamples = [];
-    let lazyFirstOpen = null;
-    const islandBeforeLazy = (await findWindow(await collectPages(), "island")) != null;
-    if (!islandBeforeLazy) {
+    // --- Section 2: lazy island window creation (no runtime mode switch) ---
+    // The runtime primary-mode switch through update_settings is currently a hard
+    // exit: update_settings destroys the inactive WebView with win.destroy(), and
+    // when that is the only window Tauri exits (observed: exit code 0 + "Error
+    // removing system tray icon"). That bug is reported to the shell owner, and
+    // this harness keeps the normal profile and exercises the lazy creation path
+    // through show_island, which calls ensure_island_window exactly like the
+    // hotkey path does. Real hotkey->island activation is measured separately by
+    // island-hotkey.mjs with an island-primary profile.
+    step("mode-switch-skipped-runtime-bug");
+    const activationTrials = [];
+    for (let i = 0; i < openTakes; i++) {
+      let islandPage = await findWindow(await collectPages(), "island");
+      const existedBefore = islandPage != null;
+      if (islandPage) { try { await islandPage.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")); } catch { /* ignore */ } await sleep(450); }
       const since = readMarksSince();
       const invokeResult = await launcher.evaluate(async () => {
         const t0 = Date.now();
         const perfStart = performance.now();
         await window.__TAURI_INTERNALS__.invoke("show_island");
-        const t1 = Date.now();
-        return { t0, t1, invokeMs: performance.now() - perfStart };
+        return { t0, invokeMs: performance.now() - perfStart };
       }).catch((e) => ({ error: String(e) }));
-      await sleep(300);
-      const islandPage = await waitWindow("island", 8000);
+      await sleep(250);
       const marks = readMarksSince().marks.concat(since.marks);
       const shown = markEpochs(marks, "island-window-shown").slice(-1)[0] ?? null;
       const paint = markEpochs(marks, "island-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
-      lazyFirstOpen = {
-        path: "show_island command (hotkey path is a no-op while the island window is absent)",
+      islandPage = await waitWindow("island", 8000);
+      activationTrials.push({
+        take: i,
+        islandExistedBefore: existedBefore,
         invokeMs: invokeResult && invokeResult.invokeMs != null ? +invokeResult.invokeMs.toFixed(2) : null,
         createShowMs: shown != null && invokeResult.t0 != null ? +(shown - invokeResult.t0).toFixed(2) : null,
         shownToPaintMs: shown != null && paint != null ? +(paint - shown).toFixed(2) : null,
         commandToPaintMs: paint != null && invokeResult.t0 != null ? +(paint - invokeResult.t0).toFixed(2) : null,
         islandPageFound: islandPage != null,
-      };
-      if (islandPage) { try { await islandPage.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")); } catch { /* ignore */ } }
-      await sleep(600);
-    }
-
-    for (let i = 0; i < openTakes; i++) {
-      let islandPage = await findWindow(await collectPages(), "island");
-      if (islandPage) { try { await islandPage.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")); } catch { /* ignore */ } await sleep(400); }
-      const since = readMarksSince();
-      let win = null;
-      try { win = await runPs(HOTKEY_PS, ["-ProcessId", String(report.conditions.appPid), "-TimeoutMs", "8000", "-Mode", "show"], 30000); } catch (e) { activationSamples.push({ take: i, error: String(e.message) }); continue; }
-      await sleep(250);
-      const marks = readMarksSince().marks.concat(since.marks);
-      const shown = markEpochs(marks, "island-window-shown").filter((v) => v >= (win.sendAtUtc || 0) - 400).slice(-1)[0] ?? null;
-      const paint = markEpochs(marks, "island-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
-      islandPage = await waitWindow("island", 4000);
-      activationSamples.push({
-        take: i, lazyCreation: false,
-        win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
-        win32FocusedMs: win && win.focusedMs != null ? win.focusedMs : null,
-        sendToShownMs: shown != null ? +(shown - win.sendAtUtc).toFixed(2) : null,
-        shownToPaintMs: shown != null && paint != null ? +(paint - shown).toFixed(2) : null,
-        sendToPaintMs: paint != null ? +(paint - win.sendAtUtc).toFixed(2) : null,
-        islandPageFound: islandPage != null,
       });
       if (islandPage) { try { await islandPage.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")); } catch { /* ignore */ } }
       readMarksSince();
-      await sleep(400);
+      await sleep(450);
     }
-    report.measurements.hotkeyWithoutIslandWindow = { attempts: hotkeyWithoutIsland.length, samples: hotkeyWithoutIsland, note: "Lazy-window regression probe: hotkey while the island window does not exist." };
+    const firstActivation = activationTrials[0] || null;
+    const warmActivation = activationTrials.slice(1);
     report.measurements.activation = {
-      lazyFirstOpen,
-      warmTrials: activationSamples.length,
-      warmVisibleMs: summarize(activationSamples.map((s) => s.win32VisibleMs).filter((v) => v != null)),
-      warmSendToShownMs: summarize(activationSamples.map((s) => s.sendToShownMs).filter((v) => v != null)),
-      warmSendToPaintMs: summarize(activationSamples.map((s) => s.sendToPaintMs).filter((v) => v != null)),
-      samples: activationSamples,
+      lazyFirstOpen: firstActivation,
+      warmTrials: warmActivation.length,
+      warmInvokeMs: summarize(warmActivation.map((s) => s.invokeMs).filter((v) => v != null)),
+      warmCreateShowMs: summarize(warmActivation.map((s) => s.createShowMs).filter((v) => v != null)),
+      warmCommandToPaintMs: summarize(warmActivation.map((s) => s.commandToPaintMs).filter((v) => v != null)),
+      warmShownToPaintMs: summarize(warmActivation.map((s) => s.shownToPaintMs).filter((v) => v != null)),
+      samples: activationTrials,
+      note: "First show_island after launch includes lazy WebView creation; later shows are warm. Command path is measured here because the runtime mode switch exits the app; hotkey->island is measured in island-hotkey.mjs.",
     };
 
-    // Ensure island exists and is visible for the remaining sections.
+    // Ensure the island exists and is visible for memory/pacing sections.
     let island = await waitWindow("island", 15000);
-    if (!island) {
-      if (report.conditions.appPid) { try { await runPs(HOTKEY_PS, ["-ProcessId", String(report.conditions.appPid), "-TimeoutMs", "4000", "-Mode", "show"], 25000); } catch { /* ignore */ } }
-      await sleep(600);
-      island = await waitWindow("island", 15000);
-    }
-    if (!island) throw new Error("island page never appeared (lazy window creation failed or mode switch failed)");
+    if (!island) { try { await launcher.evaluate(() => window.__TAURI_INTERNALS__.invoke("show_island")); } catch { /* ignore */ } await sleep(700); island = await waitWindow("island", 15000); }
+    if (!island) throw new Error("island page never appeared after show_island (lazy creation path)");
+    try { await island.evaluate(() => window.__TAURI_INTERNALS__.invoke("show_island")); } catch { /* ignore */ }
+    await sleep(400);
     report.measurements.memoryAfterIslandCreated = await memorySnapshot("island-created-visible");
     // Island hide -> memory-target trim check (visible warm island vs hidden after wait).
     try { await island.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")); } catch { /* ignore */ }
@@ -464,21 +454,26 @@ async function main() {
       islandPageStillPresent: (await findWindow(await collectPages(), "island")) != null,
       note: "Island hidden for " + trimWaitMs + " ms; a WS drop with the page still present indicates memory-target trim without process teardown (warm).",
     };
-    // Measure warm reopen latency after the trim window (marks + Win32 visible).
+    // Warm reopen after the trim window via show_island (primary mode is normal, so
+    // the hotkey would summon the launcher; island hotkey is measured separately).
     try {
       const since = readMarksSince();
-      const win = await runPs(HOTKEY_PS, ["-ProcessId", String(report.conditions.appPid), "-TimeoutMs", "4000", "-Mode", "show"], 25000);
-      await sleep(250);
+      const reopen = await launcher.evaluate(async () => {
+        const t0 = Date.now();
+        const perfStart = performance.now();
+        await window.__TAURI_INTERNALS__.invoke("show_island");
+        return { t0, invokeMs: performance.now() - perfStart };
+      });
+      await sleep(300);
       const marks = readMarksSince().marks.concat(since.marks);
-      const shown = markEpochs(marks, "island-window-shown").filter((v) => v >= (win.sendAtUtc || 0) - 400).slice(-1)[0] ?? null;
+      const shown = markEpochs(marks, "island-window-shown").slice(-1)[0] ?? null;
       const paint = markEpochs(marks, "island-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
       report.measurements.reopenAfterTrim = {
-        win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
-        win32FocusedMs: win && win.focusedMs != null ? win.focusedMs : null,
-        sendToShownMs: shown != null ? +(shown - win.sendAtUtc).toFixed(2) : null,
+        invokeMs: +reopen.invokeMs.toFixed(2),
+        createShowMs: shown != null ? +(shown - reopen.t0).toFixed(2) : null,
         shownToPaintMs: shown != null && paint != null ? +(paint - shown).toFixed(2) : null,
-        sendToPaintMs: paint != null ? +(paint - win.sendAtUtc).toFixed(2) : null,
-        note: "Warm reopen after the trim wait: if the WebView process was kept (islandPageStillPresent), this should be close to the warm-open p50 from the activation section.",
+        commandToPaintMs: paint != null ? +(paint - reopen.t0).toFixed(2) : null,
+        note: "Warm show_island reopen after the trim wait; compare with the warm activation percentiles.",
       };
     } catch (e) { report.measurements.reopenAfterTrim = { error: String(e.message) }; }
     // Ensure the island is visible again for pacing/typing sections.
@@ -489,6 +484,7 @@ async function main() {
     cdpClient = cdp;
     await cdp.send("Performance.enable").catch(() => {});
 
+    step("activation-done");
     // --- Section 4: open/close frame pacing ---
     const openSeries = [];
     const closeSeries = [];
@@ -517,6 +513,7 @@ async function main() {
     report.measurements.openFramePacing = { trials: openSeries.length, aggregate: poolFrameSeries(openSeries), series: openSeries };
     report.measurements.closeFramePacing = { trials: closeSeries.length, aggregate: poolFrameSeries(closeSeries), series: closeSeries };
 
+    step("pacing-done");
     // --- Section 5: typing -> results latency inside the island search card ---
     if (report.measurements.indexReady && report.measurements.indexReady.entries > 0) {
       try { await island.evaluate(() => window.__TAURI_INTERNALS__.invoke("show_island")); } catch { /* ignore */ }
@@ -617,6 +614,7 @@ async function main() {
       samples: switchSamples,
     };
 
+    step("switch-done attribution=" + (report.measurements.cardSwitch && report.measurements.cardSwitch.attribution));
     // --- Section 7: 20x open/close leak check ---
     const leak = [];
     try { await island.evaluate(() => window.__TAURI_INTERNALS__.invoke("show_island")); } catch { /* ignore */ }
@@ -658,11 +656,9 @@ async function main() {
   if (itrim && itrim.delta) console.log("  island hide-trim: tree " + itrim.visible.totalWorkingSetMiB + " -> " + itrim.hiddenAfterTrim.totalWorkingSetMiB + " MiB (" + itrim.delta.totalDeltaMiB + " MiB), trimmed=" + itrim.delta.trimmedCount + ", pageWarm=" + itrim.islandPageStillPresent);
   const act = report.measurements.activation;
   if (act) {
-    if (act.lazyFirstOpen) console.log("  lazy first open (show_island cmd): create+show=" + act.lazyFirstOpen.createShowMs + "ms shown->paint=" + act.lazyFirstOpen.shownToPaintMs + "ms total=" + act.lazyFirstOpen.commandToPaintMs + "ms pageFound=" + act.lazyFirstOpen.islandPageFound);
-    console.log("  warm hotkey opens: visible p50=" + act.warmVisibleMs.p50 + "ms p95=" + act.warmVisibleMs.p95 + "ms n=" + act.warmTrials + " | send->shown p50=" + act.warmSendToShownMs.p50 + " | send->paint p50=" + act.warmSendToPaintMs.p50);
+    if (act.lazyFirstOpen) console.log("  lazy first island open (show_island cmd): invoke=" + act.lazyFirstOpen.invokeMs + "ms create+show=" + act.lazyFirstOpen.createShowMs + "ms shown->paint=" + act.lazyFirstOpen.shownToPaintMs + "ms total=" + act.lazyFirstOpen.commandToPaintMs + "ms pageFound=" + act.lazyFirstOpen.islandPageFound);
+    console.log("  warm island opens (show_island cmd): invoke p50=" + act.warmInvokeMs.p50 + "ms create+show p50=" + act.warmCreateShowMs.p50 + "ms command->paint p50=" + act.warmCommandToPaintMs.p50 + "ms p95=" + act.warmCommandToPaintMs.p95 + "ms n=" + act.warmTrials);
   }
-  const hw = report.measurements.hotkeyWithoutIslandWindow;
-  if (hw) console.log("  hotkey with NO island window: attempts=" + hw.attempts + " timeouts=" + hw.samples.filter((s) => s.timedOut).length + " islandPages=" + hw.samples.filter((s) => s.islandPageFound).length + " (lazy-window regression probe)");
   const ofp = report.measurements.openFramePacing;
   if (ofp) console.log("  open frames: p50=" + ofp.aggregate.frameMs.p50 + "ms p95=" + ofp.aggregate.frameMs.p95 + "ms p99=" + ofp.aggregate.frameMs.p99 + " dropped=" + ofp.aggregate.droppedPct + "% longTasks=" + ofp.aggregate.longTasksTotal + " n=" + ofp.trials);
   const cfp = report.measurements.closeFramePacing;
