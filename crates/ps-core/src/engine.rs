@@ -2,10 +2,11 @@
 //! indexing. OWNER: L0 (integration layer). Public methods are the contract used
 //! by the Tauri shell and the benchmark harness.
 
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicU8, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::thread::JoinHandle;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -688,8 +689,12 @@ impl Engine {
     // -- preview -----------------------------------------------------------
 
     fn remember_results(&self, results: &[SearchResult]) {
+        // Preview only needs the display/metadata fields; drop the icon payload
+        // and action list from the registry copy so a keystroke-search does not
+        // clone tens of KB of app icons into memory.
+        let rows: Vec<SearchResult> = results.iter().map(trim_for_registry).collect();
         if let Ok(mut registry) = self.recent_results.lock() {
-            registry.remember(results);
+            registry.remember(&rows);
         }
     }
 
@@ -737,6 +742,14 @@ impl Engine {
             cache.put(key, payload.clone());
         }
         payload
+    }
+
+    #[cfg(test)]
+    pub(crate) fn registry_len(&self) -> usize {
+        self.recent_results
+            .lock()
+            .map(|registry| registry.len())
+            .unwrap_or(0)
     }
 
     #[cfg(test)]
@@ -2242,19 +2255,73 @@ fn app_result(app: &ps_sources::AppEntry) -> SearchResult {
     }
 }
 
+/// Bounded process-wide cache for application icon data URLs. Typing produces a
+/// search per keystroke and the same app icons repeat every time; re-reading the
+/// PNG and base64-encoding it on every keystroke was measurable in debug builds.
+/// Entries are keyed by path + mtime + size, so a re-extracted icon refreshes.
+struct CachedIcon {
+    modified_ms: i64,
+    len: u64,
+    icon: IconRef,
+}
+
+const APP_ICON_CACHE_CAP: usize = 256;
+
+fn app_icon_cache() -> &'static Mutex<HashMap<String, CachedIcon>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, CachedIcon>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 /// Real application icon as a self-contained PNG data URL (no asset-protocol
 /// scope needed in the WebView). Falls back to a monogram tile.
 fn app_icon(icon_path: Option<&str>) -> IconRef {
-    if let Some(path) = icon_path {
-        if let Ok(bytes) = std::fs::read(path) {
-            if bytes.starts_with(&[0x89, b'P', b'N', b'G']) && bytes.len() <= 512 * 1024 {
-                return IconRef::AppIconData {
-                    data: format!("data:image/png;base64,{}", base64_encode(&bytes)),
-                };
+    let Some(path) = icon_path else {
+        return IconRef::Monogram;
+    };
+    let metadata = std::fs::metadata(path).ok();
+    let modified_ms = metadata
+        .as_ref()
+        .and_then(|metadata| metadata.modified().ok())
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0);
+    let len = metadata.as_ref().map(|metadata| metadata.len()).unwrap_or(0);
+    if let Ok(cache) = app_icon_cache().lock() {
+        if let Some(cached) = cache.get(path) {
+            if cached.modified_ms == modified_ms && cached.len == len {
+                return cached.icon.clone();
             }
         }
     }
-    IconRef::Monogram
+    let icon = match std::fs::read(path) {
+        Ok(bytes)
+            if bytes.starts_with(&[0x89, b'P', b'N', b'G']) && bytes.len() <= 512 * 1024 =>
+        {
+            IconRef::AppIconData {
+                data: format!("data:image/png;base64,{}", base64_encode(&bytes)),
+            }
+        }
+        _ => IconRef::Monogram,
+    };
+    if let Ok(mut cache) = app_icon_cache().lock() {
+        if cache.len() >= APP_ICON_CACHE_CAP {
+            cache.clear();
+        }
+        cache.insert(
+            path.to_string(),
+            CachedIcon {
+                modified_ms,
+                len,
+                icon: icon.clone(),
+            },
+        );
+    }
+    icon
+}
+
+#[cfg(test)]
+fn app_icon_cache_len() -> usize {
+    app_icon_cache().lock().map(|cache| cache.len()).unwrap_or(0)
 }
 
 /// Minimal base64 encoder (icons only; no dependency needed).
@@ -2401,6 +2468,24 @@ fn clip_category_label(category: ps_sources::ClipCategory) -> &'static str {
         ps_sources::ClipCategory::Image => "IMAGE",
         ps_sources::ClipCategory::Files => "FILES",
         ps_sources::ClipCategory::Text => "TEXT",
+    }
+}
+
+/// Registry copy of a search result: everything preview needs, without the
+/// (potentially large) icon data URL or the action list.
+fn trim_for_registry(result: &SearchResult) -> SearchResult {
+    SearchResult {
+        id: result.id.clone(),
+        kind: result.kind,
+        title: result.title.clone(),
+        subtitle: result.subtitle.clone(),
+        path: result.path.clone(),
+        icon: IconRef::Monogram,
+        score: result.score,
+        match_ranges: result.match_ranges.clone(),
+        meta: result.meta.clone(),
+        action: result.action.clone(),
+        actions: Vec::new(),
     }
 }
 
@@ -3775,6 +3860,71 @@ mod tests {
                 .any(|result| result.kind == SourceKind::ContentMatch),
             "content results must still appear when filename results are sparse"
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn app_icons_are_cached_and_reused() {
+        let dir = scratch_dir("icon-cache");
+        let icon_path = dir.join("icon.png");
+        let fixture = fixture("diagram.png");
+        std::fs::copy(&fixture, &icon_path).unwrap();
+        let path_string = icon_path.to_string_lossy().to_string();
+        let before = app_icon_cache_len();
+        let first = app_icon(Some(&path_string));
+        assert!(matches!(first, IconRef::AppIconData { .. }));
+        assert_eq!(app_icon_cache_len(), before + 1, "first read caches the icon");
+        let second = app_icon(Some(&path_string));
+        assert_eq!(first, second, "cached icon data URL is identical");
+        assert_eq!(app_icon_cache_len(), before + 1, "second read is a cache hit");
+        // Missing/unsupported icons fall back to a monogram and are cached too.
+        let missing = app_icon(Some("C:\\does\\not\\exist.png"));
+        assert_eq!(missing, IconRef::Monogram);
+        assert_eq!(app_icon(None), IconRef::Monogram);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clipboard_thumbnails_are_cached() {
+        let dir = scratch_dir("thumb-cache");
+        let thumb_path = dir.join("thumb.png");
+        std::fs::copy(fixture("diagram.png"), &thumb_path).unwrap();
+        let path_string = thumb_path.to_string_lossy().to_string();
+        let before = preview::thumbnail_cache_len();
+        let first = preview::thumbnail_data_url(&path_string);
+        assert!(first.as_deref().unwrap_or("").starts_with("data:image/png;base64,"));
+        assert_eq!(preview::thumbnail_cache_len(), before + 1);
+        let second = preview::thumbnail_data_url(&path_string);
+        assert_eq!(first, second);
+        assert_eq!(preview::thumbnail_cache_len(), before + 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn remember_results_trims_icon_payload_and_actions_but_keeps_preview_data() {
+        let dir = scratch_dir("registry-trim");
+        let engine = make_engine(&dir, None);
+        let mut result = preview_result("file:trim-probe", SourceKind::File, Some(r"C:\docs\trim.txt"));
+        result.icon = IconRef::AppIconData {
+            data: format!("data:image/png;base64,{}", "A".repeat(64 * 1024)),
+        };
+        result.actions = vec![ps_ipc::ActionItem {
+            id: "reveal".into(),
+            label: "Reveal".into(),
+            action: ps_ipc::ActionSpec::RevealPath {
+                path: r"C:\docs\trim.txt".into(),
+            },
+            destructive: false,
+            shortcut: None,
+        }];
+        result.meta.snippet = Some("trimmed snippet".into());
+        engine.remember_results(std::slice::from_ref(&result));
+        let registry = engine.recent_results.lock().unwrap();
+        let stored = registry.get(&result.id).expect("registered");
+        assert_eq!(stored.icon, IconRef::Monogram, "icon payload is not cloned");
+        assert!(stored.actions.is_empty(), "action list is not cloned");
+        assert_eq!(stored.meta.snippet.as_deref(), Some("trimmed snippet"));
+        drop(registry);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

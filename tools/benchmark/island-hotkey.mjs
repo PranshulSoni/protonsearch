@@ -61,6 +61,7 @@ const port = Number(args.port || 9222);
 const takes = Number(args.takes || 10);
 const trimWaitMs = Number(args["trim-wait-ms"] || 8000);
 const idleSeconds = Number(args["idle-seconds"] || 10);
+const noCdp = Boolean(args["no-cdp"]);
 const HOTKEY_PS = resolve(__dirname, "hotkey-activate.ps1");
 const METRICS_PS = resolve(__dirname, "process-metrics.ps1");
 const MARKS_FILE = resolve(dataDir, "v2", "perf-marks.jsonl");
@@ -107,6 +108,58 @@ const report = { schema: "ps-island-hotkey/1", kind: "island-hotkey-activation",
   "This profile cannot also measure the launcher-only idle tree; island-perf.mjs runs the normal profile for that.",
 ] };
 let app = null;
+
+// Release-build path: release WebView2 CDP is disabled by design, so this mode
+// drives the real hotkey only (marks + Win32) and reads process memory via CIM.
+async function releaseHotkeyRun() {
+  await sleep(12000); // > delayed LOW trim (2.5 s) + startup settle
+  report.measurements.memoryIdleIslandPrewarmedHidden = await memorySnapshot(app.pid, "island-prewarmed-hidden-after-12s");
+  const trials = [];
+  let visibleSnapshot = null;
+  for (let i = 0; i < takes; i++) {
+    const since = readMarksSince();
+    let win = null;
+    try { win = await runPs(HOTKEY_PS, ["-ProcessId", String(app.pid), "-TimeoutMs", "8000", "-Mode", "show"], 30000); } catch (e) { trials.push({ take: i, error: String(e.message) }); continue; }
+    await sleep(300);
+    const marks = readMarksSince().marks.concat(since.marks);
+    const shown = markEpochs(marks, "island-window-shown").filter((v) => v >= ((win && win.sendAtUtc) || 0) - 400).slice(-1)[0] ?? null;
+    const paint = markEpochs(marks, "island-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
+    trials.push({
+      take: i,
+      win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
+      win32FocusedMs: win && win.focusedMs != null ? win.focusedMs : null,
+      sendToShownMs: shown != null && win ? +(shown - win.sendAtUtc).toFixed(2) : null,
+      shownToPaintMs: shown != null && paint != null ? +(paint - shown).toFixed(2) : null,
+      sendToPaintMs: shown != null && paint != null && win ? +(paint - win.sendAtUtc).toFixed(2) : null,
+      timedOut: win ? win.timedOut : null,
+    });
+    if (i === 0) { await sleep(600); visibleSnapshot = await memorySnapshot(app.pid, "island-visible-after-hotkey"); }
+    try { await runPs(HOTKEY_PS, ["-ProcessId", String(app.pid), "-TimeoutMs", "6000", "-Mode", "send"], 25000); } catch (e) { /* ignore */ }
+    await sleep(1300);
+  }
+  report.measurements.memoryIslandVisible = visibleSnapshot;
+  report.measurements.hotkeyActivation = {
+    trials: trials.length,
+    mode: "release-hotkey-only (no CDP; marks + Win32 EnumWindows)",
+    visibleMs: summarize(trials.map((t) => t.win32VisibleMs).filter((v) => v != null)),
+    focusedMs: summarize(trials.map((t) => t.win32FocusedMs).filter((v) => v != null)),
+    sendToShownMs: summarize(trials.map((t) => t.sendToShownMs).filter((v) => v != null)),
+    shownToPaintMs: summarize(trials.map((t) => t.shownToPaintMs).filter((v) => v != null)),
+    sendToPaintMs: summarize(trials.map((t) => t.sendToPaintMs).filter((v) => v != null)),
+    samples: trials,
+    note: "Island window is prewarmed at startup (island-primary profile) and hidden; each trial is real hotkey show -> hotkey dismiss. Marks island-window-shown/island-first-paint are written by the release build too (PROTONSEARCH_PERF_HOOKS=1).",
+  };
+  await sleep(trimWaitMs);
+  const hiddenTrim = await memorySnapshot(app.pid, "island-hidden-after-hotkey-trim-wait");
+  report.measurements.visibleVsHiddenTrim = {
+    waitMs: trimWaitMs,
+    visible: visibleSnapshot,
+    hiddenTrim,
+    delta: visibleSnapshot ? compareSnapshots(visibleSnapshot, hiddenTrim) : null,
+  };
+  report.status = "ok";
+}
+
 async function main() {
   const pw = loadPlaywright();
   if (!existsSync(exe)) throw new Error("exe not found: " + exe);
@@ -121,6 +174,7 @@ async function main() {
     const outFd = openSync(resolve(logDir, "island-hotkey-app-stdout.log"), "w");
     app = spawn(exe, [], { env: { ...process.env, PROTONSEARCH_DATA_DIR: dataDir, PROTONSEARCH_PERF_HOOKS: "1", PROTONSEARCH_CDP_PORT: String(port), WEBVIEW2_USER_DATA_FOLDER: resolve(dataDir, "webview2") }, stdio: ["ignore", outFd, errFd] });
     report.conditions.appPid = app.pid;
+    if (noCdp) { await releaseHotkeyRun(); return; }
     let browser = null;
     const deadline = Date.now() + 60000;
     while (!browser && Date.now() < deadline) { try { browser = await pw.chromium.connectOverCDP("http://127.0.0.1:" + port); } catch { await sleep(500); } }

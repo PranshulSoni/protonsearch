@@ -637,6 +637,8 @@ export interface AppInfo {
   dataSchema: number;
   platform: string;
   arch: string;
+  /** True only when the shell runs with PROTONSEARCH_PERF_HOOKS=1. */
+  perfHooks?: boolean;
 }
 
 export interface AgentRunRequest {

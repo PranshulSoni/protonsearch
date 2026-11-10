@@ -1670,3 +1670,165 @@ html[data-theme="dark"] .island-toast { color: var(--ps-positive-pill-ink, var(-
   .island-card-title { font-size: 11px; }
   .island-default-tag { display: none; }
 }
+
+/* Settings hub: every section card stays visible (task-59). */
+.settings-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-3);
+  margin: 2px 0 22px;
+}
+
+.settings-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 14px;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--ps-line);
+  border-radius: var(--ps-radius-row);
+  background: var(--ps-surface);
+  color: var(--ps-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-card:hover {
+  border-color: var(--ps-line-strong, var(--ps-line));
+  background: var(--ps-surface-raised);
+}
+
+.settings-card.is-active {
+  border-color: var(--ps-accent);
+  box-shadow: inset 0 0 0 1px var(--ps-accent);
+}
+
+.settings-card:focus-visible {
+  outline: 2px solid var(--ps-focus);
+  outline-offset: 2px;
+}
+
+.settings-card-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ps-line);
+  border-radius: var(--ps-radius-kbd);
+  background: var(--ps-surface-soft);
+  color: var(--ps-ink-2);
+}
+
+.settings-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-card-title {
+  color: var(--ps-ink);
+  font-size: var(--ps-text-small);
+  font-weight: 600;
+}
+
+.settings-card-value {
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
+}
+
+.settings-card-arrow {
+  color: var(--ps-ink-3);
+}
+
+.settings-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Embedded Dynamic Island section: the hub owns navigation; the island frame
+   chrome/sidebar is omitted. */
+.island-embedded {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ps-ink);
+}
+
+.island-embedded .island-main {
+  padding: 0;
+}
+
+.island-embedded .island-footer {
+  margin-top: 22px;
+}
+
+.island-embedded .btn {
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+/* Integrations rows. */
+.integration-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.integration-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--ps-line-soft);
+}
+
+.integration-row:last-child {
+  border-bottom: 0;
+}
+
+.integration-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ps-line);
+  border-radius: 6px;
+  background: var(--ps-surface-soft);
+  color: var(--ps-ink-2);
+}
+
+.integration-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.integration-title {
+  color: var(--ps-ink);
+  font-size: var(--ps-text-small);
+  font-weight: 600;
+}
+
+.integration-desc {
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+  line-height: var(--ps-leading-meta);
+}
+
+@media (max-width: 700px) {
+  .settings-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-card {
+    min-height: 56px;
+  }
+}

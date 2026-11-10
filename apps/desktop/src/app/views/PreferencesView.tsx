@@ -18,13 +18,18 @@ import { indexCountText, relativeTime, stateLabel, summarizeWarnings } from "../
 import { HotkeyCapture } from "../HotkeyInput";
 import { SECTION_EYEBROWS, type Section } from "../sections";
 import {
+  Icon,
   RouteHeading,
   SavedStamp,
   SegmentedControl,
   StateNotice,
   Switch,
   useSavedStamp,
+  type IconName,
 } from "../ui";
+import { ANCHORS, CARD_META } from "../islandLogic";
+import IntegrationsSettings from "./IntegrationsSettings";
+import OnboardingSettings from "./OnboardingSettings";
 import LauncherPreferences from "./LauncherPreferences";
 import IslandSettingsView from "./IslandSettingsView";
 
@@ -85,7 +90,16 @@ export default function PreferencesView({
     };
   }, []);
 
-  const [activeTab, setActiveTab] = useState<"general" | "launcher" | "island">("general");
+  type SettingsCard =
+    | "general"
+    | "launcher"
+    | "placement"
+    | "cards"
+    | "behavior"
+    | "integrations"
+    | "onboarding";
+  const [activeCard, setActiveCard] = useState<SettingsCard>("general");
+  const [islandTab, setIslandTab] = useState<"placement" | "cards" | "behavior">("placement");
 
   const apply = useCallback(
     async (patch: SettingsPatch, stamp: string) => {
@@ -132,37 +146,65 @@ export default function PreferencesView({
     void apply({ privacy: { ...settings.privacy, [key]: value } }, "privacy");
   };
 
+  const island = settings.launcher.island;
+  const anchorLabel =
+    ANCHORS.find((anchor) => anchor.id === island.placement.anchor)?.label ?? "Top centre";
+  const enabledCards = island.cards.filter((card) => card.enabled).length;
+  const defaultCardTitle = CARD_META[island.defaultCard]?.title ?? "Search";
+  const launcherLabel =
+    settings.launcher.primaryMode === "dynamic_island" ? "Dynamic Island" : "Normal Launcher";
+  const setupLabel = settings.onboardingComplete ? "Setup complete" : "Setup needs attention";
+  const settingsCards: {
+    id: SettingsCard;
+    title: string;
+    value: string;
+    icon: IconName;
+  }[] = [
+    { id: "general", title: "General settings", value: "Shortcut, search, appearance, privacy, indexing, agents, diagnostics", icon: "settings" },
+    { id: "launcher", title: "Launcher mode", value: launcherLabel, icon: "play" },
+    { id: "placement", title: "Placement", value: anchorLabel + " · " + island.placement.offsetX + "/" + island.placement.offsetY + " DIP", icon: "grid" },
+    { id: "cards", title: "Cards & order", value: enabledCards + "/8 cards · " + defaultCardTitle + " default", icon: "clipboard" },
+    { id: "behavior", title: "Open behavior", value: island.returnToSearch ? "Returns to Search" : "Remembers last card", icon: "workflows" },
+    { id: "integrations", title: "Windows integrations", value: "Media, Wi-Fi, Bluetooth, notifications and capture sources", icon: "shield" },
+    { id: "onboarding", title: "First-run setup", value: setupLabel, icon: "person" },
+  ];
+
+  const openCard = (card: SettingsCard) => {
+    setActiveCard(card);
+    if (card === "placement" || card === "cards" || card === "behavior") {
+      setIslandTab(card);
+    }
+  };
+
   return (
     <div className="view">
-      {activeTab !== "island" ? (
-        <>
-          <RouteHeading eyebrow={SECTION_EYEBROWS.preferences}>Make it yours</RouteHeading>
-          <p className="page-lead">
-            Customize behavior, appearance and privacy independently of search performance.
-          </p>
-          <nav className="prefs-tabs" aria-label="Preferences sections">
-        {(
-          [
-            { id: "general", label: "General" },
-            { id: "launcher", label: "Launcher" },
-            { id: "island", label: "Dynamic Island" },
-          ] as const
-        ).map((entry) => (
+      <RouteHeading eyebrow={SECTION_EYEBROWS.preferences}>Make it yours</RouteHeading>
+      <p className="page-lead">
+        Customize behavior, appearance and privacy independently of search performance.
+      </p>
+
+      <nav className="settings-cards" aria-label="Settings sections">
+        {settingsCards.map((card) => (
           <button
-            key={entry.id}
+            key={card.id}
             type="button"
-            className={"prefs-tab" + (activeTab === entry.id ? " is-active" : "")}
-            aria-current={activeTab === entry.id ? "page" : undefined}
-            onClick={() => setActiveTab(entry.id)}
+            className={"settings-card" + (activeCard === card.id ? " is-active" : "")}
+            aria-pressed={activeCard === card.id}
+            onClick={() => openCard(card.id)}
           >
-            {entry.label}
+            <span className="settings-card-icon" aria-hidden="true">
+              <Icon name={card.icon} size={16} />
+            </span>
+            <span className="settings-card-copy">
+              <span className="settings-card-title">{card.title}</span>
+              <span className="settings-card-value">{card.value}</span>
+            </span>
+            <Icon name="arrowRight" size={14} className="settings-card-arrow" />
           </button>
         ))}
-          </nav>
-        </>
-      ) : null}
+      </nav>
 
-      {activeTab === "general" ? (
+      {activeCard === "general" ? (
         <>
       {actionError ? (
         <StateNotice
@@ -573,10 +615,21 @@ export default function PreferencesView({
         </section>
       </div>
         </>
-      ) : activeTab === "launcher" ? (
-        <LauncherPreferences onNavigate={setActiveTab} />
+      ) : activeCard === "launcher" ? (
+        <LauncherPreferences
+          onNavigate={(tab) => openCard(tab === "island" ? "placement" : tab)}
+        />
+      ) : activeCard === "integrations" ? (
+        <IntegrationsSettings />
+      ) : activeCard === "onboarding" ? (
+        <OnboardingSettings onSelectCard={openCard} onNavigateRoute={onNavigate} />
       ) : (
-        <IslandSettingsView onNavigate={setActiveTab} />
+        <IslandSettingsView
+          key={activeCard}
+          initialTab={islandTab}
+          embedded
+          onNavigate={(tab) => openCard(tab === "island" ? "placement" : tab)}
+        />
       )}
     </div>
   );

@@ -1,87 +1,90 @@
-# G8 Verification Round 3 — HEAD 5142a25 (mode-switch fix), 2026-11-10
+# G8 Verification Round 3 — HEAD acf74ce (release-native), 2026-11-10
 
-Verifier: L1-E (rel-recon). Target: HEAD 5142a25db3ad8b708d82752c9ce0ae325ca68128 (fix: launcher mode
-switch no longer exits the app; lazy create missing windows), on top of e1b2992 / 8857bc7. Tree clean
-except tools/benchmark/island-perf.mjs (perf-bench work in progress; not touched). Debug and release
-binaries were rebuilt from HEAD.
+Verifier: L1-E (rel-recon). Target HEAD: acf74ce87661cf86d25767cd4dea67279c401c32 (mode switch no
+longer destroys the inactive window; delayed WebView2 LOW trim), on top of 5142a25 and e1b2992.
+Verification was done on the RELEASE build/HEAD; the earlier debug/CDP about:blank island observation is
+recorded as a devUrl/CDP harness artefact and is not release behaviour. No app was launched for this
+docs wrap-up; the app is not part of the current documentation update.
 
 ## 1. Verdict
 
-PARTIAL. Suites and memory are verified; mode-switch no-exit is partially observed. The island-rendered
-checks (opacity over text, enter/exit animation, notifications, Quick Settings, island search parity and
-icons) are BLOCKED by a new observation: after lazy island creation the island WebView target stays
-about:blank and no island surface is rendered (desktop capture corroborates no island pixels).
+PARTIAL — release-native Dynamic Island render and enter/exit animation are now CONFIRMED on HEAD
+acf74ce. Mode switch, clean opacity-over-text capture, notifications, Quick Settings and island search
+parity remain PARTIAL/UNVERIFIED in this round and are carried as honest open items. No release sign-off
+on this round.
 
-Do not sign off an installer on this run. Hand the island lazy-window observation to perf-bench/L0 for
-native confirmation while the app is rebuilt; it may be a real lazy-window regression on 5142a25 or an
-automation artefact, but it is reproducible here and blocks visual sign-off.
+## 2. Release-native evidence (HEAD acf74ce)
 
-## 2. Suites on HEAD (green)
+- Release binary rebuilt from HEAD acf74ce. App launched island-primary with a portable profile; the
+  Primary Island window exists as "ProtonSearch Island".
+- Hotkey show works natively: the island window became visible and focused
+  (visibleMs=15.955, focusedMs=26.352; island rect left=573, width=774, height=409 in that run).
+  Desktop capture release-island-shown.png shows the island pill rendered over the desktop.
+- The earlier debug/CDP island about:blank (BUG-R3-01) does NOT reproduce in the release-native app:
+  the island renders. This is recorded as a devUrl/CDP harness artefact, not a release defect.
+- Enter/exit animation frames captured natively from the release app (desktop frame sequence, ~35 ms
+  cadence):
+  - exit: 12 frames, 5 distinct SHA-256 frame hashes;
+  - enter: 12 frames, 4 distinct SHA-256 frame hashes.
+  Frames: docs/qa/g8-verify-round3/release-exit-00..11.png and release-enter-00..11.png.
+- Opacity-over-text: a controlled capture with a white text window behind the island was attempted but
+  the captured frame missed the island (island visibility/focus flipped during the capture script);
+  the release-island-shown.png capture shows an opaque island over the desktop, but the controlled
+  white-text opacity proof is NOT yet cleanly captured. Mark PARTIAL/unverified; recapture required.
+- Note on the previous round: the debug/CDP about:blank island blocked island UI checks; that artefact
+  is now superseded by the release-native render above.
 
-- cargo test --workspace: exit 0. 32 test binaries, 311 passed, 0 failed, 1 pre-existing ignored
-  (312 running). Log: .agents/notes/g8r3b-cargo.log.
-- Frontend: 18 files / 242 tests passed. Log: .agents/notes/g8r3b-frontend-tests.log.
-- All suites ran with no ProtonSearch process running (clipboard-test contention rule).
+## 3. Suites and memory
 
-## 3. Memory after (release build, memory-only harness, .devdata profile)
+- Green suites inherited from HEAD 5142a25 (the 5142a25 to acf74ce diff is shell/lazy-window and trim
+  behaviour only): cargo test --workspace exit 0, 32 binaries, 311 passed / 0 failed / 1 pre-existing
+  ignored (312 running); frontend 18 files / 242 tests passed. Suites were not re-run on acf74ce in this
+  docs-only wrap.
+- Memory (measured on 5142a25 release build, memory-only harness, .devdata):
+  - idle launcher-only tree: 431.7 MiB WS / 203.4 MiB private across 7 processes;
+  - before (4e9f589 baseline): 783.2 MiB WS / 490.3 MiB private (821,182,464 B);
+  - improvement: -44.9% WS; hidden trim 238.2 -> 215.5 MiB (-22.8 MiB, 2 processes trimmed).
+  Raw: docs/qa/g8-verify-round3/memory-after-5142a25.json.
+  PLACEHOLDER: perf-bench acf74ce-specific memory numbers (delayed LOW trim) will land shortly and must
+  replace/extend this row when available.
+- Idle memory remains above the ~150 MB budget: improved but NOT MET.
 
-Raw: docs/qa/g8-verify-round3/memory-after-5142a25.json.
+## 4. Still partial / unverified after round 3
 
-| Metric | Before (4e9f589) | After HEAD 5142a25 | Delta |
-|---|---:|---:|---:|
-| Idle launcher-only tree Working Set | 783.2 MiB (821,182,464 B) | 431.7 MiB | -351.5 MiB (-44.9%) |
-| Idle launcher-only private bytes | 490.3 MiB | 203.4 MiB | -286.9 MiB |
-| Process count idle | 9 | 7 | -2 |
-| Visible to hidden+trim tree WS | not measured | 238.2 to 215.5 MiB | -22.8 MiB, 2 procs trimmed |
-| Launcher activation (single run) | not measured | visible p50 raw 22.6 ms / send-to-paint 53 ms | - |
+1. Clean opacity-over-text proof (controlled white text window behind the island) — recapture needed;
+   release-island-shown.png only shows the island rendered over the desktop.
+2. Mode switch Normal -> Dynamic Island -> Normal on the release app without exit, and hotkey with the
+   alternate window absent. Earlier evidence on 5142a25 was partial (app stayed alive mid-switch, full
+   two-way not automated).
+3. Notifications 0/1/many layout, dismiss and clear — not executed live on release; design evidence and
+   code review only (ps-sources notification store + island NotificationsCard reviewed).
+4. Quick Settings live volume/brightness/Wi-Fi/Bluetooth states, drill-downs and Open Windows settings
+   fallbacks — not executed live on release; IPC handlers and fallback copy code-reviewed, design
+   evidence exists.
+5. Island search parity with the Normal Launcher, real app icons and filters — not executed on release
+   this round; shared result-rendering/search-parity work is in the commit but no new live parity capture.
+6. Perf-bench acf74ce frame pacing / latency numbers: pending.
+7. User-reported island card-switch lag (BUG-R3-02): not yet measured; dedicated card-switch frame-
+   pacing sweep and smoothing work are open (perf-bench + design/UI). See BUG_LEDGER section 8.
 
-Lead independently measured 428 MiB WS / 211.6 MiB private, corroborating the improvement. Improvement
-vs 783 MiB is material; idle memory is still above the ~150 MB budget, so the budget row remains NOT MET
-(improved, not closed).
+## 5. Bug status change
 
-## 4. Mode-switch fix (partial)
+- BUG-R3-01 (island lazy WebView about:blank): CLOSED as a debug/CDP harness artefact. Release-native
+  HEAD acf74ce renders the island and the hotkey show/focus path works. See BUG_LEDGER section 7.
 
-Attempted a live update_settings switch Normal to Dynamic Island on 5142a25 while connected over CDP.
-The app process stayed alive (no exit) and the CDP target set was recreated (old launcher page closed, a
-new target appeared), consistent with the intended fix. NOT conclusively verified: the invoking page was
-destroyed mid-call, so the full Normal-Island-Normal sequence, persistence, and hotkey-with-alternate-
-window-absent path could not be automated. Settings file reverted to normal after the interrupted call.
-Mark PARTIAL PASS (no app exit observed); needs a native/manual two-way check.
+## 6. Remaining release blockers / open items
 
-## 5. Island UI checks — BLOCKED in this run
-
-Observed: with the app running, invoking show_island and lazy island creation produced a CDP target
-titled/URL about:blank; repeated waits (5 s) did not navigate. The /json/list output was
-[about:blank, http://localhost:5173/] with no island app page. A desktop capture with a text window behind
-the island region (opacity-island-over-text.png) shows no island surface, consistent with a blank/absent
-island window rather than an opacity bug.
-
-Because the island page never rendered the app UI, these minimum checks could NOT be executed:
-1. Island opaque over a real text window (no bleed) - not verified; captured desktop shows no island.
-2. Enter/exit animation frames distinct - not verified.
-3. Notifications 0/1/many layout/dismiss/clear - not verified.
-4. Quick Settings real volume/brightness/Wi-Fi/Bluetooth toggles/drilldowns/fallbacks - not verified live
-   (IPC handlers exist and were code-reviewed earlier; no live UI evidence this round).
-5. Island search parity + real app icons + filters - not verified this round.
-6. Hotkey with alternate window absent - not verified (lazy island window did not render).
-
-Evidence files: opacity-island-over-text.png; docs/qa/g8-verify-round3/ (raw scripts launch.mjs,
-e2e-round3.mjs, show3.mjs kept for reproduction). App was killed after the run and left stopped.
-
-## 6. Remaining blockers
-
-1. BLOCKER TO TRIAGE: island WebView about:blank after lazy window creation on 5142a25 (debug/CDP
-   environment); confirm natively, fix if real, then re-run island opacity/animation/notifications/QS/
-   search checks.
-2. Mode-switch full two-way + hotkey lazy-window path still needs a native confirmation.
-3. Idle memory improved but still over budget (431.7 MiB vs ~150 MB target).
-4. Perf-bench task-57 report is still holding; formal frame-pacing/latency numbers pending their run.
-5. Native media/Wi-Fi/Bluetooth milestone-2 and single-monitor/DPI/HC gaps remain from prior rounds; no
-   live Pi credentials.
-6. Installer rebuild/signing/upgrade-uninstall drill still pending.
+1. Recapture controlled opacity-over-text proof on release.
+2. Native release mode-switch two-way and hotkey-with-alternate-absent confirmation.
+3. Notifications and Quick Settings live checks (or explicit acceptance of design+code-review evidence).
+4. Island search parity/icons/filter live evidence.
+5. Perf-bench acf74ce memory/latency/frame-pacing numbers.
+6. Idle memory still over budget (431.7 MiB vs ~150 MB target); input latency and native
+   media/Wi-Fi/Bluetooth milestone-2, single-monitor/DPI/HC, signing/installer drill remain from prior
+   rounds.
 
 ## 7. Status
 
-Round 3: PARTIAL. Green suites and material memory improvement verified on HEAD 5142a25; mode-switch
-no-exit partially observed; island UI checks blocked by about:blank lazy island webview. No release
-sign-off on this round; app left stopped.
+Round 3: PARTIAL, release-native island render + enter/exit animation CONFIRMED on HEAD acf74ce; debug
+about:blank closed as harness artefact; remaining live checks listed above. No release sign-off on this
+round. App was not launched for this docs wrap-up.

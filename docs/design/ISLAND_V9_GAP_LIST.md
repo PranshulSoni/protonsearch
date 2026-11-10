@@ -21,6 +21,18 @@ capability adapters, IPC gaps and evidence/a11y polish. No fake data is accepted
 
 ## Remaining gaps
 
+## P0 — native compact/UX rejection (task-62, open)
+
+| # | Issue | Required |
+|---|---|---|
+| 62.1 | Native bleed/transparency inside island bbox in user screenshots | Zero alpha inside bbox at 100/125/150% native capture over white text; native before/after; opaque-window fallback if transparent window still bleeds. |
+| 62.2 | Compact-first expectation: hotkey should show compact oval only; clicking currently can open a card/drill-down | Alt+Space always compact (520x66); typing/click expands Search; Alt+Space toggles expanded->compact->hide; no last-card restore. |
+| 62.3 | Esc chain and empty-search hint | Expanded/drilldown -> parent card -> compact -> hidden; no placeholder or empty hint compact; expanded empty = blank viewport; zero results one line only. |
+| 62.4 | Notification bars/scrollbar overlap/clutter | No footer bar, row rules or visible scrollbar; 52 px rows, hidden scroll, header clear 28x28, states 0/1/many. |
+| 62.5 | Quick Settings clutter (pills/fallback rows/duplicate On/Off) | Volume/brightness/audio + split Wi-Fi/Bluetooth + one quiet Open Windows settings link; no action pills/dead tile; honest OS consent errors. |
+| 62.6 | Card switch smoothness / per-frame native resize risk | Transform-first content switch 120/180 ms (total 220); native setIslandGeometry exactly once per transition; opaque frames; video/frame evidence. |
+| 62.7 | Native acceptance evidence missing | Native (not mock) before/after over white text window, manifest + resize count; design sign/reject. |
+
 ## P0 — user-rejection quality fixes (task-56, reviewed 2026-11-10: PASS — notes closed)
 
 After set at docs/qa/visual/live-shots/task54-after-* (1150/860/430 over a white Notepad/text window) verified: opaque

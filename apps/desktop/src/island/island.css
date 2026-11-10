@@ -48,10 +48,17 @@ html[data-window="island"] #root {
   align-items: flex-start;
   justify-content: center;
   width: 100%;
+  min-height: 100vh;
   padding: 112px;
   box-sizing: border-box;
   background: transparent;
 }
+
+/* The native window can be briefly larger than the surface; keep the surface on its anchor edge. */
+.island-host[data-anchor$="_left"] { justify-content: flex-start; }
+.island-host[data-anchor$="_right"] { justify-content: flex-end; }
+.island-host[data-anchor^="center"] { align-items: center; }
+.island-host[data-anchor^="bottom"] { align-items: flex-end; }
 
 .island-surface {
   position: relative;
@@ -73,9 +80,10 @@ html[data-window="island"] #root {
   font-family: "Inter Variable", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
   letter-spacing: -0.015em;
+  /* Native window is resized exactly once per card/mode; width/height are not
+     CSS-animated because the browser repaint of a transparent WebView2 window
+     during a size morph is what made switching feel laggy. */
   transition:
-    width var(--island-dur-morph) var(--island-ease),
-    height var(--island-dur-morph) var(--island-ease),
     border-radius var(--island-dur-radius) var(--island-ease),
     transform var(--island-dur-transform) var(--island-ease);
   outline: none;
@@ -125,8 +133,11 @@ html[data-window="island"] #root {
 }
 
 .island-surface--out .island-inner {
-  transform: translateY(-11px);
-  transition: transform 190ms var(--island-ease);
+  opacity: 0;
+  transform: scale(0.96) translateY(6px);
+  transition:
+    opacity 120ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .island-surface--in .island-inner {
@@ -380,7 +391,7 @@ html[data-window="island"] #root {
 }
 
 .island-skeleton-row {
-  height: 44px;
+  height: 50px;
   border-radius: 8px;
   background: linear-gradient(90deg, #151c20, #1b242a, #151c20);
   animation: island-skeleton 1.2s ease-in-out infinite;
@@ -1917,3 +1928,73 @@ html[data-window="island"] #root {
   margin-left: auto;
   color: #7d878d;
 }
+
+/* task-58: prewarmed card slots; inactive cards stay mounted but unpainted. */
+.island-card-slot {
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--island-panel);
+}
+
+.island-card-slot[aria-hidden="true"] {
+  display: none !important;
+}
+
+/* No scrollbar bars inside the island surface. */
+.island-surface,
+.island-surface * {
+  scrollbar-width: none;
+}
+
+.island-surface *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+.island-zero {
+  padding: 4px 2px;
+  font-size: 11px;
+  color: #9ba3ae;
+}
+
+/* ---------- task-62 exact anatomy ---------- */
+.island-notifications-card,
+.island-controls-card {
+  padding: 17px 20px 14px;
+}
+
+.island-notifications-card .island-notif-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 56px;
+}
+
+.island-notif-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.island-notif-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 18px;
+  letter-spacing: -0.03em;
+  color: var(--island-text);
+}
+
+.island-notif-heading p {
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 14px;
+  color: #9ba7ae;
+}
+
+.island-clear-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;

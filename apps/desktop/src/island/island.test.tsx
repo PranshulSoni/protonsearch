@@ -8,6 +8,7 @@ import {
   islandCardDims,
   visibleIslandCards,
 } from "./islandDims";
+import { api } from "../bridge/api";
 
 class ResizeObserverStub {
   observe() {}
@@ -155,12 +156,17 @@ describe("V9 island surface", () => {
     ).toBe("Go to Search card");
   });
 
-  it("expands search on focus and shows real results with filters", async () => {
+  it("stays compact on summon focus and expands only after a click", async () => {
     const element = await renderIsland();
     await waitFor(() => element.querySelector(".island-search-input") !== null);
     const input = element.querySelector(".island-search-input") as HTMLInputElement;
     await act(async () => {
       input.focus();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    });
+    expect(element.querySelector(".island-surface--compact")).not.toBeNull();
+    await act(async () => {
+      input.click();
       await new Promise((resolve) => setTimeout(resolve, 120));
     });
     await waitFor(() => element.querySelector(".island-surface--expanded") !== null);
@@ -176,27 +182,22 @@ describe("V9 island surface", () => {
     expect(element.querySelector(".island-result-foot")?.textContent).toContain("local results");
   });
 
-  it("renders compact visible copy for the canonical 185 px zero-results card", async () => {
+  it("removes the empty-search hint and keeps a fixed expanded height", async () => {
     const element = await renderIsland();
     await waitFor(() => element.querySelector(".island-search-input") !== null);
     const input = element.querySelector(".island-search-input") as HTMLInputElement;
-    await act(async () => {
-      input.focus();
-      await new Promise((resolve) => setTimeout(resolve, 80));
-    });
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
     await act(async () => {
       setter.call(input, "zzzz no match");
       input.dispatchEvent(new Event("input", { bubbles: true }));
       await new Promise((resolve) => setTimeout(resolve, 300));
     });
-    await waitFor(() => element.querySelector(".island-empty--compact") !== null);
     const surface = element.querySelector(".island-surface") as HTMLElement;
-    expect(surface.style.height).toBe("185px");
+    expect(surface.style.height).toBe("397px");
+    expect(element.querySelector(".island-result-row")).toBeNull();
+    expect(element.querySelector(".island-empty--compact")).toBeNull();
+    expect(surface.textContent).not.toContain("Start typing");
     expect(element.querySelector(".island-result-foot")).toBeNull();
-    expect(element.querySelector(".island-empty--compact")?.textContent).toContain(
-      "No matches for “zzzz no match”.",
-    );
   });
 
   it("switches card with the dots and exposes real clipboard tabs", async () => {
@@ -206,7 +207,10 @@ describe("V9 island surface", () => {
       (element.querySelectorAll(".island-dot-button")[2] as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 450));
     });
-    expect(element.querySelector(".island-card-heading h2")?.textContent).toBe("Clipboard");
+    expect(
+      element.querySelector('.island-card-slot[aria-hidden="false"] .island-card-heading h2')
+        ?.textContent,
+    ).toBe("Clipboard");
     const chips = [...element.querySelectorAll(".island-nav-chip")];
     expect(chips.some((chip) => chip.textContent?.includes("Pinned"))).toBe(true);
     expect(chips.find((chip) => chip.textContent?.includes("Pinned"))?.hasAttribute("disabled")).toBe(true);
@@ -219,7 +223,10 @@ describe("V9 island surface", () => {
       (element.querySelectorAll(".island-dot-button")[1] as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 450));
     });
-    expect(element.querySelector(".island-card-heading h2")?.textContent).toBe("Media");
+    expect(
+      element.querySelector('.island-card-slot[aria-hidden="false"] .island-card-heading h2')
+        ?.textContent,
+    ).toBe("Media");
     expect(element.querySelector(".island-unsupported")?.textContent).toContain("Not available yet");
     expect(element.querySelector(".island-unsupported")?.textContent).toContain("No mock data is shown.");
   });
@@ -245,7 +252,10 @@ describe("V9 island surface", () => {
       (element.querySelectorAll(".island-dot-button")[1] as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
-    expect(element.querySelector(".island-card-heading h2")?.textContent).toBe("Media");
+    expect(
+      element.querySelector('.island-card-slot[aria-hidden="false"] .island-card-heading h2')
+        ?.textContent,
+    ).toBe("Media");
     expect(element.querySelector(".island-surface--out")).toBeNull();
   });
 
@@ -275,4 +285,45 @@ describe("V9 island surface", () => {
     await waitFor(() => element.querySelector(".island-surface--compact") !== null);
     await settle(100);
   });
+
+  it("prefetches native card data before a card switch and keeps it cached", async () => {
+    const getControls = vi.spyOn(api, "getControlsStatus");
+    const element = await renderIsland();
+    await waitFor(() => element.querySelectorAll(".island-dot-button").length === 8);
+    await waitFor(() => getControls.mock.calls.length > 0, 2500);
+    const before = getControls.mock.calls.length;
+    expect(before).toBeGreaterThan(0);
+    await act(async () => {
+      (element.querySelector('.island-dot-button[aria-label="Go to Quick Settings card"]') as HTMLButtonElement).click();
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
+    // No refetch caused by the first switch (the probe runs once at bootstrap).
+    expect(getControls.mock.calls.length).toBe(before);
+    getControls.mockRestore();
+  });
+
+  it("sizes the native window once per card mode with no per-frame resize storm", async () => {
+    const calls: Array<{ w: number; h: number }> = [];
+    const geometry = vi.spyOn(api, "setIslandGeometry").mockImplementation(async (width, height) => {
+      calls.push({ w: width, h: height });
+    });
+    const element = await renderIsland();
+    await waitFor(() => element.querySelectorAll(".island-dot-button").length === 8);
+    await settle(120);
+    const initial = calls.length;
+    await act(async () => {
+      (element.querySelector('.island-dot-button[aria-label="Go to Clipboard card"]') as HTMLButtonElement).click();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+    expect(calls.length).toBe(initial + 1);
+    expect(calls[calls.length - 1]).toEqual({ w: 510, h: 391 });
+    const afterSwitch = calls.length;
+    await act(async () => {
+      (element.querySelector('.island-dot-button[aria-label="Go to Search card"]') as HTMLButtonElement).click();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+    expect(calls.length).toBe(afterSwitch + 1);
+    expect(calls[calls.length - 1]).toEqual({ w: 550, h: 397 });
+    geometry.mockRestore();
+  });;
 });

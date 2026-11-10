@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../bridge/api";
 import type { IslandCardId, SearchResult, SearchScope } from "../bridge/types";
 import {
@@ -27,7 +27,18 @@ import {
   visibleIslandCards,
   type IslandVariant,
 } from "./islandDims";
+import { markTyping, recordFrames } from "../lib/perfProbe";
 import "./island.css";
+
+// Memoized card bodies: typing in Search must not re-render hidden card DOM
+// (engine payload perf: clipboard thumbs/app icon data URLs are stable).
+const MemoClipboardCard = memo(ClipboardCard);
+const MemoAgentsCard = memo(AgentsCard);
+const MemoBrowserCard = memo(BrowserCard);
+const MemoGitCard = memo(GitCard);
+const MemoMediaCard = memo(MediaCard);
+const MemoControlsCard = memo(ControlsCard);
+const MemoNotificationsCard = memo(NotificationsCard);
 
 /**
  * V9 Dynamic Island surface. The native window adds 96 px transparent shadow
@@ -43,23 +54,23 @@ function prefersReducedMotion(): boolean {
 
 export default function IslandView() {
   const bootstrap = useIslandBootstrap();
-  const controls = useIslandControls();
   const settings = bootstrap.settings?.launcher?.island ?? null;
   const cards = useMemo(() => visibleIslandCards(settings), [settings]);
-  const defaultCard: IslandCardId = useMemo(() => {
-    const configured = settings?.defaultCard;
-    if (configured && cards.includes(configured)) return configured;
-    return cards[0] ?? "search";
-  }, [cards, settings?.defaultCard]);
-
-  const [activeCard, setActiveCard] = useState<IslandCardId>(defaultCard);
-  const [compact, setCompact] = useState(defaultCard === "search");
+  // task-58: every summon is the compact oval search pill.
+  const [activeCard, setActiveCard] = useState<IslandCardId>("search");
+  const [compact, setCompact] = useState(true);
   const [variant, setVariant] = useState<IslandVariant>("default");
   const [clipTab, setClipTab] = useState<ClipTab>("all");
   const [phase, setPhase] = useState<Phase>("idle");
   const [visibility, setVisibility] = useState<"opening" | "shown" | "closing" | "hidden">("shown");
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("all");
+  const renders = (window as unknown as { __islandRenders?: number });
+  renders.__islandRenders = (renders.__islandRenders ?? 0) + 1;
+  // Prefetch all card data as soon as the island webview has bootstrap settings.
+  // Card slots are already mounted, so the first switch is a render-only change
+  // (sources-content perf finding: first switches paid mount + async fetch).
+  const controls = useIslandControls(bootstrap.ready);
 
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -70,12 +81,17 @@ export default function IslandView() {
   const wheelAccumRef = useRef(0);
   const wheelAtRef = useRef(0);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const typedAtRef = useRef(0);
 
-  const searchExpanded = activeCard === "search" && !compact;
-  const searchState = useIslandSearch("all", query, searchExpanded);
-  const clipboardState = useIslandSearch("clipboard", "", activeCard === "clipboard");
-  const browserState = useIslandSearch("browser", "", activeCard === "browser");
-  const gitState = useIslandSearch("git", "", activeCard === "git");
+  const searchState = useIslandSearch(
+    "all",
+    query,
+    bootstrap.ready && activeCard === "search",
+  );
+  // Warm every card's data in parallel while the compact pill is shown.
+  const clipboardState = useIslandSearch("clipboard", "", bootstrap.ready);
+  const browserState = useIslandSearch("browser", "", bootstrap.ready);
+  const gitState = useIslandSearch("git", "", bootstrap.ready);
 
   const stageParam = Number(new URLSearchParams(window.location.search).get("stage") ?? "0");
   const monitor = useMemo(() => {
@@ -100,26 +116,45 @@ export default function IslandView() {
     compact,
     searchMatches: searchState.results.length,
   });
-  const dimsRef = useRef(dims);
-  dimsRef.current = dims;
-
-  // Reset to the configured default when the shell summons the island.
+  // task-58: every summon starts as the compact oval search pill, regardless of
+  // the configured default card. Expanding begins on a user click or typing.
   useEffect(() => {
     if (initialisedRef.current || !bootstrap.ready) return;
     initialisedRef.current = true;
-    setActiveCard(defaultCard);
-    setCompact(defaultCard === "search");
-  }, [bootstrap.ready, defaultCard]);
+    setActiveCard("search");
+    setCompact(true);
+    setQuery("");
+    setScope("all");
+  }, [bootstrap.ready]);
 
-  // Surface bbox contract: report the TARGET surface size once per settled
-  // dims change. A ResizeObserver during the 550 ms CSS morph caused a native
-  // window-resize storm; the window adds the 112 px shadow pad itself.
+  // task-58 geometry contract: the expanded search card has a fixed 460 px
+  // surface height so typing never resizes the native window. The window is
+  // resized ONCE per card/mode change (never per frame or per keystroke).
+  // A fixed expanded-search surface height removes native resizes while typing;
+  // the card switch path pre-resizes ONCE before the out phase.
+  const surfaceDims = activeCard === "search" && !compact
+    ? { width: dims.width, height: 397, radius: dims.radius }
+    : dims;
+  const geometryKey = surfaceDims.width + "x" + surfaceDims.height;
+  const lastGeometryKeyRef = useRef("");
+  const reportGeometry = useCallback((width: number, height: number) => {
+    const key = Math.ceil(width) + "x" + Math.ceil(height);
+    if (lastGeometryKeyRef.current === key) return;
+    lastGeometryKeyRef.current = key;
+    const w = (window as unknown as { __islandGeometryCalls?: number });
+    w.__islandGeometryCalls = (w.__islandGeometryCalls ?? 0) + 1;
+    void api.setIslandGeometry(Math.ceil(width), Math.ceil(height)).catch(() => undefined);
+  }, []);
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void api.setIslandGeometry(dims.width, dims.height).catch(() => undefined);
-    }, 80);
-    return () => window.clearTimeout(timer);
-  }, [dims.width, dims.height]);
+    reportGeometry(surfaceDims.width, surfaceDims.height);
+  }, [geometryKey, reportGeometry, surfaceDims.width, surfaceDims.height]);
+
+  useEffect(() => {
+    if (searchState.pending || typedAtRef.current === 0) return;
+    const ms = performance.now() - typedAtRef.current;
+    typedAtRef.current = 0;
+    markTyping(ms);
+  }, [searchState.pending, searchState.results]);
 
   useEffect(() => {
     if (compact) return;
@@ -137,6 +172,7 @@ export default function IslandView() {
       finish();
       return;
     }
+    recordFrames("island-close", 250);
     setVisibility("closing");
     if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
     closeTimerRef.current = window.setTimeout(finish, 120);
@@ -153,6 +189,14 @@ export default function IslandView() {
       if (now - lastSwitchRef.current < 350) return;
       lastSwitchRef.current = now;
       const token = ++tokenRef.current;
+      const targetDims = islandCardDims({
+        card,
+        variant: nextVariant,
+        stageWidth,
+        compact: false,
+      });
+      reportGeometry(targetDims.width, card === "search" ? 397 : targetDims.height);
+      recordFrames(`island-switch:${activeCard}>${card}`, 800);
       if (prefersReducedMotion()) {
         setActiveCard(card);
         setCompact(false);
@@ -169,10 +213,10 @@ export default function IslandView() {
         setPhase("in");
         window.setTimeout(() => {
           if (token === tokenRef.current) setPhase("idle");
-        }, 250);
-      }, 140);
+        }, 180);
+      }, 120);
     },
-    [activeCard, cards, compact, variant],
+    [activeCard, cards, compact, reportGeometry, stageWidth, variant],
   );
 
   const switchRelative = useCallback(
@@ -195,6 +239,8 @@ export default function IslandView() {
       setActiveCard("search");
       setCompact(true);
       setVariant("default");
+      setQuery("");
+      setScope("all");
       return;
     }
     requestHide();
@@ -225,9 +271,12 @@ export default function IslandView() {
         if (disposed) return;
         unlisteners.push(
           await listen("island:shown", () => {
+            recordFrames("island-open", 450);
             if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
-            setActiveCard(defaultCard);
-            setCompact(defaultCard === "search");
+            setActiveCard("search");
+            setCompact(true);
+            setQuery("");
+            setScope("all");
             setVariant("default");
             setPhase("idle");
             setVisibility("opening");
@@ -249,7 +298,7 @@ export default function IslandView() {
       disposed = true;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [bootstrap, defaultCard, requestHide]);
+  }, [bootstrap, requestHide]);
 
   useEffect(() => {
     return () => {
@@ -291,6 +340,13 @@ export default function IslandView() {
     [switchRelative],
   );
 
+  const onSurfaceClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!compact) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest("button")) return;
+    setCompact(false);
+  }, [compact]);
+
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     pointerStartRef.current = { x: event.clientX, y: event.clientY };
@@ -310,14 +366,28 @@ export default function IslandView() {
     [switchRelative],
   );
 
-  const card = (() => {
-    switch (activeCard) {
+  const clipboardRows = useMemo(
+    () => clipboardState.results.filter((result) => result.kind === "clipboard"),
+    [clipboardState.results],
+  );
+  const pauseAgent = useCallback((taskId: string) => {
+    void api.agentPause(taskId).catch(() => undefined);
+    bootstrap.refresh();
+  }, [bootstrap]);
+  const resumeAgent = useCallback((taskId: string) => {
+    void api.agentResume(taskId).catch(() => undefined);
+    bootstrap.refresh();
+  }, [bootstrap]);
+
+  const renderCard = (cardId: IslandCardId) => {
+    switch (cardId) {
       case "search":
         return (
           <SearchCard
             compact={compact}
             query={query}
             onQueryChange={(value) => {
+              typedAtRef.current = performance.now();
               setQuery(value);
               if (compact) setCompact(false);
             }}
@@ -328,25 +398,14 @@ export default function IslandView() {
             pending={searchState.pending}
             error={searchState.error}
             onOpen={openResult}
-            onFocus={() => {
-              if (compact) setCompact(false);
-            }}
+            onFocus={() => undefined}
             inputRef={inputRef}
-            placeholder={
-              stageWidth <= 380
-                ? "Search…"
-                : "Search files, folders, apps and actions…"
-            }
+            placeholder=""
           />
         );
-      case "clipboard": {
-        // Scope search can return non-clipboard rows in mock/preview builds;
-        // the card is strictly clipboard history.
-        const clipboardRows = clipboardState.results.filter(
-          (result) => result.kind === "clipboard",
-        );
+      case "clipboard":
         return (
-          <ClipboardCard
+          <MemoClipboardCard
             results={clipboardRows}
             pending={clipboardState.pending}
             error={clipboardState.error}
@@ -355,25 +414,18 @@ export default function IslandView() {
             onOpen={openResult}
           />
         );
-      }
       case "agent":
         return (
-          <AgentsCard
+          <MemoAgentsCard
             status={bootstrap.agentStatus}
             tasks={bootstrap.agentTasks}
-            onPause={(taskId) => {
-              void api.agentPause(taskId).catch(() => undefined);
-              bootstrap.refresh();
-            }}
-            onResume={(taskId) => {
-              void api.agentResume(taskId).catch(() => undefined);
-              bootstrap.refresh();
-            }}
+            onPause={pauseAgent}
+            onResume={resumeAgent}
           />
         );
       case "browser":
         return (
-          <BrowserCard
+          <MemoBrowserCard
             results={browserState.results}
             pending={browserState.pending}
             error={browserState.error}
@@ -382,7 +434,7 @@ export default function IslandView() {
         );
       case "git":
         return (
-          <GitCard
+          <MemoGitCard
             results={gitState.results}
             pending={gitState.pending}
             error={gitState.error}
@@ -391,7 +443,7 @@ export default function IslandView() {
         );
       case "media":
         return (
-          <MediaCard
+          <MemoMediaCard
             status={controls.status}
             pending={controls.pending}
             error={controls.error}
@@ -400,7 +452,7 @@ export default function IslandView() {
         );
       case "controls":
         return (
-          <ControlsCard
+          <MemoControlsCard
             status={controls.status}
             pending={controls.pending}
             error={controls.error}
@@ -409,7 +461,7 @@ export default function IslandView() {
         );
       case "bell":
         return (
-          <NotificationsCard
+          <MemoNotificationsCard
             status={controls.status}
             pending={controls.pending}
             error={controls.error}
@@ -419,14 +471,25 @@ export default function IslandView() {
       default:
         return (
           <UnsupportedCard
-            card={activeCard}
-            title={islandCardLabel(activeCard)}
+            card={cardId}
+            title={islandCardLabel(cardId)}
             subtitle="Not wired yet"
             reason="This card has no native data adapter yet."
           />
         );
     }
-  })();
+  };
+
+  const cardSlots = cards.map((cardId) => (
+    <div
+      key={cardId}
+      className="island-card-slot"
+      style={{ display: cardId === activeCard ? "flex" : "none" }}
+      aria-hidden={cardId !== activeCard}
+    >
+      {renderCard(cardId)}
+    </div>
+  ));
 
   const showDots = settings?.showDots !== false;
   const dots = showDots ? (
@@ -439,7 +502,7 @@ export default function IslandView() {
   ) : null;
 
   return (
-    <div className="island-host">
+    <div className="island-host" data-anchor={settings?.placement?.anchor ?? "top_center"}>
       <div
         className={[
           "island-surface",
@@ -457,16 +520,21 @@ export default function IslandView() {
         ]
           .filter(Boolean)
           .join(" ")}
-        style={{ width: dims.width + "px", height: dims.height + "px", borderRadius: dims.radius + "px" }}
+        style={{
+          width: surfaceDims.width + "px",
+          height: surfaceDims.height + "px",
+          borderRadius: surfaceDims.radius + "px",
+        }}
         role="region"
         aria-label="ProtonSearch island"
         tabIndex={-1}
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
+        onClick={onSurfaceClick}
       >
         <div className={"island-inner" + (compact ? " island-inner--compact" : " island-scrollable")}>
-          {card}
+          {cardSlots}
         </div>
         {dots}
       </div>

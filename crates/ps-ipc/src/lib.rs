@@ -1092,8 +1092,11 @@ pub struct ControlsStatus {
 pub enum MediaAction {
     Play,
     Pause,
+    #[serde(alias = "toggle")]
     PlayPause,
+    #[serde(alias = "next")]
     Next,
+    #[serde(alias = "prev", alias = "back")]
     Previous,
     Shuffle,
     Repeat,

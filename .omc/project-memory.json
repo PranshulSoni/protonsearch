@@ -381,6 +381,307 @@
       ]
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "apps/desktop/src-tauri/src/main.rs",
+      "accessCount": 46.823863787505694,
+      "lastAccessed": 1794292972566,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island/IslandView.tsx",
+      "accessCount": 13.986545881211631,
+      "lastAccessed": 1794292798035,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/island/islandDims.ts",
+      "accessCount": 1.993077891811431,
+      "lastAccessed": 1794292501726,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/island/island.css",
+      "accessCount": 4.970625535895476,
+      "lastAccessed": 1794293083544,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island",
+      "accessCount": 1.9930754140762952,
+      "lastAccessed": 1794292602472,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island/islandNativeCards.ts",
+      "accessCount": 5.989604534297211,
+      "lastAccessed": 1794292757883,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/island/NativeCards.tsx",
+      "accessCount": 2.9786532980886813,
+      "lastAccessed": 1794293090937,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island/IslandCards.tsx",
+      "accessCount": 2.978603074767395,
+      "lastAccessed": 1794294210776,
+      "type": "directory"
+    },
+    {
+      "path": "tools/benchmark/island-hotkey.mjs",
+      "accessCount": 6.995799863675132,
+      "lastAccessed": 1794292596327,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 5.976344358113125,
+      "lastAccessed": 1794293193805,
+      "type": "directory"
+    },
+    {
+      "path": "tools/benchmark/hotkey-activate.ps1",
+      "accessCount": 2.993831012908249,
+      "lastAccessed": 1794292930665,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/process-metrics.ps1",
+      "accessCount": 1.9993678074087162,
+      "lastAccessed": 1794292585246,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src",
+      "accessCount": 4.985840447141019,
+      "lastAccessed": 1794293121889,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/bridge/types.ts",
+      "accessCount": 3.9944194582884056,
+      "lastAccessed": 1794292745846,
+      "type": "directory"
+    },
+    {
+      "path": "crates/ps-sources/src/notifications.rs",
+      "accessCount": 1.9966594961284732,
+      "lastAccessed": 1794292930971,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src-tauri",
+      "accessCount": 1,
+      "lastAccessed": 1794292515478,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/main.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1794292516299,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/bridge/mock.ts",
+      "accessCount": 2.9968951593816833,
+      "lastAccessed": 1794292746367,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/island/island.test.tsx",
+      "accessCount": 5.992316693371054,
+      "lastAccessed": 1794292871071,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island/islandCards.test.tsx",
+      "accessCount": 1.9987206708635823,
+      "lastAccessed": 1794292682260,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island/IslandPageDots.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1794292588112,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop",
+      "accessCount": 1.9997828695498008,
+      "lastAccessed": 1794292617143,
+      "type": "directory"
+    },
+    {
+      "path": "docs/design/ISLAND_V9_SPEC.md",
+      "accessCount": 1,
+      "lastAccessed": 1794292590097,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/vite.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1794292616566,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/app",
+      "accessCount": 1,
+      "lastAccessed": 1794292657925,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/tsconfig.json",
+      "accessCount": 1,
+      "lastAccessed": 1794292681825,
+      "type": "file"
+    },
+    {
+      "path": "crates",
+      "accessCount": 1,
+      "lastAccessed": 1794292711544,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/lib/perfProbe.ts",
+      "accessCount": 1,
+      "lastAccessed": 1794292746890,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/lib/perfProbe.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1794292747392,
+      "type": "file"
+    },
+    {
+      "path": "docs/performance/V10_BENCHMARK_PLAN.md",
+      "accessCount": 1,
+      "lastAccessed": 1794292798980,
+      "type": "directory"
+    },
+    {
+      "path": "tools/benchmark/island-leak.mjs",
+      "accessCount": 4.998057690981933,
+      "lastAccessed": 1794293095903,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/idle-curve.mjs",
+      "accessCount": 4.998039939934005,
+      "lastAccessed": 1794293097250,
+      "type": "file"
+    },
+    {
+      "path": "docs/qa/g8-verify-round3/capture-release.ps1",
+      "accessCount": 1,
+      "lastAccessed": 1794292930372,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark",
+      "accessCount": 1,
+      "lastAccessed": 1794293102473,
+      "type": "directory"
+    },
+    {
+      "path": "docs/qa/g8-verify-round4/native-driver.ps1",
+      "accessCount": 18.9323925020904,
+      "lastAccessed": 1794293853131,
+      "type": "file"
+    },
+    {
+      "path": "docs/qa/g8-verify-round4/seed-notifications.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1794293121046,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/launcher",
+      "accessCount": 1,
+      "lastAccessed": 1794293140286,
+      "type": "directory"
+    },
+    {
+      "path": "tools/benchmark/island-probe.ps1",
+      "accessCount": 4.995105908815589,
+      "lastAccessed": 1794293858790,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/island-switch.mjs",
+      "accessCount": 11.97910186216348,
+      "lastAccessed": 1794293872288,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/README.md",
+      "accessCount": 1.9998836478955093,
+      "lastAccessed": 1794293356482,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/island-perf.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1794293354714,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/after-summon.png",
+      "accessCount": 1,
+      "lastAccessed": 1794293610244,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/after1-summon.png",
+      "accessCount": 1,
+      "lastAccessed": 1794293720279,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/baseline-custom-summon.png",
+      "accessCount": 1,
+      "lastAccessed": 1794293891328,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/typed.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294027557,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/ctrldown.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294027917,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/after-click-type.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294079165,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/island-typing.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1794294124135,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/launcher-typed.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294198631,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/island-after-click-type.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294282667,
+      "type": "file"
+    }
+  ],
   "userDirectives": []
 }

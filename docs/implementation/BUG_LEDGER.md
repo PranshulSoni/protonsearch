@@ -176,13 +176,37 @@ only where UI/app-level evidence is still pending (preview UI task-38; interacti
 
 ## 7. Round-3 observation (HEAD 5142a25, 2026-11-10)
 
-- BUG-R3-01 (P1, OPEN/TRIAGE): lazily-created Dynamic Island WebView reports about:blank and renders no
-  island UI in the debug/CDP environment on HEAD 5142a25; show_island does not navigate the island
-  target to the app UI. Desktop capture with a text window behind the island region shows no island
-  surface. Consequence: round-3 opacity/animation/notifications/Quick Settings/island-search checks are
-  blocked. Evidence: docs/qa/g8-verify-round3/ (V10_G8_VERIFICATION_ROUND3.md,
-  opacity-island-over-text.png, e2e-round3.mjs). Owner: shell/lazy-window owner; confirm natively and
-  fix or document if automation-only.
+- BUG-R3-01 (P1, CLOSED 2026-11-10): lazily-created Dynamic Island WebView reported about:blank in the
+  debug/CDP environment. CLOSED as a devUrl/CDP harness artefact, not release behaviour: the
+  release-native app on HEAD acf74ce renders the island and hotkey show/focus works
+  (visibleMs=15.955, focusedMs=26.352; release-island-shown.png; desktop capture). No release fix
+  required; keep the debug/CDP island limitation documented for future automated island tests.
 - Positive round-3 evidence: suites green (311 Rust / 242 frontend); memory-after improved to
   431.7 MiB WS / 203.4 MiB private idle (from 783.2 MiB before), hidden trim 238.2 to 215.5 MiB;
   mode-switch attempt did not exit the app (full two-way confirmation pending).
+
+
+### BUG-R3-01 closure evidence (2026-11-10)
+
+Release-native HEAD acf74ce: island window "ProtonSearch Island" rendered visibly after hotkey
+(visibleMs=15.955, focusedMs=26.352, rect left=573 width=774 height=409); desktop capture
+docs/qa/g8-verify-round3/release-island-shown.png shows the pill. Enter/exit native frame sequences were
+captured (exit 5 distinct / enter 4 distinct hashes). The debug/CDP about:blank is recorded as a
+devUrl/CDP harness limitation only.
+
+
+## 8. Round-3 follow-up: island card-switch smoothness (user-reported, 2026-11-10)
+
+- BUG-R3-02 (P1, OPEN, user-reported): switching between Dynamic Island cards is very laggy on the
+  user's machine. Not yet measured in a controlled run; perf-bench task-57 is measuring island frame
+  pacing/latency but the current harness scenarios do not yet include a dedicated card-switch sweep.
+  Required evidence: real-release card-switch frame intervals (rAF + desktop frame capture), p50/p95/p99
+  and dropped-frame count for Search->Clipboard->Agents->Quick Settings->Notifications, both warm and
+  first-open; compare against the 120 Hz refresh expectation; record card surface resize/layout
+  durations and resize events. Acceptance proposal: p95 frame interval <= 1.5x refresh, no sustained
+  dropped frames during a switch, and no layout thrash larger than the target V9 transition window
+  (~550 ms width/height, 450 ms transform). Candidate smoothing work (to be verified, not assumed):
+  transform-only card morph instead of layout animation where possible, prewarmed card DOM for the next
+  card, avoiding full-window resize per switch, batching wheel/swipe state changes, CSS containment, and
+  ensuring the delayed LOW memory trim does not run during a visible switch. Owner: L1-B design/UI with
+  perf-bench measurement; design-spec approves the motion change. No fix claimed.

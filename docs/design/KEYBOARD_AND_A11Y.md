@@ -417,3 +417,19 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
 - Island surface: no focus loss on show/hide; reduced motion removes transform; Enter/exit never fades content.
 Full binding: `ISLAND_VISUAL_UX_FIX.md`.
 
+## 13. Dynamic Island — task-62 compact/Esc keyboard
+
+- Alt+Space: hidden -> compact; compact -> hide; expanded -> compact. Never opens the last card. Input focused after show
+  so typing starts immediately; typing or click expands Search (first character inserted on expand).
+- Esc chain: drill-down -> parent expanded card -> compact -> hidden. One step per press; collapse clears query/scope and
+  resets to Search; hide returns focus to the prior app. Esc never hides directly from expanded.
+- Compact has no placeholder/hint; accessible name "Search", aria-expanded=false. Expanded empty query has no hint and no
+  suggestions. Zero results: one polite "No matches for "{query}"." line.
+- Page dots: click/arrow card switch only in expanded; no drill-down from compact.
+- Notifications: clear is a 28x28 header icon; dismiss 30x30; Tab order header -> rows/dismiss -> (none if empty); hidden
+  scrollbar; no bars.
+- Quick Settings: volume/brightness ranges labelled with values; tiles have separate toggle and chevron targets; quiet
+  "Open Windows settings" link; no dead/unsupported control. Esc from drill-down returns to Quick Settings.
+- Motion: card switches transform-first; reduced motion 0 ms; no native resize per frame.
+Full binding: `ISLAND_VISUAL_UX_FIX.md` §8.
+

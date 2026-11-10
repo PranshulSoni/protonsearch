@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../bridge/api";
 import type { ControlsStatus } from "../bridge/types";
 
@@ -17,19 +17,24 @@ export interface IslandControlsState {
   refresh: () => void;
 }
 
-export function useIslandControls(): IslandControlsState {
+export function useIslandControls(enabled: boolean): IslandControlsState {
   const [status, setStatus] = useState<ControlsStatus | null>(null);
   const [pending, setPending] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+  const loadedRef = useRef(false);
 
+  // The Wi-Fi/Bluetooth/brightness probes are heavy: run only while a native card is shown.
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
-    setPending(true);
+    // A revisit keeps the loaded status on screen instead of flashing the loading state.
+    if (!loadedRef.current) setPending(true);
     void api
       .getControlsStatus()
       .then((next) => {
         if (cancelled) return;
+        loadedRef.current = true;
         setStatus(next);
         setError(null);
         setPending(false);
@@ -42,18 +47,16 @@ export function useIslandControls(): IslandControlsState {
     return () => {
       cancelled = true;
     };
-  }, [nonce]);
+  }, [enabled, nonce]);
 
   useEffect(() => {
+    if (!enabled) return;
     const refresh = () => setNonce((value) => value + 1);
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
-  }, []);
+  }, [enabled]);
 
-  return {
-    status,
-    pending,
-    error,
-    refresh: () => setNonce((value) => value + 1),
-  };
+  const refresh = useCallback(() => setNonce((value) => value + 1), []);
+
+  return { status, pending, error, refresh };
 }

@@ -60,6 +60,12 @@ function runPs(script, scriptArgs, timeoutMs) {
   });
 }
 function killTree(pid) { if (!pid) return; try { execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }); } catch { /* gone */ } }
+function shotScreen(name) {
+  return new Promise((resolveShot) => {
+    const target = resolve(repoRoot, ".bench", name + ".png");
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", resolve(repoRoot, ".bench", "shot.ps1"), "-Path", target], { windowsHide: true }, (err) => resolveShot({ path: target, ok: !err }));
+  });
+}
 
 const args = parseArgs(process.argv.slice(2));
 const exe = resolve(args.exe || resolve(repoRoot, "target", "debug", "ProtonSearch.exe"));
@@ -276,6 +282,9 @@ async function memoryOnlyRun() {
     const primaryLabel = settingsPrimary === "dynamic_island" ? "island" : "launcher";
     const shown = markEpochs(marks, primaryLabel + "-window-shown").filter((v) => v >= ((win && win.sendAtUtc) || 0) - 400).slice(-1)[0] ?? null;
     const paint = markEpochs(marks, primaryLabel + "-first-paint").filter((v) => (shown == null ? true : v >= shown - 60)).slice(-1)[0] ?? null;
+    if (args.screenshot) {
+      report.measurements.screenshot = await shotScreen(String(args.screenshot));
+    }
     report.measurements["activation_" + settingsPrimary] = {
       win32VisibleMs: win && win.visibleMs != null ? win.visibleMs : null,
       win32FocusedMs: win && win.focusedMs != null ? win.focusedMs : null,

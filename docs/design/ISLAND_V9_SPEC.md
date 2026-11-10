@@ -309,3 +309,15 @@ settings fallback instead of "Unsupported"), and island Search using the same fo
 copy as Normal Launcher. The before/after evidence was reviewed on 2026-11-10: task-56 visual gate **PASS** (notes closed);
 remaining G5 conditions are Media/real-Windows evidence items, not surface-quality regressions (see REVIEW_3 §6).
 
+## 13. Task-62 native compact UX override (2026-11-10)
+
+User rejected the native island again (bleed/transparency, notification bars/scrollbar clutter, visual clutter, wrong
+compact-first behavior, Esc chain, empty-search hint). Binding: `ISLAND_VISUAL_UX_FIX.md` §8. Summary: every summon is
+the compact oval with no placeholder/helper text; click/typing expands Search; Esc is expanded/drill-down -> parent card
+-> compact -> hidden; no empty-search hints; notifications have no bars/footer/visible scrollbar (clear in header, 52 px
+rows, hidden-scroll list); Quick Settings is reduced to volume/brightness/audio + split Wi-Fi/Bluetooth tiles + one quiet
+"Open Windows settings" link, no action pills/dead controls; card switch is transform-first (native geometry set once,
+content transform 120/180 ms, total 220 ms) and enter/exit remain 180/120 ms transform-only; zero transparency inside the
+surface bbox, with an opaque-window fallback if native transparency bleeds. Native (not browser-mock) before/after
+evidence and a one-resize-per-transition check are required before G5 re-sign.
+

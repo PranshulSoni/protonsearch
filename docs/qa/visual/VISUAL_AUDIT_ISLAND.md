@@ -317,3 +317,14 @@ reason + Open display settings fallback; (3) Airplane/Night light/Energy saver b
 split-tile presentation deviation is recorded (E9), no dead control. Manifest regenerated at 44 captures (8 before + 36
 after); app suite 18 files / 242 tests green. **Review verdict: PASS** for the task-56 surface-quality gate; full G5
 remains conditional only on the pre-existing Media adapter and real Windows/DPI/frame-pacing evidence.
+
+## E10. Task-62 native compact/UX review — pending after captures (2026-11-10)
+
+User rejection adds native-surface issues: bleed/transparency, notification bars/scrollbar clutter, visual clutter, compact
+should be the only summon state, Esc chain, and no empty-search hint. Design binding: ISLAND_VISUAL_UX_FIX §8, SCREENS
+§2.14, ISLAND_V9_SPEC §13, KEYBOARD §13. Current native before evidence reviewed: .bench/diag/island-after-click.png
+opens a Wi-Fi drilldown from a click (should expand Search); island-after-click-type.png shows cluttered Quick Settings
+(fallback rows, action pills, duplicate On/Off); v15-island-page.png shows the placeholder hint in the compact oval.
+**No native after set exists yet; task-62 is not signed.** Acceptance requires native (not browser-mock) before/after over
+a white text window at 100/125/150% DPI plus one-native-resize-per-transition evidence.
+

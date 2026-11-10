@@ -59,3 +59,9 @@ Companion harness for the island-primary profile: start the app with `launcher.p
     node tools/benchmark/island-hotkey.mjs --exe target/release/ProtonSearch.exe --data-dir .devdata --out docs/performance/results/island-hotkey.json
 
 Why two profiles: switching primary_mode at runtime through `update_settings` currently exits the app (it destroys the inactive window; destroying the last window exits Tauri), so island-perf.mjs keeps the normal profile and measures lazy WebView creation through the `show_island` command, while island-hotkey.mjs covers the hotkey path from a fresh island-primary launch. Both truncate perf marks per session and leave no app running.
+
+### island-switch.mjs (+ island-probe.ps1)
+
+Release-native (no CDP) black-box card-switch probe for before/after builds: summons the island, sends Ctrl+Down switches, and samples UI-thread WM_NULL latency, rect and pixel changes from outside, plus in-app frame and ui-stall marks (pixel rate cannot resolve 120 Hz frames; use the frame marks for pacing).
+
+    node tools/benchmark/island-switch.mjs --exe target/release/ProtonSearch.exe --data-dir .devdata --out docs/performance/results/island-switch.json --label baseline

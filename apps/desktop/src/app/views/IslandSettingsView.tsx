@@ -54,13 +54,17 @@ const MONITOR_POLICIES = [
 
 export default function IslandSettingsView({
   onNavigate,
+  initialTab = "placement",
+  embedded = false,
 }: {
   onNavigate: (tab: PrefTab) => void;
+  initialTab?: Tab;
+  embedded?: boolean;
 }) {
   const { settings, updateSettings } = useApp();
   const { savedKey, markSaved } = useSavedStamp();
   const committed = normalizeIslandSettings(settings.launcher.island);
-  const [tab, setTab] = useState<Tab>("placement");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [draft, setDraft] = useState<IslandSettings>(committed);
   const [primaryMode, setPrimaryMode] = useState<LauncherMode>(settings.launcher.primaryMode);
   const [monitors, setMonitors] = useState<MonitorInfo[] | null>(null);
@@ -314,7 +318,11 @@ export default function IslandSettingsView({
   );
 
   return (
-    <section className="island-frame" aria-labelledby="island-settings-title">
+    <section
+      className={embedded ? "island-embedded" : "island-frame"}
+      aria-labelledby={embedded ? undefined : "island-settings-title"}
+    >
+      {!embedded ? (
       <aside className="island-sidebar">
         <div className="island-brand">
           <Logo size={26} />
@@ -343,8 +351,10 @@ export default function IslandSettingsView({
           applied by the desktop shell.
         </p>
       </aside>
+      ) : null}
 
       <div className="island-main">
+        {!embedded ? (
         <header className="island-head">
           <p className="island-eyebrow">PREFERENCES / LAUNCHER</p>
           <h1 id="island-settings-title">Make it yours.</h1>
@@ -353,7 +363,9 @@ export default function IslandSettingsView({
             keeps its V9 appearance.
           </p>
         </header>
+        ) : null}
 
+        {!embedded ? (
         <div className="island-tabs" role="tablist" aria-label="Dynamic Island settings">
           {TABS.map((entry) => (
             <button
@@ -368,6 +380,7 @@ export default function IslandSettingsView({
             </button>
           ))}
         </div>
+        ) : null}
 
         {saveError ? (
           <StateNotice

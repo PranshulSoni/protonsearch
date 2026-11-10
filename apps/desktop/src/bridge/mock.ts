@@ -591,6 +591,6 @@ export const mockBridge = {
   async showMain(): Promise<void> {},
   async quitApp(): Promise<void> {},
   async appInfo(): Promise<AppInfo> {
-    return { name: "ProtonSearch", version: "2.0.0-alpha.1", protocol: 1, dataSchema: 1, platform: "windows", arch: "x86_64" };
+    return { name: "ProtonSearch", version: "2.0.0-alpha.1", protocol: 1, dataSchema: 1, platform: "windows", arch: "x86_64", perfHooks: false };
   },
 };

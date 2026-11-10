@@ -126,10 +126,8 @@ describe("island cards real data", () => {
     const unsupportedTile = [...element.querySelectorAll(".island-control-tile")].find((tile) =>
       tile.textContent?.includes("Bluetooth"),
     );
-    expect(unsupportedTile?.textContent).toContain("Can't change here");
-    const bluetoothToggle = unsupportedTile?.querySelector<HTMLButtonElement>(
-      ".island-control-tile-toggle",
-    );
+    expect(unsupportedTile?.textContent).toContain("Can't change");
+    const bluetoothToggle = unsupportedTile?.querySelector<HTMLButtonElement>(".island-tile-main");
     expect(bluetoothToggle?.disabled).toBe(true);
     expect(bluetoothToggle?.getAttribute("title")).toContain("Bluetooth adapter isn't wired.");
   });
@@ -174,8 +172,8 @@ describe("island cards real data", () => {
       <ControlsCard status={status} pending={false} error={null} refresh={() => undefined} />,
     );
     const tiles = element.querySelectorAll(".island-control-tile");
-    const wifiToggle = tiles[0].querySelector<HTMLButtonElement>(".island-control-tile-toggle")!;
-    const btToggle = tiles[1].querySelector<HTMLButtonElement>(".island-control-tile-toggle")!;
+    const wifiToggle = tiles[0].querySelector<HTMLButtonElement>(".island-tile-main")!;
+    const btToggle = tiles[1].querySelector<HTMLButtonElement>(".island-tile-main")!;
     expect(wifiToggle.disabled).toBe(false);
     expect(btToggle.disabled).toBe(false);
     await act(async () => {
@@ -187,7 +185,7 @@ describe("island cards real data", () => {
     expect(setBluetooth).toHaveBeenCalledWith(true);
 
     await act(async () => {
-      (tiles[0].querySelector(".island-control-tile-chevron") as HTMLButtonElement).click();
+      (tiles[0].querySelector(".island-tile-chevron") as HTMLButtonElement).click();
       await Promise.resolve();
     });
     const connect = [...element.querySelectorAll<HTMLButtonElement>(".island-drilldown-action")].find(
@@ -299,9 +297,7 @@ describe("island cards real data", () => {
       await Promise.resolve();
     });
     expect(dismiss).toHaveBeenCalledWith("n1");
-    const clearButton = [...element.querySelectorAll<HTMLButtonElement>(".island-agent-button")].find(
-      (button) => button.textContent?.includes("Clear all"),
-    );
+    const clearButton = element.querySelector<HTMLButtonElement>(".island-clear-button");
     expect(clearButton?.disabled).toBe(false);
     await act(async () => {
       clearButton?.click();

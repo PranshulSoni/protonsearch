@@ -126,19 +126,35 @@ this round's partial evidence.
   budgets, execute remaining pairwise/list items, then L0 public-release acceptance.
 
 
-## 9. G8 round 3 on HEAD 5142a25 (mode-switch fix) - 2026-11-10
+## 9. G8 round 3 on HEAD acf74ce (release-native) - 2026-11-10
 
-Verdict: PARTIAL. On a rebuilt HEAD: cargo workspace 311 passed / 0 failed (32 binaries, 312 running
-incl 1 pre-existing ignored); frontend 18 files / 242 tests passed; idle launcher-only memory improved
-from 783.2 MiB WS before to 431.7 MiB WS (203.4 MiB private, 7 procs; hidden trim 238.2 to 215.5 MiB)
-but remains above the ~150 MB budget (NOT MET, improved). Mode-switch no-exit was partially observed
-(app stayed alive when switching primary mode over IPC) but full two-way and hotkey-lazy-window paths
-were not conclusively verified.
+Verdict: PARTIAL. Release-native island render and enter/exit animation are CONFIRMED on HEAD acf74ce:
+hotkey show made the "ProtonSearch Island" window visible/focused (visibleMs=15.955, focusedMs=26.352)
+with the island rendered over the desktop (docs/qa/g8-verify-round3/release-island-shown.png); native
+frame sequences show distinct enter/exit frames (enter 4 distinct of 12, exit 5 distinct of 12). The
+earlier debug/CDP about:blank island (BUG-R3-01) is CLOSED as a devUrl/CDP harness artefact, not a
+release defect.
 
-BLOCKER: island UI checks (opacity over text, enter/exit animation frames, notifications, Quick
-Settings, island search parity/icons) could not execute because the lazily-created island WebView
-reported about:blank and no island surface rendered in the desktop capture. Treat as a triage item
-before any installer sign-off; re-run round 3 island checks after fix/confirmation. Evidence:
-docs/qa/g8-verify-round3/V10_G8_VERIFICATION_ROUND3.md and memory-after-5142a25.json.
+Green state: suites inherited green from 5142a25 (cargo 311 passed / 0 failed, 32 binaries; frontend
+242 passed); the acf74ce diff is shell/lazy-window and trim only and suites were not re-run in the
+docs-only wrap. Memory on 5142a25 release: idle tree 431.7 MiB WS / 203.4 MiB private vs 783.2 MiB before
+(-44.9%), hidden trim 238.2 -> 215.5 MiB; perf-bench acf74ce specific memory numbers are pending
+(placeholder). Idle memory remains above the ~150 MB budget: improved, NOT MET.
 
-G8 status remains conditional for local/internal alpha; do NOT sign a new installer on this round.
+Still PARTIAL/unverified this round: controlled opacity-over-text capture; release mode-switch two-way
+and hotkey-with-alternate-absent; notifications 0/1/many dismiss/clear; Quick Settings live
+volume/brightness/Wi-Fi/Bluetooth states/drill-downs/settings fallbacks; island search parity/icons/
+filters. For notifications and Quick Settings, design evidence plus code review currently stand in for
+live checks and must be labelled as such.
+
+No release sign-off on this round. Remaining blockers: clean opacity capture, native mode-switch
+confirmation, notifications/QS/search parity live evidence, perf-bench acf74ce numbers, idle memory
+over budget, plus prior-round blockers (input latency, native media/Wi-Fi/Bluetooth milestone-2,
+single-monitor/DPI/HC, signing/installer drill).
+
+User-reported follow-up (2026-11-10): the switch between Dynamic Island cards is very laggy
+(BUG-R3-02, OPEN). This is not yet measured; a dedicated card-switch frame-pacing sweep (warm + first
+open, Search/Clipboard/Agents/Quick Settings/Notifications, p50/p95/p99 and dropped frames) plus
+smoothing work is required before island motion can be called smooth. Do not claim smooth card
+switching on the strength of the existing enter/exit animation evidence.
+

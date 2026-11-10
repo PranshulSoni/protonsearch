@@ -13,6 +13,7 @@
 //! search hot path.
 
 use std::collections::{HashMap, VecDeque};
+use std::sync::{Mutex, OnceLock};
 use std::io::Cursor;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
@@ -55,6 +56,11 @@ impl ResultRegistry {
 
     pub(crate) fn get(&self, result_id: &str) -> Option<&SearchResult> {
         self.map.get(result_id)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.map.len()
     }
 }
 
@@ -573,6 +579,27 @@ fn image_preview_data_url(path: &Path) -> Result<(String, u32, u32), String> {
     ))
 }
 
+/// Bounded cache for clipboard thumbnail data URLs. The island renders the
+/// clipboard card from every keystroke-search; re-reading + base64-encoding the
+/// same thumbnails per search is pure repeated work. Keyed by path + mtime + len.
+struct CachedThumbnail {
+    modified_ms: i64,
+    len: u64,
+    data_url: Option<String>,
+}
+
+const THUMBNAIL_CACHE_CAP: usize = 128;
+
+fn thumbnail_cache() -> &'static Mutex<HashMap<String, CachedThumbnail>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, CachedThumbnail>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(test)]
+pub(crate) fn thumbnail_cache_len() -> usize {
+    thumbnail_cache().lock().map(|cache| cache.len()).unwrap_or(0)
+}
+
 /// Build a bounded PNG data URL from an on-disk thumbnail (no decode needed:
 /// ps-sources writes bounded PNG thumbnails for clipboard image rows).
 pub(crate) fn thumbnail_data_url(path: &str) -> Option<String> {
@@ -581,15 +608,46 @@ pub(crate) fn thumbnail_data_url(path: &str) -> Option<String> {
     const MAX_THUMB_BYTES: u64 = 96 * 1024;
     const MAX_ENCODED_CHARS: usize = 128 * 1024;
     let metadata = std::fs::metadata(path).ok()?;
-    if metadata.len() == 0 || metadata.len() > MAX_THUMB_BYTES {
-        return None;
+    let modified_ms = metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0);
+    let len = metadata.len();
+    if let Ok(cache) = thumbnail_cache().lock() {
+        if let Some(cached) = cache.get(path) {
+            if cached.modified_ms == modified_ms && cached.len == len {
+                return cached.data_url.clone();
+            }
+        }
     }
-    let bytes = std::fs::read(path).ok()?;
-    let encoded = base64_encode(&bytes);
-    if encoded.len() > MAX_ENCODED_CHARS {
-        return None;
+    let data_url = if len == 0 || len > MAX_THUMB_BYTES {
+        None
+    } else {
+        std::fs::read(path).ok().and_then(|bytes| {
+            let encoded = base64_encode(&bytes);
+            if encoded.len() > MAX_ENCODED_CHARS {
+                None
+            } else {
+                Some(format!("data:image/png;base64,{encoded}"))
+            }
+        })
+    };
+    if let Ok(mut cache) = thumbnail_cache().lock() {
+        if cache.len() >= THUMBNAIL_CACHE_CAP {
+            cache.clear();
+        }
+        cache.insert(
+            path.to_string(),
+            CachedThumbnail {
+                modified_ms,
+                len,
+                data_url: data_url.clone(),
+            },
+        );
     }
-    Some(format!("data:image/png;base64,{encoded}"))
+    data_url
 }
 
 /// Bounded data URL for an image row: prefer the pre-generated thumbnail, then

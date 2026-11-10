@@ -70,6 +70,36 @@ fn perf_log_app(app: &AppHandle, label: &str, epoch: i64) {
     }
 }
 
+/// Perf-hook-only watchdog: posts a no-op to the UI thread every 10 ms and writes a
+/// `ui-stall-<ms>ms` mark (>= 30 ms) so blocking commands show up in perf-marks.jsonl.
+fn start_ui_stall_probe(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            if pending.load(std::sync::atomic::Ordering::SeqCst) {
+                continue;
+            }
+            pending.store(true, std::sync::atomic::Ordering::SeqCst);
+            let sent = std::time::Instant::now();
+            let (flag, handle) = (pending.clone(), app.clone());
+            if app
+                .run_on_main_thread(move || {
+                    let ms = sent.elapsed().as_millis() as i64;
+                    flag.store(false, std::sync::atomic::Ordering::SeqCst);
+                    if ms >= 30 {
+                        perf_log_app(&handle, &format!("ui-stall-{ms}ms"), epoch_ms());
+                    }
+                })
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+}
+
 #[tauri::command]
 fn perf_mark(app: AppHandle, label: String, epoch_ms: i64) -> Result<(), String> {
     perf_log_app(&app, &label, epoch_ms);
@@ -293,6 +323,7 @@ fn show_island_window(app: &AppHandle) {
         (window_size.0 - ISLAND_SHADOW_PAD * 2.0).max(240.0),
         (window_size.1 - ISLAND_SHADOW_PAD * 2.0).max(40.0),
     );
+    set_webview_memory_level(&win, false);
     let _ = win.show();
     // Mark the Win32-visible instant before focus bookkeeping.
     let invoke = PERF_INVOKE_EPOCH_MS.load(std::sync::atomic::Ordering::SeqCst);
@@ -653,6 +684,31 @@ fn engine_config(data_dir: PathBuf) -> EngineConfig {
         legacy_db: if legacy.exists() { Some(legacy) } else { None },
         version: env!("CARGO_PKG_VERSION").to_string(),
     }
+}
+
+/// Run blocking native/IO work off the UI thread. Sync Tauri commands execute on the
+/// main thread, so anything touching Windows APIs, SQLite or child processes must go
+/// through here or it freezes every window (BUG-R3-02).
+async fn run_blocking<T: Send + 'static>(
+    job: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(job)
+        .await
+        .map_err(|e| format!("background task failed: {e}"))
+}
+
+/// Native controls (Core Audio, DDC/CI, WLAN, radios) were implicitly serialized by the UI
+/// thread; keep them one-at-a-time now that they run on the blocking pool.
+static NATIVE_CONTROLS: Mutex<()> = Mutex::new(());
+
+async fn run_native<T: Send + 'static>(
+    job: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, String> {
+    run_blocking(move || {
+        let _guard = NATIVE_CONTROLS.lock().unwrap_or_else(|e| e.into_inner());
+        job()
+    })
+    .await
 }
 
 #[tauri::command]
@@ -1091,7 +1147,11 @@ fn bounded_agent_version(path: &std::path::Path) -> Option<String> {
 
 /// Detected local agent CLIs (Pi first, then other installed coding agents).
 #[tauri::command]
-fn detect_agents(state: tauri::State<'_, AppState>) -> Vec<DetectedAgent> {
+async fn detect_agents(app: AppHandle) -> Result<Vec<DetectedAgent>, String> {
+    run_blocking(move || detect_agents_blocking(&app.state::<AppState>())).await
+}
+
+fn detect_agents_blocking(state: &AppState) -> Vec<DetectedAgent> {
     if let Ok(cache) = state.agents.lock() {
         if let Some(agents) = cache.as_ref() {
             return agents.clone();
@@ -1138,8 +1198,8 @@ fn detect_agents(state: tauri::State<'_, AppState>) -> Vec<DetectedAgent> {
 }
 
 #[tauri::command]
-fn agent_status(state: tauri::State<'_, AppState>) -> AgentStatus {
-    probe_agent_status(&state)
+async fn agent_status(app: AppHandle) -> Result<AgentStatus, String> {
+    run_blocking(move || probe_agent_status(&app.state::<AppState>())).await
 }
 
 #[tauri::command]
@@ -1305,14 +1365,22 @@ fn settings_page_from_id(page: &str) -> Option<ps_windows::SettingsPage> {
 /// cards render. Honest: unavailable features carry a reason + allow-listed
 /// Windows settings fallback, never fake state.
 #[tauri::command]
-fn get_controls_status(state: tauri::State<'_, AppState>) -> ps_ipc::ControlsStatus {
-    let caps = ps_windows::native_capabilities();
-    // probes are bounded internally; this keeps the IPC call deterministic.
+async fn get_controls_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<ps_ipc::ControlsStatus, String> {
+    let data_dir = state.data_dir.clone();
+    run_native(move || build_controls_status(&data_dir)).await
+}
+
+fn build_controls_status(data_dir: &std::path::Path) -> ps_ipc::ControlsStatus {
+    // probes are bounded internally; one probe supplies both the capability
+    // matrix and the live state (probing twice doubles the IPC latency).
     let native = ps_windows::controls_status();
+    let caps = native.capabilities.clone();
     let outputs = ps_windows::list_audio_outputs().unwrap_or_default();
     let default_output = ps_windows::default_audio_output().ok();
     let audio = ps_windows::audio_state().ok();
-    let db_path = state.data_dir.join("index.db");
+    let db_path = data_dir.join("index.db");
     let notification_items: Vec<ps_ipc::AppNotification> =
         ps_sources::notifications::list(&db_path, 20, false)
             .into_iter()
@@ -1416,53 +1484,75 @@ fn get_controls_status(state: tauri::State<'_, AppState>) -> ps_ipc::ControlsSta
 }
 
 #[tauri::command]
-fn control_set_wifi(enabled: bool) -> Result<(), String> {
-    ps_windows::set_wifi_radio(enabled)
-        .map_err(|error| format!("{error:#}"))
+async fn control_set_wifi(enabled: bool) -> Result<(), String> {
+    run_native(move || {
+        ps_windows::set_wifi_radio(enabled).map_err(|error| format!("{error:#}"))
+    })
+    .await?
 }
 
 #[tauri::command]
-fn control_set_bluetooth(enabled: bool) -> Result<(), String> {
-    ps_windows::set_bluetooth_radio(enabled)
-        .map_err(|error| format!("{error:#}"))
+async fn control_set_bluetooth(enabled: bool) -> Result<(), String> {
+    run_native(move || {
+        ps_windows::set_bluetooth_radio(enabled).map_err(|error| format!("{error:#}"))
+    })
+    .await?
 }
 
 #[tauri::command]
-fn control_connect_wifi(ssid: String) -> Result<(), String> {
-    match ps_windows::connect_wifi(&ssid) {
+async fn control_connect_wifi(ssid: String) -> Result<(), String> {
+    run_native(move || match ps_windows::connect_wifi(&ssid) {
         Ok(outcome) if outcome.connected => Ok(()),
         Ok(outcome) => Err(outcome.message),
         Err(error) => Err(format!("{error:#}")),
-    }
+    })
+    .await?
 }
 
 #[tauri::command]
-fn control_open_settings(page: String) -> Result<(), String> {
+async fn control_open_settings(page: String) -> Result<(), String> {
     let page = settings_page_from_id(&page).ok_or_else(|| "Unknown settings page.".to_string())?;
-    ps_windows::open_settings_page(page).map_err(|_| "Couldn't open Windows settings.".to_string())
+    run_blocking(move || {
+        ps_windows::open_settings_page(page)
+            .map_err(|_| "Couldn't open Windows settings.".to_string())
+    })
+    .await?
 }
 
 #[tauri::command]
-fn control_set_volume(percent: u8) -> Result<(), String> {
-    ps_windows::set_audio_volume((percent.min(100) as f32) / 100.0)
-        .map_err(|_| "Couldn't change the system volume.".to_string())
+async fn control_set_volume(percent: u8) -> Result<(), String> {
+    run_native(move || {
+        ps_windows::set_audio_volume((percent.min(100) as f32) / 100.0)
+            .map_err(|_| "Couldn't change the system volume.".to_string())
+    })
+    .await?
 }
 
 #[tauri::command]
-fn control_set_muted(muted: bool) -> Result<(), String> {
-    ps_windows::set_audio_mute(muted).map_err(|_| "Couldn't change the system mute state.".to_string())
+async fn control_set_muted(muted: bool) -> Result<(), String> {
+    run_native(move || {
+        ps_windows::set_audio_mute(muted)
+            .map_err(|_| "Couldn't change the system mute state.".to_string())
+    })
+    .await?
 }
 
 #[tauri::command]
-fn control_set_brightness(percent: u8) -> Result<(), String> {
-    ps_windows::set_brightness(percent.min(100))
-        .map_err(|_| "Couldn't change the display brightness on this monitor.".to_string())
+async fn control_set_brightness(percent: u8) -> Result<(), String> {
+    run_native(move || {
+        ps_windows::set_brightness(percent.min(100))
+            .map_err(|_| "Couldn't change the display brightness on this monitor.".to_string())
+    })
+    .await?
 }
 
 #[tauri::command]
-fn control_set_audio_output(device_id: String) -> Result<(), String> {
-    ps_windows::set_audio_output(&device_id)
-        .map_err(|_| "Couldn't switch the audio output device.".to_string())
+async fn control_set_audio_output(device_id: String) -> Result<(), String> {
+    run_native(move || {
+        ps_windows::set_audio_output(&device_id)
+            .map_err(|_| "Couldn't switch the audio output device.".to_string())
+    })
+    .await?
 }
 
 #[tauri::command]
@@ -1475,48 +1565,67 @@ fn control_media(action: ps_ipc::MediaAction) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn show_local_toast(
+async fn show_local_toast(
     state: tauri::State<'_, AppState>,
     title: String,
     body: String,
 ) -> Result<(), String> {
-    let db_path = state.data_dir.join("index.db");
-    ps_sources::notifications::add_and_maybe_toast(&db_path, &title, &body, "ProtonSearch", "local")
-        .map(|_| ())
-        .map_err(|_| "Couldn't store the notification.".to_string())
+    let data_dir = state.data_dir.clone();
+    run_blocking(move || {
+        let db_path = data_dir.join("index.db");
+        ps_sources::notifications::add_and_maybe_toast(&db_path, &title, &body, "ProtonSearch", "local")
+            .map(|_| ())
+            .map_err(|_| "Couldn't store the notification.".to_string())
+    })
+    .await?
 }
 
 #[tauri::command]
-fn notifications_list(state: tauri::State<'_, AppState>) -> Vec<ps_ipc::AppNotification> {
-    let db_path = state.data_dir.join("index.db");
-    ps_sources::notifications::list(&db_path, 50, false)
-        .into_iter()
-        .map(|entry| ps_ipc::AppNotification {
-            id: entry.id.to_string(),
-            title: entry.title,
-            body: entry.body,
-            source: entry.source,
-            created_at: entry.timestamp_ms,
-            read: entry.read,
-        })
-        .collect()
+async fn notifications_list(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<ps_ipc::AppNotification>, String> {
+    let data_dir = state.data_dir.clone();
+    run_blocking(move || {
+        let db_path = data_dir.join("index.db");
+        ps_sources::notifications::list(&db_path, 50, false)
+            .into_iter()
+            .map(|entry| ps_ipc::AppNotification {
+                id: entry.id.to_string(),
+                title: entry.title,
+                body: entry.body,
+                source: entry.source,
+                created_at: entry.timestamp_ms,
+                read: entry.read,
+            })
+            .collect()
+    })
+    .await
 }
 
 #[tauri::command]
-fn notifications_dismiss(state: tauri::State<'_, AppState>, notification_id: String) -> Result<(), String> {
+async fn notifications_dismiss(
+    state: tauri::State<'_, AppState>,
+    notification_id: String,
+) -> Result<(), String> {
     let id: i64 = notification_id
         .parse()
         .map_err(|_| "Unknown notification.".to_string())?;
-    let db_path = state.data_dir.join("index.db");
-    let _ = ps_sources::notifications::dismiss(&db_path, id);
-    Ok(())
+    let data_dir = state.data_dir.clone();
+    run_blocking(move || {
+        let db_path = data_dir.join("index.db");
+        let _ = ps_sources::notifications::dismiss(&db_path, id);
+    })
+    .await
 }
 
 #[tauri::command]
-fn notifications_clear(state: tauri::State<'_, AppState>) -> Result<(), String> {
-    let db_path = state.data_dir.join("index.db");
-    let _ = ps_sources::notifications::clear(&db_path);
-    Ok(())
+async fn notifications_clear(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let data_dir = state.data_dir.clone();
+    run_blocking(move || {
+        let db_path = data_dir.join("index.db");
+        let _ = ps_sources::notifications::clear(&db_path);
+    })
+    .await
 }
 
 #[tauri::command]
@@ -1623,6 +1732,7 @@ fn app_info() -> serde_json::Value {
         "dataSchema": ps_ipc::DATA_SCHEMA_VERSION,
         "platform": std::env::consts::OS,
         "arch": std::env::consts::ARCH,
+        "perfHooks": perf_hooks_enabled(),
     })
 }
 
@@ -1685,6 +1795,9 @@ fn main() {
                 agents: Mutex::new(None),
                 agent_tasks,
             });
+            if perf_hooks_enabled() {
+                start_ui_stall_probe(app.handle());
+            }
 
             step("windows: creating");
             create_windows(app.handle())?;

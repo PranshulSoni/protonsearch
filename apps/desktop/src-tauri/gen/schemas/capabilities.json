@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default capability for the ProtonSearch windows","local":true,"windows":["launcher","main"],"permissions":["core:default","global-shortcut:default"]}}
+{"default":{"identifier":"default","description":"Default capability for the ProtonSearch windows","local":true,"windows":["launcher","main","island"],"permissions":["core:default","global-shortcut:default"]}}

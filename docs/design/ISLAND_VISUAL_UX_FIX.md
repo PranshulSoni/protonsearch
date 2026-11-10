@@ -129,3 +129,156 @@ for …” titles/aria; Wi-Fi/Bluetooth split-tile deviation recorded in VISUAL_
 opaque inside the bbox; forced-fixture brightness fallback capture shows reason + Open display settings. Manifest now 44
 captures (8 before + 36 after); app suite 18 files / 242 tests green.
 
+## 8. Task-62 native/compact UX binding (2026-11-10; supersedes task-56 where conflicting)
+
+User feedback after native review: bleed/transparency, notification bars/scrollbar clutter, general visual clutter, wrong
+compact-first expectation, Esc chain wrong, visible empty-search hint. This section is binding for the native surface and
+is the acceptance contract for ui-launcher's next native after captures.
+
+### 8.1 Compact-first and Esc chain
+
+- **Alt+Space always summons the compact oval** (520x66, radius 999) at the saved anchor/monitor. Never restore the last
+  expanded card, never auto-expand, never restore a drill-down. Every summon starts with active card = Search, query = "",
+  scope = All, compact = true.
+- **Compact oval anatomy:** brand mark 27, no placeholder, no helper text, no caret placeholder, no "Search files..."
+  hint; 8 passive page dots (5 px, active 16x5) remain as the only secondary chrome. The input is still focused after show
+  (190 ms max) so typing works immediately; caret is hidden until expansion. Accessible name "Search" and
+  aria-expanded="false".
+- **Typing or click expands:** any printable key expands Search and inserts the character; IME composition start expands;
+  a pointer click anywhere on the oval except a page dot expands Search. No other card/drill-down opens from compact.
+  Hover does not expand. Page dots switch to the selected card in expanded mode; they never open a drill-down.
+- **Alt+Space while visible:** expanded -> compact (collapse, not hide); compact -> hide. This is toggle semantics and
+  never directly hides an expanded card. Escape follows the separate chain below.
+- **Escape chain (exact, no dialogs):**
+  1. Drill-down/variant open -> parent expanded card (e.g. Wi-Fi list -> Quick Settings).
+  2. Expanded card or expanded Search -> compact oval; clear query, reset scope to All, active card = Search.
+  3. Compact oval -> hide and return focus to the previous app.
+  Esc must not hide from the expanded state and must not clear a query as a separate step. Esc handles one step per press.
+- Keyboard/ARIA: compact input combobox with aria-expanded=false; expanded combobox with aria-expanded=true,
+  aria-controls results; polite live text "Search expanded" on click/typing, "Search collapsed" on Esc; after hide focus
+  returns to the invoking window; no focus trap; Tab from the input reaches filters/results/preview in the documented order.
+- Click outside hides only when the setting is enabled; it does not change the Esc chain.
+
+### 8.2 No empty-search hint / empty states
+
+- **Remove all empty-search hint copy.** Compact oval has no placeholder. Expanded Search with an empty query shows the
+  search row + filter strip and a **blank results viewport**: no "Start typing...", no "Try a file name...", no suggestion
+  rows, no fake recent/quick destinations, no count line. The card stays the fixed 460 px expanded size; blank space is
+  intentional and must not be filled with marketing/helper text.
+- **Zero results for a non-empty query:** one line only, "No matches for "{query}"." (11/600, ink-2), no secondary hint,
+  no "Try a different spelling" line, no suggestions. The result count reads "0 matches". No fake rows.
+- **Loading:** three flat 50 px skeleton rows, no shimmer, no hint text. **Error:** "Search is unavailable." + one Retry
+  action; no hint copy. Both keep filters visible and do not resize the card.
+- Accessibility: blank empty query is announced only as "Search, no query"; do not announce a hidden hint; zero results
+  announces the one line politely; no empty-state live-region chatter on every keystroke.
+
+### 8.3 Notifications anatomy — no bars, no scrollbar overlap
+
+- Card 500x345 (>520) / 385 (<=520), radius 34; header then rows; **no footer bar, no row separators, no full-width
+  horizontal rules**. Remove the bottom "Clear all" bar; the only action is a 28x28 header icon button at top-right
+  (accessible name "Clear all notifications"), shown only when notifications exist and a real command is available.
+- Header: title "Notifications" 15/700, subtitle "Recent activity · {n} unread" 11 ink-2; header block 56 high, padding
+  18 20 10; no divider line; 8 px gap to list.
+- List: rows 52 high, gap 6, padding 0 8 0 0 (8 px right inset); **no background, border or separator**; no visible
+  scrollbar (hide native/webkit scrollbars; overlay scroll does not overlap content); max 3 full rows visible; more scrolls
+  under a 8 px inset. Dismiss 30x30 reserved right column, icon 15; disabled dismiss is hidden rather than a dead ×.
+- Row content: bell 18, title 12/600 one line ellipsis, body 10/1.4 max 2 lines, source/meta 10 ink-3 one line.
+  No notification strip/bar/progress bar is drawn unless a real OS progress belongs to that notification; no fake unread
+  bars.
+- States: 0 = centred "All caught up." (no hint, no clear button, no bars); 1 = one row, header clear button; many = 3
+  visible + hidden-scrollbar list; loading = 3 flat skeleton rows 52 without bars; error = "Notifications are unavailable."
+  + reason/Retry if supported; unsupported source omitted, not "Unsupported".
+- Copy: correct singular "1 unread"; no "Test local toast" in production; Clear all only with real bridge command; no
+  footer bar/scrollbar collisions at 1150/860/430 or 125% scaling.
+
+### 8.4 Quick Settings — usable, honest, reduced to one surface
+
+Card 515x376 (>520) / 400 (<=520) / 483 (<=380); header 56, body padding 17 20 14; no footer/action bars.
+
+1. Volume row 36: speaker icon 18, "Volume" 11, range flex, value 10 tabular; mute is a 32x32 icon button
+   (aria-pressed, aria-label "Mute"/"Unmute") at the right, not a text button block.
+2. Brightness row 36: sun icon 18, "Brightness", range, value 10; when unsupported replace the range with a single
+   trailing text link "Open display settings" (11, accent) on the same row. No separate fallback row/box.
+3. Audio output row 36: output icon 16, "Audio output" 11, current device 12 ellipsis, chevron 16; opens the output list.
+4. Split tiles two columns, gap 9, height 56: tile radius 10, bg #171e23, border #34434a, on #223a49/#416178.
+   Left area (flex 1, padding 8 10) is the toggle: Wi-Fi/Bluetooth icon 19 + label 11 + state 10 ("On"/"Off"); right
+   chevron button 32 wide separated by 1 px #4b606c opens networks/devices. No duplicate On/Off pill, no extra badge.
+   Toggle and chevron are separate accessible targets with names "Turn Wi-Fi on/off", "Show Wi-Fi networks", etc.
+5. One quiet bottom action row 32: icon 14 + "Open Windows settings" 11/650, no border/box/background; opens
+   ms-settings: display/network. This replaces Airplane/Night light/Energy saver pills and every dead/unsupported tile.
+   Unavailable item: "{Control} can't be changed here." + "Open Windows settings."; no "Unsupported" word, no dead toggle.
+- OS consent truth: Wi-Fi/BT scan denied -> inline note in the drill-down with "Open location settings" (real command), no
+  fake networks; capability unavailable -> row/tile says available-via-Windows and the fallback link is the action.
+- Fit 345 px inner: header 56 + volume 36 + brightness 36 + audio 36 + tiles 56 + gaps 8*4 + action 32 + body padding
+  31 = 315 px; no clipping, no scroll at >520. <=380 may stack tiles vertically and scroll with hidden scrollbar.
+- Loading: skeleton values + disabled controls with aria-busy; no shimmer. Setter failure: one quiet inline line
+  "Couldn't change {control}." + fallback link. No fake values, no dead controls, no "Unsupported".
+
+### 8.5 Motion — transform-first card switch
+
+- **No native resize per frame.** Before every compact/expanded/card transition, measure the target geometry and call
+  native setIslandGeometry exactly **once**; never during the animation, never per keystroke. Window background remains
+  filled/opaque so there is no blank frame while the size is applied.
+- Card switch (search -> card or card -> card), total 220 ms:
+  1. Outgoing content: transform scale(.96) translateY(6px), opacity 1->0 over 120 ms ease-in; surface stays opaque.
+  2. Swap content at 120 ms.
+  3. Incoming content: transform scale(.985) translateY(8px) -> scale(1) translateY(0), opacity 0->1 over 180 ms
+     cubic-bezier(.22,1,.36,1).
+  No width/height/radius CSS animation is used for the switch; the native window jumps once at t=0 (or immediately after
+  the outgoing frame is painted).
+- Compact -> expanded Search: native window resized once to 550x460; content transform scale(.98) translateY(6px) ->
+  1/0, 200 ms; no layout animation. Expanded -> compact: 140 ms reverse; native resize once at start.
+- Enter/exit (summon/hide): 180 ms translateY(-8px) scale(.97) -> 0/1 on show; 120 ms translateY(-6px) scale(.985) on
+  hide; **surface opacity constant 1**, no fade-through. Reduced motion: all transitions 0 ms, no transform; native
+  resize still once before show.
+- Acceptance frame targets (native video/60 fps): at 60/120/180/220 ms the surface is opaque with no desktop text/ghost;
+  no blank/white frame; no frame with missing card; native geometry call count is 1 per transition; p95 frame build
+  <=16.7 ms; no layout shift >1 px in card content; no visible scrollbar during switch. Record a native screen capture
+  (not browser mock) to prove it.
+- Dot/wheel/swipe/Ctrl card switching uses the same sequence; latest input wins; switch lock 350 ms remains; no native
+  window resize during wheel scrolling.
+
+### 8.6 Polish values (binding overrides)
+
+| Token | Value |
+|---|---|
+| Surface radius | 34 expanded; 999 compact; 41 media |
+| Border | 1 px #2e3538 solid; no inner double borders |
+| Surface shadow | native only; CSS shadow may be 0 18px 44px rgba(20,32,40,.28) + 0 2px 8px rgba(27,32,32,.18); no inner shadow |
+| Card padding | header 18 20 10; body 17 20 14 |
+| Header | 56 high; title 15/700; subtitle 11 ink-2 margin-top 4 |
+| Row density | notification 52; settings 36; tile 56; choose row 47; result row 50 |
+| Gaps | 8 default; 6 notification list; 9 tile grid; 4 label/value |
+| Type | card title 15/700; row title 12/600; body 10/1.4; meta 10; control label 11; value 10 tabular; button 11/650 |
+| Icon sizes | header 23; row 18; controls 18-19; chevrons 16; dismiss 15 |
+| Dots footer | 31 expanded / 38 compact; dot 5, active 16x5, gap 5; no glow/no fade |
+| Chrome budget | max one hairline divider under a header; no footer bars, no full-width row rules, no extra action pills; quiet text links replace boxed fallbacks |
+| Color | keep V9 graphite tokens; no rgba panel fills; only shadow/border/focus alpha |
+
+### 8.7 Native opacity and acceptance — zero transparency inside the bbox
+
+- **Mandatory:** inside the island surface bounding box every pixel is opaque (alpha 1). No CSS opacity <1 on the
+  surface/inner/card shells, no rgba panel backgrounds, no backdrop-filter, no acrylic/mica, no DWM transparency inside
+  the bbox. Alpha is allowed only for the outer shadow, 1 px borders and focus rings. Content may fade only over an
+  opaque surface.
+- Native window: transparent(true) is permitted **only in the shadow padding outside the surface**. Size/place the
+  window before show; surface already painted at opacity 1; no white/desktop frame on first paint. If native
+  transparency still produces bleed inside the bbox, use the **opaque-window fallback**: disable window transparency and
+  the custom shadow pad, size the window exactly to the surface rect (no 112 px pad), enable native DWM shadow/rounded
+  corners, keep the opaque CSS border/radius; zero transparency wins over the custom shadow.
+- Native acceptance test (not browser mock): put a white Notepad/text document directly behind the island; capture at
+  100%, 125%, 150% DPI, compact + expanded + notifications + Quick Settings. Inspect the island bbox pixels with an image
+  editor: no underlying text/letter edges, no light halo, no alpha blend, no ghost card, no partial pixel rows at the
+  rounded edges. Shadow may show outside the bbox only. Save PNGs plus a manifest under docs/qa/visual/live-shots with
+  before/after pairs.
+- Also test first show (0 ms), 90/180 ms show frames, 60/120 ms hide frames, one card switch, and reduced motion over the
+  same text window; surface must be opaque at every frame.
+
+### 8.8 Acceptance evidence for ui-launcher
+
+Native before/after at 1150/860/430 plus 125%/150% DPI, over the white text window: compact oval (no hint), click-to-expand,
+typing expands, Esc expanded->compact->hidden, no empty hint, notifications 0/1/many (no bars/scrollbar overlap), Quick
+Settings idle + Wi-Fi/Bluetooth/audio drill-downs + honest fallback, card switch frames 60/120/180/220 ms, enter/exit
+frames, reduced motion. Include a state manifest and the native resize count (must be 1 per transition). This section
+invalidates any earlier acceptance claim based on browser-mock screenshots.
+

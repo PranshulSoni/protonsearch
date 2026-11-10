@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capability for the ProtonSearch windows",
-  "windows": ["launcher", "main"],
+  "windows": ["launcher", "main", "island"],
   "permissions": [
     "core:default",
     "global-shortcut:default"

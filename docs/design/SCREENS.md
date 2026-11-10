@@ -427,6 +427,26 @@ Full values and evidence requirements: `ISLAND_VISUAL_UX_FIX.md`. The before/aft
 were reviewed on 2026-11-10 and the task-56 visual/UX gate passes with notes (see REVIEW_3 §6); remaining G5 conditions are
 pre-existing Media/real-Windows evidence items, not surface-quality regressions.
 
+### 2.14 Dynamic Island — native compact-first/UX contract (task-62)
+
+Binding additions to §2.13 / `ISLAND_V9_SPEC.md`; full values in `ISLAND_VISUAL_UX_FIX.md` §8.
+- Alt+Space always shows the **compact oval** (520x66, radius 999); no placeholder or helper hint. Click/typing expands
+  Search; page dots switch cards only in expanded mode. Alt+Space while visible: expanded -> compact, compact -> hide.
+- **Esc chain:** drill-down -> parent expanded card; expanded -> compact; compact -> hide. Collapse clears query/scope and
+  resets active card to Search; one step per press; focus returns to the previous app on hide.
+- **Empty states:** compact has no text hint; expanded empty query is a blank results viewport with filters only, no count
+  or suggestions; zero results is the single line "No matches for "{query}"." with no secondary hint.
+- **Notifications:** no footer bar/row rules; clear action is a 28x28 header icon; 52 px rows, hidden scrollbar, 8 px
+  right inset; states 0/1/many; no test toast, no dead dismiss.
+- **Quick Settings:** volume/brightness/audio rows + two split Wi-Fi/Bluetooth tiles + one quiet "Open Windows settings"
+  link; no action pills, no duplicate On/Off pill, no dead/unsupported tile; OS consent errors inline with real settings
+  link; fits 515x376/400/483.
+- **Motion:** card switch is transform-first: native geometry set once, outgoing 120 ms / incoming 180 ms, total 220 ms;
+  no width/height CSS animation or native resize per frame; enter/exit 180/120 ms transform-only.
+- **Native acceptance:** zero transparency inside the island bbox over a white text window at 100/125/150% DPI; if
+  transparency bleeds, fall back to an opaque window with native DWM shadow/rounded corners; native before/after captures
+  + one native resize per transition required. G5 re-sign is blocked until those captures are reviewed.
+
 ---
 
 ## 3. Full Desktop App

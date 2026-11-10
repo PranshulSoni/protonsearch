@@ -116,3 +116,21 @@ deviation (usable, no dead control).
 **G5 overall remains CONDITIONAL on pre-existing evidence:** Media adapter and media/Wi-Fi/BT drill-down captures, and real
 Windows/DPI/frame-pacing visual evidence (task-31/L0). These are not task-56 regressions. G4 status unchanged.
 
+## 7. Task-62 native-signoff gate (2026-11-10)
+
+User rejected the native island again: bleed/transparency, notification bars/scrollbar clutter, visual clutter, wrong
+compact-first/Esc behavior, and empty-search hint. Binding added in `ISLAND_VISUAL_UX_FIX.md` §8 (also SCREENS §2.14,
+ISLAND_V9_SPEC §13, KEYBOARD §13, GAP_LIST P0-62). No implementation is signed here.
+
+**G5 status: BLOCKED for re-sign** until ui-launcher supplies native before/after captures over a white text window
+(not browser mock) and the following pass review: (1) zero transparency inside the island bbox at 100/125/150% DPI; (2)
+Alt+Space compact-only, typing/click expands, Esc drilldown->card->compact->hidden, no empty-search hint; (3) notifications
+0/1/many with no bars/visible scrollbar overlap and header clear action; (4) reduced Quick Settings (volume/brightness/
+audio + split Wi-Fi/Bluetooth + one quiet Open Windows settings link, no dead/unsupported control); (5) transform-first
+card switch, native geometry call exactly once per transition (no per-frame resize), enter/exit 180/120 ms opaque frames.
+
+**Current native before evidence (pre-fix) reviewed:** .bench/diag/island-after-click.png shows a click opening the Wi-Fi
+drill-down instead of expanded Search; island-after-click-type.png shows the cluttered Quick Settings (fallback rows,
+action pills, duplicate On/Off); v15-island-page.png shows the compact oval with placeholder hint. Exact deltas will be
+listed when the native after set arrives; no sign-off yet.
+

@@ -114,9 +114,8 @@ export function SearchCard({
   useEffect(() => {
     setActiveIndex(0);
   }, [results]);
-  // The canonical zero-results card is 185 px tall; render a compact visible
-  // state inside the results area instead of a centred block that gets clipped.
-  const zeroResults = !pending && !error && results.length === 0;
+  const hasQuery = query.trim().length > 0;
+  const zeroResults = hasQuery && !pending && !error && results.length === 0;
   // Same pure grouping/order as the Normal Launcher; labels scroll with rows.
   const groupedResults = groupResults(results);
   const orderedResults = groupedResults.flatMap((group) =>
@@ -200,7 +199,7 @@ export function SearchCard({
             ))}
           </div>
           <div className="island-results" id="island-search-results" role="listbox" aria-label="Search results">
-            {pending && results.length === 0 ? (
+            {!hasQuery ? null : pending && results.length === 0 ? (
               <div className="island-skeleton" aria-hidden="true">
                 {[0, 1, 2].map((row) => (
                   <span className="island-skeleton-row" key={row} />
@@ -208,20 +207,11 @@ export function SearchCard({
               </div>
             ) : error ? (
               <EmptyState title="Search is unavailable." hint={error} />
-            ) : zeroResults ? (
-              <div className="island-empty island-empty--compact" role="status">
-                <strong>
-                  {query.trim()
-                    ? "No matches for “" + query.trim() + "”."
-                    : "Start typing to search files, apps, and actions."}
-                </strong>
-                <span>
-                  {query.trim()
-                    ? "Try a different spelling, or a prefix such as file:, history:, or code:."
-                    : "Try a file name, an app, or a command like “lock”."}
-                </span>
+            ) : zeroResults && query.trim() ? (
+              <div className="island-zero" role="status">
+                {"No matches for “" + query.trim() + "”."}
               </div>
-            ) : (
+            ) : zeroResults ? null : (
               visibleGroups.map((group, groupIndex) => (
                 <div
                   className="island-result-group"
@@ -258,7 +248,7 @@ export function SearchCard({
               ))
             )}
           </div>
-          {!zeroResults ? (
+          {hasQuery && !zeroResults ? (
             <footer className="island-result-foot">
               <span>{total} local results</span>
               <span className="island-kbd-hints">
