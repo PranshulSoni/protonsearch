@@ -454,6 +454,9 @@ export const mockBridge = {
   async connectWifi(): Promise<void> {},
   async openSettings(): Promise<void> {},
   async mediaCommand(): Promise<void> {},
+  async getMediaSession(): Promise<import("./types").MediaSessionInfo | null> {
+    return null;
+  },
   async showLocalToast(): Promise<void> {},
   async notificationsDismiss(): Promise<void> {},
   async notificationsClear(): Promise<void> {},

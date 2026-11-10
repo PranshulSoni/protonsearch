@@ -11,6 +11,8 @@ pub(crate) mod bluetooth;
 pub(crate) mod brightness;
 pub(crate) mod capabilities;
 pub(crate) mod clipboard;
+pub(crate) mod media;
+pub(crate) mod notifications;
 pub(crate) mod radios;
 pub(crate) mod settings_pages;
 pub(crate) mod toast;

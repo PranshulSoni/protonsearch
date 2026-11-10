@@ -102,3 +102,5 @@ docs/qa/**/webview2/
 # Verification portable data profiles (runtime artifacts)
 docs/qa/**/appdata/
 docs/qa/**/webview2/
+.recovery-*/
+

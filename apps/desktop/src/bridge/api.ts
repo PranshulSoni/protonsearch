@@ -10,6 +10,7 @@ import type {
   AgentPermissionState,
   DetectedAgent,
   ControlsStatus,
+  MediaSessionInfo,
   MonitorInfo,
   PreviewPayload,
   ActivityItem,
@@ -73,6 +74,7 @@ type Bridge = {
   connectWifi(ssid: string): Promise<void>;
   openSettings(page: string): Promise<void>;
   mediaCommand(action: string): Promise<void>;
+  getMediaSession(): Promise<MediaSessionInfo | null>;
   showLocalToast(title: string, body: string): Promise<void>;
   notificationsDismiss(notificationId: string): Promise<void>;
   notificationsClear(): Promise<void>;
@@ -111,6 +113,7 @@ const tauriBridge: Bridge = {
   connectWifi: (ssid) => invoke<void>("control_connect_wifi", { ssid }),
   openSettings: (page) => invoke<void>("control_open_settings", { page }),
   mediaCommand: (action) => invoke<void>("control_media", { action }),
+  getMediaSession: () => invoke<MediaSessionInfo | null>("get_media_session"),
   showLocalToast: (title, body) => invoke<void>("show_local_toast", { title, body }),
   notificationsDismiss: (notificationId) =>
     invoke<void>("notifications_dismiss", { notificationId }),

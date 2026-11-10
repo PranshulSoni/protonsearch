@@ -6,6 +6,7 @@ import { AgentsCard, ClipboardCard } from "./IslandCards";
 import { ControlsCard, NotificationsCard } from "./NativeCards";
 import type { ControlsStatus } from "../bridge/types";
 import { api } from "../bridge/api";
+import { useIslandControls } from "./islandNativeCards";
 import { vi } from "vitest";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -47,6 +48,36 @@ const clip = (id: string, label: string, title: string, thumb?: string): SearchR
 });
 
 describe("island cards real data", () => {
+it("refreshes controls on focus and coalesces overlapping probes", async () => {
+const resolvers: Array<(status: ControlsStatus) => void> = [];
+const getStatus = vi.spyOn(api, "getControlsStatus").mockImplementation(
+() => new Promise((done) => { resolvers.push(done); }),
+);
+function Probe() {
+const controls = useIslandControls(true);
+return <><span>{controls.pending ? "pending" : "ready"}</span><button onClick={controls.refresh}>Refresh</button></>;
+}
+const element = await mount(<Probe />);
+expect(getStatus).toHaveBeenCalledTimes(1);
+await act(async () => {
+window.dispatchEvent(new Event("focus"));
+window.dispatchEvent(new Event("focus"));
+element.querySelector("button")!.click();
+});
+expect(getStatus).toHaveBeenCalledTimes(1);
+await act(async () => {
+resolvers[0]({} as ControlsStatus);
+await Promise.resolve();
+});
+expect(getStatus).toHaveBeenCalledTimes(2);
+await act(async () => {
+resolvers[1]({} as ControlsStatus);
+await new Promise((resolve) => setTimeout(resolve, 0));
+window.dispatchEvent(new Event("focus"));
+});
+expect(getStatus).toHaveBeenCalledTimes(3);
+getStatus.mockRestore();
+});
   it("filters clipboard tabs and renders real image thumbnails", async () => {
     const thumb =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n0kAAAAASUVORK5CYII=";
@@ -85,6 +116,12 @@ describe("island cards real data", () => {
   });
 
   it("renders real volume/brightness/output controls and capability-honest toggles", async () => {
+const setMuted = vi.spyOn(api, "setMuted").mockResolvedValue();
+let finishRefresh!: () => void;
+let failRefresh = false;
+const refresh = () => failRefresh
+? Promise.reject(new Error("Controls probe failed"))
+: new Promise<void>((resolve) => { finishRefresh = resolve; });
     const status: ControlsStatus = {
       mediaCapability: { supported: false, reason: "Media session adapter isn't wired." },
       media: null,
@@ -117,7 +154,7 @@ describe("island cards real data", () => {
       notificationItems: [],
     };
     const element = await mount(
-      <ControlsCard status={status} pending={false} error={null} refresh={() => undefined} />,
+<ControlsCard status={status} pending={false} error={null} refresh={refresh} />,
     );
     expect(element.textContent).toContain("62%");
     expect(element.textContent).toContain("80%");
@@ -130,6 +167,16 @@ describe("island cards real data", () => {
     const bluetoothToggle = unsupportedTile?.querySelector<HTMLButtonElement>(".island-tile-main");
     expect(bluetoothToggle?.disabled).toBe(true);
     expect(bluetoothToggle?.getAttribute("title")).toContain("Bluetooth adapter isn't wired.");
+const muteButton = element.querySelector<HTMLButtonElement>(".island-mute-button")!;
+await act(async () => { muteButton.click(); await Promise.resolve(); });
+expect(muteButton.disabled).toBe(true);
+await act(async () => { finishRefresh(); await Promise.resolve(); });
+expect(muteButton.disabled).toBe(false);
+failRefresh = true;
+await act(async () => { muteButton.click(); await new Promise((resolve) => setTimeout(resolve, 0)); });
+expect(element.querySelector('[role="alert"]')?.textContent).toContain("Controls probe failed");
+expect(element.textContent).not.toContain("Changed mute.");
+setMuted.mockRestore();
   });
 
   it("wires real Wi-Fi/Bluetooth toggles and Wi-Fi connect/fallbacks", async () => {
@@ -152,6 +199,7 @@ describe("island cards real data", () => {
       wifiNetworks: [
         { ssid: "Home-5G", signal: 87, security: "WPA3", connected: true, hasProfile: true, connectable: true },
         { ssid: "Cafe", signal: 40, security: "Open", connected: false, hasProfile: false, connectable: false },
+        { ssid: "Guest", signal: 55, security: "WPA2", connected: false, hasProfile: true, connectable: true },
       ],
       wifiError: null,
       bluetooth: { supported: true, reason: null },
@@ -176,13 +224,19 @@ describe("island cards real data", () => {
     const btToggle = tiles[1].querySelector<HTMLButtonElement>(".island-tile-main")!;
     expect(wifiToggle.disabled).toBe(false);
     expect(btToggle.disabled).toBe(false);
+    expect(wifiToggle.getAttribute("aria-checked")).toBe("true");
+    expect(btToggle.getAttribute("aria-checked")).toBe("false");
     await act(async () => {
       wifiToggle.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
       btToggle.click();
       await Promise.resolve();
     });
     expect(setWifi).toHaveBeenCalledWith(false);
     expect(setBluetooth).toHaveBeenCalledWith(true);
+    expect(element.querySelector('[role="status"]')?.textContent).toContain("Changed Bluetooth.");
 
     await act(async () => {
       (tiles[0].querySelector(".island-tile-chevron") as HTMLButtonElement).click();
@@ -192,11 +246,15 @@ describe("island cards real data", () => {
       (button) => button.textContent === "Connect",
     );
     expect(connect).not.toBeNull();
+    expect([...element.querySelectorAll<HTMLButtonElement>(".island-drilldown-action")].find(
+      (button) => button.textContent === "Connected",
+    )?.disabled).toBe(true);
     await act(async () => {
       connect?.click();
       await Promise.resolve();
     });
-    expect(connectWifi).toHaveBeenCalledWith("Home-5G");
+    expect(connectWifi).toHaveBeenCalledWith("Guest");
+    expect(element.querySelector('[role="status"]')?.textContent).toContain("Changed Wi-Fi.");
     const fallback = [...element.querySelectorAll<HTMLButtonElement>(".island-drilldown-action")].find(
       (button) => button.textContent === "Open network settings",
     );
@@ -206,10 +264,49 @@ describe("island cards real data", () => {
       await Promise.resolve();
     });
     expect(openSettings).toHaveBeenCalledWith("wifi");
+    await act(async () => {
+      element.querySelector<HTMLButtonElement>(".island-drilldown-back")?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      element.querySelector<HTMLButtonElement>('[aria-label="Show Bluetooth devices"]')?.click();
+      await Promise.resolve();
+    });
+    expect(element.textContent).toContain("Open Bluetooth settings");
     setWifi.mockRestore();
     setBluetooth.mockRestore();
     connectWifi.mockRestore();
     openSettings.mockRestore();
+  });
+
+  it("shows Wi-Fi action progress and the rejection reason in the detail view", async () => {
+    let rejectConnect!: (reason: string) => void;
+    const connectWifi = vi.spyOn(api, "connectWifi").mockImplementation(
+      () => new Promise<void>((_resolve, reject) => { rejectConnect = reject; }),
+    );
+    const status: ControlsStatus = {
+      mediaCapability: { supported: false, reason: "n/a" }, media: null, audioOutputs: [], defaultAudioId: null,
+      volumePercent: null, muted: null, brightnessCapability: { supported: false, reason: "n/a" },
+      brightnessPercent: null, brightnessMonitors: [], wifi: { supported: true, reason: null }, wifiEnabled: true,
+      wifiNetworks: [{ ssid: "Home", signal: 90, security: "WPA2", connected: false, hasProfile: true, connectable: true }],
+      wifiError: null, bluetooth: { supported: false, reason: "n/a" }, bluetoothEnabled: null,
+      bluetoothDevices: [], bluetoothError: null, airplaneMode: { supported: false, reason: "n/a" },
+      nightLight: { supported: false, reason: "n/a" }, energySaver: { supported: false, reason: "n/a" },
+      notifications: { supported: false, reason: "n/a" }, toastCapability: { supported: false, reason: "n/a" },
+      notificationUnread: 0, notificationItems: [],
+    };
+    const element = await mount(<ControlsCard status={status} pending={false} error={null} refresh={() => undefined} />);
+    await act(async () => {
+      element.querySelector<HTMLButtonElement>('[aria-label="Show Wi-Fi networks"]')!.click();
+    });
+    const connect = element.querySelector<HTMLButtonElement>(".island-drilldown-action")!;
+    await act(async () => { connect.click(); });
+    expect(element.textContent).toContain("Updating Wi-Fi…");
+    expect(connect.disabled).toBe(true);
+    await act(async () => { rejectConnect("Access denied by system"); await Promise.resolve(); });
+    expect(element.textContent).toContain("Access denied by system");
+    expect(element.querySelector('[role="alert"]')).not.toBeNull();
+    connectWifi.mockRestore();
   });
 
   it("shows the notification capability reason and a local toast test", async () => {
@@ -306,6 +403,12 @@ describe("island cards real data", () => {
     expect(clear).toHaveBeenCalled();
     dismiss.mockRestore();
     clear.mockRestore();
+  });
+
+  it("shows an empty agent state without task-specific controls", async () => {
+    const element = await mount(<AgentsCard status={{ state: "running", runtime: "pi", model: "pi-1.5" }} tasks={[]} onPause={() => undefined} onResume={() => undefined} />);
+    expect(element.textContent).toContain("No agent tasks yet.");
+    expect(element.querySelector(".island-agent-note")).toBeNull();
   });
 
   it("renders flat real agent tasks and disables controls the task cannot use", async () => {

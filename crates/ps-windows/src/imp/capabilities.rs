@@ -45,8 +45,9 @@ fn not_supported(reason: &str) -> Result<(), String> {
 
 /// Probe every native integration this build ships.
 pub fn probe_all() -> NativeCapabilities {
-    let media_sessions = Capability::unsupported(
-        "media session controls are not shipped in this build; open the media app itself",
+    let media_sessions = run_probe(
+        || super::media::now_playing().map(|_| ()).map_err(|error| format!("{error:#}")),
+        None,
     );
     let audio_output = run_probe(
         || {

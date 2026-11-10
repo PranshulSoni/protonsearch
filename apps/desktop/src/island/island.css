@@ -36,6 +36,17 @@ html[data-window="island"] #root {
   --island-dur-transform: 450ms;
   --island-dur-out: 140ms;
   --island-dur-in: 250ms;
+  /* Summon/dismiss; keep in step with OPEN_MS / CLOSE_MS in IslandView.tsx. */
+  --island-dur-open: 420ms;
+  --island-dur-close: 150ms;
+  /* Damped spring (ratio 0.65): reaches size at ~30%, overshoots ~7%, settles. */
+  --island-spring: linear(
+    0, 0.061 4%, 0.205 8%, 0.383 12%, 0.561 16%, 0.719 20%, 0.848 24%, 0.943 28%,
+    1.007 32%, 1.046 36%, 1.064 40%, 1.068 44%, 1.063 48%, 1.052 52%, 1.034 58%,
+    1.018 64%, 1.006 70%, 0.998 78%, 0.995 86%, 0.996 93%, 1
+  );
+  /* Where the surface sits before it pops in and after it tucks away. */
+  --island-tucked: translateY(-14px) scale(0.6, 0.5);
   --island-dot-dur: 300ms;
   --island-dots-h: 31px;
   --island-dots-h-compact: 38px;
@@ -80,25 +91,61 @@ html[data-window="island"] #root {
   font-family: "Inter Variable", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
   letter-spacing: -0.015em;
-  /* Native window is resized exactly once per card/mode; width/height are not
-     CSS-animated because the browser repaint of a transparent WebView2 window
-     during a size morph is what made switching feel laggy. */
   transition:
+    width var(--island-dur-morph) var(--island-ease),
+    height var(--island-dur-morph) var(--island-ease),
     border-radius var(--island-dur-radius) var(--island-ease),
     transform var(--island-dur-transform) var(--island-ease);
   outline: none;
 }
 
-.island-surface--opening {
-  animation: island-enter 180ms var(--island-ease);
+/* Summon/dismiss: the surface pops out of its anchor edge (the top by default)
+   on a spring and tucks back the same way. */
+.island-surface {
+  transform-origin: 50% 0;
 }
 
-@keyframes island-enter {
+.island-host[data-anchor^="center"] .island-surface {
+  transform-origin: 50% 50%;
+  --island-tucked: scale(0.6, 0.5);
+}
+
+.island-host[data-anchor^="bottom"] .island-surface {
+  transform-origin: 50% 100%;
+  --island-tucked: translateY(14px) scale(0.6, 0.5);
+}
+
+/* While the native window is hidden the surface waits tucked and transparent, so
+   the first frame of the next summon is empty rather than the last drawn state. */
+.island-surface--hidden {
+  opacity: 0;
+  transform: var(--island-tucked);
+  transition: none;
+}
+
+/* The fade is short and separate from the spring: the pill is visible from the
+   first frame, so the growth itself is what the eye reads as the pop. */
+.island-surface--opening {
+  animation:
+    island-pop-in var(--island-dur-open) var(--island-spring) both,
+    island-fade-in 90ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+@keyframes island-pop-in {
   from {
-    transform: translateY(-8px) scale(0.97);
+    transform: var(--island-tucked);
   }
   to {
-    transform: translateY(0) scale(1);
+    transform: none;
+  }
+}
+
+@keyframes island-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -154,8 +201,14 @@ html[data-window="island"] #root {
 }
 
 .island-surface--closing {
-  transform: translateY(-6px) scale(0.985);
-  transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: island-pop-out var(--island-dur-close) cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes island-pop-out {
+  to {
+    opacity: 0;
+    transform: var(--island-tucked);
+  }
 }
 
 /* ---------- Search ---------- */
@@ -225,16 +278,9 @@ html[data-window="island"] #root {
   outline: none;
 }
 
-/* Borderless V9 search: focus is indicated at row/island level, not as a box. */
-.island-search-row:focus-within {
-  box-shadow: inset 0 -2px 0 rgba(154, 190, 221, 0.68);
-}
-
-.island-surface--compact:focus-within {
-  box-shadow:
-    0 26px 54px rgba(20, 32, 40, 0.25),
-    0 3px 8px rgba(27, 32, 32, 0.15),
-    inset 0 0 0 1px rgba(154, 190, 221, 0.55);
+/* V9 keeps search focus visible on the island outline without an inset line. */
+.island-surface:focus-within {
+  border-color: rgba(154, 190, 221, 0.55);
 }
 
 .island-search-row > svg {
@@ -1851,6 +1897,31 @@ html[data-window="island"] #root {
   border-radius: 8px;
   background: var(--island-control-bg);
 }
+.island-control-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-height: 34px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #344e5d;
+  border-radius: 8px;
+  background: #182831;
+  color: #d4e8f2;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.island-control-feedback.is-error {
+  border-color: #765348;
+  background: #30221f;
+  color: #f3d4c9;
+}
+.island-control-feedback .island-control-link {
+  flex: none;
+  font-size: 11px;
+}
 
 .island-drilldown-action {
   flex: none;
@@ -2084,6 +2155,22 @@ html[data-window="island"] #root {
 .island-tile-main:disabled {
   opacity: 0.62;
   cursor: not-allowed;
+}
+.island-tile-main[aria-checked="true"] {
+  background: var(--island-control-on);
+  color: #c7e2f3;
+}
+.island-tile-main[aria-checked="true"] .island-tile-label,
+.island-tile-main[aria-checked="true"] .island-tile-state {
+  color: #dceef8;
+}
+.island-tile-main:hover:not(:disabled) { background: #25343e; }
+.island-tile-main[aria-checked="true"]:hover:not(:disabled) { background: #2c4b5d; }
+.island-tile-main:focus-visible,
+.island-tile-chevron:focus-visible,
+.island-mute-button:focus-visible {
+  outline: 2px solid var(--island-focus);
+  outline-offset: -3px;
 }
 
 .island-tile-label {

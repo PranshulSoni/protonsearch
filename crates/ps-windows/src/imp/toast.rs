@@ -1,7 +1,6 @@
 //! Local Windows toast notifications for the app's own notifications.
-//! Other applications' Windows notifications are NOT accessible to normal
-//! desktop apps; the notification store is the source of truth and this module
-//! only surfaces ProtonSearch-originated toasts where Windows allows it.
+//! This module only raises ProtonSearch-originated toasts where Windows allows
+//! it; reading the system notification feed lives in notifications.rs.
 
 use anyhow::{Context, Result};
 use windows::core::HSTRING;

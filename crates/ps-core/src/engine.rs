@@ -293,7 +293,9 @@ impl Engine {
         // verb is left untouched so literal searches keep working.
         let intent_text = strip_imperative_verbs(&query_text);
         let parsed = crate::query::ParsedQuery::parse(intent_text.as_ref());
-        let scope = if parsed.scope != SearchScope::All {
+        let scope = if req.scope != SearchScope::All {
+            req.scope
+        } else if parsed.scope != SearchScope::All {
             parsed.scope
         } else {
             prefix_scope
@@ -340,7 +342,7 @@ impl Engine {
             let sources = self.sources.read().unwrap();
             let mut recent: Vec<&ps_sources::RecentEntry> = sources.recent.iter().collect();
             recent.sort_by(|a, b| b.last_used_ms.cmp(&a.last_used_ms));
-            for entry in recent.into_iter().take(5) {
+            for entry in recent.into_iter().filter(|_| scope == SearchScope::All).take(5) {
                 ranked.push(Ranked {
                     tier: 0,
                     priority: 1,
@@ -418,7 +420,7 @@ impl Engine {
                 });
                 tier0_hits += 1;
             }
-            if terms.len() == 1 {
+            if scope == SearchScope::All && terms.len() == 1 {
                 for entry in sources
                     .recent
                     .iter()
@@ -3175,6 +3177,25 @@ mod tests {
     }
 
     #[test]
+    fn app_scope_never_includes_recent_files() {
+        let dir = scratch_dir("app_recent_scope");
+        let engine = make_engine(&dir, None);
+        engine.sources.write().unwrap().recent.push(ps_sources::RecentEntry {
+            path: r"C:\docs\report.txt".into(),
+            name: "report.txt".into(),
+            last_used_ms: 1,
+        });
+        let mut request = SearchRequest::new(1, "report");
+        request.scope = SearchScope::Apps;
+        assert!(engine.search(&request).results.iter().all(|r| r.kind == SourceKind::Application));
+        request.query = "file:report".into();
+        assert!(engine.search(&request).results.iter().all(|r| r.kind == SourceKind::Application));
+        request.query.clear();
+        assert!(engine.search(&request).results.iter().all(|r| r.kind == SourceKind::Application));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn files_scope_is_strict_and_all_keeps_groups_separate() {
         let dir = scratch_dir("scopes");
         let engine = make_engine(&dir, None);
@@ -3198,6 +3219,9 @@ mod tests {
         ]);
         engine.sync_filename_entries();
 
+        let mut apps_with_file_prefix = SearchRequest::new(29, "file:report");
+        apps_with_file_prefix.scope = SearchScope::Apps;
+        assert!(engine.search(&apps_with_file_prefix).results.iter().all(|r| r.kind == SourceKind::Application));
         let mut files = SearchRequest::new(30, "report");
         files.scope = SearchScope::Files;
         let resp = engine.search(&files);

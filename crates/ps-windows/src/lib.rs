@@ -806,6 +806,105 @@ pub fn show_toast(title: &str, body: &str) -> anyhow::Result<()> {
         anyhow::bail!("toast notifications are only supported on Windows")
     }
 }
+
+/// What the system's current media session is playing.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct MediaSession {
+    pub title: String,
+    pub artist: String,
+    pub album: Option<String>,
+    /// App user model id of the player (for example "Spotify.exe").
+    pub app_id: Option<String>,
+    pub playing: bool,
+    pub position_ms: Option<u64>,
+    pub duration_ms: Option<u64>,
+}
+
+/// Transport commands a media session accepts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MediaCommand {
+    Play,
+    Pause,
+    PlayPause,
+    Next,
+    Previous,
+}
+
+/// The current system media session, or `None` when nothing is playing.
+pub fn media_session() -> anyhow::Result<Option<MediaSession>> {
+    #[cfg(windows)]
+    {
+        imp::media::now_playing()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("media sessions are only supported on Windows")
+    }
+}
+
+/// Send a transport command to the current system media session.
+pub fn media_command(command: MediaCommand) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::media::command(command)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = command;
+        anyhow::bail!("media sessions are only supported on Windows")
+    }
+}
+
+/// One entry of the Windows notification feed.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SystemNotification {
+    /// Windows' own id for the entry (used to dismiss it).
+    pub id: u32,
+    /// Display name of the app that raised it; empty when Windows has none.
+    pub app: String,
+    pub title: String,
+    pub body: String,
+    /// Unix epoch milliseconds.
+    pub created_ms: i64,
+}
+
+/// The newest entries of the Windows notification feed, read live.
+pub fn system_notifications(limit: usize) -> anyhow::Result<Vec<SystemNotification>> {
+    #[cfg(windows)]
+    {
+        imp::notifications::list(limit)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = limit;
+        anyhow::bail!("the notification feed is only supported on Windows")
+    }
+}
+
+/// Remove one entry from the Windows notification feed.
+pub fn dismiss_system_notification(id: u32) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::notifications::dismiss(id)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = id;
+        anyhow::bail!("the notification feed is only supported on Windows")
+    }
+}
+
+/// Clear the Windows notification feed.
+pub fn clear_system_notifications() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::notifications::clear()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("the notification feed is only supported on Windows")
+    }
+}
 // ---------------------------------------------------------------------------
 // Milestone 2 native controls: Wi-Fi, Bluetooth, brightness details, settings
 // fallbacks, and a ready-to-map ControlsStatus snapshot.

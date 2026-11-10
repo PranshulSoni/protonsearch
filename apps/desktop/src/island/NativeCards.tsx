@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../bridge/api";
 import type {
   AudioDeviceInfo,
@@ -66,7 +66,7 @@ export function MediaCard({
   status: ControlsStatus | null;
   pending: boolean;
   error: string | null;
-  refresh: () => void;
+ refresh: () => void | Promise<void>;
 }) {
   if (pending && !status) return <CardLoading card="media" title="Media" subtitle="Now playing" />;
   if (error && !status) {
@@ -203,27 +203,51 @@ export function ControlsCard({
   const [audioOpen, setAudioOpen] = useState(false);
   const [drilldown, setDrilldown] = useState<"wifi" | "bluetooth" | null>(null);
   const [controlError, setControlError] = useState<string | null>(null);
+  const [controlSuccess, setControlSuccess] = useState<string | null>(null);
   const [controlErrorPage, setControlErrorPage] = useState<string>("display");
+  const [controlPending, setControlPending] = useState<string | null>(null);
+  const controlPendingRef = useRef(false);
   useEffect(() => {
     setVolume(status?.volumePercent ?? 0);
     setBrightness(status?.brightnessPercent ?? 0);
   }, [status?.volumePercent, status?.brightnessPercent]);
 
   const runControl = (label: string, action: () => Promise<unknown>, fallbackPage = "display") => {
+    if (controlPendingRef.current) return;
+    controlPendingRef.current = true;
+    setControlPending(label);
     setControlError(null);
+    setControlSuccess(null);
     void action()
-      .then(refresh)
+      .then(() => refresh())
+      .then(() => setControlSuccess("Changed " + label + "."))
       .catch((reason: unknown) => {
-        const message = reason instanceof Error ? reason.message : "";
-        setControlError("Couldn't change " + label + ".");
+        const message = reason instanceof Error ? reason.message : typeof reason === "string" ? reason : "";
+        setVolume(status?.volumePercent ?? 0);
+        setBrightness(status?.brightnessPercent ?? 0);
+        setControlError(message || "Couldn't change " + label + ".");
         setControlErrorPage(
-          /location|permission|consent|denied/i.test(message) ? "privacy_location" : fallbackPage,
+          fallbackPage === "wifi" && /location|permission|consent|denied/i.test(message)
+            ? "privacy_location"
+            : fallbackPage,
         );
+      })
+      .finally(() => {
+        controlPendingRef.current = false;
+        setControlPending(null);
       });
   };
   const openSettings = (page: string) => {
     void api.openSettings(page).catch(() => undefined);
   };
+  const feedback = controlPending || controlError || controlSuccess ? (
+    <div className={"island-control-feedback" + (controlError ? " is-error" : controlPending ? " is-pending" : " is-success")} role={controlError ? "alert" : "status"}>
+      <span>{controlPending ? "Updating " + controlPending + "…" : controlError ?? controlSuccess}</span>
+      {controlError ? <button type="button" className="island-control-link" onClick={() => openSettings(controlErrorPage)}>
+        Open Windows settings
+      </button> : null}
+    </div>
+  ) : null;
 
   if (pending && !status) return <CardLoading card="controls" title="Quick Settings" subtitle="Your PC, one gesture away" />;
   if (error && !status) {
@@ -245,6 +269,7 @@ export function ControlsCard({
         <button type="button" className="island-drilldown-back" onClick={() => setDrilldown(null)}>
           <IslandIcon name="back" size={16} /> Back to Quick Settings
         </button>
+        {feedback}
         {isWifi ? (
           status.wifiError ? (
             <div className="island-control-error">
@@ -266,9 +291,13 @@ export function ControlsCard({
                 <div className="island-drilldown-row" key={network.ssid}>
                   <IslandIcon name="wifi" size={18} />
                   <span>{network.ssid + " · " + network.signal + "% · " + network.security}</span>
-                  {network.hasProfile && network.connectable ? (
-                    <button type="button" className="island-drilldown-action" onClick={() => runControl("Wi-Fi", () => api.connectWifi(network.ssid), "wifi")}>
-                      Connect
+                  {network.connected ? (
+                    <button type="button" className="island-drilldown-action" disabled>
+                      Connected
+                    </button>
+                  ) : network.hasProfile && network.connectable ? (
+                    <button type="button" className="island-drilldown-action" disabled={controlPending != null} onClick={() => runControl("Wi-Fi", () => api.connectWifi(network.ssid), "wifi")}>
+                      {controlPending ? "Connecting…" : "Connect"}
                     </button>
                   ) : (
                     <button type="button" className="island-drilldown-action" onClick={() => openSettings("wifi")}>
@@ -300,7 +329,7 @@ export function ControlsCard({
                 <IslandIcon name="bluetooth" size={18} />
                 <span>{device.name + (device.connected ? " · connected" : " · paired")}</span>
                 <button type="button" className="island-drilldown-action" onClick={() => openSettings("bluetooth")}>
-                  Manage
+                  Open Bluetooth settings
                 </button>
               </div>
             ))}
@@ -324,7 +353,7 @@ export function ControlsCard({
           min={0}
           max={100}
           value={volume}
-          disabled={status.volumePercent == null}
+          disabled={status.volumePercent == null || controlPending != null}
           aria-label="Volume"
           onChange={(event) => setVolume(Number(event.target.value))}
           onPointerUp={() => runControl("volume", () => api.setVolume(volume))}
@@ -337,7 +366,7 @@ export function ControlsCard({
           aria-pressed={status.muted === true}
           aria-label={status.muted ? "Unmute" : "Mute"}
           title={status.muted ? "Unmute" : "Mute"}
-          disabled={status.muted == null}
+          disabled={status.muted == null || controlPending != null}
           onClick={() => runControl("mute", () => api.setMuted(!(status.muted === true)))}
         >
           <IslandIcon name="volume" size={16} />
@@ -355,7 +384,7 @@ export function ControlsCard({
               min={0}
               max={100}
               value={brightness}
-              disabled={status.brightnessPercent == null}
+              disabled={status.brightnessPercent == null || controlPending != null}
               aria-label="Brightness"
               onChange={(event) => setBrightness(Number(event.target.value))}
               onPointerUp={() => runControl("brightness", () => api.setBrightness(brightness))}
@@ -387,6 +416,7 @@ export function ControlsCard({
                   role="radio"
                   aria-checked={device.id === status.defaultAudioId || device.isDefault}
                   className={"island-audio-option" + (device.id === status.defaultAudioId || device.isDefault ? " is-active" : "")}
+                  disabled={controlPending != null}
                   onClick={() => runControl("audio output", () => api.setAudioOutput(device.id))}
                 >
                   <IslandIcon name="volume" size={16} />
@@ -407,7 +437,7 @@ export function ControlsCard({
             aria-checked={status.wifiEnabled === true}
             aria-label="Wi-Fi"
             className="island-tile-main"
-            disabled={!status.wifi.supported || status.wifiEnabled == null}
+            disabled={!status.wifi.supported || status.wifiEnabled == null || controlPending != null}
             title={status.wifi.supported ? "Toggle Wi-Fi" : status.wifi.reason || "Wi-Fi can't be changed here."}
             onClick={() => runControl("Wi-Fi", () => api.setWifi(!(status.wifiEnabled === true)), "wifi")}
           >
@@ -433,7 +463,7 @@ export function ControlsCard({
             aria-checked={status.bluetoothEnabled === true}
             aria-label="Bluetooth"
             className="island-tile-main"
-            disabled={!status.bluetooth.supported || status.bluetoothEnabled == null}
+            disabled={!status.bluetooth.supported || status.bluetoothEnabled == null || controlPending != null}
             title={status.bluetooth.supported ? "Toggle Bluetooth" : status.bluetooth.reason || "Bluetooth can't be changed here."}
             onClick={() => runControl("Bluetooth", () => api.setBluetooth(!(status.bluetoothEnabled === true)), "bluetooth")}
           >
@@ -454,14 +484,7 @@ export function ControlsCard({
         </div>
       </div>
 
-      {controlError ? (
-        <div className="island-control-error">
-          <span>{controlError}</span>
-          <button type="button" className="island-control-link" onClick={() => openSettings(controlErrorPage)}>
-            Open Windows settings
-          </button>
-        </div>
-      ) : null}
+      {feedback}
 
       <button type="button" className="island-settings-link" onClick={() => openSettings("display")}>
         <IslandIcon name="controls" size={16} />

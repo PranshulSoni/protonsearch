@@ -162,9 +162,13 @@ fn place_launcher(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64)
 }
 
 fn show_launcher_window(app: &AppHandle) {
-    let Ok(win) = ensure_launcher_window(app) else {
-        return;
-    };
+let win = match ensure_launcher_window(app) {
+Ok(win) => win,
+Err(err) => {
+eprintln!("[window] failed to create launcher: {err}");
+return;
+}
+};
     // Cancel any pending dismissal from a previous close animation.
     LAUNCHER_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let scale = win.scale_factor().unwrap_or(1.0);
@@ -185,7 +189,7 @@ fn show_launcher_window(app: &AppHandle) {
             serde_json::json!({ "mode": "launcher", "invokeEpochMs": invoke }),
         );
     }
-    let _ = win.set_focus();
+    focus_window(&win);
     let _ = win.emit("launcher:summoned", ());
 }
 
@@ -304,9 +308,13 @@ fn hide_island_window(app: &AppHandle) {
 }
 
 fn show_island_window(app: &AppHandle) {
-    let Ok(win) = ensure_island_window(app) else {
-        return;
-    };
+let win = match ensure_island_window(app) {
+Ok(win) => win,
+Err(err) => {
+eprintln!("[window] failed to create island: {err}");
+return;
+}
+};
     ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     hide_launcher_window(app);
     let scale = win.scale_factor().unwrap_or(1.0);
@@ -334,7 +342,7 @@ fn show_island_window(app: &AppHandle) {
             serde_json::json!({ "mode": "island", "invokeEpochMs": invoke }),
         );
     }
-    let _ = win.set_focus();
+    focus_window(&win);
     let _ = win.emit("island:shown", ());
 }
 
@@ -345,21 +353,52 @@ fn toggle_island(app: &AppHandle) {
     let visible = win.is_visible().unwrap_or(false);
     let focused = win.is_focused().unwrap_or(false);
     if visible && focused {
-        // Frontend plays the exit animation then calls hide_island.
-        let _ = win.emit("island:dismiss", ());
-        let generation =
-            ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-        let handle = win.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(600));
-            if ISLAND_GENERATION.load(std::sync::atomic::Ordering::SeqCst) == generation {
-                set_webview_memory_level(&handle, true);
-                let _ = handle.hide();
-                let _ = handle.emit("island:hidden", ());
-            }
-        });
+        dismiss_island(&win);
     } else {
         show_island_window(app);
+    }
+}
+
+/// Ask the island to play its exit animation; the frontend then calls hide_island.
+/// Safety net: if the renderer is wedged the window must still disappear, but
+/// never hide an island that was re-summoned in the meantime.
+fn dismiss_island(win: &WebviewWindow) {
+    let _ = win.emit("island:dismiss", ());
+    let generation = ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+    let handle = win.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(600));
+        if ISLAND_GENERATION.load(std::sync::atomic::Ordering::SeqCst) == generation {
+            set_webview_memory_level(&handle, true);
+            let _ = handle.hide();
+            let _ = handle.emit("island:hidden", ());
+        }
+    });
+}
+
+/// Bring a window to the front and put keyboard focus inside its webview.
+/// WebView2 does not take focus from the window's own WM_SETFOCUS until it has
+/// been clicked once, so a freshly started app showed its search box but ignored
+/// typing and never reported losing focus. Focusing wry's container child hands
+/// real Win32 focus to the webview.
+fn focus_window(win: &WebviewWindow) {
+    let _ = win.set_focus();
+    #[cfg(windows)]
+    if let Ok(hwnd) = win.hwnd() {
+        let raw = hwnd.0 as isize;
+        let _ = win.run_on_main_thread(move || unsafe {
+            use windows::Win32::Foundation::HWND;
+            use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus};
+            use windows::Win32::UI::WindowsAndMessaging::{GetWindow, GW_CHILD};
+            let top = HWND(raw as _);
+            // Only when focus is stuck on the frame: re-focusing a webview that
+            // already has it would bounce focus and read as a focus loss.
+            if GetFocus() == top {
+                if let Ok(child) = GetWindow(top, GW_CHILD) {
+                    let _ = SetFocus(child);
+                }
+            }
+        });
     }
 }
 
@@ -375,14 +414,34 @@ fn toggle_primary_launcher(app: &AppHandle) {
     }
 }
 
+fn show_primary_launcher(app: &AppHandle) {
+    let settings = app.state::<AppState>().engine.settings();
+    if settings.launcher.primary_mode == LauncherMode::DynamicIsland && settings.launcher.island.enabled {
+        show_island_window(app);
+    } else {
+        show_launcher_window(app);
+    }
+}
+
+static WINDOW_BUILD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn dispatch_window_action(app: &AppHandle, action: fn(&AppHandle)) {
+    let app = app.clone();
+    std::thread::spawn(move || action(&app));
+}
+
 fn show_main_window(app: &AppHandle) {
-    let Ok(win) = ensure_main_window(app) else {
-        return;
-    };
+let win = match ensure_main_window(app) {
+Ok(win) => win,
+Err(err) => {
+eprintln!("[window] failed to create main window: {err}");
+return;
+}
+};
     set_webview_memory_level(&win, false);
     let _ = win.show();
     let _ = win.unminimize();
-    let _ = win.set_focus();
+    focus_window(&win);
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -405,8 +464,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .icon(tray_icon);
     builder
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "open" => show_main_window(app),
-            "search" => show_launcher_window(app),
+"open" => dispatch_window_action(app, show_main_window),
+"search" => dispatch_window_action(app, show_primary_launcher),
             "pause" => {
                 if let Some(state) = app.try_state::<AppState>() {
                     let _ = state.engine.index_command(IndexCommand::Pause);
@@ -432,7 +491,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 ..
             } = event
             {
-                toggle_launcher(tray.app_handle());
+dispatch_window_action(tray.app_handle(), toggle_primary_launcher);
             }
         })
         .build(app)?;
@@ -460,43 +519,40 @@ fn cdp_browser_args() -> Option<String> {
         .map(|port| format!("--remote-debugging-port={port}"))
 }
 
-/// When PROTONSEARCH_DATA_DIR is set (portable install / E2E sandbox), keep the
+/// When PROTONSEARCH_DATA_DIR is set (portable install / E2E sandbox), keep
 /// WebView2 profile inside it instead of %LOCALAPPDATA%\<identifier>.
 fn webview_data_dir() -> Option<PathBuf> {
-    std::env::var_os("PROTONSEARCH_DATA_DIR")
-        .filter(|dir| !dir.is_empty())
-        .map(|dir| PathBuf::from(dir).join("webview2"))
+std::env::var_os("PROTONSEARCH_DATA_DIR")
+.filter(|dir| !dir.is_empty())
+.map(|dir| PathBuf::from(dir).join("webview2"))
 }
 
-/// Ask WebView2 to trim its caches while a window is hidden. This keeps launch
-/// latency (the process and renderer stay warm) while materially lowering the
-/// idle working set; restored to NORMAL before the window is shown.
-#[cfg(windows)]
-fn set_webview_memory_level(win: &WebviewWindow, low: bool) {
-    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_19;
-    use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW;
-    use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL;
-    use windows_core::Interface;
-    let _ = win.with_webview(move |platform| {
-        let controller = platform.controller();
-        let Ok(core) = (unsafe { controller.CoreWebView2() }) else {
-            return;
-        };
-        let Ok(core19) = core.cast::<ICoreWebView2_19>() else {
-            return;
-        };
-        unsafe {
-            let _ = core19.SetMemoryUsageTargetLevel(if low {
-                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
-            } else {
-                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
-            });
-        }
+/// DISABLED (hang fix): calling WebView2 `SetMemoryUsageTargetLevel` through
+/// wry's `with_webview` around window creation/show can block the UI thread
+/// before the controller is ready, leaving the window "Not Responding" on the
+/// first launch. Keep the call site for a future safe implementation that runs
+/// only after the page loads and off the main thread.
+fn set_webview_memory_level(_win: &WebviewWindow, _low: bool) {}
+
+/// Release builds have no console: when a window cannot be created (WebView2
+/// failing to start is the usual cause) say so once, instead of leaving a tray
+/// icon whose hotkey only spins the cursor.
+fn report_window_failure(err: &tauri::Error) {
+    static REPORTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if REPORTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    let text = format!(
+        "ProtonSearch could not open its window.\n\n{err}\n\nThis usually means WebView2 cannot write its profile, for example when ProtonSearch.exe runs from a sandboxed (low-integrity) folder. Copy it to a normal folder or install it, then start it again."
+    );
+    // Own thread: the message box is modal and callers must not block on it.
+    #[cfg(windows)]
+    std::thread::spawn(move || unsafe {
+        use windows::core::{w, HSTRING};
+        use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+        let _ = MessageBoxW(None, &HSTRING::from(text), w!("ProtonSearch"), MB_OK | MB_ICONERROR);
     });
 }
-
-#[cfg(not(windows))]
-fn set_webview_memory_level(_win: &WebviewWindow, _low: bool) {}
 
 fn build_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let cdp = cdp_browser_args();
@@ -510,10 +566,10 @@ fn build_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     if let Some(args) = &cdp {
         builder = builder.additional_browser_args(args);
     }
-    if let Some(dir) = &webview_dir {
-        let _ = std::fs::create_dir_all(dir);
-        builder = builder.data_directory(dir.clone());
-    }
+if let Some(dir) = &webview_dir {
+let _ = std::fs::create_dir_all(dir);
+builder = builder.data_directory(dir.clone());
+}
     let main = builder.build()?;
     let _ = main.set_icon(window_icon()?);
     set_webview_memory_level(&main, true);
@@ -538,10 +594,11 @@ fn build_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 }
 
 fn ensure_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
     if let Some(window) = app.get_webview_window(MAIN_LABEL) {
         return Ok(window);
     }
-    build_main_window(app)
+    build_main_window(app).inspect_err(report_window_failure)
 }
 
 fn build_launcher_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
@@ -565,9 +622,9 @@ fn build_launcher_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     if let Some(args) = &cdp {
         builder = builder.additional_browser_args(args);
     }
-    if let Some(dir) = &webview_dir {
-        builder = builder.data_directory(dir.clone());
-    }
+if let Some(dir) = &webview_dir {
+builder = builder.data_directory(dir.clone());
+}
     let launcher = builder.build()?;
     let _ = launcher.set_icon(window_icon()?);
     set_webview_memory_level(&launcher, true);
@@ -582,10 +639,11 @@ fn build_launcher_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 }
 
 fn ensure_launcher_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
     if let Some(window) = app.get_webview_window(LAUNCHER_LABEL) {
         return Ok(window);
     }
-    build_launcher_window(app)
+    build_launcher_window(app).inspect_err(report_window_failure)
 }
 
 fn build_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
@@ -612,9 +670,9 @@ fn build_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     if let Some(args) = &cdp {
         builder = builder.additional_browser_args(args);
     }
-    if let Some(dir) = &webview_dir {
-        builder = builder.data_directory(dir.clone());
-    }
+if let Some(dir) = &webview_dir {
+builder = builder.data_directory(dir.clone());
+}
     let island = builder.build()?;
     let _ = island.set_icon(window_icon()?);
     set_webview_memory_level(&island, true);
@@ -628,8 +686,8 @@ fn build_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
                 .map(|state| state.engine.settings().launcher.island.hide_on_focus_loss)
                 .unwrap_or(true);
             if hide {
-                let _ = island_for_focus.hide();
-                let _ = island_for_focus.emit("island:hidden", ());
+                // Animated like every other dismissal instead of vanishing.
+                dismiss_island(&island_for_focus);
             }
         }
     });
@@ -637,10 +695,11 @@ fn build_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 }
 
 fn ensure_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
     if let Some(window) = app.get_webview_window(ISLAND_LABEL) {
         return Ok(window);
     }
-    build_island_window(app)
+    build_island_window(app).inspect_err(report_window_failure)
 }
 
 /// Hidden windows warm their WebView but must not keep desktop-sized caches.
@@ -789,7 +848,7 @@ fn validate_settings(settings: &Settings) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn update_settings(
+async fn update_settings(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
     patch: SettingsPatch,
@@ -925,12 +984,12 @@ fn launcher_hidden(app: AppHandle) {
 }
 
 #[tauri::command]
-fn show_launcher(app: AppHandle) {
+async fn show_launcher(app: AppHandle) {
     show_launcher_window(&app);
 }
 
 #[tauri::command]
-fn show_main(app: AppHandle) {
+async fn show_main(app: AppHandle) {
     show_main_window(&app);
 }
 
@@ -1372,17 +1431,42 @@ async fn get_controls_status(
     run_native(move || build_controls_status(&data_dir)).await
 }
 
-fn build_controls_status(data_dir: &std::path::Path) -> ps_ipc::ControlsStatus {
-    // probes are bounded internally; one probe supplies both the capability
-    // matrix and the live state (probing twice doubles the IPC latency).
-    let native = ps_windows::controls_status();
-    let caps = native.capabilities.clone();
-    let outputs = ps_windows::list_audio_outputs().unwrap_or_default();
-    let default_output = ps_windows::default_audio_output().ok();
-    let audio = ps_windows::audio_state().ok();
-    let db_path = data_dir.join("index.db");
-    let notification_items: Vec<ps_ipc::AppNotification> =
-        ps_sources::notifications::list(&db_path, 20, false)
+fn media_info(session: ps_windows::MediaSession) -> ps_ipc::MediaSessionInfo {
+    ps_ipc::MediaSessionInfo {
+        title: session.title,
+        artist: session.artist,
+        album: session.album,
+        artwork_data_url: None,
+        playing: session.playing,
+        position_ms: session.position_ms,
+        duration_ms: session.duration_ms,
+        can_seek: false,
+        can_shuffle: false,
+        shuffle: false,
+        can_repeat: false,
+        repeat: false,
+        app_id: session.app_id,
+    }
+}
+
+/// Windows' live notification feed merged with ProtonSearch's own stored
+/// notifications, newest first. System entries carry a "win:" id so dismissing
+/// one goes back to Windows; they are read through, never stored.
+fn notification_feed(db_path: &std::path::Path, limit: usize) -> Vec<ps_ipc::AppNotification> {
+    let mut items: Vec<ps_ipc::AppNotification> = ps_windows::system_notifications(limit)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|entry| ps_ipc::AppNotification {
+            id: format!("win:{}", entry.id),
+            title: entry.title,
+            body: entry.body,
+            source: if entry.app.is_empty() { "Windows".to_string() } else { entry.app },
+            created_at: entry.created_ms,
+            read: false,
+        })
+        .collect();
+    items.extend(
+        ps_sources::notifications::list(db_path, limit, false)
             .into_iter()
             .map(|entry| ps_ipc::AppNotification {
                 id: entry.id.to_string(),
@@ -1391,9 +1475,36 @@ fn build_controls_status(data_dir: &std::path::Path) -> ps_ipc::ControlsStatus {
                 source: entry.source,
                 created_at: entry.timestamp_ms,
                 read: entry.read,
-            })
-            .collect();
-    let notification_unread = ps_sources::notifications::unread_count(&db_path);
+            }),
+    );
+    items.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    items.truncate(limit);
+    items
+}
+
+/// Light poll for the Media card: only the media session, not the whole
+/// controls probe (Wi-Fi, Bluetooth, brightness) that get_controls_status runs.
+#[tauri::command]
+async fn get_media_session() -> Result<Option<ps_ipc::MediaSessionInfo>, String> {
+    run_blocking(|| {
+        ps_windows::media_session()
+            .map(|session| session.map(media_info))
+            .map_err(|error| format!("{error:#}"))
+    })
+    .await?
+}
+
+fn build_controls_status(data_dir: &std::path::Path) -> ps_ipc::ControlsStatus {
+    // probes are bounded internally; one probe supplies both the capability
+    // matrix and the live state (probing twice doubles the IPC latency).
+    let native = ps_windows::controls_status();
+    let caps = native.capabilities.clone();
+    let outputs = ps_windows::list_audio_outputs().unwrap_or_default();
+    let default_output = ps_windows::default_audio_output().ok();
+    let audio = ps_windows::audio_state().ok();
+    let media = ps_windows::media_session();
+    let notification_items = notification_feed(&data_dir.join("index.db"), 20);
+    let notification_unread = notification_items.iter().filter(|item| !item.read).count() as u64;
     let brightness_monitors = native
         .brightness
         .as_ref()
@@ -1419,10 +1530,11 @@ fn build_controls_status(data_dir: &std::path::Path) -> ps_ipc::ControlsStatus {
     let wifi_state = native.wifi.as_ref();
     let bluetooth_state = native.bluetooth.as_ref();
     ps_ipc::ControlsStatus {
-        media_capability: ps_ipc::ControlCapability::unsupported(
-            "Media session control is not wired in this build yet.",
-        ),
-        media: None,
+        media_capability: match &media {
+            Ok(_) => ps_ipc::ControlCapability::supported(),
+            Err(error) => ps_ipc::ControlCapability::unsupported(&format!("{error:#}")),
+        },
+        media: media.ok().flatten().map(media_info),
         audio_outputs: outputs
             .into_iter()
             .map(|device| ps_ipc::AudioDeviceInfo {
@@ -1521,7 +1633,7 @@ async fn control_open_settings(page: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn control_set_volume(percent: u8) -> Result<(), String> {
-    run_native(move || {
+ run_blocking(move || {
         ps_windows::set_audio_volume((percent.min(100) as f32) / 100.0)
             .map_err(|_| "Couldn't change the system volume.".to_string())
     })
@@ -1530,7 +1642,7 @@ async fn control_set_volume(percent: u8) -> Result<(), String> {
 
 #[tauri::command]
 async fn control_set_muted(muted: bool) -> Result<(), String> {
-    run_native(move || {
+ run_blocking(move || {
         ps_windows::set_audio_mute(muted)
             .map_err(|_| "Couldn't change the system mute state.".to_string())
     })
@@ -1556,12 +1668,18 @@ async fn control_set_audio_output(device_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn control_media(action: ps_ipc::MediaAction) -> Result<(), String> {
-    let caps = ps_windows::native_capabilities();
-    Err(caps
-        .media_sessions
-        .reason
-        .unwrap_or_else(|| "Media session control is not available in this build.".to_string()))?
+async fn control_media(action: ps_ipc::MediaAction) -> Result<(), String> {
+    let command = match action {
+        ps_ipc::MediaAction::Play => ps_windows::MediaCommand::Play,
+        ps_ipc::MediaAction::Pause => ps_windows::MediaCommand::Pause,
+        ps_ipc::MediaAction::PlayPause => ps_windows::MediaCommand::PlayPause,
+        ps_ipc::MediaAction::Next => ps_windows::MediaCommand::Next,
+        ps_ipc::MediaAction::Previous => ps_windows::MediaCommand::Previous,
+        ps_ipc::MediaAction::Shuffle | ps_ipc::MediaAction::Repeat => {
+            return Err("Shuffle and repeat can't be changed from here.".to_string());
+        }
+    };
+    run_blocking(move || ps_windows::media_command(command).map_err(|error| format!("{error:#}"))).await?
 }
 
 #[tauri::command]
@@ -1585,21 +1703,7 @@ async fn notifications_list(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<ps_ipc::AppNotification>, String> {
     let data_dir = state.data_dir.clone();
-    run_blocking(move || {
-        let db_path = data_dir.join("index.db");
-        ps_sources::notifications::list(&db_path, 50, false)
-            .into_iter()
-            .map(|entry| ps_ipc::AppNotification {
-                id: entry.id.to_string(),
-                title: entry.title,
-                body: entry.body,
-                source: entry.source,
-                created_at: entry.timestamp_ms,
-                read: entry.read,
-            })
-            .collect()
-    })
-    .await
+    run_blocking(move || notification_feed(&data_dir.join("index.db"), 50)).await
 }
 
 #[tauri::command]
@@ -1607,6 +1711,14 @@ async fn notifications_dismiss(
     state: tauri::State<'_, AppState>,
     notification_id: String,
 ) -> Result<(), String> {
+    if let Some(system_id) = notification_id.strip_prefix("win:") {
+        let id: u32 = system_id.parse().map_err(|_| "Unknown notification.".to_string())?;
+        return run_blocking(move || {
+            ps_windows::dismiss_system_notification(id)
+                .map_err(|_| "Windows couldn't dismiss that notification.".to_string())
+        })
+        .await?;
+    }
     let id: i64 = notification_id
         .parse()
         .map_err(|_| "Unknown notification.".to_string())?;
@@ -1624,6 +1736,7 @@ async fn notifications_clear(state: tauri::State<'_, AppState>) -> Result<(), St
     run_blocking(move || {
         let db_path = data_dir.join("index.db");
         let _ = ps_sources::notifications::clear(&db_path);
+        let _ = ps_windows::clear_system_notifications();
     })
     .await
 }
@@ -1701,7 +1814,7 @@ fn list_monitors() -> Vec<MonitorInfo> {
 }
 
 #[tauri::command]
-fn show_island(app: AppHandle) {
+async fn show_island(app: AppHandle) {
     show_island_window(&app);
 }
 
@@ -1739,13 +1852,13 @@ fn app_info() -> serde_json::Value {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_launcher_window(app);
+dispatch_window_action(app, show_primary_launcher);
         }))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
-                        toggle_primary_launcher(app);
+dispatch_window_action(app, toggle_primary_launcher);
                     }
                 })
                 .build(),
@@ -1799,8 +1912,6 @@ fn main() {
                 start_ui_stall_probe(app.handle());
             }
 
-            step("windows: creating");
-            create_windows(app.handle())?;
             step("tray: building");
             build_tray(app.handle())?;
 
@@ -1809,6 +1920,17 @@ fn main() {
             if let Err(err) = app.global_shortcut().register(shortcut.as_str()) {
                 eprintln!("[setup] global shortcut '{shortcut}' could not be registered: {err}");
             }
+            step("windows: creating in background");
+            let window_app = app.handle().clone();
+            let first_run = !engine.settings().onboarding_complete;
+            std::thread::spawn(move || {
+                if first_run {
+                    show_main_window(&window_app);
+                }
+                if let Err(err) = create_windows(&window_app) {
+                    eprintln!("[setup] failed to create launcher window: {err}");
+                }
+            });
             step("setup: complete");
 
             // Start scanners after windows exist so the launcher is usable while
@@ -1816,10 +1938,6 @@ fn main() {
             let engine_for_bg = engine.clone();
             std::thread::spawn(move || engine_for_bg.spawn_background());
 
-            // First run opens the desktop app; returning users get the tray only.
-            if !engine.settings().onboarding_complete {
-                show_main_window(app.handle());
-            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1869,6 +1987,7 @@ fn main() {
             control_set_brightness,
             control_set_audio_output,
             control_media,
+            get_media_session,
             show_local_toast,
             notifications_list,
             notifications_dismiss,
@@ -1893,4 +2012,27 @@ fn main() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod window_creation_regression_tests {
+    #[test]
+    fn lazy_window_creation_stays_off_sync_commands_and_ui_callbacks() {
+        let source = include_str!("main.rs");
+        for command in ["update_settings", "show_launcher", "show_main", "show_island"] {
+            assert!(source.contains(&format!("async fn {command}(")));
+        }
+        assert!(source.contains("dispatch_window_action(app, show_main_window)"));
+        assert!(source.contains("dispatch_window_action(app, show_primary_launcher)"));
+        assert!(source.contains("dispatch_window_action(tray.app_handle(), toggle_primary_launcher)"));
+        assert!(source.contains("dispatch_window_action(app, toggle_primary_launcher)"));
+    }
+
+    #[test]
+    fn startup_prewarms_off_setup_thread_and_prioritizes_onboarding() {
+        let source = include_str!("main.rs");
+        let worker = source.split("let window_app = app.handle().clone();").nth(1).unwrap();
+        assert!(worker.find("std::thread::spawn(move ||").unwrap() < worker.find("create_windows(&window_app)").unwrap());
+        assert!(worker.find("show_main_window(&window_app)").unwrap() < worker.find("create_windows(&window_app)").unwrap());
+    }
 }

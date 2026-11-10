@@ -1,0 +1,6 @@
+[setup] engine: opening
+[setup] windows: creating
+[setup] tray: building
+[setup] hotkey: registering
+[setup] global shortcut 'Alt+Space' could not be registered: HotKey already registered: HotKey { mods: Modifiers(ALT), key: Space, id: 65598 }
+[setup] setup: complete

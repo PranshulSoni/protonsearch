@@ -145,6 +145,7 @@ export function SearchCard({
     { id: "files", label: "Files" },
     { id: "folders", label: "Folders" },
     { id: "apps", label: "Apps" },
+    { id: "actions", label: "Actions" },
   ];
   return (
     <div className={"island-search" + (compact ? " island-search--compact" : " island-search--expanded")}>
@@ -493,7 +494,7 @@ export function AgentsCard({
                 <IslandIcon name="play" size={14} /> Resume
               </button>
             ) : null}
-            {!selected?.controls.canPause && !selected?.controls.canResume ? (
+            {selected && !selected.controls.canPause && !selected.controls.canResume ? (
               <span className="island-agent-note">
                 No pause or resume action is available for this task.
               </span>

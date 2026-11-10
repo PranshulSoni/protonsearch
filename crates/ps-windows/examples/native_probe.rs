@@ -117,6 +117,22 @@ fn main() {
         "local store: supported; toast supported={}",
         ps_windows::toast_supported()
     );
+    match ps_windows::system_notifications(5) {
+        Ok(entries) => {
+            println!("system feed: {} newest entries", entries.len());
+            for entry in &entries {
+                println!("  [{}] {:?}: {:?}", entry.app, entry.title, entry.body);
+            }
+        }
+        Err(error) => println!("system feed unavailable: {error:#}"),
+    }
+
+    section("media session");
+    match ps_windows::media_session() {
+        Ok(Some(session)) => println!("{session:#?}"),
+        Ok(None) => println!("nothing is playing"),
+        Err(error) => println!("media session unavailable: {error:#}"),
+    }
 
     section("controls status snapshot");
     let status = ps_windows::controls_status();

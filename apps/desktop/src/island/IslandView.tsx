@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api } from "../bridge/api";
 import type { IslandCardId, SearchResult, SearchScope } from "../bridge/types";
 import {
@@ -24,6 +24,7 @@ import {
 import {
   islandCardDims,
   islandCardLabel,
+  islandWindowWidth,
   visibleIslandCards,
   type IslandVariant,
 } from "./islandDims";
@@ -48,6 +49,13 @@ const MemoNotificationsCard = memo(NotificationsCard);
 
 type Phase = "idle" | "out" | "in";
 
+// Must match --island-dur-open / --island-dur-close in island.css.
+const OPEN_MS = 420;
+const CLOSE_MS = 150;
+// Scroll delta that switches a card, and the silence that ends a scroll gesture.
+const WHEEL_STEP = 48;
+const WHEEL_GESTURE_GAP_MS = 160;
+
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
@@ -70,7 +78,7 @@ export default function IslandView() {
   // Prefetch all card data as soon as the island webview has bootstrap settings.
   // Card slots are already mounted, so the first switch is a render-only change
   // (sources-content perf finding: first switches paid mount + async fetch).
-  const controls = useIslandControls(bootstrap.ready);
+  const controls = useIslandControls(bootstrap.ready, activeCard === "media" && visibility !== "hidden");
 
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -78,14 +86,17 @@ export default function IslandView() {
   const tokenRef = useRef(0);
   const lastSwitchRef = useRef(0);
   const closeTimerRef = useRef<number | null>(null);
-  const wheelAccumRef = useRef(0);
-  const wheelAtRef = useRef(0);
+  const openTimerRef = useRef<number | null>(null);
+  const switchTimerRef = useRef<number | null>(null);
+  const pendingSwitchRef = useRef<[IslandCardId, IslandVariant] | null>(null);
+  const switchCardRef = useRef<(card: IslandCardId, nextVariant?: IslandVariant) => void>(() => undefined);
+  const wheelRef = useRef({ accum: 0, at: 0, spent: false, spentAt: 0, peak: 0, floor: 0 });
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const typedAtRef = useRef(0);
   const hideRef = useRef<() => void>(() => undefined);
 
   const searchState = useIslandSearch(
-    "all",
+    scope,
     query,
     bootstrap.ready && activeCard === "search",
   );
@@ -128,27 +139,44 @@ export default function IslandView() {
     setScope("all");
   }, [bootstrap.ready]);
 
-  // task-58 geometry contract: the expanded search card has a fixed 460 px
-  // surface height so typing never resizes the native window. The window is
-  // resized ONCE per card/mode change (never per frame or per keystroke).
-  // A fixed expanded-search surface height removes native resizes while typing;
-  // the card switch path pre-resizes ONCE before the out phase.
-  const surfaceDims = activeCard === "search" && !compact
-    ? { width: dims.width, height: 397, radius: dims.radius }
-    : dims;
-  const geometryKey = surfaceDims.width + "x" + surfaceDims.height;
+  const surfaceDims = dims;
+  // The native window keeps one width (the widest card); only its height follows
+  // the card. Changing the width also re-centres the window, and that move lands
+  // a frame apart from the resize: the whole island visibly jumped sideways at the
+  // start of a card switch and again when the size settled afterwards.
+  const windowWidth = islandWindowWidth(stageWidth);
   const lastGeometryKeyRef = useRef("");
-  const reportGeometry = useCallback((width: number, height: number) => {
-    const key = Math.ceil(width) + "x" + Math.ceil(height);
+  const geometryHeightRef = useRef(surfaceDims.height);
+  const geometrySettleTimerRef = useRef<number | null>(null);
+  const reportGeometry = useCallback((height: number) => {
+    const key = windowWidth + "x" + Math.ceil(height);
     if (lastGeometryKeyRef.current === key) return;
     lastGeometryKeyRef.current = key;
     const w = (window as unknown as { __islandGeometryCalls?: number });
     w.__islandGeometryCalls = (w.__islandGeometryCalls ?? 0) + 1;
-    void api.setIslandGeometry(Math.ceil(width), Math.ceil(height)).catch(() => undefined);
-  }, []);
-  useEffect(() => {
-    reportGeometry(surfaceDims.width, surfaceDims.height);
-  }, [geometryKey, reportGeometry, surfaceDims.width, surfaceDims.height]);
+    void api.setIslandGeometry(windowWidth, Math.ceil(height)).catch(() => undefined);
+  }, [windowWidth]);
+  // Grow before the morph and shrink after it, so the surface is never clipped.
+  const scheduleGeometry = useCallback((height: number, duration = 550) => {
+    if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTimerRef.current);
+    if (prefersReducedMotion()) {
+      geometryHeightRef.current = height;
+      reportGeometry(height);
+      geometrySettleTimerRef.current = null;
+      return;
+    }
+    const reserved = Math.max(geometryHeightRef.current, height);
+    geometryHeightRef.current = reserved;
+    reportGeometry(reserved);
+    geometrySettleTimerRef.current = window.setTimeout(() => {
+      geometryHeightRef.current = height;
+      reportGeometry(height);
+      geometrySettleTimerRef.current = null;
+    }, duration);
+  }, [reportGeometry]);
+  useLayoutEffect(() => {
+    scheduleGeometry(surfaceDims.height);
+  }, [scheduleGeometry, surfaceDims.height]);
 
   useEffect(() => {
     if (searchState.pending || typedAtRef.current === 0) return;
@@ -176,7 +204,7 @@ export default function IslandView() {
     recordFrames("island-close", 250);
     setVisibility("closing");
     if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = window.setTimeout(finish, 120);
+    closeTimerRef.current = window.setTimeout(finish, CLOSE_MS);
   }, [visibility]);
 
   hideRef.current = requestHide;
@@ -184,25 +212,51 @@ export default function IslandView() {
   const switchCard = useCallback(
     (card: IslandCardId, nextVariant: IslandVariant = "default") => {
       if (!cards.includes(card)) return;
+      const nextCompact = card === "search" && !query.trim();
       if (card === activeCard && nextVariant === variant) {
-        if (compact) setCompact(false);
+        tokenRef.current += 1;
+        const currentDims = islandCardDims({
+          card,
+          variant: nextVariant,
+          stageWidth,
+          compact: nextCompact,
+          searchMatches: searchState.results.length,
+        });
+        scheduleGeometry(currentDims.height);
+        if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
+        switchTimerRef.current = null;
+        pendingSwitchRef.current = null;
+        setPhase("idle");
+        setCompact(nextCompact);
         return;
       }
       const now = Date.now();
-      if (now - lastSwitchRef.current < 350) return;
+      if (now - lastSwitchRef.current < 350) {
+        pendingSwitchRef.current = [card, nextVariant];
+        if (switchTimerRef.current == null) {
+          switchTimerRef.current = window.setTimeout(() => {
+            switchTimerRef.current = null;
+            const pending = pendingSwitchRef.current;
+            pendingSwitchRef.current = null;
+            if (pending) switchCardRef.current(...pending);
+          }, 350 - (now - lastSwitchRef.current));
+        }
+        return;
+      }
       lastSwitchRef.current = now;
       const token = ++tokenRef.current;
       const targetDims = islandCardDims({
         card,
         variant: nextVariant,
         stageWidth,
-        compact: false,
+        compact: nextCompact,
+        searchMatches: searchState.results.length,
       });
-      reportGeometry(targetDims.width, card === "search" ? 397 : targetDims.height);
+      scheduleGeometry(targetDims.height, prefersReducedMotion() ? 0 : 670);
       recordFrames(`island-switch:${activeCard}>${card}`, 800);
       if (prefersReducedMotion()) {
         setActiveCard(card);
-        setCompact(false);
+        setCompact(nextCompact);
         setVariant(nextVariant);
         setPhase("idle");
         return;
@@ -211,16 +265,17 @@ export default function IslandView() {
       window.setTimeout(() => {
         if (token !== tokenRef.current) return;
         setActiveCard(card);
-        setCompact(false);
+        setCompact(nextCompact);
         setVariant(nextVariant);
         setPhase("in");
         window.setTimeout(() => {
           if (token === tokenRef.current) setPhase("idle");
-        }, 180);
+        }, 250);
       }, 120);
     },
-    [activeCard, cards, compact, reportGeometry, stageWidth, variant],
+    [activeCard, cards, compact, query, scheduleGeometry, searchState.results.length, stageWidth, variant],
   );
+  switchCardRef.current = switchCard;
 
   const switchRelative = useCallback(
     (delta: number) => {
@@ -233,11 +288,26 @@ export default function IslandView() {
   );
 
   const backToCard = useCallback(() => {
+    tokenRef.current += 1;
+    if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
+    switchTimerRef.current = null;
+    pendingSwitchRef.current = null;
+    setPhase("idle");
     if (variant !== "default") {
+      const target = islandCardDims({
+        card: activeCard,
+        variant: "default",
+        stageWidth,
+        compact,
+        searchMatches: searchState.results.length,
+      });
+      scheduleGeometry(target.height);
       setVariant("default");
       return;
     }
     if (!compact) {
+      const target = islandCardDims({ card: "search", stageWidth, compact: true, searchMatches: searchState.results.length });
+      scheduleGeometry(target.height);
       // Expanded card -> compact search (predictable Esc chain), then hide.
       setActiveCard("search");
       setCompact(true);
@@ -246,8 +316,9 @@ export default function IslandView() {
       setScope("all");
       return;
     }
+    scheduleGeometry(dims.height, 0);
     requestHide();
-  }, [compact, requestHide, variant]);
+    }, [activeCard, compact, dims.height, requestHide, scheduleGeometry, searchState.results.length, stageWidth, variant]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -279,8 +350,15 @@ export default function IslandView() {
         // Listen exactly once: re-subscribing on every render previously caused
         // duplicate island:shown handlers and duplicate island-open perf marks.
         const offShown = await listen("island:shown", () => {
+          tokenRef.current += 1;
+          if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
+          switchTimerRef.current = null;
+          pendingSwitchRef.current = null;
+          const target = islandCardDims({ card: "search", stageWidth, compact: true, searchMatches: 0 });
+          scheduleGeometry(target.height, 0);
           recordFrames("island-open", 450);
           if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
+          if (openTimerRef.current != null) window.clearTimeout(openTimerRef.current);
           setActiveCard("search");
           setCompact(true);
           setQuery("");
@@ -288,14 +366,28 @@ export default function IslandView() {
           setVariant("default");
           setPhase("idle");
           setVisibility("opening");
-          window.setTimeout(() => setVisibility("shown"), 180);
-          window.setTimeout(() => inputRef.current?.focus(), 190);
+          openTimerRef.current = window.setTimeout(
+            () => setVisibility((current) => (current === "opening" ? "shown" : current)),
+            OPEN_MS,
+          );
+          // Focus now, not after the animation: keys typed right after the hotkey must land.
+          inputRef.current?.focus();
         });
         addListener(offShown);
         const offDismiss = await listen("island:dismiss", () => {
           hideRef.current();
         });
         addListener(offDismiss);
+        // Park the surface in its pre-pop state whenever the window is hidden, so
+        // the next summon pops in instead of flashing the previous, fully drawn frame.
+        const offHidden = await listen("island:hidden", () => setVisibility("hidden"));
+        addListener(offHidden);
+        // The window is prewarmed hidden. If it was summoned before these listeners
+        // existed it is already on screen and must stay visible.
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        if (!(await getCurrentWindow().isVisible())) {
+          setVisibility((current) => (current === "shown" ? "hidden" : current));
+        }
       } catch {
         /* browser preview: no Tauri event bridge */
       }
@@ -304,11 +396,14 @@ export default function IslandView() {
       disposed = true;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, []);
+  }, [scheduleGeometry, stageWidth]);
 
   useEffect(() => {
     return () => {
       if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
+      if (openTimerRef.current != null) window.clearTimeout(openTimerRef.current);
+      if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
+if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTimerRef.current);
     };
   }, []);
 
@@ -334,24 +429,52 @@ export default function IslandView() {
           if (event.deltaY < 0 && scrollable.scrollTop > 0) return;
         }
       }
-      const now = Date.now();
-      if (now - wheelAtRef.current > 500) wheelAccumRef.current = 0;
-      wheelAtRef.current = now;
-      wheelAccumRef.current += event.deltaY;
-      if (Math.abs(wheelAccumRef.current) < 48) return;
-      const direction = wheelAccumRef.current > 0 ? 1 : -1;
-      wheelAccumRef.current = 0;
+      // One card per scroll gesture. A touchpad swipe and its inertia tail (or a
+      // flick of a free-spinning wheel) arrive as dozens of wheel events; switching
+      // each time their sum crossed the threshold walked three or four cards.
+      const wheel = wheelRef.current;
+      const now = performance.now();
+      const size = Math.abs(event.deltaY);
+      if (now - wheel.at > WHEEL_GESTURE_GAP_MS) {
+        // Silence ended the previous gesture.
+        wheel.spent = false;
+        wheel.accum = 0;
+      } else if (wheel.spent && now - wheel.spentAt > 250 && size >= 24 && size > wheel.floor * 3) {
+        // Still streaming, but the deltas stopped decaying and jumped: a new swipe
+        // started on top of the last one's inertia.
+        wheel.spent = false;
+        wheel.accum = 0;
+      }
+      wheel.at = now;
+      if (wheel.spent) {
+        // Track the decay since the last peak so a re-swipe stands out from it.
+        if (size > wheel.peak) {
+          wheel.peak = size;
+          wheel.floor = size;
+        } else {
+          wheel.floor = Math.min(wheel.floor, size);
+        }
+        return;
+      }
+      wheel.accum += event.deltaY;
+      if (Math.abs(wheel.accum) < WHEEL_STEP) return;
+      const direction = wheel.accum > 0 ? 1 : -1;
+      wheel.accum = 0;
+      wheel.spent = true;
+      wheel.spentAt = now;
+      wheel.peak = size;
+      wheel.floor = size;
       switchRelative(direction);
     },
     [switchRelative],
   );
 
   const onSurfaceClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (!compact) return;
+    if (activeCard !== "search") return;
     const target = event.target;
-    if (target instanceof Element && target.closest("button")) return;
-    setCompact(false);
-  }, [compact]);
+    if (target instanceof Element && target.closest("button, .island-result-row, .island-filter")) return;
+    inputRef.current?.focus();
+  }, [activeCard]);
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -395,7 +518,7 @@ export default function IslandView() {
             onQueryChange={(value) => {
               typedAtRef.current = performance.now();
               setQuery(value);
-              if (compact) setCompact(false);
+              setCompact(!value.trim());
             }}
             scope={scope}
             onScope={setScope}
@@ -406,7 +529,7 @@ export default function IslandView() {
             onOpen={openResult}
             onFocus={() => undefined}
             inputRef={inputRef}
-            placeholder=""
+            placeholder="Search files, folders, apps…"
           />
         );
       case "clipboard":
@@ -517,6 +640,7 @@ export default function IslandView() {
           phase === "in" ? "island-surface--in" : "",
           visibility === "opening" ? "island-surface--opening" : "",
           visibility === "closing" ? "island-surface--closing" : "",
+          visibility === "hidden" ? "island-surface--hidden" : "",
           activeCard === "media" ? "island-surface--media" : "",
           stageWidth <= 380
             ? "island-surface--narrow"

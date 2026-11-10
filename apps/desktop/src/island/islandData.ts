@@ -89,7 +89,8 @@ export function useIslandSearch(
   query: string,
   enabled: boolean,
 ): ScopedSearchState {
-  const [state, setState] = useState<ScopedSearchState>({
+  const [state, setState] = useState<ScopedSearchState & { scope: SearchScope }>({
+    scope,
     results: [],
     total: 0,
     pending: enabled,
@@ -114,6 +115,7 @@ export function useIslandSearch(
       .then((response) => {
         if (token !== tokenRef.current) return;
         setState({
+          scope,
           results: response.results,
           total: response.total,
           pending: false,
@@ -123,6 +125,7 @@ export function useIslandSearch(
       .catch((error: unknown) => {
         if (token !== tokenRef.current) return;
         setState({
+          scope,
           results: [],
           total: 0,
           pending: false,
@@ -131,7 +134,7 @@ export function useIslandSearch(
       });
   }, [enabled, scope, query]);
 
-  return state;
+  return state.scope === scope ? state : { results: [], total: 0, pending: enabled, error: null };
 }
 
 export type ClipTab = "all" | "text" | "images" | "links" | "code" | "files" | "pinned";

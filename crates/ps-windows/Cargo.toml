@@ -38,6 +38,8 @@ windows = { workspace = true, features = [
     "Devices_Bluetooth",
     "Devices_Enumeration",
     "UI_Notifications",
+    "UI_Notifications_Management",
+    "ApplicationModel",
     "Data_Xml_Dom",
 ] }
 

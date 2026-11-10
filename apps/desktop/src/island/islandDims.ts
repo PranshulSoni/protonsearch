@@ -58,6 +58,17 @@ export function clampIslandWidth(nominal: number, stageWidth: number): number {
   return Math.max(240, Math.min(nominal, stageWidth - 20));
 }
 
+/**
+ * Surface width the native window is sized for: the widest card. It stays
+ * constant so a card switch never moves or re-centres the window sideways.
+ */
+export function islandWindowWidth(stageWidth: number): number {
+  return clampIslandWidth(
+    Math.max(SEARCH_EXPANDED_WIDTH, ...Object.values(NOMINAL_WIDTH)),
+    stageWidth,
+  );
+}
+
 export function breakpointHeight(view: IslandCardView, stageWidth: number): number {
   const row = HEIGHTS[view];
   if (isNarrow(stageWidth)) return row.narrow;
