@@ -435,3 +435,60 @@ Per-query input->visible samples are bimodal: fast shapes 4.2-12.8 ms (index/rep
 **Engine/IPC/UI split: UNMEASURED in the same run.** The harness wrapped `window.__TAURI_INTERNALS__.invoke` (hook reported "installed"), but the app's search path captured the original invoke at module import, so no per-call engineWall/tookMs was recorded (all null). Directional inference only, not a same-run split: engine-core's debug probe reports engine p95 8.82 ms for the slow filename shapes, and input->visible p95 is 38.2 ms, so the remainder is IPC + React commit + paint; this must be measured by persisting the app's own search timing (e.g., a `results-committed` perf mark with the SearchResponse tookMs) rather than wrapping invoke. Honest status: split NOT MEASURED.
 
 Idle CPU/memory rows are unchanged from task-43 (window creation did not materially change): release idle tree **786.9 MiB -> NOT MET** vs the `150 MB investigation budget, idle CPU 0.19% machine / 3.78% one core over 60 s. Not re-run in this pass, per task scope. Raw files: [v10-g3b-app-debug-enginefix-10beb90.json](./results/v10-g3b-app-debug-enginefix-10beb90.json), [v10-g8c-release-activation-marks-562d751.json](./results/v10-g8c-release-activation-marks-562d751.json), content acceptance in §14.3.
+
+### 14.6 Island card-switch lag + memory: BEFORE (acf74ce) vs AFTER (617b6df) - task-61
+
+User report: island open and card switching are very laggy and memory is too high. Two matched measurement sets:
+
+- **BEFORE**: commit acf74ce, debug build + CDP with the acf74ce frontend dist rebuilt in a clean git worktree (the dist is gitignored and had been overwritten by later builds). Method: island-primary profile, prewarmed island, real Ctrl+ArrowDown switches, rAF sampling + CDP Performance deltas + page resize-event counting.
+- **AFTER (frame attribution)**: same method, final build 617b6df (debug + CDP; dist built by npm run build).
+- **AFTER (native release memory/activation)**: release exe built 13:26 IST from 617b6df (matched frontend dist), no CDP.
+
+**Card switch frame pacing, BEFORE vs AFTER (debug+CDP, 5 switches search->media->clipboard->agents->controls, 120 Hz display):**
+
+| switch | BEFORE p95 frame / dropped | AFTER p95 frame / dropped | BEFORE Layout+Recalc per switch | AFTER Layout+Recalc per switch |
+|---|---:|---:|---:|---:|
+| 1 (media) | 8.6 ms / 3 | 8.6 ms / 4 | 22.4+12.4 ms | 16.3+10.0 ms |
+| 2 (clipboard) | 9.2 ms / 4 | 8.5 ms / 2 | 21.3+13.1 ms | 12.3+9.2 ms |
+| 3 (agents) | 8.8 ms / 0 | 8.4 ms / 0 | 20.7+11.4 ms | 11.0+6.0 ms |
+| 4 (controls) | 8.8 ms / 1 | 8.5 ms / 1 | 27.4+12.9 ms | 8.9+7.0 ms |
+| 5 (bell) | 8.5 ms / 0 | 8.5 ms / 1 | 14.9+11.4 ms | 5.7+5.3 ms |
+| **avg** | **8.8 / 1.6** | **8.5 / 1.6** | **21.3+12.2** | **10.8+7.5** |
+
+Steady-state switches run at the 120 Hz frame interval (8.3 ms p50) in both builds. The material AFTER change is **layout+recalc cost per switch (33.5 ms -> 18.3 ms, -45%)**, matching the "one geometry call per transition, dims-driven sizing" fix; ScriptDuration stayed ~10-11 ms. First two switches still drop 3-4 frames after a fresh open in both builds (card mount/data warm-up). An intermediate WIP build (12:28) was worse than BEFORE (first-switch p95 16.7 ms, 12/10 dropped frames); the prefetch/one-geometry pass (13:01 WIP) restored steady 8.3 ms / 0-1 dropped, and final 617b6df keeps that.
+
+**Memory - native release 617b6df (island-primary profile, CIM per-process WS/private):**
+
+| State | Measured (617b6df release) | BEFORE reference |
+|---|---:|---:|
+| Cold idle, island prewarmed hidden (12 s) | **399.5 MiB WS / 200.1 MiB private, 7 procs** | 392.6-405.9 MiB WS (acf74ce, task-57) |
+| Island visible after hotkey | 408.2 MiB WS | 520.8 MiB WS (acf74ce) |
+| Hidden after use + 6 s LOW-trim wait | **145.1 MiB WS / 352.1 MiB private** | 183.9 MiB WS (acf74ce) |
+| 20x open/switch/close (snapshot every 5) | base 145.1 -> 359.2 -> 364.0 -> 379.1 -> 351.6 MiB WS | not measured |
+
+No monotonic leak: after the first post-trim re-warm the tree plateaus ~350-380 MiB WS and ends at 351.6 MiB. The first re-open after trim costs ~215 MiB WS (WebView2 re-warm), which is expected but worth a product decision (aggressive trim vs warm latency). The original three-window v10 idle baseline was **786.9 MiB WS**, so lazy windows + trim cut the hidden idle tree by ~82% and the after-use hidden state to ~19% of the old baseline.
+
+**Native activation and jank (617b6df release):** hotkey->island window visible p50 21.5 ms; the island-first-paint mark follows island-window-shown by ~8-17 ms; however the Rust ui-stall probe recorded **ui-stall 30-39 ms on every open** (17 marks over the session) and one **ui-stall-124ms** on the first open. That is a real main-thread stall on the summon path and is the best native evidence for the user-perceived island open lag; card-switch frame pacing in the final **release** build could not be measured (see defect below).
+
+**Defect (report to ui-launcher):** the final 617b6df release build does NOT emit the frontend frame marks that are committed in perfProbe.ts (island-open, island-switch:*, island-close, island-typing). Only shell-side marks appear (island-window-shown, island-first-paint, ui-stall-*). The intermediate 13:01 WIP release build DID emit island-switch marks, so this is a regression in the final build (likely the island window capability/permission set now blocking the perf_mark invoke from the island WebView, or event wiring changed by the capability ACL pass). Impact: native release card-switch frame pacing is unmeasurable; AFTER card-switch attribution above is therefore debug+CDP. Requested fix: allow perf_mark from the island window and confirm one island-switch:* mark per switch in a release run.
+
+**Root-cause note:** the user-reported card-switch lag is not engine search (engine p50 ~1.2 ms in the payload probe). In the BEFORE build the switch transition spends **~33.5 ms in layout+recalc vs ~10 ms scripting**, consistent with the old ResizeObserver->native-resize path; the AFTER fix cuts that layout+recalc by ~45% and keeps steady-state switches at one frame (8.3 ms). Remaining native open-path cost is main-thread stalls of 30-39 ms per open (first open 124 ms) plus first-two-switch frame drops after a fresh summon (card data warm-up); those are the targets for the next UI pass. Raw JSON: [island-before-debug-acf74ce.json](./results/island-before-debug-acf74ce.json), [island-after-debug-617b6df.json](./results/island-after-debug-617b6df.json), [island-native-after-617b6df.json](./results/island-native-after-617b6df.json).
+
+### 14.7 SearchResponse payload vs IPC vs React split - task-64 (debug 617b6df, 131,199-entry real index)
+
+One debug+CDP session (island-primary, final frontend dist) for the engine payload investigation. Shell does not log raw wire bytes, so payloadChars = JSON.stringify(response).length from an identical page-side invoke("search") (app-visible JSON size, lower bound for wire bytes).
+
+| Measurement | p50 | p95 | n |
+|---|---:|---:|---:|
+| input -> first visible result (real input event + double rAF) | **15.8 ms** | **16.3 ms** | 12/13 prefixes |
+| direct invoke wall (IPC return, identical request) | 7.9 ms | 9.2 ms | 13 |
+| engine took_ms from response | ~1.2 ms | ~2.2 ms | 13 |
+| payloadChars (app-visible response JSON) | 46,342 | 54,101 | 13 (min 41,381 / max 54,101) |
+
+Per prefix: 'r' 54,101 chars; 're' 52,288; 'rea' 41,381; 'read' 41,699; 'readm' 41,398; 'readme' 47,082; 's' 49,977; 'sc' 47,817; 'scre' 45,179; 'screenshot' 42,249; 'p' 42,515; 'pro' 46,619; 'project' 46,342. Action JSON is ~5.0-6.1k chars and nulls ~356-386 per response (icon field was not populated in this data dir/profile, so icon chars read 0 here; the engine probe's icon totals are the authoritative icon measurement).
+
+**Steady-state typing (the actual lag scenario), 6 chars for readme / 8 for screenshot, 50 ms spacing:** first char 15.8-16.0 ms, then every subsequent keystroke takes **~106-108 ms** (result DOM change at ~94-96 ms) with 2/14 rows showing no result-signature change within 500 ms. Engine is not the cost: engine took_ms ~1-2 ms and direct invoke wall ~8 ms, while input->first-visible is 15.8 ms (so ~8 ms is React commit+paint beyond IPC) and the steady-state tail adds ~90 ms beyond the first keystroke. That points at the island typing/debounce/async result-update path rather than IPC payload size or engine search - worth checking the island input debounce/queue and React commit work for the remaining tail.
+
+Card open->rendered rows from this probe were a measurement artifact for press>0 (the probe waited a fixed 420 ms before sampling, so the reported ~438-441 ms is the probe's own wait, not latency); only the fresh search open (5.2 ms) is a valid row. Not published as card data; needs a follow-up probe that polls the heading change instead of waiting.
+
+Raw JSON: [task64-payload-split-617b6df.json](./results/task64-payload-split-617b6df.json).

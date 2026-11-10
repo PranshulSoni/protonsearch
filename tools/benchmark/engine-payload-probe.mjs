@@ -98,7 +98,8 @@ try {
       const direct = await island.evaluate(async (q) => {
         try {
           const t0 = performance.now();
-          const response = await window.__TAURI_INTERNALS__.invoke("search", { req: { query: q, scope: "all", limit: 30 } });
+          let requestId = 0;
+          const response = await window.__TAURI_INTERNALS__.invoke("search", { req: { protocol: 1, requestId: ++requestId, query: q, scope: "all", filters: {}, limit: 30 } });
           const wall = performance.now() - t0;
           const json = JSON.stringify(response);
           const results = Array.isArray(response.results) ? response.results : [];
@@ -200,18 +201,18 @@ try {
   const cards = [{ name: "Search", presses: 0 }, { name: "Media", presses: 1 }, { name: "Clipboard", presses: 2 }, { name: "Agents", presses: 3 }, { name: "Quick Settings", presses: 4 }, { name: "Notifications", presses: 5 }, { name: "Browser", presses: 6 }, { name: "Git", presses: 7 }];
   for (const card of cards) {
     try {
-      // reset to search card first: compact search (Esc chain to search, then ensure search)
-      await island.evaluate(() => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
-      await sleep(250);
-      await island.evaluate(() => { window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
-      await sleep(250);
+      // fresh open resets the island to compact search, then press Ctrl+Down N times
+      await island.evaluate(() => window.__TAURI_INTERNALS__.invoke("hide_island")).catch(() => {});
+      await sleep(300);
       await island.evaluate(() => window.__TAURI_INTERNALS__.invoke("show_island")).catch(() => {});
-      await sleep(500);
+      await sleep(800);
+      const rowMarksBefore = readNewMarks();
       const row = await island.evaluate(async (n) => {
         window.__T64__.reset();
         const headingOf = () => document.querySelector(".island-card-heading")?.textContent?.trim() || "";
-        const t0 = performance.now();
+        let lastT0 = performance.now();
         for (let k = 0; k < n; k++) {
+          lastT0 = performance.now();
           window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", ctrlKey: true, bubbles: true, cancelable: true }));
           await new Promise((r) => setTimeout(r, 420));
         }
@@ -220,10 +221,11 @@ try {
         await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
         const renderedAt = performance.now();
         const options = document.querySelectorAll("#island-search-results [role=option], .island-results [role=option]").length;
-        return { presses: n, heading, t0, changedAt, renderedAt, ms: +(renderedAt - t0).toFixed(2), resultOptions: options, longtasks: window.__T64__.longtasks.slice(), marks: null };
+        return { presses: n, heading, lastT0, changedAt, renderedAt, ms: +(renderedAt - lastT0).toFixed(2), resultOptions: options, longtasks: window.__T64__.longtasks.slice() };
       }, card.presses).catch((e) => ({ error: String(e) }));
       if (row.longtasks) { row.longTaskCount = row.longtasks.length; row.longTaskTotalMs = +row.longtasks.reduce((a, t) => a + t.duration, 0).toFixed(1); }
       row.card = card.name;
+      row.marks = readNewMarks().map((m) => m.label);
       cardRows.push(row);
       await sleep(250);
     } catch (e) { cardRows.push({ card: card.name, error: String(e) }); }

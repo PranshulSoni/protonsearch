@@ -1,0 +1,615 @@
+{
+  "schema": "ps-task64-payload/1",
+  "kind": "engine-payload-ipc-react-split",
+  "status": "ok",
+  "capturedAt": "2026-11-10T08:03:11.891Z",
+  "host": {
+    "hostname": "PranshulAsus"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe",
+    "exeBytes": 21293056,
+    "exeMtime": "2026-11-10T07:57:17.653Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "prefixes": [
+      "r",
+      "re",
+      "rea",
+      "read",
+      "readm",
+      "readme",
+      "s",
+      "sc",
+      "scre",
+      "screenshot",
+      "p",
+      "pro",
+      "project"
+    ],
+    "profile": "island-primary (debug + CDP)",
+    "gitHead": "617b6dffd22424610139c898c52c483287f2e661",
+    "gitDirty": 9,
+    "appPid": 18228
+  },
+  "measurements": {
+    "indexReady": {
+      "state": "indexing",
+      "entries": 131199
+    },
+    "coldMemory": {
+      "label": "cold-idle",
+      "totalWorkingSetMiB": 414.4,
+      "totalPrivateMiB": 204.2,
+      "processCount": 9
+    },
+    "typing": {
+      "rows": [
+        {
+          "prefix": "r",
+          "directInvoke": {
+            "wallMs": 8.8,
+            "tookMs": 1.861689,
+            "payloadChars": 54101,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5656,
+            "nullCount": 366
+          },
+          "start": 2489.5999999940395,
+          "changedAt": null,
+          "visibleAt": 6499.899999991059,
+          "inputToChangedMs": null,
+          "inputToVisibleMs": null,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "ui-stall-462ms",
+            "island-window-shown",
+            "island-first-paint"
+          ]
+        },
+        {
+          "prefix": "re",
+          "directInvoke": {
+            "wallMs": 6.2,
+            "tookMs": 1.2015489,
+            "payloadChars": 52288,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 4955,
+            "nullCount": 356
+          },
+          "start": 6755.699999988079,
+          "changedAt": 6757.399999991059,
+          "visibleAt": 6771.699999988079,
+          "inputToChangedMs": 1.7,
+          "inputToVisibleMs": 16,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "rea",
+          "directInvoke": {
+            "wallMs": 8.3,
+            "tookMs": 0.88453996,
+            "payloadChars": 41381,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5194,
+            "nullCount": 361
+          },
+          "start": 7047.0999999940395,
+          "changedAt": 7048.79999999702,
+          "visibleAt": 7063.0999999940395,
+          "inputToChangedMs": 1.7,
+          "inputToVisibleMs": 16,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "read",
+          "directInvoke": {
+            "wallMs": 7.9,
+            "tookMs": 1.110127,
+            "payloadChars": 41699,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5247,
+            "nullCount": 360
+          },
+          "start": 7330.899999991059,
+          "changedAt": 7332.79999999702,
+          "visibleAt": 7346.5,
+          "inputToChangedMs": 1.9,
+          "inputToVisibleMs": 15.6,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "readm",
+          "directInvoke": {
+            "wallMs": 7.9,
+            "tookMs": 1.1884891,
+            "payloadChars": 41398,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5198,
+            "nullCount": 360
+          },
+          "start": 7622.699999988079,
+          "changedAt": 7624.79999999702,
+          "visibleAt": 7638.399999991059,
+          "inputToChangedMs": 2.1,
+          "inputToVisibleMs": 15.7,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "readme",
+          "directInvoke": {
+            "wallMs": 7,
+            "tookMs": 1.015143,
+            "payloadChars": 47082,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 6117,
+            "nullCount": 361
+          },
+          "start": 7905.79999999702,
+          "changedAt": 7907.699999988079,
+          "visibleAt": 7921.5,
+          "inputToChangedMs": 1.9,
+          "inputToVisibleMs": 15.7,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "s",
+          "directInvoke": {
+            "wallMs": 8.8,
+            "tookMs": 1.8961209,
+            "payloadChars": 49977,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5732,
+            "nullCount": 370
+          },
+          "start": 8189,
+          "changedAt": 8190.699999988079,
+          "visibleAt": 8204.79999999702,
+          "inputToChangedMs": 1.7,
+          "inputToVisibleMs": 15.8,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "sc",
+          "directInvoke": {
+            "wallMs": 9.2,
+            "tookMs": 2.230939,
+            "payloadChars": 47817,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5659,
+            "nullCount": 376
+          },
+          "start": 8468.79999999702,
+          "changedAt": 8470.79999999702,
+          "visibleAt": 8479.79999999702,
+          "inputToChangedMs": 2,
+          "inputToVisibleMs": 11,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "scre",
+          "directInvoke": {
+            "wallMs": 6.1,
+            "tookMs": 1.0935049,
+            "payloadChars": 45179,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5223,
+            "nullCount": 362
+          },
+          "start": 8747.5,
+          "changedAt": 8749.39999999106,
+          "visibleAt": 8763.39999999106,
+          "inputToChangedMs": 1.9,
+          "inputToVisibleMs": 15.9,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "screenshot",
+          "directInvoke": {
+            "wallMs": 7.3,
+            "tookMs": 0.964089,
+            "payloadChars": 42249,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5325,
+            "nullCount": 360
+          },
+          "start": 9030.59999999404,
+          "changedAt": 9032.39999999106,
+          "visibleAt": 9046.39999999106,
+          "inputToChangedMs": 1.8,
+          "inputToVisibleMs": 15.8,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "p",
+          "directInvoke": {
+            "wallMs": 7.9,
+            "tookMs": 2.676178,
+            "payloadChars": 42515,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 4948,
+            "nullCount": 374
+          },
+          "start": 9313.89999999106,
+          "changedAt": 9315.699999988079,
+          "visibleAt": 9329.699999988079,
+          "inputToChangedMs": 1.8,
+          "inputToVisibleMs": 15.8,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "pro",
+          "directInvoke": {
+            "wallMs": 7.8,
+            "tookMs": 1.906806,
+            "payloadChars": 46619,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 6052,
+            "nullCount": 386
+          },
+          "start": 9597.29999999702,
+          "changedAt": 9599.199999988079,
+          "visibleAt": 9613.09999999404,
+          "inputToChangedMs": 1.9,
+          "inputToVisibleMs": 15.8,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        },
+        {
+          "prefix": "project",
+          "directInvoke": {
+            "wallMs": 6.9,
+            "tookMs": 0.894038,
+            "payloadChars": 46342,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 6003,
+            "nullCount": 384
+          },
+          "start": 9880.59999999404,
+          "changedAt": 9882.89999999106,
+          "visibleAt": 9896.89999999106,
+          "inputToChangedMs": 2.3,
+          "inputToVisibleMs": 16.3,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": []
+        }
+      ],
+      "inputToVisibleMs": {
+        "count": 12,
+        "p50": 15.8,
+        "p95": 16.3,
+        "p99": 16.3,
+        "min": 11,
+        "max": 16.3
+      },
+      "inputToChangedMs": {
+        "count": 12,
+        "p50": 1.9,
+        "p95": 2.3,
+        "p99": 2.3,
+        "min": 1.7,
+        "max": 2.3
+      },
+      "directWallMs": {
+        "count": 13,
+        "p50": 7.9,
+        "p95": 9.2,
+        "p99": 9.2,
+        "min": 6.1,
+        "max": 9.2
+      },
+      "payloadChars": {
+        "count": 13,
+        "p50": 46342,
+        "p95": 54101,
+        "p99": 54101,
+        "min": 41381,
+        "max": 54101
+      }
+    },
+    "steadyStateTyping": [
+      {
+        "rows": [
+          {
+            "value": "r",
+            "inputToChangedMs": 1.5,
+            "inputToVisibleMs": 15.8,
+            "resultOptions": 0
+          },
+          {
+            "value": "re",
+            "inputToChangedMs": 95.2,
+            "inputToVisibleMs": 106.3,
+            "resultOptions": 5
+          },
+          {
+            "value": "rea",
+            "inputToChangedMs": 94.8,
+            "inputToVisibleMs": 107.4,
+            "resultOptions": 5
+          },
+          {
+            "value": "read",
+            "inputToChangedMs": 95.3,
+            "inputToVisibleMs": 107.1,
+            "resultOptions": 5
+          },
+          {
+            "value": "readm",
+            "inputToChangedMs": null,
+            "inputToVisibleMs": 516.4,
+            "resultOptions": 5
+          },
+          {
+            "value": "readme",
+            "inputToChangedMs": null,
+            "inputToVisibleMs": 508.5,
+            "resultOptions": 5
+          }
+        ],
+        "longtasks": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskBlockingMs": 0,
+        "marks": [],
+        "query": "readme"
+      },
+      {
+        "rows": [
+          {
+            "value": "s",
+            "inputToChangedMs": 1.6,
+            "inputToVisibleMs": 16,
+            "resultOptions": 0
+          },
+          {
+            "value": "sc",
+            "inputToChangedMs": 93.8,
+            "inputToVisibleMs": 106.9,
+            "resultOptions": 5
+          },
+          {
+            "value": "scr",
+            "inputToChangedMs": 93.2,
+            "inputToVisibleMs": 106.6,
+            "resultOptions": 5
+          },
+          {
+            "value": "scre",
+            "inputToChangedMs": 94.6,
+            "inputToVisibleMs": 107.2,
+            "resultOptions": 5
+          },
+          {
+            "value": "scree",
+            "inputToChangedMs": null,
+            "inputToVisibleMs": 515.7,
+            "resultOptions": 5
+          },
+          {
+            "value": "screen",
+            "inputToChangedMs": 94.3,
+            "inputToVisibleMs": 107.2,
+            "resultOptions": 5
+          },
+          {
+            "value": "screensh",
+            "inputToChangedMs": 95.7,
+            "inputToVisibleMs": 107.5,
+            "resultOptions": 5
+          },
+          {
+            "value": "screenshot",
+            "inputToChangedMs": 94,
+            "inputToVisibleMs": 107.6,
+            "resultOptions": 5
+          }
+        ],
+        "longtasks": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskBlockingMs": 0,
+        "marks": [],
+        "query": "screenshot"
+      }
+    ],
+    "cards": {
+      "rows": [
+        {
+          "presses": 0,
+          "heading": "",
+          "lastT0": 15532.79999999702,
+          "changedAt": 15532.89999999106,
+          "renderedAt": 15538,
+          "ms": 5.2,
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Search",
+          "marks": []
+        },
+        {
+          "presses": 1,
+          "heading": "MediaNow playing",
+          "lastT0": 16958.39999999106,
+          "changedAt": 17381.19999998808,
+          "renderedAt": 17396.5,
+          "ms": 438.1,
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Media",
+          "marks": []
+        },
+        {
+          "presses": 2,
+          "heading": "ClipboardYour recent copies",
+          "lastT0": 19247,
+          "changedAt": 19671.09999999404,
+          "renderedAt": 19680.09999999404,
+          "ms": 433.1,
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Clipboard",
+          "marks": []
+        },
+        {
+          "presses": 3,
+          "heading": "AgentsTasks and active subagents",
+          "lastT0": 21947.59999999404,
+          "changedAt": 22371.79999999702,
+          "renderedAt": 22388.19999998808,
+          "ms": 440.6,
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Agents",
+          "marks": []
+        },
+        {
+          "presses": 4,
+          "heading": "Quick SettingsYour PC, one gesture away",
+          "lastT0": 25088.89999999106,
+          "changedAt": 25514.59999999404,
+          "renderedAt": 25529.59999999404,
+          "ms": 440.7,
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Quick Settings",
+          "marks": []
+        },
+        {
+          "presses": 5,
+          "heading": "BrowserBookmarks & history",
+          "lastT0": 28664,
+          "changedAt": 29084.79999999702,
+          "renderedAt": 29096.29999999702,
+          "ms": 432.3,
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Notifications",
+          "marks": []
+        },
+        {
+          "presses": 6,
+          "heading": "GitRecent commits · ProtonSearch",
+          "lastT0": 32638.89999999106,
+          "changedAt": 33063.79999999702,
+          "renderedAt": 33079.69999998808,
+          "ms": 440.8,
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Browser",
+          "marks": []
+        },
+        {
+          "presses": 7,
+          "heading": "NotificationsRecent activity",
+          "lastT0": 37039,
+          "changedAt": 37463.69999998808,
+          "renderedAt": 37479.59999999404,
+          "ms": 440.6,
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Git",
+          "marks": []
+        }
+      ],
+      "ms": {
+        "count": 8,
+        "p50": 438.1,
+        "p95": 440.8,
+        "p99": 440.8,
+        "min": 5.2,
+        "max": 440.8
+      }
+    },
+    "memoryAfterProbe": {
+      "label": "after-probe",
+      "totalWorkingSetMiB": 704.8,
+      "totalPrivateMiB": 523.8,
+      "processCount": 7
+    }
+  },
+  "blocked": [],
+  "limitations": [
+    "Shell does not log raw SearchResponse bytes; payloadChars is JSON.stringify(response).length from a direct page-side invoke (the same object the app receives after IPC parse), so it is a lower bound for wire bytes (no framing) and an upper-bound proxy for parse input size.",
+    "The app's own search invoke is captured at module import, so engineWall for the app's call is not interceptable; directInvoke wall/took_ms are measured with an identical request on the same page (same engine/DB/cache state).",
+    "Typing rows: each prefix typed into an empty island search input via the native value setter + input event (single input event per prefix, like a paste of the prefix), then wait for the result signature to change + double rAF.",
+    "Card rows: Ctrl+ArrowDown-driven card switches from the search card; open->rendered = keydown dispatch -> heading text changes -> double rAF; long tasks observed during the window."
+  ]
+}

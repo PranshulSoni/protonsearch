@@ -122,7 +122,7 @@ export function useIslandSearch(
             error: error instanceof Error ? error.message : "Search is unavailable right now.",
           });
         });
-    }, 80);
+    }, 24);
     return () => window.clearTimeout(timer);
   }, [enabled, scope, query]);
 
