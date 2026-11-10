@@ -8,6 +8,7 @@ import type {
 } from "../bridge/types";
 import { CardHead, EmptyState, UnsupportedCard } from "./IslandCards";
 import { IslandIcon } from "./IslandIcon";
+import { relativeTime } from "./islandData";
 
 /**
  * Native cards wired to the landed shell controls bridge. Capabilities are
@@ -191,10 +192,30 @@ export function ControlsCard({
 }) {
   const [volume, setVolume] = useState(status?.volumePercent ?? 0);
   const [brightness, setBrightness] = useState(status?.brightnessPercent ?? 0);
+  const [audioOpen, setAudioOpen] = useState(false);
+  const [drilldown, setDrilldown] = useState<"wifi" | "bluetooth" | null>(null);
+  const [controlError, setControlError] = useState<string | null>(null);
+  const [controlErrorPage, setControlErrorPage] = useState<string>("display");
   useEffect(() => {
     setVolume(status?.volumePercent ?? 0);
     setBrightness(status?.brightnessPercent ?? 0);
   }, [status?.volumePercent, status?.brightnessPercent]);
+
+  const runControl = (label: string, action: () => Promise<unknown>, fallbackPage = "display") => {
+    setControlError(null);
+    void action()
+      .then(refresh)
+      .catch((reason: unknown) => {
+        const message = reason instanceof Error ? reason.message : "";
+        setControlError("Couldn't change " + label + ".");
+        setControlErrorPage(
+          /location|permission|consent/i.test(message) ? "privacy_location" : fallbackPage,
+        );
+      });
+  };
+  const openSettings = (page: string) => {
+    void api.openSettings(page).catch(() => undefined);
+  };
 
   if (pending && !status) return <CardLoading card="controls" title="Quick Settings" subtitle="Your PC, one gesture away" />;
   if (error && !status) {
@@ -203,160 +224,312 @@ export function ControlsCard({
   if (!status) {
     return <UnsupportedCard card="controls" title="Quick Settings" subtitle="Your PC, one gesture away" reason="Controls are unavailable right now." />;
   }
-  const wifiEnabled = status.wifiEnabled;
-  const bluetoothEnabled = status.bluetoothEnabled;
+  const output = status.audioOutputs.find((device) => device.id === status.defaultAudioId) ?? status.audioOutputs[0] ?? null;
+  const wifiSupported = status.wifi.supported;
+  const bluetoothSupported = status.bluetooth.supported;
+
+  if (drilldown) {
+    const isWifi = drilldown === "wifi";
+    return (
+      <div className="island-card island-controls-card">
+        <CardHead
+          card="controls"
+          title={isWifi ? "Wi-Fi" : "Bluetooth"}
+          subtitle={isWifi ? "Networks and connectivity" : "Paired devices"}
+        />
+        <div className="island-divider" />
+        <button
+          type="button"
+          className="island-drilldown-back"
+          onClick={() => setDrilldown(null)}
+        >
+          <IslandIcon name="back" size={16} /> Back to Quick Settings
+        </button>
+        {isWifi ? (
+          status.wifiError ? (
+            <div className="island-control-error">
+              <span>{status.wifiError}</span>
+              <button type="button" className="island-control-link" onClick={() => openSettings("privacy_location")}>
+                Open location settings
+              </button>
+            </div>
+          ) : status.wifiNetworks.length === 0 ? (
+            <div className="island-control-error">
+              <span>No Wi-Fi networks are available here.</span>
+              <button type="button" className="island-control-link" onClick={() => openSettings("wifi")}>
+                Open network settings
+              </button>
+            </div>
+          ) : (
+            <div className="island-audio-list" role="list" aria-label="Wi-Fi networks">
+              {status.wifiNetworks.map((network) => (
+                <div className="island-drilldown-row" key={network.ssid}>
+                  <IslandIcon name="wifi" size={18} />
+                  <span>
+                    {network.ssid + " · " + network.signal + "% · " + network.security}
+                    {network.connected ? " · connected" : ""}
+                  </span>
+                  {network.hasProfile && network.connectable ? (
+                    <button
+                      type="button"
+                      className="island-drilldown-action"
+                      onClick={() => runControl("Wi-Fi", () => api.connectWifi(network.ssid), "wifi")}
+                    >
+                      Connect
+                    </button>
+                  ) : (
+                    <button type="button" className="island-drilldown-action" onClick={() => openSettings("wifi")}>
+                      Open network settings
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        ) : status.bluetoothError ? (
+          <div className="island-control-error">
+            <span>{status.bluetoothError}</span>
+            <button type="button" className="island-control-link" onClick={() => openSettings("bluetooth")}>
+              Open Bluetooth settings
+            </button>
+          </div>
+        ) : status.bluetoothDevices.length === 0 ? (
+          <div className="island-control-error">
+            <span>No paired Bluetooth devices.</span>
+            <button type="button" className="island-control-link" onClick={() => openSettings("bluetooth")}>
+              Open Bluetooth settings
+            </button>
+          </div>
+        ) : (
+          <div className="island-audio-list" role="list" aria-label="Bluetooth devices">
+            {status.bluetoothDevices.map((device) => (
+              <div className="island-drilldown-row" key={device.id}>
+                <IslandIcon name="bluetooth" size={18} />
+                <span>{device.name + (device.connected ? " · connected" : " · paired")}</span>
+                <button type="button" className="island-drilldown-action" onClick={() => openSettings("bluetooth")}>
+                  Manage
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {controlError ? <p className="island-control-error">{controlError}</p> : null}
+      </div>
+    );
+  }
+
   return (
     <div className="island-card island-controls-card">
       <CardHead card="controls" title="Quick Settings" subtitle="Your PC, one gesture away" />
       <div className="island-divider" />
-      <div className="island-setting-list">
+
+      <div className="island-setting-row">
+        <IslandIcon name="volume" size={19} />
+        <span className="island-setting-label">Volume</span>
+        <input
+          className="island-setting-slider"
+          type="range"
+          min={0}
+          max={100}
+          value={volume}
+          disabled={status.volumePercent == null}
+          aria-label="Volume"
+          onChange={(event) => setVolume(Number(event.target.value))}
+          onPointerUp={() => runControl("volume", () => api.setVolume(volume))}
+          onKeyUp={() => runControl("volume", () => api.setVolume(volume))}
+        />
+        <span className="island-setting-value">
+          {status.volumePercent == null ? "—" : volume + "%"}
+        </span>
+        <button
+          type="button"
+          className="island-setting-toggle"
+          aria-pressed={status.muted === true}
+          disabled={status.muted == null}
+          title="Mute or unmute"
+          onClick={() => runControl("mute", () => api.setMuted(!(status.muted === true)))}
+        >
+          {status.muted ? "Unmute" : "Mute"}
+        </button>
+      </div>
+
+      {status.brightnessCapability.supported ? (
         <div className="island-setting-row">
-          <IslandIcon name="volume" size={19} />
-          <span className="island-setting-label">Volume</span>
+          <IslandIcon name="brightness" size={19} />
+          <span className="island-setting-label">Brightness</span>
           <input
             className="island-setting-slider"
             type="range"
             min={0}
             max={100}
-            value={volume}
-            disabled={status.volumePercent == null}
-            aria-label="Volume"
-            onChange={(event) => setVolume(Number(event.target.value))}
-            onPointerUp={() => {
-              void api.setVolume(volume).then(refresh).catch(() => undefined);
-            }}
-            onKeyUp={() => {
-              void api.setVolume(volume).then(refresh).catch(() => undefined);
-            }}
+            value={brightness}
+            disabled={status.brightnessPercent == null}
+            aria-label="Brightness"
+            onChange={(event) => setBrightness(Number(event.target.value))}
+            onPointerUp={() => runControl("brightness", () => api.setBrightness(brightness))}
+            onKeyUp={() => runControl("brightness", () => api.setBrightness(brightness))}
           />
-          <span className="island-setting-value">{status.volumePercent == null ? "—" : volume + "%"}</span>
-          <button
-            type="button"
-            className="island-setting-toggle"
-            aria-pressed={status.muted === true}
-            disabled={status.muted == null}
-            title="Mute or unmute"
-            onClick={() => {
-              void api.setMuted(!(status.muted === true)).then(refresh).catch(() => undefined);
-            }}
-          >
-            {status.muted ? "Unmute" : "Mute"}
+          <span className="island-setting-value">
+            {status.brightnessPercent == null ? "—" : brightness + "%"}
+          </span>
+        </div>
+      ) : (
+        <div className="island-control-fallback-row">
+          <span>Brightness can't be changed here.</span>
+          <button type="button" className="island-control-link" onClick={() => openSettings("display")}>
+            Open display settings
           </button>
         </div>
-        {status.brightnessCapability.supported ? (
-          <div className="island-setting-row">
-            <IslandIcon name="brightness" size={19} />
-            <span className="island-setting-label">Brightness</span>
-            <input
-              className="island-setting-slider"
-              type="range"
-              min={0}
-              max={100}
-              value={brightness}
-              disabled={status.brightnessPercent == null}
-              aria-label="Brightness"
-              onChange={(event) => setBrightness(Number(event.target.value))}
-              onPointerUp={() => {
-                void api.setBrightness(brightness).then(refresh).catch(() => undefined);
-              }}
-              onKeyUp={() => {
-                void api.setBrightness(brightness).then(refresh).catch(() => undefined);
-              }}
-            />
-            <span className="island-setting-value">
-              {status.brightnessPercent == null ? "—" : brightness + "%"}
-            </span>
-          </div>
-        ) : (
-          <CapabilityRow
-            icon="brightness"
-            label="Brightness"
-            capability={status.brightnessCapability}
-          />
-        )}
-      </div>
+      )}
+
+      {status.audioOutputs.length > 0 ? (
+        <>
+          <button
+            type="button"
+            className="island-audio-row"
+            aria-expanded={audioOpen}
+            onClick={() => setAudioOpen((open) => !open)}
+          >
+            <IslandIcon name="output" size={16} />
+            <span>{output?.name ?? "Audio output"}</span>
+            <IslandIcon name="chevron" size={16} />
+          </button>
+          {audioOpen ? (
+            <div className="island-audio-list" role="radiogroup" aria-label="Audio output">
+              {status.audioOutputs.map((device) => (
+                <button
+                  key={device.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={device.id === status.defaultAudioId || device.isDefault}
+                  className={
+                    "island-audio-option" +
+                    (device.id === status.defaultAudioId || device.isDefault ? " is-active" : "")
+                  }
+                  onClick={() =>
+                    runControl("audio output", () => api.setAudioOutput(device.id))
+                  }
+                >
+                  <IslandIcon name="volume" size={16} />
+                  <span>{device.name}</span>
+                  {device.id === status.defaultAudioId || device.isDefault ? (
+                    <IslandIcon name="check" size={14} />
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
       <div className="island-control-grid">
-        <CapabilityTile
-          icon="wifi"
-          label="Wi-Fi"
-          capability={status.wifi}
-          value={wifiEnabled == null ? null : wifiEnabled ? "On" : "Off"}
-        />
-        <CapabilityTile
-          icon="bluetooth"
-          label="Bluetooth"
-          capability={status.bluetooth}
-          value={bluetoothEnabled == null ? null : bluetoothEnabled ? "On" : "Off"}
-        />
-        <CapabilityTile icon="airplane" label="Airplane mode" capability={status.airplaneMode} />
-        <CapabilityTile icon="bolt" label="Energy saver" capability={status.energySaver} />
+        <div className="island-control-tile">
+          <IslandIcon name="wifi" size={19} />
+          <span className="island-control-tile-body">
+            <span className="island-control-tile-label">Wi-Fi</span>
+            <span className="island-control-tile-value">
+              {wifiSupported ? (status.wifiEnabled == null ? "—" : status.wifiEnabled ? "On" : "Off") : "Can't change here"}
+            </span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={status.wifiEnabled === true}
+            aria-label="Wi-Fi"
+            className="island-control-tile-toggle"
+            disabled={!wifiSupported || status.wifiEnabled == null}
+            title={wifiSupported ? "Toggle Wi-Fi" : status.wifi.reason || "Wi-Fi can't be changed here."}
+            onClick={() => runControl("Wi-Fi", () => api.setWifi(!(status.wifiEnabled === true)), "wifi")}
+          >
+            {status.wifiEnabled ? "On" : "Off"}
+          </button>
+          <button
+            type="button"
+            className="island-control-tile-chevron"
+            aria-label="Show Wi-Fi networks"
+            onClick={() => setDrilldown((current) => (current === "wifi" ? null : "wifi"))}
+          >
+            <IslandIcon name="chevron" size={16} />
+          </button>
+        </div>
+        <div className="island-control-tile">
+          <IslandIcon name="bluetooth" size={19} />
+          <span className="island-control-tile-body">
+            <span className="island-control-tile-label">Bluetooth</span>
+            <span className="island-control-tile-value">
+              {bluetoothSupported
+                ? status.bluetoothEnabled == null
+                  ? "—"
+                  : status.bluetoothEnabled
+                    ? "On"
+                    : "Off"
+                : "Can't change here"}
+            </span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={status.bluetoothEnabled === true}
+            aria-label="Bluetooth"
+            className="island-control-tile-toggle"
+            disabled={!bluetoothSupported || status.bluetoothEnabled == null}
+            title={
+              bluetoothSupported
+                ? "Toggle Bluetooth"
+                : status.bluetooth.reason || "Bluetooth can't be changed here."
+            }
+            onClick={() =>
+              runControl(
+                "Bluetooth",
+                () => api.setBluetooth(!(status.bluetoothEnabled === true)),
+                "bluetooth",
+              )
+            }
+          >
+            {status.bluetoothEnabled ? "On" : "Off"}
+          </button>
+          <button
+            type="button"
+            className="island-control-tile-chevron"
+            aria-label="Show Bluetooth devices"
+            onClick={() =>
+              setDrilldown((current) => (current === "bluetooth" ? null : "bluetooth"))
+            }
+          >
+            <IslandIcon name="chevron" size={16} />
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
 
-function CapabilityRow({
-  icon,
-  label,
-  capability,
-  value,
-}: {
-  icon: "wifi" | "bluetooth" | "airplane" | "brightness" | "bolt";
-  label: string;
-  capability: ControlCapability;
-  value?: string | null;
-}) {
-  return (
-    <div className="island-control-row">
-      <IslandIcon name={icon} size={19} />
-      <span className="island-control-label">{label}</span>
-      <span className="island-control-value">
-        {capability.supported ? value ?? "Available" : "Unsupported"}
-      </span>
-      <button
-        type="button"
-        className="island-agent-button"
-        disabled
-        title={
-          capability.supported
-            ? "This toggle isn't exposed by the controls API yet."
-            : capability.reason || "Not supported by Windows in this build."
-        }
-      >
-        {capability.supported ? "Toggle" : "Unavailable"}
+      {controlError ? (
+        <div className="island-control-error">
+          <span>{controlError}</span>
+          <button
+            type="button"
+            className="island-control-link"
+            onClick={() => openSettings(controlErrorPage)}
+          >
+            Open Windows settings
+          </button>
+        </div>
+      ) : null}
+
+      <div className="island-settings-actions">
+        <button type="button" onClick={() => openSettings("airplane_mode")}>
+          <IslandIcon name="airplane" size={14} /> Airplane
+        </button>
+        <button type="button" onClick={() => openSettings("night_light")}>
+          <IslandIcon name="brightness" size={14} /> Night light
+        </button>
+        <button type="button" onClick={() => openSettings("energy_saver")}>
+          <IslandIcon name="bolt" size={14} /> Energy saver
+        </button>
+      </div>
+      <button type="button" className="island-control-settings" onClick={() => openSettings("display")}>
+        <IslandIcon name="controls" size={16} />
+        <span>Open Windows settings</span>
+        <IslandIcon name="chevron" size={16} />
       </button>
-    </div>
-  );
-}
-
-export function CapabilityTile({
-  icon,
-  label,
-  capability,
-  value,
-}: {
-  icon: "wifi" | "bluetooth" | "airplane" | "bolt";
-  label: string;
-  capability: ControlCapability;
-  value?: string | null;
-}) {
-  return (
-    <div
-      className="island-control-tile"
-      aria-disabled="true"
-      title={
-        capability.supported
-          ? "This toggle isn't exposed by the controls API yet."
-          : capability.reason || "Not supported by Windows in this build."
-      }
-    >
-      <IslandIcon name={icon} size={19} />
-      <span className="island-control-tile-body">
-        <span className="island-control-tile-label">{label}</span>
-        <span className="island-control-tile-value">
-          {capability.supported ? value ?? "Available" : "Unsupported"}
-        </span>
-      </span>
     </div>
   );
 }
@@ -399,23 +572,9 @@ export function NotificationsCard({
           </span>
           <strong>Notifications aren't available yet</strong>
           <span>{status.notifications.reason || "Notification history isn't wired in this build."}</span>
-          {import.meta.env.DEV && status.toastCapability.supported ? (
-            <button
-              type="button"
-              className="island-agent-button"
-              onClick={() => {
-                void api
-                  .showLocalToast("ProtonSearch island", "Local notification test")
-                  .then(refresh)
-                  .catch(() => undefined);
-              }}
-            >
-              Test local toast
-            </button>
-          ) : null}
         </div>
       ) : status.notificationItems.length === 0 ? (
-        <EmptyState title="All caught up" hint="No recent notifications." />
+        <EmptyState title="All caught up." hint="New notifications will appear here." />
       ) : (
         <div className="island-notification-list">
           {status.notificationItems.map((item) => (
@@ -424,7 +583,10 @@ export function NotificationsCard({
               <span className="island-notification-body">
                 <span className="island-notification-title">{item.title}</span>
                 <span className="island-notification-text">{item.body}</span>
-                <span className="island-notification-source">{item.source}</span>
+                <span className="island-notification-source">
+                  {item.source}
+                  {item.createdAt ? " · " + relativeTime(item.createdAt) : ""}
+                </span>
               </span>
               <button
                 type="button"
@@ -464,21 +626,6 @@ export function NotificationsCard({
         >
           Clear all
         </button>
-        {import.meta.env.DEV && status.toastCapability.supported ? (
-          <button
-            type="button"
-            className="island-agent-button"
-            title="Store a local notification and attempt a Windows toast"
-            onClick={() => {
-              void api
-                .showLocalToast("ProtonSearch island", "Local notification test")
-                .then(refresh)
-                .catch(() => undefined);
-            }}
-          >
-            Test local toast
-          </button>
-        ) : null}
       </div>
     </div>
   );

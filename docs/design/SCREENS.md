@@ -410,6 +410,22 @@ when the active option crosses into it; no extra live region.
 Capture remains live-only: ProtonSearch does not import the Windows clipboard history and cannot show copies made before
 it was running. No category chips, no category counts, no category shortcuts, no filtering controls of any kind.
 
+### 2.13 Dynamic Island — binding quality rules (task-56)
+
+The V9 Dynamic Island is bound by `ISLAND_V9_SPEC.md` plus `ISLAND_VISUAL_UX_FIX.md`. Non-negotiable surface rules:
+1. **Opaque:** solid #0d1012 surface; no rgba/alpha panels, no backdrop-filter, no surface opacity at any time; only the
+   outer shadow pad may be transparent. Verify over a light/text window; no desktop text inside the island bbox.
+2. **Enter/exit:** transform-only — show 180 ms translateY(-8) scale(.97)→0/1, hide 120 ms translateY(-6) scale(.985),
+   opacity constant 1, easing cubic-bezier(.22,1,.36,1)/cubic-bezier(.4,0,.2,1); reduced motion 0 ms; no fade-through.
+3. **Notifications:** 500x345 / 385; row grid 18 | 1fr | 30, row 52, list max 156, dismiss 30x30 reserved, footer Clear-all
+   below (real command only); no overlap; 0/1/many copy and loading/error/empty states; no test-only toast in production.
+4. **Quick Settings:** 515x376 / 400 / 483; volume/brightness/audio-output rows + split Wi-Fi/Bluetooth tiles with chevron
+   drill-downs + "Open Windows settings" fallback row; never render "Unsupported" or a dead tile; real setters only.
+5. **Search parity:** island expanded search uses the same four filters All/Files/Folders/Apps, groupResults order/labels,
+   ResultIcon source and empty copy as the Normal Launcher; no separate Actions chip; shared pure search model.
+Full values and evidence requirements: `ISLAND_VISUAL_UX_FIX.md`. This blocks G5 re-sign until before/after captures
+over a light/text window are reviewed.
+
 ---
 
 ## 3. Full Desktop App

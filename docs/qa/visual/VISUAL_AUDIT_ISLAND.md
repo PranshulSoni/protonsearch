@@ -251,3 +251,33 @@ live-shots remain outside ui-launcher write scope.
    were refreshed by the same matrix run; compact 11×37 dot target remains the documented WCAG deviation.
 5. Build/tests: npm run build exit 0; full suite 18 files / 241 tests green (island 15 tests incl. compact
    zero-results and notification dismiss/clear).
+## E7. task-54 island quality hardening
+
+- **Opaque surfaces:** island surface/inner/card shells use solid #0d1012 with background-clip padding-box, isolation:isolate and contain:paint; panel/tile/row fills are solid token colours. Surface and card opacity are always 1 and opacity transitions were removed from show/hide/card-change CSS. Only outer shadow/borders/focus use alpha. Captures over a synthetic white Notepad-like window show no desktop text or previous-card bleed inside the island bbox (only the native transparent shadow pad shows the window).
+- **Enter/exit:** show is transform-only translateY(-8px) scale(.97) -> 0/1 over 180ms cubic-bezier(.22,1,.36,1); hide is transform-only translateY(-6px) scale(.985) over 120ms then api.hideIsland; opacity never animates; reduced motion is instant; island:shown cancels a pending hide and refocuses search by 190ms. Card morph stays on the V9 550/500/450 timings with transform-only out/in.
+- **Lag:** removed the ResizeObserver->setIslandGeometry per-frame storm. Geometry now reports the TARGET surface size once per settled dims change (80ms debounce); the native window adds its 112px pad. Search debounce remains; lists are capped (5 search rows) and grouped render work is memo-friendly.
+- **Notifications:** V9 grid rows 18px | 1fr | 30px, fixed 52px rows, one-line title, clamped body, source+relative time, reserved 30x30 dismiss, scrollable list, fixed Clear all footer (real notificationsClear command, disabled when empty), canonical empty copy, singular/plural unread count, no test-only toast in normal states.
+- **Quick Settings:** V9 order volume row, brightness row (only when brightnessCapability.supported), audio-output row with real audioOutputs/setAudioOutput list, split Wi-Fi/Bluetooth radio tiles with separate toggle/chevron targets, and a full-width real 'Open Windows settings' secondary action (ms-settings fallback to run_native open_settings). No dead Unsupported tiles; unsupported controls read 'Can't change here' with reasons; setter failures show "Couldn't change <control>." and the settings fallback.
+- **Search parity:** island search now uses the same SEARCH_LIMIT/request shape as the Normal Launcher, the same groupResults order, the shared ResultRow/ResultIcon/Highlight/meta formatting, visible group labels (10/700/+0.10em ink-3), four filters All/Files/Folders/Apps, and the canonical empty/loading/error copy. App icons (data URLs) and file/folder badges come from the shared ResultIcon.
+- **Evidence:** docs/qa/visual/live-shots/task54-before-* (8 captures from the pre-fix build over the light/text window) and task54-after-* (33 captures: compact/search/controls idle+Wi-Fi+BT drilldown/notifications 0/1/3 at 1150/860/430, enter 0/90/180ms, exit 0/60/120ms, card switch, reduced motion) with task54-evidence-manifest.json.
+- **Remaining adapter gaps:** Wi-Fi/Bluetooth toggle setters and network/device connect APIs are not exposed yet (UI detects optional bridge methods and stays labelled-disabled until Lead wires them); media transport/output drilldowns await GSMTC milestone 2; native Windows opacity/flash and frame-pacing validation remains L0/task-31. Compact dot 11px WCAG deviation remains documented.
+- Build/tests: npm run build exit 0; full suite green (island/launcher parity and notification/control tests included).
+## E8. Milestone-2 native controls wired
+
+- ControlsStatus now uses real wifi networks (ssid/signal/security/connected/hasProfile/connectable), wifiError,
+  bluetooth devices/error, brightnessMonitors and capability fallbackUri. NativeCards consumes them directly:
+  - Wi-Fi/Bluetooth split tiles: real toggle via api.setWifi/api.setBluetooth + refresh; separate chevron opens a
+    dedicated drilldown card with real networks/devices (no fake rows). Wi-Fi rows show signal/security/connected;
+    Connect calls api.connectWifi only when hasProfile && connectable, otherwise Open network settings; wifiError is
+    shown honestly with a location-settings fallback, and toggle consent failures show a quiet error + Open Windows
+    settings (privacy_location when the error names location).
+  - Bluetooth drilldown lists paired devices with connected/paired state and Manage -> api.openSettings('bluetooth').
+  - Audio outputs remain the real list/setter; brightness slider renders only when brightnessCapability.supported,
+    otherwise a reason row + Open display settings; airplane/night light/energy saver are real ms-settings actions;
+    the full-width Open Windows settings button uses the allow-listed api.openSettings pages.
+  - Loading/error states remain; no dead Unsupported tiles.
+- Search/notifications/motion stay as in task-54; tests were updated for brightnessMonitors/wifiError/bluetoothError and
+  the new security field, and new Wi-Fi/BT toggle + connect/fallback coverage was added.
+- Evidence: docs/qa/visual/live-shots/task54-evidence-manifest.json (8 before + 33 after captures at 1150/860/430;
+  Wi-Fi and Bluetooth drilldown screenshots now show the real mock networks/devices and actions).
+- Build: 18 files / 242 tests passed; npm run build exit 0.

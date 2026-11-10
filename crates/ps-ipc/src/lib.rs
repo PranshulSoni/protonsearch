@@ -937,14 +937,17 @@ pub struct ControlCapability {
     pub supported: bool,
     #[serde(default)]
     pub reason: Option<String>,
+    /// Allow-listed ms-settings page for OS-owned controls (e.g. Wi-Fi policy).
+    #[serde(default)]
+    pub fallback_uri: Option<String>,
 }
 
 impl ControlCapability {
     pub fn supported() -> Self {
-        Self { supported: true, reason: None }
+        Self { supported: true, reason: None, fallback_uri: None }
     }
     pub fn unsupported(reason: &str) -> Self {
-        Self { supported: false, reason: Some(reason.to_string()) }
+        Self { supported: false, reason: Some(reason.to_string()), fallback_uri: None }
     }
 }
 
@@ -988,9 +991,16 @@ pub struct AudioDeviceInfo {
 #[serde(rename_all = "camelCase")]
 pub struct WifiNetworkInfo {
     pub ssid: String,
-    pub signal: u8,
-    pub secure: bool,
+    /// 0..=100 signal quality.
+    pub signal: u32,
+    /// Open / WPA2 / WPA3 / ...
+    pub security: String,
     pub connected: bool,
+    /// A saved Windows profile exists, so connect-without-prompt is possible.
+    #[serde(default)]
+    pub has_profile: bool,
+    #[serde(default)]
+    pub connectable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1013,6 +1023,24 @@ pub struct AppNotification {
     pub read: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrightnessMethod {
+    Dxva2,
+    DdcCi,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrightnessMonitorInfo {
+    pub index: usize,
+    pub name: String,
+    pub current: u8,
+    pub minimum: u32,
+    pub maximum: u32,
+    pub method: BrightnessMethod,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ControlsStatus {
@@ -1031,16 +1059,22 @@ pub struct ControlsStatus {
     pub brightness_capability: ControlCapability,
     #[serde(default)]
     pub brightness_percent: Option<u8>,
+    #[serde(default)]
+    pub brightness_monitors: Vec<BrightnessMonitorInfo>,
     pub wifi: ControlCapability,
     #[serde(default)]
     pub wifi_enabled: Option<bool>,
     #[serde(default)]
     pub wifi_networks: Vec<WifiNetworkInfo>,
+    #[serde(default)]
+    pub wifi_error: Option<String>,
     pub bluetooth: ControlCapability,
     #[serde(default)]
     pub bluetooth_enabled: Option<bool>,
     #[serde(default)]
     pub bluetooth_devices: Vec<BluetoothDeviceInfo>,
+    #[serde(default)]
+    pub bluetooth_error: Option<String>,
     pub airplane_mode: ControlCapability,
     pub night_light: ControlCapability,
     pub energy_saver: ControlCapability,

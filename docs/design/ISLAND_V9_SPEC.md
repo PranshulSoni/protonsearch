@@ -298,3 +298,13 @@ card overflow (bottom tiles clipped), zero-results copy invisible at 185 px, not
 dismiss state, and stale agents-1150/520/335 captures. Media adapter and media/Wi-Fi/BT drill-downs remain pending;
 compact 11×37 dot target remains the documented accessibility deviation. Geometry is unchanged and passing.
 
+## 12. Task-56 binding override — user-rejection fixes
+
+The 2026-11-10 user review rejected the island's visual/UX quality (bleed/translucency, notifications overlap, Quick
+Settings "Unsupported", search not matching Normal Launcher). The binding fix is `ISLAND_VISUAL_UX_FIX.md`; where it
+conflicts with §5/§6 here (surface opacity, enter/exit, notifications, Quick Settings, island Search parity), the fix doc
+wins. Summary: fully opaque surface (no opacity/fade), enter 180 ms / exit 120 ms transform-only, fixed-grid notifications
+with non-overlapping dismiss/footer, usable Quick Settings (volume/brightness/audio + split Wi-Fi/Bluetooth + Windows
+settings fallback instead of "Unsupported"), and island Search using the same four filters, group order, icons and empty
+copy as Normal Launcher. G5 re-sign is blocked until the before/after evidence exists.
+

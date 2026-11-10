@@ -779,6 +779,13 @@ Clipboard once; grouping is presentation, not another filter. Section label: 10/
 are not tab stops and the listbox traversal stays flat across sections. Card height/window math is the normal launcher
 formula (no extra 36 px). See SCREENS §2.12 for classification, empty/loading states and keyboard.
 
+**Island surface/notifications/Quick Settings (task-56).** The island is opaque at all times (#0d1012 surface; no
+rgba/alpha panels, no backdrop-filter, no surface opacity/fade). Enter/exit is transform-only (180/120 ms, opacity
+constant 1). Notifications use a fixed 18 / 1fr / 30 grid, 52 px rows, 156 px scroll list and a footer below the list so
+nothing overlaps. Quick Settings fits volume/brightness/audio + split Wi-Fi/Bluetooth tiles + a real "Open Windows
+settings" fallback in 515x376; never "Unsupported"/dead tiles. Island search uses the Normal Launcher's four filters,
+group order, ResultIcon source and empty copy via a shared model. Full spec: `ISLAND_VISUAL_UX_FIX.md`.
+
 **Agents section.** Workflows' top panel lists only runtimes the shell actually detected: 68 px rows, real path/version,
 availability word + badge, no invented rows. Only Pi is runnable in alpha; other detected CLIs show "Detected · not wired
 in this build" with no control. "Use" selects Pi and scrolls to the run panel; recent runs are local metadata only

@@ -24,16 +24,13 @@ import type {
   SearchResult,
   SearchScope,
 } from "../bridge/types";
-import { Highlight } from "../components/Highlight";
 import { Kbd } from "../components/Kbd";
 import { Logo } from "../components/Logo";
 import { isTauriRuntime } from "../bridge/api";
 import { groupResults } from "../lib/results";
-import { formatBytes, formatNumber } from "../lib/format";
-import { formatRecency } from "./launcherFormat";
+import { formatNumber } from "../lib/format";
 import {
   SCOPE_CHIPS,
-  clipboardCategoryTag,
   clipboardSectionDomId,
   flattenClipboardSections,
   groupClipboardSections,
@@ -51,7 +48,8 @@ import {
   quickDestinationDomId,
 } from "./launcherQuickDestinations";
 import { QuickDestinationOptions } from "./QuickDestinations";
-import { ResultIcon } from "./ResultIcon";
+import { SharedResultRow } from "./SharedResultRow";
+import { resultMetaText } from "./resultMeta";
 import { ResultPreview } from "./ResultPreview";
 import { ResultActions, buildMenuActions, type MenuAction, type MenuModel } from "./ResultActions";
 import {
@@ -227,22 +225,6 @@ function itemCountFor(
     Number.isFinite(fromEngine) ? fromEngine : 0,
   );
   return count > 0 ? count : undefined;
-}
-
-function metaText(result: SearchResult): string {
-  const meta = result.meta;
-  if (!meta) return "";
-  // Clipboard category labels live in the section header, not on every row; the
-  // trailing slot shows recency instead (SCREENS §2.12).
-  if (result.kind === "clipboard" && clipboardCategoryTag(result) !== null) {
-    return meta.modified ? formatRecency(meta.modified) : "";
-  }
-  if (meta.label) return meta.label;
-  if (meta.modified) return formatRecency(meta.modified);
-  if (meta.line != null) return "Line " + meta.line;
-  if (meta.itemCount != null) return meta.itemCount.toLocaleString() + " items";
-  if (meta.size != null) return formatBytes(meta.size);
-  return "";
 }
 
 function deriveFooterStatus(
@@ -1444,28 +1426,24 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
                   {section.items.map((result) => {
                     const index = visualIndexById.get(result.id) ?? 0;
                     const isSelected = index === activeIndex;
-                    const meta = metaText(result);
-                    const description = [result.path ?? result.subtitle, meta]
-                      .filter(Boolean)
-                      .join(" · ");
+                    const meta = resultMetaText(result);
                     return (
-                      <div
+                      <SharedResultRow
                         key={result.id}
-                        id={optionDomId(result.id)}
-                        role="option"
-                        aria-selected={isSelected}
-                        aria-label={result.title}
-                        aria-describedby={
-                          [
-                            descriptionDomId(result.id),
-                            meta ? metaDomId(result.id) : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" ")
-                        }
+                        result={result}
+                        selected={isSelected}
+                        optionId={optionDomId(result.id)}
+                        descriptionId={descriptionDomId(result.id)}
+                        metaId={metaDomId(result.id)}
+                        ariaLabel={result.title}
+                        ariaDescribedBy={[
+                          descriptionDomId(result.id),
+                          meta ? metaDomId(result.id) : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        testId="result-row"
                         className="result"
-                        data-testid="result-row"
-                        data-result-id={result.id}
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => selectAndOpen(index, result)}
                         onContextMenu={(event) => {
@@ -1473,26 +1451,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
                           selectIndex(index);
                           openMenu();
                         }}
-                      >
-                        <ResultIcon result={result} />
-                        <span className="result-body">
-                          <span className="filename" title={result.title}>
-                            <Highlight text={result.title} ranges={result.matchRanges} />
-                          </span>
-                          <span className="filepath" id={descriptionDomId(result.id)} title={result.path ?? result.subtitle}>
-                            {result.subtitle}
-                          </span>
-                        </span>
-                        {meta ? (
-                          <span className="result-meta" id={metaDomId(result.id)}>
-                            {meta}
-                          </span>
-                        ) : (
-                          <span className="sr-only" id={metaDomId(result.id)}>
-                            {description}
-                          </span>
-                        )}
-                      </div>
+                      />
                     );
                   })}
                 </div>

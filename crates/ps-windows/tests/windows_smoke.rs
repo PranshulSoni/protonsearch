@@ -372,3 +372,184 @@ fn toast_capability_is_reported_honestly() {
         assert!(!ps_windows::show_toast("ProtonSearch", "should fail").is_ok());
     }
 }
+// ---------------------------------------------------------------------------
+// Native milestone 2 (task-55): Wi-Fi, Bluetooth, brightness DDC/CI, fallbacks
+// ---------------------------------------------------------------------------
+
+#[test]
+fn settings_fallbacks_are_allow_listed() {
+    use ps_windows::SettingsPage as Page;
+    let pages = [
+        Page::Wifi,
+        Page::Bluetooth,
+        Page::Display,
+        Page::Sound,
+        Page::Notifications,
+        Page::AirplaneMode,
+        Page::MobileHotspot,
+        Page::NightLight,
+        Page::EnergySaver,
+        Page::Project,
+        Page::WindowsUpdate,
+        Page::PrivacyLocation,
+    ];
+    for page in pages {
+        let uri = page.uri();
+        assert!(uri.starts_with("ms-settings:"), "unexpected settings uri {uri}");
+        assert!(!page.label().is_empty());
+    }
+    assert_eq!(Page::Wifi.uri(), "ms-settings:network-wifi");
+    assert_eq!(Page::Bluetooth.uri(), "ms-settings:bluetooth");
+    let json = serde_json::to_string(&Page::AirplaneMode).unwrap();
+    assert_eq!(json, "\"airplane_mode\"");
+    // Do not call open_settings_page() in tests: it opens a real GUI window.
+}
+
+#[test]
+fn wifi_controls_are_usable_or_honest() {
+    let started = std::time::Instant::now();
+    let capabilities = ps_windows::native_capabilities();
+    if !capabilities.wifi.supported {
+        assert!(capabilities.wifi.reason.is_some());
+        assert_eq!(
+            capabilities.wifi.fallback_uri.as_deref(),
+            Some("ms-settings:network-wifi")
+        );
+        eprintln!(
+            "UNVERIFIED Wi-Fi: {}",
+            capabilities.wifi.reason.clone().unwrap_or_default()
+        );
+        return;
+    }
+    let state = ps_windows::wifi_radio_state().expect("Wi-Fi radio state");
+    assert!(state.available, "supported Wi-Fi must have an available radio");
+    let networks = match ps_windows::list_wifi_networks() {
+        Ok(networks) => networks,
+        Err(error) => {
+            // Windows may deny Wi-Fi scanning until the user grants location
+            // permission; that must be an honest error, not a fake empty list.
+            let message = format!("{error:#}").to_lowercase();
+            assert!(
+                message.contains("location")
+                    || message.contains("settings")
+                    || message.contains("scan")
+                    || message.contains("wlan"),
+                "unexpected Wi-Fi list error: {message}"
+            );
+            eprintln!("wifi list honest failure: {message}");
+            Vec::new()
+        }
+    };
+    eprintln!(
+        "wifi radio enabled={} adapters={:?} networks={}",
+        state.enabled,
+        ps_windows::wlan_adapters(),
+        networks.len()
+    );
+    for network in networks.iter().take(8) {
+        assert!(!network.ssid.is_empty());
+        assert!(network.signal <= 100);
+        assert!(!network.security.is_empty());
+        eprintln!(
+            "wifi network {:?} signal={} security={} connected={} profile={}",
+            network.ssid, network.signal, network.security, network.connected, network.has_profile
+        );
+    }
+    // Toggle to the CURRENT state: exercises the setter without changing connectivity.
+    match ps_windows::set_wifi_radio(state.enabled) {
+        Ok(()) => eprintln!("wifi radio setter accepted a no-op change"),
+        Err(error) => eprintln!("wifi radio setter honest failure: {error:#}"),
+    }
+    // Missing profile must fail honestly (never creates profiles or prompts for keys).
+    let result = ps_windows::connect_wifi("__protonsearch_no_such_network__");
+    match result {
+        Ok(outcome) => {
+            assert!(!outcome.connected);
+            eprintln!("connect missing profile outcome: {}", outcome.message);
+        }
+        Err(error) => {
+            let message = format!("{error:#}").to_lowercase();
+            assert!(
+                message.contains("profile") || message.contains("settings") || message.contains("radio"),
+                "unexpected connect error: {message}"
+            );
+            eprintln!("connect missing profile honest error: {message}");
+        }
+    }
+    assert!(started.elapsed() < std::time::Duration::from_secs(25));
+}
+
+#[test]
+fn bluetooth_controls_are_usable_or_honest() {
+    let capabilities = ps_windows::native_capabilities();
+    if !capabilities.bluetooth.supported {
+        assert!(capabilities.bluetooth.reason.is_some());
+        assert_eq!(
+            capabilities.bluetooth.fallback_uri.as_deref(),
+            Some("ms-settings:bluetooth")
+        );
+        eprintln!(
+            "UNVERIFIED Bluetooth: {}",
+            capabilities.bluetooth.reason.clone().unwrap_or_default()
+        );
+        return;
+    }
+    let state = ps_windows::bluetooth_radio_state().expect("Bluetooth radio state");
+    assert!(state.available, "supported Bluetooth must have an available radio");
+    let devices = ps_windows::list_bluetooth_devices().expect("paired Bluetooth devices");
+    eprintln!("bluetooth radio enabled={} paired_devices={}", state.enabled, devices.len());
+    for device in devices.iter().take(10) {
+        assert!(!device.id.is_empty());
+        assert!(device.paired);
+        eprintln!(
+            "bluetooth device name={:?} connected={} id={:?}",
+            device.name, device.connected, device.id
+        );
+    }
+    match ps_windows::set_bluetooth_radio(state.enabled) {
+        Ok(()) => eprintln!("bluetooth radio setter accepted a no-op change"),
+        Err(error) => eprintln!("bluetooth radio setter honest failure: {error:#}"),
+    }
+}
+
+#[test]
+fn brightness_controls_report_method_or_honest_fallback() {
+    let capabilities = ps_windows::native_capabilities();
+    if !capabilities.brightness.supported {
+        assert!(capabilities.brightness.reason.is_some());
+        assert_eq!(
+            capabilities.brightness.fallback_uri.as_deref(),
+            Some("ms-settings:display")
+        );
+        eprintln!(
+            "UNVERIFIED brightness: {}",
+            capabilities.brightness.reason.clone().unwrap_or_default()
+        );
+        return;
+    }
+    let monitors = ps_windows::list_brightness_monitors();
+    assert!(!monitors.is_empty(), "supported brightness must list a monitor");
+    for monitor in monitors.iter().take(4) {
+        assert!(monitor.current <= 100);
+        assert!(monitor.maximum > 0);
+        eprintln!(
+            "brightness monitor name={:?} current={} {}/{} method={:?}",
+            monitor.name, monitor.current, monitor.minimum, monitor.maximum, monitor.method
+        );
+    }
+    let current = ps_windows::get_brightness().expect("current brightness");
+    ps_windows::set_brightness(current).expect("restore brightness");
+}
+
+#[test]
+fn controls_status_snapshot_is_bounded_and_serializable() {
+    let started = std::time::Instant::now();
+    let status = ps_windows::controls_status();
+    let elapsed = started.elapsed();
+    eprintln!("controls_status() took {elapsed:?}");
+    assert!(elapsed < std::time::Duration::from_secs(30));
+    let json = serde_json::to_string(&status).expect("serialize ControlsStatus");
+    assert!(!json.is_empty());
+    assert!(status.capabilities.local_notifications.supported);
+    eprintln!("controls_status json bytes={}", json.len());
+}

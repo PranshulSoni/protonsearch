@@ -97,12 +97,17 @@ describe("island cards real data", () => {
       muted: false,
       brightnessCapability: { supported: true, reason: null },
       brightnessPercent: 80,
+      brightnessMonitors: [
+        { index: 0, name: "Built-in display", current: 80, minimum: 0, maximum: 100, method: "dxva2" },
+      ],
       wifi: { supported: true, reason: null },
       wifiEnabled: true,
       wifiNetworks: [],
+      wifiError: null,
       bluetooth: { supported: false, reason: "Bluetooth adapter isn't wired." },
       bluetoothEnabled: null,
       bluetoothDevices: [],
+      bluetoothError: null,
       airplaneMode: { supported: false, reason: "Not exposed." },
       nightLight: { supported: false, reason: "Not exposed." },
       energySaver: { supported: true, reason: null },
@@ -117,13 +122,96 @@ describe("island cards real data", () => {
     expect(element.textContent).toContain("62%");
     expect(element.textContent).toContain("80%");
     expect(element.querySelectorAll(".island-setting-slider").length).toBe(2);
-    expect(element.querySelectorAll(".island-control-tile").length).toBe(4);
+    expect(element.querySelectorAll(".island-control-tile").length).toBe(2);
     const unsupportedTile = [...element.querySelectorAll(".island-control-tile")].find((tile) =>
       tile.textContent?.includes("Bluetooth"),
     );
-    expect(unsupportedTile?.textContent).toContain("Unsupported");
-    expect(unsupportedTile?.getAttribute("aria-disabled")).toBe("true");
-    expect(unsupportedTile?.getAttribute("title")).toContain("Bluetooth adapter isn't wired.");
+    expect(unsupportedTile?.textContent).toContain("Can't change here");
+    const bluetoothToggle = unsupportedTile?.querySelector<HTMLButtonElement>(
+      ".island-control-tile-toggle",
+    );
+    expect(bluetoothToggle?.disabled).toBe(true);
+    expect(bluetoothToggle?.getAttribute("title")).toContain("Bluetooth adapter isn't wired.");
+  });
+
+  it("wires real Wi-Fi/Bluetooth toggles and Wi-Fi connect/fallbacks", async () => {
+    const setWifi = vi.spyOn(api, "setWifi").mockResolvedValue();
+    const setBluetooth = vi.spyOn(api, "setBluetooth").mockResolvedValue();
+    const connectWifi = vi.spyOn(api, "connectWifi").mockResolvedValue();
+    const openSettings = vi.spyOn(api, "openSettings").mockResolvedValue();
+    const status: ControlsStatus = {
+      mediaCapability: { supported: false, reason: "n/a" },
+      media: null,
+      audioOutputs: [],
+      defaultAudioId: null,
+      volumePercent: 62,
+      muted: false,
+      brightnessCapability: { supported: true, reason: null },
+      brightnessPercent: 80,
+      brightnessMonitors: [],
+      wifi: { supported: true, reason: null },
+      wifiEnabled: true,
+      wifiNetworks: [
+        { ssid: "Home-5G", signal: 87, security: "WPA3", connected: true, hasProfile: true, connectable: true },
+        { ssid: "Cafe", signal: 40, security: "Open", connected: false, hasProfile: false, connectable: false },
+      ],
+      wifiError: null,
+      bluetooth: { supported: true, reason: null },
+      bluetoothEnabled: false,
+      bluetoothDevices: [
+        { id: "bt-1", name: "Pods", connected: true, paired: true },
+      ],
+      bluetoothError: null,
+      airplaneMode: { supported: false, reason: "n/a" },
+      nightLight: { supported: false, reason: "n/a" },
+      energySaver: { supported: false, reason: "n/a" },
+      notifications: { supported: true, reason: null },
+      toastCapability: { supported: false, reason: "n/a" },
+      notificationUnread: 0,
+      notificationItems: [],
+    };
+    const element = await mount(
+      <ControlsCard status={status} pending={false} error={null} refresh={() => undefined} />,
+    );
+    const tiles = element.querySelectorAll(".island-control-tile");
+    const wifiToggle = tiles[0].querySelector<HTMLButtonElement>(".island-control-tile-toggle")!;
+    const btToggle = tiles[1].querySelector<HTMLButtonElement>(".island-control-tile-toggle")!;
+    expect(wifiToggle.disabled).toBe(false);
+    expect(btToggle.disabled).toBe(false);
+    await act(async () => {
+      wifiToggle.click();
+      btToggle.click();
+      await Promise.resolve();
+    });
+    expect(setWifi).toHaveBeenCalledWith(false);
+    expect(setBluetooth).toHaveBeenCalledWith(true);
+
+    await act(async () => {
+      (tiles[0].querySelector(".island-control-tile-chevron") as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    const connect = [...element.querySelectorAll<HTMLButtonElement>(".island-drilldown-action")].find(
+      (button) => button.textContent === "Connect",
+    );
+    expect(connect).not.toBeNull();
+    await act(async () => {
+      connect?.click();
+      await Promise.resolve();
+    });
+    expect(connectWifi).toHaveBeenCalledWith("Home-5G");
+    const fallback = [...element.querySelectorAll<HTMLButtonElement>(".island-drilldown-action")].find(
+      (button) => button.textContent === "Open network settings",
+    );
+    expect(fallback).not.toBeNull();
+    await act(async () => {
+      fallback?.click();
+      await Promise.resolve();
+    });
+    expect(openSettings).toHaveBeenCalledWith("wifi");
+    setWifi.mockRestore();
+    setBluetooth.mockRestore();
+    connectWifi.mockRestore();
+    openSettings.mockRestore();
   });
 
   it("shows the notification capability reason and a local toast test", async () => {
@@ -136,12 +224,15 @@ describe("island cards real data", () => {
       muted: null,
       brightnessCapability: { supported: false, reason: "No brightness path." },
       brightnessPercent: null,
+      brightnessMonitors: [],
       wifi: { supported: false, reason: "n/a" },
       wifiEnabled: null,
       wifiNetworks: [],
+      wifiError: null,
       bluetooth: { supported: false, reason: "n/a" },
       bluetoothEnabled: null,
       bluetoothDevices: [],
+      bluetoothError: null,
       airplaneMode: { supported: false, reason: "n/a" },
       nightLight: { supported: false, reason: "n/a" },
       energySaver: { supported: false, reason: "n/a" },
@@ -170,12 +261,17 @@ describe("island cards real data", () => {
       muted: false,
       brightnessCapability: { supported: true, reason: null },
       brightnessPercent: 80,
+      brightnessMonitors: [
+        { index: 0, name: "Built-in display", current: 80, minimum: 0, maximum: 100, method: "dxva2" },
+      ],
       wifi: { supported: false, reason: "n/a" },
       wifiEnabled: null,
       wifiNetworks: [],
+      wifiError: null,
       bluetooth: { supported: false, reason: "n/a" },
       bluetoothEnabled: null,
       bluetoothDevices: [],
+      bluetoothError: null,
       airplaneMode: { supported: false, reason: "n/a" },
       nightLight: { supported: false, reason: "n/a" },
       energySaver: { supported: false, reason: "n/a" },

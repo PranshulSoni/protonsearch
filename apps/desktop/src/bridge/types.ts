@@ -313,6 +313,7 @@ export interface ClipboardSettings {
 export interface ControlCapability {
   supported: boolean;
   reason: string | null;
+  fallbackUri?: string | null;
 }
 
 export interface MediaSessionInfo {
@@ -340,8 +341,19 @@ export interface AudioDeviceInfo {
 export interface WifiNetworkInfo {
   ssid: string;
   signal: number;
-  secure: boolean;
+  security: string;
   connected: boolean;
+  hasProfile: boolean;
+  connectable: boolean;
+}
+
+export interface BrightnessMonitorInfo {
+  index: number;
+  name: string;
+  current: number;
+  minimum: number;
+  maximum: number;
+  method: "dxva2" | "ddc_ci";
 }
 
 export interface BluetoothDeviceInfo {
@@ -369,12 +381,15 @@ export interface ControlsStatus {
   muted: boolean | null;
   brightnessCapability: ControlCapability;
   brightnessPercent: number | null;
+  brightnessMonitors: BrightnessMonitorInfo[];
   wifi: ControlCapability;
   wifiEnabled: boolean | null;
   wifiNetworks: WifiNetworkInfo[];
+  wifiError: string | null;
   bluetooth: ControlCapability;
   bluetoothEnabled: boolean | null;
   bluetoothDevices: BluetoothDeviceInfo[];
+  bluetoothError: string | null;
   airplaneMode: ControlCapability;
   nightLight: ControlCapability;
   energySaver: ControlCapability;

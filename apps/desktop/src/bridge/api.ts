@@ -68,6 +68,10 @@ type Bridge = {
   setMuted(muted: boolean): Promise<void>;
   setBrightness(percent: number): Promise<void>;
   setAudioOutput(deviceId: string): Promise<void>;
+  setWifi(enabled: boolean): Promise<void>;
+  setBluetooth(enabled: boolean): Promise<void>;
+  connectWifi(ssid: string): Promise<void>;
+  openSettings(page: string): Promise<void>;
   mediaCommand(action: string): Promise<void>;
   showLocalToast(title: string, body: string): Promise<void>;
   notificationsDismiss(notificationId: string): Promise<void>;
@@ -102,6 +106,10 @@ const tauriBridge: Bridge = {
   setMuted: (muted) => invoke<void>("control_set_muted", { muted }),
   setBrightness: (percent) => invoke<void>("control_set_brightness", { percent }),
   setAudioOutput: (deviceId) => invoke<void>("control_set_audio_output", { deviceId }),
+  setWifi: (enabled) => invoke<void>("control_set_wifi", { enabled }),
+  setBluetooth: (enabled) => invoke<void>("control_set_bluetooth", { enabled }),
+  connectWifi: (ssid) => invoke<void>("control_connect_wifi", { ssid }),
+  openSettings: (page) => invoke<void>("control_open_settings", { page }),
   mediaCommand: (action) => invoke<void>("control_media", { action }),
   showLocalToast: (title, body) => invoke<void>("show_local_toast", { title, body }),
   notificationsDismiss: (notificationId) =>

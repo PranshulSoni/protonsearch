@@ -164,7 +164,7 @@ describe("V9 island surface", () => {
       await new Promise((resolve) => setTimeout(resolve, 120));
     });
     await waitFor(() => element.querySelector(".island-surface--expanded") !== null);
-    expect(element.querySelectorAll(".island-filter").length).toBe(5);
+    expect(element.querySelectorAll(".island-filter").length).toBe(4);
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
     await act(async () => {
       setter.call(input, "architecture");
@@ -172,6 +172,7 @@ describe("V9 island surface", () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     });
     await waitFor(() => element.querySelectorAll(".island-result-row").length > 0);
+    expect(element.querySelectorAll(".island-group-label").length).toBeGreaterThan(0);
     expect(element.querySelector(".island-result-foot")?.textContent).toContain("local results");
   });
 
@@ -194,7 +195,7 @@ describe("V9 island surface", () => {
     expect(surface.style.height).toBe("185px");
     expect(element.querySelector(".island-result-foot")).toBeNull();
     expect(element.querySelector(".island-empty--compact")?.textContent).toContain(
-      "No matching results.",
+      "No matches for “zzzz no match”.",
     );
   });
 

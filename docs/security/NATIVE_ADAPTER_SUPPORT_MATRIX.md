@@ -1,66 +1,88 @@
-# Native adapter support matrix — MILESTONE 1 FINAL (task-35)
+# Native adapter support matrix — task-55 (milestone 2: Wi-Fi, Bluetooth, brightness, settings fallbacks)
 
 | Field | Value |
 |---|---|
-| Status | **Milestone 1 final** — wired end-to-end by the shell/UI; task-35 closed as milestone-1 complete |
+| Status | **Implemented + verified on this host**; API ready for shell commands and ui-launcher cards |
 | Date | 2026-11-10 (Asia/Calcutta) |
-| Host | Windows 11, AMD Ryzen AI 9 (10C/20T), 31 GB RAM, Cirrus Logic onboard audio |
-| Evidence | @native-probe-host.log (regenerated capability matrix + live device data) |
-| Code | crates/ps-windows: audio, brightness, capabilities, toast, winrt modules; crates/ps-sources: notifications store |
+| Code | crates/ps-windows: imp/{wifi,bluetooth,radios,brightness,capabilities,settings_pages}.rs, src/lib.rs, examples/native_probe.rs, tests/windows_smoke.rs |
+| Evidence | @native-probe-host.log (live capability + device data), @native-m2-tests.log (test-run evidence) |
+| Constraints honoured | user-level (no admin), bounded calls, no OS-consent bypass, honest typed failures, no profile/key creation |
 
-## Decision
-Milestone 1 (capabilities + Core Audio volume/output + brightness + local notification store) is complete, verified and wired. Milestone 2 (GSMTC media transport, Wi-Fi network connect, Bluetooth device list/radio toggle) is **deferred to post-alpha**; it needs its own contract/IPC additions and real media/network/Bluetooth hardware verification that should not be rushed into this release. To keep the UI honest, the not-yet-shipped adapters now report `supported=false` with explicit reasons (they previously reported raw API availability, which could have produced non-functional controls).
-
-## Capability matrix on this host (milestone-1 final)
-
-| Capability | Supported | Host result / reason | State |
-|---|---|---|---|
-| audio_output | **yes** | 1 active render endpoint: `Speakers (Cirrus Logic XU (with APO Extensions))`, marked default | shipped |
-| audio_volume | **yes** | master volume 0.88, muted=false; read/write round-trip with state restore | shipped |
-| audio_output_switch | **yes** | IPolicyConfig interface created; SetDefaultEndpoint implemented | shipped (single endpoint on this host) |
-| local_notifications | **yes** | SQLite local store: add/list/unread/mark_read/dismiss/clear | shipped |
-| brightness | **no** | no monitor exposes user-level brightness control (external desktop monitor; Dxva2 per-monitor detection) | capability-gated in UI |
-| toast_notifications | **no** | 0x80073D54: process has no package identity (unpackaged dev binary) | honest limitation; fix = AUMID shortcut at install |
-| media_sessions | **no** | 'GSMTC media enumeration/transport controls are a post-alpha follow-up; capability probe exists but the control API is not shipped in this build' | milestone 2 (post-alpha) |
-| wifi | **no** | 'Wi-Fi network list/connect is a post-alpha follow-up; the UI should open Windows network settings for now' | milestone 2 (post-alpha) |
-| bluetooth | **no** | 'Bluetooth device list/radio toggle is a post-alpha follow-up; the UI should open Windows Bluetooth settings for now' | milestone 2 (post-alpha) |
-| airplane_mode / energy_saver / hotspot / cast / night_light | no | explicit unsupported reasons | not planned for alpha |
-
-## Shipped API surface (milestone 1)
-`cargo
-ps_windows::native_capabilities() -> NativeCapabilities   // serde; per-feature supported + reason
-ps_windows::list_audio_outputs() / default_audio_output() / set_audio_output(id)
-ps_windows::get_audio_volume() / set_audio_volume(f32) / get_audio_mute() / set_audio_mute(bool) / audio_state()
-ps_windows::brightness_supported() / brightness_monitors() / get_brightness() / set_brightness(u8)
-ps_windows::toast_supported() / show_toast(title, body)
-ps_sources::notifications::{add, list, unread_count, mark_read, dismiss, clear, add_and_maybe_toast}
+## What shipped
+`text
+Wi-Fi      ps_windows::wifi_radio_state() -> RadioStateInfo{available,enabled}
+           ps_windows::set_wifi_radio(bool)
+           ps_windows::list_wifi_networks() -> Vec<WifiNetworkInfo{ssid, signal(0-100), security,
+               connected, has_profile, connectable}>
+           ps_windows::connect_wifi(ssid) -> WifiConnectOutcome{ssid, connected, message}
+           ps_windows::wlan_adapters() -> Vec<String>
+Bluetooth ps_windows::bluetooth_radio_state() -> RadioStateInfo
+           ps_windows::set_bluetooth_radio(bool)
+           ps_windows::list_bluetooth_devices() -> Vec<BluetoothDeviceInfo{id,name,connected,paired}>
+Brightness ps_windows::list_brightness_monitors() -> Vec<BrightnessMonitorInfo{index,name,current,
+               minimum,maximum, method: dxva2|ddc_ci}>   (Dxva2 first, then DDC/CI VCP 0x10 fallback)
+           ps_windows::brightness_supported() / brightness_monitors() / get_brightness() / set_brightness(0-100)
+Settings  ps_windows::SettingsPage enum (wifi, bluetooth, display, sound, notifications,
+               airplane_mode, mobile_hotspot, night_light, energy_saver, project,
+               windows_update, privacy_location) with .uri() (ms-settings:*) and .label()
+           ps_windows::open_settings_page(SettingsPage) -> Result<()>  (allow-listed URIs only)
+Snapshot  ps_windows::controls_status() -> ControlsStatus{capabilities, wifi: Option<WifiState>,
+               bluetooth: Option<BluetoothState>, brightness: Option<BrightnessState>}
+           WifiState{radio, networks, error: Option<String>}
+           BluetoothState{radio, devices, error: Option<String>}
+           BrightnessState{supported, monitors}
+Capability ps_windows::native_capabilities() -> NativeCapabilities (per feature: supported,
+               reason, fallback_uri). fallback_uri is set for OS-owned features even when
+               supported so the UI can offer an 'Open Windows settings' secondary action.
 `
-All user-level (no admin). Capability probes are bounded at 3 s each and side-effect free.
 
-## Milestone 2 — post-alpha follow-up plan (explicitly deferred)
+## Host probe results (real, this machine)
 
-### (1) GSMTC media sessions/transport
-- `GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get()` (already probed) -> `GetSessions()`; per session: `GetPlaybackInfo()` (status + supported controls), `TryGetMediaPropertiesAsync()` (title/artist/album + thumbnail via `RandomAccessStreamReference`, bounded <=512 KiB, no network), `GetTimelineProperties()` for position/seek support; `TryTogglePlayPause` / `TrySkipNext` / `TrySkipPrevious`; shuffle/repeat/seek exposed only when playback-info reports support.
-- New ps-ipc contract additions needed (L0): `MediaSessionInfo` {sessionId, sourceAppUserModelId, title, artist, album, playbackStatus, canPlayPause/canSkip, positionMs/durationMs, artwork (bounded bytes) } + `MediaAction` enum + transport result DTO.
-- Tests: enumerate sessions/source apps; control calls guarded by playback status; artwork size bound; honest unsupported when no session/media apps. Requires a real playing media app for control verification.
+| Feature | Result | Evidence |
+|---|---|---|
+| Wi-Fi radio | available=true, enabled=true; adapter `MediaTek Wi-Fi 7 MT7925 Wireless LAN Card` | probe log |
+| Wi-Fi network list | Windows **denied scan access** (location permission) -> honest error naming Settings > Privacy & security > Location + ms-settings:network-wifi fallback; UI can open @PrivacyLocation | probe log |
+| Wi-Fi radio toggle | action reached Windows but returned RadioAccessStatus::DeniedByUser -> honest error + 'open Windows settings'; we deliberately do NOT bypass OS consent | test log |
+| Wi-Fi connect-if-profile | missing-profile path verified: honest error, no profile/key creation; real saved-profile connect UNVERIFIED on this host | test log |
+| Bluetooth radio | available=true, enabled=false (user has it off); toggle returned DeniedByUser -> honest error + ms-settings:bluetooth fallback | probe + test logs |
+| Bluetooth paired devices | 2 devices enumerated with name/id/connected (Mivi SuperPods Immersio, Pranshul's iPhone) | probe log |
+| Brightness | Dxva2 + DDC/CI implemented; this external monitor exposes neither -> supported=false with reason + ms-settings:display fallback | probe log |
+| Settings fallbacks | wifi/bluetooth/display/sound/notifications/airplane/hotspot/night light/battery saver/project/windows update/location -> ms-settings:* | test `settings_fallbacks_are_allow_listed` |
+| Controls snapshot | `controls_status()` bounded ~1.5 s, serialisable, carries per-section error strings | test log |
 
-### (2) Wi-Fi
-- WlanAPI: `WlanOpenHandle` / `WlanEnumInterfaces` / `WlanGetAvailableNetworkList` (SSID, signal quality, security, profile name, connectable flag); radio state via WinRT `Radio` (RadioKind::WiFi, `SetStateAsync`) with `RadioAccessStatus` gating; `WlanConnect` only against an existing profile (`WlanGetProfileNames`), never prompts for keys; missing profile/permission -> structured error + 'open Windows network settings'.
-- IPC additions needed: `WifiNetworkInfo` {ssid, signal, security, hasProfile, connected} + `WifiRadioState` + connect result DTO.
-- Tests: network list on host; radio state read (no toggle during tests); connect path only when a saved profile exists, otherwise asserts structured error.
+## Architecture note (important)
+Repeated `Radio.GetRadiosAsync()` calls from fresh short-lived MTA threads crashed natively on Windows (access violation after the first enumeration). All WinRT radio/Bluetooth work now runs on ONE persistent MTA worker thread (`ps-winrt-radio`) with bounded request timeouts; results are plain data. This is why the adapter is stable across repeated probes/UI refreshes. Wi-Fi network lists use WlanAPI (WlanOpenHandle/WlanEnumInterfaces/WlanGetAvailableNetworkList/WlanGetProfileList/WlanConnect) with WlanFreeMemory. No admin rights are requested anywhere.
 
-### (3) Bluetooth
-- WinRT `Radio`: enumerate radios, Bluetooth on/off via `SetStateAsync` gated on `RadioAccessStatus`; paired devices via `DeviceInformation::FindAllAsync(BluetoothDevice::GetDeviceSelectorFromPairingState(true))` -> name/id/connected; pairing and connection remain OS UI; no fake pairing. Connect only if the platform exposes it for the device class, otherwise return unsupported.
-- IPC additions needed: `BluetoothRadioState` + `BluetoothDeviceInfo` {id, name, connected, paired}.
-- Tests: radio enumeration, device list; toggle only with explicit user action in manual E2E (never in automated tests to avoid changing the user's radios).
+## Honest behaviour requirements for the UI (agreed semantics)
+1. Never render a dead toggle: every unsupported capability carries `reason` + `fallback_uri`; render an 'Open Windows settings' button via `open_settings_page`.
+2. Wi-Fi card: use `ControlsStatus.wifi.radio` for the radio toggle, `networks` for the list; when `wifi.error` is present show that text + a button to `SettingsPage::PrivacyLocation` (for the location-permission case) or `Wifi`.
+3. Radio setter errors are trustworthy: surface the message (it already names the OS reason) and offer the fallback page instead of retrying silently.
+4. connect_wifi only uses saved profiles; on error show message and open `SettingsPage::Wifi`. Never ask the user for a Wi-Fi key in ProtonSearch.
+5. Brightness slider: bind to `list_brightness_monitors()[0].current`/`set_brightness`; if `brightness.supported==false` hide the slider and show fallback button.
 
-### Preconditions / risks for milestone 2
-- WinRT async + COM apartment discipline on background threads; bounded calls with timeouts.
-- New ps-ipc DTOs (L0-owned) and UI card wiring; cannot be verified without real media/network/Bluetooth hardware and a release-candidate pass.
-- No admin required anywhere; no network access for artwork (local stream only).
+## Suggested shell/UI mapping
+`text
+shell command                  -> ps-windows call
+controls.status                -> controls_status()
+wifi.radio.set(enabled)        -> set_wifi_radio(enabled)
+wifi.networks.list             -> list_wifi_networks()
+wifi.connect(ssid)             -> connect_wifi(ssid)
+bluetooth.radio.set(enabled)   -> set_bluetooth_radio(enabled)
+bluetooth.devices.list         -> list_bluetooth_devices()
+brightness.list                -> list_brightness_monitors()
+brightness.set(percent)        -> set_brightness(percent)
+settings.open(page)            -> open_settings_page(SettingsPage)
+capabilities.get               -> native_capabilities()
+`
 
-## Verification (milestone 1 final)
-- `cargo test -p ps-windows`: 7 unit + 15 integration = 22 passed / 0 failed (capability probe bounded + serde round-trip, audio enumeration, volume/mute restore, brightness gated round-trip, toast honesty).
-- `cargo test -p ps-sources`: 18 unit + 3 notification-store tests + 31/32 sources tests passed / 0 failed (1 ignored action smoke).
+## Tests / verification
+- `cargo test -p ps-windows`: 7 unit + 20 integration = **27 passed / 0 failed**, incl. capability probe boundedness/serde, settings allow-list, Wi-Fi honest-error paths, Bluetooth radio/device read paths, brightness method/fallback, controls snapshot bounded+serialisable.
 - `cargo check -p ps-windows -p ps-sources -p ps-content -p ps-ocr --all-targets` clean.
-- Host probe: `cargo run -p ps-windows --example native_probe` -> @native-probe-host.log.
+- Host evidence: @native-probe-host.log, @native-m2-tests.log.
+
+## Remaining honest limitations
+- Wi-Fi network list requires Windows **location permission** for desktop apps on Win11; without it Windows returns access-denied and we surface that (no fake list). After the user enables it, the same API returns SSIDs. This is a Windows privacy requirement, not a ProtonSearch bug.
+- OS radio consent can be denied per app (RadioAccessStatus::DeniedByUser); we honour it and route to Windows settings rather than bypassing it.
+- Real connect to a saved profile and radio toggles that change state are not exercised in automated tests (would alter the user's connectivity); they are implemented and error-checked.
+- Brightness on this host's external monitor exposes neither Dxva2 nor DDC/CI; the slider stays hidden with an honest reason + fallback.
+- Media session transport controls are out of scope for task-55 (separate work item) and report supported=false with a reason.

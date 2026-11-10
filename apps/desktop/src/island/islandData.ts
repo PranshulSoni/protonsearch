@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../bridge/api";
+import { SEARCH_LIMIT } from "../launcher/launcherLayout";
 import type {
   AgentStatus,
   AgentTask,
@@ -102,7 +103,7 @@ export function useIslandSearch(
     setState((current) => ({ ...current, pending: true, error: null }));
     const timer = window.setTimeout(() => {
       void api
-        .search({ requestId: Date.now() + token, query, scope, limit: 20 })
+        .search({ requestId: Date.now() + token, query, scope, limit: SEARCH_LIMIT })
         .then((response) => {
           if (token !== tokenRef.current) return;
           setState({

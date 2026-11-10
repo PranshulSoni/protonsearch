@@ -1,15 +1,16 @@
 //! Capability probes for the native adapter layer (v10 Quick Settings / Media /
 //! Notifications cards). Every probe is bounded (worker thread + timeout) and
-//! returns supported/unsupported with an honest reason; no UI or state changes.
+//! returns supported/unsupported with an honest reason and — where Windows owns
+//! the feature — an allow-listed ms-settings fallback URI for the UI button.
 
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::NativeCapabilities;
+use crate::{Capability, NativeCapabilities, SettingsPage};
 
-const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+const PROBE_TIMEOUT: Duration = Duration::from_secs(4);
 
-fn run_probe<F>(probe: F) -> crate::Capability
+fn run_probe<F>(probe: F, fallback: Option<SettingsPage>) -> Capability
 where
     F: FnOnce() -> Result<(), String> + Send + 'static,
 {
@@ -21,13 +22,20 @@ where
             let _ = sender.send(result);
         });
     if spawned.is_err() {
-        return crate::Capability::unsupported("could not start capability probe");
+        return Capability::unsupported("could not start capability probe");
     }
-    match receiver.recv_timeout(PROBE_TIMEOUT) {
-        Ok(Ok(Ok(()))) => crate::Capability::supported(),
-        Ok(Ok(Err(reason))) => crate::Capability::unsupported(reason),
-        Ok(Err(_)) => crate::Capability::unsupported("capability probe panicked"),
-        Err(_) => crate::Capability::unsupported("capability probe timed out"),
+    let capability = match receiver.recv_timeout(PROBE_TIMEOUT) {
+        Ok(Ok(Ok(()))) => Capability::supported(),
+        Ok(Ok(Err(reason))) => Capability::unsupported(reason),
+        Ok(Err(_)) => Capability::unsupported("capability probe panicked"),
+        Err(_) => Capability::unsupported("capability probe timed out"),
+    };
+    // Keep the settings fallback available even when supported: Windows may still
+    // deny a specific action (e.g. radio consent / location permission), and the
+    // UI should be able to offer "open Windows settings".
+    match fallback {
+        Some(page) => capability.with_fallback(page),
+        None => capability,
     }
 }
 
@@ -35,72 +43,121 @@ fn not_supported(reason: &str) -> Result<(), String> {
     Err(reason.to_string())
 }
 
-/// Probe every native integration this build knows about.
+/// Probe every native integration this build ships.
 pub fn probe_all() -> NativeCapabilities {
-    NativeCapabilities {
-        media_sessions: crate::Capability::unsupported(
-            "GSMTC media enumeration/transport controls are a post-alpha follow-up; capability probe exists but the control API is not shipped in this build",
-        ),
-        audio_output: run_probe(|| {
+    let media_sessions = Capability::unsupported(
+        "media session controls are not shipped in this build; open the media app itself",
+    );
+    let audio_output = run_probe(
+        || {
             if super::audio::output_supported() {
                 Ok(())
             } else {
                 not_supported("no active audio render endpoint")
             }
-        }),
-        audio_volume: run_probe(|| {
+        },
+        Some(SettingsPage::Sound),
+    );
+    let audio_volume = run_probe(
+        || {
             if super::audio::volume_supported() {
                 Ok(())
             } else {
                 not_supported("default output device does not expose master volume")
             }
-        }),
-        audio_output_switch: run_probe(|| {
+        },
+        Some(SettingsPage::Sound),
+    );
+    let audio_output_switch = run_probe(
+        || {
             if super::audio::output_switch_supported() {
                 Ok(())
             } else {
-                not_supported("IPolicyConfig default-device switching is unavailable; use Windows sound settings")
+                not_supported("default-device switching is unavailable on this build")
             }
-        }),
-        wifi: crate::Capability::unsupported(
-            "Wi-Fi network list/connect is a post-alpha follow-up; the UI should open Windows network settings for now",
-        ),
-        bluetooth: crate::Capability::unsupported(
-            "Bluetooth device list/radio toggle is a post-alpha follow-up; the UI should open Windows Bluetooth settings for now",
-        ),
-        brightness: run_probe(|| {
+        },
+        Some(SettingsPage::Sound),
+    );
+    let wifi = run_probe(
+        || {
+            if super::wifi::supported() {
+                Ok(())
+            } else {
+                not_supported("no Wi-Fi adapter or radio is available on this device")
+            }
+        },
+        Some(SettingsPage::Wifi),
+    );
+    let bluetooth = run_probe(
+        || {
+            if super::bluetooth::supported() {
+                Ok(())
+            } else {
+                not_supported("no Bluetooth radio is available on this device")
+            }
+        },
+        Some(SettingsPage::Bluetooth),
+    );
+    let brightness = run_probe(
+        || {
             if super::brightness::supported() {
                 Ok(())
             } else {
-                not_supported("no monitor exposes user-level brightness control")
+                not_supported(
+                    "no monitor exposes brightness control (internal panel or DDC/CI) on this device",
+                )
             }
-        }),
-        local_notifications: crate::Capability::supported(),
-        toast_notifications: run_probe(|| {
+        },
+        Some(SettingsPage::Display),
+    );
+    let local_notifications = Capability::supported();
+    let toast_notifications = run_probe(
+        || {
             let owned = super::winrt::ensure_apartment();
             let result = (|| -> Result<(), String> {
                 let app_id = windows::core::HSTRING::from("ProtonSearch");
-                windows::UI::Notifications::ToastNotificationManager::CreateToastNotifierWithId(&app_id)
-                    .map(|_| ())
-                    .map_err(|error| format!("Windows toast notifications unavailable for this app identity: {error}"))
+                windows::UI::Notifications::ToastNotificationManager::CreateToastNotifierWithId(
+                    &app_id,
+                )
+                .map(|_| ())
+                .map_err(|error| {
+                    format!("Windows toast notifications unavailable for this app identity: {error}")
+                })
             })();
             super::winrt::release_apartment(owned);
             result
-        }),
-        airplane_mode: crate::Capability::unsupported(
-            "not implemented in this milestone (planned: Windows radio/network APIs, user-level)",
+        },
+        Some(SettingsPage::Notifications),
+    );
+    NativeCapabilities {
+        media_sessions,
+        audio_output,
+        audio_volume,
+        audio_output_switch,
+        wifi,
+        bluetooth,
+        brightness,
+        local_notifications,
+        toast_notifications,
+        airplane_mode: Capability::unsupported_with_fallback(
+            "airplane mode has no stable user-level desktop API; use Windows settings",
+            SettingsPage::AirplaneMode,
         ),
-        energy_saver: crate::Capability::unsupported(
-            "not implemented in this milestone (planned: battery/energy APIs)",
+        energy_saver: Capability::unsupported_with_fallback(
+            "battery saver has no stable user-level desktop API; use Windows settings",
+            SettingsPage::EnergySaver,
         ),
-        hotspot: crate::Capability::unsupported(
-            "not implemented in this milestone (Windows Mobile Hotspot has no stable user-level API)",
+        hotspot: Capability::unsupported_with_fallback(
+            "mobile hotspot has no stable user-level desktop API; use Windows settings",
+            SettingsPage::MobileHotspot,
         ),
-        cast: crate::Capability::unsupported(
-            "not implemented in this milestone (requires MIracast/device picker UX)",
+        cast: Capability::unsupported_with_fallback(
+            "projecting/casting uses the Windows device picker; use Windows settings",
+            SettingsPage::Project,
         ),
-        night_light: crate::Capability::unsupported(
-            "not implemented in this milestone (color temperature is a display-driver/OS setting)",
+        night_light: Capability::unsupported_with_fallback(
+            "night light is an OS display setting; use Windows settings",
+            SettingsPage::NightLight,
         ),
     }
 }

@@ -7,6 +7,8 @@ import type {
 } from "../bridge/types";
 import { useEffect, useState } from "react";
 import { Logo } from "../components/Logo";
+import { groupResults } from "../lib/results";
+import { SharedResultRow } from "../launcher/SharedResultRow";
 import { IslandIcon, type IslandIconName } from "./IslandIcon";
 import {
   relativeTime,
@@ -112,19 +114,34 @@ export function SearchCard({
   useEffect(() => {
     setActiveIndex(0);
   }, [results]);
-  const openActive = () => {
-    const result = results[activeIndex];
-    if (result) onOpen(result);
-  };
   // The canonical zero-results card is 185 px tall; render a compact visible
   // state inside the results area instead of a centred block that gets clipped.
   const zeroResults = !pending && !error && results.length === 0;
+  // Same pure grouping/order as the Normal Launcher; labels scroll with rows.
+  const groupedResults = groupResults(results);
+  const orderedResults = groupedResults.flatMap((group) =>
+    group.items.map((item) => item.result),
+  );
+  let remainingRows = 5;
+  const visibleGroups = groupedResults
+    .map((group) => {
+      const items = group.items.slice(0, Math.max(0, remainingRows));
+      remainingRows -= items.length;
+      return { ...group, items };
+    })
+    .filter((group) => group.items.length > 0);
+  const rowIndexById = new Map(
+    orderedResults.map((result, index) => [result.id, index] as const),
+  );
+  const openActive = () => {
+    const result = orderedResults[activeIndex];
+    if (result) onOpen(result);
+  };
   const filters: Array<{ id: SearchScope; label: string }> = [
     { id: "all", label: "All" },
     { id: "files", label: "Files" },
     { id: "folders", label: "Folders" },
     { id: "apps", label: "Apps" },
-    { id: "actions", label: "Actions" },
   ];
   return (
     <div className={"island-search" + (compact ? " island-search--compact" : " island-search--expanded")}>
@@ -194,47 +211,50 @@ export function SearchCard({
             ) : zeroResults ? (
               <div className="island-empty island-empty--compact" role="status">
                 <strong>
-                  {query.trim() ? "No matching results." : "Start typing to search."}
+                  {query.trim()
+                    ? "No matches for “" + query.trim() + "”."
+                    : "Start typing to search files, apps, and actions."}
                 </strong>
                 <span>
                   {query.trim()
-                    ? "Try another word or filter."
-                    : "Files, folders, apps and actions."}
+                    ? "Try a different spelling, or a prefix such as file:, history:, or code:."
+                    : "Try a file name, an app, or a command like “lock”."}
                 </span>
               </div>
             ) : (
-              results.slice(0, 5).map((result) => (
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={results.indexOf(result) === activeIndex}
-                  key={result.id}
-                  className={
-                    "island-result-row" +
-                    (results.indexOf(result) === activeIndex ? " is-active" : "")
-                  }
-                  onClick={() => onOpen(result)}
-                  onMouseEnter={() => setActiveIndex(results.indexOf(result))}
+              visibleGroups.map((group, groupIndex) => (
+                <div
+                  className="island-result-group"
+                  role="group"
+                  aria-labelledby={"island-group-" + groupIndex}
+                  key={group.kind}
                 >
-                  <span className="island-result-icon">
-                    <IslandIcon
-                      name={
-                        result.kind === "folder"
-                          ? "file"
-                          : result.kind === "application"
-                            ? "search"
-                            : result.kind === "action"
-                              ? "bolt"
-                              : "file"
-                      }
-                      size={18}
-                    />
-                  </span>
-                  <span className="island-result-body">
-                    <span className="island-result-title">{result.title}</span>
-                    <span className="island-result-sub">{result.subtitle}</span>
-                  </span>
-                </button>
+                  <div
+                    className="island-group-label"
+                    id={"island-group-" + groupIndex}
+                    role="presentation"
+                  >
+                    {group.label}
+                  </div>
+                  {group.items.map((item) => {
+                    const result = item.result;
+                    const index = rowIndexById.get(result.id) ?? 0;
+                    return (
+                      <SharedResultRow
+                        key={result.id}
+                        result={result}
+                        selected={index === activeIndex}
+                        optionId={"island-opt-" + result.id.replace(/[^a-zA-Z0-9_-]/g, "_")}
+                        descriptionId={"island-desc-" + result.id.replace(/[^a-zA-Z0-9_-]/g, "_")}
+                        metaId={"island-meta-" + result.id.replace(/[^a-zA-Z0-9_-]/g, "_")}
+                        testId="island-result-row"
+                        className="island-result-row"
+                        onMouseEnter={() => setActiveIndex(index)}
+                        onClick={() => onOpen(result)}
+                      />
+                    );
+                  })}
+                </div>
               ))
             )}
           </div>

@@ -90,3 +90,17 @@ the shell controls API (volume 62 %, brightness 80 %, audio output, real notific
 **Gate status unchanged:** G4 PASS WITH CONDITIONS; G5 PASS WITH CONDITIONS (evidence improved, new visual fixes required
 before rel-recon can treat card states as fully accepted). re-sign may proceed for the rest; these are owner-tracked.
 
+## 6. Task-56 user-rejection blocker (2026-11-10)
+
+User rejected the island visual/UX quality: bleed/translucency, overlapping notifications, Quick Settings showing
+"Unsupported", and search not matching Normal Launcher. New binding doc: `ISLAND_VISUAL_UX_FIX.md` (opaque surface,
+enter/exit 180/120 ms transform-only, fixed-grid notifications, usable Quick Settings + Open Windows settings fallback,
+island Search parity with Normal Launcher). ISLAND_V9_SPEC §12 records the override; SCREENS §2.13, DESIGN_SYSTEM and
+KEYBOARD are synced.
+
+**G5 status: BLOCKED for re-sign** until ui-launcher delivers before/after captures over a light/text window and the
+fixes are reviewed: (a) no desktop text/previous card visible inside the island bbox at any animation keyframe; (b)
+notifications 0/1/3 without overlap; (c) Quick Settings usable with real controls + fallback, no "Unsupported"; (d) island
+search same filters/group order/labels/icons/empty copy as Normal Launcher. Existing conditional items remain. G4 status
+unchanged; this is an island (G5) quality gate.
+

@@ -404,3 +404,16 @@ produce; if a reader is chattier, fix the live-region throttling, not the markup
    skipped and onboarding never blocks on it.
 6. **10 px tracked caps** at 100 % DPI are the smallest text; if a low-vision user increases Windows text size and the
    WebView does not scale it, the app falls short — record the measured behaviour at Windows text size 125–200 %.
+
+## 12. Dynamic Island — task-56 quality keys
+
+- Search/filter: same four filters All/Files/Folders/Apps as Normal Launcher; focus stays in input, arrows filter, Enter
+  opens; group order/empty copy match the Normal Launcher; compact→expanded uses the same query epoch rules.
+- Notifications: row action dismiss is a 30x30 named button; Tab order row content → dismiss → Clear all; disabled dismiss
+  must expose its reason; no hidden/overlapping target.
+- Quick Settings: sliders labelled with value text; ←/→/Home/End adjust; split Wi-Fi/Bluetooth tiles have separate toggle
+  and chevron targets (Space toggles, chevron opens the list); "Open Windows settings" is a real button; Esc/back returns
+  and restores focus to the tile. No "Unsupported" text.
+- Island surface: no focus loss on show/hide; reduced motion removes transform; Enter/exit never fades content.
+Full binding: `ISLAND_VISUAL_UX_FIX.md`.
+

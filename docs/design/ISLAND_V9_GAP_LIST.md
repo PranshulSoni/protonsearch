@@ -21,6 +21,17 @@ capability adapters, IPC gaps and evidence/a11y polish. No fake data is accepted
 
 ## Remaining gaps
 
+## P0 — user-rejection quality fixes (task-56, open)
+
+| # | Issue | Required |
+|---|---|---|
+| 0.1 | Island surface bleed/translucency in user screenshots: opacity/alpha/fade treatment lets desktop/previous content show through | Fully opaque surface/cards at all times; no surface opacity/fade; only shadow pad transparent; verify over light/text window. See `ISLAND_VISUAL_UX_FIX.md` §1. |
+| 0.2 | Enter/exit motion is not a defined, opaque transition | Show 180 ms transform translateY(-8) scale(.97)->0/1; hide 120 ms translateY(-6) scale(.985); opacity constant 1; reduced motion 0 ms; no fade-through. |
+| 0.3 | Notifications overlap (row content/dismiss/footer) | Fixed 18 / 1fr / 30 grid, 52 px rows, 156 px scroll list, 30x30 dismiss reserved, footer below list; 0/1/many states; no test toast. |
+| 0.4 | Quick Settings shows "Unsupported" / dead controls; content overflows | Real volume/brightness/audio + split Wi-Fi/Bluetooth tiles with chevron lists + real "Open Windows settings" fallback; never "Unsupported"; layout fits 376. |
+| 0.5 | Island Search does not match Normal Launcher | Same four filters, shared group order/labels, ResultIcon source, row data and empty copy; shared pure search model; no Actions chip. |
+
+
 ### P1 — must be tracked before G5 sign-off / release
 
 | # | Gap | Current evidence | Required / owner |

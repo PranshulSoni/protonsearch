@@ -1,14 +1,19 @@
-//! Monitor brightness via Dxva2 (user-level, no admin). Works for internal
-//! laptop panels that expose brightness controls; external monitors may not
-//! expose it. Every call returns a structured error when unsupported.
+//! Monitor brightness via Dxva2 with a DDC/CI fallback for external monitors.
+//! User-level, bounded, never blocks the UI; unsupported monitors get an honest
+//! reason and the UI can fall back to Windows display settings.
 
 use anyhow::anyhow;
 use windows::Win32::Devices::Display::{
     DestroyPhysicalMonitors, GetMonitorBrightness, GetNumberOfPhysicalMonitorsFromHMONITOR,
-    GetPhysicalMonitorsFromHMONITOR, SetMonitorBrightness, PHYSICAL_MONITOR,
+    GetPhysicalMonitorsFromHMONITOR, GetVCPFeatureAndVCPFeatureReply, SetMonitorBrightness,
+    SetVCPFeature, MC_VCP_CODE_TYPE, PHYSICAL_MONITOR,
 };
 use windows::Win32::Foundation::{BOOL, HANDLE, LPARAM, RECT};
 use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, HDC, HMONITOR};
+
+use crate::{BrightnessMethod, BrightnessMonitorInfo};
+
+const VCP_BRIGHTNESS: u8 = 0x10;
 
 struct PhysicalMonitor {
     handle: HANDLE,
@@ -68,8 +73,6 @@ fn physical_monitors(monitor: HMONITOR) -> Vec<PhysicalMonitor> {
     array
         .into_iter()
         .map(|monitor| {
-            // PHYSICAL_MONITOR is a packed struct: copy fields by value instead
-            // of taking references to packed fields.
             let description_units: [u16; 128] = monitor.szPhysicalMonitorDescription;
             let handle = monitor.hPhysicalMonitor;
             let end = description_units
@@ -92,43 +95,101 @@ fn all_physical_monitors() -> Vec<PhysicalMonitor> {
     monitors
 }
 
-fn brightness_of(monitor: &PhysicalMonitor) -> anyhow::Result<u8> {
+struct MonitorReading {
+    current: u8,
+    minimum: u32,
+    maximum: u32,
+    method: BrightnessMethod,
+}
+
+fn normalize(current: u32, minimum: u32, maximum: u32) -> u8 {
+    let span = maximum.saturating_sub(minimum).max(1);
+    (((current.saturating_sub(minimum)) as f64 / span as f64) * 100.0).round().min(100.0) as u8
+}
+
+fn dxva2_reading(monitor: &PhysicalMonitor) -> Option<MonitorReading> {
     let mut minimum = 0u32;
     let mut current = 0u32;
     let mut maximum = 0u32;
     let ok = unsafe { GetMonitorBrightness(monitor.handle, &mut minimum, &mut current, &mut maximum) };
     if ok == 0 || maximum == 0 {
-        return Err(anyhow!("monitor does not expose brightness control"));
+        return None;
     }
-    let value = ((current.saturating_sub(minimum)) as f64
-        / (maximum.saturating_sub(minimum)).max(1) as f64
-        * 100.0)
-        .round() as u8;
-    Ok(value.min(100))
+    Some(MonitorReading {
+        current: normalize(current, minimum, maximum),
+        minimum,
+        maximum,
+        method: BrightnessMethod::Dxva2,
+    })
 }
 
-/// True when at least one monitor exposes brightness control.
+/// DDC/CI fallback via VCP code 0x10 (brightness) for external monitors.
+fn ddc_reading(monitor: &PhysicalMonitor) -> Option<MonitorReading> {
+    let mut code_type = MC_VCP_CODE_TYPE::default();
+    let mut current = 0u32;
+    let mut maximum = 0u32;
+    let ok = unsafe {
+        GetVCPFeatureAndVCPFeatureReply(
+            monitor.handle,
+            VCP_BRIGHTNESS,
+            Some(&mut code_type),
+            &mut current,
+            Some(&mut maximum),
+        )
+    };
+    if ok == 0 || maximum == 0 {
+        return None;
+    }
+    Some(MonitorReading {
+        current: normalize(current, 0, maximum),
+        minimum: 0,
+        maximum,
+        method: BrightnessMethod::DdcCi,
+    })
+}
+
+fn reading(monitor: &PhysicalMonitor) -> Option<MonitorReading> {
+    dxva2_reading(monitor).or_else(|| ddc_reading(monitor))
+}
+
+/// True when at least one monitor exposes brightness control (Dxva2 or DDC/CI).
 pub fn supported() -> bool {
-    all_physical_monitors()
-        .iter()
-        .any(|monitor| brightness_of(monitor).is_ok())
+    all_physical_monitors().iter().any(|monitor| reading(monitor).is_some())
 }
 
-/// Monitor descriptions that expose brightness control.
+/// Descriptions of monitors that expose brightness control.
 pub fn monitors() -> Vec<String> {
     all_physical_monitors()
         .iter()
-        .filter(|monitor| brightness_of(monitor).is_ok())
+        .filter(|monitor| reading(monitor).is_some())
         .map(|monitor| monitor.description.clone())
+        .collect()
+}
+
+/// Per-monitor brightness details (current value + control method).
+pub fn list_monitors() -> Vec<BrightnessMonitorInfo> {
+    all_physical_monitors()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, monitor)| {
+            let reading = reading(monitor)?;
+            Some(BrightnessMonitorInfo {
+                index,
+                name: monitor.description.clone(),
+                current: reading.current,
+                minimum: reading.minimum,
+                maximum: reading.maximum,
+                method: reading.method,
+            })
+        })
         .collect()
 }
 
 /// Current brightness (0..=100) of the first brightness-capable monitor.
 pub fn get_brightness() -> anyhow::Result<u8> {
-    let monitors = all_physical_monitors();
-    for monitor in &monitors {
-        if let Ok(value) = brightness_of(monitor) {
-            return Ok(value);
+    for monitor in all_physical_monitors().iter() {
+        if let Some(reading) = reading(monitor) {
+            return Ok(reading.current);
         }
     }
     Err(anyhow!("no monitor exposes brightness control on this host"))
@@ -141,24 +202,27 @@ pub fn set_brightness(percent: u8) -> anyhow::Result<()> {
     let mut changed = 0usize;
     let mut last_error = None;
     for monitor in &monitors {
-        let mut minimum = 0u32;
-        let mut current = 0u32;
-        let mut maximum = 0u32;
-        let ok =
-            unsafe { GetMonitorBrightness(monitor.handle, &mut minimum, &mut current, &mut maximum) };
-        if ok == 0 || maximum == 0 {
+        let Some(reading) = reading(monitor) else {
             continue;
-        }
-        let target =
-            minimum + ((maximum.saturating_sub(minimum)) as f64 * percent as f64 / 100.0).round() as u32;
-        if unsafe { SetMonitorBrightness(monitor.handle, target) } == 0 {
+        };
+        let target = reading.minimum
+            + ((reading.maximum.saturating_sub(reading.minimum)) as f64 * percent as f64 / 100.0)
+                .round() as u32;
+        let ok = match reading.method {
+            BrightnessMethod::Dxva2 => (unsafe { SetMonitorBrightness(monitor.handle, target) }) != 0,
+            BrightnessMethod::DdcCi => {
+                (unsafe { SetVCPFeature(monitor.handle, VCP_BRIGHTNESS, target) }) != 0
+            }
+        };
+        if ok {
+            changed += 1;
+        } else {
             last_error = Some(anyhow!(
-                "SetMonitorBrightness failed for {}",
-                monitor.description
+                "could not change brightness for {} ({:?})",
+                monitor.description,
+                reading.method
             ));
-            continue;
         }
-        changed += 1;
     }
     if changed > 0 {
         Ok(())

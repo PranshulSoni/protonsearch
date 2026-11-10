@@ -57,11 +57,11 @@ export default function IslandView() {
   const [variant, setVariant] = useState<IslandVariant>("default");
   const [clipTab, setClipTab] = useState<ClipTab>("all");
   const [phase, setPhase] = useState<Phase>("idle");
-  const [closing, setClosing] = useState(false);
+  const [visibility, setVisibility] = useState<"opening" | "shown" | "closing" | "hidden">("shown");
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("all");
 
-  const surfaceRef = useRef<HTMLDivElement>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const initialisedRef = useRef(false);
   const tokenRef = useRef(0);
@@ -111,25 +111,15 @@ export default function IslandView() {
     setCompact(defaultCard === "search");
   }, [bootstrap.ready, defaultCard]);
 
-  // Surface bbox contract: the window adds the shadow padding; report surface only.
+  // Surface bbox contract: report the TARGET surface size once per settled
+  // dims change. A ResizeObserver during the 550 ms CSS morph caused a native
+  // window-resize storm; the window adds the 112 px shadow pad itself.
   useEffect(() => {
-    const element = surfaceRef.current;
-    if (!element) return;
-    let last = "";
-    const report = () => {
-      const rect = element.getBoundingClientRect();
-      const width = Math.ceil(rect.width);
-      const height = Math.ceil(rect.height);
-      const key = width + "x" + height;
-      if (key === last) return;
-      last = key;
-      void api.setIslandGeometry(width, height).catch(() => undefined);
-    };
-    report();
-    const observer = new ResizeObserver(report);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+    const timer = window.setTimeout(() => {
+      void api.setIslandGeometry(dims.width, dims.height).catch(() => undefined);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [dims.width, dims.height]);
 
   useEffect(() => {
     if (compact) return;
@@ -138,19 +128,19 @@ export default function IslandView() {
   }, [compact, activeCard]);
 
   const requestHide = useCallback(() => {
-    if (closing) return;
+    if (visibility === "closing" || visibility === "hidden") return;
     const finish = () => {
+      setVisibility("hidden");
       void api.hideIsland().catch(() => undefined);
-      setClosing(false);
     };
     if (prefersReducedMotion()) {
       finish();
       return;
     }
-    setClosing(true);
+    setVisibility("closing");
     if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = window.setTimeout(finish, 450);
-  }, [closing]);
+    closeTimerRef.current = window.setTimeout(finish, 120);
+  }, [visibility]);
 
   const switchCard = useCallback(
     (card: IslandCardId, nextVariant: IslandVariant = "default") => {
@@ -235,11 +225,13 @@ export default function IslandView() {
         if (disposed) return;
         unlisteners.push(
           await listen("island:shown", () => {
-            setClosing(false);
+            if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
             setActiveCard(defaultCard);
             setCompact(defaultCard === "search");
             setVariant("default");
             setPhase("idle");
+            setVisibility("opening");
+            window.setTimeout(() => setVisibility("shown"), 180);
             bootstrap.refresh();
             window.setTimeout(() => inputRef.current?.focus(), 190);
           }),
@@ -449,13 +441,13 @@ export default function IslandView() {
   return (
     <div className="island-host">
       <div
-        ref={surfaceRef}
         className={[
           "island-surface",
           compact ? "island-surface--compact" : "island-surface--expanded",
           phase === "out" ? "island-surface--out" : "",
           phase === "in" ? "island-surface--in" : "",
-          closing ? "island-surface--closing" : "",
+          visibility === "opening" ? "island-surface--opening" : "",
+          visibility === "closing" ? "island-surface--closing" : "",
           activeCard === "media" ? "island-surface--media" : "",
           stageWidth <= 380
             ? "island-surface--narrow"

@@ -132,7 +132,7 @@ fn place_launcher(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64)
 }
 
 fn show_launcher_window(app: &AppHandle) {
-    let Some(win) = app.get_webview_window(LAUNCHER_LABEL) else {
+    let Ok(win) = ensure_launcher_window(app) else {
         return;
     };
     // Cancel any pending dismissal from a previous close animation.
@@ -143,6 +143,7 @@ fn show_launcher_window(app: &AppHandle) {
         .map(|s| (s.width as f64 / scale, s.height as f64 / scale))
         .unwrap_or((launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT)));
     place_launcher(app, &win, size.0, size.1);
+    set_webview_memory_level(&win, false);
     let _ = win.show();
     // Mark the Win32-visible instant before focus/placement bookkeeping so the
     // benchmark harness can measure hotkey->first-pixel honestly.
@@ -178,6 +179,7 @@ fn dismiss_launcher(app: &AppHandle) {
 }
 fn hide_launcher_window(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(LAUNCHER_LABEL) {
+        set_webview_memory_level(&win, true);
         let _ = win.hide();
         let _ = win.emit("launcher:hidden", ());
     }
@@ -264,13 +266,14 @@ fn place_island(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
 
 fn hide_island_window(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(ISLAND_LABEL) {
+        set_webview_memory_level(&win, true);
         let _ = win.hide();
         let _ = win.emit("island:hidden", ());
     }
 }
 
 fn show_island_window(app: &AppHandle) {
-    let Some(win) = app.get_webview_window(ISLAND_LABEL) else {
+    let Ok(win) = ensure_island_window(app) else {
         return;
     };
     ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -314,8 +317,9 @@ fn toggle_island(app: &AppHandle) {
                 ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
             let handle = win.clone();
             std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(320));
+                std::thread::sleep(std::time::Duration::from_millis(600));
                 if ISLAND_GENERATION.load(std::sync::atomic::Ordering::SeqCst) == generation {
+                    set_webview_memory_level(&handle, true);
                     let _ = handle.hide();
                     let _ = handle.emit("island:hidden", ());
                 }
@@ -339,11 +343,13 @@ fn toggle_primary_launcher(app: &AppHandle) {
 }
 
 fn show_main_window(app: &AppHandle) {
-    if let Some(win) = app.get_webview_window(MAIN_LABEL) {
-        let _ = win.show();
-        let _ = win.unminimize();
-        let _ = win.set_focus();
-    }
+    let Ok(win) = ensure_main_window(app) else {
+        return;
+    };
+    set_webview_memory_level(&win, false);
+    let _ = win.show();
+    let _ = win.unminimize();
+    let _ = win.set_focus();
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -429,125 +435,192 @@ fn webview_data_dir() -> Option<PathBuf> {
         .map(|dir| PathBuf::from(dir).join("webview2"))
 }
 
-fn create_windows(app: &AppHandle) -> tauri::Result<()> {
+/// Ask WebView2 to trim its caches while a window is hidden. This keeps launch
+/// latency (the process and renderer stay warm) while materially lowering the
+/// idle working set; restored to NORMAL before the window is shown.
+#[cfg(windows)]
+fn set_webview_memory_level(win: &WebviewWindow, low: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_19;
+    use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW;
+    use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL;
+    use windows_core::Interface;
+    let _ = win.with_webview(move |platform| {
+        let controller = platform.controller();
+        let Ok(core) = (unsafe { controller.CoreWebView2() }) else {
+            return;
+        };
+        let Ok(core19) = core.cast::<ICoreWebView2_19>() else {
+            return;
+        };
+        unsafe {
+            let _ = core19.SetMemoryUsageTargetLevel(if low {
+                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+            } else {
+                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+            });
+        }
+    });
+}
+
+#[cfg(not(windows))]
+fn set_webview_memory_level(_win: &WebviewWindow, _low: bool) {}
+
+fn build_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let cdp = cdp_browser_args();
     let webview_dir = webview_data_dir();
+    let mut builder = WebviewWindowBuilder::new(app, MAIN_LABEL, tauri::WebviewUrl::App("index.html".into()))
+        .title("ProtonSearch")
+        .inner_size(1180.0, 800.0)
+        .min_inner_size(560.0, 480.0)
+        .visible(false)
+        .center();
+    if let Some(args) = &cdp {
+        builder = builder.additional_browser_args(args);
+    }
     if let Some(dir) = &webview_dir {
         let _ = std::fs::create_dir_all(dir);
+        builder = builder.data_directory(dir.clone());
     }
-    if app.get_webview_window(MAIN_LABEL).is_none() {
-        let mut main_builder = WebviewWindowBuilder::new(app, MAIN_LABEL, tauri::WebviewUrl::App("index.html".into()))
-            .title("ProtonSearch")
-            .inner_size(1180.0, 800.0)
-            .min_inner_size(560.0, 480.0)
-            .visible(false)
-            .center();
-        if let Some(args) = &cdp {
-            main_builder = main_builder.additional_browser_args(args);
-        }
-        if let Some(dir) = &webview_dir {
-            main_builder = main_builder.data_directory(dir.clone());
-        }
-        let main = main_builder.build()?;
-        let _ = main.set_icon(window_icon()?);
-        // Clamp the desktop window to the current monitor (design review L5):
-        // never let the caption buttons or bottom edge fall outside the work area.
-        if let Ok(Some(monitor)) = main.current_monitor() {
-            let scale = monitor.scale_factor();
-            let mw = monitor.size().width as f64 / scale;
-            let mh = monitor.size().height as f64 / scale;
-            let width = 1180.0_f64.min(mw - 48.0).max(560.0);
-            let height = 800.0_f64.min(mh - 96.0).max(480.0);
-            let _ = main.set_size(tauri::LogicalSize::new(width, height));
-            let _ = main.center();
-        }
-        let win = main.clone();
-        main.on_window_event(move |event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // Keep the app alive in the tray; explicit Quit exits.
-                api.prevent_close();
-                let _ = win.hide();
-            }
-        });
+    let main = builder.build()?;
+    let _ = main.set_icon(window_icon()?);
+    set_webview_memory_level(&main, true);
+    if let Ok(Some(monitor)) = main.current_monitor() {
+        let scale = monitor.scale_factor();
+        let mw = monitor.size().width as f64 / scale;
+        let mh = monitor.size().height as f64 / scale;
+        let width = 1180.0_f64.min(mw - 48.0).max(560.0);
+        let height = 800.0_f64.min(mh - 96.0).max(480.0);
+        let _ = main.set_size(tauri::LogicalSize::new(width, height));
+        let _ = main.center();
     }
+    let win = main.clone();
+    main.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            let _ = win.hide();
+        }
+    });
+    Ok(main)
+}
 
-    if app.get_webview_window(LAUNCHER_LABEL).is_none() {
-        let mut launcher_builder = WebviewWindowBuilder::new(
-            app,
-            LAUNCHER_LABEL,
-            tauri::WebviewUrl::App("index.html".into()),
-        )
-        .title("ProtonSearch")
-        .inner_size(launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT))
-        .min_inner_size(560.0, 160.0)
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .visible(false);
-        if let Some(args) = &cdp {
-            launcher_builder = launcher_builder.additional_browser_args(args);
-        }
-        if let Some(dir) = &webview_dir {
-            launcher_builder = launcher_builder.data_directory(dir.clone());
-        }
-        let launcher = launcher_builder.build()?;
-        let _ = launcher.set_icon(window_icon()?);
-        place_launcher(app, &launcher, launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT));
-        let launcher_for_focus = launcher.clone();
-        launcher.on_window_event(move |event| {
-            if let tauri::WindowEvent::Focused(false) = event {
-                let _ = launcher_for_focus.emit("launcher:dismiss", ());
-            }
-        });
+fn ensure_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    if let Some(window) = app.get_webview_window(MAIN_LABEL) {
+        return Ok(window);
     }
+    build_main_window(app)
+}
 
-    if app.get_webview_window(ISLAND_LABEL).is_none() {
-        let mut island_builder = WebviewWindowBuilder::new(
-            app,
-            ISLAND_LABEL,
-            tauri::WebviewUrl::App("index.html".into()),
-        )
-        .title("ProtonSearch Island")
-        .inner_size(
-            ISLAND_DEFAULT_WIDTH + ISLAND_SHADOW_PAD * 2.0,
-            ISLAND_DEFAULT_HEIGHT + ISLAND_SHADOW_PAD * 2.0,
-        )
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .visible(false)
-        .focused(false);
-        if let Some(args) = &cdp {
-            island_builder = island_builder.additional_browser_args(args);
-        }
-        if let Some(dir) = &webview_dir {
-            island_builder = island_builder.data_directory(dir.clone());
-        }
-        let island = island_builder.build()?;
-        let _ = island.set_icon(window_icon()?);
-        place_island(app, &island, ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT);
-        let app_for_focus = app.clone();
-        let island_for_focus = island.clone();
-        island.on_window_event(move |event| {
-            if let tauri::WindowEvent::Focused(false) = event {
-                let hide = app_for_focus
-                    .try_state::<AppState>()
-                    .map(|state| state.engine.settings().launcher.island.hide_on_focus_loss)
-                    .unwrap_or(true);
-                if hide {
-                    let _ = island_for_focus.hide();
-                    let _ = island_for_focus.emit("island:hidden", ());
-                }
-            }
-        });
+fn build_launcher_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    let cdp = cdp_browser_args();
+    let webview_dir = webview_data_dir();
+    let mut builder = WebviewWindowBuilder::new(
+        app,
+        LAUNCHER_LABEL,
+        tauri::WebviewUrl::App("index.html".into()),
+    )
+    .title("ProtonSearch")
+    .inner_size(launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT))
+    .min_inner_size(560.0, 160.0)
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .visible(false);
+    if let Some(args) = &cdp {
+        builder = builder.additional_browser_args(args);
     }
+    if let Some(dir) = &webview_dir {
+        builder = builder.data_directory(dir.clone());
+    }
+    let launcher = builder.build()?;
+    let _ = launcher.set_icon(window_icon()?);
+    set_webview_memory_level(&launcher, true);
+    place_launcher(app, &launcher, launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT));
+    let launcher_for_focus = launcher.clone();
+    launcher.on_window_event(move |event| {
+        if let tauri::WindowEvent::Focused(false) = event {
+            let _ = launcher_for_focus.emit("launcher:dismiss", ());
+        }
+    });
+    Ok(launcher)
+}
 
+fn ensure_launcher_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    if let Some(window) = app.get_webview_window(LAUNCHER_LABEL) {
+        return Ok(window);
+    }
+    build_launcher_window(app)
+}
+
+fn build_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    let cdp = cdp_browser_args();
+    let webview_dir = webview_data_dir();
+    let mut builder = WebviewWindowBuilder::new(
+        app,
+        ISLAND_LABEL,
+        tauri::WebviewUrl::App("index.html".into()),
+    )
+    .title("ProtonSearch Island")
+    .inner_size(
+        ISLAND_DEFAULT_WIDTH + ISLAND_SHADOW_PAD * 2.0,
+        ISLAND_DEFAULT_HEIGHT + ISLAND_SHADOW_PAD * 2.0,
+    )
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .visible(false)
+    .focused(false);
+    if let Some(args) = &cdp {
+        builder = builder.additional_browser_args(args);
+    }
+    if let Some(dir) = &webview_dir {
+        builder = builder.data_directory(dir.clone());
+    }
+    let island = builder.build()?;
+    let _ = island.set_icon(window_icon()?);
+    set_webview_memory_level(&island, true);
+    place_island(app, &island, ISLAND_DEFAULT_WIDTH, ISLAND_DEFAULT_HEIGHT);
+    let app_for_focus = app.clone();
+    let island_for_focus = island.clone();
+    island.on_window_event(move |event| {
+        if let tauri::WindowEvent::Focused(false) = event {
+            let hide = app_for_focus
+                .try_state::<AppState>()
+                .map(|state| state.engine.settings().launcher.island.hide_on_focus_loss)
+                .unwrap_or(true);
+            if hide {
+                let _ = island_for_focus.hide();
+                let _ = island_for_focus.emit("island:hidden", ());
+            }
+        }
+    });
+    Ok(island)
+}
+
+fn ensure_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    if let Some(window) = app.get_webview_window(ISLAND_LABEL) {
+        return Ok(window);
+    }
+    build_island_window(app)
+}
+
+/// Memory: prewarm ONLY the user's primary floating launcher. The desktop app
+/// and the alternative launcher are created lazily on first use, so an idle
+/// tray session keeps one WebView alive instead of three.
+fn create_windows(app: &AppHandle) -> tauri::Result<()> {
+    let settings = app.state::<AppState>().engine.settings();
+    if settings.launcher.primary_mode == LauncherMode::DynamicIsland
+        && settings.launcher.island.enabled
+    {
+        let _ = ensure_island_window(app)?;
+    } else {
+        let _ = ensure_launcher_window(app)?;
+    }
     Ok(())
 }
 
@@ -681,6 +754,15 @@ fn update_settings(
         if settings.launcher.primary_mode != previous.launcher.primary_mode {
             hide_launcher_window(&app);
             hide_island_window(&app);
+            // Free the inactive launcher's WebView; it is re-created lazily.
+            let inactive = if settings.launcher.primary_mode == LauncherMode::DynamicIsland {
+                LAUNCHER_LABEL
+            } else {
+                ISLAND_LABEL
+            };
+            if let Some(win) = app.get_webview_window(inactive) {
+                let _ = win.destroy();
+            }
         }
     }
     Ok(settings)
@@ -1166,22 +1248,45 @@ fn agent_stop(state: tauri::State<'_, AppState>) {
     }
 }
 
+/// Capability-gated snapshot of the native integrations the island/settings
+/// cards render. Honest: unavailable features carry a reason, never fake state.
 fn map_capability(capability: &ps_windows::Capability) -> ps_ipc::ControlCapability {
     ps_ipc::ControlCapability {
         supported: capability.supported,
         reason: capability.reason.clone(),
+        fallback_uri: capability.fallback_uri.clone(),
     }
 }
 
+fn settings_page_from_id(page: &str) -> Option<ps_windows::SettingsPage> {
+    Some(match page {
+        "wifi" => ps_windows::SettingsPage::Wifi,
+        "bluetooth" => ps_windows::SettingsPage::Bluetooth,
+        "display" => ps_windows::SettingsPage::Display,
+        "sound" => ps_windows::SettingsPage::Sound,
+        "notifications" => ps_windows::SettingsPage::Notifications,
+        "airplane_mode" => ps_windows::SettingsPage::AirplaneMode,
+        "mobile_hotspot" => ps_windows::SettingsPage::MobileHotspot,
+        "night_light" => ps_windows::SettingsPage::NightLight,
+        "energy_saver" => ps_windows::SettingsPage::EnergySaver,
+        "project" => ps_windows::SettingsPage::Project,
+        "windows_update" => ps_windows::SettingsPage::WindowsUpdate,
+        "privacy_location" => ps_windows::SettingsPage::PrivacyLocation,
+        _ => return None,
+    })
+}
+
 /// Capability-gated snapshot of the native integrations the island/settings
-/// cards render. Honest: unavailable features carry a reason, never fake state.
+/// cards render. Honest: unavailable features carry a reason + allow-listed
+/// Windows settings fallback, never fake state.
 #[tauri::command]
 fn get_controls_status(state: tauri::State<'_, AppState>) -> ps_ipc::ControlsStatus {
     let caps = ps_windows::native_capabilities();
+    // probes are bounded internally; this keeps the IPC call deterministic.
+    let native = ps_windows::controls_status();
     let outputs = ps_windows::list_audio_outputs().unwrap_or_default();
     let default_output = ps_windows::default_audio_output().ok();
     let audio = ps_windows::audio_state().ok();
-    let brightness = ps_windows::get_brightness().ok();
     let db_path = state.data_dir.join("index.db");
     let notification_items: Vec<ps_ipc::AppNotification> =
         ps_sources::notifications::list(&db_path, 20, false)
@@ -1196,9 +1301,31 @@ fn get_controls_status(state: tauri::State<'_, AppState>) -> ps_ipc::ControlsSta
             })
             .collect();
     let notification_unread = ps_sources::notifications::unread_count(&db_path);
+    let brightness_monitors = native
+        .brightness
+        .as_ref()
+        .map(|state| {
+            state
+                .monitors
+                .iter()
+                .map(|monitor| ps_ipc::BrightnessMonitorInfo {
+                    index: monitor.index,
+                    name: monitor.name.clone(),
+                    current: monitor.current,
+                    minimum: monitor.minimum,
+                    maximum: monitor.maximum,
+                    method: match monitor.method {
+                        ps_windows::BrightnessMethod::Dxva2 => ps_ipc::BrightnessMethod::Dxva2,
+                        ps_windows::BrightnessMethod::DdcCi => ps_ipc::BrightnessMethod::DdcCi,
+                    },
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let brightness_percent = brightness_monitors.first().map(|monitor| monitor.current);
+    let wifi_state = native.wifi.as_ref();
+    let bluetooth_state = native.bluetooth.as_ref();
     ps_ipc::ControlsStatus {
-        // Milestone 2 (GSMTC transport) is not wired yet: keep the honest false
-        // even though the OS manager probe succeeds.
         media_capability: ps_ipc::ControlCapability::unsupported(
             "Media session control is not wired in this build yet.",
         ),
@@ -1215,13 +1342,44 @@ fn get_controls_status(state: tauri::State<'_, AppState>) -> ps_ipc::ControlsSta
         volume_percent: audio.map(|state| (state.volume * 100.0).round().clamp(0.0, 100.0) as u8),
         muted: audio.map(|state| state.muted),
         brightness_capability: map_capability(&caps.brightness),
-        brightness_percent: brightness,
+        brightness_percent,
+        brightness_monitors,
         wifi: map_capability(&caps.wifi),
-        wifi_enabled: None,
-        wifi_networks: Vec::new(),
+        wifi_enabled: wifi_state.map(|state| state.radio.enabled),
+        wifi_networks: wifi_state
+            .map(|state| {
+                state
+                    .networks
+                    .iter()
+                    .map(|network| ps_ipc::WifiNetworkInfo {
+                        ssid: network.ssid.clone(),
+                        signal: network.signal,
+                        security: network.security.clone(),
+                        connected: network.connected,
+                        has_profile: network.has_profile,
+                        connectable: network.connectable,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        wifi_error: wifi_state.and_then(|state| state.error.clone()),
         bluetooth: map_capability(&caps.bluetooth),
-        bluetooth_enabled: None,
-        bluetooth_devices: Vec::new(),
+        bluetooth_enabled: bluetooth_state.map(|state| state.radio.enabled),
+        bluetooth_devices: bluetooth_state
+            .map(|state| {
+                state
+                    .devices
+                    .iter()
+                    .map(|device| ps_ipc::BluetoothDeviceInfo {
+                        id: device.id.clone(),
+                        name: device.name.clone(),
+                        connected: device.connected,
+                        paired: device.paired,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        bluetooth_error: bluetooth_state.and_then(|state| state.error.clone()),
         airplane_mode: map_capability(&caps.airplane_mode),
         night_light: map_capability(&caps.night_light),
         energy_saver: map_capability(&caps.energy_saver),
@@ -1230,6 +1388,33 @@ fn get_controls_status(state: tauri::State<'_, AppState>) -> ps_ipc::ControlsSta
         notification_unread,
         notification_items,
     }
+}
+
+#[tauri::command]
+fn control_set_wifi(enabled: bool) -> Result<(), String> {
+    ps_windows::set_wifi_radio(enabled)
+        .map_err(|error| format!("{error:#}"))
+}
+
+#[tauri::command]
+fn control_set_bluetooth(enabled: bool) -> Result<(), String> {
+    ps_windows::set_bluetooth_radio(enabled)
+        .map_err(|error| format!("{error:#}"))
+}
+
+#[tauri::command]
+fn control_connect_wifi(ssid: String) -> Result<(), String> {
+    match ps_windows::connect_wifi(&ssid) {
+        Ok(outcome) if outcome.connected => Ok(()),
+        Ok(outcome) => Err(outcome.message),
+        Err(error) => Err(format!("{error:#}")),
+    }
+}
+
+#[tauri::command]
+fn control_open_settings(page: String) -> Result<(), String> {
+    let page = settings_page_from_id(&page).ok_or_else(|| "Unknown settings page.".to_string())?;
+    ps_windows::open_settings_page(page).map_err(|_| "Couldn't open Windows settings.".to_string())
 }
 
 #[tauri::command]
@@ -1537,6 +1722,10 @@ fn main() {
             perf_mark,
             get_preview,
             get_controls_status,
+            control_set_wifi,
+            control_set_bluetooth,
+            control_connect_wifi,
+            control_open_settings,
             control_set_volume,
             control_set_muted,
             control_set_brightness,

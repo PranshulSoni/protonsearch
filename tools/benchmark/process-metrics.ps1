@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Get-Tree([int]$rootId) {
-    $all = Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name, WorkingSetSize, PrivatePageCount
+    $all = Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name, WorkingSetSize, PrivatePageCount, CommandLine
     $map = @{}
     foreach ($p in $all) { $map[[int]$p.ProcessId] = $p }
     $tree = New-Object System.Collections.Generic.List[object]
@@ -54,7 +54,7 @@ if ($Mode -eq "memory") {
         processCount = $tree.Count
         totalWorkingSetBytes = [int64](($tree | Measure-Object -Property WorkingSetSize -Sum).Sum)
         totalPrivateBytes = [int64](($tree | Measure-Object -Property PrivatePageCount -Sum).Sum)
-        processes = @($tree | ForEach-Object { [pscustomobject]@{ pid = [int]$_.ProcessId; name = $_.Name; wsBytes = [int64]$_.WorkingSetSize } })
+        processes = @($tree | ForEach-Object { [pscustomobject]@{ pid = [int]$_.ProcessId; name = $_.Name; wsBytes = [int64]$_.WorkingSetSize; privateBytes = [int64]$_.PrivatePageCount; commandLine = $(if ($_.CommandLine) { $_.CommandLine.Substring(0, [Math]::Min(400, $_.CommandLine.Length)) } else { "" }) } })
         cpuSecondsTotal = [math]::Round($cpuNow, 3)
     } | ConvertTo-Json -Compress -Depth 4
 } else {

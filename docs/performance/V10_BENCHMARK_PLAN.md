@@ -37,6 +37,20 @@ Thresholds marked "stretch" come from the master prompt; the acceptance threshol
 | T11 | Input-to-highlight under one rendered frame when feasible | debug build + perf marks: `node tools/benchmark/app-baseline.mjs` selection measurement (launcher-selection-painted) | p95 <= 1 frame (16.7 ms @60 Hz / 8.3 ms @120 Hz) for arrow-key selection highlight | ui-launcher + perf-bench | **DEBUG MET, recheck on commit 10beb90**: input->selection-painted p50 **5** / p95 **6** / p99 8 ms (n=20/20), stable vs the earlier 5/7 ms result. |
 | T12 | Cold start / activation split | release launch to first invocation vs warm summons (T5 harness records cold first trial vs warm) | reported, no invented threshold | ui-launcher | **RELEASE MEASURED (commit c7ee0a7)**: cold first summon visible p50 6.198 ms vs warm 7.029 ms (window is pre-created hidden, so cold is process-cold not window-cold; reported honestly). |
 
+### 2b. Island performance acceptance (task-57)
+
+| Row | Scenario | Acceptance threshold | Owner | Status |
+|---|---|---|---|---|
+| I1 Island open frame pacing | `node tools/benchmark/island-perf.mjs` open series (8 takes, 950 ms window, 120 Hz assumed) | >=99% frame intervals <= 1.5x period; p95 <= 1.2x period (10 ms); long tasks >50 ms = 0 | ui-launcher + L0 shell, perf-bench | PENDING current green build |
+| I2 Island close frame pacing | same harness close series (Escape -> exit animation) | same thresholds as I1 | ui-launcher + L0, perf-bench | PENDING |
+| I3 Island typing -> results | island search card, 20 typed queries, input event -> results visible + double rAF | p95 <= 30 ms (same as T6, island surface) | ui-launcher + engine-core | PENDING |
+| I4 Island card switch | Ctrl+ArrowDown/Up, 20 takes, keydown -> new card heading painted + double rAF | p95 <= 16.7 ms (one 60 Hz frame) stretch; report per-switch Layout/Recalc/Script deltas + resize events | ui-launcher | PENDING |
+| I5 Idle memory, primary launcher only | lazy main/alternate windows; per-process WS/private/command lines | materially below the 786.9 MiB three-window baseline; no invented ceiling; report exact breakdown | L0 shell + perf-bench | PENDING |
+| I6 WebView2 hide trim | hide launcher/island, wait 8 s, compare per-process WS; page retained (warm) | WS drop on hidden WebView2 processes with warm reopen latency unchanged | L0 shell | PENDING |
+| I7 Activation trade-off | first lazy island open (WebView creation) vs warm open, real hotkey + marks | first-open delta reported; warm hotkey->visible p95 <= 50 ms (T5) | L0 shell + ui-launcher | PENDING |
+| I8 Open/close leak | 20x hide/show, memory every 5 cycles | growth <= 20 MiB over 20 cycles (non-monotonic noise reported, no leak declared without evidence) | L0 shell + perf-bench | PENDING |
+| I9 Lag root cause | card-switch CDP Performance durations + resize events | evidence table; label native resize storm vs React scripting vs mixed | perf-bench | PENDING |
+
 Additional required v10 measurements tracked in this plan but without stretch numbers: index build time/memory (T1/T2 harness), content import time (T3 harness), OCR index size (T4 harness), long tasks and layout shift per transition (T7 harness), reduced-motion equivalence (T7 reduced-motion scenario), hotkey conflict/remap path (manual UI test, ui-launcher), WebView2 child-process memory breakdown (T9), indexing-active scroll/typing smoothness (T7 + app harness under scan), multi-monitor/DPI placement (blocked on hardware, section 6), battery/power (not measured without a supported observer).
 
 ## 3. Measurement definitions (binding for every row)

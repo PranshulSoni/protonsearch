@@ -468,6 +468,9 @@ pub struct Capability {
     pub supported: bool,
     /// Why the capability is unavailable (None when supported unless a note).
     pub reason: Option<String>,
+    /// Honest "open Windows settings" fallback for unsupported OS toggles.
+    #[serde(default)]
+    pub fallback_uri: Option<String>,
 }
 
 impl Capability {
@@ -475,6 +478,7 @@ impl Capability {
         Self {
             supported: true,
             reason: None,
+            fallback_uri: None,
         }
     }
 
@@ -482,11 +486,81 @@ impl Capability {
         Self {
             supported: false,
             reason: Some(reason.into()),
+            fallback_uri: None,
+        }
+    }
+
+    /// Unsupported state with an allow-listed ms-settings fallback page.
+    pub fn unsupported_with_fallback(reason: impl Into<String>, page: SettingsPage) -> Self {
+        Self {
+            supported: false,
+            reason: Some(reason.into()),
+            fallback_uri: Some(page.uri().to_string()),
         }
     }
 
     pub fn is_supported(&self) -> bool {
         self.supported
+    }
+
+    pub fn with_fallback(mut self, page: SettingsPage) -> Self {
+        self.fallback_uri = Some(page.uri().to_string());
+        self
+    }
+}
+
+/// Allow-listed Windows Settings pages used as honest fallbacks instead of dead
+/// toggles. No user-controlled URI strings are accepted anywhere.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SettingsPage {
+    Wifi,
+    Bluetooth,
+    Display,
+    Sound,
+    Notifications,
+    AirplaneMode,
+    MobileHotspot,
+    NightLight,
+    EnergySaver,
+    Project,
+    WindowsUpdate,
+    PrivacyLocation,
+}
+
+impl SettingsPage {
+    pub fn uri(self) -> &'static str {
+        match self {
+            SettingsPage::Wifi => "ms-settings:network-wifi",
+            SettingsPage::Bluetooth => "ms-settings:bluetooth",
+            SettingsPage::Display => "ms-settings:display",
+            SettingsPage::Sound => "ms-settings:sound",
+            SettingsPage::Notifications => "ms-settings:notifications",
+            SettingsPage::AirplaneMode => "ms-settings:network-airplanemode",
+            SettingsPage::MobileHotspot => "ms-settings:network-mobilehotspot",
+            SettingsPage::NightLight => "ms-settings:nightlight",
+            SettingsPage::EnergySaver => "ms-settings:batterysaver",
+            SettingsPage::Project => "ms-settings:display",
+            SettingsPage::WindowsUpdate => "ms-settings:windowsupdate",
+            SettingsPage::PrivacyLocation => "ms-settings:privacy-location",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            SettingsPage::Wifi => "Open Wi-Fi settings",
+            SettingsPage::Bluetooth => "Open Bluetooth settings",
+            SettingsPage::Display => "Open display settings",
+            SettingsPage::Sound => "Open sound settings",
+            SettingsPage::Notifications => "Open notification settings",
+            SettingsPage::AirplaneMode => "Open airplane mode settings",
+            SettingsPage::MobileHotspot => "Open mobile hotspot settings",
+            SettingsPage::NightLight => "Open night light settings",
+            SettingsPage::EnergySaver => "Open battery saver settings",
+            SettingsPage::Project => "Open display settings",
+            SettingsPage::WindowsUpdate => "Open Windows Update",
+            SettingsPage::PrivacyLocation => "Open location privacy settings",
+        }
     }
 }
 
@@ -730,5 +804,311 @@ pub fn show_toast(title: &str, body: &str) -> anyhow::Result<()> {
     {
         let _ = (title, body);
         anyhow::bail!("toast notifications are only supported on Windows")
+    }
+}
+// ---------------------------------------------------------------------------
+// Milestone 2 native controls: Wi-Fi, Bluetooth, brightness details, settings
+// fallbacks, and a ready-to-map ControlsStatus snapshot.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RadioStateInfo {
+    pub available: bool,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct WifiNetworkInfo {
+    pub ssid: String,
+    /// 0..=100 signal quality.
+    pub signal: u32,
+    /// Open / WPA / WPA2 / WPA3 / Secured(...)
+    pub security: String,
+    pub connected: bool,
+    /// A saved Windows profile exists, so connect-without-prompt is possible.
+    pub has_profile: bool,
+    pub connectable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct WifiConnectOutcome {
+    pub ssid: String,
+    pub connected: bool,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BluetoothDeviceInfo {
+    pub id: String,
+    pub name: String,
+    pub connected: bool,
+    pub paired: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrightnessMethod {
+    Dxva2,
+    /// DDC/CI fallback (external monitors).
+    DdcCi,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BrightnessMonitorInfo {
+    pub index: usize,
+    pub name: String,
+    pub current: u8,
+    pub minimum: u32,
+    pub maximum: u32,
+    pub method: BrightnessMethod,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct WifiState {
+    pub radio: RadioStateInfo,
+    pub networks: Vec<WifiNetworkInfo>,
+    /// Honest failure when the scan/list was denied (e.g. location permission).
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct BluetoothState {
+    pub radio: RadioStateInfo,
+    pub devices: Vec<BluetoothDeviceInfo>,
+    /// Honest failure when device enumeration failed.
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct BrightnessState {
+    pub supported: bool,
+    pub monitors: Vec<BrightnessMonitorInfo>,
+}
+
+/// Snapshot for the shell/UI Quick Settings card; every section is optional and
+/// bounded (None = timed out or unavailable, capability explains why).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ControlsStatus {
+    pub capabilities: NativeCapabilities,
+    pub wifi: Option<WifiState>,
+    pub bluetooth: Option<BluetoothState>,
+    pub brightness: Option<BrightnessState>,
+}
+
+fn bounded_control<T, F>(probe: F, timeout: std::time::Duration) -> Option<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> anyhow::Result<T> + Send + 'static,
+{
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let spawned = std::thread::Builder::new()
+        .name("ps-control-probe".into())
+        .spawn(move || {
+            let _ = sender.send(probe());
+        });
+    if spawned.is_err() {
+        return None;
+    }
+    match receiver.recv_timeout(timeout) {
+        Ok(Ok(value)) => Some(value),
+        _ => None,
+    }
+}
+
+/// Wi-Fi radio state (WinRT Radio).
+pub fn wifi_radio_state() -> anyhow::Result<RadioStateInfo> {
+    #[cfg(windows)]
+    {
+        imp::wifi::radio_state()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("Wi-Fi controls are only supported on Windows")
+    }
+}
+
+/// Turn the Wi-Fi radio on/off (user-level; RadioAccessStatus is surfaced as an
+/// error with the Wi-Fi settings fallback when Windows denies it).
+pub fn set_wifi_radio(enabled: bool) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::wifi::set_radio(enabled)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enabled;
+        anyhow::bail!("Wi-Fi controls are only supported on Windows")
+    }
+}
+
+/// Available Wi-Fi networks (cached Windows scan list; may be empty briefly after
+/// turning the radio on). Never triggers a blocking scan.
+pub fn list_wifi_networks() -> anyhow::Result<Vec<WifiNetworkInfo>> {
+    #[cfg(windows)]
+    {
+        imp::wifi::list_networks()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("Wi-Fi controls are only supported on Windows")
+    }
+}
+
+/// Connect using an EXISTING saved Windows profile. Never creates a profile and
+/// never prompts for keys: missing profiles return an error with the settings
+/// fallback (ms-settings:network-wifi).
+pub fn connect_wifi(ssid: &str) -> anyhow::Result<WifiConnectOutcome> {
+    #[cfg(windows)]
+    {
+        imp::wifi::connect(ssid)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = ssid;
+        anyhow::bail!("Wi-Fi controls are only supported on Windows")
+    }
+}
+
+/// WLAN adapter descriptions (diagnostics/UI detail line).
+pub fn wlan_adapters() -> Vec<String> {
+    #[cfg(windows)]
+    {
+        imp::wifi::interface_descriptions()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+pub fn bluetooth_radio_state() -> anyhow::Result<RadioStateInfo> {
+    #[cfg(windows)]
+    {
+        imp::bluetooth::radio_state()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("Bluetooth controls are only supported on Windows")
+    }
+}
+
+/// Turn the Bluetooth radio on/off (user-level; denials surface as errors).
+pub fn set_bluetooth_radio(enabled: bool) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::bluetooth::set_radio(enabled)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enabled;
+        anyhow::bail!("Bluetooth controls are only supported on Windows")
+    }
+}
+
+/// Paired Bluetooth devices (read-only; pairing/connection stays in Windows).
+pub fn list_bluetooth_devices() -> anyhow::Result<Vec<BluetoothDeviceInfo>> {
+    #[cfg(windows)]
+    {
+        imp::bluetooth::paired_devices()
+    }
+    #[cfg(not(windows))]
+    {
+        anyhow::bail!("Bluetooth controls are only supported on Windows")
+    }
+}
+
+/// Per-monitor brightness details incl. control method (Dxva2 or DDC/CI).
+pub fn list_brightness_monitors() -> Vec<BrightnessMonitorInfo> {
+    #[cfg(windows)]
+    {
+        imp::brightness::list_monitors()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// Open one of the allow-listed Windows Settings pages.
+pub fn open_settings_page(page: SettingsPage) -> anyhow::Result<()> {
+    #[cfg(windows)]
+    {
+        imp::settings_pages::open(page)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = page;
+        anyhow::bail!("Windows Settings pages are only available on Windows")
+    }
+}
+
+/// Bounded Quick Settings snapshot for the shell/UI.
+pub fn controls_status() -> ControlsStatus {
+    let capabilities = NativeCapabilities::probe();
+    let timeout = std::time::Duration::from_secs(8);
+    let wifi = if capabilities.wifi.supported {
+        bounded_control(
+            || {
+                let radio = wifi_radio_state()?;
+                match list_wifi_networks() {
+                    Ok(networks) => Ok(WifiState {
+                        radio,
+                        networks,
+                        error: None,
+                    }),
+                    Err(error) => Ok(WifiState {
+                        radio,
+                        networks: Vec::new(),
+                        error: Some(format!("{error:#}")),
+                    }),
+                }
+            },
+            timeout,
+        )
+    } else {
+        None
+    };
+    let bluetooth = if capabilities.bluetooth.supported {
+        bounded_control(
+            || {
+                let radio = bluetooth_radio_state()?;
+                match list_bluetooth_devices() {
+                    Ok(devices) => Ok(BluetoothState {
+                        radio,
+                        devices,
+                        error: None,
+                    }),
+                    Err(error) => Ok(BluetoothState {
+                        radio,
+                        devices: Vec::new(),
+                        error: Some(format!("{error:#}")),
+                    }),
+                }
+            },
+            timeout,
+        )
+    } else {
+        None
+    };
+    let brightness = if capabilities.brightness.supported {
+        bounded_control(
+            || {
+                Ok(BrightnessState {
+                    supported: true,
+                    monitors: list_brightness_monitors(),
+                })
+            },
+            timeout,
+        )
+    } else {
+        None
+    };
+    ControlsStatus {
+        capabilities,
+        wifi,
+        bluetooth,
+        brightness,
     }
 }

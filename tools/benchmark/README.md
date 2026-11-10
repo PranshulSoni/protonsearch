@@ -30,3 +30,25 @@ Caveats recorded in every JSON:
 
 - v9-island-cards.json: V9 reference card-switch transitions (Ctrl+ArrowDown).
 - app-island-cards.json: template for the future React Dynamic Island (CDP attach).
+
+## island-perf.mjs
+
+Island-specific performance harness for task-57. Launches the debug app with CDP
+and perf hooks (PROTONSEARCH_PERF_HOOKS=1), then measures:
+
+- idle process-tree memory with only the primary launcher prewarmed (lazy main/alternate windows) with per-process WS, private bytes and command lines;
+- WebView2 memory-target trim: hide the launcher/island, wait --trim-wait-ms, compare per-process WS (process retained = warm trim);
+- activation trade-off: first lazy island open vs warm opens, using the real global hotkey (SendInput) plus island-window-shown / island-first-paint marks;
+- open/close frame pacing (rAF intervals, p50/p95/p99, dropped/over-budget, long tasks, layout shift, page resize events, unique surface sizes);
+- typing -> results latency inside the island search card;
+- card-switch latency plus root-cause attribution from CDP Performance durations (Task/Script/Layout/Recalc) and page resize-event counts (native resize storm vs React);
+- 20x open/close leak check with memory snapshots every 5 cycles.
+
+Usage:
+
+    node tools/benchmark/island-perf.mjs --exe target/debug/ProtonSearch.exe --out docs/performance/results/island-perf.json
+    node tools/benchmark/island-perf.mjs --attach-only --port 9222 --no-serve ...
+
+Requirements/caveats: debug build with CDP (WEBVIEW2 CDP is debug-only), vite preview on 5173 for the debug devUrl, PROTONSEARCH_PERF_HOOKS=1 marks in <data_dir>/v2/perf-marks.jsonl, single-instance app (the harness kills stale ProtonSearch processes before launch and leaves none running). Assumed refresh 120 Hz by default (--hz); per-trial percentiles are pooled as a mean of per-trial percentiles, so aggregate p95 is an estimate - per-trial rows are kept in the JSON.
+
+Raw JSON includes every sample so a reviewer can re-derive the numbers.

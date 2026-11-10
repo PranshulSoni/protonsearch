@@ -7,10 +7,14 @@
 //! - Caches (icons) are written atomically (temp file + rename).
 
 pub(crate) mod audio;
+pub(crate) mod bluetooth;
 pub(crate) mod brightness;
 pub(crate) mod capabilities;
 pub(crate) mod clipboard;
+pub(crate) mod radios;
+pub(crate) mod settings_pages;
 pub(crate) mod toast;
+pub(crate) mod wifi;
 pub(crate) mod winrt;
 pub(crate) mod icons;
 pub(crate) mod native;
