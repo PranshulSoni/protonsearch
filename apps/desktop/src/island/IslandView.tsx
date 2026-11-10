@@ -82,6 +82,8 @@ export default function IslandView() {
   const wheelAtRef = useRef(0);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const typedAtRef = useRef(0);
+  const hideRef = useRef<() => void>(() => undefined);
+  const refreshRef = useRef<() => void>(() => undefined);
 
   const searchState = useIslandSearch(
     "all",
@@ -178,6 +180,9 @@ export default function IslandView() {
     closeTimerRef.current = window.setTimeout(finish, 120);
   }, [visibility]);
 
+  hideRef.current = requestHide;
+  refreshRef.current = bootstrap.refresh;
+
   const switchCard = useCallback(
     (card: IslandCardId, nextVariant: IslandVariant = "default") => {
       if (!cards.includes(card)) return;
@@ -265,31 +270,35 @@ export default function IslandView() {
   useEffect(() => {
     let disposed = false;
     const unlisteners: Array<() => void> = [];
+    const addListener = (unlisten: () => void) => {
+      if (disposed) unlisten();
+      else unlisteners.push(unlisten);
+    };
     void (async () => {
       try {
         const { listen } = await import("@tauri-apps/api/event");
         if (disposed) return;
-        unlisteners.push(
-          await listen("island:shown", () => {
-            recordFrames("island-open", 450);
-            if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
-            setActiveCard("search");
-            setCompact(true);
-            setQuery("");
-            setScope("all");
-            setVariant("default");
-            setPhase("idle");
-            setVisibility("opening");
-            window.setTimeout(() => setVisibility("shown"), 180);
-            bootstrap.refresh();
-            window.setTimeout(() => inputRef.current?.focus(), 190);
-          }),
-        );
-        unlisteners.push(
-          await listen("island:dismiss", () => {
-            requestHide();
-          }),
-        );
+        // Listen exactly once: re-subscribing on every render previously caused
+        // duplicate island:shown handlers and duplicate island-open perf marks.
+        const offShown = await listen("island:shown", () => {
+          recordFrames("island-open", 450);
+          if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
+          setActiveCard("search");
+          setCompact(true);
+          setQuery("");
+          setScope("all");
+          setVariant("default");
+          setPhase("idle");
+          setVisibility("opening");
+          window.setTimeout(() => setVisibility("shown"), 180);
+          refreshRef.current();
+          window.setTimeout(() => inputRef.current?.focus(), 190);
+        });
+        addListener(offShown);
+        const offDismiss = await listen("island:dismiss", () => {
+          hideRef.current();
+        });
+        addListener(offDismiss);
       } catch {
         /* browser preview: no Tauri event bridge */
       }
@@ -298,7 +307,7 @@ export default function IslandView() {
       disposed = true;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [bootstrap, requestHide]);
+  }, []);
 
   useEffect(() => {
     return () => {

@@ -1,0 +1,886 @@
+{
+  "schema": "ps-task64-payload/1",
+  "kind": "engine-payload-ipc-react-split",
+  "status": "ok",
+  "capturedAt": "2026-11-10T08:09:23.035Z",
+  "host": {
+    "hostname": "PranshulAsus"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe",
+    "exeBytes": 20696064,
+    "exeMtime": "2026-11-10T08:08:54.207Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "prefixes": [
+      "r",
+      "re",
+      "rea",
+      "read",
+      "readm",
+      "readme",
+      "s",
+      "sc",
+      "scre",
+      "screenshot",
+      "p",
+      "pro",
+      "project"
+    ],
+    "profile": "island-primary (debug + CDP)",
+    "gitHead": "364be8af6bd97c981162c0aeadf5d9e56acdaf80",
+    "gitDirty": 1,
+    "appPid": 40948
+  },
+  "measurements": {
+    "indexReady": {
+      "state": "indexing",
+      "entries": 131199
+    },
+    "coldMemory": {
+      "label": "cold-idle",
+      "totalWorkingSetMiB": 700.6,
+      "totalPrivateMiB": 328,
+      "processCount": 15
+    },
+    "typing": {
+      "rows": [
+        {
+          "prefix": "r",
+          "directInvoke": {
+            "wallMs": 14.4,
+            "tookMs": 2.097962,
+            "payloadChars": 47532,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 6201,
+            "nullCount": 374
+          },
+          "start": 5099.29999999702,
+          "changedAt": null,
+          "visibleAt": 9112,
+          "inputToChangedMs": null,
+          "inputToVisibleMs": null,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "ui-stall-4367ms",
+            "island-window-shown",
+            "ui-stall-82ms",
+            "island-first-paint",
+            "island-open|n=41|p50=8.3|p95=8.8|p99=91.8|max=91.8|drop=2|long=1",
+            "island-typing|ms=3232.5"
+          ]
+        },
+        {
+          "prefix": "re",
+          "directInvoke": {
+            "wallMs": 13.7,
+            "tookMs": 2.1988819,
+            "payloadChars": 52286,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 4955,
+            "nullCount": 356
+          },
+          "start": 9384.79999999702,
+          "changedAt": null,
+          "visibleAt": 13390.70000000298,
+          "inputToChangedMs": null,
+          "inputToVisibleMs": null,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=49.0"
+          ]
+        },
+        {
+          "prefix": "rea",
+          "directInvoke": {
+            "wallMs": 10.2,
+            "tookMs": 1.345212,
+            "payloadChars": 41381,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5194,
+            "nullCount": 361
+          },
+          "start": 13666.59999999404,
+          "changedAt": 13668.70000000298,
+          "visibleAt": 13683.5,
+          "inputToChangedMs": 2.1,
+          "inputToVisibleMs": 16.9,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=35.2"
+          ]
+        },
+        {
+          "prefix": "read",
+          "directInvoke": {
+            "wallMs": 7.4,
+            "tookMs": 1.180178,
+            "payloadChars": 41704,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5247,
+            "nullCount": 360
+          },
+          "start": 13961,
+          "changedAt": 13964,
+          "visibleAt": 13969.5,
+          "inputToChangedMs": 3,
+          "inputToVisibleMs": 8.5,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=40.8",
+            "island-typing|ms=37.0"
+          ]
+        },
+        {
+          "prefix": "readm",
+          "directInvoke": {
+            "wallMs": 7.4,
+            "tookMs": 1.076882,
+            "payloadChars": 41400,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5198,
+            "nullCount": 360
+          },
+          "start": 14242.79999999702,
+          "changedAt": 14245.59999999404,
+          "visibleAt": 14251.5,
+          "inputToChangedMs": 2.8,
+          "inputToVisibleMs": 8.7,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=45.3",
+            "island-typing|ms=33.8"
+          ]
+        },
+        {
+          "prefix": "readme",
+          "directInvoke": {
+            "wallMs": 6.5,
+            "tookMs": 0.949842,
+            "payloadChars": 47082,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 6117,
+            "nullCount": 361
+          },
+          "start": 14517,
+          "changedAt": 14519.79999999702,
+          "visibleAt": 14526.89999999106,
+          "inputToChangedMs": 2.8,
+          "inputToVisibleMs": 9.9,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=41.4",
+            "island-typing|ms=34.2"
+          ]
+        },
+        {
+          "prefix": "s",
+          "directInvoke": {
+            "wallMs": 9.3,
+            "tookMs": 2.572883,
+            "payloadChars": 49976,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5732,
+            "nullCount": 370
+          },
+          "start": 14787.89999999106,
+          "changedAt": 14790.09999999404,
+          "visibleAt": 14793.89999999106,
+          "inputToChangedMs": 2.2,
+          "inputToVisibleMs": 6,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=39.7",
+            "island-typing|ms=33.1"
+          ]
+        },
+        {
+          "prefix": "sc",
+          "directInvoke": {
+            "wallMs": 9.4,
+            "tookMs": 2.74148,
+            "payloadChars": 47814,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5659,
+            "nullCount": 376
+          },
+          "start": 15071.39999999106,
+          "changedAt": 15074.20000000298,
+          "visibleAt": 15078.09999999404,
+          "inputToChangedMs": 2.8,
+          "inputToVisibleMs": 6.7,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=40.0",
+            "island-typing|ms=33.9"
+          ]
+        },
+        {
+          "prefix": "scre",
+          "directInvoke": {
+            "wallMs": 9,
+            "tookMs": 1.080445,
+            "payloadChars": 45181,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5223,
+            "nullCount": 362
+          },
+          "start": 15342.29999999702,
+          "changedAt": 15344.29999999702,
+          "visibleAt": 15351.39999999106,
+          "inputToChangedMs": 2,
+          "inputToVisibleMs": 9.1,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=40.0",
+            "island-typing|ms=33.3"
+          ]
+        },
+        {
+          "prefix": "screenshot",
+          "directInvoke": {
+            "wallMs": 6.4,
+            "tookMs": 0.80617696,
+            "payloadChars": 42254,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 5325,
+            "nullCount": 360
+          },
+          "start": 15617.89999999106,
+          "changedAt": 15620.39999999106,
+          "visibleAt": 15626.39999999106,
+          "inputToChangedMs": 2.5,
+          "inputToVisibleMs": 8.5,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=38.4",
+            "island-typing|ms=32.7"
+          ]
+        },
+        {
+          "prefix": "p",
+          "directInvoke": {
+            "wallMs": 9,
+            "tookMs": 2.832902,
+            "payloadChars": 42516,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 4948,
+            "nullCount": 374
+          },
+          "start": 15900.79999999702,
+          "changedAt": 15903.5,
+          "visibleAt": 15910.29999999702,
+          "inputToChangedMs": 2.7,
+          "inputToVisibleMs": 9.5,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=37.9",
+            "island-typing|ms=35.3"
+          ]
+        },
+        {
+          "prefix": "pro",
+          "directInvoke": {
+            "wallMs": 7.5,
+            "tookMs": 1.883061,
+            "payloadChars": 46622,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 6052,
+            "nullCount": 386
+          },
+          "start": 16176.5,
+          "changedAt": 16178.79999999702,
+          "visibleAt": 16184.59999999404,
+          "inputToChangedMs": 2.3,
+          "inputToVisibleMs": 8.1,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=39.1",
+            "island-typing|ms=32.7"
+          ]
+        },
+        {
+          "prefix": "project",
+          "directInvoke": {
+            "wallMs": 7.4,
+            "tookMs": 1.091131,
+            "payloadChars": 46342,
+            "resultCount": 30,
+            "iconChars": 0,
+            "actionChars": 6003,
+            "nullCount": 384
+          },
+          "start": 16454.5,
+          "changedAt": 16457.39999999106,
+          "visibleAt": 16461.59999999404,
+          "inputToChangedMs": 2.9,
+          "inputToVisibleMs": 7.1,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskBlockingMs": 0,
+          "marks": [
+            "island-typing|ms=38.0",
+            "island-typing|ms=33.6"
+          ]
+        }
+      ],
+      "inputToVisibleMs": {
+        "count": 11,
+        "p50": 8.5,
+        "p95": 16.9,
+        "p99": 16.9,
+        "min": 6,
+        "max": 16.9
+      },
+      "inputToChangedMs": {
+        "count": 11,
+        "p50": 2.7,
+        "p95": 3,
+        "p99": 3,
+        "min": 2,
+        "max": 3
+      },
+      "directWallMs": {
+        "count": 13,
+        "p50": 9,
+        "p95": 14.4,
+        "p99": 14.4,
+        "min": 6.4,
+        "max": 14.4
+      },
+      "payloadChars": {
+        "count": 13,
+        "p50": 46342,
+        "p95": 52286,
+        "p99": 52286,
+        "min": 41381,
+        "max": 52286
+      }
+    },
+    "steadyStateTyping": [
+      {
+        "rows": [
+          {
+            "value": "r",
+            "inputToChangedMs": 2.9,
+            "inputToVisibleMs": 9.2,
+            "resultOptions": 0
+          },
+          {
+            "value": "re",
+            "inputToChangedMs": 44.5,
+            "inputToVisibleMs": 56.4,
+            "resultOptions": 5
+          },
+          {
+            "value": "rea",
+            "inputToChangedMs": 36.7,
+            "inputToVisibleMs": 42.4,
+            "resultOptions": 5
+          },
+          {
+            "value": "read",
+            "inputToChangedMs": 39.3,
+            "inputToVisibleMs": 49.7,
+            "resultOptions": 5
+          },
+          {
+            "value": "readm",
+            "inputToChangedMs": null,
+            "inputToVisibleMs": 516.7,
+            "resultOptions": 5
+          },
+          {
+            "value": "readme",
+            "inputToChangedMs": null,
+            "inputToVisibleMs": 506.1,
+            "resultOptions": 5
+          }
+        ],
+        "longtasks": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskBlockingMs": 0,
+        "marks": [
+          "island-typing|ms=40.2",
+          "island-typing|ms=33.5",
+          "island-typing|ms=42.8",
+          "island-typing|ms=43.9",
+          "island-typing|ms=36.2",
+          "island-typing|ms=36.3",
+          "island-typing|ms=37.2",
+          "island-typing|ms=38.0"
+        ],
+        "query": "readme"
+      },
+      {
+        "rows": [
+          {
+            "value": "s",
+            "inputToChangedMs": 2.9,
+            "inputToVisibleMs": 10.7,
+            "resultOptions": 0
+          },
+          {
+            "value": "sc",
+            "inputToChangedMs": 39.7,
+            "inputToVisibleMs": 48.4,
+            "resultOptions": 5
+          },
+          {
+            "value": "scr",
+            "inputToChangedMs": 45.3,
+            "inputToVisibleMs": 53.3,
+            "resultOptions": 5
+          },
+          {
+            "value": "scre",
+            "inputToChangedMs": 37.6,
+            "inputToVisibleMs": 43.1,
+            "resultOptions": 5
+          },
+          {
+            "value": "scree",
+            "inputToChangedMs": null,
+            "inputToVisibleMs": 514.4,
+            "resultOptions": 5
+          },
+          {
+            "value": "screen",
+            "inputToChangedMs": 37.9,
+            "inputToVisibleMs": 42.4,
+            "resultOptions": 5
+          },
+          {
+            "value": "screensh",
+            "inputToChangedMs": 43,
+            "inputToVisibleMs": 54.9,
+            "resultOptions": 5
+          },
+          {
+            "value": "screenshot",
+            "inputToChangedMs": 38.4,
+            "inputToVisibleMs": 46.9,
+            "resultOptions": 5
+          }
+        ],
+        "longtasks": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskBlockingMs": 0,
+        "marks": [
+          "island-typing|ms=34.3",
+          "island-typing|ms=41.4",
+          "island-typing|ms=39.1",
+          "island-typing|ms=40.9",
+          "island-typing|ms=37.0",
+          "island-typing|ms=41.5",
+          "island-typing|ms=37.3",
+          "island-typing|ms=38.5",
+          "island-typing|ms=37.7"
+        ],
+        "query": "screenshot"
+      }
+    ],
+    "cards": {
+      "rows": [
+        {
+          "presses": 0,
+          "heading": "MediaNow playing",
+          "renderedAt": 21587.70000000298,
+          "ms": 0,
+          "perPress": [],
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Search",
+          "marks": []
+        },
+        {
+          "presses": 1,
+          "heading": "MediaNow playing",
+          "renderedAt": 24133.89999999106,
+          "ms": 814.6,
+          "perPress": [
+            {
+              "switchIndex": 0,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 814.6
+            }
+          ],
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Media",
+          "marks": [
+            "island-switch:search>media|n=94|p50=8.3|p95=8.5|p99=33.3|max=33.3|drop=1|long=0"
+          ]
+        },
+        {
+          "presses": 2,
+          "heading": "MediaNow playing",
+          "renderedAt": 27816.29999999702,
+          "ms": 816.1,
+          "perPress": [
+            {
+              "switchIndex": 0,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 814
+            },
+            {
+              "switchIndex": 1,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.1
+            }
+          ],
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Clipboard",
+          "marks": [
+            "island-switch:search>media|n=97|p50=8.3|p95=8.5|p99=8.6|max=8.6|drop=0|long=0",
+            "island-switch:media>clipboard|n=96|p50=8.3|p95=8.5|p99=16.8|max=16.8|drop=1|long=0",
+            "ui-stall-31ms"
+          ]
+        },
+        {
+          "presses": 3,
+          "heading": "MediaNow playing",
+          "renderedAt": 33992.70000000298,
+          "ms": 817.9,
+          "perPress": [
+            {
+              "switchIndex": 0,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 814.9
+            },
+            {
+              "switchIndex": 1,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 815.2
+            },
+            {
+              "switchIndex": 2,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 817.9
+            }
+          ],
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Agents",
+          "marks": [
+            "island-first-paint",
+            "ui-stall-2472ms",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-open|n=55|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "ui-stall-576ms",
+            "island-switch:search>media|n=97|p50=8.3|p95=8.5|p99=8.6|max=8.6|drop=0|long=0",
+            "island-switch:media>clipboard|n=94|p50=8.3|p95=8.7|p99=33.4|max=33.4|drop=1|long=0",
+            "island-switch:clipboard>agent|n=96|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0"
+          ]
+        },
+        {
+          "presses": 4,
+          "heading": "MediaNow playing",
+          "renderedAt": 39892.5,
+          "ms": 816.9,
+          "perPress": [
+            {
+              "switchIndex": 0,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.8
+            },
+            {
+              "switchIndex": 1,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 815.8
+            },
+            {
+              "switchIndex": 2,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 815.7
+            },
+            {
+              "switchIndex": 3,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.9
+            }
+          ],
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Quick Settings",
+          "marks": [
+            "island-switch:search>media|n=97|p50=8.3|p95=8.5|p99=8.6|max=8.6|drop=0|long=0",
+            "island-switch:media>clipboard|n=97|p50=8.3|p95=8.5|p99=9.6|max=9.6|drop=0|long=0",
+            "island-switch:clipboard>agent|n=96|p50=8.3|p95=8.5|p99=16.6|max=16.6|drop=1|long=0",
+            "island-switch:agent>controls|n=97|p50=8.3|p95=8.5|p99=8.6|max=8.6|drop=0|long=0"
+          ]
+        },
+        {
+          "presses": 5,
+          "heading": "MediaNow playing",
+          "renderedAt": 46941.70000000298,
+          "ms": 816.1,
+          "perPress": [
+            {
+              "switchIndex": 0,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 814
+            },
+            {
+              "switchIndex": 1,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.4
+            },
+            {
+              "switchIndex": 2,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.9
+            },
+            {
+              "switchIndex": 3,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 815.5
+            },
+            {
+              "switchIndex": 4,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.1
+            }
+          ],
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Notifications",
+          "marks": [
+            "island-switch:search>media|n=97|p50=8.3|p95=8.4|p99=8.5|max=8.5|drop=0|long=0",
+            "island-switch:media>clipboard|n=97|p50=8.3|p95=8.5|p99=8.7|max=8.7|drop=0|long=0",
+            "island-switch:clipboard>agent|n=97|p50=8.3|p95=8.5|p99=8.6|max=8.6|drop=0|long=0",
+            "island-switch:agent>controls|n=96|p50=8.3|p95=8.5|p99=16.7|max=16.7|drop=1|long=0",
+            "island-switch:controls>browser|n=97|p50=8.3|p95=8.5|p99=8.6|max=8.6|drop=0|long=0"
+          ]
+        },
+        {
+          "presses": 6,
+          "heading": "MediaNow playing",
+          "renderedAt": 55108.89999999106,
+          "ms": 815.4,
+          "perPress": [
+            {
+              "switchIndex": 0,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 814.2
+            },
+            {
+              "switchIndex": 1,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.1
+            },
+            {
+              "switchIndex": 2,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 818
+            },
+            {
+              "switchIndex": 3,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.4
+            },
+            {
+              "switchIndex": 4,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 815.9
+            },
+            {
+              "switchIndex": 5,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 815.4
+            }
+          ],
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Browser",
+          "marks": [
+            "island-switch:search>media|n=97|p50=8.3|p95=8.5|p99=8.5|max=8.5|drop=0|long=0",
+            "island-switch:media>clipboard|n=97|p50=8.3|p95=8.5|p99=8.7|max=8.7|drop=0|long=0",
+            "island-switch:clipboard>agent|n=96|p50=8.3|p95=8.5|p99=16.5|max=16.5|drop=1|long=0",
+            "island-switch:agent>controls|n=97|p50=8.3|p95=8.5|p99=8.6|max=8.6|drop=0|long=0",
+            "island-switch:controls>browser|n=97|p50=8.3|p95=8.5|p99=8.5|max=8.5|drop=0|long=0",
+            "island-switch:browser>git|n=97|p50=8.3|p95=8.5|p99=8.5|max=8.5|drop=0|long=0"
+          ]
+        },
+        {
+          "presses": 7,
+          "heading": "MediaNow playing",
+          "renderedAt": 64375.09999999404,
+          "ms": 815.8,
+          "perPress": [
+            {
+              "switchIndex": 0,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 814.8
+            },
+            {
+              "switchIndex": 1,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.7
+            },
+            {
+              "switchIndex": 2,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 815.7
+            },
+            {
+              "switchIndex": 3,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816.3
+            },
+            {
+              "switchIndex": 4,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816
+            },
+            {
+              "switchIndex": 5,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 816
+            },
+            {
+              "switchIndex": 6,
+              "headingBefore": "MediaNow playing",
+              "headingAfter": "MediaNow playing",
+              "ms": 815.8
+            }
+          ],
+          "resultOptions": 0,
+          "longtasks": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "card": "Git",
+          "marks": [
+            "island-switch:search>media|n=97|p50=8.3|p95=8.4|p99=8.5|max=8.5|drop=0|long=0",
+            "island-switch:media>clipboard|n=97|p50=8.3|p95=8.5|p99=8.5|max=8.5|drop=0|long=0",
+            "island-switch:clipboard>agent|n=97|p50=8.3|p95=8.5|p99=8.6|max=8.6|drop=0|long=0",
+            "island-switch:agent>controls|n=97|p50=8.3|p95=8.5|p99=9.4|max=9.4|drop=0|long=0",
+            "island-switch:controls>browser|n=97|p50=8.3|p95=8.5|p99=8.7|max=8.7|drop=0|long=0",
+            "island-switch:browser>git|n=97|p50=8.3|p95=8.4|p99=9.0|max=9.0|drop=0|long=0",
+            "island-switch:git>bell|n=95|p50=8.3|p95=8.5|p99=24.8|max=24.8|drop=1|long=0"
+          ]
+        }
+      ],
+      "ms": {
+        "count": 8,
+        "p50": 815.8,
+        "p95": 817.9,
+        "p99": 817.9,
+        "min": 0,
+        "max": 817.9
+      }
+    },
+    "memoryAfterProbe": {
+      "label": "after-probe",
+      "totalWorkingSetMiB": 520.1,
+      "totalPrivateMiB": 352.8,
+      "processCount": 7
+    }
+  },
+  "blocked": [],
+  "limitations": [
+    "Shell does not log raw SearchResponse bytes; payloadChars is JSON.stringify(response).length from a direct page-side invoke (the same object the app receives after IPC parse), so it is a lower bound for wire bytes (no framing) and an upper-bound proxy for parse input size.",
+    "The app's own search invoke is captured at module import, so engineWall for the app's call is not interceptable; directInvoke wall/took_ms are measured with an identical request on the same page (same engine/DB/cache state).",
+    "Typing rows: each prefix typed into an empty island search input via the native value setter + input event (single input event per prefix, like a paste of the prefix), then wait for the result signature to change + double rAF.",
+    "Card rows: Ctrl+ArrowDown-driven card switches from the search card; open->rendered = keydown dispatch -> heading text changes -> double rAF; long tasks observed during the window."
+  ]
+}

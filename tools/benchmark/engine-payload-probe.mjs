@@ -210,18 +210,24 @@ try {
       const row = await island.evaluate(async (n) => {
         window.__T64__.reset();
         const headingOf = () => document.querySelector(".island-card-heading")?.textContent?.trim() || "";
-        let lastT0 = performance.now();
+        let lastMeasured = null;
+        const perPress = [];
         for (let k = 0; k < n; k++) {
-          lastT0 = performance.now();
+          const before = headingOf();
+          const t0 = performance.now();
           window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", ctrlKey: true, bubbles: true, cancelable: true }));
-          await new Promise((r) => setTimeout(r, 420));
+          const deadline = performance.now() + 800;
+          while (performance.now() < deadline && headingOf() === before) await new Promise((r) => setTimeout(r, 3));
+          await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+          const ms = performance.now() - t0;
+          perPress.push({ switchIndex: k, headingBefore: before, headingAfter: headingOf(), ms: +ms.toFixed(2) });
+          lastMeasured = +ms.toFixed(2);
+          await new Promise((r) => setTimeout(r, 300));
         }
         const heading = headingOf();
-        const changedAt = performance.now();
-        await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
         const renderedAt = performance.now();
         const options = document.querySelectorAll("#island-search-results [role=option], .island-results [role=option]").length;
-        return { presses: n, heading, lastT0, changedAt, renderedAt, ms: +(renderedAt - lastT0).toFixed(2), resultOptions: options, longtasks: window.__T64__.longtasks.slice() };
+        return { presses: n, heading, renderedAt, ms: lastMeasured != null ? lastMeasured : 0, perPress, resultOptions: options, longtasks: window.__T64__.longtasks.slice() };
       }, card.presses).catch((e) => ({ error: String(e) }));
       if (row.longtasks) { row.longTaskCount = row.longtasks.length; row.longTaskTotalMs = +row.longtasks.reduce((a, t) => a + t.duration, 0).toFixed(1); }
       row.card = card.name;
@@ -246,6 +252,6 @@ if (report.measurements.typing) {
   console.log("  per-prefix rows: " + JSON.stringify(report.measurements.typing.rows.map((r) => ({ p: r.prefix, vis: r.inputToVisibleMs, ch: r.inputToChangedMs, wall: r.directInvoke && r.directInvoke.wallMs, took: r.directInvoke && r.directInvoke.tookMs, bytes: r.directInvoke && r.directInvoke.payloadChars, icons: r.directInvoke && r.directInvoke.iconChars, actions: r.directInvoke && r.directInvoke.actionChars, nulls: r.directInvoke && r.directInvoke.nullCount, long: r.longTaskCount, blocking: r.longTaskBlockingMs, marks: r.marks }))));
   if (report.measurements.steadyStateTyping) console.log("  steady-state: " + JSON.stringify(report.measurements.steadyStateTyping.map((s2) => ({ q: s2.q || s2.query, rows: s2.rows && s2.rows.map((r2) => ({ v: r2.value, ms: r2.inputToVisibleMs, ch: r2.inputToChangedMs })), long: s2.longTaskCount, blocking: s2.longTaskBlockingMs, err: s2.error }))));
 }
-if (report.measurements.cards) console.log("  card open->rendered: " + JSON.stringify(report.measurements.cards.ms) + " rows=" + JSON.stringify(report.measurements.cards.rows.map((r) => ({ c: r.card, ms: r.ms, heading: r.heading, long: r.longTaskCount }))));
+if (report.measurements.cards) console.log("  card switch latency: " + JSON.stringify(report.measurements.cards.ms) + " rows=" + JSON.stringify(report.measurements.cards.rows.map((r) => ({ c: r.card, ms: r.ms, perPress: r.perPress && r.perPress.map((p) => p.ms), heading: r.heading, long: r.longTaskCount }))));
 if (report.blocked.length) console.log("  blocked: " + report.blocked.join(" | "));
 console.log("  results: " + outPath);

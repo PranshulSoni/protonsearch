@@ -492,3 +492,15 @@ Per prefix: 'r' 54,101 chars; 're' 52,288; 'rea' 41,381; 'read' 41,699; 'readm' 
 Card open->rendered rows from this probe were a measurement artifact for press>0 (the probe waited a fixed 420 ms before sampling, so the reported ~438-441 ms is the probe's own wait, not latency); only the fresh search open (5.2 ms) is a valid row. Not published as card data; needs a follow-up probe that polls the heading change instead of waiting.
 
 Raw JSON: [task64-payload-split-617b6df.json](./results/task64-payload-split-617b6df.json).
+
+**Update: island debounce 80 ms -> 24 ms (commit 364be8a, direct follow-up to the ~106 ms steady-state typing tail).** Re-measured with the same debug+CDP payload probe and final minified dist (131,199-entry .devdata index):
+
+| Measurement | BEFORE (617b6df) | AFTER (364be8a) |
+|---|---:|---:|
+| Single input event input->first-visible | p50 15.8 / p95 16.3 ms (n=12) | **p50 8.5 / p95 16.9 ms (n=11, min 6.0)** |
+| Steady-state subsequent keystroke (50 ms spacing) | ~106-108 ms (result change ~94-96 ms) | **~42-56 ms (result change ~36-45 ms)** |
+| island-typing frontend mark (typedAt -> after paint rAF) | not emitted in this build | 32.7-49.0 ms per keystroke |
+| direct invoke wall / engine took_ms | 7.9 / ~1.2 ms p50 | 9.0 / ~1.2 ms p50 |
+| payloadChars p50 | 46,342 | 46,342 (unchanged) |
+
+The debounce fix **materially improved typing**: per-keystroke tail dropped from ~106-108 ms to ~42-56 ms (~50-60% faster), and single-input-event latency halved (p50 15.8 -> 8.5 ms). Remaining ~40-50 ms per steady-state keystroke is still dominated by UI-side work (24 ms debounce + IPC ~7-9 ms + full result-list commit/paint); two of fourteen rows still show no result-signature change within 500 ms when a prefix does not change the result set (measurement caveat, not a regression). Raw JSON: [task64-payload-split-364be8a.json](./results/task64-payload-split-364be8a.json). Card press>0 rows in this run are still probe artifacts (350 ms switch guard vs 300 ms spacing) - ignored per engine-core.
