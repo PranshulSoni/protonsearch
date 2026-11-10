@@ -157,5 +157,18 @@ $info = @(
 $info | Set-Content -LiteralPath (Join-Path $OutDir 'BUILD_INFO.txt') -Encoding UTF8
 $copied | ForEach-Object { Write-Host ('  ' + $_) }
 Write-Host ('  checksums: ' + (Join-Path $OutDir 'SHA256SUMS.txt'))
+# Windows can reject an NSIS self-extraction when the setup is launched from
+# inside this project tree (observed as "Error writing temporary file" with the
+# same hash that installs fine from Desktop). Mirror the user-facing artifacts
+# to a normal folder outside the repo so the installer always has a safe path.
+$safeDir = Join-Path $env:USERPROFILE 'ProtonSearch-Release'
+if ($OutDir -ne $safeDir) {
+    New-Item -ItemType Directory -Path $safeDir -Force | Out-Null
+    foreach ($f in @($copied + (Join-Path $OutDir 'SHA256SUMS.txt') + (Join-Path $OutDir 'BUILD_INFO.txt'))) {
+        if (Test-Path -LiteralPath $f) { Copy-Item -LiteralPath $f -Destination $safeDir -Force }
+    }
+    Write-Host ('  safe copy: ' + $safeDir + '  (run the setup from here)')
+}
+
 Write-Warn2 'UNSIGNED ARTIFACT - signing is a G7 release gate; do not publish.'
 Write-Host 'Installer build complete (local only).' -ForegroundColor Green
