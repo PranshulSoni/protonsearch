@@ -84,16 +84,21 @@ export default function AgentsSection({ onUsePi }: AgentsSectionProps = {}) {
 
   return (
     <Panel
-      title="Pi Agent Runtime"
-      subtitle="Local Pi coding-agent runtime and execution status on this machine."
+      id="workflows-agents"
+      title="Agents"
+      hint="Local Pi coding-agent runtime and execution status on this machine."
     >
-      {loading ? <StateNotice kind="loading" title="Checking Pi runtime…" /> : null}
+      {loading ? (
+        <p className="muted" aria-busy="true">
+          Checking Pi runtime…
+        </p>
+      ) : null}
 
       {!loading && loadError ? (
         <StateNotice
-          kind="error"
+          tone="error"
           title="Pi runtime check failed"
-          description="Could not query local Pi installation."
+          body="Could not query local Pi installation."
           actionLabel="Retry"
           onAction={() => void loadPiAgent()}
         />
@@ -102,9 +107,8 @@ export default function AgentsSection({ onUsePi }: AgentsSectionProps = {}) {
       {!loading && !loadError && (!piAgent || !piAgent.available) ? (
         <div className="pi-agent-missing">
           <EmptyState
-            icon="workflows"
             title="Pi agent runtime not detected"
-            description="Install or configure the Pi CLI runtime below to enable local agent workflows."
+            body="Install or configure the Pi CLI runtime below to enable local agent workflows."
           />
           <div style={{ marginTop: 12 }}>
             <PiSetup onChanged={() => void loadPiAgent()} />
@@ -172,7 +176,7 @@ export default function AgentsSection({ onUsePi }: AgentsSectionProps = {}) {
       <div className="agent-runs">
         <h3 className="agent-section-label">Recent Pi runs</h3>
         {runs.length === 0 ? (
-          <p className="muted">No Pi workflow runs recorded yet.</p>
+          <p className="muted">No runs yet.</p>
         ) : (
           <ol className="agent-run-list">
             {runs.slice(0, 4).map((run) => (

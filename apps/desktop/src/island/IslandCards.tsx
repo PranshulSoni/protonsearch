@@ -5,10 +5,10 @@ import type {
   SearchResult,
   SearchScope,
 } from "../bridge/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { api } from "../bridge/api";
 import { buildAgentRunRequest, createAgentRunId } from "../app/agentRun";
-import { useTodos } from "../lib/todoStore";
+import { useTodos, type TodoItem } from "../lib/todoStore";
 import { Logo } from "../components/Logo";
 import { groupResultsInRankOrder } from "../lib/results";
 import { ISLAND_VISIBLE_ROWS } from "./islandDims";
@@ -1088,117 +1088,6 @@ export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
             Clear completed ({completedCount})
           </button>
         ) : null}
-      </div>
-    </div>
-  );
-}: { onOpenMain?: () => void }) {
-  const { todos, error, addTodo, toggleTodo } = useTodos();
-  const [draft, setDraft] = useState("");
-  const activeTodos = todos.filter((t) => !t.completed);
-  const completedCount = todos.length - activeTodos.length;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (draft.trim()) {
-      if (!(await addTodo(draft.trim()))) return;
-      setDraft("");
-    }
-  };
-
-  return (
-    <div className="island-card island-todo-card">
-      {error ? <p role="alert">{error}</p> : null}
-      <CardHead
-        card="bell"
-        title="To-do"
-        subtitle={
-          activeTodos.length === 0
-            ? "All caught up"
-            : `${activeTodos.length} ${activeTodos.length === 1 ? "task" : "tasks"} pending`
-        }
-      />
-      <div className="island-divider" />
-      <form className="island-todo-add" onSubmit={handleSubmit} style={{ padding: "6px 12px 10px" }}>
-        <input
-          className="island-search-input"
-          style={{ width: "100%", height: "30px", fontSize: "12px", padding: "0 10px", background: "rgba(255,255,255,0.06)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.08)", color: "#fff" }}
-          placeholder="Add a task and press Enter…"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-      </form>
-      <div className="island-todo-list island-scrollable" style={{ maxHeight: "200px", overflowY: "auto", padding: "0 12px" }}>
-        {todos.length === 0 ? (
-          <EmptyState title="No tasks yet" hint="Type above to add your first to-do item." />
-        ) : (
-          todos.slice(0, 5).map((todo) => (
-            <div
-              key={todo.id}
-              className={"island-todo-row" + (todo.completed ? " is-completed" : "")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "6px 4px",
-                borderBottom: "1px solid rgba(255,255,255,0.04)",
-                opacity: todo.completed ? 0.5 : 1,
-                textDecoration: todo.completed ? "line-through" : "none",
-              }}
-            >
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={todo.completed}
-                className="island-todo-check"
-                style={{
-                  width: "18px",
-                  height: "18px",
-                  borderRadius: "4px",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  background: todo.completed ? "var(--ps-brand-red, #dc2626)" : "transparent",
-                  color: "#fff",
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: "11px",
-                  cursor: "pointer",
-                }}
-                onClick={() => toggleTodo(todo.id)}
-              >
-                {todo.completed ? "✓" : ""}
-              </button>
-              <span className="island-todo-title" style={{ flex: 1, fontSize: "12px", color: "#f3f4f6" }}>
-                {todo.title}
-              </span>
-              {todo.priority && todo.priority !== "medium" ? (
-                <span
-                  style={{
-                    fontSize: "10px",
-                    textTransform: "uppercase",
-                    padding: "1px 5px",
-                    borderRadius: "3px",
-                    background: todo.priority === "high" ? "rgba(220,38,38,0.2)" : "rgba(255,255,255,0.06)",
-                    color: todo.priority === "high" ? "#f87171" : "#9ca3af",
-                  }}
-                >
-                  {todo.priority}
-                </span>
-              ) : null}
-            </div>
-          ))
-        )}
-      </div>
-      <div className="island-todo-footer" style={{ padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "6px" }}>
-        <button
-          type="button"
-          className="island-settings-link"
-          style={{ background: "transparent", border: 0, color: "var(--ps-text-muted, #9ca3af)", fontSize: "11px", cursor: "pointer", textDecoration: "underline" }}
-          onClick={() => {
-            void api.showMain();
-            if (onOpenMain) onOpenMain();
-          }}
-        >
-          Open full To-do view ({completedCount} completed) →
-        </button>
       </div>
     </div>
   );
