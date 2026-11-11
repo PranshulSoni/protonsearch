@@ -2493,3 +2493,392 @@ html[data-window="island"] #root {
 .island-result-row .provenance-badge {
   display: none;
 }
+/* ==========================================================================
+   Launcher / Dynamic Island Todo Card Styles (append to apps/desktop/src/island/island.css)
+   ========================================================================== */
+
+.island-todo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  color: #f3f4f6;
+}
+
+.island-todo-error {
+  margin: 6px 12px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(220, 38, 38, 0.16);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+  font-size: 11px;
+}
+
+.island-todo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  flex-wrap: wrap;
+}
+
+.island-todo-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.island-todo-title-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.island-todo-subtitle-pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d1d5db;
+}
+
+.island-todo-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.island-todo-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.island-todo-filter-pill:hover {
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.island-todo-filter-pill.is-active {
+  background: rgba(220, 38, 38, 0.22);
+  color: #fca5a5;
+}
+
+.island-todo-filter-count {
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.island-todo-add {
+  padding: 8px 12px 10px;
+}
+
+.island-todo-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.island-todo-input {
+  flex: 1;
+  height: 32px;
+  font-size: 12px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.island-todo-input:focus {
+  border-color: rgba(220, 38, 38, 0.65);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.island-todo-prio-toggle,
+.island-todo-due-toggle {
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #d1d5db;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.island-todo-prio-toggle.prio-high {
+  background: rgba(220, 38, 38, 0.2);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+}
+
+.island-todo-prio-toggle.prio-medium {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fde68a;
+}
+
+.island-todo-prio-toggle.prio-low {
+  background: rgba(156, 163, 175, 0.12);
+  color: #9ca3af;
+}
+
+.island-todo-due-toggle.is-active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.4);
+  color: #93c5fd;
+}
+
+.island-todo-submit-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  background: var(--ps-brand-red, #dc2626);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: filter 120ms ease;
+}
+
+.island-todo-submit-btn:hover {
+  filter: brightness(1.1);
+}
+
+.island-todo-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  outline: none;
+}
+
+.island-todo-empty {
+  padding: 20px 12px;
+  text-align: center;
+}
+
+.island-todo-empty-title {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.island-todo-empty-hint {
+  margin: 0;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.island-todo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-left-width: 3px;
+  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+
+.island-todo-row.prio-border-high {
+  border-left-color: #ef4444;
+}
+
+.island-todo-row.prio-border-medium {
+  border-left-color: #f59e0b;
+}
+
+.island-todo-row.prio-border-low {
+  border-left-color: #6b7280;
+}
+
+.island-todo-row:hover,
+.island-todo-row.is-selected {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.island-todo-row.is-completed {
+  opacity: 0.52;
+}
+
+.island-todo-row.is-completed .island-todo-title {
+  text-decoration: line-through;
+  color: #9ca3af;
+}
+
+.island-todo-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.island-todo-check.is-checked {
+  background: var(--ps-brand-red, #dc2626);
+  border-color: var(--ps-brand-red, #dc2626);
+}
+
+.island-todo-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.island-todo-title {
+  font-size: 12px;
+  color: #f3f4f6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.island-todo-note-preview {
+  font-size: 10px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.island-todo-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.island-todo-due-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #d1d5db;
+}
+
+.island-todo-due-badge.is-today {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+}
+
+.island-todo-due-badge.is-overdue {
+  background: rgba(220, 38, 38, 0.22);
+  color: #fca5a5;
+}
+
+.island-todo-prio-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.island-todo-prio-badge.prio-high {
+  background: rgba(220, 38, 38, 0.2);
+  color: #f87171;
+}
+
+.island-todo-prio-badge.prio-medium {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+
+.island-todo-prio-badge.prio-low {
+  background: rgba(255, 255, 255, 0.06);
+  color: #9ca3af;
+}
+
+.island-todo-pin-btn,
+.island-todo-del-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.island-todo-pin-btn.is-pinned {
+  color: #fbbf24;
+}
+
+.island-todo-pin-btn:hover {
+  color: #fde68a;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.island-todo-del-btn:hover {
+  color: #f87171;
+  background: rgba(220, 38, 38, 0.16);
+}
+
+.island-todo-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 6px;
+}
+
+.island-todo-clear-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.island-todo-clear-btn:hover {
+  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.14);
+}

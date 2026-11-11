@@ -724,7 +724,374 @@ export function UnsupportedCard({
   );
 }
 
+type TodoFilter = "active" | "today" | "high" | "done" | "all";
+type Priority = "low" | "medium" | "high";
+
+const PRIORITY_ORDER: Record<Priority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+const NEXT_PRIORITY: Record<Priority, Priority> = {
+  low: "medium",
+  medium: "high",
+  high: "low",
+};
+
+function todayIso(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function tomorrowIso(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function parseQuickTodoInput(
+  raw: string,
+  fallbackPriority: Priority,
+  fallbackDue: string | undefined
+): { title: string; priority: Priority; dueDate?: string } {
+  let priority: Priority = fallbackPriority;
+  let dueDate: string | undefined = fallbackDue;
+  let text = raw.trim();
+
+  text = text.replace(/\B!(high|med|medium|low)\b/gi, (_, p: string) => {
+    const norm = p.toLowerCase();
+    priority = norm === "med" ? "medium" : (norm as Priority);
+    return "";
+  });
+
+  text = text.replace(/\B@(today|tomorrow|\d{4}-\d{2}-\d{2})\b/gi, (_, d: string) => {
+    const norm = d.toLowerCase();
+    if (norm === "today") dueDate = todayIso();
+    else if (norm === "tomorrow") dueDate = tomorrowIso();
+    else dueDate = norm;
+    return "";
+  });
+
+  return {
+    title: text.replace(/\s{2,}/g, " ").trim(),
+    priority,
+    dueDate,
+  };
+}
+
+function formatDueBadge(dueDate?: string | null): { label: string; overdue: boolean; isToday: boolean } | null {
+  if (!dueDate) return null;
+  const today = todayIso();
+  const tomorrow = tomorrowIso();
+  if (dueDate === today) return { label: "Today", overdue: false, isToday: true };
+  if (dueDate === tomorrow) return { label: "Tomorrow", overdue: false, isToday: false };
+  if (dueDate < today) return { label: `Overdue · ${dueDate.slice(5)}`, overdue: true, isToday: false };
+  return { label: dueDate.slice(5), overdue: false, isToday: false };
+}
+
 export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
+  const { todos, error, addTodo, toggleTodo, updateTodo, deleteTodo, clearCompleted } = useTodos();
+  const [draft, setDraft] = useState("");
+  const [priority, setPriority] = useState<Priority>("medium");
+  const [quickDue, setQuickDue] = useState<"" | "today" | "tomorrow">("");
+  const [filter, setFilter] = useState<TodoFilter>("active");
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
+
+  const today = todayIso();
+  const activeTodos = useMemo(() => todos.filter((t) => !t.completed), [todos]);
+  const completedCount = todos.length - activeTodos.length;
+  const todayCount = useMemo(
+    () => activeTodos.filter((t) => t.dueDate === today).length,
+    [activeTodos, today]
+  );
+  const highCount = useMemo(
+    () => activeTodos.filter((t) => t.priority === "high").length,
+    [activeTodos]
+  );
+
+  const filteredTodos = useMemo(() => {
+    const subset = todos.filter((t) => {
+      if (filter === "active") return !t.completed;
+      if (filter === "done") return t.completed;
+      if (filter === "today") return !t.completed && t.dueDate === today;
+      if (filter === "high") return !t.completed && t.priority === "high";
+      return true;
+    });
+
+    return [...subset].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
+      const pa = PRIORITY_ORDER[(a.priority ?? "medium") as Priority] ?? 1;
+      const pb = PRIORITY_ORDER[(b.priority ?? "medium") as Priority] ?? 1;
+      if (pa !== pb) return pa - pb;
+      if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate) {
+        return a.dueDate.localeCompare(b.dueDate);
+      }
+      if (a.dueDate && !b.dueDate) return -1;
+      if (!a.dueDate && b.dueDate) return 1;
+      return b.createdAt - a.createdAt;
+    });
+  }, [todos, filter, today]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!draft.trim()) return;
+    const fallbackDue =
+      quickDue === "today" ? todayIso() : quickDue === "tomorrow" ? tomorrowIso() : undefined;
+    const parsed = parseQuickTodoInput(draft, priority, fallbackDue);
+    if (!parsed.title) return;
+    if (!(await addTodo(parsed.title, parsed.dueDate, parsed.priority))) return;
+    setDraft("");
+    setQuickDue("");
+    if (filter === "done") setFilter("active");
+  };
+
+  const cycleItemPriority = (todo: TodoItem) => {
+    const current = (todo.priority ?? "medium") as Priority;
+    updateTodo(todo.id, { priority: NEXT_PRIORITY[current] });
+  };
+
+  const togglePin = (todo: TodoItem) => {
+    updateTodo(todo.id, { pinned: !todo.pinned });
+  };
+
+  const handleListKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (filteredTodos.length === 0) return;
+    const clampedIdx = Math.min(selectedIndex, filteredTodos.length - 1);
+    const activeItem = filteredTodos[clampedIdx];
+    if (!activeItem) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((i) => (i + 1) % filteredTodos.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((i) => (i - 1 + filteredTodos.length) % filteredTodos.length);
+    } else if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      toggleTodo(activeItem.id);
+    } else if (e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      cycleItemPriority(activeItem);
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      deleteTodo(activeItem.id);
+    }
+  };
+
+  const filterTabs: { id: TodoFilter; label: string; count?: number }[] = [
+    { id: "active", label: "Active", count: activeTodos.length },
+    { id: "today", label: "Today", count: todayCount },
+    { id: "high", label: "High", count: highCount },
+    { id: "done", label: "Done", count: completedCount },
+    { id: "all", label: "All", count: todos.length },
+  ];
+
+  return (
+    <div className="island-card island-todo-card">
+      {error ? (
+        <p role="alert" className="island-todo-error">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="island-todo-header">
+        <div className="island-todo-header-left">
+          <span className="island-todo-title-text">To-do</span>
+          <span className="island-todo-subtitle-pill">
+            {activeTodos.length === 0
+              ? "All caught up"
+              : `${activeTodos.length} ${activeTodos.length === 1 ? "task" : "tasks"} pending`}
+          </span>
+        </div>
+        <div className="island-todo-filters" role="tablist" aria-label="Filter tasks">
+          {filterTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={filter === tab.id}
+              className={"island-todo-filter-pill" + (filter === tab.id ? " is-active" : "")}
+              onClick={() => {
+                setFilter(tab.id);
+                setSelectedIndex(0);
+              }}
+            >
+              <span>{tab.label}</span>
+              {typeof tab.count === "number" && tab.count > 0 ? (
+                <span className="island-todo-filter-count">{tab.count}</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="island-divider" />
+
+      <form className="island-todo-add" onSubmit={handleSubmit}>
+        <div className="island-todo-input-row">
+          <input
+            className="island-search-input island-todo-input"
+            placeholder="Add task… (try !high @today)"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <button
+            type="button"
+            title={`Priority: ${priority} (click to cycle)`}
+            className={`island-todo-prio-toggle prio-${priority}`}
+            onClick={() => setPriority((p) => NEXT_PRIORITY[p])}
+          >
+            {priority === "high" ? "High" : priority === "medium" ? "Med" : "Low"}
+          </button>
+          <button
+            type="button"
+            title="Set due date"
+            className={"island-todo-due-toggle" + (quickDue ? " is-active" : "")}
+            onClick={() =>
+              setQuickDue((d) => (d === "" ? "today" : d === "today" ? "tomorrow" : ""))
+            }
+          >
+            {quickDue === "today" ? "Today" : quickDue === "tomorrow" ? "Tmrw" : "Due"}
+          </button>
+          <button type="submit" className="island-todo-submit-btn" aria-label="Add task">
+            +
+          </button>
+        </div>
+      </form>
+
+      <div
+        className="island-todo-list island-scrollable"
+        tabIndex={0}
+        onKeyDown={handleListKeyDown}
+        aria-label="Task list"
+      >
+        {filteredTodos.length === 0 ? (
+          <div className="island-todo-empty">
+            <p className="island-todo-empty-title">
+              {todos.length === 0 ? "No tasks yet" : `No ${filter} tasks`}
+            </p>
+            <p className="island-todo-empty-hint">
+              {todos.length === 0
+                ? "Type above and press Enter to add your first task."
+                : "Switch filter tabs above or add a new task."}
+            </p>
+          </div>
+        ) : (
+          filteredTodos.slice(0, 8).map((todo, idx) => {
+            const prio = (todo.priority ?? "medium") as Priority;
+            const dueBadge = formatDueBadge(todo.dueDate);
+            const isSelected = idx === selectedIndex;
+
+            return (
+              <div
+                key={todo.id}
+                className={
+                  "island-todo-row" +
+                  ` prio-border-${prio}` +
+                  (todo.completed ? " is-completed" : "") +
+                  (isSelected ? " is-selected" : "")
+                }
+                onMouseEnter={() => setSelectedIndex(idx)}
+              >
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={todo.completed}
+                  className={"island-todo-check" + (todo.completed ? " is-checked" : "")}
+                  onClick={() => toggleTodo(todo.id)}
+                >
+                  {todo.completed ? "✓" : ""}
+                </button>
+
+                <div className="island-todo-main" onClick={() => toggleTodo(todo.id)}>
+                  <span className="island-todo-title">{todo.title}</span>
+                  {todo.notes ? (
+                    <span className="island-todo-note-preview" title={todo.notes}>
+                      {todo.notes}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="island-todo-meta">
+                  {dueBadge ? (
+                    <span
+                      className={
+                        "island-todo-due-badge" +
+                        (dueBadge.overdue ? " is-overdue" : dueBadge.isToday ? " is-today" : "")
+                      }
+                    >
+                      {dueBadge.label}
+                    </span>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    title="Click to cycle priority"
+                    className={`island-todo-prio-badge prio-${prio}`}
+                    onClick={() => cycleItemPriority(todo)}
+                  >
+                    {prio === "medium" ? "med" : prio}
+                  </button>
+
+                  <button
+                    type="button"
+                    title={todo.pinned ? "Unpin task" : "Pin task to top"}
+                    className={"island-todo-pin-btn" + (todo.pinned ? " is-pinned" : "")}
+                    onClick={() => togglePin(todo)}
+                    aria-label={todo.pinned ? "Unpin task" : "Pin task"}
+                  >
+                    ★
+                  </button>
+
+                  <button
+                    type="button"
+                    title="Delete task"
+                    className="island-todo-del-btn"
+                    onClick={() => deleteTodo(todo.id)}
+                    aria-label="Delete task"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="island-todo-footer">
+        <button
+          type="button"
+          className="island-settings-link"
+          onClick={() => {
+            void api.showMain();
+            if (onOpenMain) onOpenMain();
+          }}
+        >
+          Open full To-do view ({todos.length} total) →
+        </button>
+
+        {completedCount > 0 ? (
+          <button
+            type="button"
+            className="island-todo-clear-btn"
+            onClick={() => clearCompleted()}
+          >
+            Clear completed ({completedCount})
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}: { onOpenMain?: () => void }) {
   const { todos, error, addTodo, toggleTodo } = useTodos();
   const [draft, setDraft] = useState("");
   const activeTodos = todos.filter((t) => !t.completed);
