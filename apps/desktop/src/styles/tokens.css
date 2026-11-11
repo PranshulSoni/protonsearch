@@ -15,17 +15,23 @@
   --ps-fw-strong: 680;
   --ps-fw-label: 750;
 
-  --ps-text-display: clamp(26px, 4vw, 41px);
+  --ps-text-display: clamp(28px, 4vw, 42px);
   --ps-text-h1-setup: 32px;
   --ps-text-stat: 34px;
   --ps-text-input: 21px;
-  --ps-text-body: 13px;
-  --ps-text-strong: 13px;
-  --ps-text-small: 12px;
-  --ps-text-meta: 11px;
-  --ps-text-micro: 10px;
-  --ps-text-section: 11px;
-  --ps-text-kbd: 10px;
+  --ps-text-body: 14px;
+  --ps-text-strong: 14px;
+  --ps-text-small: 13px;
+  --ps-text-meta: 12px;
+  --ps-text-micro: 11px;
+  --ps-text-section: 12px;
+  --ps-text-kbd: 11px;
+
+  /* Brand red & silver accents */
+  --ps-brand-red: #e53935;
+  --ps-brand-red-soft: #ff5252;
+  --ps-brand-red-glow: rgba(229, 57, 53, 0.25);
+  --ps-brand-silver: #d1d5db;
 
   /* Surfaces */
   --ps-ground: #e8ebe8;

@@ -122,7 +122,7 @@ export const ISLAND_CARD_LABEL: Record<IslandCardId, string> = {
   controls: "Quick Settings",
   browser: "Browser",
   git: "Git",
-  bell: "Notifications",
+  bell: "To-do",
 };
 
 export function islandCardLabel(card: IslandCardId): string {

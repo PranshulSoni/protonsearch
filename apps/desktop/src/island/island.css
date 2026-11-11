@@ -2395,9 +2395,9 @@ html[data-window="island"] #root {
 
 .island-tile-main.is-on .island-tile-icon-box,
 .island-tile-main[aria-checked="true"] .island-tile-icon-box {
-  background: #ffffff;
-  color: #0b0d11;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  background: var(--ps-blue-600, #0078d4);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 120, 212, 0.45);
 }
 
 .island-tile-main:focus-visible,
@@ -2431,7 +2431,10 @@ html[data-window="island"] #root {
 }
 
 .island-tile-chevron {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ps-ink-3, #9ca3af);
+  margin-left: 4px;
 }
 
 .island-control-feedback {

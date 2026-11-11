@@ -34,6 +34,7 @@ import {
 } from "../roots";
 import { SECTION_EYEBROWS } from "../sections";
 import { sourceIconName } from "../sourceIcons";
+import { OcrEngineSelector } from "../OcrEngineSelector";
 import {
   Callout,
   Dot,
@@ -51,9 +52,9 @@ import {
 type RebuildCommand = Extract<IndexCommand, "rebuild" | "rebuild_content" | "rebuild_ocr">;
 
 const DEPTH_OPTIONS: { value: RootMode; label: string }[] = [
-  { value: "names_only", label: "Names only" },
-  { value: "content", label: "+ Content" },
-  { value: "content_and_ocr", label: "+ OCR" },
+  { value: "names_only", label: "File names" },
+  { value: "content", label: "Inside files" },
+  { value: "content_and_ocr", label: "Inside files & images (OCR)" },
 ];
 
 const REBUILD: Record<RebuildCommand, { label: string; confirm: string }> = {
@@ -287,7 +288,7 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
 
   return (
     <div className="view">
-      <RouteHeading eyebrow={SECTION_EYEBROWS.indexes}>Search &amp; indexes</RouteHeading>
+      <RouteHeading eyebrow={SECTION_EYEBROWS.indexes}>Search &amp; Indexing</RouteHeading>
       <p className="page-lead">
         Choose what ProtonSearch can find, without blocking the fast filename index.
       </p>
@@ -505,6 +506,15 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
               onChange={setOcrEnabled}
             />
           </div>
+          {settings.indexing.ocrEnabled && (
+            <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--ps-border-subtle, rgba(255,255,255,0.08))" }}>
+              <div style={{ marginBottom: "0.5rem", fontSize: "0.85rem", fontWeight: 500, color: "var(--ps-text-dim)" }}>OCR Engine &amp; Models</div>
+              <OcrEngineSelector
+                value={settings.ocrEngine}
+                onChange={(ocrEngine) => void updateSettings({ ocrEngine })}
+              />
+            </div>
+          )}
         </div>
         {!settings.indexing.contentEnabled ? (
           <Callout tone="warn" role="status">
@@ -564,16 +574,15 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
               </div>
             </dl>
             {warningSummary ? (
-              <StateNotice
-                tone="warn"
-                title="Index needs attention."
-                body={warningSummary.body}
-                details={warningSummary.details}
-                actionLabel="Review locations"
-                onAction={() =>
-                  document.getElementById("indexes-locations")?.scrollIntoView({ block: "start" })
-                }
-              />
+              <details className="skipped-items-disclosure" style={{ marginTop: "1rem", padding: "0.75rem 1rem", background: "var(--ps-surface-subtle, rgba(255,255,255,0.03))", borderRadius: "8px", border: "1px solid var(--ps-border-subtle, rgba(255,255,255,0.06))" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 500, fontSize: "0.85rem", color: "var(--ps-text-muted)" }}>
+                  Review skipped items ({status.warnings.length})
+                </summary>
+                <div style={{ marginTop: "0.5rem", fontSize: "0.825rem", color: "var(--ps-text-dim)", lineHeight: 1.5 }}>
+                  <p>{warningSummary.body}</p>
+                  {warningSummary.details && <p style={{ marginTop: "0.25rem", opacity: 0.85 }}>{warningSummary.details}</p>}
+                </div>
+              </details>
             ) : null}
           </>
         ) : (

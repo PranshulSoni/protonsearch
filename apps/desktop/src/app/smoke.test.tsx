@@ -57,19 +57,19 @@ describe("desktop app shell smoke", () => {
     const navButtons = [...container.querySelectorAll<HTMLButtonElement>(".navbtn")];
     expect(navButtons.map((button) => button.textContent?.trim())).toEqual([
       "Home",
-      "Search & indexes",
-      "Activity",
+      "Search & Indexing",
       "Workflows",
-      "Preferences",
+      "To-do",
+      "Settings",
     ]);
     expect(container.querySelector("#main h1")?.textContent).toMatch(
       /^Good (morning|afternoon|evening)/,
     );
 
     const routes: Array<{ navIndex: number; heading: string }> = [
-      { navIndex: 1, heading: "Search & indexes" },
-      { navIndex: 2, heading: "Your activity" },
-      { navIndex: 3, heading: "Workflows" },
+      { navIndex: 1, heading: "Search & Indexing" },
+      { navIndex: 2, heading: "Workflows" },
+      { navIndex: 3, heading: "To-do" },
       { navIndex: 4, heading: "Make it yours" },
     ];
     for (const route of routes) {
@@ -159,7 +159,7 @@ describe("desktop app shell smoke", () => {
     });
     await flush(8);
     await act(async () => {
-      container.querySelectorAll<HTMLButtonElement>(".navbtn")[3].click();
+      container.querySelectorAll<HTMLButtonElement>(".navbtn")[2].click();
     });
     await flush(8);
     const text = container.textContent ?? "";

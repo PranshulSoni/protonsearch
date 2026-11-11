@@ -73,27 +73,17 @@ export default function HomeView({
         <Icon name="arrowUpRight" size={16} className="launcher-entry-arrow" />
       </button>
 
-      {status &&
-      (status.state === "paused" ||
-        status.state === "error" ||
-        status.warnings.length > 0) ? (
+      {status && (status.state === "paused" || status.state === "error") ? (
         <StateNotice
           tone={status.state === "error" ? "error" : "warn"}
           role={status.state === "error" ? "alert" : "status"}
           title={
             status.state === "error"
               ? "Indexing stopped."
-              : status.state === "paused"
-                ? "Indexing is paused."
-                : "Index needs attention."
+              : "Indexing is paused."
           }
-          body={
-            status.state === "error" || status.state === "paused"
-              ? "New files aren't being added. Existing search still works."
-              : warningSummary?.body
-          }
-          details={status.state === "ready" ? warningSummary?.details : undefined}
-          actionLabel="Open Search & indexes"
+          body="New files aren't being added. Existing search still works."
+          actionLabel="Open Search & Indexing"
           onAction={() => onNavigate("indexes")}
         />
       ) : null}

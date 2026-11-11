@@ -44,6 +44,14 @@ function SharedResultRowBase({
 }: SharedResultRowProps) {
   const meta = resultMetaText(result);
   const description = [result.path ?? result.subtitle, meta].filter(Boolean).join(" · ");
+  const provenance =
+    result.kind === "ocr_text" || result.meta?.label?.includes("screenshot") || result.meta?.label?.includes("OCR")
+      ? "OCR"
+      : result.meta?.snippet || result.meta?.line != null || result.meta?.label?.includes("document")
+        ? "Content"
+        : result.kind === "file" || result.kind === "folder" || result.kind === "application"
+          ? "Filename"
+          : null;
   return (
     <div
       id={optionId}
@@ -64,9 +72,14 @@ function SharedResultRowBase({
       <span className="result-body">
         <span className="filename" title={result.title}>
           <Highlight text={result.title} ranges={result.matchRanges} />
+          {provenance ? <span className={`provenance-badge provenance-${provenance.toLowerCase()}`}>{provenance}</span> : null}
         </span>
         <span className="filepath" id={descriptionId} title={result.path ?? result.subtitle}>
-          {result.subtitle}
+          {result.meta?.snippet ? (
+            <span className="result-snippet">“{result.meta.snippet}”</span>
+          ) : (
+            result.subtitle
+          )}
         </span>
       </span>
       {meta ? (
@@ -128,6 +141,7 @@ function areEqual(prev: SharedResultRowProps, next: SharedResultRowProps): boole
     am?.modified === bm?.modified &&
     am?.itemCount === bm?.itemCount &&
     am?.line === bm?.line &&
+    am?.snippet === bm?.snippet &&
     am?.sourceLabel === bm?.sourceLabel
   );
 }

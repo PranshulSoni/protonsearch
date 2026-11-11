@@ -230,6 +230,24 @@ export function ResultIcon({ result, large = false }: { result: SearchResult; la
   const tone = toneFor(result);
   const className = "fileicon fileicon--" + tone + (large ? " fileicon--large" : "");
 
+  if (result.meta?.thumbnailDataUrl && !iconFailed) {
+    return (
+      <span className={className + " fileicon--real fileicon--thumb"} data-testid="result-icon" aria-hidden="true">
+        <img
+          src={result.meta.thumbnailDataUrl}
+          alt=""
+          width={large ? 32 : 28}
+          height={large ? 32 : 28}
+          style={{ objectFit: "cover", borderRadius: "4px" }}
+          draggable={false}
+          decoding="async"
+          loading="lazy"
+          onError={() => setIconFailed(true)}
+        />
+      </span>
+    );
+  }
+
   // Real app icon sources: IPC app_icon_data (data URL, preferred — no asset
   // scope issues) or the legacy app_icon path via convertFileSrc. Any decode
   // failure falls back to the deterministic monogram/letter badge.

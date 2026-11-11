@@ -427,21 +427,11 @@ fn focus_window(win: &WebviewWindow) {
 
 fn toggle_primary_launcher(app: &AppHandle) {
     PERF_INVOKE_EPOCH_MS.store(epoch_ms(), std::sync::atomic::Ordering::SeqCst);
-    let settings = app.state::<AppState>().engine.settings();
-    if settings.launcher.primary_mode == LauncherMode::DynamicIsland && settings.launcher.island.enabled {
-        toggle_island(app);
-    } else {
-        toggle_launcher(app);
-    }
+    toggle_island(app);
 }
 
 fn show_primary_launcher(app: &AppHandle) {
-    let settings = app.state::<AppState>().engine.settings();
-    if settings.launcher.primary_mode == LauncherMode::DynamicIsland && settings.launcher.island.enabled {
-        show_island_window(app);
-    } else {
-        show_launcher_window(app);
-    }
+    show_island_window(app);
 }
 
 static WINDOW_BUILD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());

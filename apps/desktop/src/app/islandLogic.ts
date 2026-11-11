@@ -38,7 +38,7 @@ export const CARD_META: Record<IslandCardId, CardMeta> = {
   controls: { title: "Quick Settings", description: "Volume, Wi-Fi, Bluetooth, brightness.", icon: "grid" },
   browser: { title: "Browser", description: "Open tabs from supported browsers.", icon: "browser" },
   git: { title: "Git", description: "Repository status, branches and changes.", icon: "git" },
-  bell: { title: "Notifications", description: "Recent Windows notifications.", icon: "activity" },
+  bell: { title: "To-do", description: "Quick tasks, checklists and active to-dos.", icon: "todo" },
 };
 
 export interface AnchorMeta {

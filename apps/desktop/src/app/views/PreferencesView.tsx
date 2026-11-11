@@ -93,14 +93,12 @@ export default function PreferencesView({
 
   type SettingsCard =
     | "general"
-    | "launcher"
-    | "placement"
     | "cards"
     | "behavior"
     | "integrations"
     | "onboarding";
   const [activeCard, setActiveCard] = useState<SettingsCard>("general");
-  const [islandTab, setIslandTab] = useState<"placement" | "cards" | "behavior">("placement");
+  const [islandTab, setIslandTab] = useState<"cards" | "behavior">("cards");
 
   const apply = useCallback(
     async (patch: SettingsPatch, stamp: string) => {
@@ -148,12 +146,8 @@ export default function PreferencesView({
   };
 
   const island = settings.launcher.island;
-  const anchorLabel =
-    ANCHORS.find((anchor) => anchor.id === island.placement.anchor)?.label ?? "Top centre";
   const enabledCards = island.cards.filter((card) => card.enabled).length;
   const defaultCardTitle = CARD_META[island.defaultCard]?.title ?? "Search";
-  const launcherLabel =
-    settings.launcher.primaryMode === "dynamic_island" ? "Dynamic Island" : "Normal Launcher";
   const setupLabel = settings.onboardingComplete ? "Setup complete" : "Setup needs attention";
   const settingsCards: {
     id: SettingsCard;
@@ -162,8 +156,6 @@ export default function PreferencesView({
     icon: IconName;
   }[] = [
     { id: "general", title: "General settings", value: "Shortcut, search, appearance, privacy, indexing, agents, diagnostics", icon: "settings" },
-    { id: "launcher", title: "Launcher mode", value: launcherLabel, icon: "play" },
-    { id: "placement", title: "Placement", value: anchorLabel + " · " + island.placement.offsetX + "/" + island.placement.offsetY + " DIP", icon: "grid" },
     { id: "cards", title: "Cards & order", value: enabledCards + "/8 cards · " + defaultCardTitle + " default", icon: "clipboard" },
     { id: "behavior", title: "Open behavior", value: island.returnToSearch ? "Returns to Search" : "Remembers last card", icon: "workflows" },
     { id: "integrations", title: "Windows integrations", value: "Media, Wi-Fi, Bluetooth, notifications and capture sources", icon: "shield" },
@@ -172,7 +164,7 @@ export default function PreferencesView({
 
   const openCard = (card: SettingsCard) => {
     setActiveCard(card);
-    if (card === "placement" || card === "cards" || card === "behavior") {
+    if (card === "cards" || card === "behavior") {
       setIslandTab(card);
     }
   };
@@ -620,10 +612,6 @@ export default function PreferencesView({
         </section>
       </div>
         </>
-      ) : activeCard === "launcher" ? (
-        <LauncherPreferences
-          onNavigate={(tab) => openCard(tab === "island" ? "placement" : tab)}
-        />
       ) : activeCard === "integrations" ? (
         <IntegrationsSettings />
       ) : activeCard === "onboarding" ? (
@@ -633,7 +621,7 @@ export default function PreferencesView({
           key={activeCard}
           initialTab={islandTab}
           embedded
-          onNavigate={(tab) => openCard(tab === "island" ? "placement" : tab)}
+          onNavigate={(tab) => openCard(tab === "island" ? "cards" : tab as SettingsCard)}
         />
       )}
     </div>

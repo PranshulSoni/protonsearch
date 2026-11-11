@@ -482,37 +482,16 @@ export default function OnboardingView() {
                 setDraft((current) => ({ ...current, hotkey: display }));
               }}
             />
-            <div className="onboard-launcher-mode" role="radiogroup" aria-label="Primary launcher">
+            <div className="onboard-launcher-mode">
               <p className="choice-name">Primary launcher for Alt + Space</p>
-              <label className="choice choice-single">
-                <input
-                  type="radio"
-                  name="onboarding-launcher-mode"
-                  checked={launcherMode === "dynamic_island"}
-                  onChange={() => setLauncherMode("dynamic_island")}
-                />
+              <div className="choice choice-single" style={{ cursor: "default" }}>
                 <span className="choice-text">
                   <span className="choice-name">Dynamic Island</span>
                   <span className="choice-hint">
-                    A compact island at the top of the screen with cards and dots.
+                    A compact, responsive island at the top of the screen with searchable cards and quick actions.
                   </span>
                 </span>
-              </label>
-              <label className="choice choice-single">
-                <input
-                  type="radio"
-                  name="onboarding-launcher-mode"
-                  checked={launcherMode === "normal"}
-                  onChange={() => setLauncherMode("normal")}
-                />
-                <span className="choice-text">
-                  <span className="choice-name">Normal Launcher</span>
-                  <span className="choice-hint">
-                    The familiar centred launcher window with the full result list.
-                  </span>
-                </span>
-              </label>
-              <p className="field-help">Change this later in Preferences → Launcher.</p>
+              </div>
             </div>
             <label className="choice choice-single">
               <input

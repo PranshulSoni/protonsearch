@@ -7,6 +7,7 @@ import {
   ClipboardCard,
   GitCard,
   SearchCard,
+  TodoCard,
   UnsupportedCard,
 } from "./IslandCards";
 import {
@@ -39,7 +40,7 @@ const MemoBrowserCard = memo(BrowserCard);
 const MemoGitCard = memo(GitCard);
 const MemoMediaCard = memo(MediaCard);
 const MemoControlsCard = memo(ControlsCard);
-const MemoNotificationsCard = memo(NotificationsCard);
+const MemoTodoCard = memo(TodoCard);
 
 /**
  * V9 Dynamic Island surface. The native window adds 96 px transparent shadow
@@ -434,13 +435,11 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
 
   const onWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
-      const scrollable = (event.target as Element | null)?.closest(".island-scrollable");
+      const scrollable = (event.target as Element | null)?.closest(".island-scrollable, .island-results, .island-todo-list, .island-agent-list, .island-choose-list");
       if (scrollable instanceof HTMLElement) {
-        const canScroll = scrollable.scrollHeight > scrollable.clientHeight;
-        if (canScroll) {
-          if (event.deltaY > 0 && scrollable.scrollTop + scrollable.clientHeight < scrollable.scrollHeight) return;
-          if (event.deltaY < 0 && scrollable.scrollTop > 0) return;
-        }
+        // When the pointer is anywhere inside a scrollable content area, keep scrolling
+        // completely contained inside the list and never let it switch cards accidentally.
+        return;
       }
       // One card per scroll gesture. A touchpad swipe and its inertia tail (or a
       // flick of a free-spinning wheel) arrive as dozens of wheel events; switching
@@ -603,11 +602,8 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
         );
       case "bell":
         return (
-          <MemoNotificationsCard
-            status={controls.status}
-            pending={controls.pending}
-            error={controls.error}
-            refresh={controls.refresh}
+          <MemoTodoCard
+            onOpenMain={() => requestHide()}
           />
         );
       default:

@@ -7,8 +7,8 @@ import { useApp } from "../App";
 import { Logo } from "../components/Logo";
 import HomeView from "./views/HomeView";
 import IndexesView from "./views/IndexesView";
-import ActivityView from "./views/ActivityView";
 import WorkflowsView from "./views/WorkflowsView";
+import TodoView from "./views/TodoView";
 import PreferencesView from "./views/PreferencesView";
 import { SECTION_TITLES, type Section } from "./sections";
 import { takeOnboardingCrossfade } from "./transition";
@@ -23,10 +23,10 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: "home", label: "Home", icon: "home" },
-  { id: "indexes", label: "Search & indexes", icon: "search" },
-  { id: "activity", label: "Activity", icon: "activity" },
+  { id: "indexes", label: "Search & Indexing", icon: "search" },
   { id: "workflows", label: "Workflows", icon: "workflows" },
-  { id: "preferences", label: "Preferences", icon: "preferences" },
+  { id: "todo", label: "To-do", icon: "todo" },
+  { id: "preferences", label: "Settings", icon: "settings" },
 ];
 
 export default function DesktopApp() {
@@ -160,8 +160,8 @@ export default function DesktopApp() {
         <div className="workspace">
           {section === "home" ? <HomeView onNavigate={navigate} /> : null}
           {section === "indexes" ? <IndexesView focusSource={pendingSource} /> : null}
-          {section === "activity" ? <ActivityView /> : null}
           {section === "workflows" ? <WorkflowsView /> : null}
+          {section === "todo" ? <TodoView /> : null}
           {section === "preferences" ? <PreferencesView onNavigate={navigate} /> : null}
         </div>
       </main>

@@ -36,25 +36,17 @@ import {
   useSavedStamp,
 } from "../ui";
 
-type Tab = "placement" | "cards" | "behavior";
+type Tab = "cards" | "behavior";
 type PrefTab = "general" | "launcher" | "island";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "placement", label: "Placement" },
   { id: "cards", label: "Cards & order" },
   { id: "behavior", label: "Behavior" },
 ];
 
-const MONITOR_POLICIES = [
-  { value: "primary", label: "Primary monitor" },
-  { value: "cursor", label: "Monitor under cursor" },
-  { value: "active", label: "Active window's monitor" },
-  { value: "specific", label: "Selected specific monitor" },
-];
-
 export default function IslandSettingsView({
   onNavigate,
-  initialTab = "placement",
+  initialTab = "cards",
   embedded = false,
 }: {
   onNavigate: (tab: PrefTab) => void;
@@ -216,7 +208,7 @@ export default function IslandSettingsView({
       setNotice(
         adjusted
           ? "Position adjusted to stay inside the work area."
-          : tab === "placement"
+          : (tab as string) === "placement"
             ? "Placement saved for the selected display."
             : "Settings saved.",
       );
@@ -392,7 +384,7 @@ export default function IslandSettingsView({
           />
         ) : null}
 
-        {tab === "placement" ? (
+        {(tab as string) === "placement" ? (
           <div className="island-tab-panel" role="tabpanel" aria-label="Placement">
             <div className="island-section-head">
               <h2>Position on screen</h2>

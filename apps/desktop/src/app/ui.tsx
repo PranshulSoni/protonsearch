@@ -10,6 +10,7 @@ export type IconName =
   | "search"
   | "activity"
   | "workflows"
+  | "todo"
   | "preferences"
   | "arrowRight"
   | "arrowUpRight"
@@ -55,6 +56,12 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M20 4v4h-4" />
       <path d="M19 15a7 7 0 0 1-12.5 3.5L4 16" />
       <path d="M4 20v-4h4" />
+    </>
+  ),
+  todo: (
+    <>
+      <path d="m8.5 12 2.5 2.5 5-5" />
+      <rect x="4" y="4" width="16" height="16" rx="3" />
     </>
   ),
   preferences: (
