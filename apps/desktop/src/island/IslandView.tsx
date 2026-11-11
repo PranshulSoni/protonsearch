@@ -98,10 +98,13 @@ export default function IslandView() {
   const hideRef = useRef<() => void>(() => undefined);
 
   const [clipboardRevision, setClipboardRevision] = useState(0);
+  const [browserRevision, setBrowserRevision] = useState(0);
 
   useEffect(() => {
     if (activeCard === "clipboard") {
       setClipboardRevision((r) => r + 1);
+    } else if (activeCard === "browser") {
+      setBrowserRevision((r) => r + 1);
     }
   }, [activeCard]);
 
@@ -112,7 +115,7 @@ export default function IslandView() {
   );
   // Warm every card's data in parallel while the compact pill is shown.
   const clipboardState = useIslandSearch("clipboard", "", bootstrap.ready, clipboardRevision);
-  const browserState = useIslandSearch("browser", "", bootstrap.ready);
+  const browserState = useIslandSearch("browser", "", bootstrap.ready, browserRevision);
   const gitState = useIslandSearch("git", "", bootstrap.ready);
 
   const stageParam = Number(new URLSearchParams(window.location.search).get("stage") ?? "0");

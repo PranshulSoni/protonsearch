@@ -679,6 +679,97 @@ fn epoch_conversion_helpers_are_correct() {
     );
 }
 
+#[test]
+fn chromium_profile_fetches_beyond_2000_history_entries_and_custom_roots() {
+    let dir = workdir("browser-chromium-full");
+    let profile = dir.join("Profile 1");
+    std::fs::create_dir_all(&profile).unwrap();
+
+    let chrome_time: i64 = 11_644_473_600_000_000 + 1_760_000_000_000 * 1000;
+    let conn = rusqlite::Connection::open(profile.join("History")).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE urls (
+            id INTEGER PRIMARY KEY,
+            url TEXT,
+            title TEXT,
+            visit_count INTEGER,
+            last_visit_time INTEGER,
+            hidden INTEGER DEFAULT 0
+        );",
+    )
+    .unwrap();
+    {
+        let mut stmt = conn
+            .prepare("INSERT INTO urls(url, title, visit_count, last_visit_time, hidden) VALUES (?1, ?2, 1, ?3, 0)")
+            .unwrap();
+        for i in 0..2500 {
+            stmt.execute(rusqlite::params![
+                format!("https://example.com/page/{i}"),
+                format!("Page {i}"),
+                chrome_time + i as i64
+            ])
+            .unwrap();
+        }
+    }
+    drop(conn);
+
+    let bookmarks = serde_json::json!({
+        "roots": {
+            "custom_root": {
+                "type": "folder",
+                "children": [
+                    {"type": "url", "name": "Speed Dial", "url": "https://opera.example.com"}
+                ]
+            },
+            "trash": {
+                "type": "folder",
+                "children": [
+                    {"type": "url", "name": "Deleted", "url": "https://deleted.example.com"}
+                ]
+            }
+        }
+    });
+    std::fs::write(profile.join("Bookmarks"), serde_json::to_vec(&bookmarks).unwrap()).unwrap();
+
+    let cache = dir.join("cache");
+    let (entries, warnings) = browser::scan_chromium_profile_with_cache(&profile, "Opera GX", &cache);
+    assert!(warnings.is_empty(), "warnings={warnings:?}");
+    let history_count = entries.iter().filter(|e| !e.bookmark).count();
+    assert_eq!(history_count, 2500, "must fetch all history beyond 2000 cap");
+    assert!(entries.iter().all(|e| e.source == "Opera GX"));
+    assert!(entries.iter().any(|e| e.bookmark && e.url == "https://opera.example.com"));
+    assert!(!entries.iter().any(|e| e.url == "https://deleted.example.com"));
+}
+
+#[test]
+fn gecko_profile_supports_custom_browser_name_and_filters_place_urls() {
+    let dir = workdir("browser-gecko-zen");
+    let profile = dir.join("zen.default");
+    std::fs::create_dir_all(&profile).unwrap();
+    let conn = rusqlite::Connection::open(profile.join("places.sqlite")).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE moz_places (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER, last_visit_date INTEGER);
+         CREATE TABLE moz_bookmarks (id INTEGER PRIMARY KEY, type INTEGER, fk INTEGER, title TEXT);",
+    )
+    .unwrap();
+    let us: i64 = 1_760_000_000_000_000;
+    conn.execute(
+        "INSERT INTO moz_places VALUES
+            (1, 'https://zen-browser.app', 'Zen Browser', 5, ?1),
+            (2, 'place:sort=8&maxResults=10', 'Most Visited', 0, 0)",
+        rusqlite::params![us],
+    )
+    .unwrap();
+    drop(conn);
+
+    let cache = dir.join("cache");
+    let (entries, warnings) = browser::scan_gecko_profile_with_cache(&profile, "Zen", &cache);
+    assert!(warnings.is_empty(), "warnings={warnings:?}");
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].source, "Zen");
+    assert_eq!(entries[0].url, "https://zen-browser.app");
+}
+
 // ---------------------------------------------------------------------------
 // Git
 // ---------------------------------------------------------------------------

@@ -486,6 +486,89 @@ impl Engine {
                 self.remember_results(&results);
                 return self.response(req, query_text, results, timings, started, &settings);
             }
+            if scope == SearchScope::Browser {
+                let tier_start = Instant::now();
+                let mut hits = 0usize;
+                if settings.privacy.browser_history {
+                    let sources = self.sources.read().unwrap();
+                    let want_bookmarks = filters.kinds.is_empty()
+                        || filters.kinds.contains(&SourceKind::Bookmark);
+                    let want_history = filters.kinds.is_empty()
+                        || filters.kinds.contains(&SourceKind::BrowserHistory);
+
+                    let mut bookmarks: Vec<&ps_sources::BrowserEntry> = sources
+                        .browser
+                        .iter()
+                        .filter(|e| e.bookmark && want_bookmarks)
+                        .collect();
+                    bookmarks.sort_by(|a, b| {
+                        b.last_visit_ms
+                            .cmp(&a.last_visit_ms)
+                            .then_with(|| b.visit_count.cmp(&a.visit_count))
+                    });
+
+                    let mut history: Vec<&ps_sources::BrowserEntry> = sources
+                        .browser
+                        .iter()
+                        .filter(|e| !e.bookmark && want_history)
+                        .collect();
+                    history.sort_by(|a, b| {
+                        b.last_visit_ms
+                            .cmp(&a.last_visit_ms)
+                            .then_with(|| b.visit_count.cmp(&a.visit_count))
+                    });
+
+                    let top_bookmark_slots = if want_bookmarks && want_history {
+                        2.min(bookmarks.len())
+                    } else if want_bookmarks {
+                        limit
+                    } else {
+                        0
+                    };
+
+                    for (i, entry) in bookmarks.iter().take(top_bookmark_slots).enumerate() {
+                        ranked.push(Ranked {
+                            tier: 0,
+                            priority: 6,
+                            score: 2000.0 - i as f32,
+                            order: i as u32,
+                            result: browser_result(entry),
+                        });
+                        hits += 1;
+                    }
+                    for (i, entry) in history.iter().take(limit).enumerate() {
+                        ranked.push(Ranked {
+                            tier: 0,
+                            priority: 6,
+                            score: 1900.0 - i as f32,
+                            order: i as u32,
+                            result: browser_result(entry),
+                        });
+                        hits += 1;
+                    }
+                    if want_bookmarks && history.len() + top_bookmark_slots < limit {
+                        for (i, entry) in bookmarks.iter().skip(top_bookmark_slots).take(limit).enumerate() {
+                            ranked.push(Ranked {
+                                tier: 0,
+                                priority: 6,
+                                score: 500.0 - i as f32,
+                                order: (top_bookmark_slots + i) as u32,
+                                result: browser_result(entry),
+                            });
+                            hits += 1;
+                        }
+                    }
+                }
+                timings.push(TierTiming {
+                    tier: 0,
+                    label: "browser history".to_string(),
+                    took_ms: tier_start.elapsed().as_secs_f64() as f32 * 1000.0,
+                    hits,
+                });
+                let results = finalize(ranked, limit);
+                self.remember_results(&results);
+                return self.response(req, query_text, results, timings, started, &settings);
+            }
             let sources = self.sources.read().unwrap();
             let mut recent: Vec<&ps_sources::RecentEntry> = sources.recent.iter().collect();
             recent.sort_by(|a, b| b.last_used_ms.cmp(&a.last_used_ms));
@@ -902,8 +985,25 @@ impl Engine {
             }
         }
         let sources = self.sources.read().unwrap();
-        if sources_worth_it && scope_allows(scope, SourceKind::BrowserHistory) {
-            for (i, entry) in match_browser(&sources.browser, &terms).into_iter().take(4).enumerate() {
+        if sources_worth_it
+            && settings.privacy.browser_history
+            && (scope_allows(scope, SourceKind::BrowserHistory)
+                || scope_allows(scope, SourceKind::Bookmark))
+        {
+            let browser_limit = if scope == SearchScope::Browser { limit } else { 4 };
+            for (i, entry) in match_browser(&sources.browser, &terms)
+                .into_iter()
+                .filter(|entry| {
+                    let kind = if entry.bookmark {
+                        SourceKind::Bookmark
+                    } else {
+                        SourceKind::BrowserHistory
+                    };
+                    filters.kinds.is_empty() || filters.kinds.contains(&kind)
+                })
+                .take(browser_limit)
+                .enumerate()
+            {
                 let result = browser_result(entry);
                 let (tier, priority, score) = if ranked_scope {
                     (title_class(&result.title), CATEGORY_BROWSER, 0.0)
@@ -1377,6 +1477,19 @@ impl Engine {
             if patch.privacy.is_some() || patch.clipboard.is_some() {
                 // Enabling/disabling/pausing clipboard capture takes effect at once.
                 self.sync_clipboard_listener();
+            }
+            if patch.privacy.is_some() {
+                if next.privacy.browser_history {
+                    let (browser, warnings) = ps_sources::browser::scan_configured(&next.privacy);
+                    if let Ok(mut sources) = self.sources.write() {
+                        sources.browser = browser;
+                    }
+                    for warning in warnings {
+                        self.push_warning(warning);
+                    }
+                } else if let Ok(mut sources) = self.sources.write() {
+                    sources.browser.clear();
+                }
             }
             if patch.indexing.is_some() || patch.privacy.is_some() {
                 if next.indexing.paused {
@@ -2185,6 +2298,13 @@ fn refresh_loop(engine: std::sync::Weak<Engine>) {
             save_app_cache(&engine.config.data_dir, &apps);
             if let Ok(mut sources) = engine.sources.write() {
                 sources.apps = apps;
+            }
+        }
+        let settings = engine.settings_snapshot();
+        if settings.privacy.browser_history {
+            let (browser, _) = ps_sources::browser::scan_configured(&settings.privacy);
+            if let Ok(mut sources) = engine.sources.write() {
+                sources.browser = browser;
             }
         }
     }
@@ -3324,9 +3444,15 @@ fn browser_result(entry: &ps_sources::BrowserEntry) -> SearchResult {
         meta: ResultMeta {
             modified: Some(entry.last_visit_ms),
             label: Some(if entry.bookmark {
-                "Bookmark".into()
-            } else {
+                if entry.source.is_empty() {
+                    "Bookmark".into()
+                } else {
+                    format!("{} · Bookmark", entry.source)
+                }
+            } else if entry.source.is_empty() {
                 format!("{} visits", entry.visit_count.max(1))
+            } else {
+                format!("{} · {} visits", entry.source, entry.visit_count.max(1))
             }),
             ..ResultMeta::default()
         },
@@ -5544,6 +5670,86 @@ mod tests {
             "PROGRAMMING".to_lowercase().as_str()
         ));
         assert!(!contains_ci("Example Domain", "rust"));
+    }
+
+    #[test]
+    fn browser_scope_returns_empty_and_full_query_results_across_browsers() {
+        let dir = scratch_dir("browser-scope");
+        let engine = make_engine(&dir, None);
+        {
+            let mut settings = engine.settings.write().unwrap();
+            settings.privacy.browser_history = true;
+        }
+        {
+            let mut sources = engine.sources.write().unwrap();
+            let mut list = vec![ps_sources::BrowserEntry {
+                url: "https://example.com/bm".into(),
+                title: "Saved Docs".into(),
+                source: "Firefox".into(),
+                visit_count: 0,
+                last_visit_ms: 0,
+                bookmark: true,
+            }];
+            for (idx, browser) in ["Chrome", "Edge", "Brave", "Opera GX", "Zen", "Vivaldi"].iter().enumerate() {
+                list.push(ps_sources::BrowserEntry {
+                    url: format!("https://example.com/item/{idx}"),
+                    title: format!("Example Visit {idx}"),
+                    source: (*browser).into(),
+                    visit_count: 2,
+                    last_visit_ms: 10_000 + idx as i64,
+                    bookmark: false,
+                });
+            }
+            sources.browser = list;
+        }
+
+        // Empty query in Browser scope must return both recent history and bookmarks.
+        let empty_res = engine.search(&SearchRequest {
+            protocol: PROTOCOL_VERSION,
+            request_id: 1,
+            query: String::new(),
+            scope: SearchScope::Browser,
+            filters: SearchFilters::default(),
+            limit: 10,
+        });
+        assert!(empty_res.results.iter().any(|r| r.kind == SourceKind::Bookmark));
+        assert!(empty_res.results.iter().any(|r| r.kind == SourceKind::BrowserHistory));
+        assert_eq!(empty_res.results.len(), 7);
+
+        // Non-empty query in Browser scope must return more than 4 matching items up to limit.
+        let query_res = engine.search(&SearchRequest {
+            protocol: PROTOCOL_VERSION,
+            request_id: 2,
+            query: "example".into(),
+            scope: SearchScope::Browser,
+            filters: SearchFilters::default(),
+            limit: 10,
+        });
+        let browser_hits = query_res
+            .results
+            .iter()
+            .filter(|r| matches!(r.kind, SourceKind::Bookmark | SourceKind::BrowserHistory))
+            .count();
+        assert_eq!(browser_hits, 7, "all 7 browser items must match");
+
+        // bookmarks: prefix must filter strictly to bookmarks.
+        let bm_res = engine.search(&SearchRequest {
+            protocol: PROTOCOL_VERSION,
+            request_id: 3,
+            query: "example bookmarks:".into(),
+            scope: SearchScope::All,
+            filters: SearchFilters::default(),
+            limit: 10,
+        });
+        let bm_browser_hits: Vec<_> = bm_res
+            .results
+            .iter()
+            .filter(|r| matches!(r.kind, SourceKind::Bookmark | SourceKind::BrowserHistory))
+            .collect();
+        assert_eq!(bm_browser_hits.len(), 1);
+        assert_eq!(bm_browser_hits[0].kind, SourceKind::Bookmark);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
