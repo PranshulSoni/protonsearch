@@ -264,13 +264,20 @@ export function OcrEngineSelector({
                   <button
                     type="button"
                     className="ocr-btn ocr-btn-secondary"
-                    disabled={disabled}
+                    disabled={disabled || isDownloading}
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowLicenseModal(true);
                     }}
                   >
-                    View License
+                    {isDownloading ? (
+                      <>
+                        <span className="ocr-spinner" />
+                        Downloading...
+                      </>
+                    ) : (
+                      "View License & Download"
+                    )}
                   </button>
                 ) : (
                   <button
@@ -305,10 +312,28 @@ export function OcrEngineSelector({
             <div className="ocr-license-actions">
               <button
                 type="button"
+                className="ocr-btn ocr-btn-primary"
+                disabled={disabled || downloadingEngine === "indra"}
+                onClick={() => {
+                  setShowLicenseModal(false);
+                  void handleDownload("indra");
+                }}
+              >
+                {downloadingEngine === "indra" ? (
+                  <>
+                    <span className="ocr-spinner" />
+                    Downloading...
+                  </>
+                ) : (
+                  "Accept & Download (~27 MB)"
+                )}
+              </button>
+              <button
+                type="button"
                 className="ocr-btn ocr-btn-secondary"
                 onClick={() => setShowLicenseModal(false)}
               >
-                Close
+                Cancel
               </button>
             </div>
           </div>

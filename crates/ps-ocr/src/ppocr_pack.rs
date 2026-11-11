@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 const RELEASE: &str = "https://github.com/GreatV/oar-ocr/releases/download/v0.7.0/";
+const INDRA_RELEASE: &str = "https://huggingface.co/datalab-to/indra-ocr/resolve/main/";
 const MAX_REDIRECTS: usize = 5;
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -35,6 +36,39 @@ const ASSETS: &[Asset] = &[
         name: "ppocrv6_tiny_dict.txt",
         sha256: "c5cbe34ef40c29c4df07ed012bf96569cb69a2d2a01a07027e9f13cb832bd9cd",
         max_bytes: 1024 * 1024,
+    },
+];
+
+const INDRA_ASSETS: &[Asset] = &[
+    Asset {
+        name: "meta.json",
+        sha256: "4ce4c94b46f5d644033c02e718322014ff4081270f385038c571912b56696339",
+        max_bytes: 512 * 1024,
+    },
+    Asset {
+        name: "det.onnx",
+        sha256: "f2bd4cba23e9c328cf7ec824634e423e191a2c6aacbbf35c62bd79dd70f62f59",
+        max_bytes: 1024 * 1024,
+    },
+    Asset {
+        name: "rec.onnx",
+        sha256: "475972a2710be4a3cbfeb2bc7f3624ffd563de07de42476fc7a290d4e1ece484",
+        max_bytes: 10 * 1024 * 1024,
+    },
+    Asset {
+        name: "order.onnx",
+        sha256: "a42db2e8b536ad3d84045a4b7f9b0a72667cf8be4aa02d63f7b38004719fb180",
+        max_bytes: 6 * 1024 * 1024,
+    },
+    Asset {
+        name: "orient.onnx",
+        sha256: "20eaf670f55a7cf9facfe1bdd6c7b8e40be75bbf4d48a3df43f66aa3bbd874fd",
+        max_bytes: 1024 * 1024,
+    },
+    Asset {
+        name: "lm.npz",
+        sha256: "6c0fb618a363a0acdd05d4f5b0edd9e8146d2d990541b87f6130bbfe17cea58d",
+        max_bytes: 25 * 1024 * 1024,
     },
 ];
 
@@ -72,14 +106,52 @@ pub fn install_pp_ocrv6_tiny(model_dir: impl AsRef<Path>) -> anyhow::Result<()> 
     })
 }
 
+/// Downloads and installs the verified Indra OCR model pack from Hugging Face.
+pub fn install_indra(model_dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    let client = Client::builder()
+        .connect_timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(300))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= MAX_REDIRECTS || !safe_url(attempt.url()) {
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        }))
+        .build()
+        .context("creating Indra download client")?;
+    install_with(model_dir.as_ref(), INDRA_ASSETS, |asset, out| {
+        let url = format!("{INDRA_RELEASE}{}", asset.name);
+        let mut response = client.get(url).send()?.error_for_status()?;
+        if !safe_url(response.url()) {
+            bail!("model download redirected to an untrusted URL");
+        }
+        if response
+            .content_length()
+            .is_some_and(|size| size > asset.max_bytes)
+        {
+            bail!("model asset exceeds its size limit");
+        }
+        let mut limited = (&mut response).take(asset.max_bytes + 1);
+        std::io::copy(&mut limited, out)?;
+        Ok(())
+    })
+}
+
 fn safe_url(url: &reqwest::Url) -> bool {
-    url.scheme() == "https"
-        && url.username().is_empty()
-        && url.password().is_none()
-        && matches!(
-            url.host_str(),
-            Some("github.com" | "release-assets.githubusercontent.com")
-        )
+    if url.scheme() != "https" || !url.username().is_empty() || url.password().is_some() {
+        return false;
+    }
+    match url.host_str() {
+        Some(host) => {
+            host == "github.com"
+                || host == "release-assets.githubusercontent.com"
+                || host == "huggingface.co"
+                || host.ends_with(".hf.co")
+                || host.ends_with(".huggingface.co")
+        }
+        None => false,
+    }
 }
 
 /// Recovers any model pack left in an inconsistent state by an interrupted process.

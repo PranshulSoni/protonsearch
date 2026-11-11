@@ -1204,6 +1204,16 @@ impl Engine {
                     ..Default::default()
                 })
             }
+            ps_ipc::OcrEngine::Indra => {
+                let model_dir = self.config.data_dir.join("models").join("indra");
+                let parent = self.config.data_dir.join("models");
+                std::fs::create_dir_all(&parent)?;
+                ps_ocr::ppocr_pack::install_indra(&model_dir)?;
+                self.update_settings(SettingsPatch {
+                    ocr_engine: Some(ps_ipc::OcrEngine::Indra),
+                    ..Default::default()
+                })
+            }
             ps_ipc::OcrEngine::Windows => {
                 self.update_settings(SettingsPatch {
                     ocr_engine: Some(ps_ipc::OcrEngine::Windows),
@@ -1959,7 +1969,10 @@ fn ocr_candidates(index: &FilenameIndex, modes: &[(String, u8)]) -> Vec<(String,
         .iter()
         .filter(|entry| entry.kind == EntryKind::File)
         .filter(|entry| ps_ocr::IMAGE_EXTENSIONS.contains(&entry.ext.to_ascii_lowercase().as_str()))
-        .filter(|entry| mode_for(modes, &entry.path) >= 2)
+        // OCR runs on any content-enabled root (>= 1) when OCR is globally enabled.
+        // ContentAndOcr (level 2) is the preferred mode, but NamesOnly roots (level 0)
+        // are intentionally excluded so users can keep fast-only roots fast.
+        .filter(|entry| mode_for(modes, &entry.path) >= 1)
         .map(|entry| (entry.path.clone(), entry.size, entry.modified))
         .collect()
 }

@@ -8,6 +8,9 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 use crate::{OcrDocument, MAX_IMAGE_PIXELS, MAX_LONG_EDGE, OCR_TIMEOUT};
 
 const MAX_INPUT_BYTES: u64 = 100 * 1024 * 1024;
@@ -22,7 +25,7 @@ pub struct Tesseract {
 }
 
 impl Tesseract {
-    /// True when Tesseract executable is present at a standard location or TESSERACT_PATH.
+    /// True when Tesseract executable is present at a standard location, TESSERACT_PATH, or PATH.
     pub fn is_installed() -> bool {
         if let Ok(path) = std::env::var("TESSERACT_PATH") {
             if Path::new(&path).is_file() {
@@ -37,7 +40,93 @@ impl Tesseract {
                 return true;
             }
         }
+        // Also check system PATH via `where` / which
+        if let Ok(output) = std::process::Command::new("where")
+            .arg("tesseract")
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output()
+        {
+            if output.status.success() {
+                let path_str = String::from_utf8_lossy(&output.stdout);
+                if let Some(first_line) = path_str.lines().next() {
+                    let p = Path::new(first_line.trim());
+                    if p.is_file() {
+                        return true;
+                    }
+                }
+            }
+        }
         false
+    }
+
+    /// Returns the path to the Tesseract executable when installed, None otherwise.
+    pub fn find_executable() -> Option<PathBuf> {
+        if let Ok(path) = std::env::var("TESSERACT_PATH") {
+            let p = PathBuf::from(&path);
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+        for candidate in [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        ] {
+            let p = Path::new(candidate);
+            if p.is_file() {
+                return Some(p.to_path_buf());
+            }
+        }
+        if let Ok(output) = std::process::Command::new("where")
+            .arg("tesseract")
+            .creation_flags(0x08000000)
+            .output()
+        {
+            if output.status.success() {
+                let path_str = String::from_utf8_lossy(&output.stdout);
+                if let Some(first_line) = path_str.lines().next() {
+                    let p = PathBuf::from(first_line.trim());
+                    if p.is_file() {
+                        return Some(p);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Automatically detects and initializes a local Tesseract installation using standard locations and PATH.
+    pub fn default_installed() -> anyhow::Result<Self> {
+        let exe = Self::find_executable().ok_or_else(|| anyhow!("Tesseract executable not found"))?;
+        let tessdata = if let Ok(prefix) = std::env::var("TESSDATA_PREFIX") {
+            let p = PathBuf::from(prefix);
+            if p.is_dir() {
+                p
+            } else {
+                exe.parent().unwrap_or(Path::new("")).join("tessdata")
+            }
+        } else if let Some(parent) = exe.parent() {
+            parent.join("tessdata")
+        } else {
+            PathBuf::from("tessdata")
+        };
+        let lang = if tessdata.join("eng.traineddata").is_file() {
+            "eng".to_string()
+        } else if let Ok(entries) = std::fs::read_dir(&tessdata) {
+            let mut found = None;
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if let Some(prefix) = name.strip_suffix(".traineddata") {
+                    if !prefix.starts_with("osd") {
+                        found = Some(prefix.to_string());
+                        break;
+                    }
+                }
+            }
+            found.unwrap_or_else(|| "eng".to_string())
+        } else {
+            "eng".to_string()
+        };
+        Self::new(exe, tessdata, lang)
     }
 
     /// Create an adapter only when the configured executable and all requested

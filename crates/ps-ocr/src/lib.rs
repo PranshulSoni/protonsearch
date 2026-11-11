@@ -180,7 +180,12 @@ pub fn is_engine_available(engine: &str, _model_dir: Option<&Path>) -> bool {
             #[cfg(feature = "onnx")]
             {
                 if let Some(dir) = _model_dir {
-                    dir.join("indra.onnx").is_file() || dir.join("model.onnx").is_file()
+                    (dir.join("det.onnx").is_file()
+                        && dir.join("rec.onnx").is_file()
+                        && dir.join("order.onnx").is_file()
+                        && dir.join("meta.json").is_file())
+                        || dir.join("indra.onnx").is_file()
+                        || dir.join("model.onnx").is_file()
                 } else {
                     false
                 }
@@ -245,15 +250,18 @@ pub fn extract_image_with_engine(
             }))
         }
         "tesseract" => {
-            if let Some(dir) = model_dir {
-                let tess = tesseract::Tesseract::new(
+            let tess = if let Some(dir) = model_dir {
+                tesseract::Tesseract::new(
                     dir.join("tesseract.exe"),
                     dir.join("tessdata"),
                     "eng",
-                )?;
-                tess.recognize(path, max_pixels)
+                )
             } else {
-                extract_image(path, max_pixels)
+                tesseract::Tesseract::default_installed()
+            };
+            match tess {
+                Ok(tess) => tess.recognize(path, max_pixels),
+                Err(_) => extract_image(path, max_pixels),
             }
         }
         _ => extract_image(path, max_pixels),
