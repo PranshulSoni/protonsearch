@@ -183,3 +183,19 @@ fn ocr_query_sanitisation_quotes_terms() {
     );
     assert!(ps_ocr::store::sanitize_fts_query("((( )))").is_empty());
 }
+
+#[test]
+fn ppocrv6_extracts_text_when_installed() {
+    let app_data = std::env::var("APPDATA").unwrap_or_default();
+    let model_dir = PathBuf::from(app_data).join("protonsearch").join("v2").join("models").join("ppocrv6");
+    if !ps_ocr::is_engine_available("pp_ocr_v6", Some(&model_dir)) {
+        eprintln!("SKIPPED: ppocrv6 models not present in APPDATA");
+        return;
+    }
+    let path = fixture("ocr_sample.png");
+    let result = ps_ocr::extract_image_with_engine(&path, 16_000_000, "pp_ocr_v6", Some(&model_dir))
+        .expect("extract_image_with_engine should not error")
+        .expect("should find text in ocr_sample.png");
+    eprintln!("pp_ocr_v6 recognized: {:?}", result.text);
+    assert!(!result.text.trim().is_empty(), "pp_ocr_v6 text was empty");
+}

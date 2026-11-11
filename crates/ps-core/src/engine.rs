@@ -1399,6 +1399,7 @@ impl Engine {
             IndexCommand::RebuildOcr => {
                 self.db.ocr_clear()?;
                 self.ocr_documents.store(0, Ordering::SeqCst);
+                self.force_rescan.store(true, Ordering::SeqCst);
             }
             IndexCommand::Shutdown => {
                 self.shutdown.store(true, Ordering::SeqCst);

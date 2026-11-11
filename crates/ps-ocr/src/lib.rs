@@ -222,10 +222,9 @@ pub fn extract_image_with_engine(
         #[cfg(feature = "onnx")]
         "pp_ocr_v6" => {
             let dir = model_dir.ok_or_else(|| anyhow!("missing model_dir for PP-OCRv6"))?;
-            let ocr = onnx::OnnxOcr::pp_ocrv6_tiny(dir)?;
             let img = image::open(path)?;
             let (width, height) = (img.width(), img.height());
-            let text = ocr.recognize(img)?;
+            let text = onnx::recognize_ppocrv6(dir, img)?;
             Ok(Some(OcrDocument {
                 text,
                 language: "und".to_string(),
@@ -237,10 +236,9 @@ pub fn extract_image_with_engine(
         #[cfg(feature = "onnx")]
         "indra" => {
             let dir = model_dir.ok_or_else(|| anyhow!("missing model_dir for Indra"))?;
-            let ocr = onnx::OnnxOcr::indra(dir)?;
             let img = image::open(path)?;
             let (width, height) = (img.width(), img.height());
-            let text = ocr.recognize(img)?;
+            let text = onnx::recognize_indra(dir, img)?;
             Ok(Some(OcrDocument {
                 text,
                 language: "und".to_string(),

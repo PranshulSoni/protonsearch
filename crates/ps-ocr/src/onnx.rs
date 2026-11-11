@@ -75,6 +75,39 @@ impl OnnxOcr {
     }
 }
 
+use std::sync::Mutex;
+
+static CACHED_PPOCR: Mutex<Option<(PathBuf, OnnxOcr)>> = Mutex::new(None);
+static CACHED_INDRA: Mutex<Option<(PathBuf, OnnxOcr)>> = Mutex::new(None);
+
+/// Recognizes text using a cached PP-OCRv6 tiny pipeline.
+pub fn recognize_ppocrv6(model_dir: &Path, image: DynamicImage) -> anyhow::Result<String> {
+    let mut guard = CACHED_PPOCR.lock().map_err(|e| anyhow::anyhow!("mutex poisoned: {e}"))?;
+    if let Some((cached_dir, pipeline)) = guard.as_ref() {
+        if cached_dir == model_dir {
+            return pipeline.recognize(image);
+        }
+    }
+    let pipeline = OnnxOcr::pp_ocrv6_tiny(model_dir)?;
+    let result = pipeline.recognize(image);
+    *guard = Some((model_dir.to_path_buf(), pipeline));
+    result
+}
+
+/// Recognizes text using a cached Indra OCR pipeline.
+pub fn recognize_indra(model_dir: &Path, image: DynamicImage) -> anyhow::Result<String> {
+    let mut guard = CACHED_INDRA.lock().map_err(|e| anyhow::anyhow!("mutex poisoned: {e}"))?;
+    if let Some((cached_dir, pipeline)) = guard.as_ref() {
+        if cached_dir == model_dir {
+            return pipeline.recognize(image);
+        }
+    }
+    let pipeline = OnnxOcr::indra(model_dir)?;
+    let result = pipeline.recognize(image);
+    *guard = Some((model_dir.to_path_buf(), pipeline));
+    result
+}
+
 fn require_file(path: &Path) -> anyhow::Result<()> {
     if !path.is_file() {
         bail!("required local OCR model asset not found: {}", path.display());

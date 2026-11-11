@@ -519,7 +519,7 @@ INSERT INTO ocr_documents(id, path, hash, text, lang, indexed_at) VALUES(1, 'C:\
 INSERT INTO ocr_fts(rowid, path, text) VALUES(1, 'C:\\Photos\\Résumé.png', 'legacy caption');",
 ).unwrap();
         drop(conn);
-        let index = ps_index::FilenameIndex::from_entries(vec![ps_index::IndexEntry {
+        let mut index = ps_index::FilenameIndex::from_entries(vec![ps_index::IndexEntry {
             path: "C:\\Photos\\Résumé.png".into(),
             name: "Résumé.png".into(),
             ext: "png".into(),
@@ -527,7 +527,16 @@ INSERT INTO ocr_fts(rowid, path, text) VALUES(1, 'C:\\Photos\\Résumé.png', 'le
             size: 42,
             modified: 1234,
         }]);
+        index.set_roots(vec!["C:\\Photos".into()]);
         index.save(&dir.join(crate::engine::INDEX_FILE)).unwrap();
+        let mut test_settings = ps_ipc::Settings::default();
+        test_settings.onboarding_complete = true;
+        test_settings.indexing.roots = vec![ps_ipc::RootConfig {
+            path: "C:\\Photos".into(),
+            mode: ps_ipc::RootMode::NamesOnly,
+            enabled: true,
+        }];
+        crate::settings::save(&dir.join("settings.json"), &test_settings).unwrap();
         let engine = std::sync::Arc::new(
             crate::engine::Engine::open(crate::engine::EngineConfig {
                 data_dir: dir.clone(),
