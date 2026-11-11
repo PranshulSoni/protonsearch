@@ -45,7 +45,7 @@ const PREFIXES: ReadonlyArray<{ prefix: string; scope: SearchScope }> = [
   { prefix: "bookmarks:", scope: "browser" },
   { prefix: "google:", scope: "browser" },
   { prefix: "content:", scope: "content" },
-  { prefix: "ocr:", scope: "content" },
+  { prefix: "ocr:", scope: "ocr" },
   { prefix: "git:", scope: "git" },
   { prefix: "commits:", scope: "git" },
   { prefix: "todos:", scope: "git" },
@@ -99,6 +99,7 @@ const SCOPE_LABELS: Readonly<Record<string, string>> = {
   clipboard: "CLIPBOARD",
   browser: "WEB",
   git: "GIT",
+  ocr: "OCR",
   actions: "ACTIONS",
   commands: "COMMANDS",
   content: "DOCUMENTS",
@@ -122,6 +123,16 @@ export function guardScopeResults(
 ): SearchResult[] {
   if (scope === "files") return results.filter((result) => result.kind !== "folder");
   if (scope === "folders") return results.filter((result) => result.kind === "folder");
+  if (scope === "ocr") {
+    return results.filter(
+      (result) =>
+        result.kind === "ocr_text" ||
+        result.kind === "content_match" ||
+        result.kind === "document" ||
+        result.kind === "recent" ||
+        (result.kind === "file" && !result.path?.endsWith("/")),
+    );
+  }
   return [...results];
 }
 

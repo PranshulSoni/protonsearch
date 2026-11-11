@@ -146,6 +146,7 @@ export function SearchCard({
     { id: "folders", label: "Folders" },
     { id: "apps", label: "Apps" },
     { id: "actions", label: "Actions" },
+    { id: "ocr", label: "OCR" },
   ];
   return (
     <div className={"island-search" + (compact ? " island-search--compact" : " island-search--expanded")}>

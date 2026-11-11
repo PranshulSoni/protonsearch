@@ -362,6 +362,55 @@ impl Engine {
                 self.remember_results(&results);
                 return self.response(req, query_text, results, timings, started, &settings);
             }
+            if scope == SearchScope::Ocr {
+                let tier_start = Instant::now();
+                let mut hits = 0usize;
+                if let Ok(ocr_hits) = self.db.ocr_recent(limit) {
+                    for hit in ocr_hits {
+                        ranked.push(Ranked {
+                            tier: 0,
+                            priority: 8,
+                            score: 1000.0 - (hits as f32 * 1.0),
+                            result: ocr_result(hit, &settings),
+                        });
+                        hits += 1;
+                    }
+                }
+                if hits < limit {
+                    let sources = self.sources.read().unwrap();
+                    for entry in &sources.recent {
+                        if hits >= limit {
+                            break;
+                        }
+                        let p = Path::new(&entry.path);
+                        let ext = p
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .unwrap_or("")
+                            .to_ascii_lowercase();
+                        if ps_ocr::IMAGE_EXTENSIONS.contains(&ext.as_str())
+                            || ps_content::is_supported(p)
+                        {
+                            ranked.push(Ranked {
+                                tier: 0,
+                                priority: 7,
+                                score: 800.0 - (hits as f32 * 1.0),
+                                result: recent_result(entry),
+                            });
+                            hits += 1;
+                        }
+                    }
+                }
+                timings.push(TierTiming {
+                    tier: 0,
+                    label: "OCR & documents".to_string(),
+                    took_ms: tier_start.elapsed().as_secs_f64() as f32 * 1000.0,
+                    hits,
+                });
+                let results = finalize(ranked, limit);
+                self.remember_results(&results);
+                return self.response(req, query_text, results, timings, started, &settings);
+            }
             let sources = self.sources.read().unwrap();
             let mut recent: Vec<&ps_sources::RecentEntry> = sources.recent.iter().collect();
             recent.sort_by(|a, b| b.last_used_ms.cmp(&a.last_used_ms));
@@ -483,6 +532,22 @@ impl Engine {
                     })
                     .map(str::to_string)
                     .collect()
+            } else if scope == SearchScope::Ocr {
+                [
+                    "png", "jpg", "jpeg", "bmp", "gif", "webp", "tif", "tiff",
+                    "pdf", "docx", "doc", "docm", "dotx", "pptx", "pptm", "xlsx", "xlsm",
+                    "txt", "text", "rtf", "md", "markdown", "epub", "csv", "log",
+                ]
+                .into_iter()
+                .filter(|ext| {
+                    filters.extensions.is_empty()
+                        || filters
+                            .extensions
+                            .iter()
+                            .any(|filter| filter.trim_start_matches('.').eq_ignore_ascii_case(ext))
+                })
+                .map(str::to_string)
+                .collect()
             } else {
                 filters
                     .extensions
@@ -490,15 +555,15 @@ impl Engine {
                     .map(|ext| ext.trim_start_matches('.').to_lowercase())
                     .collect()
             };
-            if scope == SearchScope::Photos && extensions.is_empty() {
+            if (scope == SearchScope::Photos || scope == SearchScope::Ocr) && extensions.is_empty() {
                 // ps-index treats an empty extension list as unrestricted.
-                extensions.push("__no_photo_extension__".to_string());
+                extensions.push("__no_matching_extension__".to_string());
             }
             // Strict scope semantics: Files never returns folders and Folders
             // never returns files (All keeps both groups separate). An explicit
             // kind: filter can only narrow, never widen, the scope.
             let scope_kind = match scope {
-                SearchScope::Files | SearchScope::Photos => Some(EntryKind::File),
+                SearchScope::Files | SearchScope::Photos | SearchScope::Ocr => Some(EntryKind::File),
                 SearchScope::Folders => Some(EntryKind::Folder),
                 _ => None,
             };
@@ -556,9 +621,9 @@ impl Engine {
                 .filter(|entry| entry.tier <= 1 && entry.score > ceiling)
                 .count()
         };
-        let content_worth_it = count_above(500.0) < limit;
+        let content_worth_it = count_above(500.0) < limit || scope == SearchScope::Ocr;
         let sources_worth_it = count_above(400.0) < limit;
-        let ocr_worth_it = count_above(300.0) < limit;
+        let ocr_worth_it = count_above(300.0) < limit || scope == SearchScope::Ocr;
 
         // Tier 1: indexed content, clipboard, browser, git.
         if content_worth_it && settings.indexing.content_enabled && content_scope_allows(scope) {
@@ -570,10 +635,15 @@ impl Engine {
                 match result {
                     Ok(content_hits) => {
                         for hit in content_hits {
+                            let (tier, score) = if scope == SearchScope::Ocr {
+                                (0, 800.0)
+                            } else {
+                                (1, 500.0)
+                            };
                             ranked.push(Ranked {
-                                tier: 1,
+                                tier,
                                 priority: 3,
-                                score: 500.0,
+                                score,
                                 result: content_result(hit, &settings),
                             });
                             hits += 1;
@@ -657,16 +727,23 @@ impl Engine {
             let mut hits = 0usize;
             let ocr_hits = if scope == SearchScope::Photos {
                 self.db.ocr_search_photos(&query_text, 5, &filters)
+            } else if scope == SearchScope::Ocr {
+                self.db.ocr_search(&query_text, 10)
             } else {
                 self.db.ocr_search(&query_text, 5)
             };
             match ocr_hits {
                 Ok(ocr_hits) => {
                     for hit in ocr_hits {
+                        let (tier, score) = if scope == SearchScope::Ocr {
+                            (0, 900.0)
+                        } else {
+                            (2, 300.0)
+                        };
                         ranked.push(Ranked {
-                            tier: 2,
+                            tier,
                             priority: 3,
-                            score: 300.0,
+                            score,
                             result: ocr_result(hit, &settings),
                         });
                         hits += 1;
@@ -2128,6 +2205,9 @@ fn scope_allows(scope: SearchScope, kind: SourceKind) -> bool {
             | (SearchScope::Git, SourceKind::GitRepository)
             | (SearchScope::Git, SourceKind::GitTodo)
             | (SearchScope::Ocr, SourceKind::OcrText)
+            | (SearchScope::Ocr, SourceKind::ContentMatch)
+            | (SearchScope::Ocr, SourceKind::File)
+            | (SearchScope::Ocr, SourceKind::Document)
             | (SearchScope::Actions, SourceKind::Action)
             | (SearchScope::Actions, SourceKind::Command)
             | (SearchScope::Commands, SourceKind::Command)
@@ -2139,7 +2219,7 @@ fn scope_allows(scope: SearchScope, kind: SourceKind) -> bool {
 /// mix document matches into a file list (task-37 decision; ContentMatch stays
 /// reachable through ALL and the content: prefix).
 fn content_scope_allows(scope: SearchScope) -> bool {
-    matches!(scope, SearchScope::All | SearchScope::Content)
+    matches!(scope, SearchScope::All | SearchScope::Content | SearchScope::Ocr)
 }
 
 /// Delegate ordering, dedupe and truncation to the shared ranker (engine-core)
@@ -3541,6 +3621,10 @@ mod tests {
         assert!(scope_allows(SearchScope::Photos, SourceKind::File));
         assert!(scope_allows(SearchScope::Photos, SourceKind::OcrText));
         assert!(!scope_allows(SearchScope::Photos, SourceKind::Folder));
+        assert!(scope_allows(SearchScope::Ocr, SourceKind::OcrText));
+        assert!(scope_allows(SearchScope::Ocr, SourceKind::ContentMatch));
+        assert!(scope_allows(SearchScope::Ocr, SourceKind::File));
+        assert!(!scope_allows(SearchScope::Ocr, SourceKind::Folder));
     }
     #[test]
     fn photos_scope_returns_raster_files_and_raster_ocr_only() {
@@ -3669,6 +3753,72 @@ mod tests {
             .results
             .iter()
             .all(|result| result.kind != SourceKind::OcrText));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ocr_scope_returns_images_and_documents_with_ocr_and_content_matches() {
+        let dir = scratch_dir("ocr-scope");
+        let engine = make_engine(&dir, None);
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![
+            ps_index::IndexEntry {
+                path: r"C:\docs\invoice.png".into(),
+                name: "invoice.png".into(),
+                ext: "png".into(),
+                kind: EntryKind::File,
+                size: 10,
+                modified: 1,
+            },
+            ps_index::IndexEntry {
+                path: r"C:\docs\invoice.pdf".into(),
+                name: "invoice.pdf".into(),
+                ext: "pdf".into(),
+                kind: EntryKind::File,
+                size: 10,
+                modified: 1,
+            },
+            ps_index::IndexEntry {
+                path: r"C:\docs\invoice-folder".into(),
+                name: "invoice-folder".into(),
+                ext: String::new(),
+                kind: EntryKind::Folder,
+                size: 0,
+                modified: 1,
+            },
+        ]);
+        engine.sync_filename_entries();
+        engine
+            .db
+            .ocr_upsert(
+                r"C:\docs\invoice.png",
+                "png-hash",
+                "total amount due $500",
+                "en",
+                10,
+                10,
+                10,
+                1,
+            )
+            .unwrap();
+        engine.settings.write().unwrap().indexing.ocr_enabled = true;
+
+        let mut request = SearchRequest::new(40, "invoice");
+        request.scope = SearchScope::Ocr;
+        let results = engine.search(&request).results;
+        assert!(!results.is_empty());
+        assert!(
+            results.iter().all(|result| {
+                result.kind == SourceKind::OcrText
+                    || result.kind == SourceKind::ContentMatch
+                    || result.path.as_deref().is_some_and(|path| {
+                        let lower = path.to_ascii_lowercase();
+                        lower.ends_with(".png") || lower.ends_with(".pdf")
+                    })
+            }),
+            "OCR scope must only return images and documents: {:?}",
+            results.iter().map(|r| (&r.path, r.kind)).collect::<Vec<_>>()
+        );
+        assert!(!results.iter().any(|r| r.kind == SourceKind::Folder));
         let _ = std::fs::remove_dir_all(&dir);
     }
     #[test]
@@ -4655,6 +4805,7 @@ mod tests {
         assert!(!content_scope_allows(SearchScope::Files));
         assert!(content_scope_allows(SearchScope::Content));
         assert!(content_scope_allows(SearchScope::All));
+        assert!(content_scope_allows(SearchScope::Ocr));
     }
 
     #[test]

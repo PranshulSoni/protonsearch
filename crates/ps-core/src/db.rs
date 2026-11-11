@@ -331,6 +331,26 @@ params![path, hash, text, lang, width, height, i64::try_from(file_size).unwrap_o
         self.ocr_search_inner(query, limit, 0, false)
     }
 
+    pub fn ocr_recent(&self, limit: usize) -> anyhow::Result<Vec<OcrHit>> {
+        let conn = self.lock()?;
+        let mut stmt = conn.prepare(
+            "SELECT path, text FROM ocr_documents ORDER BY indexed_at DESC, id DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map(params![limit as i64], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        let mut hits = Vec::new();
+        for row in rows {
+            let (path, text) = row?;
+            hits.push(OcrHit {
+                path,
+                text,
+                line: Some(1),
+            });
+        }
+        Ok(hits)
+    }
+
     pub fn ocr_search_photos(
         &self,
         query: &str,

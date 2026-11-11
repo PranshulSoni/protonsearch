@@ -152,7 +152,7 @@ describe("V9 island surface", () => {
       setter.call(input, "report");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    for (const [label, scope] of [["Apps", "apps"], ["Files", "files"], ["Folders", "folders"], ["Actions", "actions"], ["All", "all"]]) {
+    for (const [label, scope] of [["Apps", "apps"], ["Files", "files"], ["Folders", "folders"], ["Actions", "actions"], ["OCR", "ocr"], ["All", "all"]]) {
       await act(async () => {
         const button = Array.from(element.querySelectorAll<HTMLButtonElement>(".island-filter")).find((item) => item.textContent === label)!;
         button.click();
@@ -196,7 +196,7 @@ describe("V9 island surface", () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     });
     await waitFor(() => element.querySelector(".island-surface--expanded") !== null);
-    expect(element.querySelectorAll(".island-filter").length).toBe(5);
+    expect(element.querySelectorAll(".island-filter").length).toBe(6);
     await waitFor(() => element.querySelectorAll(".island-result-row").length > 0);
     expect(element.querySelectorAll(".island-group-label").length).toBeGreaterThan(0);
     expect(element.querySelector(".island-result-foot")?.textContent).toContain("local results");

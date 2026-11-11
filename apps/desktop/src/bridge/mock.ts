@@ -205,6 +205,24 @@ const sample: SearchResult[] = [
       line: 42,
     },
   },
+  {
+    id: "ocr:system-diagram",
+    kind: "ocr_text",
+    title: "System Architecture Diagram.png",
+    subtitle: "Pictures / Screenshots",
+    path: USER + "\\Pictures\\Screenshots\\System Architecture Diagram.png",
+    icon: { type: "file_type", ext: "png" },
+    score: 85,
+    matchRanges: [{ start: 7, end: 19 }],
+    meta: {
+      label: "Text in screenshot",
+      snippet: "ProtonSearch architecture diagram with high performance local-first indexing and OCR pipeline.",
+    },
+    action: {
+      type: "open_path",
+      path: USER + "\\Pictures\\Screenshots\\System Architecture Diagram.png",
+    },
+  },
 ];
 
 const activity: ActivityItem[] = [
@@ -263,6 +281,7 @@ export const mockBridge = {
           clipboard: ["clipboard"],
           browser: ["browser_history", "bookmark"],
           git: ["git_commit", "git_repository", "git_todo"],
+          ocr: ["ocr_text", "document", "content_match", "file", "recent"],
           actions: ["action", "calculator", "command"],
         };
         if (map[req.scope] && !map[req.scope].includes(r.kind)) return false;
