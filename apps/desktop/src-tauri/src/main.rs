@@ -969,6 +969,24 @@ fn complete_onboarding(
 }
 
 #[tauri::command]
+async fn get_ocr_engines(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<ps_ipc::OcrEngineDetails>, String> {
+    Ok(state.engine.list_ocr_engines())
+}
+
+#[tauri::command]
+async fn download_ocr_engine(
+    state: tauri::State<'_, AppState>,
+    engine: ps_ipc::OcrEngine,
+) -> Result<Settings, String> {
+    let engine_instance = state.engine.clone();
+    run_blocking(move || engine_instance.download_ocr_engine(engine))
+        .await?
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn index_command(state: tauri::State<'_, AppState>, command: IndexCommand) -> Result<(), String> {
     state.engine.index_command(command).map_err(|e| e.to_string())?;
     if matches!(
@@ -2016,6 +2034,8 @@ dispatch_window_action(app, toggle_primary_launcher);
             get_activity,
             get_onboarding,
             complete_onboarding,
+            get_ocr_engines,
+            download_ocr_engine,
             index_command,
             set_launcher_geometry,
             list_monitors,

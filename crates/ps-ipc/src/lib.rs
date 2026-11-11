@@ -530,6 +530,21 @@ pub struct OcrEngineOption {
     pub availability: OcrEngineAvailability,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrEngineDetails {
+    pub engine: OcrEngine,
+    pub name: String,
+    pub availability: OcrEngineAvailability,
+    pub size_label: String,
+    pub speed_label: String,
+    pub badge: String,
+    pub description: String,
+    pub highlights: Vec<String>,
+    pub license: Option<String>,
+    pub download_size_bytes: Option<u64>,
+}
+
 /// Currently only Windows OCR is actionable; optional engines require a
 /// separately installed runtime/model and are never downloaded implicitly.
 pub const OCR_ENGINE_OPTIONS: [OcrEngineOption; 4] = [

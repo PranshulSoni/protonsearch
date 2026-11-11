@@ -18,6 +18,8 @@ import type {
   AppInfo,
   EngineStatus,
   IndexCommand,
+  OcrEngine,
+  OcrEngineDetails,
   OnboardingInput,
   OnboardingState,
   NativeCommand,
@@ -61,6 +63,8 @@ type Bridge = {
   getActivity(query?: ActivityQuery): Promise<ActivityItem[]>;
   getOnboarding(): Promise<OnboardingState>;
   completeOnboarding(input: OnboardingInput): Promise<Settings>;
+  getOcrEngines(): Promise<OcrEngineDetails[]>;
+  downloadOcrEngine(engine: OcrEngine): Promise<Settings>;
   indexCommand(command: IndexCommand): Promise<void>;
   setLauncherGeometry(height: number, preview: boolean): Promise<void>;
   getPreview(resultId: string, maxChars?: number): Promise<PreviewPayload>;
@@ -133,6 +137,8 @@ const tauriBridge: Bridge = {
   getActivity: (query) => invoke<ActivityItem[]>("get_activity", { query: query ?? null }),
   getOnboarding: () => invoke<OnboardingState>("get_onboarding"),
   completeOnboarding: (input) => invoke<Settings>("complete_onboarding", { input }),
+  getOcrEngines: () => invoke<OcrEngineDetails[]>("get_ocr_engines"),
+  downloadOcrEngine: (engine) => invoke<Settings>("download_ocr_engine", { engine }),
   indexCommand: (command) => invoke<void>("index_command", { command }),
   setLauncherGeometry: (height, preview) =>
     invoke<void>("set_launcher_geometry", { height, preview }),

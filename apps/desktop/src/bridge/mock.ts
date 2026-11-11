@@ -357,6 +357,78 @@ export const mockBridge = {
     };
     return settings;
   },
+  async getOcrEngines(): Promise<import("./types").OcrEngineDetails[]> {
+    return [
+      {
+        engine: "windows",
+        name: "Windows OCR",
+        availability: "available",
+        sizeLabel: "Built-in (0 MB)",
+        speedLabel: "Fast (~45ms/img)",
+        badge: "Built-in",
+        description: "Built into Windows and available now. Keeps OCR local and preserves the current working engine.",
+        highlights: [
+          "Built into Windows 10 & 11",
+          "Zero setup or downloads required",
+          "100% offline and low memory footprint",
+        ],
+        license: null,
+        downloadSizeBytes: null,
+      },
+      {
+        engine: "pp_ocr_v6",
+        name: "PP-OCRv6",
+        availability: "not_installed",
+        sizeLabel: "~6.1 MB",
+        speedLabel: "Ultra-Fast (~30ms/img)",
+        badge: "Recommended",
+        description: "Compact and designed for speed; approximately 6.1 MB of models, plus a runtime.",
+        highlights: [
+          "High accuracy on screenshots, PDFs & text",
+          "Ultra-fast local inference (~30ms/image)",
+          "Compact ~6.1 MB model download",
+        ],
+        license: "Apache 2.0",
+        downloadSizeBytes: 6100000,
+      },
+      {
+        engine: "indra",
+        name: "Indra",
+        availability: "not_installed",
+        sizeLabel: "~27 MB",
+        speedLabel: "Deep (~120ms/img)",
+        badge: "Multilingual & Skewed",
+        description: "Designed for higher-quality text recognition, including skewed and multilingual text; approximately 27 MB of models. Its license requires acceptance before download.",
+        highlights: [
+          "Specialized in skewed and rotated text",
+          "Extended multilingual script coverage",
+          "Requires research license acceptance",
+        ],
+        license: "Research & Non-Commercial (Acceptance required)",
+        downloadSizeBytes: 27000000,
+      },
+      {
+        engine: "tesseract",
+        name: "Tesseract",
+        availability: "not_installed",
+        sizeLabel: "External CLI",
+        speedLabel: "Traditional (~150ms/img)",
+        badge: "Extensible",
+        description: "A traditional OCR engine with separately installed language data; download size depends on the languages selected. Not configured in ProtonSearch.",
+        highlights: [
+          "Uses system Tesseract installation",
+          "Extensible with custom traineddata packs",
+          "Traditional open-source engine",
+        ],
+        license: "Apache 2.0",
+        downloadSizeBytes: null,
+      },
+    ];
+  },
+  async downloadOcrEngine(engine: import("./types").OcrEngine): Promise<Settings> {
+    settings = { ...settings, ocrEngine: engine };
+    return settings;
+  },
   async indexCommand(_command: IndexCommand): Promise<void> {},
   async confirmNativeAction(): Promise<OpenOutcome> {
     return { ok: false, message: "Browser preview: system actions are disabled." };

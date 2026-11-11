@@ -1024,6 +1024,119 @@ impl Engine {
         self.db.clear_activity()
     }
 
+    pub fn list_ocr_engines(&self) -> Vec<ps_ipc::OcrEngineDetails> {
+        let models_dir = self.config.data_dir.join("models");
+        let ppocr_available = ps_ocr::is_engine_available("pp_ocr_v6", Some(&models_dir.join("ppocrv6")));
+        let indra_available = ps_ocr::is_engine_available("indra", Some(&models_dir.join("indra")));
+        let tesseract_available = ps_ocr::is_engine_available("tesseract", None);
+        let windows_available = ps_ocr::is_engine_available("windows", None);
+
+        vec![
+            ps_ipc::OcrEngineDetails {
+                engine: ps_ipc::OcrEngine::PpOcrV6,
+                name: "PP-OCRv6".to_string(),
+                availability: if ppocr_available {
+                    ps_ipc::OcrEngineAvailability::Available
+                } else {
+                    ps_ipc::OcrEngineAvailability::NotInstalled
+                },
+                size_label: "~6.1 MB".to_string(),
+                speed_label: "Ultra-Fast (~30ms/img)".to_string(),
+                badge: "Recommended".to_string(),
+                description: "Lightweight state-of-the-art neural model pack. Best balance of speed, accuracy, and resource efficiency for desktop screenshots, PDFs, and documents.".to_string(),
+                highlights: vec![
+                    "High accuracy on screenshots, PDFs & text".to_string(),
+                    "Ultra-fast local inference (~30ms/image)".to_string(),
+                    "Compact ~6.1 MB model download".to_string(),
+                ],
+                license: Some("Apache 2.0".to_string()),
+                download_size_bytes: Some(6_100_000),
+            },
+            ps_ipc::OcrEngineDetails {
+                engine: ps_ipc::OcrEngine::Windows,
+                name: "Windows OCR".to_string(),
+                availability: if windows_available {
+                    ps_ipc::OcrEngineAvailability::Available
+                } else {
+                    ps_ipc::OcrEngineAvailability::NotInstalled
+                },
+                size_label: "Built-in (0 MB)".to_string(),
+                speed_label: "Fast (~45ms/img)".to_string(),
+                badge: "Built-in".to_string(),
+                description: "Native Windows media recognition service. Works out of the box with zero downloads, fully local and privacy-safe.".to_string(),
+                highlights: vec![
+                    "Built into Windows 10 & 11".to_string(),
+                    "Zero setup or downloads required".to_string(),
+                    "100% offline and low memory footprint".to_string(),
+                ],
+                license: None,
+                download_size_bytes: None,
+            },
+            ps_ipc::OcrEngineDetails {
+                engine: ps_ipc::OcrEngine::Indra,
+                name: "Indra OCR".to_string(),
+                availability: if indra_available {
+                    ps_ipc::OcrEngineAvailability::Available
+                } else {
+                    ps_ipc::OcrEngineAvailability::NotInstalled
+                },
+                size_label: "~27 MB".to_string(),
+                speed_label: "Deep (~120ms/img)".to_string(),
+                badge: "Multilingual & Skewed".to_string(),
+                description: "Specialized deep learning model designed for complex multi-language scripts, rotated documents, and heavily distorted scans.".to_string(),
+                highlights: vec![
+                    "Specialized in skewed and rotated text".to_string(),
+                    "Extended multilingual script coverage".to_string(),
+                    "Requires research license acceptance".to_string(),
+                ],
+                license: Some("Research & Non-Commercial (Acceptance required)".to_string()),
+                download_size_bytes: Some(27_000_000),
+            },
+            ps_ipc::OcrEngineDetails {
+                engine: ps_ipc::OcrEngine::Tesseract,
+                name: "Tesseract OCR".to_string(),
+                availability: if tesseract_available {
+                    ps_ipc::OcrEngineAvailability::Available
+                } else {
+                    ps_ipc::OcrEngineAvailability::NotInstalled
+                },
+                size_label: "External CLI".to_string(),
+                speed_label: "Traditional (~150ms/img)".to_string(),
+                badge: "Extensible".to_string(),
+                description: "Classic open-source OCR engine using the system-installed Tesseract CLI and customizable traineddata language packages.".to_string(),
+                highlights: vec![
+                    "Uses system Tesseract installation".to_string(),
+                    "Extensible with custom traineddata packs".to_string(),
+                    "Traditional open-source engine".to_string(),
+                ],
+                license: Some("Apache 2.0".to_string()),
+                download_size_bytes: None,
+            },
+        ]
+    }
+
+    pub fn download_ocr_engine(&self, engine: ps_ipc::OcrEngine) -> anyhow::Result<Settings> {
+        match engine {
+            ps_ipc::OcrEngine::PpOcrV6 => {
+                let model_dir = self.config.data_dir.join("models").join("ppocrv6");
+                let parent = self.config.data_dir.join("models");
+                std::fs::create_dir_all(&parent)?;
+                ps_ocr::ppocr_pack::install_pp_ocrv6_tiny(&model_dir)?;
+                self.update_settings(SettingsPatch {
+                    ocr_engine: Some(ps_ipc::OcrEngine::PpOcrV6),
+                    ..Default::default()
+                })
+            }
+            ps_ipc::OcrEngine::Windows => {
+                self.update_settings(SettingsPatch {
+                    ocr_engine: Some(ps_ipc::OcrEngine::Windows),
+                    ..Default::default()
+                })
+            }
+            _ => anyhow::bail!("Direct download for {:?} is not supported yet.", engine),
+        }
+    }
+
     pub fn onboarding(&self) -> OnboardingState {
         let settings = self.settings_snapshot();
         OnboardingState {

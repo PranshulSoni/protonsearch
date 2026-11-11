@@ -225,6 +225,18 @@ export interface OcrEngineOption {
   engine: OcrEngine;
   availability: OcrEngineAvailability;
 }
+export interface OcrEngineDetails {
+  engine: OcrEngine;
+  name: string;
+  availability: OcrEngineAvailability;
+  sizeLabel: string;
+  speedLabel: string;
+  badge: string;
+  description: string;
+  highlights: string[];
+  license?: string | null;
+  downloadSizeBytes?: number | null;
+}
 export const OCR_ENGINE_OPTIONS: OcrEngineOption[] = [
   { engine: "windows", availability: "available" },
   { engine: "pp_ocr_v6", availability: "not_installed" },

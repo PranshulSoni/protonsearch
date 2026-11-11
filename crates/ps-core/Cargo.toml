@@ -10,7 +10,7 @@ ps-index = { path = "../ps-index" }
 ps-content = { path = "../ps-content" }
 ps-sources = { path = "../ps-sources" }
 ps-windows = { path = "../ps-windows" }
-ps-ocr = { path = "../ps-ocr" }
+ps-ocr = { path = "../ps-ocr", features = ["onnx", "ppocr-pack-download"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
