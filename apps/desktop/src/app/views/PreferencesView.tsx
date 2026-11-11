@@ -28,10 +28,9 @@ import {
   useSavedStamp,
   type IconName,
 } from "../ui";
-import { ANCHORS, CARD_META } from "../islandLogic";
+import { CARD_META } from "../islandLogic";
 import IntegrationsSettings from "./IntegrationsSettings";
 import OnboardingSettings from "./OnboardingSettings";
-import LauncherPreferences from "./LauncherPreferences";
 import IslandSettingsView from "./IslandSettingsView";
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [

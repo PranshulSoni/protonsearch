@@ -102,7 +102,7 @@ export default function OnboardingView() {
   );
   const [stepIndex, setStepIndex] = useState(() => persisted?.stepIndex ?? 0);
   const [finishing, setFinishing] = useState(false);
-  const [launcherMode, setLauncherMode] = useState<LauncherMode>(settings.launcher.primaryMode);
+  const launcherMode: LauncherMode = "dynamic_island";
   const [formError, setFormError] = useState<string | null>(null);
   const [finishFailed, setFinishFailed] = useState(false);
   const lastSkipRef = useRef(false);

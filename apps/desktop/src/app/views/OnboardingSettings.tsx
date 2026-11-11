@@ -12,13 +12,13 @@ export default function OnboardingSettings({
   onSelectCard,
   onNavigateRoute,
 }: {
-  onSelectCard: (card: "general" | "launcher" | "placement" | "onboarding") => void;
+  onSelectCard: (card: "general" | "cards" | "behavior" | "onboarding") => void;
   onNavigateRoute: (section: Section) => void;
 }) {
   const { settings } = useApp();
   const roots = settings.indexing.roots.filter((root) => root.enabled);
   const complete = settings.onboardingComplete;
-  const launcher = settings.launcher.primaryMode === "dynamic_island" ? "Dynamic Island" : "Normal Launcher";
+  const launcher = "Dynamic Island";
 
   return (
     <div className="settings-grid settings-grid--single">
@@ -54,11 +54,11 @@ export default function OnboardingSettings({
             indexes; this build has no separate “run setup again” command.
           </p>
           <div className="section-actions">
-            <button type="button" className="btn" onClick={() => onSelectCard("launcher")}>
-              <Icon name="play" size={14} /> Change launcher
+            <button type="button" className="btn" onClick={() => onSelectCard("cards")}>
+              <Icon name="clipboard" size={14} /> Cards &amp; order
             </button>
-            <button type="button" className="btn" onClick={() => onSelectCard("placement")}>
-              <Icon name="grid" size={14} /> Island placement
+            <button type="button" className="btn" onClick={() => onSelectCard("behavior")}>
+              <Icon name="workflows" size={14} /> Open behavior
             </button>
             <button type="button" className="btn" onClick={() => onNavigateRoute("indexes")}>
               <Icon name="folder" size={14} /> Search &amp; indexes
@@ -79,8 +79,8 @@ export default function OnboardingSettings({
             Change card order, visibility and the default in Cards &amp; order.
           </p>
           <div className="section-actions">
-            <button type="button" className="btn" onClick={() => onSelectCard("placement")}>
-              <Icon name="grid" size={14} /> Placement
+            <button type="button" className="btn" onClick={() => onSelectCard("cards")}>
+              <Icon name="clipboard" size={14} /> Cards &amp; order
             </button>
           </div>
         </div>

@@ -44,6 +44,13 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "behavior", label: "Behavior" },
 ];
 
+const MONITOR_POLICIES = [
+  { value: "primary", label: "Primary monitor" },
+  { value: "cursor", label: "Monitor under cursor" },
+  { value: "active", label: "Active window's monitor" },
+  { value: "specific", label: "Selected specific monitor" },
+];
+
 export default function IslandSettingsView({
   onNavigate,
   initialTab = "cards",

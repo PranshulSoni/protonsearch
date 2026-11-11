@@ -13,7 +13,6 @@ import {
 import {
   ControlsCard,
   MediaCard,
-  NotificationsCard,
 } from "./NativeCards";
 import { useIslandControls } from "./islandNativeCards";
 import { IslandPageDots } from "./IslandPageDots";

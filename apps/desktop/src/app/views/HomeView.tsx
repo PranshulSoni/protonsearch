@@ -15,7 +15,6 @@ import {
   recentAccessed,
   relativeTime,
   sourceStatusText,
-  summarizeWarnings,
 } from "../describe";
 import { useOpenLauncher } from "../hooks";
 import { displayHotkey } from "../hotkey";
@@ -55,7 +54,6 @@ export default function HomeView({
   const userName = settings.userName?.trim() || null;
   const sources = status?.sources ?? [];
   const shortcut = displayHotkey(settings.hotkey);
-  const warningSummary = summarizeWarnings(status?.warnings ?? []);
 
   return (
     <div className="view">

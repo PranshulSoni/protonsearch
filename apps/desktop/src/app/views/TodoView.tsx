@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTodos, type TodoItem } from "../../lib/todoStore";
 import { SECTION_EYEBROWS } from "../sections";
-import { Callout, EmptyState, Icon, Panel, RouteHeading } from "../ui";
+import { EmptyState, Icon, Panel, RouteHeading } from "../ui";
 
 type FilterTab = "all" | "active" | "completed" | "high" | "today";
 
