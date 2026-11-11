@@ -786,41 +786,54 @@ function parseQuickTodoInput(
   };
 }
 
+function nowDateTimeLocal(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
 function formatDueBadge(dueDate?: string | null): { label: string; overdue: boolean; isToday: boolean } | null {
   if (!dueDate) return null;
   const today = todayIso();
   const tomorrow = tomorrowIso();
-  if (dueDate === today) return { label: "Today", overdue: false, isToday: true };
-  if (dueDate === tomorrow) return { label: "Tomorrow", overdue: false, isToday: false };
-  if (dueDate < today) return { label: `Overdue · ${dueDate.slice(5)}`, overdue: true, isToday: false };
-  return { label: dueDate.slice(5), overdue: false, isToday: false };
+  const datePart = dueDate.slice(0, 10);
+  const timePart = dueDate.includes("T") ? dueDate.slice(11, 16) : null;
+  const timeSuffix = timePart ? ` ${timePart}` : "";
+
+  if (datePart === today) {
+    return { label: `Today${timeSuffix}`, overdue: false, isToday: true };
+  }
+  if (datePart === tomorrow) {
+    return { label: `Tomorrow${timeSuffix}`, overdue: false, isToday: false };
+  }
+  if (datePart < today) {
+    return { label: `Overdue · ${datePart.slice(5)}${timeSuffix}`, overdue: true, isToday: false };
+  }
+  return { label: `${datePart.slice(5)}${timeSuffix}`, overdue: false, isToday: false };
 }
 
-export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
+export function TodoCard({ onOpenMain: _onOpenMain }: { onOpenMain?: () => void }) {
   const { todos, error, addTodo, toggleTodo, updateTodo, deleteTodo, clearCompleted } = useTodos();
   const [draft, setDraft] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
-  const [quickDue, setQuickDue] = useState<"" | "today" | "tomorrow">("");
+  const [dueDateTime, setDueDateTime] = useState<string>("");
   const [filter, setFilter] = useState<TodoFilter>("active");
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [editingDueId, setEditingDueId] = useState<string | null>(null);
 
   const today = todayIso();
   const activeTodos = useMemo(() => todos.filter((t) => !t.completed), [todos]);
   const completedCount = todos.length - activeTodos.length;
-  const todayCount = useMemo(
-    () => activeTodos.filter((t) => t.dueDate === today).length,
-    [activeTodos, today]
-  );
-  const highCount = useMemo(
-    () => activeTodos.filter((t) => t.priority === "high").length,
-    [activeTodos]
-  );
 
   const filteredTodos = useMemo(() => {
     const subset = todos.filter((t) => {
       if (filter === "active") return !t.completed;
       if (filter === "done") return t.completed;
-      if (filter === "today") return !t.completed && t.dueDate === today;
+      if (filter === "today") return !t.completed && (t.dueDate?.startsWith(today) ?? false);
       if (filter === "high") return !t.completed && t.priority === "high";
       return true;
     });
@@ -843,13 +856,11 @@ export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!draft.trim()) return;
-    const fallbackDue =
-      quickDue === "today" ? todayIso() : quickDue === "tomorrow" ? tomorrowIso() : undefined;
-    const parsed = parseQuickTodoInput(draft, priority, fallbackDue);
+    const parsed = parseQuickTodoInput(draft, priority, dueDateTime || undefined);
     if (!parsed.title) return;
     if (!(await addTodo(parsed.title, parsed.dueDate, parsed.priority))) return;
     setDraft("");
-    setQuickDue("");
+    setDueDateTime("");
     if (filter === "done") setFilter("active");
   };
 
@@ -886,31 +897,25 @@ export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
     }
   };
 
-  const filterTabs: { id: TodoFilter; label: string; count?: number }[] = [
-    { id: "active", label: "Active", count: activeTodos.length },
-    { id: "today", label: "Today", count: todayCount },
-    { id: "high", label: "High", count: highCount },
-    { id: "done", label: "Done", count: completedCount },
-    { id: "all", label: "All", count: todos.length },
+  const filterTabs: { id: TodoFilter; label: string }[] = [
+    { id: "active", label: "Active" },
+    { id: "today", label: "Today" },
+    { id: "high", label: "High" },
+    { id: "done", label: "Done" },
+    { id: "all", label: "All" },
   ];
 
   return (
     <div className="island-card island-todo-card">
+      <CardHead card="bell" title="To-do" subtitle="Tasks & Reminders" />
+
       {error ? (
         <p role="alert" className="island-todo-error">
           {error}
         </p>
       ) : null}
 
-      <div className="island-todo-header">
-        <div className="island-todo-header-left">
-          <span className="island-todo-title-text">To-do</span>
-          <span className="island-todo-subtitle-pill">
-            {activeTodos.length === 0
-              ? "All caught up"
-              : `${activeTodos.length} ${activeTodos.length === 1 ? "task" : "tasks"} pending`}
-          </span>
-        </div>
+      <div className="island-todo-subbar">
         <div className="island-todo-filters" role="tablist" aria-label="Filter tasks">
           {filterTabs.map((tab) => (
             <button
@@ -925,12 +930,20 @@ export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
               }}
             >
               <span>{tab.label}</span>
-              {typeof tab.count === "number" && tab.count > 0 ? (
-                <span className="island-todo-filter-count">{tab.count}</span>
-              ) : null}
             </button>
           ))}
         </div>
+
+        {completedCount > 0 ? (
+          <button
+            type="button"
+            className="island-todo-clear-btn"
+            onClick={() => clearCompleted()}
+            title="Clear completed tasks"
+          >
+            Clear completed ({completedCount})
+          </button>
+        ) : null}
       </div>
 
       <div className="island-divider" />
@@ -951,16 +964,28 @@ export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
           >
             {priority === "high" ? "High" : priority === "medium" ? "Med" : "Low"}
           </button>
-          <button
-            type="button"
-            title="Set due date"
-            className={"island-todo-due-toggle" + (quickDue ? " is-active" : "")}
-            onClick={() =>
-              setQuickDue((d) => (d === "" ? "today" : d === "today" ? "tomorrow" : ""))
-            }
-          >
-            {quickDue === "today" ? "Today" : quickDue === "tomorrow" ? "Tmrw" : "Due"}
-          </button>
+          <div className="island-todo-due-wrap" title="Set due date & time">
+            <input
+              type="datetime-local"
+              className="island-todo-dt-input"
+              value={dueDateTime}
+              onChange={(e) => setDueDateTime(e.target.value)}
+              aria-label="Due date and time"
+            />
+            <span className={"island-todo-dt-badge" + (dueDateTime ? " is-set" : "")}>
+              {dueDateTime ? dueDateTime.replace("T", " ") : "Due date/time"}
+            </span>
+          </div>
+          {dueDateTime ? (
+            <button
+              type="button"
+              className="island-todo-clear-dt-btn"
+              onClick={() => setDueDateTime("")}
+              title="Clear date & time"
+            >
+              ×
+            </button>
+          ) : null}
           <button type="submit" className="island-todo-submit-btn" aria-label="Add task">
             +
           </button>
@@ -985,10 +1010,11 @@ export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
             </p>
           </div>
         ) : (
-          filteredTodos.slice(0, 8).map((todo, idx) => {
+          filteredTodos.map((todo, idx) => {
             const prio = (todo.priority ?? "medium") as Priority;
             const dueBadge = formatDueBadge(todo.dueDate);
             const isSelected = idx === selectedIndex;
+            const isEditingDue = editingDueId === todo.id;
 
             return (
               <div
@@ -1021,20 +1047,37 @@ export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
                 </div>
 
                 <div className="island-todo-meta">
-                  {dueBadge ? (
-                    <span
+                  {isEditingDue ? (
+                    <div className="island-todo-row-dt-editor">
+                      <input
+                        type="datetime-local"
+                        className="island-todo-row-dt-input"
+                        defaultValue={todo.dueDate ?? nowDateTimeLocal()}
+                        autoFocus
+                        onChange={(e) => {
+                          updateTodo(todo.id, { dueDate: e.target.value || null });
+                          setEditingDueId(null);
+                        }}
+                        onBlur={() => setEditingDueId(null)}
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      title="Click to change due date & time"
                       className={
-                        "island-todo-due-badge" +
-                        (dueBadge.overdue ? " is-overdue" : dueBadge.isToday ? " is-today" : "")
+                        "island-todo-due-badge-btn" +
+                        (dueBadge ? (dueBadge.overdue ? " is-overdue" : dueBadge.isToday ? " is-today" : "") : " is-empty")
                       }
+                      onClick={() => setEditingDueId(todo.id)}
                     >
-                      {dueBadge.label}
-                    </span>
-                  ) : null}
+                      {dueBadge ? dueBadge.label : "+ Due"}
+                    </button>
+                  )}
 
                   <button
                     type="button"
-                    title="Click to cycle priority"
+                    title={`Priority: ${prio} (click to cycle)`}
                     className={`island-todo-prio-badge prio-${prio}`}
                     onClick={() => cycleItemPriority(todo)}
                   >
@@ -1065,29 +1108,6 @@ export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
             );
           })
         )}
-      </div>
-
-      <div className="island-todo-footer">
-        <button
-          type="button"
-          className="island-settings-link"
-          onClick={() => {
-            void api.showMain();
-            if (onOpenMain) onOpenMain();
-          }}
-        >
-          Open full To-do view ({todos.length} total) →
-        </button>
-
-        {completedCount > 0 ? (
-          <button
-            type="button"
-            className="island-todo-clear-btn"
-            onClick={() => clearCompleted()}
-          >
-            Clear completed ({completedCount})
-          </button>
-        ) : null}
       </div>
     </div>
   );

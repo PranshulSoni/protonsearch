@@ -451,12 +451,19 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
         // completely contained inside the list and never let it switch cards accidentally.
         return;
       }
-      // One card per scroll gesture. A touchpad swipe and its inertia tail (or a
-      // flick of a free-spinning wheel) arrive as dozens of wheel events; switching
-      // each time their sum crossed the threshold walked three or four cards.
+
+      // Two-finger left/right horizontal swipe switches island cards.
+      // deltaX is primary (touchpad 2-finger horizontal swipe). If deltaX is 0,
+      // fallback to deltaY so keyboard/mouse wheels or tests can still navigate.
       const wheel = wheelRef.current;
       const now = performance.now();
-      const size = Math.abs(event.deltaY);
+      const deltaX = event.deltaX;
+      const deltaY = event.deltaY;
+      const absX = Math.abs(deltaX);
+
+      const delta = absX > 0 ? deltaX : deltaY;
+      const size = Math.abs(delta);
+
       if (now - wheel.at > WHEEL_GESTURE_GAP_MS) {
         // Silence ended the previous gesture.
         wheel.spent = false;
@@ -478,7 +485,7 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
         }
         return;
       }
-      wheel.accum += event.deltaY;
+      wheel.accum += delta;
       if (Math.abs(wheel.accum) < WHEEL_STEP) return;
       const direction = wheel.accum > 0 ? 1 : -1;
       wheel.accum = 0;
