@@ -74,14 +74,20 @@ fn main() {
                 .insert(app.target.replace('/', "\\").to_lowercase());
         }
     }
-    let violations: Vec<_> = icon_sources.iter().filter(|(_, sources)| sources.len() > 1).collect();
+    let violations: Vec<_> = icon_sources
+        .iter()
+        .filter(|(_, sources)| sources.len() > 1)
+        .collect();
     println!(
         "unique icon paths: {} ; icon files mapped to >1 distinct source: {}",
         icon_sources.len(),
         violations.len()
     );
     for (icon, sources) in violations.iter().take(5) {
-        println!("  MAPPING VIOLATION {}: {sources:?}", icon.rsplit('\\').next().unwrap_or(icon));
+        println!(
+            "  MAPPING VIOLATION {}: {sources:?}",
+            icon.rsplit('\\').next().unwrap_or(icon)
+        );
     }
 
     let mut verified = 0usize;
@@ -130,9 +136,7 @@ fn main() {
                 "spot {needle:?}: name={:?} target={:?} icon={:?}",
                 app.name,
                 app.target,
-                app.icon_path
-                    .as_deref()
-                    .and_then(|path| path.rsplit('\\').next())
+                app.icon_path.as_deref().and_then(|path| path.rsplit('\\').next())
             );
         }
     }

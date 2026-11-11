@@ -10,7 +10,8 @@
 //! character/word error rate against ground truth, not rely on this field.
 
 use std::path::Path;
-use std::sync::{mpsc, OnceLock};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{mpsc, Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail};
@@ -19,6 +20,12 @@ use sha2::{Digest, Sha256};
 #[cfg(windows)]
 mod platform;
 
+#[cfg(feature = "onnx")]
+pub mod onnx;
+pub mod tesseract;
+
+#[cfg(feature = "ppocr-pack-download")]
+pub mod ppocr_pack;
 pub mod store;
 
 pub use store::{OcrHit, OcrIndex};
@@ -42,6 +49,52 @@ pub const MAX_LONG_EDGE: u32 = 4096;
 pub const MAX_IMAGE_PIXELS: u64 = 16_000_000;
 /// Per-image wall-clock budget.
 pub const OCR_TIMEOUT: Duration = Duration::from_secs(20);
+const MAX_OCR_WORKERS: usize = 4;
+static OCR_WORKERS: OnceLock<Arc<WorkerLimit>> = OnceLock::new();
+
+struct WorkerLimit {
+    active: AtomicUsize,
+    max: usize,
+}
+
+struct WorkerPermit {
+    limit: Arc<WorkerLimit>,
+}
+
+impl WorkerLimit {
+    fn new(max: usize) -> Self {
+        Self {
+            active: AtomicUsize::new(0),
+            max,
+        }
+    }
+
+    fn try_acquire(self: &Arc<Self>) -> anyhow::Result<WorkerPermit> {
+        let mut active = self.active.load(Ordering::Relaxed);
+        loop {
+            if active >= self.max {
+                bail!("OCR worker capacity reached ({})", self.max);
+            }
+            match self
+                .active
+                .compare_exchange_weak(active, active + 1, Ordering::Relaxed, Ordering::Relaxed)
+            {
+                Ok(_) => {
+                    return Ok(WorkerPermit {
+                        limit: Arc::clone(self),
+                    })
+                }
+                Err(current) => active = current,
+            }
+        }
+    }
+}
+
+impl Drop for WorkerPermit {
+    fn drop(&mut self) {
+        self.limit.active.fetch_sub(1, Ordering::Relaxed);
+    }
+}
 
 /// True when the current OS exposes a usable OCR engine.
 pub fn available() -> bool {
@@ -91,8 +144,8 @@ pub fn content_hash_bytes(bytes: &[u8]) -> String {
 /// SHA-256 hex of an image file (streamed, bounded memory).
 pub fn content_hash_file(path: &Path) -> anyhow::Result<String> {
     use std::io::Read;
-    let mut file = std::fs::File::open(path)
-        .map_err(|error| anyhow!("opening {}: {error}", path.display()))?;
+    let mut file =
+        std::fs::File::open(path).map_err(|error| anyhow!("opening {}: {error}", path.display()))?;
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
     loop {
@@ -105,6 +158,41 @@ pub fn content_hash_file(path: &Path) -> anyhow::Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+/// True when the specified engine is available.
+pub fn is_engine_available(engine: &str, _model_dir: Option<&Path>) -> bool {
+    match engine {
+        "windows" => available(),
+        "pp_ocr_v6" => {
+            #[cfg(feature = "onnx")]
+            {
+                if let Some(dir) = _model_dir {
+                    dir.join("pp-ocrv6_tiny_det.onnx").is_file()
+                        && dir.join("pp-ocrv6_tiny_rec.onnx").is_file()
+                        && dir.join("ppocrv6_tiny_dict.txt").is_file()
+                } else {
+                    false
+                }
+            }
+            #[cfg(not(feature = "onnx"))]
+            false
+        }
+        "indra" => {
+            #[cfg(feature = "onnx")]
+            {
+                if let Some(dir) = _model_dir {
+                    dir.join("indra.onnx").is_file() || dir.join("model.onnx").is_file()
+                } else {
+                    false
+                }
+            }
+            #[cfg(not(feature = "onnx"))]
+            false
+        }
+        "tesseract" => tesseract::Tesseract::is_installed(),
+        _ => false,
+    }
+}
+
 /// Extract text from one image file. Bounded by decoded pixels and timeout.
 /// Returns Ok(None) for unsupported extensions, empty results and when no OCR
 /// engine is available on the machine.
@@ -112,11 +200,68 @@ pub fn extract_image(path: &Path, max_pixels: u64) -> anyhow::Result<Option<OcrD
     extract_image_timed(path, max_pixels).map(|(document, _elapsed)| document)
 }
 
-/// Extract text and report per-image wall-clock timing (benchmark entry point).
-pub fn extract_image_timed(
+/// Extract text using a specified engine and optional model directory.
+pub fn extract_image_with_engine(
     path: &Path,
     max_pixels: u64,
-) -> anyhow::Result<(Option<OcrDocument>, Duration)> {
+    engine: &str,
+    model_dir: Option<&Path>,
+) -> anyhow::Result<Option<OcrDocument>> {
+    if !is_supported_image(path) {
+        return Ok(None);
+    }
+    if !path.is_file() {
+        bail!("image not found: {}", path.display());
+    }
+    match engine {
+        #[cfg(feature = "onnx")]
+        "pp_ocr_v6" => {
+            let dir = model_dir.ok_or_else(|| anyhow!("missing model_dir for PP-OCRv6"))?;
+            let ocr = onnx::OnnxOcr::pp_ocrv6_tiny(dir)?;
+            let img = image::open(path)?;
+            let (width, height) = (img.width(), img.height());
+            let text = ocr.recognize(img)?;
+            Ok(Some(OcrDocument {
+                text,
+                language: "und".to_string(),
+                confidence: 1.0,
+                width,
+                height,
+            }))
+        }
+        #[cfg(feature = "onnx")]
+        "indra" => {
+            let dir = model_dir.ok_or_else(|| anyhow!("missing model_dir for Indra"))?;
+            let ocr = onnx::OnnxOcr::indra(dir)?;
+            let img = image::open(path)?;
+            let (width, height) = (img.width(), img.height());
+            let text = ocr.recognize(img)?;
+            Ok(Some(OcrDocument {
+                text,
+                language: "und".to_string(),
+                confidence: 1.0,
+                width,
+                height,
+            }))
+        }
+        "tesseract" => {
+            if let Some(dir) = model_dir {
+                let tess = tesseract::Tesseract::new(
+                    dir.join("tesseract.exe"),
+                    dir.join("tessdata"),
+                    "eng",
+                )?;
+                tess.recognize(path, max_pixels)
+            } else {
+                extract_image(path, max_pixels)
+            }
+        }
+        _ => extract_image(path, max_pixels),
+    }
+}
+
+/// Extract text and report per-image wall-clock timing (benchmark entry point).
+pub fn extract_image_timed(path: &Path, max_pixels: u64) -> anyhow::Result<(Option<OcrDocument>, Duration)> {
     if !is_supported_image(path) {
         return Ok((None, Duration::ZERO));
     }
@@ -126,9 +271,12 @@ pub fn extract_image_timed(
     let started = Instant::now();
     let owned = path.to_path_buf();
     let (sender, receiver) = mpsc::channel();
+    let worker_limit = OCR_WORKERS.get_or_init(|| Arc::new(WorkerLimit::new(MAX_OCR_WORKERS)));
+    let permit = worker_limit.try_acquire()?;
     std::thread::Builder::new()
         .name("ps-ocr-worker".into())
         .spawn(move || {
+            let _permit = permit;
             let result = recognize_bounded(&owned, max_pixels);
             let _ = sender.send(result);
         })
@@ -151,4 +299,25 @@ fn recognize_bounded(path: &Path, max_pixels: u64) -> anyhow::Result<Option<OcrD
 #[cfg(not(windows))]
 fn recognize_bounded(_path: &Path, _max_pixels: u64) -> anyhow::Result<Option<OcrDocument>> {
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timed_out_worker_slot_stays_occupied_until_worker_exits() {
+        let limit = Arc::new(WorkerLimit::new(1));
+        let permit = limit.try_acquire().unwrap();
+        let (release, wait) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let _permit = permit;
+            let _ = wait.recv();
+        });
+
+        assert!(limit.try_acquire().is_err());
+        release.send(()).unwrap();
+        worker.join().unwrap();
+        assert!(limit.try_acquire().is_ok());
+    }
 }

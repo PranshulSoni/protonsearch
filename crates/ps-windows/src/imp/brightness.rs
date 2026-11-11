@@ -5,8 +5,8 @@
 use anyhow::anyhow;
 use windows::Win32::Devices::Display::{
     DestroyPhysicalMonitors, GetMonitorBrightness, GetNumberOfPhysicalMonitorsFromHMONITOR,
-    GetPhysicalMonitorsFromHMONITOR, GetVCPFeatureAndVCPFeatureReply, SetMonitorBrightness,
-    SetVCPFeature, MC_VCP_CODE_TYPE, PHYSICAL_MONITOR,
+    GetPhysicalMonitorsFromHMONITOR, GetVCPFeatureAndVCPFeatureReply, SetMonitorBrightness, SetVCPFeature,
+    MC_VCP_CODE_TYPE, PHYSICAL_MONITOR,
 };
 use windows::Win32::Foundation::{BOOL, HANDLE, LPARAM, RECT};
 use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, HDC, HMONITOR};
@@ -32,12 +32,7 @@ impl Drop for PhysicalMonitor {
     }
 }
 
-unsafe extern "system" fn enum_monitor(
-    monitor: HMONITOR,
-    _hdc: HDC,
-    _rect: *mut RECT,
-    data: LPARAM,
-) -> BOOL {
+unsafe extern "system" fn enum_monitor(monitor: HMONITOR, _hdc: HDC, _rect: *mut RECT, data: LPARAM) -> BOOL {
     let monitors = &mut *(data.0 as *mut Vec<HMONITOR>);
     monitors.push(monitor);
     BOOL(1)
@@ -104,7 +99,9 @@ struct MonitorReading {
 
 fn normalize(current: u32, minimum: u32, maximum: u32) -> u8 {
     let span = maximum.saturating_sub(minimum).max(1);
-    (((current.saturating_sub(minimum)) as f64 / span as f64) * 100.0).round().min(100.0) as u8
+    (((current.saturating_sub(minimum)) as f64 / span as f64) * 100.0)
+        .round()
+        .min(100.0) as u8
 }
 
 fn dxva2_reading(monitor: &PhysicalMonitor) -> Option<MonitorReading> {
@@ -154,7 +151,9 @@ fn reading(monitor: &PhysicalMonitor) -> Option<MonitorReading> {
 
 /// True when at least one monitor exposes brightness control (Dxva2 or DDC/CI).
 pub fn supported() -> bool {
-    all_physical_monitors().iter().any(|monitor| reading(monitor).is_some())
+    all_physical_monitors()
+        .iter()
+        .any(|monitor| reading(monitor).is_some())
 }
 
 /// Descriptions of monitors that expose brightness control.
@@ -206,8 +205,8 @@ pub fn set_brightness(percent: u8) -> anyhow::Result<()> {
             continue;
         };
         let target = reading.minimum
-            + ((reading.maximum.saturating_sub(reading.minimum)) as f64 * percent as f64 / 100.0)
-                .round() as u32;
+            + ((reading.maximum.saturating_sub(reading.minimum)) as f64 * percent as f64 / 100.0).round()
+                as u32;
         let ok = match reading.method {
             BrightnessMethod::Dxva2 => (unsafe { SetMonitorBrightness(monitor.handle, target) }) != 0,
             BrightnessMethod::DdcCi => {

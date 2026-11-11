@@ -31,13 +31,32 @@ fn summarize(mut samples: Vec<f64>) -> (f64, f64, f64) {
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let data_dir = PathBuf::from(args.first().cloned().unwrap_or_else(|| ".devdata-perf51/v2".into()));
+    let data_dir = PathBuf::from(
+        args.first()
+            .cloned()
+            .unwrap_or_else(|| ".devdata-perf51/v2".into()),
+    );
     let iters: usize = args.get(1).and_then(|v| v.parse().ok()).unwrap_or(30);
-    let out_path = Path::new(args.get(2).map(String::as_str).unwrap_or("target/search-perf-before.json"));
+    let out_path = Path::new(
+        args.get(2)
+            .map(String::as_str)
+            .unwrap_or("target/search-perf-before.json"),
+    );
 
     let queries: &[&str] = &[
-        "readme", "index", "screenshot", "report", "project phoenix", "final", "invoice",
-        "notes", "config", "pdf", "x", "zzzzqqqq", "screenshot 2026-11-09",
+        "readme",
+        "index",
+        "screenshot",
+        "report",
+        "project phoenix",
+        "final",
+        "invoice",
+        "notes",
+        "config",
+        "pdf",
+        "x",
+        "zzzzqqqq",
+        "screenshot 2026-11-09",
     ];
 
     // Optional WAL maintenance before opening (diagnostic): a huge uncheckpointed

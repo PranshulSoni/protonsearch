@@ -17,7 +17,8 @@ fn xml_escape(text: &str) -> String {
 pub fn supported() -> bool {
     let owned = super::winrt::ensure_apartment();
     let app_id = HSTRING::from("ProtonSearch");
-    let result = windows::UI::Notifications::ToastNotificationManager::CreateToastNotifierWithId(&app_id).is_ok();
+    let result =
+        windows::UI::Notifications::ToastNotificationManager::CreateToastNotifierWithId(&app_id).is_ok();
     super::winrt::release_apartment(owned);
     result
 }
@@ -39,8 +40,9 @@ pub fn show(title: &str, body: &str) -> Result<()> {
         let notification = windows::UI::Notifications::ToastNotification::CreateToastNotification(&document)
             .context("CreateToastNotification")?;
         let app_id = HSTRING::from("ProtonSearch");
-        let notifier = windows::UI::Notifications::ToastNotificationManager::CreateToastNotifierWithId(&app_id)
-            .context("CreateToastNotifierWithId(ProtonSearch)")?;
+        let notifier =
+            windows::UI::Notifications::ToastNotificationManager::CreateToastNotifierWithId(&app_id)
+                .context("CreateToastNotifierWithId(ProtonSearch)")?;
         notifier.Show(&notification).context("ToastNotifier::Show")
     })();
     super::winrt::release_apartment(owned);

@@ -45,8 +45,7 @@ impl OcrIndex {
     pub fn open(db_path: &Path) -> Result<Self> {
         if let Some(parent) = db_path.parent() {
             if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)
-                    .with_context(|| format!("creating {}", parent.display()))?;
+                std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
             }
         }
         let conn = Connection::open(db_path)
@@ -61,20 +60,15 @@ impl OcrIndex {
 
     fn from_connection(conn: Connection) -> Result<Self> {
         conn.busy_timeout(std::time::Duration::from_millis(5000))?;
-        let _ = conn.execute_batch(
-            "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;",
-        );
-        conn.execute_batch(SCHEMA)
-            .context("migrating OCR schema")?;
+        let _ = conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;");
+        conn.execute_batch(SCHEMA).context("migrating OCR schema")?;
         Ok(Self {
             conn: Mutex::new(conn),
         })
     }
 
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, Connection>> {
-        self.conn
-            .lock()
-            .map_err(|_| anyhow!("OCR index lock poisoned"))
+        self.conn.lock().map_err(|_| anyhow!("OCR index lock poisoned"))
     }
 
     /// Store OCR text for a path. Deduplicated by content hash: an unchanged

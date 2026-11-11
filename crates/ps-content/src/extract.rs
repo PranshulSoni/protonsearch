@@ -77,18 +77,17 @@ pub fn detect_kind(path: &Path) -> DocKind {
         "md" | "markdown" | "mdx" | "rst" => DocKind::Markdown,
         "json" | "jsonc" | "jsonl" | "ndjson" => DocKind::Json,
         // Plain text and configuration formats that we decode as text.
-        "txt" | "text" | "log" | "nfo" | "csv" | "tsv" | "yaml" | "yml" | "toml" | "ini"
-        | "cfg" | "conf" | "properties" | "env" | "xml" | "html" | "htm" | "css" | "scss"
-        | "less" | "srt" | "vtt" => DocKind::Text,
-        // Source code families.
-        "rs" | "py" | "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "vue" | "svelte" | "go"
-        | "java" | "kt" | "kts" | "c" | "h" | "cc" | "cpp" | "cxx" | "hpp" | "cs" | "fs" | "rb"
-        | "php" | "swift" | "m" | "mm" | "sh" | "bash" | "zsh" | "ps1" | "psm1" | "bat" | "cmd"
-        | "sql" | "graphql" | "gql" | "proto" | "lua" | "r" | "pl" | "scala" | "dart" | "ex"
-        | "exs" | "erl" | "hs" | "clj" | "cljs" | "zig" | "nim" | "asm" | "s" | "vb" | "vbs"
-        | "cmake" | "gradle" | "makefile" | "dockerfile" | "tf" | "hcl" | "nix" | "sol" => {
-            DocKind::Code
+        "txt" | "text" | "log" | "nfo" | "csv" | "tsv" | "yaml" | "yml" | "toml" | "ini" | "cfg" | "conf"
+        | "properties" | "env" | "xml" | "html" | "htm" | "css" | "scss" | "less" | "srt" | "vtt" => {
+            DocKind::Text
         }
+        // Source code families.
+        "rs" | "py" | "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "vue" | "svelte" | "go" | "java"
+        | "kt" | "kts" | "c" | "h" | "cc" | "cpp" | "cxx" | "hpp" | "cs" | "fs" | "rb" | "php" | "swift"
+        | "m" | "mm" | "sh" | "bash" | "zsh" | "ps1" | "psm1" | "bat" | "cmd" | "sql" | "graphql" | "gql"
+        | "proto" | "lua" | "r" | "pl" | "scala" | "dart" | "ex" | "exs" | "erl" | "hs" | "clj" | "cljs"
+        | "zig" | "nim" | "asm" | "s" | "vb" | "vbs" | "cmake" | "gradle" | "makefile" | "dockerfile"
+        | "tf" | "hcl" | "nix" | "sol" => DocKind::Code,
         _ => DocKind::Other,
     }
 }
@@ -106,16 +105,13 @@ pub fn extract_text(path: &Path, max_bytes: usize) -> anyhow::Result<Option<Extr
 
 /// Extract text with explicit bounds. Parsers that can plausibly hang or panic
 /// (PDF, zip-based formats) run on a short-lived worker thread with a timeout.
-pub fn extract_text_with(
-    path: &Path,
-    options: ExtractOptions,
-) -> anyhow::Result<Option<ExtractedDocument>> {
+pub fn extract_text_with(path: &Path, options: ExtractOptions) -> anyhow::Result<Option<ExtractedDocument>> {
     let kind = detect_kind(path);
     if kind == DocKind::Other {
         return Ok(None);
     }
-    let metadata = std::fs::metadata(path)
-        .with_context(|| format!("reading metadata for {}", path.display()))?;
+    let metadata =
+        std::fs::metadata(path).with_context(|| format!("reading metadata for {}", path.display()))?;
     if !metadata.is_file() {
         return Ok(None);
     }
@@ -211,11 +207,7 @@ fn install_quiet_panic_hook() {
     });
 }
 
-fn extract_structured(
-    path: &Path,
-    kind: DocKind,
-    max_bytes: usize,
-) -> anyhow::Result<ExtractedDocument> {
+fn extract_structured(path: &Path, kind: DocKind, max_bytes: usize) -> anyhow::Result<ExtractedDocument> {
     match kind {
         DocKind::Pdf => extract_pdf(path, max_bytes),
         DocKind::Docx => extract_docx(path, max_bytes),
@@ -234,11 +226,7 @@ fn extract_structured(
 // Plain text
 // ---------------------------------------------------------------------------
 
-fn extract_plain(
-    path: &Path,
-    kind: DocKind,
-    max_bytes: usize,
-) -> anyhow::Result<ExtractedDocument> {
+fn extract_plain(path: &Path, kind: DocKind, max_bytes: usize) -> anyhow::Result<ExtractedDocument> {
     let metadata = std::fs::metadata(path)?;
     let file_len = metadata.len();
     // Read enough bytes to cover the cap even for UTF-16 input.
@@ -259,8 +247,7 @@ fn extract_plain(
 }
 
 fn read_prefix(path: &Path, cap: usize) -> anyhow::Result<Vec<u8>> {
-    let mut file = std::fs::File::open(path)
-        .with_context(|| format!("opening {}", path.display()))?;
+    let mut file = std::fs::File::open(path).with_context(|| format!("opening {}", path.display()))?;
     let mut buffer = Vec::with_capacity(cap.min(64 * 1024));
     file.by_ref()
         .take(cap as u64)
@@ -316,7 +303,9 @@ pub fn truncate_utf8(mut text: String, max_bytes: usize) -> (String, bool) {
 
 /// Replace NULs and stray control characters; keep newlines and tabs.
 pub fn sanitize_text(text: &str) -> String {
-    if !text.chars().any(|c| c.is_control() && c != '\n' && c != '\t' && c != '\r')
+    if !text
+        .chars()
+        .any(|c| c.is_control() && c != '\n' && c != '\t' && c != '\r')
         && !text.contains('\r')
     {
         return text.to_string();
@@ -346,8 +335,8 @@ pub fn sanitize_text(text: &str) -> String {
 
 fn extract_pdf(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocument> {
     let bytes = std::fs::read(path).with_context(|| format!("reading pdf {}", path.display()))?;
-    let raw = pdf_extract::extract_text_from_mem(&bytes)
-        .map_err(|e| anyhow!("pdf extraction failed: {e}"))?;
+    let raw =
+        pdf_extract::extract_text_from_mem(&bytes).map_err(|e| anyhow!("pdf extraction failed: {e}"))?;
     let text = sanitize_text(&raw);
     let (text, truncated) = truncate_utf8(text, max_bytes);
     Ok(ExtractedDocument {
@@ -369,11 +358,7 @@ fn open_zip(path: &Path) -> anyhow::Result<ZipArchive> {
         .with_context(|| format!("opening zip container {}", path.display()))
 }
 
-fn read_zip_entry_lenient(
-    archive: &mut ZipArchive,
-    name: &str,
-    cap: usize,
-) -> Option<Vec<u8>> {
+fn read_zip_entry_lenient(archive: &mut ZipArchive, name: &str, cap: usize) -> Option<Vec<u8>> {
     let mut entry = archive.by_name(name).ok()?;
     if entry.size() > cap as u64 {
         return None;
@@ -565,7 +550,7 @@ fn parse_xlsx_sheet(xml: &str, shared: &[String]) -> String {
                     cell_is_inline = false;
                     for attribute in event.attributes().flatten() {
                         if attribute.key.local_name().as_ref() == "t" {
-                            let raw = attribute.unescape_value().unwrap_or_default();
+                            let raw = &attribute.value;
                             cell_is_shared = raw == "s";
                             cell_is_inline = raw == "inlineStr";
                         }
@@ -650,8 +635,7 @@ fn extract_epub(path: &Path, max_bytes: usize) -> anyhow::Result<ExtractedDocume
         };
         total += bytes.len();
         let markup = String::from_utf8_lossy(&bytes);
-        let fragment =
-            extract_xml_text(&markup, &[], &["p", "div", "br"], &[], &["script", "style"]);
+        let fragment = extract_xml_text(&markup, &[], &["p", "div", "br"], &[], &["script", "style"]);
         text.push_str(&fragment);
         if !text.ends_with('\n') {
             text.push('\n');
@@ -703,8 +687,7 @@ fn extract_xml_text(
                 let name = local.as_ref();
                 if skip_tags.iter().any(|tag| *tag == name) {
                     skip_depth += 1;
-                } else if (capture_all || text_tags.iter().any(|tag| *tag == name))
-                    && capture_depth.is_none()
+                } else if (capture_all || text_tags.iter().any(|tag| *tag == name)) && capture_depth.is_none()
                 {
                     capture_depth = Some(depth);
                 }

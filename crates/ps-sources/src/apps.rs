@@ -30,7 +30,18 @@ const MAX_ICONS: usize = 400;
 /// else from the Start Menu is a documentation shortcut and belongs to file
 /// search, not the application index.
 const APPLICATION_EXTENSIONS: &[&str] = &[
-    "exe", "com", "bat", "cmd", "ps1", "psm1", "msc", "cpl", "scr", "appref-ms", "jar", "hta",
+    "exe",
+    "com",
+    "bat",
+    "cmd",
+    "ps1",
+    "psm1",
+    "msc",
+    "cpl",
+    "scr",
+    "appref-ms",
+    "jar",
+    "hta",
     "lnk",
 ];
 
@@ -106,7 +117,9 @@ pub fn scan_with_icons(icon_cache_dir: &Path) -> (Vec<AppEntry>, Vec<String>) {
     by_identity.sort_by(|a, b| {
         dedupe_preference(a)
             .cmp(&dedupe_preference(b))
-            .then_with(|| normalize_display_name(&a.display_name).cmp(&normalize_display_name(&b.display_name)))
+            .then_with(|| {
+                normalize_display_name(&a.display_name).cmp(&normalize_display_name(&b.display_name))
+            })
             .then_with(|| a.entry.target.cmp(&b.entry.target))
     });
     let mut seen_names: HashSet<String> = HashSet::new();
@@ -137,7 +150,10 @@ pub fn scan_with_icons(icon_cache_dir: &Path) -> (Vec<AppEntry>, Vec<String>) {
                 Ok(_) => {
                     icon_warnings += 1;
                     if warnings.len() < 20 {
-                        warnings.push(format!("icon {}: extraction reported a missing file", app.entry.name));
+                        warnings.push(format!(
+                            "icon {}: extraction reported a missing file",
+                            app.entry.name
+                        ));
                     }
                 }
                 Err(error) => {

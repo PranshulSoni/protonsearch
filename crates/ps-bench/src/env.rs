@@ -76,15 +76,35 @@ $cpu=Get-CimInstance Win32_Processor | Select-Object -First 1
         .unwrap_or_else(|| "unknown".to_string());
     match v {
         Some(v) => HostInfo {
-            os: v.get("os").and_then(|x| x.as_str()).unwrap_or("unknown").to_string(),
-            cpu: v.get("cpu").and_then(|x| x.as_str()).unwrap_or("unknown").to_string(),
+            os: v
+                .get("os")
+                .and_then(|x| x.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            cpu: v
+                .get("cpu")
+                .and_then(|x| x.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
             physical_cores: v.get("physical_cores").and_then(|x| x.as_u64()).unwrap_or(0) as u32,
             logical_cores: v.get("logical_cores").and_then(|x| x.as_u64()).unwrap_or(0) as u32,
             ram_bytes: v.get("ram_bytes").and_then(|x| x.as_u64()).unwrap_or(0),
-            hostname: v.get("hostname").and_then(|x| x.as_str()).unwrap_or("unknown").to_string(),
+            hostname: v
+                .get("hostname")
+                .and_then(|x| x.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
             rustc,
-            captured_at_local: v.get("captured_at_local").and_then(|x| x.as_str()).unwrap_or("").to_string(),
-            captured_at_utc: v.get("captured_at_utc").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+            captured_at_local: v
+                .get("captured_at_local")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string(),
+            captured_at_utc: v
+                .get("captured_at_utc")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string(),
         },
         None => HostInfo {
             os: std::env::consts::OS.to_string(),
@@ -114,7 +134,10 @@ pub fn process_memory(pid: u32) -> Option<ProcessMemory> {
     Some(ProcessMemory {
         pid,
         working_set_bytes: v.get("working_set_bytes").and_then(|x| x.as_u64()).unwrap_or(0),
-        peak_working_set_bytes: v.get("peak_working_set_bytes").and_then(|x| x.as_u64()).unwrap_or(0),
+        peak_working_set_bytes: v
+            .get("peak_working_set_bytes")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0),
     })
 }
 

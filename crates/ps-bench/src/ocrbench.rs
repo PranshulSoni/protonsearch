@@ -42,7 +42,9 @@ pub fn load_manifest(path: &Path) -> anyhow::Result<Vec<ManifestEntry>> {
         if line.trim().is_empty() {
             continue;
         }
-        out.push(serde_json::from_str(line).map_err(|e| anyhow::anyhow!("{}:{}: {e}", path.display(), i + 1))?);
+        out.push(
+            serde_json::from_str(line).map_err(|e| anyhow::anyhow!("{}:{}: {e}", path.display(), i + 1))?,
+        );
     }
     anyhow::ensure!(!out.is_empty(), "empty OCR manifest: {}", path.display());
     Ok(out)
@@ -50,7 +52,11 @@ pub fn load_manifest(path: &Path) -> anyhow::Result<Vec<ManifestEntry>> {
 
 /// Generate the corpus by invoking the committed PowerShell GDI+ script.
 pub fn generate_corpus(out_dir: &Path, script: &Path, count: usize) -> anyhow::Result<usize> {
-    anyhow::ensure!(script.exists(), "OCR corpus generator script not found: {}", script.display());
+    anyhow::ensure!(
+        script.exists(),
+        "OCR corpus generator script not found: {}",
+        script.display()
+    );
     if let Some(dir) = out_dir.parent() {
         std::fs::create_dir_all(dir)?;
     }
@@ -167,16 +173,28 @@ mod winrt_ocr {
             // StorageFile::GetFileFromPathAsync goes through the Storage broker and
             // is denied for processes launched by the agent harness; an in-process
             // in-memory stream has no such ACL dependency.
-            let bytes = std::fs::read(path)
-                .map_err(|e| anyhow::anyhow!("read image {}: {e}", path.display()))?;
+            let bytes =
+                std::fs::read(path).map_err(|e| anyhow::anyhow!("read image {}: {e}", path.display()))?;
             let stream = InMemoryRandomAccessStream::new().map_err(to_anyhow)?;
             let writer = DataWriter::CreateDataWriter(&stream).map_err(to_anyhow)?;
             writer.WriteBytes(&bytes).map_err(to_anyhow)?;
             writer.StoreAsync().map_err(to_anyhow)?.get().map_err(to_anyhow)?;
             stream.Seek(0).map_err(to_anyhow)?;
-            let decoder = BitmapDecoder::CreateAsync(&stream).map_err(to_anyhow)?.get().map_err(to_anyhow)?;
-            let bitmap = decoder.GetSoftwareBitmapAsync().map_err(to_anyhow)?.get().map_err(to_anyhow)?;
-            let result = self.engine.RecognizeAsync(&bitmap).map_err(to_anyhow)?.get().map_err(to_anyhow)?;
+            let decoder = BitmapDecoder::CreateAsync(&stream)
+                .map_err(to_anyhow)?
+                .get()
+                .map_err(to_anyhow)?;
+            let bitmap = decoder
+                .GetSoftwareBitmapAsync()
+                .map_err(to_anyhow)?
+                .get()
+                .map_err(to_anyhow)?;
+            let result = self
+                .engine
+                .RecognizeAsync(&bitmap)
+                .map_err(to_anyhow)?
+                .get()
+                .map_err(to_anyhow)?;
             Ok(result.Text().map_err(to_anyhow)?.to_string())
         }
     }
@@ -297,7 +315,10 @@ fn now_utc() -> String {
 }
 
 pub fn run(args: &Args) -> anyhow::Result<()> {
-    let manifest_path = PathBuf::from(args.get("--manifest").unwrap_or(".bench/ocr-corpus/manifest.jsonl"));
+    let manifest_path = PathBuf::from(
+        args.get("--manifest")
+            .unwrap_or(".bench/ocr-corpus/manifest.jsonl"),
+    );
     let out = PathBuf::from(args.required("--out")?);
     let passes = args.usize_or("--passes", 2)?.max(1);
     let limit = args.usize_or("--limit", 0)?;
@@ -307,8 +328,15 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         std::env::current_dir()?.join(&manifest_path)
     };
     let manifest = load_manifest(&manifest_path)?;
-    let base_dir = manifest_path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from("."));
-    let subset: Vec<&ManifestEntry> = if limit > 0 { manifest.iter().take(limit).collect() } else { manifest.iter().collect() };
+    let base_dir = manifest_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+    let subset: Vec<&ManifestEntry> = if limit > 0 {
+        manifest.iter().take(limit).collect()
+    } else {
+        manifest.iter().collect()
+    };
 
     let languages = winrt_ocr::available_languages();
     let session_open_start = Instant::now();
@@ -322,7 +350,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                 reason: format!("Windows.Media.Ocr unavailable on this host: {err}"),
                 host: host_info().clone(),
                 generated_at_utc: now_utc(),
-                command: format!("ps-bench ocr --manifest {} --out {}", manifest_path.display(), out.display()),
+                command: format!(
+                    "ps-bench ocr --manifest {} --out {}",
+                    manifest_path.display(),
+                    out.display()
+                ),
                 engine: "windows.media.ocr".to_string(),
                 languages,
                 session_open_ms: 0.0,
@@ -405,28 +437,47 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         let wall_ms = wall_start.elapsed().as_secs_f64() * 1000.0;
         let mut sorted_cer = cers.clone();
         sorted_cer.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let median_cer = if sorted_cer.is_empty() { 0.0 } else { sorted_cer[sorted_cer.len() / 2] };
+        let median_cer = if sorted_cer.is_empty() {
+            0.0
+        } else {
+            sorted_cer[sorted_cer.len() / 2]
+        };
         pass_reports.push(PassReport {
             pass,
             images: latencies.len(),
             wall_ms,
-            images_per_sec: if wall_ms > 0.0 { latencies.len() as f64 / (wall_ms / 1000.0) } else { 0.0 },
+            images_per_sec: if wall_ms > 0.0 {
+                latencies.len() as f64 / (wall_ms / 1000.0)
+            } else {
+                0.0
+            },
             latency: summarize(&latencies),
-            mean_cer: if cers.is_empty() { 0.0 } else { cers.iter().sum::<f64>() / cers.len() as f64 },
+            mean_cer: if cers.is_empty() {
+                0.0
+            } else {
+                cers.iter().sum::<f64>() / cers.len() as f64
+            },
             median_cer,
-            exact_rate: if latencies.is_empty() { 0.0 } else { exact as f64 / latencies.len() as f64 },
+            exact_rate: if latencies.is_empty() {
+                0.0
+            } else {
+                exact as f64 / latencies.len() as f64
+            },
             total_chars: chars,
             total_errors: errors,
             image_errors,
         });
     }
 
-    let recognized_any = per_image.iter().any(|r| r.pass == 1 && !r.recognized.starts_with("ERROR:"));
+    let recognized_any = per_image
+        .iter()
+        .any(|r| r.pass == 1 && !r.recognized.starts_with("ERROR:"));
     let failed = !recognized_any;
 
     // Aggregation uses the last pass (warm) for scenarios; per-image rows keep all passes.
     let warm: Vec<&ImageResult> = per_image.iter().filter(|r| r.pass == passes).collect();
-    let mut scen: std::collections::BTreeMap<String, (usize, f64, usize, Vec<f64>)> = std::collections::BTreeMap::new();
+    let mut scen: std::collections::BTreeMap<String, (usize, f64, usize, Vec<f64>)> =
+        std::collections::BTreeMap::new();
     for r in &warm {
         let e = scen.entry(r.scenario.clone()).or_insert((0, 0.0, 0, Vec::new()));
         e.0 += 1;
@@ -522,6 +573,9 @@ pub fn run_generate(args: &Args) -> anyhow::Result<()> {
     let script = PathBuf::from(args.get("--script").unwrap_or("tools/ocr/gen_ocr_corpus.ps1"));
     let count = args.usize_or("--count", 0)?;
     let n = generate_corpus(&out_dir, &script, count)?;
-    println!("ps-bench ocr-corpus: {n} images + manifest -> {}", out_dir.display());
+    println!(
+        "ps-bench ocr-corpus: {n} images + manifest -> {}",
+        out_dir.display()
+    );
     Ok(())
 }

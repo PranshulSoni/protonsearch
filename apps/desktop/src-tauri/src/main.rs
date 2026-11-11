@@ -7,22 +7,24 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 mod monitors;
 
 use ps_agent::{AgentClient, AgentEvent, PiAgentClient, PiAgentConfig};
-use ps_ipc::agent_task::DetectedAgent;
 use ps_core::{Engine, EngineConfig};
+use ps_ipc::agent_task::DetectedAgent;
 use ps_ipc::{
-    ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentRuntime, AgentState,
-    AgentStatus, EngineStatus, IndexCommand, LauncherMode, MonitorInfo, NativeCommand, OnboardingInput,
-    OnboardingState,
-    OpenOutcome, SearchRequest, SearchResponse, Settings, SettingsPatch,
+    ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentRuntime,
+    AgentState, AgentStatus, EngineStatus, IndexCommand, LauncherMode, MonitorInfo, NativeCommand,
+    OnboardingInput, OnboardingState, OpenOutcome, SearchRequest, SearchResponse, Settings, SettingsPatch,
 };
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow, WebviewWindowBuilder,
+};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 const LAUNCHER_LABEL: &str = "launcher";
@@ -116,7 +118,11 @@ const LAUNCHER_DEFAULT_HEIGHT: f64 = 520.0;
 /// never clipped by the native window edge. 28 logical px on every side.
 const LAUNCHER_SHADOW_PAD: f64 = 28.0;
 fn launcher_window_width(preview: bool) -> f64 {
-    (if preview { LAUNCHER_PREVIEW_CARD_WIDTH } else { LAUNCHER_CARD_WIDTH }) + LAUNCHER_SHADOW_PAD * 2.0
+    (if preview {
+        LAUNCHER_PREVIEW_CARD_WIDTH
+    } else {
+        LAUNCHER_CARD_WIDTH
+    }) + LAUNCHER_SHADOW_PAD * 2.0
 }
 fn launcher_window_height(content_height: f64) -> f64 {
     content_height + LAUNCHER_SHADOW_PAD * 2.0
@@ -139,7 +145,9 @@ struct AppState {
 /// Position the frameless launcher near the top-center of the monitor under the
 /// cursor (multi-monitor correctness), clamped into that monitor's work area.
 fn place_launcher(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
-    let cursor = app.cursor_position().unwrap_or(tauri::PhysicalPosition::new(0.0, 0.0));
+    let cursor = app
+        .cursor_position()
+        .unwrap_or(tauri::PhysicalPosition::new(0.0, 0.0));
     let monitor = app
         .monitor_from_point(cursor.x, cursor.y)
         .ok()
@@ -149,7 +157,13 @@ fn place_launcher(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64)
         Some(m) => {
             let pos = m.position();
             let size = m.size();
-            (pos.x as f64, pos.y as f64, size.width as f64, size.height as f64, m.scale_factor())
+            (
+                pos.x as f64,
+                pos.y as f64,
+                size.width as f64,
+                size.height as f64,
+                m.scale_factor(),
+            )
         }
         None => (0.0, 0.0, 1920.0, 1080.0, 1.0),
     };
@@ -162,20 +176,23 @@ fn place_launcher(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64)
 }
 
 fn show_launcher_window(app: &AppHandle) {
-let win = match ensure_launcher_window(app) {
-Ok(win) => win,
-Err(err) => {
-eprintln!("[window] failed to create launcher: {err}");
-return;
-}
-};
+    let win = match ensure_launcher_window(app) {
+        Ok(win) => win,
+        Err(err) => {
+            eprintln!("[window] failed to create launcher: {err}");
+            return;
+        }
+    };
     // Cancel any pending dismissal from a previous close animation.
     LAUNCHER_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let scale = win.scale_factor().unwrap_or(1.0);
     let size = win
         .inner_size()
         .map(|s| (s.width as f64 / scale, s.height as f64 / scale))
-        .unwrap_or((launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT)));
+        .unwrap_or((
+            launcher_window_width(false),
+            launcher_window_height(LAUNCHER_DEFAULT_HEIGHT),
+        ));
     place_launcher(app, &win, size.0, size.1);
     set_webview_memory_level(&win, false);
     let _ = win.show();
@@ -252,7 +269,13 @@ fn place_island(app: &AppHandle, win: &WebviewWindow, width: f64, height: f64) {
         ),
         None => {
             let cursor = app.cursor_position().unwrap_or(PhysicalPosition::new(0.0, 0.0));
-            (0.0, 0.0, cursor.x.max(1920.0), (cursor.y + 1080.0).max(1080.0), 1.0)
+            (
+                0.0,
+                0.0,
+                cursor.x.max(1920.0),
+                (cursor.y + 1080.0).max(1080.0),
+                1.0,
+            )
         }
     };
     let pad = ISLAND_SHADOW_PAD;
@@ -308,13 +331,13 @@ fn hide_island_window(app: &AppHandle) {
 }
 
 fn show_island_window(app: &AppHandle) {
-let win = match ensure_island_window(app) {
-Ok(win) => win,
-Err(err) => {
-eprintln!("[window] failed to create island: {err}");
-return;
-}
-};
+    let win = match ensure_island_window(app) {
+        Ok(win) => win,
+        Err(err) => {
+            eprintln!("[window] failed to create island: {err}");
+            return;
+        }
+    };
     ISLAND_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     hide_launcher_window(app);
     let scale = win.scale_factor().unwrap_or(1.0);
@@ -405,9 +428,7 @@ fn focus_window(win: &WebviewWindow) {
 fn toggle_primary_launcher(app: &AppHandle) {
     PERF_INVOKE_EPOCH_MS.store(epoch_ms(), std::sync::atomic::Ordering::SeqCst);
     let settings = app.state::<AppState>().engine.settings();
-    if settings.launcher.primary_mode == LauncherMode::DynamicIsland
-        && settings.launcher.island.enabled
-    {
+    if settings.launcher.primary_mode == LauncherMode::DynamicIsland && settings.launcher.island.enabled {
         toggle_island(app);
     } else {
         toggle_launcher(app);
@@ -431,13 +452,13 @@ fn dispatch_window_action(app: &AppHandle, action: fn(&AppHandle)) {
 }
 
 fn show_main_window(app: &AppHandle) {
-let win = match ensure_main_window(app) {
-Ok(win) => win,
-Err(err) => {
-eprintln!("[window] failed to create main window: {err}");
-return;
-}
-};
+    let win = match ensure_main_window(app) {
+        Ok(win) => win,
+        Err(err) => {
+            eprintln!("[window] failed to create main window: {err}");
+            return;
+        }
+    };
     set_webview_memory_level(&win, false);
     let _ = win.show();
     let _ = win.unminimize();
@@ -527,9 +548,9 @@ fn cdp_browser_args() -> Option<String> {
 /// When PROTONSEARCH_DATA_DIR is set (portable install / E2E sandbox), keep
 /// WebView2 profile inside it instead of %LOCALAPPDATA%\<identifier>.
 fn webview_data_dir() -> Option<PathBuf> {
-std::env::var_os("PROTONSEARCH_DATA_DIR")
-.filter(|dir| !dir.is_empty())
-.map(|dir| PathBuf::from(dir).join("webview2"))
+    std::env::var_os("PROTONSEARCH_DATA_DIR")
+        .filter(|dir| !dir.is_empty())
+        .map(|dir| PathBuf::from(dir).join("webview2"))
 }
 
 /// DISABLED (hang fix): calling WebView2 `SetMemoryUsageTargetLevel` through
@@ -547,15 +568,27 @@ fn report_window_failure(err: &tauri::Error) {
     if REPORTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
         return;
     }
-    let text = format!(
-        "ProtonSearch could not open its window.\n\n{err}\n\nThis usually means WebView2 cannot write its profile, for example when ProtonSearch.exe runs from a sandboxed (low-integrity) folder. Copy it to a normal folder or install it, then start it again."
-    );
+    let err_str = err.to_string();
+    let text = if err_str.contains("0x800700AA") || err_str.contains("requested resource is in use") {
+        format!(
+            "ProtonSearch could not open its window.\n\n{err}\n\nAnother instance of ProtonSearch is already running in the background and holding the profile lock. Please open Task Manager, end any running ProtonSearch processes, and launch again."
+        )
+    } else {
+        format!(
+            "ProtonSearch could not open its window.\n\n{err}\n\nThis usually means WebView2 cannot write its profile, for example when ProtonSearch.exe runs from a sandboxed (low-integrity) folder. Copy it to a normal folder or install it, then start it again."
+        )
+    };
     // Own thread: the message box is modal and callers must not block on it.
     #[cfg(windows)]
     std::thread::spawn(move || unsafe {
         use windows::core::{w, HSTRING};
         use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
-        let _ = MessageBoxW(None, &HSTRING::from(text), w!("ProtonSearch"), MB_OK | MB_ICONERROR);
+        let _ = MessageBoxW(
+            None,
+            &HSTRING::from(text),
+            w!("ProtonSearch"),
+            MB_OK | MB_ICONERROR,
+        );
     });
 }
 
@@ -571,10 +604,10 @@ fn build_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     if let Some(args) = &cdp {
         builder = builder.additional_browser_args(args);
     }
-if let Some(dir) = &webview_dir {
-let _ = std::fs::create_dir_all(dir);
-builder = builder.data_directory(dir.clone());
-}
+    if let Some(dir) = &webview_dir {
+        let _ = std::fs::create_dir_all(dir);
+        builder = builder.data_directory(dir.clone());
+    }
     let main = builder.build()?;
     let _ = main.set_icon(window_icon()?);
     set_webview_memory_level(&main, true);
@@ -599,7 +632,7 @@ builder = builder.data_directory(dir.clone());
 }
 
 fn ensure_main_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
     if let Some(window) = app.get_webview_window(MAIN_LABEL) {
         return Ok(window);
     }
@@ -609,31 +642,36 @@ let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
 fn build_launcher_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let cdp = cdp_browser_args();
     let webview_dir = webview_data_dir();
-    let mut builder = WebviewWindowBuilder::new(
-        app,
-        LAUNCHER_LABEL,
-        tauri::WebviewUrl::App("index.html".into()),
-    )
-    .title("ProtonSearch")
-    .inner_size(launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT))
-    .min_inner_size(560.0, 160.0)
-    .decorations(false)
-    .transparent(true)
-    .shadow(false)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .resizable(false)
-    .visible(false);
+    let mut builder =
+        WebviewWindowBuilder::new(app, LAUNCHER_LABEL, tauri::WebviewUrl::App("index.html".into()))
+            .title("ProtonSearch")
+            .inner_size(
+                launcher_window_width(false),
+                launcher_window_height(LAUNCHER_DEFAULT_HEIGHT),
+            )
+            .min_inner_size(560.0, 160.0)
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .visible(false);
     if let Some(args) = &cdp {
         builder = builder.additional_browser_args(args);
     }
-if let Some(dir) = &webview_dir {
-builder = builder.data_directory(dir.clone());
-}
+    if let Some(dir) = &webview_dir {
+        builder = builder.data_directory(dir.clone());
+    }
     let launcher = builder.build()?;
     let _ = launcher.set_icon(window_icon()?);
     set_webview_memory_level(&launcher, true);
-    place_launcher(app, &launcher, launcher_window_width(false), launcher_window_height(LAUNCHER_DEFAULT_HEIGHT));
+    place_launcher(
+        app,
+        &launcher,
+        launcher_window_width(false),
+        launcher_window_height(LAUNCHER_DEFAULT_HEIGHT),
+    );
     let launcher_for_focus = launcher.clone();
     launcher.on_window_event(move |event| {
         if let tauri::WindowEvent::Focused(false) = event {
@@ -644,7 +682,7 @@ builder = builder.data_directory(dir.clone());
 }
 
 fn ensure_launcher_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
     if let Some(window) = app.get_webview_window(LAUNCHER_LABEL) {
         return Ok(window);
     }
@@ -654,30 +692,27 @@ let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
 fn build_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let cdp = cdp_browser_args();
     let webview_dir = webview_data_dir();
-    let mut builder = WebviewWindowBuilder::new(
-        app,
-        ISLAND_LABEL,
-        tauri::WebviewUrl::App("index.html".into()),
-    )
-    .title("ProtonSearch Island")
-    .inner_size(
-        ISLAND_DEFAULT_WIDTH + ISLAND_SHADOW_PAD * 2.0,
-        ISLAND_DEFAULT_HEIGHT + ISLAND_SHADOW_PAD * 2.0,
-    )
-    .decorations(false)
-    .transparent(true)
-    .shadow(false)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .resizable(false)
-    .visible(false)
-    .focused(false);
+    let mut builder =
+        WebviewWindowBuilder::new(app, ISLAND_LABEL, tauri::WebviewUrl::App("index.html".into()))
+            .title("ProtonSearch Island")
+            .inner_size(
+                ISLAND_DEFAULT_WIDTH + ISLAND_SHADOW_PAD * 2.0,
+                ISLAND_DEFAULT_HEIGHT + ISLAND_SHADOW_PAD * 2.0,
+            )
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .visible(false)
+            .focused(false);
     if let Some(args) = &cdp {
         builder = builder.additional_browser_args(args);
     }
-if let Some(dir) = &webview_dir {
-builder = builder.data_directory(dir.clone());
-}
+    if let Some(dir) = &webview_dir {
+        builder = builder.data_directory(dir.clone());
+    }
     let island = builder.build()?;
     let _ = island.set_icon(window_icon()?);
     set_webview_memory_level(&island, true);
@@ -700,7 +735,7 @@ builder = builder.data_directory(dir.clone());
 }
 
 fn ensure_island_window(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    let _guard = WINDOW_BUILD_LOCK.lock().unwrap_or_else(|err| err.into_inner());
     if let Some(window) = app.get_webview_window(ISLAND_LABEL) {
         return Ok(window);
     }
@@ -753,9 +788,7 @@ fn engine_config(data_dir: PathBuf) -> EngineConfig {
 /// Run blocking native/IO work off the UI thread. Sync Tauri commands execute on the
 /// main thread, so anything touching Windows APIs, SQLite or child processes must go
 /// through here or it freezes every window (BUG-R3-02).
-async fn run_blocking<T: Send + 'static>(
-    job: impl FnOnce() -> T + Send + 'static,
-) -> Result<T, String> {
+async fn run_blocking<T: Send + 'static>(job: impl FnOnce() -> T + Send + 'static) -> Result<T, String> {
     tauri::async_runtime::spawn_blocking(job)
         .await
         .map_err(|e| format!("background task failed: {e}"))
@@ -765,9 +798,7 @@ async fn run_blocking<T: Send + 'static>(
 /// thread; keep them one-at-a-time now that they run on the blocking pool.
 static NATIVE_CONTROLS: Mutex<()> = Mutex::new(());
 
-async fn run_native<T: Send + 'static>(
-    job: impl FnOnce() -> T + Send + 'static,
-) -> Result<T, String> {
+async fn run_native<T: Send + 'static>(job: impl FnOnce() -> T + Send + 'static) -> Result<T, String> {
     run_blocking(move || {
         let _guard = NATIVE_CONTROLS.lock().unwrap_or_else(|e| e.into_inner());
         job()
@@ -776,10 +807,7 @@ async fn run_native<T: Send + 'static>(
 }
 
 #[tauri::command]
-async fn search(
-    state: tauri::State<'_, AppState>,
-    req: SearchRequest,
-) -> Result<SearchResponse, String> {
+async fn search(state: tauri::State<'_, AppState>, req: SearchRequest) -> Result<SearchResponse, String> {
     let engine = state.engine.clone();
     tauri::async_runtime::spawn_blocking(move || engine.search(&req))
         .await
@@ -787,23 +815,19 @@ async fn search(
 }
 
 #[tauri::command]
-async fn open_result(
-    state: tauri::State<'_, AppState>,
-    action: ActionSpec,
-) -> Result<OpenOutcome, String> {
+async fn open_result(state: tauri::State<'_, AppState>, action: ActionSpec) -> Result<OpenOutcome, String> {
     let engine = state.engine.clone();
-    Ok(tauri::async_runtime::spawn_blocking(move || engine.execute_action(action))
-        .await
-        .map_err(|e| format!("action task failed: {e}"))?)
+    Ok(
+        tauri::async_runtime::spawn_blocking(move || engine.execute_action(action))
+            .await
+            .map_err(|e| format!("action task failed: {e}"))?,
+    )
 }
 
 /// Second step of the destructive-action confirmation handshake. The engine
 /// only accepts the command it asked about within 15 seconds.
 #[tauri::command]
-fn confirm_native_action(
-    state: tauri::State<'_, AppState>,
-    command: NativeCommand,
-) -> OpenOutcome {
+fn confirm_native_action(state: tauri::State<'_, AppState>, command: NativeCommand) -> OpenOutcome {
     state.engine.confirm_destructive(command)
 }
 
@@ -862,10 +886,7 @@ async fn update_settings(
     let mut candidate = previous.clone();
     candidate.apply(&patch);
     validate_settings(&candidate)?;
-    let settings = state
-        .engine
-        .update_settings(patch)
-        .map_err(|e| e.to_string())?;
+    let settings = state.engine.update_settings(patch).map_err(|e| e.to_string())?;
     // The Pi launcher path may have changed; drop the cached probe and agent list.
     ps_agent::clear_probe_cache();
     if let Ok(mut cache) = state.agents.lock() {
@@ -919,7 +940,11 @@ async fn get_activity(
     query: Option<ActivityQuery>,
 ) -> Result<Vec<ActivityItem>, String> {
     let engine = state.engine.clone();
-    let query = query.unwrap_or(ActivityQuery { limit: 50, since: None, kinds: Vec::new() });
+    let query = query.unwrap_or(ActivityQuery {
+        limit: 50,
+        since: None,
+        kinds: Vec::new(),
+    });
     tauri::async_runtime::spawn_blocking(move || engine.activity(query))
         .await
         .map_err(|e| format!("activity task failed: {e}"))
@@ -1018,11 +1043,7 @@ fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
 /// Validate and live-apply a new global shortcut. Restores the previous one if
 /// the new combination cannot be registered (e.g. another app owns it).
 #[tauri::command]
-fn set_hotkey(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-    hotkey: String,
-) -> Result<Settings, String> {
+fn set_hotkey(app: AppHandle, state: tauri::State<'_, AppState>, hotkey: String) -> Result<Settings, String> {
     let candidate = hotkey.trim().to_string();
     if candidate.is_empty() || candidate.len() > 64 {
         return Err("Enter a shortcut such as Alt+Space.".into());
@@ -1045,9 +1066,7 @@ fn set_hotkey(
 fn probe_agent_status(state: &AppState) -> AgentStatus {
     let settings = state.engine.settings();
     if settings.agent.runtime == AgentRuntime::Pi {
-        let probed = ps_agent::probe_pi_cached(
-            settings.agent.pi_path.as_deref().map(std::path::Path::new),
-        );
+        let probed = ps_agent::probe_pi_cached(settings.agent.pi_path.as_deref().map(std::path::Path::new));
         let running = state
             .pi_agent
             .lock()
@@ -1223,8 +1242,7 @@ fn detect_agents_blocking(state: &AppState) -> Vec<DetectedAgent> {
     }
     let settings = state.engine.settings();
     let mut agents = Vec::new();
-    if let Some(info) =
-        ps_agent::probe_pi_cached(settings.agent.pi_path.as_deref().map(std::path::Path::new))
+    if let Some(info) = ps_agent::probe_pi_cached(settings.agent.pi_path.as_deref().map(std::path::Path::new))
     {
         agents.push(DetectedAgent {
             id: "pi".into(),
@@ -1277,11 +1295,10 @@ fn agent_start(
         return Err("Agent workflows are disabled in Preferences.".into());
     }
     if settings.agent.runtime == AgentRuntime::Pi {
-        let mut config =
-            PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
+        let mut config = PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
             "The Pi CLI agent is not available. Install it from pi.dev or set its path in Preferences."
                 .to_string()
-            })?;
+        })?;
         // ALPHA SAFETY GATE (security re-review RR-02): Pi runs read-only until
         // a server-side per-run consent token exists; persisted settings can
         // never silently enable edits/shell.
@@ -1321,10 +1338,7 @@ fn agent_start(
             });
     }
     let mut slot = state.agent.lock().map_err(|e| e.to_string())?;
-    let needs_spawn = slot
-        .as_ref()
-        .map(|client| !client.is_alive())
-        .unwrap_or(true);
+    let needs_spawn = slot.as_ref().map(|client| !client.is_alive()).unwrap_or(true);
     if needs_spawn {
         let config = ps_agent::default_config(&state.data_dir).ok_or_else(|| {
             "The optional Python agent runtime is not installed on this machine.".to_string()
@@ -1366,10 +1380,7 @@ fn agent_cancel(state: tauri::State<'_, AppState>, run_id: Option<String>) -> Re
 }
 
 #[tauri::command]
-fn agent_approve(
-    state: tauri::State<'_, AppState>,
-    response: AgentApprovalResponse,
-) -> Result<(), String> {
+fn agent_approve(state: tauri::State<'_, AppState>, response: AgentApprovalResponse) -> Result<(), String> {
     if state.engine.settings().agent.runtime == AgentRuntime::Pi {
         return Err(
             "Pi runs do not ask for per-tool approval; file edits and shell access are opted in before the run."
@@ -1429,9 +1440,7 @@ fn settings_page_from_id(page: &str) -> Option<ps_windows::SettingsPage> {
 /// cards render. Honest: unavailable features carry a reason + allow-listed
 /// Windows settings fallback, never fake state.
 #[tauri::command]
-async fn get_controls_status(
-    state: tauri::State<'_, AppState>,
-) -> Result<ps_ipc::ControlsStatus, String> {
+async fn get_controls_status(state: tauri::State<'_, AppState>) -> Result<ps_ipc::ControlsStatus, String> {
     let data_dir = state.data_dir.clone();
     run_native(move || build_controls_status(&data_dir)).await
 }
@@ -1465,7 +1474,11 @@ fn notification_feed(db_path: &std::path::Path, limit: usize) -> Vec<ps_ipc::App
             id: format!("win:{}", entry.id),
             title: entry.title,
             body: entry.body,
-            source: if entry.app.is_empty() { "Windows".to_string() } else { entry.app },
+            source: if entry.app.is_empty() {
+                "Windows".to_string()
+            } else {
+                entry.app
+            },
             created_at: entry.created_ms,
             read: false,
         })
@@ -1602,18 +1615,12 @@ fn build_controls_status(data_dir: &std::path::Path) -> ps_ipc::ControlsStatus {
 
 #[tauri::command]
 async fn control_set_wifi(enabled: bool) -> Result<(), String> {
-    run_native(move || {
-        ps_windows::set_wifi_radio(enabled).map_err(|error| format!("{error:#}"))
-    })
-    .await?
+    run_native(move || ps_windows::set_wifi_radio(enabled).map_err(|error| format!("{error:#}"))).await?
 }
 
 #[tauri::command]
 async fn control_set_bluetooth(enabled: bool) -> Result<(), String> {
-    run_native(move || {
-        ps_windows::set_bluetooth_radio(enabled).map_err(|error| format!("{error:#}"))
-    })
-    .await?
+    run_native(move || ps_windows::set_bluetooth_radio(enabled).map_err(|error| format!("{error:#}"))).await?
 }
 
 #[tauri::command]
@@ -1630,15 +1637,14 @@ async fn control_connect_wifi(ssid: String) -> Result<(), String> {
 async fn control_open_settings(page: String) -> Result<(), String> {
     let page = settings_page_from_id(&page).ok_or_else(|| "Unknown settings page.".to_string())?;
     run_blocking(move || {
-        ps_windows::open_settings_page(page)
-            .map_err(|_| "Couldn't open Windows settings.".to_string())
+        ps_windows::open_settings_page(page).map_err(|_| "Couldn't open Windows settings.".to_string())
     })
     .await?
 }
 
 #[tauri::command]
 async fn control_set_volume(percent: u8) -> Result<(), String> {
- run_blocking(move || {
+    run_blocking(move || {
         ps_windows::set_audio_volume((percent.min(100) as f32) / 100.0)
             .map_err(|_| "Couldn't change the system volume.".to_string())
     })
@@ -1647,9 +1653,8 @@ async fn control_set_volume(percent: u8) -> Result<(), String> {
 
 #[tauri::command]
 async fn control_set_muted(muted: bool) -> Result<(), String> {
- run_blocking(move || {
-        ps_windows::set_audio_mute(muted)
-            .map_err(|_| "Couldn't change the system mute state.".to_string())
+    run_blocking(move || {
+        ps_windows::set_audio_mute(muted).map_err(|_| "Couldn't change the system mute state.".to_string())
     })
     .await?
 }
@@ -1717,7 +1722,9 @@ async fn notifications_dismiss(
     notification_id: String,
 ) -> Result<(), String> {
     if let Some(system_id) = notification_id.strip_prefix("win:") {
-        let id: u32 = system_id.parse().map_err(|_| "Unknown notification.".to_string())?;
+        let id: u32 = system_id
+            .parse()
+            .map_err(|_| "Unknown notification.".to_string())?;
         return run_blocking(move || {
             ps_windows::dismiss_system_notification(id)
                 .map_err(|_| "Windows couldn't dismiss that notification.".to_string())
@@ -1747,34 +1754,61 @@ async fn notifications_clear(state: tauri::State<'_, AppState>) -> Result<(), St
 }
 
 #[tauri::command]
-fn get_preview(
+async fn get_preview(
     state: tauri::State<'_, AppState>,
     req: ps_ipc::PreviewRequest,
-) -> ps_ipc::PreviewPayload {
-    state.engine.preview(&req)
+) -> Result<ps_ipc::PreviewPayload, String> {
+    let permit = PreviewPermit::try_acquire()?;
+    let engine = state.engine.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        engine.preview(&req)
+    })
+    .await
+    .map_err(|e| format!("Preview task failed: {e}"))
+}
+const MAX_CONCURRENT_PREVIEWS: usize = 2;
+static ACTIVE_PREVIEWS: AtomicUsize = AtomicUsize::new(0);
+struct PreviewPermit;
+impl PreviewPermit {
+    fn try_acquire() -> Result<Self, String> {
+        let mut active = ACTIVE_PREVIEWS.load(Ordering::Acquire);
+        loop {
+            if active >= MAX_CONCURRENT_PREVIEWS {
+                return Err(
+                    "Preview capacity is busy; wait for a preview to finish and try again.".to_string(),
+                );
+            }
+            match ACTIVE_PREVIEWS.compare_exchange_weak(
+                active,
+                active + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => return Ok(Self),
+                Err(current) => active = current,
+            }
+        }
+    }
+}
+impl Drop for PreviewPermit {
+    fn drop(&mut self) {
+        ACTIVE_PREVIEWS.fetch_sub(1, Ordering::AcqRel);
+    }
 }
 
 #[tauri::command]
-fn agent_tasks(
-    state: tauri::State<'_, AppState>,
-    limit: Option<usize>,
-) -> Vec<ps_agent::AgentTask> {
+fn agent_tasks(state: tauri::State<'_, AppState>, limit: Option<usize>) -> Vec<ps_agent::AgentTask> {
     state.agent_tasks.tasks(limit.unwrap_or(50).min(200))
 }
 
 #[tauri::command]
-fn agent_task_tree(
-    state: tauri::State<'_, AppState>,
-    limit: Option<usize>,
-) -> Vec<ps_agent::AgentTaskNode> {
+fn agent_task_tree(state: tauri::State<'_, AppState>, limit: Option<usize>) -> Vec<ps_agent::AgentTaskNode> {
     state.agent_tasks.tree(limit.unwrap_or(50).min(200))
 }
 
 #[tauri::command]
-fn agent_task(
-    state: tauri::State<'_, AppState>,
-    task_id: String,
-) -> Option<ps_agent::AgentTask> {
+fn agent_task(state: tauri::State<'_, AppState>, task_id: String) -> Option<ps_agent::AgentTask> {
     state.agent_tasks.task(&task_id)
 }
 
@@ -1799,18 +1833,12 @@ fn agent_stop_all(state: tauri::State<'_, AppState>) -> Vec<ps_agent::AgentTask>
 
 #[tauri::command]
 fn agent_pause(state: tauri::State<'_, AppState>, task_id: String) -> Result<(), String> {
-    state
-        .agent_tasks
-        .pause(&task_id)
-        .map_err(|e| e.to_string())
+    state.agent_tasks.pause(&task_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn agent_resume(state: tauri::State<'_, AppState>, task_id: String) -> Result<(), String> {
-    state
-        .agent_tasks
-        .resume(&task_id)
-        .map_err(|e| e.to_string())
+    state.agent_tasks.resume(&task_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1829,12 +1857,7 @@ fn hide_island(app: AppHandle) {
 }
 
 #[tauri::command]
-fn set_island_geometry(
-    app: AppHandle,
-    window: WebviewWindow,
-    width: f64,
-    height: f64,
-) -> Result<(), String> {
+fn set_island_geometry(app: AppHandle, window: WebviewWindow, width: f64, height: f64) -> Result<(), String> {
     let width = width.clamp(240.0, 900.0);
     let height = height.clamp(40.0, 760.0);
     place_island(&app, &window, width, height);
@@ -2059,6 +2082,7 @@ dispatch_window_action(app, toggle_primary_launcher);
 
 #[cfg(test)]
 mod window_creation_regression_tests {
+    use super::*;
     #[test]
     fn lazy_window_creation_stays_off_sync_commands_and_ui_callbacks() {
         let source = include_str!("main.rs");
@@ -2074,8 +2098,33 @@ mod window_creation_regression_tests {
     #[test]
     fn startup_prewarms_off_setup_thread_and_prioritizes_onboarding() {
         let source = include_str!("main.rs");
-        let worker = source.split("let window_app = app.handle().clone();").nth(1).unwrap();
-        assert!(worker.find("std::thread::spawn(move ||").unwrap() < worker.find("create_windows(&window_app)").unwrap());
-        assert!(worker.find("show_main_window(&window_app)").unwrap() < worker.find("create_windows(&window_app)").unwrap());
+        let worker = source
+            .split("let window_app = app.handle().clone();")
+            .nth(1)
+            .unwrap();
+        assert!(
+            worker.find("std::thread::spawn(move ||").unwrap()
+                < worker.find("create_windows(&window_app)").unwrap()
+        );
+        assert!(
+            worker.find("show_main_window(&window_app)").unwrap()
+                < worker.find("create_windows(&window_app)").unwrap()
+        );
+    }
+    #[test]
+    fn preview_permits_are_bounded_and_released_after_unwind() {
+        let permits: Vec<_> = (0..MAX_CONCURRENT_PREVIEWS)
+            .map(|_| PreviewPermit::try_acquire().unwrap())
+            .collect();
+        assert!(PreviewPermit::try_acquire().is_err());
+        drop(permits);
+        assert!(PreviewPermit::try_acquire().is_ok());
+
+        let panic_result = std::panic::catch_unwind(|| {
+            let _permit = PreviewPermit::try_acquire().unwrap();
+            panic!("simulated preview panic");
+        });
+        assert!(panic_result.is_err());
+        assert!(PreviewPermit::try_acquire().is_ok());
     }
 }

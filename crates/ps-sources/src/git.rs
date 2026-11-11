@@ -16,14 +16,27 @@ const MAX_TODOS_PER_REPO: usize = 200;
 const MAX_TODO_FILE_BYTES: u64 = 1024 * 1024;
 
 const JUNK_DIRS: &[&str] = &[
-    "node_modules", "target", "dist", "build", "venv", ".venv", "appdata", "obj", "out",
-    ".next", ".nuxt", ".cache", "cache", "__pycache__", "vendor", "third_party",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    "venv",
+    ".venv",
+    "appdata",
+    "obj",
+    "out",
+    ".next",
+    ".nuxt",
+    ".cache",
+    "cache",
+    "__pycache__",
+    "vendor",
+    "third_party",
 ];
 
 const CODE_EXTENSIONS: &[&str] = &[
-    "rs", "py", "js", "jsx", "ts", "tsx", "go", "cpp", "c", "h", "hpp", "java", "kt", "cs",
-    "md", "txt", "rb", "php", "swift", "sh", "ps1", "sql", "lua", "scala", "dart", "yaml",
-    "yml", "toml", "css", "html",
+    "rs", "py", "js", "jsx", "ts", "tsx", "go", "cpp", "c", "h", "hpp", "java", "kt", "cs", "md", "txt",
+    "rb", "php", "swift", "sh", "ps1", "sql", "lua", "scala", "dart", "yaml", "yml", "toml", "css", "html",
 ];
 
 pub fn scan_roots(roots: &[String], cancelled: &dyn Fn() -> bool) -> (Vec<GitEntry>, Vec<String>) {
@@ -128,11 +141,7 @@ pub fn scan_repo(repo: &Path) -> (Vec<GitEntry>, Vec<String>) {
 
     match run_git(
         repo,
-        &[
-            "log",
-            "--max-count=100",
-            "--format=%H%x1F%an%x1F%at%x1F%s",
-        ],
+        &["log", "--max-count=100", "--format=%H%x1F%an%x1F%at%x1F%s"],
     ) {
         Ok(output) => {
             let text = String::from_utf8_lossy(&output.stdout);

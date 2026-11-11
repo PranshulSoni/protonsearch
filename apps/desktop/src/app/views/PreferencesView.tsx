@@ -16,6 +16,7 @@ import type {
 import { formatNumber } from "../../lib/format";
 import { indexCountText, relativeTime, stateLabel, summarizeWarnings } from "../describe";
 import { HotkeyCapture } from "../HotkeyInput";
+import { OcrEngineSelector } from "../OcrEngineSelector";
 import { SECTION_EYEBROWS, type Section } from "../sections";
 import {
   Icon,
@@ -482,6 +483,10 @@ export default function PreferencesView({
                 }
               />
             </div>
+            <OcrEngineSelector
+              value={settings.ocrEngine}
+              onChange={(ocrEngine) => void apply({ ocrEngine }, "indexing")}
+            />
             <div className="section-actions">
               <button type="button" className="linkbtn" onClick={() => onNavigate("indexes")}>
                 Index health

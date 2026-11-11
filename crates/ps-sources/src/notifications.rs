@@ -47,13 +47,7 @@ pub struct NotificationEntry {
 }
 
 /// Add a notification to the local store; returns its id.
-pub fn add(
-    db_path: &Path,
-    title: &str,
-    body: &str,
-    source: &str,
-    kind: &str,
-) -> Result<i64> {
+pub fn add(db_path: &Path, title: &str, body: &str, source: &str, kind: &str) -> Result<i64> {
     let title = truncate(text_clean(title), MAX_TITLE_CHARS);
     let body = truncate(text_clean(body), MAX_BODY_CHARS);
     if title.trim().is_empty() {
@@ -138,7 +132,9 @@ pub fn add_and_maybe_toast(
 ) -> Result<(i64, Option<String>)> {
     let id = add(db_path, title, body, source, kind)?;
     let toast_error = if ps_windows::toast_supported() {
-        ps_windows::show_toast(title, body).err().map(|error| format!("{error:#}"))
+        ps_windows::show_toast(title, body)
+            .err()
+            .map(|error| format!("{error:#}"))
     } else {
         Some("Windows toast notifications are not available for this app identity".to_string())
     };
@@ -184,10 +180,7 @@ fn open_existing(db_path: &Path) -> Result<rusqlite::Connection> {
     if !db_path.is_file() {
         bail!("database does not exist: {}", db_path.display());
     }
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )?;
+    let conn = rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let _ = conn.busy_timeout(std::time::Duration::from_millis(2000));
     Ok(conn)
 }
@@ -195,8 +188,7 @@ fn open_existing(db_path: &Path) -> Result<rusqlite::Connection> {
 fn open_or_create(db_path: &Path) -> Result<rusqlite::Connection> {
     if let Some(parent) = db_path.parent() {
         if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("creating {}", parent.display()))?;
+            std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
         }
     }
     let conn = rusqlite::Connection::open(db_path)?;

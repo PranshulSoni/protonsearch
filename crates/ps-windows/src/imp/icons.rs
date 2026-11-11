@@ -15,14 +15,14 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, bail, Context};
 use windows::Win32::Foundation::{HWND, SIZE};
 use windows::Win32::Graphics::Gdi::{
-    DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER,
-    BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ,
+    DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+    DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ,
 };
 use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
 use windows::Win32::System::Com::IBindCtx;
 use windows::Win32::UI::Shell::{
-    ExtractIconExW, IShellItemImageFactory, SHCreateItemFromParsingName, SHGetFileInfoW,
-    SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SIIGBF_BIGGERSIZEOK, SIIGBF_RESIZETOFIT,
+    ExtractIconExW, IShellItemImageFactory, SHCreateItemFromParsingName, SHGetFileInfoW, SHFILEINFOW,
+    SHGFI_ICON, SHGFI_LARGEICON, SIIGBF_BIGGERSIZEOK, SIIGBF_RESIZETOFIT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON, ICONINFO};
 
@@ -66,11 +66,7 @@ fn cache_path(cache_dir: &Path, source: &Path, size: u32) -> PathBuf {
     cache_dir.join(format!("{hash:016x}-{size}.png"))
 }
 
-pub(crate) fn extract_icon_png(
-    source: &Path,
-    size: u32,
-    cache_dir: &Path,
-) -> anyhow::Result<PathBuf> {
+pub(crate) fn extract_icon_png(source: &Path, size: u32, cache_dir: &Path) -> anyhow::Result<PathBuf> {
     let size = size.clamp(16, 256);
     let out = cache_path(cache_dir, source, size);
     if out.is_file() {
@@ -83,9 +79,8 @@ pub(crate) fn extract_icon_png(
         match shell_item_image(&display, size) {
             Ok(image) => image,
             Err(shell_error) => {
-                let icon = load_hicon(source, size).with_context(|| {
-                    format!("shell item icon failed ({shell_error}); fallback failed")
-                })?;
+                let icon = load_hicon(source, size)
+                    .with_context(|| format!("shell item icon failed ({shell_error}); fallback failed"))?;
                 let image = hicon_to_rgba(icon, size);
                 let _ = unsafe { DestroyIcon(icon) };
                 image?
@@ -271,11 +266,7 @@ unsafe fn read_bitmap_bgra(bitmap: HBITMAP) -> anyhow::Result<RawBitmap> {
     if scanned == 0 {
         bail!("GetDIBits failed for bitmap");
     }
-    Ok(RawBitmap {
-        width,
-        height,
-        bgra,
-    })
+    Ok(RawBitmap { width, height, bgra })
 }
 
 fn raw_to_rgba(mut raw: RawBitmap, target: u32, un_premultiply: bool) -> image::RgbaImage {

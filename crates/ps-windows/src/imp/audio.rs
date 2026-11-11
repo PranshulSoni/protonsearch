@@ -4,11 +4,11 @@
 //! state instead of pretending success.
 
 use anyhow::{bail, Context};
-use windows::core::{GUID, Interface, PROPVARIANT, PWSTR};
+use windows::core::{Interface, GUID, PROPVARIANT, PWSTR};
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
 use windows::Win32::Media::Audio::{
-    eConsole, eMultimedia, eRender, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
-    DEVICE_STATE_ACTIVE, ERole,
+    eConsole, eMultimedia, eRender, ERole, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
+    DEVICE_STATE_ACTIVE,
 };
 use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PropVariantToStringAlloc};
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ};
@@ -208,7 +208,11 @@ pub fn volume_supported() -> bool {
 pub fn output_supported() -> bool {
     let _com = ComGuard::new();
     collection()
-        .map(|collection| unsafe { collection.GetCount() }.map(|count| count > 0).unwrap_or(false))
+        .map(|collection| {
+            unsafe { collection.GetCount() }
+                .map(|count| count > 0)
+                .unwrap_or(false)
+        })
         .unwrap_or(false)
 }
 

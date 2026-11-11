@@ -15,9 +15,26 @@ use std::time::Instant;
 use ps_index::{EntryKind, FilenameIndex, IndexEntry};
 
 const WORDS: &[&str] = &[
-    "report", "budget", "invoice", "design", "notes", "meeting", "project", "summary",
-    "analysis", "proposal", "draft", "final", "photo", "screenshot", "backup", "archive",
-    "config", "readme", "test", "data",
+    "report",
+    "budget",
+    "invoice",
+    "design",
+    "notes",
+    "meeting",
+    "project",
+    "summary",
+    "analysis",
+    "proposal",
+    "draft",
+    "final",
+    "photo",
+    "screenshot",
+    "backup",
+    "archive",
+    "config",
+    "readme",
+    "test",
+    "data",
 ];
 const EXTENSIONS: &[&str] = &["pdf", "docx", "txt", "md", "png", "rs", "json", "csv"];
 
@@ -25,7 +42,10 @@ struct Lcg(u64);
 
 impl Lcg {
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.0
     }
 
@@ -107,15 +127,42 @@ fn query_suite(count: usize) -> Vec<QueryCase> {
         chars.into_iter().collect::<String>()
     };
     vec![
-        QueryCase { label: "exact", text: exact },
-        QueryCase { label: "prefix", text: prefix },
-        QueryCase { label: "substring", text: "port_00".to_string() },
-        QueryCase { label: "fuzzy", text: "rprt_00".to_string() },
-        QueryCase { label: "typo", text: typo },
-        QueryCase { label: "cjk", text: "会议纪要".to_string() },
-        QueryCase { label: "path-segment", text: "budget_0".to_string() },
-        QueryCase { label: "multi-term", text: "final report".to_string() },
-        QueryCase { label: "zero-match", text: "zzzqqqxxx".to_string() },
+        QueryCase {
+            label: "exact",
+            text: exact,
+        },
+        QueryCase {
+            label: "prefix",
+            text: prefix,
+        },
+        QueryCase {
+            label: "substring",
+            text: "port_00".to_string(),
+        },
+        QueryCase {
+            label: "fuzzy",
+            text: "rprt_00".to_string(),
+        },
+        QueryCase {
+            label: "typo",
+            text: typo,
+        },
+        QueryCase {
+            label: "cjk",
+            text: "会议纪要".to_string(),
+        },
+        QueryCase {
+            label: "path-segment",
+            text: "budget_0".to_string(),
+        },
+        QueryCase {
+            label: "multi-term",
+            text: "final report".to_string(),
+        },
+        QueryCase {
+            label: "zero-match",
+            text: "zzzqqqxxx".to_string(),
+        },
     ]
 }
 

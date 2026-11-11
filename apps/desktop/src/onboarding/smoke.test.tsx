@@ -48,6 +48,29 @@ async function flush(times = 8) {
 }
 
 describe("onboarding smoke", () => {
+  it("explains OCR engines during setup and only enables the installed engine", async () => {
+    const { default: App } = await import("../App");
+    await act(async () => root.render(<App view="main" />));
+    await flush(8);
+    const primary = () => container.querySelector<HTMLButtonElement>(".setup-bottom .btn-primary");
+    for (let index = 0; index < 2; index += 1) {
+      await act(async () => primary()?.click());
+      await flush(2);
+    }
+    const firstLocation = container.querySelector<HTMLInputElement>(".choices input[type=checkbox]");
+    expect(firstLocation).not.toBeNull();
+    await act(async () => firstLocation?.click());
+    await flush(2);
+    await act(async () => primary()?.click());
+    await flush(2);
+    expect(container.querySelector("#onboarding-step-eyebrow")?.textContent).toContain("04 of 07");
+    const selector = container.querySelector<HTMLSelectElement>("#ocr-engine");
+    expect(selector?.value).toBe("windows");
+    expect(selector?.querySelector<HTMLOptionElement>('option[value="pp_ocr_v6"]')?.disabled).toBe(true);
+    expect(container.textContent).toContain("Built into Windows and available now.");
+    expect(container.textContent).toContain("Not configured in ProtonSearch.");
+  });
+
   it("runs the seven-step flow, keeps progress local and completes through the bridge", async () => {
     const { default: App } = await import("../App");
     await act(async () => {

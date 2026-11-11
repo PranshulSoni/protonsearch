@@ -36,6 +36,7 @@ let settings: Settings = {
   density: "comfortable",
   motion: "system",
   launchAtLogin: true,
+  ocrEngine: "windows",
   indexing: {
     roots: [
       { path: USER + "\\Documents", mode: "content", enabled: true },
@@ -351,6 +352,7 @@ export const mockBridge = {
         contentEnabled: input.contentEnabled,
         ocrEnabled: input.ocrEnabled,
       },
+      ocrEngine: input.ocrEngine,
       agent: { ...settings.agent, enabled: input.agentOptIn },
     };
     return settings;

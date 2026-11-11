@@ -92,15 +92,12 @@ fn read_launch_history(db: &Path) -> Result<Vec<RecentEntry>, String> {
     if !db.is_file() {
         return Ok(Vec::new());
     }
-    let conn = rusqlite::Connection::open_with_flags(
-        db,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )
-    .map_err(|error| format!("launch history unavailable: {error}"))?;
+    let conn = rusqlite::Connection::open_with_flags(db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|error| format!("launch history unavailable: {error}"))?;
     let _ = conn.busy_timeout(std::time::Duration::from_millis(2000));
-    let mut statement = match conn.prepare(
-        "SELECT path, last_used_ms FROM launch_history ORDER BY last_used_ms DESC LIMIT ?1",
-    ) {
+    let mut statement = match conn
+        .prepare("SELECT path, last_used_ms FROM launch_history ORDER BY last_used_ms DESC LIMIT ?1")
+    {
         Ok(statement) => statement,
         // No launch_history table yet: not a warning-worthy condition.
         Err(_) => return Ok(Vec::new()),

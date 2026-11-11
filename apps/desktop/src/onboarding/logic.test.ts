@@ -25,6 +25,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     density: "comfortable",
     motion: "system",
     launchAtLogin: true,
+ocrEngine: "windows",
     indexing: {
       roots: [],
       excludedPaths: [],
@@ -284,6 +285,7 @@ describe("buildOnboardingInput", () => {
       ],
       contentEnabled: true,
       ocrEnabled: true,
+ocrEngine: "windows",
       hotkey: "Shift+Super+S",
       agentOptIn: true,
     });
@@ -309,6 +311,7 @@ describe("buildOnboardingInput", () => {
       roots: [],
       contentEnabled: false,
       ocrEnabled: false,
+ocrEngine: "windows",
       hotkey: "Super+Space",
       agentOptIn: false,
       skipped: true,
@@ -366,6 +369,7 @@ describe("draft persistence", () => {
     expect(parsePersistedOnboarding("not json")).toBeNull();
     expect(parsePersistedOnboarding(serializeOnboardingDraft(9, draft))).toBeNull();
     expect(parsePersistedOnboarding(JSON.stringify({ stepIndex: 1, draft: { roots: [] } }))).toBeNull();
+    expect(parsePersistedOnboarding(JSON.stringify({ stepIndex: 1, draft: { ...draft, ocrEngine: "bogus" } }))?.draft.ocrEngine).toBe("windows");
     expect(
       parsePersistedOnboarding(
         JSON.stringify({

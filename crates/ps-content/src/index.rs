@@ -90,7 +90,8 @@ impl ContentIndex {
             .context("setting sqlite busy_timeout")?;
         // WAL is requested for file databases; in-memory databases stay in
         // memory mode and simply ignore the request.
-        let _ = conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;");
+        let _ =
+            conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;");
         conn.execute_batch(SCHEMA).context("migrating content schema")?;
         Ok(Self {
             conn: Mutex::new(conn),
@@ -135,11 +136,7 @@ impl ContentIndex {
         self.index_file_with(path, ExtractOptions::new(max_bytes))
     }
 
-    pub fn index_file_with(
-        &self,
-        path: &Path,
-        options: ExtractOptions,
-    ) -> anyhow::Result<bool> {
+    pub fn index_file_with(&self, path: &Path, options: ExtractOptions) -> anyhow::Result<bool> {
         let metadata = match std::fs::metadata(path) {
             Ok(metadata) if metadata.is_file() => metadata,
             _ => return Ok(false),
@@ -220,8 +217,16 @@ impl ContentIndex {
                     "UPDATE documents SET path = ?1, title = ?2, kind = ?3, size = ?4, mtime = ?5, \
                      content_hash = ?6, text = ?7, truncated = ?8, indexed_at = ?9 WHERE id = ?10",
                     params![
-                        path_string, title, kind, size as i64, mtime, content_hash,
-                        extracted.text, truncated, indexed_at, id
+                        path_string,
+                        title,
+                        kind,
+                        size as i64,
+                        mtime,
+                        content_hash,
+                        extracted.text,
+                        truncated,
+                        indexed_at,
+                        id
                     ],
                 )?;
                 transaction.execute(
@@ -235,8 +240,15 @@ impl ContentIndex {
                     "INSERT INTO documents(path, title, kind, size, mtime, content_hash, \
                      text, truncated, indexed_at) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                     params![
-                        path_string, title, kind, size as i64, mtime, content_hash,
-                        extracted.text, truncated, indexed_at
+                        path_string,
+                        title,
+                        kind,
+                        size as i64,
+                        mtime,
+                        content_hash,
+                        extracted.text,
+                        truncated,
+                        indexed_at
                     ],
                 )?;
                 let id = transaction.last_insert_rowid();
@@ -247,10 +259,7 @@ impl ContentIndex {
                 true
             }
         };
-        transaction.execute(
-            "DELETE FROM content_errors WHERE path = ?1",
-            params![path_string],
-        )?;
+        transaction.execute("DELETE FROM content_errors WHERE path = ?1", params![path_string])?;
         transaction.commit().context("committing content write")?;
         if wrote {
             self.indexed_bytes
@@ -296,10 +305,7 @@ impl ContentIndex {
             )?;
             transaction.execute("DELETE FROM documents WHERE id = ?1", params![id])?;
         }
-        transaction.execute(
-            "DELETE FROM content_errors WHERE path = ?1",
-            params![path_string],
-        )?;
+        transaction.execute("DELETE FROM content_errors WHERE path = ?1", params![path_string])?;
         transaction.commit()?;
         Ok(())
     }
@@ -310,8 +316,7 @@ impl ContentIndex {
         let like = format!("{}%", prefix.replace('%', "\\%").replace('_', "\\_"));
         let paths: Vec<String> = {
             let conn = self.lock()?;
-            let mut statement =
-                conn.prepare("SELECT path FROM documents WHERE path LIKE ?1 ESCAPE '\\'")?;
+            let mut statement = conn.prepare("SELECT path FROM documents WHERE path LIKE ?1 ESCAPE '\\'")?;
             let rows = statement.query_map(params![like], |row| row.get::<_, String>(0))?;
             rows.collect::<Result<Vec<_>, _>>()?
         };
@@ -384,9 +389,7 @@ impl ContentIndex {
         let paths: Vec<String> = {
             let conn = self.lock()?;
             let mut statement = conn.prepare("SELECT path FROM documents LIMIT ?1")?;
-            let rows = statement.query_map(params![limit.max(1) as i64], |row| {
-                row.get::<_, String>(0)
-            })?;
+            let rows = statement.query_map(params![limit.max(1) as i64], |row| row.get::<_, String>(0))?;
             rows.collect::<Result<Vec<_>, _>>()?
         };
         let mut removed = 0u64;
@@ -402,10 +405,8 @@ impl ContentIndex {
     /// Delete all content rows (rebuild support).
     pub fn clear(&self) -> anyhow::Result<()> {
         let conn = self.lock()?;
-        conn.execute_batch(
-            "DELETE FROM documents_fts; DELETE FROM documents; DELETE FROM content_errors;",
-        )
-        .context("clearing content index")
+        conn.execute_batch("DELETE FROM documents_fts; DELETE FROM documents; DELETE FROM content_errors;")
+            .context("clearing content index")
     }
 
     fn record_error(&self, path: &str, error: &anyhow::Error) {
@@ -424,12 +425,11 @@ impl ContentIndex {
         let Ok(conn) = self.lock() else {
             return Vec::new();
         };
-        let mut statement = match conn
-            .prepare("SELECT path, error FROM content_errors ORDER BY at DESC LIMIT ?1")
-        {
-            Ok(statement) => statement,
-            Err(_) => return Vec::new(),
-        };
+        let mut statement =
+            match conn.prepare("SELECT path, error FROM content_errors ORDER BY at DESC LIMIT ?1") {
+                Ok(statement) => statement,
+                Err(_) => return Vec::new(),
+            };
         let rows = statement.query_map([limit.max(1) as i64], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         });
@@ -469,7 +469,10 @@ pub fn query_terms(query: &str) -> Vec<String> {
             continue;
         }
         // Characters that carry FTS5 syntax meaning; treat as separators.
-        if matches!(ch, ' ' | '\t' | '\n' | '\r' | '"' | '(' | ')' | '*' | '^' | ':' | '+' | ',' | '{' | '}') {
+        if matches!(
+            ch,
+            ' ' | '\t' | '\n' | '\r' | '"' | '(' | ')' | '*' | '^' | ':' | '+' | ',' | '{' | '}'
+        ) {
             push_current(&mut terms, &mut current);
             continue;
         }
@@ -685,7 +688,5 @@ pub fn find_line_of_first_term(text: &str, terms: &[String]) -> Option<u32> {
             break;
         }
     }
-    best.map(|index| {
-        (haystack[..index].iter().filter(|byte| **byte == b'\n').count() as u32) + 1
-    })
+    best.map(|index| (haystack[..index].iter().filter(|byte| **byte == b'\n').count() as u32) + 1)
 }

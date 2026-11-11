@@ -16,7 +16,9 @@ use crate::SystemNotification;
 
 fn listener() -> Result<UserNotificationListener> {
     let listener = UserNotificationListener::Current().context("opening the notification listener")?;
-    let mut access = listener.GetAccessStatus().context("checking notification access")?;
+    let mut access = listener
+        .GetAccessStatus()
+        .context("checking notification access")?;
     if access == Access::Unspecified {
         access = listener
             .RequestAccessAsync()
@@ -77,7 +79,8 @@ pub fn list(limit: usize) -> Result<Vec<SystemNotification>> {
             .context("requesting notifications")?
             .get()
             .context("reading notifications")?;
-        let mut entries: Vec<SystemNotification> = (&items).into_iter().filter_map(|item| describe(&item)).collect();
+        let mut entries: Vec<SystemNotification> =
+            (&items).into_iter().filter_map(|item| describe(&item)).collect();
         entries.sort_by(|a, b| b.created_ms.cmp(&a.created_ms));
         entries.truncate(limit);
         Ok(entries)
@@ -85,7 +88,11 @@ pub fn list(limit: usize) -> Result<Vec<SystemNotification>> {
 }
 
 pub fn dismiss(id: u32) -> Result<()> {
-    super::winrt::run(move || listener()?.RemoveNotification(id).context("removing the notification"))
+    super::winrt::run(move || {
+        listener()?
+            .RemoveNotification(id)
+            .context("removing the notification")
+    })
 }
 
 pub fn clear() -> Result<()> {

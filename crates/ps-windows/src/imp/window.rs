@@ -72,14 +72,8 @@ fn process_exe(pid: u32) -> Option<PathBuf> {
     let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
     let mut buf = [0u16; MAX_PATH as usize + 260];
     let mut size = buf.len() as u32;
-    let result = unsafe {
-        QueryFullProcessImageNameW(
-            handle,
-            PROCESS_NAME_WIN32,
-            PWSTR(buf.as_mut_ptr()),
-            &mut size,
-        )
-    };
+    let result =
+        unsafe { QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut size) };
     let _ = unsafe { CloseHandle(handle) };
     result.ok()?;
     let path = String::from_utf16_lossy(&buf[..size as usize]);

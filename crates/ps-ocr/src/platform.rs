@@ -7,7 +7,7 @@ use windows::core::HSTRING;
 use windows::Graphics::Imaging::{BitmapPixelFormat, SoftwareBitmap};
 use windows::Media::Ocr::OcrEngine;
 use windows::Security::Cryptography::CryptographicBuffer;
-use windows::Win32::System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize};
+use windows::Win32::System::WinRT::{RoInitialize, RoUninitialize, RO_INIT_MULTITHREADED};
 
 use crate::{OcrDocument, MAX_IMAGE_PIXELS, MAX_LONG_EDGE};
 
@@ -66,8 +66,7 @@ fn recognize_inner(path: &Path, max_pixels: u64) -> anyhow::Result<Option<OcrDoc
     if !available() {
         return Ok(None);
     }
-    let image = image::open(path)
-        .map_err(|error| anyhow!("decoding image {}: {error}", path.display()))?;
+    let image = decode_image(path)?;
     let rgba = image.to_rgba8();
     let (mut width, mut height) = rgba.dimensions();
     if width == 0 || height == 0 {
@@ -112,13 +111,9 @@ fn recognize_inner(path: &Path, max_pixels: u64) -> anyhow::Result<Option<OcrDoc
     }
     let buffer = CryptographicBuffer::CreateFromByteArray(&bgra)
         .map_err(|error| anyhow!("creating WinRT buffer: {error}"))?;
-    let bitmap = SoftwareBitmap::CreateCopyFromBuffer(
-        &buffer,
-        BitmapPixelFormat::Bgra8,
-        width as i32,
-        height as i32,
-    )
-    .map_err(|error| anyhow!("creating SoftwareBitmap: {error}"))?;
+    let bitmap =
+        SoftwareBitmap::CreateCopyFromBuffer(&buffer, BitmapPixelFormat::Bgra8, width as i32, height as i32)
+            .map_err(|error| anyhow!("creating SoftwareBitmap: {error}"))?;
 
     let engine = match OcrEngine::TryCreateFromUserProfileLanguages() {
         Ok(engine) => engine,
@@ -130,10 +125,7 @@ fn recognize_inner(path: &Path, max_pixels: u64) -> anyhow::Result<Option<OcrDoc
     let result = operation
         .get()
         .map_err(|error| anyhow!("Windows OCR failed: {error}"))?;
-    let text = result
-        .Text()
-        .map(|text| text.to_string())
-        .unwrap_or_default();
+    let text = result.Text().map(|text| text.to_string()).unwrap_or_default();
     let text = text.trim().to_string();
     let language = engine
         .RecognizerLanguage()
@@ -153,10 +145,66 @@ fn recognize_inner(path: &Path, max_pixels: u64) -> anyhow::Result<Option<OcrDoc
     }))
 }
 
+/// Inspect image metadata and set decoder allocation limits before decoding pixels.
+fn decode_image(path: &Path) -> anyhow::Result<image::DynamicImage> {
+    use image::io::Reader as ImageReader;
+
+    let reader = ImageReader::open(path)
+        .and_then(ImageReader::with_guessed_format)
+        .map_err(|error| anyhow!("opening image {}: {error}", path.display()))?;
+    let (width, height) = reader
+        .into_dimensions()
+        .map_err(|error| anyhow!("reading image dimensions {}: {error}", path.display()))?;
+    // shortcut: >16 MP images are rejected; use streaming decode to restore downscaling.
+    if width == 0 || height == 0 || width as u64 * height as u64 > MAX_IMAGE_PIXELS {
+        bail!(
+            "image dimensions exceed decode limit: {} ({}x{})",
+            path.display(),
+            width,
+            height
+        );
+    }
+
+    let mut reader = ImageReader::open(path)
+        .and_then(ImageReader::with_guessed_format)
+        .map_err(|error| anyhow!("opening image {}: {error}", path.display()))?;
+    let mut limits = image::io::Limits::default();
+    limits.max_image_width = Some(MAX_IMAGE_PIXELS as u32);
+    limits.max_image_height = Some(MAX_IMAGE_PIXELS as u32);
+    limits.max_alloc = Some(MAX_IMAGE_PIXELS * 4);
+    reader.limits(limits);
+    reader
+        .decode()
+        .map_err(|error| anyhow!("decoding image {}: {error}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oversized_bmp_header_is_rejected_before_pixel_decode() {
+        let path = std::env::temp_dir().join(format!("ps-ocr-oversized-{}.bmp", std::process::id()));
+        let mut bmp = vec![0u8; 54];
+        bmp[..2].copy_from_slice(b"BM");
+        bmp[2..6].copy_from_slice(&54u32.to_le_bytes());
+        bmp[10..14].copy_from_slice(&54u32.to_le_bytes());
+        bmp[14..18].copy_from_slice(&40u32.to_le_bytes());
+        bmp[18..22].copy_from_slice(&8192i32.to_le_bytes());
+        bmp[22..26].copy_from_slice(&2049i32.to_le_bytes());
+        bmp[26..28].copy_from_slice(&1u16.to_le_bytes());
+        bmp[28..30].copy_from_slice(&24u16.to_le_bytes());
+        std::fs::write(&path, bmp).unwrap();
+
+        let error = decode_image(&path).unwrap_err();
+        let _ = std::fs::remove_file(path);
+        assert!(error.to_string().contains("dimensions exceed decode limit"));
+    }
+}
+
 fn fallback_engine() -> anyhow::Result<OcrEngine> {
     use windows::Globalization::Language;
     let language = Language::CreateLanguage(&HSTRING::from("en-US"))
         .map_err(|error| anyhow!("creating en-US language: {error}"))?;
-    OcrEngine::TryCreateFromLanguage(&language)
-        .map_err(|error| anyhow!("creating OCR engine: {error}"))
+    OcrEngine::TryCreateFromLanguage(&language).map_err(|error| anyhow!("creating OCR engine: {error}"))
 }

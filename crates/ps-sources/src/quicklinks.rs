@@ -28,8 +28,7 @@ pub fn load(db_path: &Path) -> Vec<WorkflowEntry> {
         return Vec::new();
     };
     let mut entries = Vec::new();
-    if let Ok(mut statement) = conn.prepare("SELECT name, url, keyword FROM quicklinks ORDER BY name")
-    {
+    if let Ok(mut statement) = conn.prepare("SELECT name, url, keyword FROM quicklinks ORDER BY name") {
         if let Ok(rows) = statement.query_map([], |row| {
             let name: String = row.get(0)?;
             let url: String = row.get(1)?;
@@ -108,10 +107,7 @@ fn open_existing(db_path: &Path) -> Result<rusqlite::Connection> {
     if !db_path.is_file() {
         anyhow::bail!("database does not exist: {}", db_path.display());
     }
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )?;
+    let conn = rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let _ = conn.busy_timeout(std::time::Duration::from_millis(2000));
     Ok(conn)
 }
@@ -119,8 +115,7 @@ fn open_existing(db_path: &Path) -> Result<rusqlite::Connection> {
 fn open_or_create(db_path: &Path) -> Result<rusqlite::Connection> {
     if let Some(parent) = db_path.parent() {
         if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("creating {}", parent.display()))?;
+            std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
         }
     }
     let conn = rusqlite::Connection::open(db_path)?;

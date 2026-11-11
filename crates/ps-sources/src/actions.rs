@@ -19,11 +19,7 @@ pub fn execute(action: &ActionSpec) -> OpenOutcome {
 /// Execute a user-invoked action; v2_db is used to resolve RunWorkflow ids.
 pub fn execute_with(action: &ActionSpec, v2_db: Option<&Path>) -> OpenOutcome {
     let result: anyhow::Result<String> = match action {
-        ActionSpec::OpenPath {
-            path,
-            line,
-            column,
-        } => {
+        ActionSpec::OpenPath { path, line, column } => {
             let target = Path::new(path);
             if !target.exists() {
                 return OpenOutcome {
@@ -31,8 +27,7 @@ pub fn execute_with(action: &ActionSpec, v2_db: Option<&Path>) -> OpenOutcome {
                     message: format!("path does not exist: {path}"),
                 };
             }
-            ps_windows::open_path_at(target, *line, *column)
-                .map(|_| format!("Opened {path}"))
+            ps_windows::open_path_at(target, *line, *column).map(|_| format!("Opened {path}"))
         }
         ActionSpec::RevealPath { path } => {
             let target = Path::new(path);
@@ -40,8 +35,7 @@ pub fn execute_with(action: &ActionSpec, v2_db: Option<&Path>) -> OpenOutcome {
         }
         ActionSpec::OpenUrl { url } => ps_windows::open_url(url).map(|_| format!("Opened {url}")),
         ActionSpec::LaunchApp { app_id, target } => {
-            ps_windows::launch_app(app_id, target.as_deref())
-                .map(|_| format!("Launched {app_id}"))
+            ps_windows::launch_app(app_id, target.as_deref()).map(|_| format!("Launched {app_id}"))
         }
         ActionSpec::CopyText { text } => {
             ps_windows::set_clipboard_text(text).map(|_| "Copied to clipboard".to_string())
@@ -83,19 +77,13 @@ pub fn execute_with(action: &ActionSpec, v2_db: Option<&Path>) -> OpenOutcome {
 /// Run a reviewed native command. Returns a structured outcome; never panics.
 pub fn run_native(command: NativeCommand) -> OpenOutcome {
     let result: anyhow::Result<&'static str> = match command {
-        NativeCommand::LockWorkstation => {
-            ps_windows::lock_workstation().map(|_| "Workstation locked")
-        }
+        NativeCommand::LockWorkstation => ps_windows::lock_workstation().map(|_| "Workstation locked"),
         NativeCommand::Sleep => ps_windows::sleep_pc().map(|_| "Suspending"),
         NativeCommand::Shutdown => ps_windows::shutdown_pc().map(|_| "Shutting down"),
         NativeCommand::Restart => ps_windows::restart_pc().map(|_| "Restarting"),
-        NativeCommand::EmptyRecycleBin => {
-            ps_windows::empty_recycle_bin().map(|_| "Recycle bin emptied")
-        }
+        NativeCommand::EmptyRecycleBin => ps_windows::empty_recycle_bin().map(|_| "Recycle bin emptied"),
         NativeCommand::OpenSettings => ps_windows::open_settings().map(|_| "Opened Settings"),
-        NativeCommand::OpenTaskManager => {
-            ps_windows::open_task_manager().map(|_| "Opened Task Manager")
-        }
+        NativeCommand::OpenTaskManager => ps_windows::open_task_manager().map(|_| "Opened Task Manager"),
         NativeCommand::OpenTerminal => ps_windows::open_terminal().map(|_| "Opened terminal"),
         NativeCommand::ToggleDarkMode => toggle_dark_mode().map(|_| "Toggled app theme"),
         // Indexing state is owned by the engine; these are acknowledgements.

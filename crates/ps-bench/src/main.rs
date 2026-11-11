@@ -76,13 +76,20 @@ fn cmd_gen(args: &Args) -> anyhow::Result<()> {
     let seed = args.u64_or("--seed", DEFAULT_SEED)?;
     let out = PathBuf::from(args.required("--out")?);
     if count < dataset::ANCHORS.len() {
-        anyhow::bail!("--count must be at least {} to fit planted anchors", dataset::ANCHORS.len());
+        anyhow::bail!(
+            "--count must be at least {} to fit planted anchors",
+            dataset::ANCHORS.len()
+        );
     }
     let stats = dataset::generate_to_file(seed, count, &out)?;
     println!("ps-bench gen: seed={seed} requested={count}");
     println!(
         "wrote {} entries ({} files, {} folders) in {:.0} ms -> {}",
-        stats.entries, stats.files, stats.folders, stats.generated_ms, out.display()
+        stats.entries,
+        stats.files,
+        stats.folders,
+        stats.generated_ms,
+        out.display()
     );
     println!(
         "corpus: bytes={} fnv1a64={} sha256={}",
@@ -94,7 +101,10 @@ fn cmd_gen(args: &Args) -> anyhow::Result<()> {
         "characteristics: hidden={} cjk={} non_ascii={} long_path_gt200={} anchors={}",
         stats.hidden, stats.cjk, stats.non_ascii, stats.long_paths, stats.anchors
     );
-    println!("top extensions: {:?}", &stats.top_exts[..stats.top_exts.len().min(10)]);
+    println!(
+        "top extensions: {:?}",
+        &stats.top_exts[..stats.top_exts.len().min(10)]
+    );
     println!("meta: {}", out.with_extension("meta.json").display());
     Ok(())
 }
@@ -200,10 +210,17 @@ fn cmd_golden_synth(args: &Args) -> anyhow::Result<()> {
 #[cfg(feature = "engine")]
 fn cmd_golden_real(args: &Args) -> anyhow::Result<()> {
     let paths = PathBuf::from(args.get("--paths").unwrap_or(".bench/real-paths.jsonl"));
-    let out = PathBuf::from(args.get("--out").unwrap_or("tests/golden/real-corpus-golden.json"));
+    let out = PathBuf::from(
+        args.get("--out")
+            .unwrap_or("tests/golden/real-corpus-golden.json"),
+    );
     let max_queries = args.usize_or("--max-queries", 80)?;
     let seed = args.u64_or("--seed", DEFAULT_SEED)?;
-    anyhow::ensure!(paths.exists(), "real corpus export not found: {} (run ps-bench real-export first)", paths.display());
+    anyhow::ensure!(
+        paths.exists(),
+        "real corpus export not found: {} (run ps-bench real-export first)",
+        paths.display()
+    );
     let golden = relevance::build_real_golden(&paths, &out, max_queries, seed)?;
     println!(
         "ps-bench golden-real: {} queries from {} real entries -> {}",

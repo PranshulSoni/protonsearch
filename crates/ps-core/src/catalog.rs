@@ -26,8 +26,14 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "Windows action",
         keywords: &["lock", "workstation", "screen"],
         aliases: &[
-            "lock pc", "lock my pc", "lock computer", "lock my computer",
-            "lock screen", "lock the screen", "lock this pc", "lock windows",
+            "lock pc",
+            "lock my pc",
+            "lock computer",
+            "lock my computer",
+            "lock screen",
+            "lock the screen",
+            "lock this pc",
+            "lock windows",
         ],
         command: NativeCommand::LockWorkstation,
         destructive: false,
@@ -38,8 +44,13 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "Windows action",
         keywords: &["sleep", "suspend", "standby"],
         aliases: &[
-            "sleep pc", "sleep my pc", "put pc to sleep", "put my pc to sleep",
-            "put the computer to sleep", "sleep computer", "suspend",
+            "sleep pc",
+            "sleep my pc",
+            "put pc to sleep",
+            "put my pc to sleep",
+            "put the computer to sleep",
+            "sleep computer",
+            "suspend",
         ],
         command: NativeCommand::Sleep,
         destructive: false,
@@ -50,11 +61,23 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "Windows action - requires confirmation",
         keywords: &["shutdown", "power", "off"],
         aliases: &[
-            "shut down", "shutdown", "shut down pc", "shut down my pc",
-            "shut down computer", "shut down my computer", "shut down this pc",
-            "turn off pc", "turn off my pc", "turn off computer",
-            "turn off my computer", "turn off this pc", "turn my pc off",
-            "turn the pc off", "power off", "power down", "power off pc",
+            "shut down",
+            "shutdown",
+            "shut down pc",
+            "shut down my pc",
+            "shut down computer",
+            "shut down my computer",
+            "shut down this pc",
+            "turn off pc",
+            "turn off my pc",
+            "turn off computer",
+            "turn off my computer",
+            "turn off this pc",
+            "turn my pc off",
+            "turn the pc off",
+            "power off",
+            "power down",
+            "power off pc",
         ],
         command: NativeCommand::Shutdown,
         destructive: true,
@@ -65,9 +88,17 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "Windows action - requires confirmation",
         keywords: &["restart", "reboot", "power"],
         aliases: &[
-            "restart", "restart pc", "restart my pc", "restart computer",
-            "restart my computer", "restart this pc", "reboot", "reboot pc",
-            "reboot my pc", "reboot computer", "reboot my computer",
+            "restart",
+            "restart pc",
+            "restart my pc",
+            "restart computer",
+            "restart my computer",
+            "restart this pc",
+            "reboot",
+            "reboot pc",
+            "reboot my pc",
+            "reboot computer",
+            "reboot my computer",
             "restart the computer",
         ],
         command: NativeCommand::Restart,
@@ -79,9 +110,15 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "Windows action - requires confirmation",
         keywords: &["empty", "recycle", "bin", "trash", "cleanup"],
         aliases: &[
-            "empty recycle bin", "empty the recycle bin", "empty bin",
-            "empty trash", "empty trash bin", "empty the trash",
-            "clear recycle bin", "clear the recycle bin", "clear trash",
+            "empty recycle bin",
+            "empty the recycle bin",
+            "empty bin",
+            "empty trash",
+            "empty trash bin",
+            "empty the trash",
+            "clear recycle bin",
+            "clear the recycle bin",
+            "clear trash",
         ],
         command: NativeCommand::EmptyRecycleBin,
         destructive: true,
@@ -92,8 +129,12 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "Windows action",
         keywords: &["settings", "windows", "preferences", "control panel"],
         aliases: &[
-            "open settings", "open windows settings", "windows settings",
-            "settings app", "control panel", "open control panel",
+            "open settings",
+            "open windows settings",
+            "windows settings",
+            "settings app",
+            "control panel",
+            "open control panel",
         ],
         command: NativeCommand::OpenSettings,
         destructive: false,
@@ -104,8 +145,11 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "Windows action",
         keywords: &["task manager", "processes", "performance", "process"],
         aliases: &[
-            "task manager", "open task manager", "open the task manager",
-            "running processes", "process explorer",
+            "task manager",
+            "open task manager",
+            "open the task manager",
+            "running processes",
+            "process explorer",
         ],
         command: NativeCommand::OpenTaskManager,
         destructive: false,
@@ -116,8 +160,15 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "Windows action",
         keywords: &["terminal", "command prompt", "cmd", "powershell", "shell"],
         aliases: &[
-            "terminal", "open terminal", "open the terminal", "command prompt",
-            "open command prompt", "cmd", "powershell", "open powershell", "shell",
+            "terminal",
+            "open terminal",
+            "open the terminal",
+            "command prompt",
+            "open command prompt",
+            "cmd",
+            "powershell",
+            "open powershell",
+            "shell",
         ],
         command: NativeCommand::OpenTerminal,
         destructive: false,
@@ -127,7 +178,12 @@ pub const ACTIONS: &[CatalogAction] = &[
         title: "Pause indexing",
         subtitle: "ProtonSearch action",
         keywords: &["pause", "indexing", "index", "stop"],
-        aliases: &["pause indexing", "pause the index", "stop indexing", "pause index"],
+        aliases: &[
+            "pause indexing",
+            "pause the index",
+            "stop indexing",
+            "pause index",
+        ],
         command: NativeCommand::PauseIndexing,
         destructive: false,
     },
@@ -137,8 +193,11 @@ pub const ACTIONS: &[CatalogAction] = &[
         subtitle: "ProtonSearch action",
         keywords: &["resume", "indexing", "index", "start"],
         aliases: &[
-            "resume indexing", "resume the index", "start indexing",
-            "start indexing again", "resume index",
+            "resume indexing",
+            "resume the index",
+            "start indexing",
+            "start indexing again",
+            "resume index",
         ],
         command: NativeCommand::ResumeIndexing,
         destructive: false,
@@ -147,9 +206,30 @@ pub const ACTIONS: &[CatalogAction] = &[
 
 /// Filler words that never carry intent in a short command query.
 const FILLERS: &[&str] = &[
-    "my", "the", "a", "an", "please", "now", "immediately", "for", "me", "i",
-    "want", "to", "can", "you", "this", "that", "it", "computer", "machine",
-    "pc", "system", "quickly", "right", "away",
+    "my",
+    "the",
+    "a",
+    "an",
+    "please",
+    "now",
+    "immediately",
+    "for",
+    "me",
+    "i",
+    "want",
+    "to",
+    "can",
+    "you",
+    "this",
+    "that",
+    "it",
+    "computer",
+    "machine",
+    "pc",
+    "system",
+    "quickly",
+    "right",
+    "away",
 ];
 
 struct ActionIndex {
@@ -215,7 +295,10 @@ fn index_of(action: &'static CatalogAction) -> ActionIndex {
             }
         }
     }
-    ActionIndex { tokens, phrases: compacted }
+    ActionIndex {
+        tokens,
+        phrases: compacted,
+    }
 }
 
 /// Query tokens after filler removal, normalised and deduplicated.
@@ -360,9 +443,9 @@ mod tests {
     fn destructive_commands_are_flagged() {
         for action in ACTIONS {
             match action.command {
-                NativeCommand::Shutdown
-                | NativeCommand::Restart
-                | NativeCommand::EmptyRecycleBin => assert!(action.destructive),
+                NativeCommand::Shutdown | NativeCommand::Restart | NativeCommand::EmptyRecycleBin => {
+                    assert!(action.destructive)
+                }
                 _ => assert!(!action.destructive),
             }
         }

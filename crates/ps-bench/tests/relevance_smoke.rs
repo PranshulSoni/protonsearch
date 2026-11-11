@@ -22,7 +22,11 @@ fn build_index() -> FilenameIndex {
             path: e.path,
             name: e.name,
             ext: e.ext,
-            kind: if e.kind == "folder" { EntryKind::Folder } else { EntryKind::File },
+            kind: if e.kind == "folder" {
+                EntryKind::Folder
+            } else {
+                EntryKind::File
+            },
             size: e.size,
             modified: e.modified,
         })
@@ -50,8 +54,9 @@ fn dataset_generation_is_deterministic() {
 
 #[test]
 fn synthetic_golden_relevance_smoke() {
-    let golden: GoldenFile = serde_json::from_str(include_str!("../../../tests/golden/synthetic-golden.json"))
-        .expect("parse tests/golden/synthetic-golden.json");
+    let golden: GoldenFile =
+        serde_json::from_str(include_str!("../../../tests/golden/synthetic-golden.json"))
+            .expect("parse tests/golden/synthetic-golden.json");
     assert_eq!(golden.entries, 10_000, "fixture must match the 10k smoke corpus");
 
     let index = build_index();
@@ -80,7 +85,11 @@ fn synthetic_golden_relevance_smoke() {
     assert_eq!(aggregate.queries, golden.queries.len());
     for r in &per_query {
         assert!((0.0..=1.0).contains(&r.mrr), "mrr out of range for {}", r.id);
-        assert!((0.0..=1.0).contains(&r.recall_at_10), "recall out of range for {}", r.id);
+        assert!(
+            (0.0..=1.0).contains(&r.recall_at_10),
+            "recall out of range for {}",
+            r.id
+        );
     }
 
     if aggregate.queries_with_any_result == 0 {

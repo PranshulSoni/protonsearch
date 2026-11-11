@@ -30,15 +30,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rayon::prelude::*;
 
-pub use scan::{
-    default_excluded_paths, scan, scan_roots, walk_paths, ScanOptions, DEFAULT_JUNK_DIRS,
-};
+pub use scan::{default_excluded_paths, scan, scan_roots, walk_paths, ScanOptions, DEFAULT_JUNK_DIRS};
 
 use matching::{
-    bloom_add, cmp_ci, ends_with_ci, eq_ci, find_ci, match_name_into, score_for_segment,
-    segment_level, segment_level_multi, starts_with_ci, to_utf16_ranges, typo_only_match, QueryPlan,
-    PATH_MAX_SCORE, SCORE_EXACT_NAME, SCORE_PREFIX, SCORE_SCALE, SCORE_SPANNING, SCORE_SUBSTRING,
-    SCORE_TYPO,
+    bloom_add, cmp_ci, ends_with_ci, eq_ci, find_ci, match_name_into, score_for_segment, segment_level,
+    segment_level_multi, starts_with_ci, to_utf16_ranges, typo_only_match, QueryPlan, PATH_MAX_SCORE,
+    SCORE_EXACT_NAME, SCORE_PREFIX, SCORE_SCALE, SCORE_SPANNING, SCORE_SUBSTRING, SCORE_TYPO,
 };
 
 /// Below this many entries the rayon wake-up cost dominates, so scans run
@@ -598,6 +595,13 @@ impl FilenameIndex {
         Cow::Owned(out)
     }
 
+    /// Metadata for one indexed path without materializing the full entry list.
+    pub fn metadata_for_path(&self, path: &str) -> Option<(u64, i64)> {
+        let lower_name = file_name(path).to_lowercase();
+        let index = self.find_by_name_and_path(&lower_name, path)?;
+        Some((self.entry_size(index), self.entry_modified(index)))
+    }
+
     /// Materialize an owned view (compat API). This is O(n) and allocates
     /// roughly 250 bytes per entry; hot paths must use entry_path/entry_name.
     pub fn entries(&self) -> &[IndexEntry] {
@@ -650,13 +654,11 @@ impl FilenameIndex {
     fn entry_path_cmp(&self, a: u32, b: u32) -> Ordering {
         let ra = &self.entries[a as usize];
         let rb = &self.entries[b as usize];
-        self.dir_bytes(ra.dir)
-            .cmp(self.dir_bytes(rb.dir))
-            .then_with(|| {
-                let na = self.arena_str(ra.name_off, ra.name_len);
-                let nb = self.arena_str(rb.name_off, rb.name_len);
-                na.as_bytes().cmp(nb.as_bytes())
-            })
+        self.dir_bytes(ra.dir).cmp(self.dir_bytes(rb.dir)).then_with(|| {
+            let na = self.arena_str(ra.name_off, ra.name_len);
+            let nb = self.arena_str(rb.name_off, rb.name_len);
+            na.as_bytes().cmp(nb.as_bytes())
+        })
     }
 
     fn hit_from_candidate(&self, c: Candidate) -> FileHit {
@@ -693,10 +695,7 @@ impl FilenameIndex {
             cands.push(Candidate {
                 idx: h.entry_index as u32,
                 score: (h.score * SCORE_SCALE) as i64,
-                name_len: self
-                    .rec(h.entry_index)
-                    .map(|r| r.name_len)
-                    .unwrap_or(u16::MAX),
+                name_len: self.rec(h.entry_index).map(|r| r.name_len).unwrap_or(u16::MAX),
                 modified: self.entry_modified(h.entry_index),
                 ranges: h.ranges,
             });
@@ -721,12 +720,7 @@ impl FilenameIndex {
     }
 
     #[inline]
-    fn filter_pass(
-        &self,
-        filter: &EntryFilter<'_>,
-        i: usize,
-        under: Option<&[bool]>,
-    ) -> bool {
+    fn filter_pass(&self, filter: &EntryFilter<'_>, i: usize, under: Option<&[bool]>) -> bool {
         let Some(r) = self.rec(i) else { return false };
         if r.kind == KIND_TOMBSTONE {
             return false;
@@ -782,12 +776,7 @@ impl FilenameIndex {
         self.search_filtered(query, limit, &EntryFilter::default())
     }
 
-    pub fn search_filtered(
-        &self,
-        query: &str,
-        limit: usize,
-        filter: &EntryFilter<'_>,
-    ) -> Vec<FileHit> {
+    pub fn search_filtered(&self, query: &str, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
         if limit == 0 || self.live == 0 {
             return Vec::new();
         }
@@ -837,12 +826,7 @@ impl FilenameIndex {
         self.search_scan_filtered(query, limit, &EntryFilter::default())
     }
 
-    pub fn search_scan_filtered(
-        &self,
-        query: &str,
-        limit: usize,
-        filter: &EntryFilter<'_>,
-    ) -> Vec<FileHit> {
+    pub fn search_scan_filtered(&self, query: &str, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
         if limit == 0 || self.live == 0 {
             return Vec::new();
         }
@@ -853,12 +837,7 @@ impl FilenameIndex {
         self.search_scan_plan(&plan, limit, filter)
     }
 
-    fn search_prefix_plan(
-        &self,
-        plan: &QueryPlan,
-        limit: usize,
-        filter: &EntryFilter<'_>,
-    ) -> Vec<FileHit> {
+    fn search_prefix_plan(&self, plan: &QueryPlan, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
         if plan.has_sep {
             return Vec::new();
         }
@@ -910,12 +889,7 @@ impl FilenameIndex {
         top.into_hits()
     }
 
-    fn search_scan_plan(
-        &self,
-        plan: &QueryPlan,
-        limit: usize,
-        filter: &EntryFilter<'_>,
-    ) -> Vec<FileHit> {
+    fn search_scan_plan(&self, plan: &QueryPlan, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
         if plan.has_sep {
             return self.search_spanning(plan, limit, filter);
         }
@@ -947,12 +921,7 @@ impl FilenameIndex {
         self.merge_hits(name_hits, path_hits, limit)
     }
 
-    fn scan_name_phase(
-        &self,
-        plan: &QueryPlan,
-        limit: usize,
-        filter: &EntryFilter<'_>,
-    ) -> Vec<FileHit> {
+    fn scan_name_phase(&self, plan: &QueryPlan, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
         let under = self.compute_under(filter);
         let n = self.entries.len();
         let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
@@ -999,12 +968,7 @@ impl FilenameIndex {
 
     /// Dedicated typo pass: relaxed bloom plus the cheap bounded edit-distance
     /// check only. Runs only when the stronger top-k is not already full.
-    fn scan_typo_phase(
-        &self,
-        plan: &QueryPlan,
-        limit: usize,
-        filter: &EntryFilter<'_>,
-    ) -> Vec<FileHit> {
+    fn scan_typo_phase(&self, plan: &QueryPlan, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
         let relaxed = plan.relaxed();
         let under = self.compute_under(filter);
         let n = self.entries.len();
@@ -1030,16 +994,13 @@ impl FilenameIndex {
                     .len()
                     .saturating_sub(r.ext_len as usize + usize::from(r.ext_len > 0));
                 let qlen = plan.char_len;
-                let name_in_window =
-                    r.name_len as usize + 2 >= qlen && (r.name_len as usize) <= qlen + 2;
+                let name_in_window = r.name_len as usize + 2 >= qlen && (r.name_len as usize) <= qlen + 2;
                 let stem_in_window = stem_len + 2 >= qlen && stem_len <= qlen + 2;
                 if !name_in_window && !stem_in_window {
                     continue;
                 }
                 if let Some(first) = plan.terms_chars.first().and_then(|c| c.first()) {
-                    if name.as_bytes().first().map(|b| b.to_ascii_lowercase())
-                        != Some(*first as u8)
-                    {
+                    if name.as_bytes().first().map(|b| b.to_ascii_lowercase()) != Some(*first as u8) {
                         continue;
                     }
                 }
@@ -1107,12 +1068,7 @@ impl FilenameIndex {
         levels
     }
 
-    fn scan_path_phase(
-        &self,
-        limit: usize,
-        filter: &EntryFilter<'_>,
-        levels: &[u8],
-    ) -> Vec<FileHit> {
+    fn scan_path_phase(&self, limit: usize, filter: &EntryFilter<'_>, levels: &[u8]) -> Vec<FileHit> {
         let under = self.compute_under(filter);
         let n = self.entries.len();
         let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
@@ -1150,12 +1106,7 @@ impl FilenameIndex {
     /// whole path, then falls back to a directory-anchored pass and finally a
     /// complete full-path scan. There is no arbitrary index cap: an anchor near
     /// the end of a 1M-entry index is still found.
-    fn search_spanning(
-        &self,
-        plan: &QueryPlan,
-        limit: usize,
-        filter: &EntryFilter<'_>,
-    ) -> Vec<FileHit> {
+    fn search_spanning(&self, plan: &QueryPlan, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
         let q = normalize_seps(&plan.lower);
         let sep = std::path::MAIN_SEPARATOR;
         let trimmed = q.trim_end_matches(sep);
@@ -1253,9 +1204,7 @@ impl FilenameIndex {
                     // its descendants (no sibling-prefix false positives).
                     is_under(path, trimmed)
                 } else {
-                    eq_ci(path, trimmed)
-                        || starts_with_ci(path, trimmed)
-                        || ends_with_ci(path, trimmed)
+                    eq_ci(path, trimmed) || starts_with_ci(path, trimmed) || ends_with_ci(path, trimmed)
                 };
                 out.push(hit as u8);
             }
@@ -1348,10 +1297,7 @@ impl FilenameIndex {
         if self.dir_map.is_none() {
             let mut map = HashMap::with_capacity(self.dirs.len());
             for (id, d) in self.dirs.iter().enumerate() {
-                map.insert(
-                    self.arena_str(d.path_off, d.path_len).to_string(),
-                    id as u32,
-                );
+                map.insert(self.arena_str(d.path_off, d.path_len).to_string(), id as u32);
             }
             self.dir_map = Some(map);
         }
@@ -1423,9 +1369,9 @@ impl FilenameIndex {
         });
         self.blooms.push(bloom);
         // Insert into the name-sorted array at the right position.
-        let pos = self.sorted.partition_point(|&x| {
-            self.entry_sort_cmp(x, idx) == Ordering::Less
-        });
+        let pos = self
+            .sorted
+            .partition_point(|&x| self.entry_sort_cmp(x, idx) == Ordering::Less);
         self.sorted.insert(pos, idx);
         self.live += 1;
         self.invalidate_cache();
@@ -1629,8 +1575,7 @@ impl<'a> TopK<'a> {
                     || (score == worst.score
                         && (name_len < worst.name_len
                             || (name_len == worst.name_len
-                                && (modified > worst.modified
-                                    || modified == worst.modified))))
+                                && (modified > worst.modified || modified == worst.modified))))
             }
             None => true,
         }

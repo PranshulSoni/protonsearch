@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use ps_ocr::{extract_image, extract_image_timed, OcrIndex, OcrDocument};
+use ps_ocr::{extract_image, extract_image_timed, OcrDocument, OcrIndex};
 
 fn workdir(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
@@ -88,7 +88,11 @@ fn extracts_numbers_from_generated_png() {
     let document = extract_image(&path, 16_000_000).unwrap().expect("text");
     let normalized = normalize(&document.text);
     eprintln!("numbers fixture OCR: {:?}", document.text);
-    assert!(normalized.contains("1284"), "expected 1284 in {:?}", document.text);
+    assert!(
+        normalized.contains("1284"),
+        "expected 1284 in {:?}",
+        document.text
+    );
 }
 
 #[test]
@@ -155,13 +159,9 @@ fn ocr_storage_dedupes_by_hash_and_searches() {
         width: 640,
         height: 480,
     };
-    assert!(index
-        .store("C:\\shots\\budget.png", "hash-a", &document)
-        .unwrap());
+    assert!(index.store("C:\\shots\\budget.png", "hash-a", &document).unwrap());
     assert!(
-        !index
-            .store("C:\\shots\\budget.png", "hash-a", &document)
-            .unwrap(),
+        !index.store("C:\\shots\\budget.png", "hash-a", &document).unwrap(),
         "same content hash must be deduplicated"
     );
     let hits = index.search("quarterly", 10).unwrap();
@@ -177,6 +177,9 @@ fn ocr_storage_dedupes_by_hash_and_searches() {
 
 #[test]
 fn ocr_query_sanitisation_quotes_terms() {
-    assert_eq!(ps_ocr::store::sanitize_fts_query("alpha beta"), "\"alpha\" \"beta\"");
+    assert_eq!(
+        ps_ocr::store::sanitize_fts_query("alpha beta"),
+        "\"alpha\" \"beta\""
+    );
     assert!(ps_ocr::store::sanitize_fts_query("((( )))").is_empty());
 }

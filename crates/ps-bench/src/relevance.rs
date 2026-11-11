@@ -138,17 +138,18 @@ fn duplicate_anchor_paths(name: &str) -> Vec<String> {
 /// Golden fixture for the deterministic synthetic corpus (all sizes, anchors planted).
 pub fn synthetic_golden(seed: u64, entries: usize) -> GoldenFile {
     let mut queries = Vec::new();
-    let mut add = |id: &str, cat: &str, query: &str, top1: Option<String>, top5: Vec<String>, rationale: &str| {
-        queries.push(GoldenQuery {
-            id: id.to_string(),
-            category: cat.to_string(),
-            query: query.to_string(),
-            expected_top1: top1,
-            expected_top5: top5,
-            expect_empty: false,
-            rationale: rationale.to_string(),
-        });
-    };
+    let mut add =
+        |id: &str, cat: &str, query: &str, top1: Option<String>, top5: Vec<String>, rationale: &str| {
+            queries.push(GoldenQuery {
+                id: id.to_string(),
+                category: cat.to_string(),
+                query: query.to_string(),
+                expected_top1: top1,
+                expected_top5: top5,
+                expect_empty: false,
+                rationale: rationale.to_string(),
+            });
+        };
 
     add(
         "exact_unique",
@@ -392,11 +393,23 @@ pub fn evaluate(index: &FilenameIndex, golden: &GoldenFile) -> (Aggregate, Vec<P
                 expected.push(p.clone());
             }
         }
-        let rank = paths.iter().position(|p| expected.iter().any(|e| e == p)).map(|i| i + 1);
-        let mrr = rank.map(|r| if r <= 10 { 1.0 / r as f64 } else { 0.0 }).unwrap_or(0.0);
+        let rank = paths
+            .iter()
+            .position(|p| expected.iter().any(|e| e == p))
+            .map(|i| i + 1);
+        let mrr = rank
+            .map(|r| if r <= 10 { 1.0 / r as f64 } else { 0.0 })
+            .unwrap_or(0.0);
         let overlap = paths.iter().filter(|p| expected.iter().any(|e| e == *p)).count();
-        let recall = if expected.is_empty() { 0.0 } else { (overlap as f64 / expected.len() as f64).min(1.0) };
-        let exact = q.expected_top1.as_ref().map(|top1| paths.first().map(|p| p == top1).unwrap_or(false));
+        let recall = if expected.is_empty() {
+            0.0
+        } else {
+            (overlap as f64 / expected.len() as f64).min(1.0)
+        };
+        let exact = q
+            .expected_top1
+            .as_ref()
+            .map(|top1| paths.first().map(|p| p == top1).unwrap_or(false));
         let ok = match exact {
             Some(e) => e,
             None => rank.is_some(),
@@ -433,8 +446,16 @@ pub fn evaluate(index: &FilenameIndex, golden: &GoldenFile) -> (Aggregate, Vec<P
         scored_queries: scored,
         queries_with_any_result: any_result,
         mrr_at_10: if scored > 0 { mrr_sum / scored as f64 } else { 0.0 },
-        recall_at_10: if scored > 0 { recall_sum / scored as f64 } else { 0.0 },
-        exact_at_1: if exact_n > 0 { Some(exact_sum / exact_n as f64) } else { None },
+        recall_at_10: if scored > 0 {
+            recall_sum / scored as f64
+        } else {
+            0.0
+        },
+        exact_at_1: if exact_n > 0 {
+            Some(exact_sum / exact_n as f64)
+        } else {
+            None
+        },
         pass_rate: if n > 0 { passed as f64 / n as f64 } else { 0.0 },
         zero_match_correct: zm_correct,
         zero_match_total: zm_total,
@@ -444,9 +465,13 @@ pub fn evaluate(index: &FilenameIndex, golden: &GoldenFile) -> (Aggregate, Vec<P
 
 pub fn load_golden(path: &Path) -> anyhow::Result<GoldenFile> {
     let text = std::fs::read_to_string(path)?;
-    let golden: GoldenFile = serde_json::from_str(&text)
-        .map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))?;
-    anyhow::ensure!(golden.schema == GOLDEN_SCHEMA, "unexpected golden schema: {}", golden.schema);
+    let golden: GoldenFile =
+        serde_json::from_str(&text).map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))?;
+    anyhow::ensure!(
+        golden.schema == GOLDEN_SCHEMA,
+        "unexpected golden schema: {}",
+        golden.schema
+    );
     Ok(golden)
 }
 
@@ -472,13 +497,18 @@ fn print_results(report: &RelevanceReport) {
         report.aggregate.zero_match_correct,
         report.aggregate.zero_match_total
     );
-    println!("  {:<18} {:<16} {:>4} {:>6} {:>7} {:>7}  query", "id", "category", "rank", "recall", "exact", "pass");
+    println!(
+        "  {:<18} {:<16} {:>4} {:>6} {:>7} {:>7}  query",
+        "id", "category", "rank", "recall", "exact", "pass"
+    );
     for r in &report.per_query {
         println!(
             "  {:<18} {:<16} {:>4} {:>6.2} {:>7} {:>7}  {}",
             r.id,
             r.category,
-            r.rank_of_first_expected.map(|x| x.to_string()).unwrap_or_else(|| "-".to_string()),
+            r.rank_of_first_expected
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| "-".to_string()),
             r.recall_at_10,
             r.exact_at_1.map(|x| if x { "yes" } else { "NO" }).unwrap_or("-"),
             if r.passed { "ok" } else { "FAIL" },
@@ -489,7 +519,10 @@ fn print_results(report: &RelevanceReport) {
     if !failures.is_empty() {
         println!("  failures:");
         for f in failures {
-            println!("    - [{}] {:?} top1={:?} rank={:?}", f.id, f.query, f.top1, f.rank_of_first_expected);
+            println!(
+                "    - [{}] {:?} top1={:?} rank={:?}",
+                f.id, f.query, f.top1, f.rank_of_first_expected
+            );
         }
     }
 }
@@ -515,9 +548,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     let (aggregate, per_query) = evaluate(&index, &golden);
 
     let mut notes = vec![
-        "metrics fixed at top-10: MRR@10, recall@10, exact-match@1; expectEmpty scored separately".to_string(),
+        "metrics fixed at top-10: MRR@10, recall@10, exact-match@1; expectEmpty scored separately"
+            .to_string(),
         "expectedTop5 is the expected set for MRR/recall, not an exhaustive reference list".to_string(),
-        "engine_not_ready means ps-index::search returned no results; the table is structural only".to_string(),
+        "engine_not_ready means ps-index::search returned no results; the table is structural only"
+            .to_string(),
     ];
     if golden.corpus.starts_with("real") {
         notes.push("real-corpus fixture is generated from this machine's read-only legacy export; it is evidence, not a portable CI test".to_string());
@@ -541,14 +576,24 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             bytes: dataset_bytes,
             fnv1a64: format!("{fnv:016x}"),
         },
-        golden: GoldenRef { corpus: golden.corpus.clone(), queries: golden.queries.len(), seed: golden.seed },
+        golden: GoldenRef {
+            corpus: golden.corpus.clone(),
+            queries: golden.queries.len(),
+            seed: golden.seed,
+        },
         aggregate,
         per_query,
         engine_ready,
         notes,
     };
     write_json(&out, &report)?;
-    println!("ps-bench relevance: corpus={} queries={} entries={} engine_ready={}", golden.corpus, golden.queries.len(), count, report.engine_ready);
+    println!(
+        "ps-bench relevance: corpus={} queries={} entries={} engine_ready={}",
+        golden.corpus,
+        golden.queries.len(),
+        count,
+        report.engine_ready
+    );
     print_results(&report);
     if !report.engine_ready {
         println!("  WARNING: search returned no results (ps-index stub); relevance scores are NOT valid.");
@@ -568,7 +613,12 @@ pub fn write_synthetic_fixture(out: &Path, seed: u64, entries: usize) -> anyhow:
 }
 
 /// Build a golden fixture from the real legacy corpus export.
-pub fn build_real_golden(paths_path: &Path, out: &Path, max_queries: usize, seed: u64) -> anyhow::Result<GoldenFile> {
+pub fn build_real_golden(
+    paths_path: &Path,
+    out: &Path,
+    max_queries: usize,
+    seed: u64,
+) -> anyhow::Result<GoldenFile> {
     let entries = dataset::load_entries(paths_path)?;
     let total = entries.len();
     let mut name_counts: HashMap<String, u32> = HashMap::new();
@@ -593,7 +643,9 @@ pub fn build_real_golden(paths_path: &Path, out: &Path, max_queries: usize, seed
         n.len() >= 10
             && n.len() <= 120
             && !n.starts_with('.')
-            && n.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.' | '(' | ')' | '&' | '+'))
+            && n.chars().all(|c| {
+                c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.' | '(' | ')' | '&' | '+')
+            })
     };
 
     // exact unique names
@@ -627,7 +679,10 @@ pub fn build_real_golden(paths_path: &Path, out: &Path, max_queries: usize, seed
     }
 
     // duplicate names (2..=10 occurrences)
-    let mut dup_names: Vec<(&String, &u32)> = name_counts.iter().filter(|(n, c)| **c >= 2 && **c <= 10 && n.len() >= 6).collect();
+    let mut dup_names: Vec<(&String, &u32)> = name_counts
+        .iter()
+        .filter(|(n, c)| **c >= 2 && **c <= 10 && n.len() >= 6)
+        .collect();
     dup_names.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
     for i in 0..dup_names.len().min(10) {
         let (name, _) = dup_names[i];
@@ -643,7 +698,8 @@ pub fn build_real_golden(paths_path: &Path, out: &Path, max_queries: usize, seed
                 expected_top1: None,
                 expected_top5: paths.into_iter().take(5).collect(),
                 expect_empty: false,
-                rationale: "duplicated filename in the real corpus; MRR@10 over all listed copies".to_string(),
+                rationale: "duplicated filename in the real corpus; MRR@10 over all listed copies"
+                    .to_string(),
             },
             &mut queries,
             &mut used,
@@ -683,7 +739,9 @@ pub fn build_real_golden(paths_path: &Path, out: &Path, max_queries: usize, seed
                 expected_top1: None,
                 expected_top5: matches,
                 expect_empty: false,
-                rationale: format!("first 12 chars of a unique real filename; expected set = names sharing the prefix"),
+                rationale: format!(
+                    "first 12 chars of a unique real filename; expected set = names sharing the prefix"
+                ),
             },
             &mut queries,
             &mut used,
@@ -707,7 +765,12 @@ pub fn build_real_golden(paths_path: &Path, out: &Path, max_queries: usize, seed
         }
         // Delete the character at ~40% into the name (still in the stem).
         let del = (chars.len() * 2 / 5).max(4).min(chars.len() - 2);
-        let typo: String = chars.iter().enumerate().filter(|(i, _)| *i != del).map(|(_, c)| *c).collect();
+        let typo: String = chars
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| *i != del)
+            .map(|(_, c)| *c)
+            .collect();
         if typo == e.name {
             continue;
         }
@@ -729,7 +792,10 @@ pub fn build_real_golden(paths_path: &Path, out: &Path, max_queries: usize, seed
 
     // hidden files with unique names
     let mut hid = 0usize;
-    for e in entries.iter().filter(|e| e.name.starts_with('.') && !e.is_folder()) {
+    for e in entries
+        .iter()
+        .filter(|e| e.name.starts_with('.') && !e.is_folder())
+    {
         if hid >= 5 {
             break;
         }
@@ -753,7 +819,10 @@ pub fn build_real_golden(paths_path: &Path, out: &Path, max_queries: usize, seed
 
     // long paths
     let mut longs = 0usize;
-    for e in entries.iter().filter(|e| !e.is_folder() && e.path.chars().count() >= 180) {
+    for e in entries
+        .iter()
+        .filter(|e| !e.is_folder() && e.path.chars().count() >= 180)
+    {
         if longs >= 5 {
             break;
         }

@@ -6,10 +6,12 @@ import type {
   LegacySummary,
   OnboardingInput,
   OnboardingState,
+  OcrEngine,
   RootConfig,
   RootMode,
   Settings,
 } from "../bridge/types";
+import { OCR_ENGINE_OPTIONS } from "../bridge/types";
 import { DEFAULT_HOTKEY, displayHotkey, parseHotkey } from "../app/hotkey";
 import { ROOT_MODE_ORDER, ROOT_MODE_SHORT } from "../app/roots";
 
@@ -33,6 +35,7 @@ export interface OnboardingDraft {
   /** Raw text in the shortcut field; validated on the shortcut step. */
   hotkey: string;
   launchAtLogin: boolean;
+  ocrEngine: OcrEngine;
 }
 
 function initialHotkey(settings: Settings): string {
@@ -63,6 +66,7 @@ export function createOnboardingDraft(
     agentOptIn: false,
     hotkey: initialHotkey(settings),
     launchAtLogin: settings.launchAtLogin,
+    ocrEngine: settings.ocrEngine ?? "windows",
   };
 }
 
@@ -102,6 +106,7 @@ export interface OnboardingSummary {
   roots: RootConfig[];
   contentEnabled: boolean;
   ocrEnabled: boolean;
+  ocrEngine: OcrEngine;
   agentOptIn: boolean;
   launchAtLogin: boolean;
   hotkeyDisplay: string;
@@ -126,6 +131,7 @@ export function summarizeDraft(draft: OnboardingDraft): OnboardingSummary {
     roots,
     contentEnabled: draftContentEnabled(draft),
     ocrEnabled: draftOcrEnabled(draft),
+    ocrEngine: draft.ocrEngine ?? "windows",
     agentOptIn: draft.agentOptIn,
     launchAtLogin: draft.launchAtLogin,
     hotkeyDisplay: hotkey.ok ? hotkey.display : draft.hotkey.trim() || DEFAULT_HOTKEY,
@@ -173,6 +179,7 @@ export function buildOnboardingInput(draft: OnboardingDraft): OnboardingInput {
     })),
     contentEnabled: draftContentEnabled(draft),
     ocrEnabled: draftOcrEnabled(draft),
+    ocrEngine: draft.ocrEngine,
     hotkey: hotkey.ok ? hotkey.accelerator : DEFAULT_HOTKEY,
     agentOptIn: draft.agentOptIn,
   };
@@ -186,6 +193,7 @@ export function buildSkippedOnboardingInput(draft?: Pick<OnboardingDraft, "hotke
     roots: [],
     contentEnabled: false,
     ocrEnabled: false,
+    ocrEngine: "windows",
     hotkey: parsed && parsed.ok ? parsed.accelerator : DEFAULT_HOTKEY,
     agentOptIn: false,
     skipped: true,
@@ -292,6 +300,9 @@ export function parsePersistedOnboarding(
         agentOptIn: draft.agentOptIn,
         hotkey: draft.hotkey,
         launchAtLogin: draft.launchAtLogin,
+        ocrEngine: OCR_ENGINE_OPTIONS.some(
+          (option) => option.engine === draft.ocrEngine && option.availability === "available",
+        ) ? draft.ocrEngine! : "windows",
       },
     };
   } catch {

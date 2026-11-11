@@ -15,19 +15,11 @@ pub fn enumerate() -> Vec<MonitorInfo> {
     };
     use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 
-    unsafe extern "system" fn callback(
-        monitor: HMONITOR,
-        _hdc: HDC,
-        _rect: *mut RECT,
-        data: LPARAM,
-    ) -> BOOL {
+    unsafe extern "system" fn callback(monitor: HMONITOR, _hdc: HDC, _rect: *mut RECT, data: LPARAM) -> BOOL {
         let monitors = &mut *(data.0 as *mut Vec<MonitorInfo>);
         let mut info = MONITORINFOEXW::default();
         info.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
-        let ok = GetMonitorInfoW(
-            monitor,
-            &mut info.monitorInfo as *mut _ as *mut _,
-        );
+        let ok = GetMonitorInfoW(monitor, &mut info.monitorInfo as *mut _ as *mut _);
         if ok.as_bool() {
             let device = String::from_utf16_lossy(
                 &info.szDevice[..info

@@ -117,10 +117,7 @@ impl Default for ClipboardCaptureOptions {
 
 /// Start the Win32 clipboard listener with both format toggles on and seed the
 /// current clipboard first. Only one listener may run per process.
-pub fn start_listener(
-    db_path: PathBuf,
-    image_dir: PathBuf,
-) -> Result<ps_windows::ClipboardListener> {
+pub fn start_listener(db_path: PathBuf, image_dir: PathBuf) -> Result<ps_windows::ClipboardListener> {
     start_listener_with_options(db_path, image_dir, ClipboardCaptureOptions::default())
 }
 
@@ -264,23 +261,58 @@ pub fn record_snapshot(
 
     if let Some(html) = snapshot.html.as_deref() {
         let text = strip_html(html);
-        let content = if text.trim().is_empty() { html.to_string() } else { text };
+        let content = if text.trim().is_empty() {
+            html.to_string()
+        } else {
+            text
+        };
         let category = classify(&content);
-        let id = insert_item(db_path, image_dir, &content, &source_app, category, "html", "text/html", Some(html))?;
+        let id = insert_item(
+            db_path,
+            image_dir,
+            &content,
+            &source_app,
+            category,
+            "html",
+            "text/html",
+            Some(html),
+        )?;
         return Ok(id.map(|(id, _)| id).into_iter().collect());
     }
 
     if let Some(rtf) = snapshot.rtf.as_deref() {
         let text = strip_rtf(rtf);
-        let content = if text.trim().is_empty() { rtf.to_string() } else { text };
+        let content = if text.trim().is_empty() {
+            rtf.to_string()
+        } else {
+            text
+        };
         let category = classify(&content);
-        let id = insert_item(db_path, image_dir, &content, &source_app, category, "rtf", "application/rtf", Some(rtf))?;
+        let id = insert_item(
+            db_path,
+            image_dir,
+            &content,
+            &source_app,
+            category,
+            "rtf",
+            "application/rtf",
+            Some(rtf),
+        )?;
         return Ok(id.map(|(id, _)| id).into_iter().collect());
     }
 
     if let Some(text) = snapshot.text.as_deref() {
         let category = classify(text);
-        let id = insert_item(db_path, image_dir, text, &source_app, category, "text", "text/plain", None)?;
+        let id = insert_item(
+            db_path,
+            image_dir,
+            text,
+            &source_app,
+            category,
+            "text",
+            "text/plain",
+            None,
+        )?;
         return Ok(id.map(|(id, _)| id).into_iter().collect());
     }
 
@@ -323,13 +355,17 @@ pub fn record(db_path: &Path, text: &str, source_app: &str) -> Result<bool> {
 /// Store a PNG clipboard image using only the encoded payload (legacy helper:
 /// dimensions are decoded from the PNG). Prefer record_image_captured when the
 /// capture pipeline already knows format/dimensions.
-pub fn record_image(
-    db_path: &Path,
-    png_bytes: &[u8],
-    source_app: &str,
-    image_dir: &Path,
-) -> Result<bool> {
-    record_image_captured(db_path, png_bytes, 0, 0, "png", "image/png", source_app, image_dir)
+pub fn record_image(db_path: &Path, png_bytes: &[u8], source_app: &str, image_dir: &Path) -> Result<bool> {
+    record_image_captured(
+        db_path,
+        png_bytes,
+        0,
+        0,
+        "png",
+        "image/png",
+        source_app,
+        image_dir,
+    )
 }
 
 /// Store a PNG clipboard image with explicit metadata from the capture pipeline.
@@ -366,8 +402,7 @@ pub fn copy_to_clipboard(db_path: &Path, id: i64) -> Result<()> {
         let path = image_path
             .filter(|path| !path.is_empty())
             .ok_or_else(|| anyhow::anyhow!("clipboard image row {id} has no stored PNG path"))?;
-        let bytes = std::fs::read(&path)
-            .with_context(|| format!("reading stored clipboard image {path}"))?;
+        let bytes = std::fs::read(&path).with_context(|| format!("reading stored clipboard image {path}"))?;
         ps_windows::set_clipboard_image(&bytes)?;
         Ok(())
     } else {
@@ -397,9 +432,7 @@ pub fn search(db_path: &Path, query: &str, limit: usize) -> Vec<ClipboardEntry> 
         Ok(statement) => statement,
         Err(_) => return Vec::new(),
     };
-    let rows = statement.query_map(rusqlite::params![pattern, limit as i64], |row| {
-        map_entry(row)
-    });
+    let rows = statement.query_map(rusqlite::params![pattern, limit as i64], |row| map_entry(row));
     match rows {
         Ok(rows) => rows.flatten().collect(),
         Err(_) => Vec::new(),
@@ -729,7 +762,9 @@ fn make_thumbnail(image: &image::DynamicImage, _max_edge: u32) -> Vec<u8> {
         return Vec::new();
     }
     for edge in [THUMB_LONG_EDGE, 96, 64] {
-        let scale = (edge as f64 / width as f64).min(edge as f64 / height as f64).min(1.0);
+        let scale = (edge as f64 / width as f64)
+            .min(edge as f64 / height as f64)
+            .min(1.0);
         let target_width = ((width as f64 * scale).round() as u32).max(1);
         let target_height = ((height as f64 * scale).round() as u32).max(1);
         let resized = if target_width == width && target_height == height {
@@ -758,8 +793,7 @@ fn make_thumbnail(image: &image::DynamicImage, _max_edge: u32) -> Vec<u8> {
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let temp = path.with_extension(format!("tmp-{}", std::process::id()));
-    std::fs::write(&temp, bytes)
-        .with_context(|| format!("writing clipboard payload {}", temp.display()))?;
+    std::fs::write(&temp, bytes).with_context(|| format!("writing clipboard payload {}", temp.display()))?;
     std::fs::rename(&temp, path)
         .with_context(|| format!("committing clipboard payload {}", path.display()))?;
     Ok(())
@@ -933,10 +967,7 @@ fn open_existing(db_path: &Path) -> Result<rusqlite::Connection> {
     if !db_path.is_file() {
         anyhow::bail!("database does not exist: {}", db_path.display());
     }
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )?;
+    let conn = rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let _ = conn.busy_timeout(std::time::Duration::from_millis(2000));
     Ok(conn)
 }
@@ -957,8 +988,7 @@ fn open_existing_with_flags(db_path: &Path) -> Result<(rusqlite::Connection, Sch
 fn open_or_create(db_path: &Path) -> Result<rusqlite::Connection> {
     if let Some(parent) = db_path.parent() {
         if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("creating {}", parent.display()))?;
+            std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
         }
     }
     let conn = rusqlite::Connection::open(db_path)?;
@@ -968,8 +998,7 @@ fn open_or_create(db_path: &Path) -> Result<rusqlite::Connection> {
 }
 
 fn migrate(conn: &rusqlite::Connection) -> Result<()> {
-    conn.execute_batch(SCHEMA)
-        .context("migrating clipboard schema")?;
+    conn.execute_batch(SCHEMA).context("migrating clipboard schema")?;
     let mut added = false;
     for (name, definition) in ADDED_COLUMNS {
         if !has_column(conn, name)? {
@@ -1006,7 +1035,12 @@ fn backfill_categories(conn: &rusqlite::Connection) -> Result<usize> {
              WHERE category IS NULL OR category = '' LIMIT ?1",
         )?;
         let rows = statement.query_map([MAX_BACKFILL_ROWS as i64], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3).unwrap_or_default()))
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3).unwrap_or_default(),
+            ))
         })?;
         rows.flatten().collect()
     };
@@ -1036,9 +1070,7 @@ fn backfill_image_meta(conn: &rusqlite::Connection) -> Result<usize> {
                AND (image_width IS NULL OR image_width = 0)
              LIMIT 200",
         )?;
-        let rows = statement.query_map([], |row| {
-            Ok((row.get(0)?, row.get::<_, String>(1)?))
-        })?;
+        let rows = statement.query_map([], |row| Ok((row.get(0)?, row.get::<_, String>(1)?)))?;
         rows.flatten().collect()
     };
     let mut updated = 0usize;
@@ -1139,9 +1171,9 @@ fn is_email(text: &str) -> bool {
     {
         return false;
     }
-    let valid_local = local.chars().all(|ch| {
-        ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '%' | '+' | '-' | '\'')
-    });
+    let valid_local = local
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '%' | '+' | '-' | '\''));
     let valid_domain = domain
         .chars()
         .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-'));
@@ -1194,9 +1226,32 @@ fn is_code(text: &str) -> bool {
         return true;
     }
     let code_tokens: &[&str] = &[
-        "fn ", "def ", "class ", "function ", "import ", "#include", "public static", "const ",
-        "let mut ", "let ", "var ", "=>", "();", "</", "/>", "&&", "||", "::", "println!(",
-        "console.log(", "system.out.", "def main(", "if (", "for (", "while (", "return ",
+        "fn ",
+        "def ",
+        "class ",
+        "function ",
+        "import ",
+        "#include",
+        "public static",
+        "const ",
+        "let mut ",
+        "let ",
+        "var ",
+        "=>",
+        "();",
+        "</",
+        "/>",
+        "&&",
+        "||",
+        "::",
+        "println!(",
+        "console.log(",
+        "system.out.",
+        "def main(",
+        "if (",
+        "for (",
+        "while (",
+        "return ",
     ];
     let token_hits = code_tokens.iter().filter(|token| lower.contains(*token)).count();
     if token_hits >= 2 {
@@ -1265,9 +1320,7 @@ fn strip_rtf(rtf: &str) -> String {
 }
 
 fn escape_like(text: &str) -> String {
-    text.replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
+    text.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
 }
 
 fn now_ms() -> i64 {

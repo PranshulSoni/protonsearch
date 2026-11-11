@@ -28,7 +28,16 @@ pub fn percentile_sorted(sorted: &[f64], pct: f64) -> f64 {
 
 pub fn summarize(samples: &[f64]) -> Summary {
     if samples.is_empty() {
-        return Summary { count: 0, min: 0.0, mean: 0.0, p50: 0.0, p90: 0.0, p95: 0.0, p99: 0.0, max: 0.0 };
+        return Summary {
+            count: 0,
+            min: 0.0,
+            mean: 0.0,
+            p50: 0.0,
+            p90: 0.0,
+            p95: 0.0,
+            p99: 0.0,
+            max: 0.0,
+        };
     }
     let mut v = samples.to_vec();
     v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));

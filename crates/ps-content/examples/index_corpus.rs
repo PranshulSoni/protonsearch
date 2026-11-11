@@ -19,10 +19,7 @@ fn main() -> anyhow::Result<()> {
             .cloned()
             .unwrap_or_else(|| "target/ps-content-bench/smoke-index.db".to_string()),
     );
-    let max_files: usize = args
-        .get(3)
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(5000);
+    let max_files: usize = args.get(3).and_then(|value| value.parse().ok()).unwrap_or(5000);
     if !root.is_dir() {
         anyhow::bail!("root is not a directory: {}", root.display());
     }
@@ -68,7 +65,11 @@ fn main() -> anyhow::Result<()> {
         elapsed.as_secs_f64() * 1000.0
     );
     for (path, error) in &errors {
-        println!("  error {}: {}", path, error.chars().take(160).collect::<String>());
+        println!(
+            "  error {}: {}",
+            path,
+            error.chars().take(160).collect::<String>()
+        );
     }
     println!("smoke: process completed normally (no abort)");
     Ok(())

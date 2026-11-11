@@ -22,8 +22,8 @@ use crate::{fnv1a64_file, sha256_via_certutil, write_json, RESULT_SCHEMA};
 
 /// Default location of the legacy v1 index on this machine.
 pub fn default_legacy_db() -> PathBuf {
-    let appdata = std::env::var("APPDATA")
-        .unwrap_or_else(|_| "C:\\Users\\Default\\AppData\\Roaming".to_string());
+    let appdata =
+        std::env::var("APPDATA").unwrap_or_else(|_| "C:\\Users\\Default\\AppData\\Roaming".to_string());
     PathBuf::from(appdata).join("protonsearch").join("file_index.db")
 }
 
@@ -84,8 +84,12 @@ fn count(conn: &Connection, sql: &str) -> u64 {
 
 pub fn db_facts(legacy_db: &Path) -> anyhow::Result<DbFacts> {
     let conn = open_legacy_ro(legacy_db)?;
-    let page_size: u64 = conn.query_row("PRAGMA page_size", [], |r| r.get::<_, i64>(0)).unwrap_or(0) as u64;
-    let page_count: u64 = conn.query_row("PRAGMA page_count", [], |r| r.get::<_, i64>(0)).unwrap_or(0) as u64;
+    let page_size: u64 = conn
+        .query_row("PRAGMA page_size", [], |r| r.get::<_, i64>(0))
+        .unwrap_or(0) as u64;
+    let page_count: u64 = conn
+        .query_row("PRAGMA page_count", [], |r| r.get::<_, i64>(0))
+        .unwrap_or(0) as u64;
     Ok(DbFacts {
         db_path: legacy_db.display().to_string(),
         db_bytes: file_len(legacy_db),
@@ -153,7 +157,12 @@ fn ext_of(name: &str) -> String {
 }
 
 /// Export the real legacy corpus to JSONL in deterministic path order.
-pub fn export_legacy(legacy_db: &Path, out: &Path, meta_out: &Path, limit: usize) -> anyhow::Result<ExportReport> {
+pub fn export_legacy(
+    legacy_db: &Path,
+    out: &Path,
+    meta_out: &Path,
+    limit: usize,
+) -> anyhow::Result<ExportReport> {
     let start = Instant::now();
     let facts = db_facts(legacy_db)?;
     if facts.files == 0 {
@@ -176,7 +185,11 @@ pub fn export_legacy(legacy_db: &Path, out: &Path, meta_out: &Path, limit: usize
         "SELECT path, name, extension, modified, size, is_dir FROM files ORDER BY path"
     };
     let mut stmt = conn.prepare(sql)?;
-    let mut rows = if limit > 0 { stmt.query([limit as i64])? } else { stmt.query([])? };
+    let mut rows = if limit > 0 {
+        stmt.query([limit as i64])?
+    } else {
+        stmt.query([])?
+    };
 
     let mut entries: u64 = 0;
     let mut files = 0u64;
@@ -194,23 +207,43 @@ pub fn export_legacy(legacy_db: &Path, out: &Path, meta_out: &Path, limit: usize
         let modified: i64 = row.get(3)?;
         let size: i64 = row.get(4)?;
         let is_dir: i64 = row.get(5)?;
-        let ext = if extension.is_empty() { ext_of(&name) } else { extension.to_ascii_lowercase() };
+        let ext = if extension.is_empty() {
+            ext_of(&name)
+        } else {
+            extension.to_ascii_lowercase()
+        };
         let entry = DatasetEntry {
             path: path.clone(),
             name: name.clone(),
             ext: ext.clone(),
-            kind: if is_dir != 0 { "folder".to_string() } else { "file".to_string() },
+            kind: if is_dir != 0 {
+                "folder".to_string()
+            } else {
+                "file".to_string()
+            },
             size: size.max(0) as u64,
             modified,
         };
         serde_json::to_writer(&mut writer, &entry)?;
         writer.write_all(b"\n")?;
         entries += 1;
-        if is_dir != 0 { folders += 1 } else { files += 1 }
-        if !ext.is_empty() { exts.insert(ext); }
-        if path.chars().any(crate::dataset::is_cjk) { cjk += 1 }
-        if !path.is_ascii() { non_ascii += 1 }
-        if name.starts_with('.') { hidden += 1 }
+        if is_dir != 0 {
+            folders += 1
+        } else {
+            files += 1
+        }
+        if !ext.is_empty() {
+            exts.insert(ext);
+        }
+        if path.chars().any(crate::dataset::is_cjk) {
+            cjk += 1
+        }
+        if !path.is_ascii() {
+            non_ascii += 1
+        }
+        if name.starts_with('.') {
+            hidden += 1
+        }
         max_path = max_path.max(path.chars().count() as u64);
     }
     writer.flush()?;
@@ -234,7 +267,10 @@ pub fn export_legacy(legacy_db: &Path, out: &Path, meta_out: &Path, limit: usize
         ));
     }
     if facts.wal_bytes > 0 {
-        notes.push(format!("legacy -wal present ({} bytes) and intentionally not replayed", facts.wal_bytes));
+        notes.push(format!(
+            "legacy -wal present ({} bytes) and intentionally not replayed",
+            facts.wal_bytes
+        ));
     }
     if let Some(m) = mem {
         notes.push(format!(

@@ -34,12 +34,7 @@ fn summarize(samples: &mut Vec<f64>) -> (f64, f64, f64) {
     )
 }
 
-fn bench(
-    label: &str,
-    queries: &[QueryDef],
-    iters: usize,
-    mut run: impl FnMut(&str) -> usize,
-) {
+fn bench(label: &str, queries: &[QueryDef], iters: usize, mut run: impl FnMut(&str) -> usize) {
     let mut all = Vec::new();
     let mut per_category: std::collections::BTreeMap<String, Vec<f64>> = Default::default();
     for q in queries {
@@ -94,10 +89,7 @@ fn main() -> anyhow::Result<()> {
     // Interleaved A/B: the pre-task-42 implementation (FTS5 snippet() + 128 KB
     // text fetch + lowercase line scan) versus the current ContentIndex::search.
     // Alternating per iteration cancels machine-load drift.
-    let conn = rusqlite::Connection::open_with_flags(
-        db,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )?;
+    let conn = rusqlite::Connection::open_with_flags(db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     conn.busy_timeout(std::time::Duration::from_millis(2000))?;
     let mut old_samples = Vec::new();
     let mut new_samples = Vec::new();
@@ -117,8 +109,14 @@ fn main() -> anyhow::Result<()> {
     }
     let (op50, op95, op99) = summarize(&mut old_samples);
     let (np50, np95, np99) = summarize(&mut new_samples);
-    println!("A/B old (snippet()+128KB text)  n={} p50={op50:7.2} p95={op95:7.2} p99={op99:7.2} ms", iters * queries.len());
-    println!("A/B new (Rust snippet, 32KB)    n={} p50={np50:7.2} p95={np95:7.2} p99={np99:7.2} ms", iters * queries.len());
+    println!(
+        "A/B old (snippet()+128KB text)  n={} p50={op50:7.2} p95={op95:7.2} p99={op99:7.2} ms",
+        iters * queries.len()
+    );
+    println!(
+        "A/B new (Rust snippet, 32KB)    n={} p50={np50:7.2} p95={np95:7.2} p99={np99:7.2} ms",
+        iters * queries.len()
+    );
     Ok(())
 }
 

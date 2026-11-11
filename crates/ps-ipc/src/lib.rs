@@ -42,6 +42,7 @@ fn default_protocol() -> u32 {
 pub enum SearchScope {
     #[default]
     All,
+    Photos,
     Files,
     Folders,
     Content,
@@ -496,6 +497,65 @@ pub struct IndexingSettings {
     pub paused: bool,
 }
 
+/// OCR backend selected by the user. Unavailable engines remain representable
+/// in settings so a future build can honor the choice without changing the wire format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OcrEngine {
+    Windows,
+    PpOcrV6,
+    Indra,
+    Tesseract,
+}
+impl Default for OcrEngine {
+    fn default() -> Self {
+        Self::Windows
+    }
+}
+fn legacy_ocr_engine() -> OcrEngine {
+    OcrEngine::Windows
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OcrEngineAvailability {
+    Available,
+    NotInstalled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrEngineOption {
+    pub engine: OcrEngine,
+    pub availability: OcrEngineAvailability,
+}
+
+/// Currently only Windows OCR is actionable; optional engines require a
+/// separately installed runtime/model and are never downloaded implicitly.
+pub const OCR_ENGINE_OPTIONS: [OcrEngineOption; 4] = [
+    OcrEngineOption {
+        engine: OcrEngine::Windows,
+        availability: OcrEngineAvailability::Available,
+    },
+    OcrEngineOption {
+        engine: OcrEngine::PpOcrV6,
+        availability: OcrEngineAvailability::NotInstalled,
+    },
+    OcrEngineOption {
+        engine: OcrEngine::Indra,
+        availability: OcrEngineAvailability::NotInstalled,
+    },
+    OcrEngineOption {
+        engine: OcrEngine::Tesseract,
+        availability: OcrEngineAvailability::NotInstalled,
+    },
+];
+pub fn ocr_engine_available(engine: OcrEngine) -> bool {
+    OCR_ENGINE_OPTIONS
+        .iter()
+        .any(|option| option.engine == engine && option.availability == OcrEngineAvailability::Available)
+}
+
 impl Default for IndexingSettings {
     fn default() -> Self {
         Self {
@@ -946,10 +1006,18 @@ pub struct ControlCapability {
 
 impl ControlCapability {
     pub fn supported() -> Self {
-        Self { supported: true, reason: None, fallback_uri: None }
+        Self {
+            supported: true,
+            reason: None,
+            fallback_uri: None,
+        }
     }
     pub fn unsupported(reason: &str) -> Self {
-        Self { supported: false, reason: Some(reason.to_string()), fallback_uri: None }
+        Self {
+            supported: false,
+            reason: Some(reason.to_string()),
+            fallback_uri: None,
+        }
     }
 }
 
@@ -1117,6 +1185,9 @@ pub struct Settings {
     pub motion: MotionPreference,
     pub launch_at_login: bool,
     pub indexing: IndexingSettings,
+    /// Missing values in older settings files preserve the legacy Windows OCR path.
+    #[serde(default = "legacy_ocr_engine")]
+    pub ocr_engine: OcrEngine,
     pub privacy: PrivacySettings,
     pub agent: AgentSettings,
     pub semantic: SemanticSettings,
@@ -1152,6 +1223,7 @@ impl Default for Settings {
             motion: MotionPreference::System,
             launch_at_login: false,
             indexing: IndexingSettings::default(),
+            ocr_engine: OcrEngine::default(),
             privacy: PrivacySettings::default(),
             agent: AgentSettings::default(),
             semantic: SemanticSettings::default(),
@@ -1184,6 +1256,8 @@ pub struct SettingsPatch {
     pub launch_at_login: Option<bool>,
     #[serde(default)]
     pub indexing: Option<IndexingSettings>,
+    #[serde(default)]
+    pub ocr_engine: Option<OcrEngine>,
     #[serde(default)]
     pub privacy: Option<PrivacySettings>,
     #[serde(default)]
@@ -1226,6 +1300,9 @@ impl Settings {
         }
         if let Some(v) = &patch.indexing {
             self.indexing = v.clone();
+        }
+        if let Some(v) = patch.ocr_engine {
+            self.ocr_engine = v;
         }
         if let Some(v) = &patch.privacy {
             self.privacy = v.clone();
@@ -1306,6 +1383,8 @@ pub struct OnboardingInput {
     pub roots: Vec<RootConfig>,
     pub content_enabled: bool,
     pub ocr_enabled: bool,
+    #[serde(default)]
+    pub ocr_engine: OcrEngine,
     pub hotkey: String,
     pub agent_opt_in: bool,
     #[serde(default)]
@@ -1465,6 +1544,27 @@ mod tests {
         assert_eq!(settings.launcher.island.default_card, IslandCardId::Search);
         assert!(settings.clipboard.capture_images);
         assert_eq!(settings.clipboard.retention_days, 30);
+        assert_eq!(settings.ocr_engine, OcrEngine::Windows);
+        assert_eq!(Settings::default().ocr_engine, OcrEngine::Windows);
+    }
+    #[test]
+    fn ocr_engine_settings_roundtrip_and_patch() {
+        let mut settings = Settings::default();
+        let patch = SettingsPatch {
+            ocr_engine: Some(OcrEngine::Indra),
+            ..SettingsPatch::default()
+        };
+        assert!(settings.apply(&patch));
+        let encoded = serde_json::to_string(&settings).unwrap();
+        let decoded: Settings = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded.ocr_engine, OcrEngine::Indra);
+        assert_eq!(
+            OCR_ENGINE_OPTIONS
+                .iter()
+                .filter(|option| option.availability == OcrEngineAvailability::Available)
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -1475,6 +1575,15 @@ mod tests {
         assert!(json.contains("\"protocol\":1"), "{json}");
         let back: SearchRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(back, req);
+    }
+
+    #[test]
+    fn photos_search_scope_has_a_stable_wire_name() {
+        let mut req = SearchRequest::new(8, "photo");
+        req.scope = SearchScope::Photos;
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"scope\":\"photos\""), "{json}");
+        assert_eq!(serde_json::from_str::<SearchRequest>(&json).unwrap(), req);
     }
 
     #[test]

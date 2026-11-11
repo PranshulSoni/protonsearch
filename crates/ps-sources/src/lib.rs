@@ -132,9 +132,24 @@ pub struct BrowserEntry {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GitEntry {
-    Repo { path: String, name: String, branch: Option<String> },
-    Commit { repo: String, hash: String, message: String, author: String, date_ms: i64 },
-    Todo { repo: String, path: String, line: u32, text: String },
+    Repo {
+        path: String,
+        name: String,
+        branch: Option<String>,
+    },
+    Commit {
+        repo: String,
+        hash: String,
+        message: String,
+        author: String,
+        date_ms: i64,
+    },
+    Todo {
+        repo: String,
+        path: String,
+        line: u32,
+        text: String,
+    },
 }
 
 /// A saved quicklink (keyword -> URL template) or snippet.
@@ -168,12 +183,7 @@ impl Sources {
     /// Load every enabled source. Never fails fatally: partial failures are
     /// collected in warnings and the remaining sources still work.
     pub fn load(settings: &ps_ipc::Settings, legacy_db: Option<&std::path::Path>) -> (Self, Vec<String>) {
-        Self::load_with_paths(
-            settings,
-            legacy_db,
-            &v2_db_path(),
-            &default_icon_cache_dir(),
-        )
+        Self::load_with_paths(settings, legacy_db, &v2_db_path(), &default_icon_cache_dir())
     }
 
     /// Testable variant with explicit v2 database and icon-cache paths.
@@ -310,7 +320,10 @@ mod path_tests {
         let base = std::env::temp_dir().join("protonsearch-test-portable-data");
         let _guard = EnvGuard::set("PROTONSEARCH_DATA_DIR", base.as_os_str());
         assert_eq!(default_cache_dir(), base.join("v2").join("cache"));
-        assert_eq!(default_icon_cache_dir(), base.join("v2").join("cache").join("icons"));
+        assert_eq!(
+            default_icon_cache_dir(),
+            base.join("v2").join("cache").join("icons")
+        );
         assert_eq!(
             default_clipboard_images_dir(),
             base.join("v2").join("cache").join("clipboard")

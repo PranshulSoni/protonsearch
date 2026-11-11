@@ -9,6 +9,7 @@ import { formatNumber } from "../lib/format";
 import { Logo } from "../components/Logo";
 import { parseHotkey } from "../app/hotkey";
 import { HotkeyCapture } from "../app/HotkeyInput";
+import { OcrEngineSelector } from "../app/OcrEngineSelector";
 import { api } from "../bridge/api";
 import { rootDisplayName, samePath, validateRootPath } from "../app/roots";
 import { Callout, Icon, SegmentedControl, StateNotice } from "../app/ui";
@@ -459,6 +460,10 @@ export default function OnboardingView() {
             <p className="depth-tradeoff">
               {DEPTH_TRADEOFF[summary.deepestMode ?? "names_only"]}
             </p>
+            <OcrEngineSelector
+              value={draft.ocrEngine}
+              onChange={(ocrEngine) => patchDraft({ ocrEngine })}
+            />
             <p className="field-help">
               Filename search is always on. Extracted text only comes from the depth you choose.
               Nothing is uploaded.

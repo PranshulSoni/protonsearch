@@ -31,12 +31,19 @@ pub fn run_child_json(args: &[String]) -> anyhow::Result<ChildOutcome> {
     let text = String::from_utf8_lossy(&out.stdout);
     let marker = "PSBENCH_JSON:";
     let pos = text.find(marker).with_context(|| {
-        format!("child did not print {marker}; stdout head: {}", text.chars().take(400).collect::<String>())
+        format!(
+            "child did not print {marker}; stdout head: {}",
+            text.chars().take(400).collect::<String>()
+        )
     })?;
     let line = text[pos + marker.len()..]
         .lines()
         .next()
         .context("child JSON line missing")?;
     let value: Value = serde_json::from_str(line.trim()).context("parse child JSON")?;
-    Ok(ChildOutcome { value, wall_ms, exit_code: out.status.code().unwrap_or(-1) })
+    Ok(ChildOutcome {
+        value,
+        wall_ms,
+        exit_code: out.status.code().unwrap_or(-1),
+    })
 }

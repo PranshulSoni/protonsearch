@@ -9,11 +9,11 @@ use windows::core::{GUID, PCWSTR};
 use windows::Devices::Radios::RadioKind;
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::NetworkManagement::WiFi::{
-    dot11_BSS_type_any, wlan_connection_mode_profile, WlanCloseHandle, WlanConnect,
-    WlanEnumInterfaces, WlanFreeMemory, WlanGetAvailableNetworkList, WlanGetProfileList,
-    WlanOpenHandle, DOT11_SSID, WLAN_AVAILABLE_NETWORK, WLAN_AVAILABLE_NETWORK_CONNECTED,
-    WLAN_AVAILABLE_NETWORK_HAS_PROFILE, WLAN_AVAILABLE_NETWORK_LIST, WLAN_CONNECTION_PARAMETERS,
-    WLAN_INTERFACE_INFO_LIST, WLAN_PROFILE_INFO_LIST,
+    dot11_BSS_type_any, wlan_connection_mode_profile, WlanCloseHandle, WlanConnect, WlanEnumInterfaces,
+    WlanFreeMemory, WlanGetAvailableNetworkList, WlanGetProfileList, WlanOpenHandle, DOT11_SSID,
+    WLAN_AVAILABLE_NETWORK, WLAN_AVAILABLE_NETWORK_CONNECTED, WLAN_AVAILABLE_NETWORK_HAS_PROFILE,
+    WLAN_AVAILABLE_NETWORK_LIST, WLAN_CONNECTION_PARAMETERS, WLAN_INTERFACE_INFO_LIST,
+    WLAN_PROFILE_INFO_LIST,
 };
 
 use super::radios;
@@ -319,7 +319,11 @@ fn wlan_error_message(code: u32) -> String {
 pub(crate) fn interface_descriptions() -> Vec<String> {
     WlanSession::open()
         .and_then(|session| session.interfaces())
-        .map(|interfaces| interfaces.into_iter().map(|(_, description)| description).collect())
+        .map(|interfaces| {
+            interfaces
+                .into_iter()
+                .map(|(_, description)| description)
+                .collect()
+        })
         .unwrap_or_default()
 }
-

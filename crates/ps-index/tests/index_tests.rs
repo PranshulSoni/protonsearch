@@ -3,9 +3,7 @@
 
 use std::path::PathBuf;
 
-use ps_index::{
-    scan, EntryFilter, EntryKind, FilenameIndex, IndexEntry, ScanOptions,
-};
+use ps_index::{scan, EntryFilter, EntryKind, FilenameIndex, IndexEntry, ScanOptions};
 
 struct TempTree {
     root: PathBuf,
@@ -69,8 +67,22 @@ fn entry(path: &str, kind: EntryKind, size: u64, modified: i64) -> IndexEntry {
 
 fn synthetic_10k() -> Vec<IndexEntry> {
     let words = [
-        "report", "budget", "invoice", "design", "notes", "meeting", "project", "summary",
-        "analysis", "proposal", "draft", "final", "photo", "screenshot", "backup", "archive",
+        "report",
+        "budget",
+        "invoice",
+        "design",
+        "notes",
+        "meeting",
+        "project",
+        "summary",
+        "analysis",
+        "proposal",
+        "draft",
+        "final",
+        "photo",
+        "screenshot",
+        "backup",
+        "archive",
     ];
     let exts = ["pdf", "docx", "txt", "md", "png", "rs"];
     let mut out = Vec::with_capacity(10_000);
@@ -80,7 +92,12 @@ fn synthetic_10k() -> Vec<IndexEntry> {
             words[i % words.len()],
             words[(i / 7) % words.len()]
         );
-        let name = format!("{}_{:05}.{}", words[(i / 3) % words.len()], i, exts[i % exts.len()]);
+        let name = format!(
+            "{}_{:05}.{}",
+            words[(i / 3) % words.len()],
+            i,
+            exts[i % exts.len()]
+        );
         out.push(entry(
             &format!("{dir}\\{name}"),
             EntryKind::File,
@@ -102,7 +119,9 @@ fn ten_thousand_entries_are_deterministic_and_correct() {
     assert_eq!(index.entry_name(hits[0].entry_index), "report_00000.pdf");
     assert!((hits[0].score - 1.0).abs() < 1e-6);
     // entry_path maps back without materializing entries().
-    assert!(index.entry_path(hits[0].entry_index).ends_with("report_00000.pdf"));
+    assert!(index
+        .entry_path(hits[0].entry_index)
+        .ends_with("report_00000.pdf"));
 
     // Determinism: identical results on repeated calls.
     for q in [
@@ -133,13 +152,26 @@ fn ten_thousand_entries_are_deterministic_and_correct() {
 
 #[test]
 fn unicode_cjk_hidden_and_long_paths() {
-    let long_dir: String = (0..10)
-        .map(|i| format!("nested_directory_{:02}\\", i))
-        .collect();
+    let long_dir: String = (0..10).map(|i| format!("nested_directory_{:02}\\", i)).collect();
     let entries = vec![
-        entry("C:\\Users\\X\\Documents\\报告-最终版.pdf", EntryKind::File, 10, 1000),
-        entry("C:\\Users\\X\\Documents\\会议纪要.docx", EntryKind::File, 20, 2000),
-        entry("C:\\Users\\X\\Documents\\日本語テスト.txt", EntryKind::File, 30, 3000),
+        entry(
+            "C:\\Users\\X\\Documents\\报告-最终版.pdf",
+            EntryKind::File,
+            10,
+            1000,
+        ),
+        entry(
+            "C:\\Users\\X\\Documents\\会议纪要.docx",
+            EntryKind::File,
+            20,
+            2000,
+        ),
+        entry(
+            "C:\\Users\\X\\Documents\\日本語テスト.txt",
+            EntryKind::File,
+            30,
+            3000,
+        ),
         entry(
             &format!("C:\\Users\\X\\{long_dir}deep_leaf.txt"),
             EntryKind::File,
@@ -147,7 +179,12 @@ fn unicode_cjk_hidden_and_long_paths() {
             4000,
         ),
         entry("C:\\Users\\X\\Documents\\.gitignore", EntryKind::File, 5, 5000),
-        entry("C:\\Users\\X\\Documents\\hidden_report.pdf", EntryKind::File, 6, 6000),
+        entry(
+            "C:\\Users\\X\\Documents\\hidden_report.pdf",
+            EntryKind::File,
+            6,
+            6000,
+        ),
     ];
     let index = FilenameIndex::from_entries(entries);
 
@@ -187,16 +224,25 @@ fn ranking_order_is_exact_stem_prefix_word_substring_path_fuzzy() {
     ];
     let index = FilenameIndex::from_entries(entries);
     let hits = index.search("report", 20);
-    let names: Vec<&str> = hits
-        .iter()
-        .map(|h| index.entry_name(h.entry_index))
-        .collect();
+    let names: Vec<&str> = hits.iter().map(|h| index.entry_name(h.entry_index)).collect();
     let pos = |n: &str| names.iter().position(|x| *x == n).unwrap_or(usize::MAX);
     assert!(pos("report") < pos("report.pdf"), "exact name first: {names:?}");
-    assert!(pos("report.pdf") < pos("reports.txt"), "stem before prefix: {names:?}");
-    assert!(pos("reports.txt") < pos("annual-report.txt"), "prefix before word-prefix: {names:?}");
-    assert!(pos("annual-report.txt") < pos("myreport.txt"), "word-prefix before substring: {names:?}");
-    assert!(pos("myreport.txt") < pos("r_e_p_o_r_t.txt"), "substring before fuzzy: {names:?}");
+    assert!(
+        pos("report.pdf") < pos("reports.txt"),
+        "stem before prefix: {names:?}"
+    );
+    assert!(
+        pos("reports.txt") < pos("annual-report.txt"),
+        "prefix before word-prefix: {names:?}"
+    );
+    assert!(
+        pos("annual-report.txt") < pos("myreport.txt"),
+        "word-prefix before substring: {names:?}"
+    );
+    assert!(
+        pos("myreport.txt") < pos("r_e_p_o_r_t.txt"),
+        "substring before fuzzy: {names:?}"
+    );
 }
 
 #[test]
@@ -205,12 +251,7 @@ fn multi_term_and_extension_shaped_queries_work() {
     // queries must match names where tokens are separated by _ . or case, and
     // extension-shaped queries (".pdf", "xlsx") must match by substring.
     let entries = vec![
-        entry(
-            r"C:\docs\quarterly_report_final.pdf",
-            EntryKind::File,
-            10,
-            1000,
-        ),
+        entry(r"C:\docs\quarterly_report_final.pdf", EntryKind::File, 10, 1000),
         entry(r"C:\docs\quarterly_report_draft.pdf", EntryKind::File, 11, 2000),
         entry(r"C:\docs\budget.xlsx", EntryKind::File, 12, 3000),
         entry(r"C:\docs\notes.txt", EntryKind::File, 13, 4000),
@@ -399,7 +440,11 @@ fn full_path_query_finds_anchor_beyond_old_scan_cap() {
     assert_eq!(index.len(), N + 1);
 
     let hits = index.search(anchor, 10);
-    assert_eq!(hits.len(), 1, "full-path query must find the anchor at the end of the index");
+    assert_eq!(
+        hits.len(),
+        1,
+        "full-path query must find the anchor at the end of the index"
+    );
     assert_eq!(index.entry_path(hits[0].entry_index), anchor);
     assert!((hits[0].score - 1.0).abs() < 1e-6);
 

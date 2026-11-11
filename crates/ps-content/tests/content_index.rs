@@ -7,9 +7,7 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use ps_content::{
-    extract_text, import_legacy, ContentIndex, DocKind, ExtractOptions, DEFAULT_MAX_BYTES,
-};
+use ps_content::{extract_text, import_legacy, ContentIndex, DocKind, ExtractOptions, DEFAULT_MAX_BYTES};
 
 fn workdir(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
@@ -231,7 +229,10 @@ fn extracts_minimal_pdf_text() {
 fn extracts_docx_paragraphs() {
     let dir = workdir("extract-docx");
     let docx = dir.join("report.docx");
-    write_docx(&docx, &["Quarterly protonsearch report", "Second paragraph budget"]);
+    write_docx(
+        &docx,
+        &["Quarterly protonsearch report", "Second paragraph budget"],
+    );
     let document = extract_text(&docx, DEFAULT_MAX_BYTES)
         .expect("docx extraction must not fail")
         .expect("docx is supported");
@@ -272,11 +273,7 @@ fn extracts_utf16_text_with_bom() {
 #[test]
 fn extracts_cjk_text() {
     let dir = workdir("extract-cjk");
-    let path = write_file(
-        &dir,
-        "cjk.md",
-        "搜索内容检索 中文文档 ProtonSearch".as_bytes(),
-    );
+    let path = write_file(&dir, "cjk.md", "搜索内容检索 中文文档 ProtonSearch".as_bytes());
     let document = extract_text(&path, DEFAULT_MAX_BYTES).unwrap().unwrap();
     assert_eq!(document.kind, DocKind::Markdown);
     assert!(document.text.contains("搜索"), "{:?}", document.text);
@@ -319,18 +316,21 @@ fn pdf_with_invalid_content_stream() -> Vec<u8> {
     let content: Vec<u8> = b"BT (hi) Tj ET\n%\xFF\xFE".to_vec();
     let objects: Vec<(String, Vec<u8>)> = vec![
         ("<< /Type /Catalog /Pages 2 0 R >>".to_string(), Vec::new()),
-        ("<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(), Vec::new()),
+        (
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
+            Vec::new(),
+        ),
         (
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R \
              /Resources << /Font << /F1 5 0 R >> >> >>"
                 .to_string(),
             Vec::new(),
         ),
+        (format!("<< /Length {} >>\nstream\n", content.len()), content),
         (
-            format!("<< /Length {} >>\nstream\n", content.len()),
-            content,
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
+            Vec::new(),
         ),
-        ("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(), Vec::new()),
     ];
     let mut pdf: Vec<u8> = b"%PDF-1.4\n".to_vec();
     let mut offsets = Vec::new();
@@ -344,9 +344,7 @@ fn pdf_with_invalid_content_stream() -> Vec<u8> {
         pdf.extend_from_slice(b"\nendobj\n");
     }
     let xref_offset = pdf.len();
-    pdf.extend_from_slice(
-        format!("xref\n0 {}\n", objects.len() + 1).as_bytes(),
-    );
+    pdf.extend_from_slice(format!("xref\n0 {}\n", objects.len() + 1).as_bytes());
     pdf.extend_from_slice(b"0000000000 65535 f \n");
     for offset in &offsets {
         pdf.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());

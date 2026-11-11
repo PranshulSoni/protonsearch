@@ -7,6 +7,7 @@ import {
   setPreviewLoader,
   useLauncherPreview,
   type LauncherPreviewState,
+  type PreviewLoader,
 } from "./previewClient";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -46,11 +47,15 @@ function makePayload(id: string, title: string): PreviewPayload {
 function Probe({ result }: { result: SearchResult | null }) {
   const state: LauncherPreviewState = useLauncherPreview(result, result !== null);
   return (
-    <span
-      data-testid="probe"
-      data-status={state.status}
-      data-title={state.payload?.title ?? ""}
-    />
+    <>
+      <span
+        data-testid="probe"
+        data-status={state.status}
+        data-title={state.payload?.title ?? ""}
+        data-error={state.error ?? ""}
+      />
+      <button data-testid="reload" onClick={state.reload} />
+    </>
   );
 }
 
@@ -80,6 +85,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+vi.useRealTimers();
   setPreviewLoader(null);
   if (root) {
     await act(async () => {
@@ -92,6 +98,15 @@ afterEach(async () => {
 });
 
 describe("preview client", () => {
+  it("preserves a string rejection message", async () => {
+    setPreviewLoader(vi.fn<PreviewLoader>().mockRejectedValue("Preview capacity is full."));
+    const element = await mountRender(makeResult("capacity"));
+    await wait(150);
+    const probe = element.querySelector('[data-testid="probe"]');
+    expect(probe?.getAttribute("data-status")).toBe("error");
+    expect(probe?.getAttribute("data-error")).toBe("Preview capacity is full.");
+  });
+
   it("debounces, caches by result id, and exposes ready/loading states", async () => {
     const loader = vi.fn(async (resultId: string) => makePayload(resultId, "Preview " + resultId));
     setPreviewLoader(loader);
@@ -137,4 +152,97 @@ describe("preview client", () => {
       "Fresh preview",
     );
   });
+
+  it("refreshes when the preview is reopened or retried", async () => {
+    const loader = vi
+      .fn<PreviewLoader>()
+      .mockResolvedValueOnce(makePayload("same", "Old preview"))
+      .mockResolvedValueOnce(makePayload("same", "Reopened preview"))
+      .mockResolvedValueOnce(makePayload("same", "Retried preview"));
+    setPreviewLoader(loader);
+    const element = await mountRender(makeResult("same"));
+    await wait(150);
+    expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-title")).toBe(
+      "Old preview",
+    );
+
+    await mountRender(null);
+    await mountRender(makeResult("same"));
+    await wait(150);
+    expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-title")).toBe(
+      "Reopened preview",
+    );
+
+    await act(async () => {
+      element.querySelector<HTMLButtonElement>('[data-testid="reload"]')?.click();
+    });
+    expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-status")).toBe(
+      "loading",
+    );
+    await wait(150);
+    expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-title")).toBe(
+      "Retried preview",
+    );
+    expect(loader).toHaveBeenCalledTimes(3);
+  });
+it("does not launch additional requests when retrying a stalled preview", async () => {
+vi.useFakeTimers();
+const loader = vi.fn<PreviewLoader>(() => new Promise<PreviewPayload>(() => {}));
+setPreviewLoader(loader);
+const element = await mountRender(makeResult("stuck"));
+await act(async () => {
+vi.advanceTimersByTime(8_120);
+});
+expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-status")).toBe("error");
+for (let retry = 0; retry < 3; retry += 1) {
+await act(async () => {
+element.querySelector<HTMLButtonElement>('[data-testid="reload"]')?.click();
+});
+await act(async () => {
+vi.advanceTimersByTime(120);
+});
+expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-status")).toBe("loading");
+await act(async () => {
+vi.advanceTimersByTime(8_000);
+});
+expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-status")).toBe("error");
+}
+expect(loader).toHaveBeenCalledTimes(1);
+});
+it("allows a new retry after the timed-out request eventually settles", async () => {
+vi.useFakeTimers();
+let resolveStalled!: (payload: PreviewPayload) => void;
+const loader = vi
+.fn<PreviewLoader>()
+.mockImplementationOnce(
+() => new Promise<PreviewPayload>((resolve) => {
+resolveStalled = resolve;
+}),
+)
+.mockResolvedValueOnce(makePayload("eventual", "Fresh retry"));
+setPreviewLoader(loader);
+const element = await mountRender(makeResult("eventual"));
+await act(async () => {
+vi.advanceTimersByTime(8_120);
+});
+expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-status")).toBe("error");
+await act(async () => {
+resolveStalled(makePayload("eventual", "Late result"));
+await Promise.resolve();
+await Promise.resolve();
+});
+expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-title")).toBe("");
+await act(async () => {
+element.querySelector<HTMLButtonElement>('[data-testid="reload"]')?.click();
+});
+await act(async () => {
+vi.advanceTimersByTime(120);
+await Promise.resolve();
+});
+expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-status")).toBe("ready");
+expect(element.querySelector('[data-testid="probe"]')?.getAttribute("data-title")).toBe(
+"Fresh retry",
+);
+expect(loader).toHaveBeenCalledTimes(2);
+});
 });

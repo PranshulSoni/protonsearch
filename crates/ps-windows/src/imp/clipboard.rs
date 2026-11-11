@@ -23,24 +23,21 @@ use anyhow::{anyhow, bail, Context};
 use windows::core::{w, HSTRING};
 use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    BI_BITFIELDS, BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BITMAPV5HEADER, CBM_INIT,
-    CreateDIBitmap, DIB_RGB_COLORS, DeleteObject, GetDC, GetDIBits, GetObjectW, HGDIOBJ, ReleaseDC,
+    CreateDIBitmap, DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
+    BITMAPINFOHEADER, BITMAPV5HEADER, BI_BITFIELDS, BI_RGB, CBM_INIT, DIB_RGB_COLORS, HGDIOBJ,
 };
 use windows::Win32::System::DataExchange::{
-    AddClipboardFormatListener, CloseClipboard, EmptyClipboard, EnumClipboardFormats,
-    GetClipboardData, GetClipboardFormatNameW, OpenClipboard, RegisterClipboardFormatW,
-    SetClipboardData,
+    AddClipboardFormatListener, CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
+    GetClipboardFormatNameW, OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Memory::{
-    GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
-};
+use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::Shell::DROPFILES;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, PostQuitMessage,
-    PostThreadMessageW, RegisterClassW, TranslateMessage, HMENU, MSG, WINDOW_EX_STYLE,
-    WINDOW_STYLE, WNDCLASSW, WM_DESTROY, WM_QUIT,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, PostQuitMessage, PostThreadMessageW,
+    RegisterClassW, TranslateMessage, HMENU, MSG, WINDOW_EX_STYLE, WINDOW_STYLE, WM_DESTROY, WM_QUIT,
+    WNDCLASSW,
 };
 
 use super::util::ComGuard;
@@ -123,7 +120,10 @@ impl ClipboardSession {
 
     fn rtf(&self) -> Option<String> {
         let raw = registered_bytes("Rich Text Format")?;
-        Some(truncate_string(&String::from_utf8_lossy(&raw), MAX_RICH_FORMAT_BYTES))
+        Some(truncate_string(
+            &String::from_utf8_lossy(&raw),
+            MAX_RICH_FORMAT_BYTES,
+        ))
     }
 
     fn image(&self) -> Option<CapturedImage> {
@@ -352,7 +352,9 @@ struct DibHeader {
 }
 
 fn read_u16(bytes: &[u8], offset: usize) -> Option<u16> {
-    bytes.get(offset..offset + 2).map(|slice| u16::from_le_bytes([slice[0], slice[1]]))
+    bytes
+        .get(offset..offset + 2)
+        .map(|slice| u16::from_le_bytes([slice[0], slice[1]]))
 }
 
 fn read_i32(bytes: &[u8], offset: usize) -> Option<i32> {
@@ -440,9 +442,11 @@ fn decode_dib_image(bytes: &[u8], v5: bool) -> Option<ClipboardImage> {
     let bpp = bit_count;
     let bytes_per_row = (width as u64 * bpp as u64).div_ceil(32) * 4;
     let required = (header.header_size as u64)
-        .checked_add(
-            if !v5 && header.compression == BI_BITFIELDS.0 { 12 } else { 0 },
-        )?
+        .checked_add(if !v5 && header.compression == BI_BITFIELDS.0 {
+            12
+        } else {
+            0
+        })?
         .checked_add(bytes_per_row.checked_mul(abs_height as u64)?)?;
     if required > bytes.len() as u64 {
         return None;
@@ -483,7 +487,11 @@ fn decode_dib_image(bytes: &[u8], v5: bool) -> Option<ClipboardImage> {
     let bottom_up = header.height > 0;
     let mut rgba = vec![0u8; width as usize * abs_height as usize * 4];
     for row in 0..abs_height as usize {
-        let source_row = if bottom_up { abs_height as usize - 1 - row } else { row };
+        let source_row = if bottom_up {
+            abs_height as usize - 1 - row
+        } else {
+            row
+        };
         let row_start = source_row * bytes_per_row as usize;
         for x in 0..width as usize {
             let pixel_offset = match bpp {
@@ -510,10 +518,8 @@ fn decode_dib_image(bytes: &[u8], v5: bool) -> Option<ClipboardImage> {
                     ((r as u32) | ((g as u32) << 8) | ((b as u32) << 16), 255)
                 }
                 16 => {
-                    let value = u16::from_le_bytes([
-                        *data.get(pixel_offset)?,
-                        *data.get(pixel_offset + 1)?,
-                    ]) as u32;
+                    let value =
+                        u16::from_le_bytes([*data.get(pixel_offset)?, *data.get(pixel_offset + 1)?]) as u32;
                     (value, 255)
                 }
                 8 => (*data.get(pixel_offset)? as u32, 255),
@@ -691,11 +697,7 @@ fn bitmap_handle_image() -> Option<ClipboardImage> {
             destination[3] = source[3];
         }
         normalize_alpha(&mut rgba);
-        Some(ClipboardImage {
-            width,
-            height,
-            rgba,
-        })
+        Some(ClipboardImage { width, height, rgba })
     }
 }
 
@@ -802,9 +804,7 @@ fn build_dib_rgb(image: &ClipboardImage) -> Vec<u8> {
         biSizeImage: (stride * height as usize) as u32,
         ..Default::default()
     };
-    out.extend_from_slice(unsafe {
-        std::slice::from_raw_parts(&header as *const _ as *const u8, 40)
-    });
+    out.extend_from_slice(unsafe { std::slice::from_raw_parts(&header as *const _ as *const u8, 40) });
     for row in (0..height as usize).rev() {
         for x in 0..width as usize {
             let px = &image.rgba[(row * width as usize + x) * 4..][..4];
@@ -837,9 +837,7 @@ fn build_dibv5_bitfields(image: &ClipboardImage) -> Vec<u8> {
     };
     header.bV5CSType = 0x7352_4742; // LCS_sRGB
     let mut out = Vec::with_capacity(124 + stride * height as usize);
-    out.extend_from_slice(unsafe {
-        std::slice::from_raw_parts(&header as *const _ as *const u8, 124)
-    });
+    out.extend_from_slice(unsafe { std::slice::from_raw_parts(&header as *const _ as *const u8, 124) });
     for row in (0..height as usize).rev() {
         for x in 0..width as usize {
             let px = &image.rgba[(row * width as usize + x) * 4..][..4];
@@ -1093,12 +1091,7 @@ unsafe fn create_listener_window(_thread_id: u32) -> anyhow::Result<()> {
     Ok(())
 }
 
-unsafe extern "system" fn wndproc(
-    window: HWND,
-    message: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+unsafe extern "system" fn wndproc(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match message {
         WM_CLIPBOARDUPDATE => {
             // Never decode here: just wake the capture worker (bounded queue,
@@ -1130,12 +1123,7 @@ mod decode_tests {
         let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
         for y in 0..height {
             for x in 0..width {
-                rgba.extend_from_slice(&[
-                    (x % 256) as u8,
-                    (y % 256) as u8,
-                    ((x + y) % 256) as u8,
-                    255,
-                ]);
+                rgba.extend_from_slice(&[(x % 256) as u8, (y % 256) as u8, ((x + y) % 256) as u8, 255]);
             }
         }
         rgba
@@ -1198,9 +1186,7 @@ mod decode_tests {
             biSizeImage: (stride * height as usize) as u32,
             ..Default::default()
         };
-        out.extend_from_slice(unsafe {
-            std::slice::from_raw_parts(&header as *const _ as *const u8, 40)
-        });
+        out.extend_from_slice(unsafe { std::slice::from_raw_parts(&header as *const _ as *const u8, 40) });
         for mask in [0x00FF_0000u32, 0x0000_FF00, 0x0000_00FF] {
             out.extend_from_slice(&mask.to_le_bytes());
         }
@@ -1280,9 +1266,8 @@ mod decode_tests {
             biClrUsed: 4,
             ..Default::default()
         };
-        payload.extend_from_slice(unsafe {
-            std::slice::from_raw_parts(&header as *const _ as *const u8, 40)
-        });
+        payload
+            .extend_from_slice(unsafe { std::slice::from_raw_parts(&header as *const _ as *const u8, 40) });
         for (r, g, b) in [(0u8, 0u8, 0u8), (255, 0, 0), (0, 255, 0), (0, 0, 255)] {
             payload.extend_from_slice(&[b, g, r, 0]);
         }

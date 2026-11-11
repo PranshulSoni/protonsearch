@@ -407,8 +407,7 @@ impl FilenameIndex {
         // The sorted array must actually be ordered by the same comparator the
         // runtime uses; otherwise prefix binary search would silently misbehave.
         for pair in sorted.windows(2) {
-            if crate::sort_cmp_parts(&arena, &entries, &dirs, pair[0], pair[1])
-                == std::cmp::Ordering::Greater
+            if crate::sort_cmp_parts(&arena, &entries, &dirs, pair[0], pair[1]) == std::cmp::Ordering::Greater
             {
                 return Err(corrupt("sorted array is not ordered"));
             }
@@ -512,7 +511,10 @@ mod tests {
             let mut f = File::create(&path).unwrap();
             f.write_all(&bytes[..cut.min(bytes.len())]).unwrap();
             drop(f);
-            assert!(FilenameIndex::load(&path).is_err(), "truncated at {cut} must fail");
+            assert!(
+                FilenameIndex::load(&path).is_err(),
+                "truncated at {cut} must fail"
+            );
         }
         // Flip a byte in the arena: checksum must catch it.
         let mut flipped = bytes.clone();

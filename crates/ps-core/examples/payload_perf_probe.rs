@@ -30,8 +30,16 @@ fn json_len(value: &impl serde::Serialize) -> usize {
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let data_dir = PathBuf::from(args.first().cloned().unwrap_or_else(|| ".devdata-perf64/v2".into()));
-    let out_path = Path::new(args.get(1).map(String::as_str).unwrap_or("target/payload-perf.json"));
+    let data_dir = PathBuf::from(
+        args.first()
+            .cloned()
+            .unwrap_or_else(|| ".devdata-perf64/v2".into()),
+    );
+    let out_path = Path::new(
+        args.get(1)
+            .map(String::as_str)
+            .unwrap_or("target/payload-perf.json"),
+    );
 
     match std::fs::read_to_string(data_dir.join("settings.json"))
         .map_err(|err| err.to_string())
@@ -259,8 +267,16 @@ fn base64_encode(bytes: &[u8]) -> String {
         let triple = (b0 << 16) | (b1 << 8) | b2;
         out.push(TABLE[((triple >> 18) & 0x3F) as usize] as char);
         out.push(TABLE[((triple >> 12) & 0x3F) as usize] as char);
-        out.push(if chunk.len() > 1 { TABLE[((triple >> 6) & 0x3F) as usize] as char } else { '=' });
-        out.push(if chunk.len() > 2 { TABLE[(triple & 0x3F) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            TABLE[((triple >> 6) & 0x3F) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            TABLE[(triple & 0x3F) as usize] as char
+        } else {
+            '='
+        });
     }
     out
 }

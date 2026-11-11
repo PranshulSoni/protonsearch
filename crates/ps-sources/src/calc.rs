@@ -418,8 +418,16 @@ fn apply_function(name: &str, arguments: &[f64]) -> Option<f64> {
                 None
             }
         }
-        "min" => arguments.iter().copied().reduce(f64::min).filter(|v| v.is_finite()),
-        "max" => arguments.iter().copied().reduce(f64::max).filter(|v| v.is_finite()),
+        "min" => arguments
+            .iter()
+            .copied()
+            .reduce(f64::min)
+            .filter(|v| v.is_finite()),
+        "max" => arguments
+            .iter()
+            .copied()
+            .reduce(f64::max)
+            .filter(|v| v.is_finite()),
         "avg" | "mean" => {
             if arguments.is_empty() {
                 return None;
@@ -461,7 +469,11 @@ pub fn format_number(value: f64) -> String {
         return "NaN".to_string();
     }
     if value.is_infinite() {
-        return if value > 0.0 { "∞".to_string() } else { "-∞".to_string() };
+        return if value > 0.0 {
+            "∞".to_string()
+        } else {
+            "-∞".to_string()
+        };
     }
     let absolute = value.abs();
     if absolute != 0.0 && (absolute >= 1e15 || absolute < 1e-9) {
@@ -510,65 +522,325 @@ struct Unit {
 
 const UNITS: &[Unit] = &[
     // Length (base: metre)
-    Unit { symbol: "mm", aliases: &["mm", "millimeter", "millimeters", "millimetre", "millimetres"], category: Category::Length, factor: 0.001 },
-    Unit { symbol: "cm", aliases: &["cm", "centimeter", "centimeters", "centimetre", "centimetres"], category: Category::Length, factor: 0.01 },
-    Unit { symbol: "m", aliases: &["m", "meter", "meters", "metre", "metres"], category: Category::Length, factor: 1.0 },
-    Unit { symbol: "km", aliases: &["km", "kilometer", "kilometers", "kilometre", "kilometres"], category: Category::Length, factor: 1000.0 },
-    Unit { symbol: "in", aliases: &["in", "inch", "inches"], category: Category::Length, factor: 0.0254 },
-    Unit { symbol: "ft", aliases: &["ft", "foot", "feet"], category: Category::Length, factor: 0.3048 },
-    Unit { symbol: "yd", aliases: &["yd", "yard", "yards"], category: Category::Length, factor: 0.9144 },
-    Unit { symbol: "mi", aliases: &["mi", "mile", "miles"], category: Category::Length, factor: 1609.344 },
-    Unit { symbol: "nmi", aliases: &["nmi", "nauticalmile", "nauticalmiles"], category: Category::Length, factor: 1852.0 },
+    Unit {
+        symbol: "mm",
+        aliases: &["mm", "millimeter", "millimeters", "millimetre", "millimetres"],
+        category: Category::Length,
+        factor: 0.001,
+    },
+    Unit {
+        symbol: "cm",
+        aliases: &["cm", "centimeter", "centimeters", "centimetre", "centimetres"],
+        category: Category::Length,
+        factor: 0.01,
+    },
+    Unit {
+        symbol: "m",
+        aliases: &["m", "meter", "meters", "metre", "metres"],
+        category: Category::Length,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "km",
+        aliases: &["km", "kilometer", "kilometers", "kilometre", "kilometres"],
+        category: Category::Length,
+        factor: 1000.0,
+    },
+    Unit {
+        symbol: "in",
+        aliases: &["in", "inch", "inches"],
+        category: Category::Length,
+        factor: 0.0254,
+    },
+    Unit {
+        symbol: "ft",
+        aliases: &["ft", "foot", "feet"],
+        category: Category::Length,
+        factor: 0.3048,
+    },
+    Unit {
+        symbol: "yd",
+        aliases: &["yd", "yard", "yards"],
+        category: Category::Length,
+        factor: 0.9144,
+    },
+    Unit {
+        symbol: "mi",
+        aliases: &["mi", "mile", "miles"],
+        category: Category::Length,
+        factor: 1609.344,
+    },
+    Unit {
+        symbol: "nmi",
+        aliases: &["nmi", "nauticalmile", "nauticalmiles"],
+        category: Category::Length,
+        factor: 1852.0,
+    },
     // Mass (base: gram)
-    Unit { symbol: "mg", aliases: &["mg", "milligram", "milligrams"], category: Category::Mass, factor: 0.001 },
-    Unit { symbol: "g", aliases: &["g", "gram", "grams"], category: Category::Mass, factor: 1.0 },
-    Unit { symbol: "kg", aliases: &["kg", "kilogram", "kilograms"], category: Category::Mass, factor: 1000.0 },
-    Unit { symbol: "t", aliases: &["t", "tonne", "tonnes", "metrict", "metrictons"], category: Category::Mass, factor: 1_000_000.0 },
-    Unit { symbol: "oz", aliases: &["oz", "ounce", "ounces"], category: Category::Mass, factor: 28.349523125 },
-    Unit { symbol: "lb", aliases: &["lb", "lbs", "pound", "pounds"], category: Category::Mass, factor: 453.59237 },
-    Unit { symbol: "st", aliases: &["st", "stone", "stones"], category: Category::Mass, factor: 6350.29318 },
+    Unit {
+        symbol: "mg",
+        aliases: &["mg", "milligram", "milligrams"],
+        category: Category::Mass,
+        factor: 0.001,
+    },
+    Unit {
+        symbol: "g",
+        aliases: &["g", "gram", "grams"],
+        category: Category::Mass,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "kg",
+        aliases: &["kg", "kilogram", "kilograms"],
+        category: Category::Mass,
+        factor: 1000.0,
+    },
+    Unit {
+        symbol: "t",
+        aliases: &["t", "tonne", "tonnes", "metrict", "metrictons"],
+        category: Category::Mass,
+        factor: 1_000_000.0,
+    },
+    Unit {
+        symbol: "oz",
+        aliases: &["oz", "ounce", "ounces"],
+        category: Category::Mass,
+        factor: 28.349523125,
+    },
+    Unit {
+        symbol: "lb",
+        aliases: &["lb", "lbs", "pound", "pounds"],
+        category: Category::Mass,
+        factor: 453.59237,
+    },
+    Unit {
+        symbol: "st",
+        aliases: &["st", "stone", "stones"],
+        category: Category::Mass,
+        factor: 6350.29318,
+    },
     // Data (base: byte)
-    Unit { symbol: "B", aliases: &["b", "byte", "bytes"], category: Category::Data, factor: 1.0 },
-    Unit { symbol: "KB", aliases: &["kb", "kilobyte", "kilobytes"], category: Category::Data, factor: 1024.0 },
-    Unit { symbol: "MB", aliases: &["mb", "megabyte", "megabytes"], category: Category::Data, factor: 1_048_576.0 },
-    Unit { symbol: "GB", aliases: &["gb", "gigabyte", "gigabytes"], category: Category::Data, factor: 1_073_741_824.0 },
-    Unit { symbol: "TB", aliases: &["tb", "terabyte", "terabytes"], category: Category::Data, factor: 1_099_511_627_776.0 },
-    Unit { symbol: "KiB", aliases: &["kib", "kibibyte", "kibibytes"], category: Category::Data, factor: 1024.0 },
-    Unit { symbol: "MiB", aliases: &["mib", "mebibyte", "mebibytes"], category: Category::Data, factor: 1_048_576.0 },
-    Unit { symbol: "GiB", aliases: &["gib", "gibibyte", "gibibytes"], category: Category::Data, factor: 1_073_741_824.0 },
+    Unit {
+        symbol: "B",
+        aliases: &["b", "byte", "bytes"],
+        category: Category::Data,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "KB",
+        aliases: &["kb", "kilobyte", "kilobytes"],
+        category: Category::Data,
+        factor: 1024.0,
+    },
+    Unit {
+        symbol: "MB",
+        aliases: &["mb", "megabyte", "megabytes"],
+        category: Category::Data,
+        factor: 1_048_576.0,
+    },
+    Unit {
+        symbol: "GB",
+        aliases: &["gb", "gigabyte", "gigabytes"],
+        category: Category::Data,
+        factor: 1_073_741_824.0,
+    },
+    Unit {
+        symbol: "TB",
+        aliases: &["tb", "terabyte", "terabytes"],
+        category: Category::Data,
+        factor: 1_099_511_627_776.0,
+    },
+    Unit {
+        symbol: "KiB",
+        aliases: &["kib", "kibibyte", "kibibytes"],
+        category: Category::Data,
+        factor: 1024.0,
+    },
+    Unit {
+        symbol: "MiB",
+        aliases: &["mib", "mebibyte", "mebibytes"],
+        category: Category::Data,
+        factor: 1_048_576.0,
+    },
+    Unit {
+        symbol: "GiB",
+        aliases: &["gib", "gibibyte", "gibibytes"],
+        category: Category::Data,
+        factor: 1_073_741_824.0,
+    },
     // Time (base: second)
-    Unit { symbol: "ms", aliases: &["ms", "millisecond", "milliseconds"], category: Category::Time, factor: 0.001 },
-    Unit { symbol: "s", aliases: &["s", "sec", "secs", "second", "seconds"], category: Category::Time, factor: 1.0 },
-    Unit { symbol: "min", aliases: &["min", "mins", "minute", "minutes"], category: Category::Time, factor: 60.0 },
-    Unit { symbol: "h", aliases: &["h", "hr", "hrs", "hour", "hours"], category: Category::Time, factor: 3600.0 },
-    Unit { symbol: "day", aliases: &["d", "day", "days"], category: Category::Time, factor: 86400.0 },
-    Unit { symbol: "week", aliases: &["wk", "week", "weeks"], category: Category::Time, factor: 604_800.0 },
-    Unit { symbol: "year", aliases: &["yr", "year", "years"], category: Category::Time, factor: 31_557_600.0 },
+    Unit {
+        symbol: "ms",
+        aliases: &["ms", "millisecond", "milliseconds"],
+        category: Category::Time,
+        factor: 0.001,
+    },
+    Unit {
+        symbol: "s",
+        aliases: &["s", "sec", "secs", "second", "seconds"],
+        category: Category::Time,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "min",
+        aliases: &["min", "mins", "minute", "minutes"],
+        category: Category::Time,
+        factor: 60.0,
+    },
+    Unit {
+        symbol: "h",
+        aliases: &["h", "hr", "hrs", "hour", "hours"],
+        category: Category::Time,
+        factor: 3600.0,
+    },
+    Unit {
+        symbol: "day",
+        aliases: &["d", "day", "days"],
+        category: Category::Time,
+        factor: 86400.0,
+    },
+    Unit {
+        symbol: "week",
+        aliases: &["wk", "week", "weeks"],
+        category: Category::Time,
+        factor: 604_800.0,
+    },
+    Unit {
+        symbol: "year",
+        aliases: &["yr", "year", "years"],
+        category: Category::Time,
+        factor: 31_557_600.0,
+    },
     // Volume (base: litre)
-    Unit { symbol: "ml", aliases: &["ml", "milliliter", "milliliters", "millilitre", "millilitres"], category: Category::Volume, factor: 0.001 },
-    Unit { symbol: "l", aliases: &["l", "liter", "liters", "litre", "litres"], category: Category::Volume, factor: 1.0 },
-    Unit { symbol: "gal", aliases: &["gal", "gallon", "gallons"], category: Category::Volume, factor: 3.785411784 },
-    Unit { symbol: "qt", aliases: &["qt", "quart", "quarts"], category: Category::Volume, factor: 0.946352946 },
-    Unit { symbol: "pt", aliases: &["pt", "pint", "pints"], category: Category::Volume, factor: 0.473176473 },
-    Unit { symbol: "cup", aliases: &["cup", "cups"], category: Category::Volume, factor: 0.2365882365 },
-    Unit { symbol: "floz", aliases: &["floz", "fluidounce", "fluidounces"], category: Category::Volume, factor: 0.0295735295625 },
+    Unit {
+        symbol: "ml",
+        aliases: &["ml", "milliliter", "milliliters", "millilitre", "millilitres"],
+        category: Category::Volume,
+        factor: 0.001,
+    },
+    Unit {
+        symbol: "l",
+        aliases: &["l", "liter", "liters", "litre", "litres"],
+        category: Category::Volume,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "gal",
+        aliases: &["gal", "gallon", "gallons"],
+        category: Category::Volume,
+        factor: 3.785411784,
+    },
+    Unit {
+        symbol: "qt",
+        aliases: &["qt", "quart", "quarts"],
+        category: Category::Volume,
+        factor: 0.946352946,
+    },
+    Unit {
+        symbol: "pt",
+        aliases: &["pt", "pint", "pints"],
+        category: Category::Volume,
+        factor: 0.473176473,
+    },
+    Unit {
+        symbol: "cup",
+        aliases: &["cup", "cups"],
+        category: Category::Volume,
+        factor: 0.2365882365,
+    },
+    Unit {
+        symbol: "floz",
+        aliases: &["floz", "fluidounce", "fluidounces"],
+        category: Category::Volume,
+        factor: 0.0295735295625,
+    },
     // Area (base: square metre)
-    Unit { symbol: "m2", aliases: &["m2", "sqm", "squaremeter", "squaremeters"], category: Category::Area, factor: 1.0 },
-    Unit { symbol: "km2", aliases: &["km2", "sqkm"], category: Category::Area, factor: 1_000_000.0 },
-    Unit { symbol: "cm2", aliases: &["cm2", "sqcm"], category: Category::Area, factor: 0.0001 },
-    Unit { symbol: "ft2", aliases: &["ft2", "sqft", "squarefoot", "squarefeet"], category: Category::Area, factor: 0.09290304 },
-    Unit { symbol: "in2", aliases: &["in2", "sqin"], category: Category::Area, factor: 0.00064516 },
-    Unit { symbol: "acre", aliases: &["acre", "acres"], category: Category::Area, factor: 4046.8564224 },
-    Unit { symbol: "ha", aliases: &["ha", "hectare", "hectares"], category: Category::Area, factor: 10_000.0 },
+    Unit {
+        symbol: "m2",
+        aliases: &["m2", "sqm", "squaremeter", "squaremeters"],
+        category: Category::Area,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "km2",
+        aliases: &["km2", "sqkm"],
+        category: Category::Area,
+        factor: 1_000_000.0,
+    },
+    Unit {
+        symbol: "cm2",
+        aliases: &["cm2", "sqcm"],
+        category: Category::Area,
+        factor: 0.0001,
+    },
+    Unit {
+        symbol: "ft2",
+        aliases: &["ft2", "sqft", "squarefoot", "squarefeet"],
+        category: Category::Area,
+        factor: 0.09290304,
+    },
+    Unit {
+        symbol: "in2",
+        aliases: &["in2", "sqin"],
+        category: Category::Area,
+        factor: 0.00064516,
+    },
+    Unit {
+        symbol: "acre",
+        aliases: &["acre", "acres"],
+        category: Category::Area,
+        factor: 4046.8564224,
+    },
+    Unit {
+        symbol: "ha",
+        aliases: &["ha", "hectare", "hectares"],
+        category: Category::Area,
+        factor: 10_000.0,
+    },
     // Speed (base: metre/second)
-    Unit { symbol: "mps", aliases: &["mps", "m/s", "meterspersecond"], category: Category::Speed, factor: 1.0 },
-    Unit { symbol: "kmh", aliases: &["kmh", "km/h", "kph", "kilometersperhour"], category: Category::Speed, factor: 1.0 / 3.6 },
-    Unit { symbol: "mph", aliases: &["mph", "milesperhour"], category: Category::Speed, factor: 0.44704 },
-    Unit { symbol: "kn", aliases: &["kn", "knot", "knots"], category: Category::Speed, factor: 0.514444444 },
+    Unit {
+        symbol: "mps",
+        aliases: &["mps", "m/s", "meterspersecond"],
+        category: Category::Speed,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "kmh",
+        aliases: &["kmh", "km/h", "kph", "kilometersperhour"],
+        category: Category::Speed,
+        factor: 1.0 / 3.6,
+    },
+    Unit {
+        symbol: "mph",
+        aliases: &["mph", "milesperhour"],
+        category: Category::Speed,
+        factor: 0.44704,
+    },
+    Unit {
+        symbol: "kn",
+        aliases: &["kn", "knot", "knots"],
+        category: Category::Speed,
+        factor: 0.514444444,
+    },
     // Temperature (custom formulas; factor unused)
-    Unit { symbol: "°C", aliases: &["c", "°c", "celsius", "centigrade"], category: Category::Temperature, factor: 1.0 },
-    Unit { symbol: "°F", aliases: &["f", "°f", "fahrenheit"], category: Category::Temperature, factor: 1.0 },
-    Unit { symbol: "K", aliases: &["k", "kelvin"], category: Category::Temperature, factor: 1.0 },
+    Unit {
+        symbol: "°C",
+        aliases: &["c", "°c", "celsius", "centigrade"],
+        category: Category::Temperature,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "°F",
+        aliases: &["f", "°f", "fahrenheit"],
+        category: Category::Temperature,
+        factor: 1.0,
+    },
+    Unit {
+        symbol: "K",
+        aliases: &["k", "kelvin"],
+        category: Category::Temperature,
+        factor: 1.0,
+    },
 ];
 
 fn find_unit(name: &str) -> Option<&'static Unit> {
@@ -601,17 +873,8 @@ fn parse_conversion(query: &str) -> Option<(f64, String, String)> {
     // it when no other separator token is present.
     let separator_index = tokens
         .iter()
-        .position(|token| {
-            matches!(
-                token.to_ascii_lowercase().as_str(),
-                "to" | "into" | "as" | "="
-            )
-        })
-        .or_else(|| {
-            tokens
-                .iter()
-                .position(|token| token.eq_ignore_ascii_case("in"))
-        })?;
+        .position(|token| matches!(token.to_ascii_lowercase().as_str(), "to" | "into" | "as" | "="))
+        .or_else(|| tokens.iter().position(|token| token.eq_ignore_ascii_case("in")))?;
     if separator_index == 0 || separator_index + 1 >= tokens.len() {
         return None;
     }

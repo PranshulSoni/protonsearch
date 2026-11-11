@@ -54,8 +54,7 @@ impl ParsedQuery {
         let is_math = if trimmed.is_empty() {
             false
         } else {
-            ps_sources::calc::evaluate(trimmed).is_some()
-                || ps_sources::calc::convert(trimmed).is_some()
+            ps_sources::calc::evaluate(trimmed).is_some() || ps_sources::calc::convert(trimmed).is_some()
         };
         Self {
             raw: trimmed.to_string(),
@@ -390,10 +389,7 @@ mod tests {
         assert_eq!(p.terms, vec!["projects"]);
 
         let p = ParsedQuery::parse(r#"in:"C:\Users\Me\Documents" report"#);
-        assert_eq!(
-            p.filters.under_path.as_deref(),
-            Some(r"C:\Users\Me\Documents")
-        );
+        assert_eq!(p.filters.under_path.as_deref(), Some(r"C:\Users\Me\Documents"));
         assert_eq!(p.terms, vec!["report"]);
     }
 

@@ -13,20 +13,22 @@
 //! search hot path.
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Mutex, OnceLock};
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 use std::time::UNIX_EPOCH;
 
-use ps_ipc::{ActionSpec, PreviewField, PreviewPayload, PreviewRange, PreviewStatus, SearchResult, SourceKind};
+use ps_ipc::{
+    ActionSpec, PreviewField, PreviewPayload, PreviewRange, PreviewStatus, SearchResult, SourceKind,
+};
 
 use crate::db::EngineDb;
 
-pub(crate) const PREVIEW_CACHE_CAP: usize = 128;
 pub(crate) const RESULT_REGISTRY_CAP: usize = 512;
 
 const PREVIEW_IMAGE_MAX_BYTES: u64 = 16 * 1024 * 1024;
 const PREVIEW_IMAGE_MAX_EDGE: u32 = 640;
+const PREVIEW_IMAGE_MAX_DECODE_PIXELS: u64 = 16 * 1024 * 1024;
 const PREVIEW_TEXT_MAX_BYTES: u64 = 16 * 1024 * 1024;
 const PREVIEW_SNIPPET_CHARS: usize = 240;
 const PREVIEW_FIELD_MAX_CHARS: usize = 200;
@@ -64,40 +66,6 @@ impl ResultRegistry {
     }
 }
 
-/// Bounded LRU cache of rendered preview payloads, keyed by (resultId, maxChars).
-#[derive(Default)]
-pub(crate) struct PreviewCache {
-    order: VecDeque<(String, usize)>,
-    map: HashMap<(String, usize), PreviewPayload>,
-}
-
-impl PreviewCache {
-    pub(crate) fn get(&mut self, key: &(String, usize)) -> Option<PreviewPayload> {
-        let payload = self.map.get(key)?.clone();
-        if let Some(position) = self.order.iter().position(|candidate| candidate == key) {
-            let key = self.order.remove(position).expect("checked position");
-            self.order.push_back(key);
-        }
-        Some(payload)
-    }
-
-    pub(crate) fn put(&mut self, key: (String, usize), payload: PreviewPayload) {
-        if self.map.insert(key.clone(), payload).is_none() {
-            self.order.push_back(key);
-        }
-        while self.order.len() > PREVIEW_CACHE_CAP {
-            if let Some(oldest) = self.order.pop_front() {
-                self.map.remove(&oldest);
-            }
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn len(&self) -> usize {
-        self.map.len()
-    }
-}
-
 /// Build the preview payload for one resolved search result.
 pub(crate) fn build_preview(
     result: &SearchResult,
@@ -111,7 +79,11 @@ pub(crate) fn build_preview(
         subtitle: result.subtitle.clone(),
         format: preview_format(result),
         text: None,
-        snippet: result.meta.snippet.clone().filter(|value| !value.trim().is_empty()),
+        snippet: result
+            .meta
+            .snippet
+            .clone()
+            .filter(|value| !value.trim().is_empty()),
         highlight_ranges: result
             .match_ranges
             .iter()
@@ -136,10 +108,11 @@ pub(crate) fn build_preview(
         | SourceKind::ContentMatch
         | SourceKind::OcrText
         | SourceKind::Recent => match result.path.as_deref() {
-            Some(path) => fill_file_preview(&mut payload, path, max_chars, db),
+            Some(path) => {
+                fill_file_preview(&mut payload, path, max_chars, db, result.kind == SourceKind::File)
+            }
             None => {
-                payload.unsupported_reason =
-                    Some("No file path is attached to this result.".to_string());
+                payload.unsupported_reason = Some("No file path is attached to this result.".to_string());
             }
         },
         SourceKind::Clipboard | SourceKind::Snippet => {
@@ -147,12 +120,7 @@ pub(crate) fn build_preview(
         }
         SourceKind::BrowserHistory | SourceKind::Bookmark => {
             payload.format = "url".to_string();
-            payload.text = Some(
-                result
-                    .path
-                    .clone()
-                    .unwrap_or_else(|| result.subtitle.clone()),
-            );
+            payload.text = Some(result.path.clone().unwrap_or_else(|| result.subtitle.clone()));
         }
         _ => {
             payload.format = preview_format(result);
@@ -270,15 +238,18 @@ fn fill_clipboard_preview(
             }
         }
     }
-    if payload.image_data_url.is_none()
-        && payload.text.is_none()
-        && payload.unsupported_reason.is_none()
-    {
+    if payload.image_data_url.is_none() && payload.text.is_none() && payload.unsupported_reason.is_none() {
         payload.unsupported_reason = Some("Clipboard item content is unavailable.".to_string());
     }
 }
 
-fn fill_file_preview(payload: &mut PreviewPayload, path: &str, max_chars: usize, db: &EngineDb) {
+fn fill_file_preview(
+    payload: &mut PreviewPayload,
+    path: &str,
+    max_chars: usize,
+    db: &EngineDb,
+    filename_result: bool,
+) {
     let path_ref = Path::new(path);
     let extension = extension_of(path);
     let metadata = std::fs::metadata(path_ref).ok();
@@ -368,12 +339,23 @@ fn fill_file_preview(payload: &mut PreviewPayload, path: &str, max_chars: usize,
         Ok(Some(document)) => {
             let (text, truncated) = sanitize_preview_text(&document.text, max_chars);
             if text.trim().is_empty() {
-                payload.unsupported_reason = Some(if extension == "pdf" {
-                    "This PDF has no text layer (scanned document); OCR preview is not available yet."
-                        .to_string()
+                if extension == "pdf" {
+                    if let Some(ocr) = db.ocr_text_for_path(path) {
+                        let (ocr, ocr_truncated) = sanitize_preview_text(&ocr, max_chars);
+                        if !ocr.trim().is_empty() {
+                            payload.ocr_text = Some(ocr);
+                            payload.truncated = ocr_truncated;
+                            return;
+                        }
+                    }
+                    payload.unsupported_reason = Some(
+                        "This PDF has no text layer (scanned document); OCR preview is not available yet."
+                            .to_string(),
+                    );
                 } else {
-                    "No extractable text was found in this file.".to_string()
-                });
+                    payload.unsupported_reason =
+                        Some("No extractable text was found in this file.".to_string());
+                }
                 return;
             }
             payload.fields.push(PreviewField {
@@ -390,6 +372,9 @@ fn fill_file_preview(payload: &mut PreviewPayload, path: &str, max_chars: usize,
                     label: "Note".into(),
                     value: "Preview truncated".into(),
                 });
+            }
+            if filename_result {
+                payload.highlight_ranges.clear();
             }
             if payload.snippet.is_none() {
                 payload.snippet = first_line_excerpt(&text);
@@ -409,8 +394,7 @@ fn fill_file_preview(payload: &mut PreviewPayload, path: &str, max_chars: usize,
             }
         }
         Ok(None) => {
-            payload.unsupported_reason =
-                Some(format!("Preview is not available for .{extension} files."));
+            payload.unsupported_reason = Some(format!("Preview is not available for .{extension} files."));
         }
         Err(err) => {
             let reason: String = format!("{err:#}")
@@ -436,11 +420,7 @@ fn preview_format(result: &SearchResult) -> String {
     if result.kind == SourceKind::Folder {
         return "folder".to_string();
     }
-    let extension = result
-        .path
-        .as_deref()
-        .map(extension_of)
-        .unwrap_or_default();
+    let extension = result.path.as_deref().map(extension_of).unwrap_or_default();
     if !extension.is_empty() {
         return extension;
     }
@@ -523,11 +503,8 @@ fn clipboard_text(result: &SearchResult) -> Option<String> {
 /// Read the clipboard image row for a result id (id form "clip:<rowid>").
 fn clipboard_image_info(db_path: &Path, result_id: &str) -> Option<(String, u32, u32, Option<String>)> {
     let id: i64 = result_id.strip_prefix("clip:")?.parse().ok()?;
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )
-    .ok()?;
+    let conn =
+        rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
     let _ = conn.busy_timeout(std::time::Duration::from_millis(1000));
     conn.query_row(
         "SELECT image_path, ocr_text FROM clipboard_history WHERE id = ?1 AND image_path IS NOT NULL",
@@ -558,15 +535,31 @@ fn is_image_extension(extension: &str) -> bool {
 
 /// Downscale an image to a bounded PNG data URL. Never upscales.
 fn image_preview_data_url(path: &Path) -> Result<(String, u32, u32), String> {
-    let bytes = std::fs::read(path).map_err(|err| err.to_string())?;
-    if bytes.is_empty() {
-        return Err("empty image file".to_string());
+    use image::io::Reader as ImageReader;
+    let reader = ImageReader::open(path)
+        .and_then(ImageReader::with_guessed_format)
+        .map_err(|err| err.to_string())?;
+    let (width, height) = reader.into_dimensions().map_err(|err| err.to_string())?;
+    if width == 0
+        || height == 0
+        || width > 8192
+        || height > 8192
+        || width as u64 * height as u64 > PREVIEW_IMAGE_MAX_DECODE_PIXELS
+    {
+        return Err(format!(
+            "image dimensions exceed preview decode limit ({width} x {height})"
+        ));
     }
-    let image = image::load_from_memory(&bytes).map_err(|err| err.to_string())?;
+    let mut reader = ImageReader::open(path)
+        .and_then(ImageReader::with_guessed_format)
+        .map_err(|err| err.to_string())?;
+    let mut limits = image::io::Limits::default();
+    limits.max_image_width = Some(8192);
+    limits.max_image_height = Some(8192);
+    limits.max_alloc = Some(PREVIEW_IMAGE_MAX_DECODE_PIXELS * 4);
+    reader.limits(limits);
+    let image = reader.decode().map_err(|err| err.to_string())?;
     let (width, height) = (image.width(), image.height());
-    if width > 8192 || height > 8192 {
-        return Err(format!("image dimensions exceed the 8192 px preview limit ({width} x {height})"));
-    }
     let thumbnail = image.thumbnail(PREVIEW_IMAGE_MAX_EDGE, PREVIEW_IMAGE_MAX_EDGE);
     let mut png = Vec::new();
     thumbnail
@@ -776,6 +769,33 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn oversized_png_header_is_rejected_before_pixel_decode() {
+        let mut png = Vec::new();
+        image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(1, 1, image::Rgba([0, 0, 0, 0])))
+            .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        png[16..20].copy_from_slice(&5000u32.to_be_bytes());
+        png[20..24].copy_from_slice(&5000u32.to_be_bytes());
+        let crc = png[12..29].iter().fold(!0u32, |crc, byte| {
+            (0..8).fold(crc ^ *byte as u32, |crc, _| {
+                (crc >> 1) ^ (0xEDB88320 & (0u32.wrapping_sub(crc & 1)))
+            })
+        }) ^ !0u32;
+        png[29..33].copy_from_slice(&crc.to_be_bytes());
+        let path = std::env::temp_dir().join(format!(
+            "ps-preview-{}-{}.png",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::write(&path, png).unwrap();
+        let error = image_preview_data_url(&path).unwrap_err();
+        let _ = std::fs::remove_file(path);
+        assert!(error.contains("5000 x 5000"), "{error}");
+    }
 
     #[test]
     fn base64_matches_known_vectors() {

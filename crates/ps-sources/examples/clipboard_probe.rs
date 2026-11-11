@@ -24,9 +24,7 @@ fn main() {
     match ps_sources::clipboard::capture_current(&db, &images) {
         Ok(Some(entry)) => println!(
             "capture_current -> id={} category={:?} text={:?}",
-            entry.id,
-            entry.category,
-            entry.text
+            entry.id, entry.category, entry.text
         ),
         other => println!("capture_current unexpected: {other:?}"),
     }
@@ -45,16 +43,13 @@ fn main() {
     for entry in ps_sources::clipboard::list_recent(&db, 10) {
         println!(
             "  recent id={} category={:?} pinned={} text={:?}",
-            entry.id,
-            entry.category,
-            entry.pinned,
-            entry.text
+            entry.id, entry.category, entry.pinned, entry.text
         );
     }
 
     // 3) Live listener: a new copy must appear in the DB.
-    let listener = ps_sources::clipboard::start_listener(db.clone(), images.clone())
-        .expect("start clipboard listener");
+    let listener =
+        ps_sources::clipboard::start_listener(db.clone(), images.clone()).expect("start clipboard listener");
     let marker = "live listener probe marker 42";
     ps_windows::set_clipboard_text(marker).expect("set clipboard");
     let mut found = false;

@@ -100,8 +100,7 @@ fn sidecar_fingerprint(db: &Path) -> anyhow::Result<String> {
 }
 
 fn sha256_file(path: &Path) -> anyhow::Result<String> {
-    let bytes = std::fs::read(path)
-        .with_context(|| format!("reading legacy database {}", path.display()))?;
+    let bytes = std::fs::read(path).with_context(|| format!("reading legacy database {}", path.display()))?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
     Ok(format!("{:x}", hasher.finalize()))
@@ -171,7 +170,8 @@ fn copy(table: &str, columns: &[&str], source: &Connection, target: &Connection)
         for index in 0..columns.len() {
             values.push(row.get(index)?);
         }
-        let params: Vec<&dyn rusqlite::ToSql> = values.iter().map(|value| value as &dyn rusqlite::ToSql).collect();
+        let params: Vec<&dyn rusqlite::ToSql> =
+            values.iter().map(|value| value as &dyn rusqlite::ToSql).collect();
         inserted(&mut insert_stmt, &params)?;
         copied += 1;
     }
@@ -262,9 +262,9 @@ pub fn migrate_legacy_db(
         );
         if opts.import_clipboard && table_exists(&source, "clipboard_history") {
             // Clipboard rows need the v2 schema; ps-sources owns that table.
-            report
-                .warnings
-                .push("clipboard_history exists but v2 clipboard import is owned by ps-sources; not copied".into());
+            report.warnings.push(
+                "clipboard_history exists but v2 clipboard import is owned by ps-sources; not copied".into(),
+            );
         }
         if let Some(summary) = &import_summary {
             report.files = summary.files_copied;
@@ -374,7 +374,10 @@ mod tests {
         let legacy = dir.join("legacy.db");
         let v2 = dir.join("v2.db");
         make_legacy(&legacy);
-        let opts = MigrationOptions { dry_run: false, ..Default::default() };
+        let opts = MigrationOptions {
+            dry_run: false,
+            ..Default::default()
+        };
         let report = migrate_legacy_db(&legacy, &v2, &opts).unwrap();
         assert!(report.source_unchanged);
         assert!(report.skipped_tables.contains(&"ai_settings"));

@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ps_sources::{
-    browser, clipboard, git, quicklinks, BrowserEntry, ClipCategory, ClipboardEntry, GitEntry,
-    Sources, WorkflowKind,
+    browser, clipboard, git, quicklinks, BrowserEntry, ClipCategory, ClipboardEntry, GitEntry, Sources,
+    WorkflowKind,
 };
 
 /// The OS clipboard is process-global; serialize tests that read/write it.
@@ -86,7 +86,10 @@ fn clipboard_records_dedupes_and_searches() {
     let dir = workdir("clipboard");
     let db = dir.join("index.db");
     assert!(clipboard::record(&db, "first copied text", "Code").unwrap());
-    assert!(!clipboard::record(&db, "first copied text", "Code").unwrap(), "consecutive duplicate must be deduped");
+    assert!(
+        !clipboard::record(&db, "first copied text", "Code").unwrap(),
+        "consecutive duplicate must be deduped"
+    );
     assert!(clipboard::record(&db, "second copied protonsearch text", "chrome").unwrap());
     assert!(!clipboard::record(&db, "   ", "x").unwrap());
     assert!(!clipboard::record(&db, &"x".repeat(2 * 1024 * 1024), "x").unwrap());
@@ -108,12 +111,7 @@ fn test_png(width: u32, height: u32) -> Vec<u8> {
     let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
     for y in 0..height {
         for x in 0..width {
-            pixels.extend_from_slice(&[
-                (x % 256) as u8,
-                (y % 256) as u8,
-                ((x + y) % 256) as u8,
-                255,
-            ]);
+            pixels.extend_from_slice(&[(x % 256) as u8, (y % 256) as u8, ((x + y) % 256) as u8, 255]);
         }
     }
     let buffer = image::RgbaImage::from_raw(width, height, pixels).expect("rgba buffer");
@@ -138,7 +136,11 @@ fn clipboard_image_is_stored_as_png() {
     let entry = &entries[0];
     assert_eq!(entry.category, ClipCategory::Image);
     assert_eq!((entry.width, entry.height), (Some(32), Some(24)));
-    assert!(entry.image_path.as_deref().map(|p| Path::new(p).is_file()).unwrap_or(false));
+    assert!(entry
+        .image_path
+        .as_deref()
+        .map(|p| Path::new(p).is_file())
+        .unwrap_or(false));
     let thumbnail = entry.thumbnail_path.as_deref().expect("thumbnail path");
     assert!(Path::new(thumbnail).is_file(), "thumbnail missing: {thumbnail}");
     let thumb = image::open(thumbnail).expect("decode thumbnail");
@@ -156,10 +158,9 @@ fn clipboard_image_metadata_survives_restart_and_copies_back() {
     let db = dir.join("index.db");
     let images = dir.join("images");
     let png = test_png(40, 30);
-    assert!(clipboard::record_image_captured(
-        &db, &png, 40, 30, "dib", "image/png", "paint", &images
-    )
-    .unwrap());
+    assert!(
+        clipboard::record_image_captured(&db, &png, 40, 30, "dib", "image/png", "paint", &images).unwrap()
+    );
 
     // Restart persistence: a fresh reconnect to the same DB returns the row and
     // the payload files are still valid.
@@ -210,7 +211,10 @@ fn files_snapshot_uses_files_category() {
     let db = dir.join("index.db");
     let images = dir.join("images");
     let snapshot = ps_windows::ClipboardSnapshot {
-        files: vec![r"C:\Windows\win.ini".to_string(), r"C:\Windows\notepad.exe".to_string()],
+        files: vec![
+            r"C:\Windows\win.ini".to_string(),
+            r"C:\Windows\notepad.exe".to_string(),
+        ],
         text: Some("C:\\Windows\\win.ini\r\nC:\\Windows\\notepad.exe".to_string()),
         ..Default::default()
     };
@@ -247,7 +251,10 @@ fn clipboard_capture_options_filter_formats_not_master_gate() {
         },
     );
     assert!(images_only.png.is_some());
-    assert!(images_only.text.is_none(), "captureText=false must drop text alternatives");
+    assert!(
+        images_only.text.is_none(),
+        "captureText=false must drop text alternatives"
+    );
 
     let text_only = clipboard::filter_snapshot(
         snapshot.clone(),
@@ -274,10 +281,9 @@ fn clipboard_thumbnail_is_within_ipc_contract() {
     let images = dir.join("images");
     // Large enough that a naive thumbnail would be big.
     let png = test_png(640, 480);
-    assert!(clipboard::record_image_captured(
-        &db, &png, 640, 480, "dib", "image/png", "paint", &images
-    )
-    .unwrap());
+    assert!(
+        clipboard::record_image_captured(&db, &png, 640, 480, "dib", "image/png", "paint", &images).unwrap()
+    );
     let entry = clipboard::list_recent(&db, 1).remove(0);
     assert_eq!((entry.width, entry.height), (Some(640), Some(480)));
     assert_eq!(entry.mime.as_deref(), Some("image/png"));
@@ -303,9 +309,7 @@ fn clipboard_rejects_oversized_image_dimensions() {
     let db = dir.join("index.db");
     let images = dir.join("images");
     let png = test_png(4, 4);
-    let result = clipboard::record_image_captured(
-        &db, &png, 9000, 9000, "dib", "image/png", "test", &images,
-    );
+    let result = clipboard::record_image_captured(&db, &png, 9000, 9000, "dib", "image/png", "test", &images);
     assert!(result.is_err(), "dims above the IPC contract must be rejected");
     assert_eq!(clipboard::count(&db), 0);
 }
@@ -368,8 +372,10 @@ fn clipboard_categories_are_classified_and_returned() {
     assert_eq!(clipboard::count(&db), 5);
 
     let entries = clipboard::list_recent(&db, 10);
-    let by_text: std::collections::HashMap<&str, ClipCategory> =
-        entries.iter().map(|entry| (entry.text.as_str(), entry.category)).collect();
+    let by_text: std::collections::HashMap<&str, ClipCategory> = entries
+        .iter()
+        .map(|entry| (entry.text.as_str(), entry.category))
+        .collect();
     assert_eq!(by_text["https://example.com/page"], ClipCategory::Link);
     assert_eq!(by_text["finance.team@example.com"], ClipCategory::Email);
     assert_eq!(by_text[r"C:\Users\me\Documents\report.pdf"], ClipCategory::Path);
@@ -386,11 +392,14 @@ fn clipboard_categories_are_classified_and_returned() {
 
     // Wire/serde contract for engine-core.
     assert_eq!(serde_json::to_string(&ClipCategory::Path).unwrap(), "\"path\"");
-    let decoded: ClipboardEntry = serde_json::from_str(
-        r#"{"id":1,"text":"x","timestamp_ms":0,"source_app":"","pinned":false}"#,
-    )
-    .unwrap();
-    assert_eq!(decoded.category, ClipCategory::Text, "missing category must default to text");
+    let decoded: ClipboardEntry =
+        serde_json::from_str(r#"{"id":1,"text":"x","timestamp_ms":0,"source_app":"","pinned":false}"#)
+            .unwrap();
+    assert_eq!(
+        decoded.category,
+        ClipCategory::Text,
+        "missing category must default to text"
+    );
 }
 
 #[test]
@@ -439,9 +448,15 @@ INSERT INTO clipboard_history(content, timestamp, source_app, is_image, pinned)
 
     let entries = clipboard::list_recent(&db, 10);
     assert_eq!(entries.len(), 3, "entries={entries:?}");
-    let by_text: std::collections::HashMap<&str, ClipCategory> =
-        entries.iter().map(|entry| (entry.text.as_str(), entry.category)).collect();
-    assert_eq!(by_text["https://old.example.com/x"], ClipCategory::Link, "backfill link");
+    let by_text: std::collections::HashMap<&str, ClipCategory> = entries
+        .iter()
+        .map(|entry| (entry.text.as_str(), entry.category))
+        .collect();
+    assert_eq!(
+        by_text["https://old.example.com/x"],
+        ClipCategory::Link,
+        "backfill link"
+    );
     assert_eq!(by_text["plain old note"], ClipCategory::Text, "backfill text");
     assert_eq!(by_text[r"C:\temp\new-file.txt"], ClipCategory::Path);
     assert_eq!(clipboard::count(&db), 3);
@@ -512,11 +527,10 @@ fn clipboard_image_rows_are_categorised_as_image() {
     let db = dir.join("index.db");
     let images = dir.join("images");
     let png: Vec<u8> = vec![
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
-        0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
-        0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78,
-        0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-        0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00,
+        0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00,
+        0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01,
+        0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
     ];
     assert!(clipboard::record_image(&db, &png, "snippingtool", &images).unwrap());
     let recent = clipboard::list_recent(&db, 5);
@@ -584,15 +598,10 @@ fn chromium_profile_history_and_bookmarks_are_read() {
             }
         }
     });
-    std::fs::write(
-        profile.join("Bookmarks"),
-        serde_json::to_vec(&bookmarks).unwrap(),
-    )
-    .unwrap();
+    std::fs::write(profile.join("Bookmarks"), serde_json::to_vec(&bookmarks).unwrap()).unwrap();
 
     let cache = dir.join("cache");
-    let (entries, warnings) =
-        browser::scan_chromium_profile_with_cache(&profile, "Chrome", &cache);
+    let (entries, warnings) = browser::scan_chromium_profile_with_cache(&profile, "Chrome", &cache);
     assert!(warnings.is_empty(), "warnings={warnings:?}");
     let history = entries
         .iter()
@@ -603,12 +612,16 @@ fn chromium_profile_history_and_bookmarks_are_read() {
     assert!(!history.bookmark);
     assert!(history.last_visit_ms > 0, "epoch conversion must produce unix ms");
     assert!(
-        entries.iter().all(|entry| !entry.url.starts_with("chrome-extension://")),
+        entries
+            .iter()
+            .all(|entry| !entry.url.starts_with("chrome-extension://")),
         "extension urls must be filtered"
     );
     let bookmarks: Vec<&BrowserEntry> = entries.iter().filter(|entry| entry.bookmark).collect();
     assert_eq!(bookmarks.len(), 2, "nested bookmark must be found");
-    assert!(bookmarks.iter().any(|entry| entry.url == "https://example.com/nested"));
+    assert!(bookmarks
+        .iter()
+        .any(|entry| entry.url == "https://example.com/nested"));
 }
 
 #[test]
@@ -641,7 +654,9 @@ fn firefox_profile_history_and_bookmarks_are_read() {
     assert!(entries.iter().any(|entry| {
         entry.url == "https://mozilla.org" && entry.title == "Mozilla" && entry.visit_count == 3
     }));
-    assert!(entries.iter().any(|entry| entry.bookmark && entry.title == "Mozilla bookmarked"));
+    assert!(entries
+        .iter()
+        .any(|entry| entry.bookmark && entry.title == "Mozilla bookmarked"));
 }
 
 #[test]
@@ -658,7 +673,10 @@ fn epoch_conversion_helpers_are_correct() {
     // 1970-01-01 in chromium epoch.
     assert_eq!(browser::chromium_time_to_unix_ms(11_644_473_600_000_000), 0);
     assert_eq!(browser::chromium_time_to_unix_ms(0), 0);
-    assert_eq!(browser::firefox_time_to_unix_ms(1_760_000_000_000_000), 1_760_000_000_000);
+    assert_eq!(
+        browser::firefox_time_to_unix_ms(1_760_000_000_000_000),
+        1_760_000_000_000
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -715,7 +733,9 @@ fn git_repo_commits_and_todos_are_scanned() {
     let (entries, warnings) = git::scan_repo(&repo);
     assert!(warnings.is_empty(), "warnings={warnings:?}");
     assert!(
-        entries.iter().any(|entry| matches!(entry, GitEntry::Repo { name, .. } if name == "sample-repo")),
+        entries
+            .iter()
+            .any(|entry| matches!(entry, GitEntry::Repo { name, .. } if name == "sample-repo")),
         "repo entry missing: {entries:?}"
     );
     assert!(entries.iter().any(|entry| matches!(entry, GitEntry::Commit { message, author, .. } if message == "initial commit" && author == "Proton Test")));
@@ -738,7 +758,9 @@ fn git_discovery_finds_repo_roots() {
     std::fs::create_dir_all(junk.join(".git")).unwrap();
     let found = git::discover_repos(&dir.join("projects"), 8, 50);
     assert!(found.iter().any(|path| path.ends_with("repo-one")));
-    assert!(!found.iter().any(|path| path.to_string_lossy().contains("node_modules")));
+    assert!(!found
+        .iter()
+        .any(|path| path.to_string_lossy().contains("node_modules")));
 }
 
 // ---------------------------------------------------------------------------
@@ -749,20 +771,22 @@ fn git_discovery_finds_repo_roots() {
 fn scans_real_installed_apps() {
     let dir = workdir("apps-scan");
     let (apps, warnings) = ps_sources::apps::scan_with_icons(&dir.join("icons"));
-    eprintln!(
-        "apps discovered: {} (warnings: {})",
-        apps.len(),
-        warnings.len()
-    );
+    eprintln!("apps discovered: {} (warnings: {})", apps.len(), warnings.len());
     assert!(!apps.is_empty(), "expected at least one installed app");
     assert!(
-        apps.iter().all(|app| !app.name.trim().is_empty() && !app.target.trim().is_empty()),
+        apps.iter()
+            .all(|app| !app.name.trim().is_empty() && !app.target.trim().is_empty()),
         "every app needs a name and target"
     );
     let mut keys = std::collections::HashSet::new();
     for app in &apps {
         let key = format!("{}|{}", app.name.to_lowercase(), app.target.to_lowercase());
-        assert!(keys.insert(key), "duplicate app entry: {} {}", app.name, app.target);
+        assert!(
+            keys.insert(key),
+            "duplicate app entry: {} {}",
+            app.name,
+            app.target
+        );
     }
     let with_icons = apps.iter().filter(|app| app.icon_path.is_some()).count();
     eprintln!("apps with extracted icons: {with_icons}/{}", apps.len());
@@ -813,7 +837,11 @@ fn icon_cache_honours_portable_data_dir_and_populates_icons() {
     );
 
     assert!(!apps.is_empty(), "expected installed apps on this host");
-    assert!(cache.is_dir(), "icon cache dir was not created: {}", cache.display());
+    assert!(
+        cache.is_dir(),
+        "icon cache dir was not created: {}",
+        cache.display()
+    );
     assert!(with_icons > 0, "at least one app must get a real icon");
     assert!(
         classic_with > 0,
@@ -831,8 +859,8 @@ fn icon_cache_honours_portable_data_dir_and_populates_icons() {
         let Some(path) = app.icon_path.as_deref() else {
             continue;
         };
-        let bytes = std::fs::read(path)
-            .unwrap_or_else(|error| panic!("icon_path {} unreadable: {error}", path));
+        let bytes =
+            std::fs::read(path).unwrap_or_else(|error| panic!("icon_path {} unreadable: {error}", path));
         assert!(
             bytes.len() > 8 && bytes.starts_with(&[0x89, b'P', b'N', b'G']),
             "icon_path {} is not a PNG",
@@ -846,18 +874,34 @@ fn icon_cache_honours_portable_data_dir_and_populates_icons() {
     assert!(png_files > 0, "no PNGs were written to the icon cache");
 }
 
-
 /// Normalized display name for duplicate detection.
 fn normalized_name(name: &str) -> String {
-    name.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+    name.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 /// Extensions the application index accepts for classic Start-Menu targets.
 fn is_application_extension(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
     let extension = lower.rsplit('.').next().unwrap_or("");
-    ["exe", "com", "bat", "cmd", "ps1", "psm1", "msc", "cpl", "scr", "appref-ms", "jar", "hta", "lnk"]
-        .contains(&extension)
+    [
+        "exe",
+        "com",
+        "bat",
+        "cmd",
+        "ps1",
+        "psm1",
+        "msc",
+        "cpl",
+        "scr",
+        "appref-ms",
+        "jar",
+        "hta",
+        "lnk",
+    ]
+    .contains(&extension)
 }
 
 #[test]
@@ -983,10 +1027,7 @@ fn open_path_action_really_invokes_shell() {
     // ShellExecuteW opens .cmd with the system handler (console host). The
     // script writes a marker file and exits immediately, proving invocation
     // without leaving any GUI application running.
-    let script = format!(
-        "@echo off\r\necho shell-executed > \"{}\"\r\n",
-        marker.display()
-    );
+    let script = format!("@echo off\r\necho shell-executed > \"{}\"\r\n", marker.display());
     std::fs::write(&probe, script).unwrap();
     let outcome = ps_sources::actions::execute(&ps_ipc::ActionSpec::OpenPath {
         path: probe.to_string_lossy().to_string(),
@@ -1018,12 +1059,8 @@ fn open_path_action_really_invokes_shell() {
 fn sources_load_returns_real_apps_and_respects_privacy_defaults() {
     let dir = workdir("sources-load");
     let settings = ps_ipc::Settings::default();
-    let (sources, warnings) = Sources::load_with_paths(
-        &settings,
-        None,
-        &dir.join("index.db"),
-        &dir.join("icons"),
-    );
+    let (sources, warnings) =
+        Sources::load_with_paths(&settings, None, &dir.join("index.db"), &dir.join("icons"));
     eprintln!(
         "sources: apps={} recent={} clipboard={} browser={} git={} workflows={} warnings={}",
         sources.apps.len(),
@@ -1034,7 +1071,10 @@ fn sources_load_returns_real_apps_and_respects_privacy_defaults() {
         sources.workflows.len(),
         warnings.len()
     );
-    assert!(!sources.apps.is_empty(), "apps source must load on a real machine");
+    assert!(
+        !sources.apps.is_empty(),
+        "apps source must load on a real machine"
+    );
     assert!(sources.recent.len() <= 400);
     assert!(sources.browser.is_empty(), "browser disabled by default");
     assert!(sources.git.is_empty(), "git disabled by default");

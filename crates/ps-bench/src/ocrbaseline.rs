@@ -57,7 +57,11 @@ fn accuracy(rows: &[(f64, usize, usize, bool)]) -> Accuracy {
         mean_cer: rows.iter().map(|r| r.0).sum::<f64>() / rows.len() as f64,
         median_cer: cers[cers.len() / 2],
         exact_rate: exact as f64 / rows.len() as f64,
-        char_accuracy: if chars > 0 { (chars.saturating_sub(errors)) as f64 / chars as f64 } else { 0.0 },
+        char_accuracy: if chars > 0 {
+            (chars.saturating_sub(errors)) as f64 / chars as f64
+        } else {
+            0.0
+        },
         chars,
         errors,
     }
@@ -166,14 +170,18 @@ fn now_utc() -> String {
 }
 
 fn opt_sum(conn: &rusqlite::Connection, sql: &str) -> u64 {
-    conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap_or(0).max(0) as u64
+    conn.query_row(sql, [], |r| r.get::<_, i64>(0))
+        .unwrap_or(0)
+        .max(0) as u64
 }
 
 fn index_facts(db_path: &Path) -> IndexFacts {
     let mut facts = IndexFacts {
         db_path: db_path.display().to_string(),
         db_bytes: std::fs::metadata(db_path).map(|m| m.len()).unwrap_or(0),
-        wal_bytes: std::fs::metadata(format!("{}-wal", db_path.display())).map(|m| m.len()).unwrap_or(0),
+        wal_bytes: std::fs::metadata(format!("{}-wal", db_path.display()))
+            .map(|m| m.len())
+            .unwrap_or(0),
         documents: 0,
         text_bytes: 0,
         estimated_fts_bytes: 0,
@@ -184,7 +192,10 @@ fn index_facts(db_path: &Path) -> IndexFacts {
         facts.text_bytes = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(text)),0) FROM ocr_documents");
         let data = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(block)),0) FROM ocr_fts_data");
         let idx = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(term)),0) FROM ocr_fts_idx");
-        let content = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(c0)+LENGTH(c1)),0) FROM ocr_fts_content");
+        let content = opt_sum(
+            &conn,
+            "SELECT COALESCE(SUM(LENGTH(c0)+LENGTH(c1)),0) FROM ocr_fts_content",
+        );
         let docsize = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(sz)),0) FROM ocr_fts_docsize");
         facts.estimated_fts_bytes = data + idx + content + docsize;
     }
@@ -252,19 +263,48 @@ fn build_queries(docs: &[(String, String)], seed: u64) -> Vec<OcrQuery> {
     };
 
     let high: Vec<(String, u32)> = ranked.iter().filter(|(_, n)| *n >= 20).cloned().collect();
-    let medium: Vec<(String, u32)> = ranked.iter().filter(|(_, n)| (3..20).contains(n)).cloned().collect();
+    let medium: Vec<(String, u32)> = ranked
+        .iter()
+        .filter(|(_, n)| (3..20).contains(n))
+        .cloned()
+        .collect();
     let mut suite: Vec<OcrQuery> = Vec::new();
     let mut used = std::collections::HashSet::new();
-    let mut push = |id: String, category: &str, query: String, note: String, suite: &mut Vec<OcrQuery>, used: &mut std::collections::HashSet<String>| {
+    let mut push = |id: String,
+                    category: &str,
+                    query: String,
+                    note: String,
+                    suite: &mut Vec<OcrQuery>,
+                    used: &mut std::collections::HashSet<String>| {
         if used.insert(query.clone()) {
-            suite.push(OcrQuery { id, category: category.to_string(), query, expected_hits: 0, note });
+            suite.push(OcrQuery {
+                id,
+                category: category.to_string(),
+                query,
+                expected_hits: 0,
+                note,
+            });
         }
     };
     for (i, (term, n)) in pick(&high, 8, &mut rng).into_iter().enumerate() {
-        push(format!("hi_{i}"), "single_high_df", term.clone(), format!("df={n} in recognized OCR text"), &mut suite, &mut used);
+        push(
+            format!("hi_{i}"),
+            "single_high_df",
+            term.clone(),
+            format!("df={n} in recognized OCR text"),
+            &mut suite,
+            &mut used,
+        );
     }
     for (i, (term, n)) in pick(&medium, 8, &mut rng).into_iter().enumerate() {
-        push(format!("med_{i}"), "single_medium_df", term.clone(), format!("df={n}"), &mut suite, &mut used);
+        push(
+            format!("med_{i}"),
+            "single_medium_df",
+            term.clone(),
+            format!("df={n}"),
+            &mut suite,
+            &mut used,
+        );
     }
     // pairs from one recognized document
     let mut pairs = 0;
@@ -274,7 +314,14 @@ fn build_queries(docs: &[(String, String)], seed: u64) -> Vec<OcrQuery> {
         }
         let terms: Vec<String> = tokenize(text).into_iter().filter(|t| plausible(t)).collect();
         if terms.len() >= 4 {
-            push(format!("pair_{pairs}"), "multi_term", format!("{} {}", terms[0], terms[1]), "two terms from one OCR document".to_string(), &mut suite, &mut used);
+            push(
+                format!("pair_{pairs}"),
+                "multi_term",
+                format!("{} {}", terms[0], terms[1]),
+                "two terms from one OCR document".to_string(),
+                &mut suite,
+                &mut used,
+            );
             pairs += 1;
         }
     }
@@ -293,18 +340,43 @@ fn build_queries(docs: &[(String, String)], seed: u64) -> Vec<OcrQuery> {
             }
         }
         if let Some(q) = found {
-            push(format!("phrase_{phrases}"), "phrase", q, "adjacent-word phrase".to_string(), &mut suite, &mut used);
+            push(
+                format!("phrase_{phrases}"),
+                "phrase",
+                q,
+                "adjacent-word phrase".to_string(),
+                &mut suite,
+                &mut used,
+            );
             phrases += 1;
         }
     }
     // CJK tokens
-    let cjk_terms: Vec<(String, u32)> = ranked.iter().filter(|(t, n)| *n >= 1 && t.chars().any(is_cjk)).cloned().collect();
+    let cjk_terms: Vec<(String, u32)> = ranked
+        .iter()
+        .filter(|(t, n)| *n >= 1 && t.chars().any(is_cjk))
+        .cloned()
+        .collect();
     for (i, (term, _)) in pick(&cjk_terms, 3, &mut rng).into_iter().enumerate() {
         let short: String = term.chars().take(4).collect();
-        push(format!("cjk_{i}"), "cjk", short, "CJK token substring".to_string(), &mut suite, &mut used);
+        push(
+            format!("cjk_{i}"),
+            "cjk",
+            short,
+            "CJK token substring".to_string(),
+            &mut suite,
+            &mut used,
+        );
     }
     for i in 0..3 {
-        push(format!("zero_{i}"), "zero_match", format!("zzqxocr{i}plkjhgf"), "must return no OCR documents".to_string(), &mut suite, &mut used);
+        push(
+            format!("zero_{i}"),
+            "zero_match",
+            format!("zzqxocr{i}plkjhgf"),
+            "must return no OCR documents".to_string(),
+            &mut suite,
+            &mut used,
+        );
     }
     suite
 }
@@ -329,21 +401,32 @@ fn load_queries(path: &Path) -> anyhow::Result<Vec<OcrQuery>> {
         if line.trim().is_empty() {
             continue;
         }
-        out.push(serde_json::from_str(line).map_err(|e| anyhow::anyhow!("{}:{}: {e}", path.display(), i + 1))?);
+        out.push(
+            serde_json::from_str(line).map_err(|e| anyhow::anyhow!("{}:{}: {e}", path.display(), i + 1))?,
+        );
     }
     Ok(out)
 }
 
 pub fn run(args: &Args) -> anyhow::Result<()> {
-    let manifest_path = PathBuf::from(args.get("--manifest").unwrap_or(".bench/ocr-corpus/manifest.jsonl"));
+    let manifest_path = PathBuf::from(
+        args.get("--manifest")
+            .unwrap_or(".bench/ocr-corpus/manifest.jsonl"),
+    );
     let db_path = PathBuf::from(args.get("--db").unwrap_or(".bench/v10-ocr-index.db"));
-    let queries_out = PathBuf::from(args.get("--queries-out").unwrap_or(".bench/v10-ocr-queries.jsonl"));
+    let queries_out = PathBuf::from(
+        args.get("--queries-out")
+            .unwrap_or(".bench/v10-ocr-queries.jsonl"),
+    );
     let out = PathBuf::from(args.required("--out")?);
     let iters = args.usize_or("--iters", 30)?.max(1);
     let limit = args.usize_or("--limit", 20)?;
     let cold_restarts = args.usize_or("--cold-restarts", 2)?;
     let manifest = load_manifest(&manifest_path)?;
-    let base_dir = manifest_path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from("."));
+    let base_dir = manifest_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
     let languages = ps_ocr::available_languages();
     let corpus = CorpusFacts {
         manifest_path: manifest_path.display().to_string(),
@@ -414,7 +497,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                     let exact = normalize(&entry.text) == normalize(&doc.text);
                     let row = (c, errs, n, exact);
                     all_rows.push(row);
-                    if entry.text.chars().any(is_cjk) { cjk_rows.push(row) } else { en_rows.push(row) }
+                    if entry.text.chars().any(is_cjk) {
+                        cjk_rows.push(row)
+                    } else {
+                        en_rows.push(row)
+                    }
                     if pass == 1 {
                         if let Ok(hash) = ps_ocr::content_hash_file(&path) {
                             let _ = index.store(&path.display().to_string(), &hash, &doc);
@@ -438,7 +525,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             none_results,
             errors,
             wall_ms,
-            images_per_sec: if wall_ms > 0.0 { timings.len() as f64 / (wall_ms / 1000.0) } else { 0.0 },
+            images_per_sec: if wall_ms > 0.0 {
+                timings.len() as f64 / (wall_ms / 1000.0)
+            } else {
+                0.0
+            },
             image_ms: summarize(&timings),
             accuracy_all: accuracy(&all_rows),
             accuracy_english: accuracy(&en_rows),
@@ -488,9 +579,16 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                 }
             }
         }
-        if returned > 0 { with_results += 1 } else { zero_results += 1 }
+        if returned > 0 {
+            with_results += 1
+        } else {
+            zero_results += 1
+        }
         let summary = summarize(&samples);
-        by_cat.entry(q.category.clone()).or_default().push(samples.clone());
+        by_cat
+            .entry(q.category.clone())
+            .or_default()
+            .push(samples.clone());
         all_samples.push(samples.clone());
         timings.push(QueryTiming {
             id: q.id.clone(),
@@ -509,7 +607,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         .into_iter()
         .map(|(category, slices)| {
             let queries = slices.len();
-            CategoryRow { category, summary: crate::stats::summarize_slices(&slices), queries }
+            CategoryRow {
+                category,
+                summary: crate::stats::summarize_slices(&slices),
+                queries,
+            }
         })
         .collect();
     categories.sort_by(|a, b| a.category.cmp(&b.category));
@@ -540,16 +642,42 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                 limit.to_string(),
             ];
             let outcome = childproc::run_child_json(&child_args)?;
-            let probe_ms = outcome.value.get("rss_probe_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let probe_ms = outcome
+                .value
+                .get("rss_probe_ms")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
             raw_vec.push(outcome.wall_ms);
             wall_vec.push((outcome.wall_ms - probe_ms).max(0.0));
             probe_vec.push(probe_ms);
-            open_vec.push(outcome.value.get("open_ms").and_then(|v| v.as_f64()).unwrap_or(0.0));
-            let qs = outcome.value.get("queries").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-            let first = qs.first().and_then(|q| q.get("ms")).and_then(|v| v.as_f64()).unwrap_or(0.0);
+            open_vec.push(
+                outcome
+                    .value
+                    .get("open_ms")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0),
+            );
+            let qs = outcome
+                .value
+                .get("queries")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            let first = qs
+                .first()
+                .and_then(|q| q.get("ms"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
             first_vec.push(first);
         }
-        cold = Some(ColdReport { restarts: cold_restarts, open_ms: open_vec, first_query_ms: first_vec, wall_ms: wall_vec, wall_raw_ms: raw_vec, rss_probe_ms: probe_vec });
+        cold = Some(ColdReport {
+            restarts: cold_restarts,
+            open_ms: open_vec,
+            first_query_ms: first_vec,
+            wall_ms: wall_vec,
+            wall_raw_ms: raw_vec,
+            rss_probe_ms: probe_vec,
+        });
     }
 
     let report = OcrBaselineReport {
@@ -588,10 +716,30 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             p.accuracy_all.char_accuracy * 100.0, p.accuracy_english.char_accuracy * 100.0, p.accuracy_cjk.char_accuracy * 100.0
         );
     }
-    println!("  index: docs={} text_bytes={} db_bytes={} wal_bytes={} est_fts_bytes={}", report.index.documents, report.index.text_bytes, report.index.db_bytes, report.index.wal_bytes, report.index.estimated_fts_bytes);
-    println!("  warm retrieval ({} iters/query, {} queries): p50={:.3} p95={:.3} p99={:.3} ms", iters, verified.len(), report.warm.overall.p50, report.warm.overall.p95, report.warm.overall.p99);
+    println!(
+        "  index: docs={} text_bytes={} db_bytes={} wal_bytes={} est_fts_bytes={}",
+        report.index.documents,
+        report.index.text_bytes,
+        report.index.db_bytes,
+        report.index.wal_bytes,
+        report.index.estimated_fts_bytes
+    );
+    println!(
+        "  warm retrieval ({} iters/query, {} queries): p50={:.3} p95={:.3} p99={:.3} ms",
+        iters,
+        verified.len(),
+        report.warm.overall.p50,
+        report.warm.overall.p95,
+        report.warm.overall.p99
+    );
     if let Some(cold) = &report.cold {
-        println!("  cold ({} restarts): open p50={:.2} ms first-query p50={:.2} ms wall p50={:.0} ms", cold.restarts, summarize(&cold.open_ms).p50, summarize(&cold.first_query_ms).p50, summarize(&cold.wall_ms).p50);
+        println!(
+            "  cold ({} restarts): open p50={:.2} ms first-query p50={:.2} ms wall p50={:.0} ms",
+            cold.restarts,
+            summarize(&cold.open_ms).p50,
+            summarize(&cold.first_query_ms).p50,
+            summarize(&cold.wall_ms).p50
+        );
     }
     for note in &report.limitations {
         println!("  limit: {note}");

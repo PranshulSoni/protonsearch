@@ -49,18 +49,36 @@ pub struct V2IndexFacts {
 }
 
 fn opt_sum(conn: &rusqlite::Connection, sql: &str) -> u64 {
-    conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap_or(0).max(0) as u64
+    conn.query_row(sql, [], |r| r.get::<_, i64>(0))
+        .unwrap_or(0)
+        .max(0) as u64
 }
 
 fn v2_facts(db_path: &Path) -> anyhow::Result<V2IndexFacts> {
     let conn = rusqlite::Connection::open(db_path)?;
     conn.execute_batch("PRAGMA query_only=ON;")?;
-    let page_size = conn.query_row("PRAGMA page_size", [], |r| r.get::<_, i64>(0)).unwrap_or(0) as u64;
-    let page_count = conn.query_row("PRAGMA page_count", [], |r| r.get::<_, i64>(0)).unwrap_or(0) as u64;
-    let fts_data = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(block)),0) FROM documents_fts_data");
-    let fts_idx = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(term)),0) FROM documents_fts_idx");
-    let fts_content = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(c0)+LENGTH(c1)+LENGTH(c2)),0) FROM documents_fts_content");
-    let fts_docsize = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(sz)),0) FROM documents_fts_docsize");
+    let page_size = conn
+        .query_row("PRAGMA page_size", [], |r| r.get::<_, i64>(0))
+        .unwrap_or(0) as u64;
+    let page_count = conn
+        .query_row("PRAGMA page_count", [], |r| r.get::<_, i64>(0))
+        .unwrap_or(0) as u64;
+    let fts_data = opt_sum(
+        &conn,
+        "SELECT COALESCE(SUM(LENGTH(block)),0) FROM documents_fts_data",
+    );
+    let fts_idx = opt_sum(
+        &conn,
+        "SELECT COALESCE(SUM(LENGTH(term)),0) FROM documents_fts_idx",
+    );
+    let fts_content = opt_sum(
+        &conn,
+        "SELECT COALESCE(SUM(LENGTH(c0)+LENGTH(c1)+LENGTH(c2)),0) FROM documents_fts_content",
+    );
+    let fts_docsize = opt_sum(
+        &conn,
+        "SELECT COALESCE(SUM(LENGTH(sz)),0) FROM documents_fts_docsize",
+    );
     Ok(V2IndexFacts {
         db_path: db_path.display().to_string(),
         db_bytes: std::fs::metadata(db_path).map(|m| m.len()).unwrap_or(0),
@@ -233,7 +251,10 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             zero_result += 1;
         }
         let summary = summarize(&samples);
-        by_cat.entry(q.category.clone()).or_default().push(samples.clone());
+        by_cat
+            .entry(q.category.clone())
+            .or_default()
+            .push(samples.clone());
         all_samples.push(samples.clone());
         timing_rows.push(V2QueryTiming {
             id: q.id.clone(),
@@ -253,7 +274,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         .into_iter()
         .map(|(category, slices)| {
             let queries = slices.len();
-            V2CategoryRow { category, summary: crate::stats::summarize_slices(&slices), queries }
+            V2CategoryRow {
+                category,
+                summary: crate::stats::summarize_slices(&slices),
+                queries,
+            }
         })
         .collect();
     categories.sort_by(|a, b| a.category.cmp(&b.category));
@@ -273,7 +298,8 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         let mut wall_vec = Vec::new();
         let mut raw_vec = Vec::new();
         let mut probe_vec = Vec::new();
-        let mut per_query_sums: std::collections::HashMap<String, Vec<f64>> = std::collections::HashMap::new();
+        let mut per_query_sums: std::collections::HashMap<String, Vec<f64>> =
+            std::collections::HashMap::new();
         let mut order: Vec<String> = Vec::new();
         for _ in 0..cold_restarts {
             let child_args: Vec<String> = vec![
@@ -286,12 +312,27 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                 limit.to_string(),
             ];
             let outcome = childproc::run_child_json(&child_args)?;
-            let probe_ms = outcome.value.get("rss_probe_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let probe_ms = outcome
+                .value
+                .get("rss_probe_ms")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
             raw_vec.push(outcome.wall_ms);
             wall_vec.push((outcome.wall_ms - probe_ms).max(0.0));
             probe_vec.push(probe_ms);
-            open_vec.push(outcome.value.get("open_ms").and_then(|v| v.as_f64()).unwrap_or(0.0));
-            let qs = outcome.value.get("queries").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+            open_vec.push(
+                outcome
+                    .value
+                    .get("open_ms")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0),
+            );
+            let qs = outcome
+                .value
+                .get("queries")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
             let mut first = None;
             for q in &qs {
                 let id = q.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -308,7 +349,12 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         }
         let per_query = order
             .iter()
-            .map(|id| (id.clone(), per_query_sums.get(id).map(|v| summarize(v).p50).unwrap_or(0.0)))
+            .map(|id| {
+                (
+                    id.clone(),
+                    per_query_sums.get(id).map(|v| summarize(v).p50).unwrap_or(0.0),
+                )
+            })
             .collect();
         cold = Some(V2ColdReport {
             restarts: cold_restarts,
@@ -368,17 +414,31 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         report.index.indexed_text_bytes
     );
     if let Some(import) = &report.import {
-        println!("  import: {} docs / {} files in {:.0} ms", import.content_documents, import.files_copied, import.import_wall_ms);
+        println!(
+            "  import: {} docs / {} files in {:.0} ms",
+            import.content_documents, import.files_copied, import.import_wall_ms
+        );
     }
-    println!("  open_ms: {:.2} (stats: docs={} bytes={})", report.open_ms, stats.documents, stats.bytes_indexed);
+    println!(
+        "  open_ms: {:.2} (stats: docs={} bytes={})",
+        report.open_ms, stats.documents, stats.bytes_indexed
+    );
     println!("  warm ({} iters/query, {} queries):", iters, suite.len());
     println!(
         "   overall: p50={:.3} p95={:.3} p99={:.3} min={:.3} max={:.3} mean={:.3} n={}",
-        report.warm.overall.p50, report.warm.overall.p95, report.warm.overall.p99,
-        report.warm.overall.min, report.warm.overall.max, report.warm.overall.mean, report.warm.overall.count
+        report.warm.overall.p50,
+        report.warm.overall.p95,
+        report.warm.overall.p99,
+        report.warm.overall.min,
+        report.warm.overall.max,
+        report.warm.overall.mean,
+        report.warm.overall.count
     );
     for row in &report.warm.by_category {
-        println!("   [{:18}] p50={:7.3} p95={:7.3} p99={:7.3} n={}", row.category, row.summary.p50, row.summary.p95, row.summary.p99, row.summary.count);
+        println!(
+            "   [{:18}] p50={:7.3} p95={:7.3} p99={:7.3} n={}",
+            row.category, row.summary.p50, row.summary.p95, row.summary.p99, row.summary.count
+        );
     }
     if let Some(cold) = &report.cold {
         println!(

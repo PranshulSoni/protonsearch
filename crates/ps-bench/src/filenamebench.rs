@@ -43,7 +43,11 @@ pub fn load_index_entries(path: &Path) -> anyhow::Result<Vec<IndexEntry>> {
             path: e.path,
             name: e.name,
             ext: e.ext,
-            kind: if e.kind == "folder" { EntryKind::Folder } else { EntryKind::File },
+            kind: if e.kind == "folder" {
+                EntryKind::Folder
+            } else {
+                EntryKind::File
+            },
             size: e.size,
             modified: e.modified,
         });
@@ -180,7 +184,10 @@ fn run_queries(index: &FilenameIndex, suite: &[QueryDef], iters: usize, limit: u
             zero_results += 1;
         }
         let summary = summarize(&samples);
-        by_cat.entry(q.category.clone()).or_default().push(samples.clone());
+        by_cat
+            .entry(q.category.clone())
+            .or_default()
+            .push(samples.clone());
         overall_slices.push(samples.clone());
         timings.push(QueryTiming {
             id: q.id.clone(),
@@ -197,7 +204,11 @@ fn run_queries(index: &FilenameIndex, suite: &[QueryDef], iters: usize, limit: u
         .into_iter()
         .map(|(category, slices)| {
             let queries = slices.len();
-            CategoryRow { category, summary: crate::stats::summarize_slices(&slices), queries }
+            CategoryRow {
+                category,
+                summary: crate::stats::summarize_slices(&slices),
+                queries,
+            }
         })
         .collect();
     categories.sort_by(|a, b| a.category.cmp(&b.category));
@@ -255,13 +266,23 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     let warm = run_queries(&index, &suite, iters, limit);
     let non_zero_queries = suite.iter().filter(|q| q.category != "zero_match").count();
     let engine_ready = warm.queries_with_results >= non_zero_queries / 2 && warm.queries_with_results > 0;
-    let status = if engine_ready { "ok" } else { "engine_not_ready_search_empty" };
+    let status = if engine_ready {
+        "ok"
+    } else {
+        "engine_not_ready_search_empty"
+    };
 
     let mut save_status = None;
     if let Some(path) = &save_index {
         let start = Instant::now();
         match index.save(path) {
-            Ok(()) => save_status = Some(format!("ok ({:.1} ms, {} bytes)", start.elapsed().as_secs_f64() * 1000.0, std::fs::metadata(path).map(|m| m.len()).unwrap_or(0))),
+            Ok(()) => {
+                save_status = Some(format!(
+                    "ok ({:.1} ms, {} bytes)",
+                    start.elapsed().as_secs_f64() * 1000.0,
+                    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+                ))
+            }
             Err(err) => save_status = Some(format!("save failed: {err}")),
         }
     }
@@ -280,7 +301,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             cold_queries.to_string(),
         ];
         if let Some(path) = &save_index {
-            if save_status.as_deref().map(|s| s.starts_with("ok")).unwrap_or(false) {
+            if save_status
+                .as_deref()
+                .map(|s| s.starts_with("ok"))
+                .unwrap_or(false)
+            {
                 child_args.push("--index-bin".to_string());
                 child_args.push(path.display().to_string());
             }
@@ -310,7 +335,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             load_ms: v.get("load_ms").and_then(|x| x.as_f64()).unwrap_or(0.0),
             build_ms: v.get("build_ms").and_then(|x| x.as_f64()).unwrap_or(0.0),
             parse_ms: v.get("parse_ms").and_then(|x| x.as_f64()).unwrap_or(0.0),
-            load_mode: v.get("load_mode").and_then(|x| x.as_str()).unwrap_or("unknown").to_string(),
+            load_mode: v
+                .get("load_mode")
+                .and_then(|x| x.as_str())
+                .unwrap_or("unknown")
+                .to_string(),
             rss_bytes: v.get("rss_bytes").and_then(|x| x.as_u64()).unwrap_or(0),
             first_query_ms,
             per_query,
@@ -361,15 +390,31 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
 
     write_json(&out, &report)?;
 
-    println!("ps-bench filename: dataset={} entries={} status={}", dataset_path.display(), entry_count, status);
-    println!("  dataset: {} bytes fnv1a64={:016x} parse_ms={:.1} build_ms={:.1} total_ms={:.1}", dataset_bytes, fnv, report.build.parse_ms, report.build.build_ms, report.build.total_ms);
+    println!(
+        "ps-bench filename: dataset={} entries={} status={}",
+        dataset_path.display(),
+        entry_count,
+        status
+    );
+    println!(
+        "  dataset: {} bytes fnv1a64={:016x} parse_ms={:.1} build_ms={:.1} total_ms={:.1}",
+        dataset_bytes, fnv, report.build.parse_ms, report.build.build_ms, report.build.total_ms
+    );
     if let (Some(a), Some(b)) = (&memory_before, &report.build.memory_after_build) {
         println!("  rss: before={} MB after_build={} MB peak={} MB delta={:.1} MB ({:.1} B/entry); engine.memory_bytes={:.1} MB", a.working_set_bytes / 1_000_000, b.working_set_bytes / 1_000_000, b.peak_working_set_bytes / 1_000_000, report.build.rss_delta_bytes as f64 / 1e6, report.build.rss_bytes_per_entry, report.build.engine_memory_bytes as f64 / 1e6);
     }
-    println!("  warm search ({} iters/query, {} queries, limit {}):", iters, suite.len(), limit);
+    println!(
+        "  warm search ({} iters/query, {} queries, limit {}):",
+        iters,
+        suite.len(),
+        limit
+    );
     print_summary("  overall", &report.warm.overall);
     for row in &report.warm.by_category {
-        println!("  [{:18}] p50={:8.3} p95={:8.3} p99={:8.3} n={}", row.category, row.summary.p50, row.summary.p95, row.summary.p99, row.summary.count);
+        println!(
+            "  [{:18}] p50={:8.3} p95={:8.3} p99={:8.3} n={}",
+            row.category, row.summary.p50, row.summary.p95, row.summary.p99, row.summary.count
+        );
     }
     println!(
         "  queries_with_results={} zero={} deterministic_order={}",
@@ -381,7 +426,11 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     if !report.cold.is_empty() {
         let load: Vec<f64> = report.cold.iter().map(|c| c.load_ms).collect();
         let wall: Vec<f64> = report.cold.iter().map(|c| c.wall_ms).collect();
-        let first: Vec<f64> = report.cold.iter().flat_map(|c| c.first_query_ms.iter().copied()).collect();
+        let first: Vec<f64> = report
+            .cold
+            .iter()
+            .flat_map(|c| c.first_query_ms.iter().copied())
+            .collect();
         let rss: Vec<f64> = report.cold.iter().map(|c| c.rss_bytes as f64).collect();
         println!(
             "  cold restart ({}): load p50={:.1} ms wall p50={:.0} ms rss p50={:.0} MB first-query p50={:.3} ms",

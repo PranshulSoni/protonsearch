@@ -11,9 +11,7 @@ pub(crate) fn ensure_apartment() -> bool {
         return false;
     }
     match unsafe {
-        windows::Win32::System::WinRT::RoInitialize(
-            windows::Win32::System::WinRT::RO_INIT_MULTITHREADED,
-        )
+        windows::Win32::System::WinRT::RoInitialize(windows::Win32::System::WinRT::RO_INIT_MULTITHREADED)
     } {
         Ok(()) => {
             APARTMENT.with(|cell| cell.set(true));

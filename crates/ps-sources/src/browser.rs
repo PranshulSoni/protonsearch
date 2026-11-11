@@ -43,8 +43,7 @@ pub fn scan_with_cache(cache_root: &Path) -> (Vec<BrowserEntry>, Vec<String>) {
 
     if let Some(profiles_root) = firefox_profiles_root() {
         for profile in firefox_profiles(&profiles_root) {
-            let (mut found, mut profile_warnings) =
-                scan_firefox_profile_with_cache(&profile, cache_root);
+            let (mut found, mut profile_warnings) = scan_firefox_profile_with_cache(&profile, cache_root);
             entries.append(&mut found);
             warnings.append(&mut profile_warnings);
             if entries.len() >= MAX_TOTAL {
@@ -64,10 +63,7 @@ pub fn scan_configured(privacy: &ps_ipc::PrivacySettings) -> (Vec<BrowserEntry>,
     scan()
 }
 
-fn merge_entries(
-    entries: Vec<BrowserEntry>,
-    warnings: Vec<String>,
-) -> (Vec<BrowserEntry>, Vec<String>) {
+fn merge_entries(entries: Vec<BrowserEntry>, warnings: Vec<String>) -> (Vec<BrowserEntry>, Vec<String>) {
     let mut merged: HashMap<String, BrowserEntry> = HashMap::new();
     for entry in entries {
         match merged.get_mut(&entry.url) {
@@ -118,10 +114,7 @@ fn chromium_roots() -> Vec<(&'static str, PathBuf)> {
         roots.push(("Vivaldi", local.join("Vivaldi").join("User Data")));
     }
     if let Some(roaming) = &roaming {
-        roots.push((
-            "Opera",
-            roaming.join("Opera Software").join("Opera Stable"),
-        ));
+        roots.push(("Opera", roaming.join("Opera Software").join("Opera Stable")));
     }
     roots
 }
@@ -145,10 +138,7 @@ fn chromium_profiles(root: &Path) -> Vec<PathBuf> {
 }
 
 /// Scan one Chromium-family profile directory (History + Bookmarks).
-pub fn scan_chromium_profile(
-    profile: &Path,
-    source: &str,
-) -> (Vec<BrowserEntry>, Vec<String>) {
+pub fn scan_chromium_profile(profile: &Path, source: &str) -> (Vec<BrowserEntry>, Vec<String>) {
     scan_chromium_profile_with_cache(profile, source, &crate::default_cache_dir())
 }
 
@@ -214,10 +204,7 @@ fn read_chromium_history(
     result
 }
 
-fn parse_chromium_bookmarks(
-    bookmarks: &Path,
-    source: &str,
-) -> anyhow::Result<Vec<BrowserEntry>> {
+fn parse_chromium_bookmarks(bookmarks: &Path, source: &str) -> anyhow::Result<Vec<BrowserEntry>> {
     let raw = std::fs::read_to_string(bookmarks)?;
     let value: serde_json::Value = serde_json::from_str(&raw)?;
     let mut out = Vec::new();
@@ -232,11 +219,7 @@ fn parse_chromium_bookmarks(
     Ok(out)
 }
 
-fn collect_chromium_bookmarks(
-    node: &serde_json::Value,
-    source: &str,
-    out: &mut Vec<BrowserEntry>,
-) {
+fn collect_chromium_bookmarks(node: &serde_json::Value, source: &str, out: &mut Vec<BrowserEntry>) {
     if out.len() >= MAX_PER_PROFILE {
         return;
     }

@@ -46,7 +46,11 @@ fn not_supported(reason: &str) -> Result<(), String> {
 /// Probe every native integration this build ships.
 pub fn probe_all() -> NativeCapabilities {
     let media_sessions = run_probe(
-        || super::media::now_playing().map(|_| ()).map_err(|error| format!("{error:#}")),
+        || {
+            super::media::now_playing()
+                .map(|_| ())
+                .map_err(|error| format!("{error:#}"))
+        },
         None,
     );
     let audio_output = run_probe(
@@ -117,13 +121,11 @@ pub fn probe_all() -> NativeCapabilities {
             let owned = super::winrt::ensure_apartment();
             let result = (|| -> Result<(), String> {
                 let app_id = windows::core::HSTRING::from("ProtonSearch");
-                windows::UI::Notifications::ToastNotificationManager::CreateToastNotifierWithId(
-                    &app_id,
-                )
-                .map(|_| ())
-                .map_err(|error| {
-                    format!("Windows toast notifications unavailable for this app identity: {error}")
-                })
+                windows::UI::Notifications::ToastNotificationManager::CreateToastNotifierWithId(&app_id)
+                    .map(|_| ())
+                    .map_err(|error| {
+                        format!("Windows toast notifications unavailable for this app identity: {error}")
+                    })
             })();
             super::winrt::release_apartment(owned);
             result

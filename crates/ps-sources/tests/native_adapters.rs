@@ -19,8 +19,22 @@ fn notifications_store_roundtrip_and_counts() {
     assert_eq!(notifications::unread_count(&db), 0);
     assert!(notifications::list(&db, 10, true).is_empty());
 
-    let first = notifications::add(&db, "Index ready", "Your documents are indexed.", "indexer", "info").unwrap();
-    let second = notifications::add(&db, "Agent finished", "The workflow completed.", "agent", "success").unwrap();
+    let first = notifications::add(
+        &db,
+        "Index ready",
+        "Your documents are indexed.",
+        "indexer",
+        "info",
+    )
+    .unwrap();
+    let second = notifications::add(
+        &db,
+        "Agent finished",
+        "The workflow completed.",
+        "agent",
+        "success",
+    )
+    .unwrap();
     assert_eq!(notifications::unread_count(&db), 2);
 
     let entries = notifications::list(&db, 10, false);
@@ -34,7 +48,11 @@ fn notifications_store_roundtrip_and_counts() {
     assert_eq!(notifications::unread_count(&db), 1);
 
     assert!(notifications::dismiss(&db, second).unwrap());
-    assert_eq!(notifications::list(&db, 10, false).len(), 1, "dismissed hidden by default");
+    assert_eq!(
+        notifications::list(&db, 10, false).len(),
+        1,
+        "dismissed hidden by default"
+    );
     assert_eq!(notifications::list(&db, 10, true).len(), 2);
     assert_eq!(notifications::unread_count(&db), 0, "dismissed is not unread");
 
@@ -46,7 +64,10 @@ fn notifications_store_roundtrip_and_counts() {
 fn notifications_validate_and_truncate_input() {
     let dir = workdir("notifications-validate");
     let db = dir.join("index.db");
-    assert!(notifications::add(&db, "   ", "body", "test", "info").is_err(), "empty title rejected");
+    assert!(
+        notifications::add(&db, "   ", "body", "test", "info").is_err(),
+        "empty title rejected"
+    );
     let long = "x".repeat(20_000);
     let id = notifications::add(&db, "Long", &long, "test", "info").unwrap();
     let entry = notifications::list(&db, 1, true).remove(0);
@@ -66,7 +87,10 @@ fn notifications_toast_fallback_is_honest() {
         "info",
     )
     .unwrap();
-    assert!(id > 0, "store write must succeed even when toasts are unavailable");
+    assert!(
+        id > 0,
+        "store write must succeed even when toasts are unavailable"
+    );
     // Windows toasts may be unavailable for unpackaged apps; when they are we
     // must report why instead of pretending success.
     if ps_windows::toast_supported() {

@@ -11,8 +11,8 @@ use std::thread::JoinHandle;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use ps_ipc::*;
 use ps_index::{EntryKind, FilenameIndex};
+use ps_ipc::*;
 
 use crate::catalog;
 use crate::db::EngineDb;
@@ -22,7 +22,6 @@ mod preview;
 pub const INDEX_FILE: &str = "filename-index.bin";
 const DB_FILE: &str = "index.db";
 const MAX_CONTENT_PER_PASS: usize = 4000;
-const MAX_OCR_PER_PASS: usize = 400;
 const MAX_WARNINGS: usize = 24;
 
 // -- Preview limits (Gate 2) --
@@ -35,6 +34,21 @@ const STATE_READY: u8 = 1;
 const STATE_INDEXING: u8 = 2;
 const STATE_PAUSED: u8 = 3;
 const STATE_ERROR: u8 = 4;
+fn ensure_ocr_engine_available(engine: OcrEngine, data_dir: &Path) -> anyhow::Result<()> {
+    let (engine_name, model_dir) = match engine {
+        OcrEngine::Windows => ("windows", None),
+        OcrEngine::PpOcrV6 => ("pp_ocr_v6", Some(data_dir.join("models").join("ppocrv6"))),
+        OcrEngine::Indra => ("indra", Some(data_dir.join("models").join("indra"))),
+        OcrEngine::Tesseract => ("tesseract", None),
+    };
+    if !ps_ocr::is_engine_available(engine_name, model_dir.as_deref()) {
+        anyhow::bail!(
+            "OCR engine {:?} is unavailable. Select Windows OCR in settings; optional engines are not installed.",
+            engine
+        );
+    }
+    Ok(())
+}
 
 /// Test seam: unit tests must never install a real Win32 clipboard hook (it is
 /// a process-global hook thread and can corrupt a short-lived test process on
@@ -121,7 +135,7 @@ struct Ranked {
     result: SearchResult,
 }
 
-use preview::{PreviewCache, ResultRegistry};
+use preview::ResultRegistry;
 
 pub struct Engine {
     config: EngineConfig,
@@ -146,8 +160,6 @@ pub struct Engine {
     legacy_summary: Mutex<Option<LegacySummary>>,
     /// Recently returned results, so a preview request can resolve resultId -> row.
     recent_results: Mutex<ResultRegistry>,
-    /// Bounded LRU of rendered preview payloads.
-    preview_cache: Mutex<PreviewCache>,
     /// Live Win32 clipboard listener (only one per process). Held so it can be
     /// stopped explicitly on shutdown or when the privacy setting is disabled.
     clipboard_listener: Mutex<Option<(ClipboardHook, ClipboardCapture)>>,
@@ -203,10 +215,7 @@ impl Engine {
                 None
             }
         };
-        let content_documents = content
-            .as_ref()
-            .map(|c| c.stats().documents)
-            .unwrap_or(0);
+        let content_documents = content.as_ref().map(|c| c.stats().documents).unwrap_or(0);
         let ocr_documents = db.ocr_count();
 
         // A pending one-time legacy migration is real background work, so the
@@ -245,7 +254,6 @@ impl Engine {
             force_rescan: AtomicBool::new(false),
             legacy_summary: Mutex::new(None),
             recent_results: Mutex::new(ResultRegistry::default()),
-            preview_cache: Mutex::new(PreviewCache::default()),
             clipboard_listener: Mutex::new(None),
             clipboard_callback: Mutex::new(None),
             pending_destructive: Mutex::new(None),
@@ -331,7 +339,10 @@ impl Engine {
                 let mut hits = 0usize;
                 if settings.privacy.clipboard_history {
                     let db_path = self.clipboard_db_path();
-                    for (i, entry) in ps_sources::clipboard::list_recent(&db_path, 20).into_iter().enumerate() {
+                    for (i, entry) in ps_sources::clipboard::list_recent(&db_path, 20)
+                        .into_iter()
+                        .enumerate()
+                    {
                         ranked.push(Ranked {
                             tier: 0,
                             priority: 8,
@@ -372,8 +383,8 @@ impl Engine {
         let tier_start = Instant::now();
         let mut tier0_hits = 0usize;
         if scope_allows(scope, SourceKind::Calculator) {
-            if let Some(calc) = ps_sources::calc::evaluate(&query_text)
-                .or_else(|| ps_sources::calc::convert(&query_text))
+            if let Some(calc) =
+                ps_sources::calc::evaluate(&query_text).or_else(|| ps_sources::calc::convert(&query_text))
             {
                 ranked.push(Ranked {
                     tier: 0,
@@ -460,16 +471,34 @@ impl Engine {
         // Tier 1: filename index.
         if scope_allows(scope, SourceKind::File) || scope_allows(scope, SourceKind::Folder) {
             let tier_start = Instant::now();
-            let extensions: Vec<String> = filters
-                .extensions
-                .iter()
-                .map(|ext| ext.trim_start_matches('.').to_lowercase())
-                .collect();
+            let mut extensions: Vec<String> = if scope == SearchScope::Photos {
+                ["png", "jpg", "jpeg", "bmp", "gif", "webp", "tif", "tiff"]
+                    .into_iter()
+                    .filter(|ext| {
+                        filters.extensions.is_empty()
+                            || filters
+                                .extensions
+                                .iter()
+                                .any(|filter| filter.trim_start_matches('.').eq_ignore_ascii_case(ext))
+                    })
+                    .map(str::to_string)
+                    .collect()
+            } else {
+                filters
+                    .extensions
+                    .iter()
+                    .map(|ext| ext.trim_start_matches('.').to_lowercase())
+                    .collect()
+            };
+            if scope == SearchScope::Photos && extensions.is_empty() {
+                // ps-index treats an empty extension list as unrestricted.
+                extensions.push("__no_photo_extension__".to_string());
+            }
             // Strict scope semantics: Files never returns folders and Folders
             // never returns files (All keeps both groups separate). An explicit
             // kind: filter can only narrow, never widen, the scope.
             let scope_kind = match scope {
-                SearchScope::Files => Some(EntryKind::File),
+                SearchScope::Files | SearchScope::Photos => Some(EntryKind::File),
                 SearchScope::Folders => Some(EntryKind::Folder),
                 _ => None,
             };
@@ -565,7 +594,10 @@ impl Engine {
         let mut source_hits = 0usize;
         // Clipboard results are read live from the v2 database: the in-memory
         // sources snapshot is loaded once at startup and would be stale.
-        if sources_worth_it && settings.privacy.clipboard_history && scope_allows(scope, SourceKind::Clipboard) {
+        if sources_worth_it
+            && settings.privacy.clipboard_history
+            && scope_allows(scope, SourceKind::Clipboard)
+        {
             let db_path = self.clipboard_db_path();
             let query = if terms.is_empty() {
                 ""
@@ -623,7 +655,12 @@ impl Engine {
         if ocr_worth_it && settings.indexing.ocr_enabled && scope_allows(scope, SourceKind::OcrText) {
             let tier_start = Instant::now();
             let mut hits = 0usize;
-            match self.db.ocr_search(&query_text, 5) {
+            let ocr_hits = if scope == SearchScope::Photos {
+                self.db.ocr_search_photos(&query_text, 5, &filters)
+            } else {
+                self.db.ocr_search(&query_text, 5)
+            };
+            match ocr_hits {
                 Ok(ocr_hits) => {
                     for hit in ocr_hits {
                         ranked.push(Ranked {
@@ -713,9 +750,9 @@ impl Engine {
         }
     }
 
-    /// Build a bounded, cached preview for a result id returned by search().
+    /// Build a bounded preview for a result id returned by search().
     ///
-    /// Synchronous and bounded (extraction caps + LRU cache); the UI path must
+    /// Synchronous and bounded (extraction caps); the UI path must
     /// call it from a blocking worker, never from the search hot path. Unknown
     /// or expired ids return an honest payload instead of blank content.
     pub fn preview(&self, req: &PreviewRequest) -> PreviewPayload {
@@ -723,16 +760,8 @@ impl Engine {
             .max_chars
             .unwrap_or(PREVIEW_DEFAULT_CHARS)
             .clamp(PREVIEW_MIN_CHARS, PREVIEW_MAX_CHARS);
-        let key = (req.result_id.clone(), max_chars);
-        if let Ok(mut cache) = self.preview_cache.lock() {
-            if let Some(payload) = cache.get(&key) {
-                return payload;
-            }
-        }
         let payload = match self.resolve_result(&req.result_id) {
-            Some(result) => {
-                preview::build_preview(&result, max_chars, &self.db, &self.clipboard_db_path())
-            }
+            Some(result) => preview::build_preview(&result, max_chars, &self.db, &self.clipboard_db_path()),
             None => PreviewPayload {
                 result_id: req.result_id.clone(),
                 title: String::new(),
@@ -753,9 +782,6 @@ impl Engine {
                 image_mime: None,
             },
         };
-        if let Ok(mut cache) = self.preview_cache.lock() {
-            cache.put(key, payload.clone());
-        }
         payload
     }
 
@@ -764,14 +790,6 @@ impl Engine {
         self.recent_results
             .lock()
             .map(|registry| registry.len())
-            .unwrap_or(0)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn preview_cache_len(&self) -> usize {
-        self.preview_cache
-            .lock()
-            .map(|cache| cache.len())
             .unwrap_or(0)
     }
 
@@ -858,7 +876,12 @@ impl Engine {
                 label: "Applications".into(),
                 enabled: true,
                 item_count: sources.apps.len() as u64,
-                state: if sources.apps.is_empty() { "starting" } else { "ready" }.into(),
+                state: if sources.apps.is_empty() {
+                    "starting"
+                } else {
+                    "ready"
+                }
+                .into(),
                 detail: None,
             },
             SourceStatus {
@@ -866,7 +889,12 @@ impl Engine {
                 label: "Browser history & bookmarks".into(),
                 enabled: settings.privacy.browser_history,
                 item_count: sources.browser.len() as u64,
-                state: if settings.privacy.browser_history { "ready" } else { "disabled" }.into(),
+                state: if settings.privacy.browser_history {
+                    "ready"
+                } else {
+                    "disabled"
+                }
+                .into(),
                 detail: None,
             },
             SourceStatus {
@@ -903,7 +931,12 @@ impl Engine {
                 label: "Git repositories".into(),
                 enabled: settings.privacy.git_indexing,
                 item_count: sources.git.len() as u64,
-                state: if settings.privacy.git_indexing { "ready" } else { "disabled" }.into(),
+                state: if settings.privacy.git_indexing {
+                    "ready"
+                } else {
+                    "disabled"
+                }
+                .into(),
                 detail: None,
             },
         ];
@@ -942,6 +975,9 @@ impl Engine {
     }
 
     pub fn update_settings(&self, patch: SettingsPatch) -> anyhow::Result<Settings> {
+        if let Some(engine) = patch.ocr_engine {
+            ensure_ocr_engine_available(engine, &self.config.data_dir)?;
+        }
         let (next, changed) = {
             let mut guard = self
                 .settings
@@ -999,6 +1035,7 @@ impl Engine {
     }
 
     pub fn complete_onboarding(&self, input: OnboardingInput) -> anyhow::Result<Settings> {
+        ensure_ocr_engine_available(input.ocr_engine, &self.config.data_dir)?;
         let mut settings = self.settings_snapshot();
         settings.user_name = input
             .user_name
@@ -1020,6 +1057,7 @@ impl Engine {
             .collect();
         settings.indexing.content_enabled = input.content_enabled;
         settings.indexing.ocr_enabled = input.ocr_enabled || (input.skipped && false);
+        settings.ocr_engine = input.ocr_engine;
         settings.agent.enabled = input.agent_opt_in;
         settings.onboarding_complete = true;
         settings.privacy.telemetry = false;
@@ -1036,11 +1074,7 @@ impl Engine {
         // other caller of the invoke surface) cannot one-shot power off the PC.
         if let ActionSpec::RunNative { command } = &action {
             if is_destructive(*command) {
-                let pending = self
-                    .pending_destructive
-                    .lock()
-                    .ok()
-                    .and_then(|guard| *guard);
+                let pending = self.pending_destructive.lock().ok().and_then(|guard| *guard);
                 let confirmed = pending
                     .map(|(pending_command, at)| pending_command == *command && now_ms() - at < 15_000)
                     .unwrap_or(false);
@@ -1082,12 +1116,9 @@ impl Engine {
             _ => ps_sources::actions::execute(&action),
         };
         if outcome.ok && settings.privacy.activity_history {
-            let _ = self.db.log_activity(
-                kind,
-                &title,
-                Some(&outcome.message),
-                path.as_deref(),
-            );
+            let _ = self
+                .db
+                .log_activity(kind, &title, Some(&outcome.message), path.as_deref());
         }
         outcome
     }
@@ -1225,9 +1256,30 @@ impl Engine {
     /// mutation of the index (load, migration replace_all, scan, rebuild).
     fn sync_filename_entries(&self) {
         if let Ok(index) = self.index.read() {
-            self.filename_entries
-                .store(index.len() as u64, Ordering::Relaxed);
+            self.filename_entries.store(index.len() as u64, Ordering::Relaxed);
         }
+    }
+    fn backfill_ocr_metadata(&self) -> anyhow::Result<()> {
+        let mut after_id = 0i64;
+        loop {
+            if self.shutdown.load(Ordering::SeqCst) || self.paused.load(Ordering::SeqCst) {
+                break;
+            }
+            let pending = self.db.ocr_paths_needing_metadata(after_id, 128)?;
+            let Some((last_id, _)) = pending.last() else { break };
+            after_id = *last_id;
+            let index = self.index.read().unwrap();
+            let updates: Vec<_> = pending
+                .into_iter()
+                .filter_map(|(id, path)| {
+                    index
+                        .metadata_for_path(&path)
+                        .map(|(size, modified)| (id, path, size, modified))
+                })
+                .collect();
+            self.db.ocr_backfill_metadata(&updates)?;
+        }
+        Ok(())
     }
 
     /// Current filename count read from the index itself, healing the cached
@@ -1492,20 +1544,40 @@ fn run_background_inner(engine: &Arc<Engine>) {
 
     let roots = engine.configured_roots();
     if !roots.is_empty() {
-        let current_roots: Vec<String> = roots
-            .iter()
-            .map(|root| ps_index::normalize_root(root))
-            .collect();
-        let rescan = engine.force_rescan.swap(false, Ordering::SeqCst)
-            || {
-                let index = engine.index.read().unwrap();
-                index.is_empty() || index.roots() != current_roots.as_slice()
-            };
+        let current_roots: Vec<String> = roots.iter().map(|root| ps_index::normalize_root(root)).collect();
+        let rescan = engine.force_rescan.swap(false, Ordering::SeqCst) || {
+            let index = engine.index.read().unwrap();
+            index.is_empty() || index.roots() != current_roots.as_slice()
+        };
         if rescan {
             engine.set_phase("scanning files");
             scan_into_index(engine, &roots);
             engine.save_index();
         }
+    }
+
+    // Backfill after scanning, before content/OCR work, so legacy rows can
+    // use the fresh filename index without delaying heavier indexing stages.
+    match engine.db.ocr_metadata_pending() {
+        Ok(count) if count > 0 => {
+            engine.set_phase("updating OCR metadata");
+            if let Err(err) = engine.backfill_ocr_metadata() {
+                engine.push_warning(format!("OCR metadata update failed: {err}"));
+            } else if !engine.shutdown.load(Ordering::SeqCst) && !engine.paused.load(Ordering::SeqCst) {
+                match engine.db.ocr_metadata_pending() {
+                    Ok(remaining) if remaining > 0 => engine.push_warning(format!(
+                        "{remaining} OCR rows still need filename metadata; they will be retried on the next indexing run"
+                    )),
+                    Err(err) => engine.push_warning(format!("OCR metadata check failed: {err}")),
+                    _ => {}
+                }
+            }
+        }
+        Err(err) => engine.push_warning(format!("OCR metadata check failed: {err}")),
+        _ => {}
+    }
+
+    if !roots.is_empty() {
         engine.set_phase("indexing content");
         index_content(engine, &roots);
         engine.set_phase("indexing screenshots");
@@ -1552,10 +1624,7 @@ fn scan_into_index(engine: &Arc<Engine>, roots: &[PathBuf]) {
         progress: &mut progress,
     };
     let (mut index, stats) = ps_index::scan(options);
-    let root_strings: Vec<String> = roots
-        .iter()
-        .map(|root| ps_index::normalize_root(root))
-        .collect();
+    let root_strings: Vec<String> = roots.iter().map(|root| ps_index::normalize_root(root)).collect();
     index.set_roots(root_strings);
     if stats.errors > 0 {
         engine.push_warning(format!("{} directories or files could not be read", stats.errors));
@@ -1604,8 +1673,9 @@ fn index_content(engine: &Arc<Engine>, roots: &[PathBuf]) {
         match content.index_file(&path, ps_content::DEFAULT_MAX_BYTES) {
             Ok(true) => written += 1,
             Ok(false) => {}
-            Err(err) => engine
-                .push_warning(format!("content extraction failed for {}: {err}", path.display())),
+            Err(err) => {
+                engine.push_warning(format!("content extraction failed for {}: {err}", path.display()))
+            }
         }
     }
     let documents = content.stats().documents;
@@ -1618,23 +1688,26 @@ fn index_content(engine: &Arc<Engine>, roots: &[PathBuf]) {
 
 fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
     let settings = engine.settings_snapshot();
-    if !settings.indexing.ocr_enabled || !ps_ocr::available() {
+    if !settings.indexing.ocr_enabled {
+        return;
+    }
+    let (engine_name, model_dir) = match settings.ocr_engine {
+        OcrEngine::Windows => ("windows", None),
+        OcrEngine::PpOcrV6 => ("pp_ocr_v6", Some(engine.config.data_dir.join("models").join("ppocrv6"))),
+        OcrEngine::Indra => ("indra", Some(engine.config.data_dir.join("models").join("indra"))),
+        OcrEngine::Tesseract => ("tesseract", None),
+    };
+    if !ps_ocr::is_engine_available(engine_name, model_dir.as_deref()) {
+        engine.push_warning(format!(
+            "OCR engine {:?} is unavailable or missing local assets; select an available engine in settings.",
+            settings.ocr_engine
+        ));
         return;
     }
     let modes = root_modes(&settings);
-    let candidates: Vec<(String, u64, i64)> = {
+    let candidates = {
         let index = engine.index.read().unwrap();
-        index
-            .entries()
-            .iter()
-            .filter(|entry| entry.kind == EntryKind::File)
-            .filter(|entry| {
-                ps_ocr::IMAGE_EXTENSIONS.contains(&entry.ext.to_ascii_lowercase().as_str())
-            })
-            .filter(|entry| mode_for(&modes, &entry.path) >= 2)
-            .map(|entry| (entry.path.clone(), entry.size, entry.modified))
-            .take(MAX_OCR_PER_PASS)
-            .collect()
+        ocr_candidates(&index, &modes)
     };
     let mut indexed = 0usize;
     let mut processed = 0usize;
@@ -1648,21 +1721,37 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
         }
         let hash = quick_hash(&path, size, modified);
         if engine.db.ocr_has(&path, &hash) {
+            if let Err(err) = engine.db.ocr_update_metadata(&path, size, modified) {
+                engine.push_warning(format!("OCR metadata update failed for {path}: {err}"));
+            }
             continue;
         }
-        match ps_ocr::extract_image(Path::new(&path), 16_777_216) {
+        match ps_ocr::extract_image_with_engine(
+            Path::new(&path),
+            16_777_216,
+            engine_name,
+            model_dir.as_deref(),
+        ) {
             Ok(Some(document)) if !document.text.trim().is_empty() => {
-                let _ = engine.db.ocr_upsert(
+                match engine.db.ocr_upsert(
                     &path,
                     &hash,
                     &document.text,
                     &document.language,
                     document.width,
                     document.height,
-                );
-                indexed += 1;
+                    size,
+                    modified,
+                ) {
+                    Ok(()) => indexed += 1,
+                    Err(err) => engine.push_warning(format!("OCR indexing failed for {path}: {err}")),
+                }
             }
-            Ok(_) => {}
+            Ok(_) => {
+                if let Err(err) = engine.db.ocr_delete(&path) {
+                    engine.push_warning(format!("OCR cleanup failed for {path}: {err}"));
+                }
+            }
             Err(err) => engine.push_warning(format!("OCR failed for {path}: {err}")),
         }
     }
@@ -1673,6 +1762,16 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
     engine.last_updated.store(now_ms(), Ordering::SeqCst);
     let _ = roots;
     let _ = indexed;
+}
+fn ocr_candidates(index: &FilenameIndex, modes: &[(String, u8)]) -> Vec<(String, u64, i64)> {
+    index
+        .entries()
+        .iter()
+        .filter(|entry| entry.kind == EntryKind::File)
+        .filter(|entry| ps_ocr::IMAGE_EXTENSIONS.contains(&entry.ext.to_ascii_lowercase().as_str()))
+        .filter(|entry| mode_for(modes, &entry.path) >= 2)
+        .map(|entry| (entry.path.clone(), entry.size, entry.modified))
+        .collect()
 }
 
 fn quick_hash(path: &str, size: u64, modified: i64) -> String {
@@ -1720,10 +1819,7 @@ fn mode_for(modes: &[(String, u8)], path: &str) -> u8 {
 }
 
 fn load_migrated_files(db_path: &Path) -> anyhow::Result<Vec<ps_index::IndexEntry>> {
-    let conn = rusqlite::Connection::open_with_flags(
-        db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )?;
+    let conn = rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let has_table: bool = conn
         .query_row(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='files'",
@@ -1769,18 +1865,14 @@ fn read_legacy_summary(path: &Path) -> LegacySummary {
     if !summary.detected {
         return summary;
     }
-    let Ok(conn) = rusqlite::Connection::open_with_flags(
-        path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ) else {
+    let Ok(conn) = rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+    else {
         return summary;
     };
     let count = |table: &str| -> u64 {
-        conn.query_row(
-            &format!("SELECT COUNT(*) FROM {table}"),
-            [],
-            |row| row.get::<_, i64>(0),
-        )
+        conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+            row.get::<_, i64>(0)
+        })
         .unwrap_or(0) as u64
     };
     let exists = |table: &str| -> bool {
@@ -1832,8 +1924,7 @@ fn strip_imperative_verbs(raw: &str) -> std::borrow::Cow<'_, str> {
         let lower = text.to_ascii_lowercase();
         if lower.ends_with("please") {
             let cut = text.len() - "please".len();
-            let before_is_boundary =
-                cut == 0 || text.as_bytes()[cut - 1].is_ascii_whitespace();
+            let before_is_boundary = cut == 0 || text.as_bytes()[cut - 1].is_ascii_whitespace();
             if before_is_boundary {
                 let candidate = text[..cut].trim_end();
                 if candidate.is_empty() {
@@ -1847,7 +1938,14 @@ fn strip_imperative_verbs(raw: &str) -> std::borrow::Cow<'_, str> {
     }
     let lower = text.to_ascii_lowercase();
     const VERBS: [&str; 8] = [
-        "go to", "switch to", "open up", "open", "launch", "start", "run", "show",
+        "go to",
+        "switch to",
+        "open up",
+        "open",
+        "launch",
+        "start",
+        "run",
+        "show",
     ];
     for verb in VERBS {
         if lower.starts_with(verb) {
@@ -1871,7 +1969,9 @@ fn strip_imperative_verbs(raw: &str) -> std::borrow::Cow<'_, str> {
 fn effective_query(raw: &str, fallback: SearchScope) -> (SearchScope, String) {
     let trimmed = raw.trim_start();
     let lower = trimmed.to_lowercase();
-    const PREFIXES: [(&str, SearchScope); 16] = [
+    const PREFIXES: [(&str, SearchScope); 18] = [
+        ("photos:", SearchScope::Photos),
+        ("photo:", SearchScope::Photos),
         ("file:", SearchScope::Files),
         ("files:", SearchScope::Files),
         ("folder:", SearchScope::Folders),
@@ -1904,6 +2004,8 @@ fn scope_allows(scope: SearchScope, kind: SourceKind) -> bool {
     matches!(
         (scope, kind),
         (SearchScope::Files, SourceKind::File)
+            | (SearchScope::Photos, SourceKind::File)
+            | (SearchScope::Photos, SourceKind::OcrText)
             | (SearchScope::Folders, SourceKind::Folder)
             | (SearchScope::Apps, SourceKind::Application)
             | (SearchScope::Clipboard, SourceKind::Clipboard)
@@ -2050,10 +2152,7 @@ fn contains_ci(haystack: &str, needle: &str) -> bool {
     false
 }
 
-fn match_git<'a>(
-    entries: &'a [ps_sources::GitEntry],
-    terms: &[String],
-) -> Vec<&'a ps_sources::GitEntry> {
+fn match_git<'a>(entries: &'a [ps_sources::GitEntry], terms: &[String]) -> Vec<&'a ps_sources::GitEntry> {
     entries
         .iter()
         .filter(|entry| {
@@ -2061,7 +2160,12 @@ fn match_git<'a>(
                 ps_sources::GitEntry::Repo { name, path, .. } => {
                     format!("{} {}", name.to_lowercase(), path.to_lowercase())
                 }
-                ps_sources::GitEntry::Commit { message, author, hash, .. } => {
+                ps_sources::GitEntry::Commit {
+                    message,
+                    author,
+                    hash,
+                    ..
+                } => {
                     format!(
                         "{} {} {}",
                         message.to_lowercase(),
@@ -2310,9 +2414,7 @@ fn app_icon(icon_path: Option<&str>) -> IconRef {
         }
     }
     let icon = match std::fs::read(path) {
-        Ok(bytes)
-            if bytes.starts_with(&[0x89, b'P', b'N', b'G']) && bytes.len() <= 512 * 1024 =>
-        {
+        Ok(bytes) if bytes.starts_with(&[0x89, b'P', b'N', b'G']) && bytes.len() <= 512 * 1024 => {
             IconRef::AppIconData {
                 data: format!("data:image/png;base64,{}", base64_encode(&bytes)),
             }
@@ -2351,8 +2453,16 @@ fn base64_encode(bytes: &[u8]) -> String {
         let triple = (b0 << 16) | (b1 << 8) | b2;
         out.push(TABLE[((triple >> 18) & 0x3f) as usize] as char);
         out.push(TABLE[((triple >> 12) & 0x3f) as usize] as char);
-        out.push(if chunk.len() > 1 { TABLE[((triple >> 6) & 0x3f) as usize] as char } else { '=' });
-        out.push(if chunk.len() > 2 { TABLE[(triple & 0x3f) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            TABLE[((triple >> 6) & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            TABLE[(triple & 0x3f) as usize] as char
+        } else {
+            '='
+        });
     }
     out
 }
@@ -2506,8 +2616,7 @@ fn trim_for_registry(result: &SearchResult) -> SearchResult {
 }
 
 fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
-    let is_image_row = entry.category == ps_sources::ClipCategory::Image
-        || entry.image_path.is_some();
+    let is_image_row = entry.category == ps_sources::ClipCategory::Image || entry.image_path.is_some();
     let first_line = entry.text.lines().next().unwrap_or("").trim();
     let mut title: String = first_line.chars().take(120).collect();
     if is_image_row {
@@ -2521,10 +2630,7 @@ fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
         };
     }
     let thumbnail_data_url = if is_image_row {
-        preview::image_row_data_url(
-            entry.thumbnail_path.as_deref(),
-            entry.image_path.as_deref(),
-        )
+        preview::image_row_data_url(entry.thumbnail_path.as_deref(), entry.image_path.as_deref())
     } else {
         None
     };
@@ -2688,9 +2794,7 @@ fn git_result(entry: &ps_sources::GitEntry) -> SearchResult {
                 modified: Some(*date_ms),
                 ..ResultMeta::default()
             },
-            action: ActionSpec::CopyText {
-                text: hash.clone(),
-            },
+            action: ActionSpec::CopyText { text: hash.clone() },
             actions: Vec::new(),
         },
         ps_sources::GitEntry::Todo {
@@ -2826,13 +2930,19 @@ fn describe_action(action: &ActionSpec) -> (ActivityKind, String, Option<String>
                 .unwrap_or_else(|| path.clone()),
             Some(path.clone()),
         ),
-        ActionSpec::RevealPath { path } => {
-            (ActivityKind::Open, "Reveal in Explorer".into(), Some(path.clone()))
-        }
+        ActionSpec::RevealPath { path } => (
+            ActivityKind::Open,
+            "Reveal in Explorer".into(),
+            Some(path.clone()),
+        ),
         ActionSpec::OpenUrl { url } => (ActivityKind::Open, url.clone(), None),
         ActionSpec::LaunchApp { app_id, .. } => (ActivityKind::Launch, app_id.clone(), None),
         ActionSpec::CopyText { text } => (ActivityKind::Open, text.chars().take(80).collect(), None),
-        ActionSpec::CopyImage { path } => (ActivityKind::Open, format!("Copied image: {path}"), Some(path.clone())),
+        ActionSpec::CopyImage { path } => (
+            ActivityKind::Open,
+            format!("Copied image: {path}"),
+            Some(path.clone()),
+        ),
         ActionSpec::RunNative { command } => (ActivityKind::Workflow, format!("{command:?}"), None),
         ActionSpec::RunWorkflow { id } => (ActivityKind::Workflow, id.clone(), None),
         ActionSpec::None => (ActivityKind::System, "No action".into(), None),
@@ -2921,6 +3031,114 @@ mod tests {
         .unwrap()
     }
 
+    #[test]
+    fn metadata_backfill_stops_on_cancel_and_resumes_from_pending_rows() {
+        let dir = scratch_dir("metadata-backfill-resume");
+        let index = FilenameIndex::from_entries(vec![ps_index::IndexEntry {
+            path: r"C:\photos\old.png".into(),
+            name: "old.png".into(),
+            ext: "png".into(),
+            kind: EntryKind::File,
+            size: 42,
+            modified: 1234,
+        }]);
+        index.save(&dir.join(INDEX_FILE)).unwrap();
+        let engine = make_engine(&dir, None);
+        engine
+            .db
+            .ocr_upsert(r"C:\photos\old.png", "hash", "legacy", "en", 1, 1, 0, 0)
+            .unwrap();
+        rusqlite::Connection::open(dir.join(DB_FILE))
+            .unwrap()
+            .execute("UPDATE ocr_documents SET path_lower = ''", [])
+            .unwrap();
+
+        engine.shutdown.store(true, Ordering::SeqCst);
+        engine.backfill_ocr_metadata().unwrap();
+        assert_eq!(engine.db.ocr_metadata_pending().unwrap(), 1);
+
+        engine.shutdown.store(false, Ordering::SeqCst);
+        engine.backfill_ocr_metadata().unwrap();
+        assert_eq!(engine.db.ocr_metadata_pending().unwrap(), 0);
+        let hits = engine
+            .db
+            .ocr_search_photos(
+                "legacy",
+                5,
+                &SearchFilters {
+                    under_path: Some(r"c:\photos\old.png".into()),
+                    modified_after: Some(1234),
+                    min_size: Some(42),
+                    ..SearchFilters::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(hits.len(), 1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn background_backfill_uses_index_created_by_fresh_scan() {
+        let dir = scratch_dir("metadata-backfill-fresh-scan");
+        let root = dir.join("photos");
+        std::fs::create_dir_all(&root).unwrap();
+        let photo = root.join("old.png");
+        std::fs::write(&photo, b"image placeholder").unwrap();
+        let engine = std::sync::Arc::new(make_engine(&dir, None));
+        let path = photo.to_string_lossy().into_owned();
+        engine
+            .db
+            .ocr_upsert(&path, "hash", "legacy", "en", 1, 1, 0, 0)
+            .unwrap();
+        let orphan = root.join("removed.png").to_string_lossy().into_owned();
+        engine
+            .db
+            .ocr_upsert(&orphan, "orphan", "orphan legacy", "en", 1, 1, 0, 0)
+            .unwrap();
+        rusqlite::Connection::open(dir.join(DB_FILE))
+            .unwrap()
+            .execute("UPDATE ocr_documents SET path_lower = ''", [])
+            .unwrap();
+        {
+            let mut settings = engine.settings.write().unwrap();
+            settings.onboarding_complete = true;
+            settings.indexing.roots = vec![ps_ipc::RootConfig {
+                path: root.to_string_lossy().into_owned(),
+                mode: ps_ipc::RootMode::NamesOnly,
+                enabled: true,
+            }];
+        }
+        engine.clone().spawn_background();
+        for _ in 0..500 {
+            if engine.status().state == IndexerState::Ready {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(engine.db.ocr_metadata_pending().unwrap(), 1);
+        assert!(engine
+            .status()
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("1 OCR rows still need filename metadata")));
+        assert_eq!(
+            engine
+                .db
+                .ocr_search_photos(
+                    "legacy",
+                    5,
+                    &SearchFilters {
+                        min_size: Some(17),
+                        ..SearchFilters::default()
+                    }
+                )
+                .unwrap()
+                .len(),
+            1
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     fn sample_entries(n: usize) -> Vec<ps_index::IndexEntry> {
         (0..n)
             .map(|i| ps_index::IndexEntry {
@@ -2953,6 +3171,28 @@ mod tests {
              INSERT INTO files VALUES ('C:/Docs/b.pdf','b.pdf','pdf',1700000001,1200,0,1);",
         )
         .unwrap();
+    }
+
+    #[test]
+    fn ocr_candidates_include_images_past_legacy_limit_and_empty_files() {
+        let entries = (0..450)
+            .map(|i| ps_index::IndexEntry {
+                path: format!(r"C:\images\scan{i}.png"),
+                name: format!("scan{i}.png"),
+                ext: "png".into(),
+                kind: EntryKind::File,
+                size: if i == 0 { 0 } else { 1 },
+                modified: i as i64,
+            })
+            .collect();
+        let index = FilenameIndex::from_entries(entries);
+        let candidates = ocr_candidates(&index, &[(r"c:\images\".into(), 2)]);
+
+        assert_eq!(candidates.len(), 450);
+        assert_eq!(candidates[0].1, 0, "empty images remain eligible for OCR");
+        assert!(candidates
+            .iter()
+            .any(|(path, _, _)| path.ends_with("scan449.png")));
     }
 
     #[test]
@@ -3077,16 +3317,14 @@ mod tests {
     fn imperative_verbs_are_stripped_for_apps_and_files() {
         let dir = scratch_dir("verbs");
         let engine = make_engine(&dir, None);
-        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![
-            ps_index::IndexEntry {
-                path: r"C:\docs\architecture notes.txt".into(),
-                name: "architecture notes.txt".into(),
-                ext: "txt".into(),
-                kind: EntryKind::File,
-                size: 10,
-                modified: 1,
-            },
-        ]);
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![ps_index::IndexEntry {
+            path: r"C:\docs\architecture notes.txt".into(),
+            name: "architecture notes.txt".into(),
+            ext: "txt".into(),
+            kind: EntryKind::File,
+            size: 10,
+            modified: 1,
+        }]);
         engine.sync_filename_entries();
         {
             let mut sources = engine.sources.write().unwrap();
@@ -3115,9 +3353,9 @@ mod tests {
             ];
         }
         let has_app = |resp: &SearchResponse, needle: &str| {
-            resp.results.iter().any(|r| {
-                r.kind == SourceKind::Application && r.title.to_lowercase().contains(needle)
-            })
+            resp.results
+                .iter()
+                .any(|r| r.kind == SourceKind::Application && r.title.to_lowercase().contains(needle))
         };
         assert!(
             has_app(&engine.search(&SearchRequest::new(20, "open chrome")), "chrome"),
@@ -3187,24 +3425,264 @@ mod tests {
         assert!(!scope_allows(SearchScope::Folders, SourceKind::File));
         assert!(scope_allows(SearchScope::All, SourceKind::File));
         assert!(scope_allows(SearchScope::All, SourceKind::Folder));
+        assert!(scope_allows(SearchScope::Photos, SourceKind::File));
+        assert!(scope_allows(SearchScope::Photos, SourceKind::OcrText));
+        assert!(!scope_allows(SearchScope::Photos, SourceKind::Folder));
+    }
+    #[test]
+    fn photos_scope_returns_raster_files_and_raster_ocr_only() {
+        let dir = scratch_dir("photos-scope");
+        let engine = make_engine(&dir, None);
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![
+            ps_index::IndexEntry {
+                path: r"C:\photos\sunset.png".into(),
+                name: "sunset.png".into(),
+                ext: "png".into(),
+                kind: EntryKind::File,
+                size: 10,
+                modified: 1,
+            },
+            ps_index::IndexEntry {
+                path: r"C:\photos\sunset.pdf".into(),
+                name: "sunset.pdf".into(),
+                ext: "pdf".into(),
+                kind: EntryKind::File,
+                size: 10,
+                modified: 1,
+            },
+            ps_index::IndexEntry {
+                path: r"C:\photos\sunset".into(),
+                name: "sunset".into(),
+                ext: String::new(),
+                kind: EntryKind::Folder,
+                size: 0,
+                modified: 1,
+            },
+        ]);
+        engine.sync_filename_entries();
+        engine
+            .db
+            .ocr_upsert(
+                r"C:\photos\sunset.png",
+                "png-hash",
+                "violet nebula phrase",
+                "en",
+                10,
+                10,
+                10,
+                1,
+            )
+            .unwrap();
+        engine
+            .db
+            .ocr_upsert(
+                r"C:\photos\sunset.pdf",
+                "pdf-hash",
+                "violet nebula phrase",
+                "en",
+                10,
+                10,
+                10,
+                1,
+            )
+            .unwrap();
+        engine
+            .db
+            .ocr_upsert(
+                r"C:\photos-private\sunset.png",
+                "sibling-hash",
+                "violet nebula phrase",
+                "en",
+                10,
+                10,
+                10,
+                1,
+            )
+            .unwrap();
+        assert_eq!(
+            engine
+                .db
+                .ocr_search_photos("violet nebula", 5, &SearchFilters::default())
+                .unwrap()
+                .len(),
+            2
+        );
+        engine.settings.write().unwrap().indexing.ocr_enabled = true;
+
+        let mut request = SearchRequest::new(40, "sunset");
+        request.scope = SearchScope::Photos;
+        let results = engine.search(&request).results;
+        assert!(!results.is_empty());
+        assert!(
+            results.iter().all(|result| {
+                result.kind == SourceKind::OcrText
+                    || result.path.as_deref().is_some_and(|path| {
+                        path.to_ascii_lowercase().ends_with(".png")
+                            || path.to_ascii_lowercase().ends_with(".jpg")
+                            || path.to_ascii_lowercase().ends_with(".jpeg")
+                            || path.to_ascii_lowercase().ends_with(".bmp")
+                            || path.to_ascii_lowercase().ends_with(".gif")
+                            || path.to_ascii_lowercase().ends_with(".webp")
+                            || path.to_ascii_lowercase().ends_with(".tif")
+                            || path.to_ascii_lowercase().ends_with(".tiff")
+                    })
+            }),
+            "Photos must exclude PDFs and folders: {:?}",
+            results.iter().map(|r| (&r.path, r.kind)).collect::<Vec<_>>()
+        );
+
+        request.query = "violet nebula".into();
+        request.filters.under_path = Some(r"C:\photos".into());
+        let response = engine.search(&request);
+        let ocr_paths: Vec<_> = response
+            .results
+            .iter()
+            .filter(|result| result.kind == SourceKind::OcrText)
+            .filter_map(|result| result.path.as_deref())
+            .collect();
+        assert_eq!(ocr_paths, vec![r"C:\photos\sunset.png"], "response: {response:?}");
+        request.filters.extensions = vec!["pdf".into()];
+        request.query = "sunset".into();
+        assert!(
+            engine.search(&request).results.is_empty(),
+            "Photos ext:pdf must not widen the photo scope"
+        );
+        request.filters.extensions.clear();
+        request.filters.under_path = None;
+        request.filters.modified_after = Some(2);
+        request.query = "violet nebula".into();
+        assert!(engine
+            .search(&request)
+            .results
+            .iter()
+            .all(|result| result.kind != SourceKind::OcrText));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn onboarding_rejects_unavailable_ocr_engine_without_saving() {
+        let dir = scratch_dir("onboarding-unsupported-ocr");
+        let engine = make_engine(&dir, None);
+        let result = engine.complete_onboarding(OnboardingInput {
+            user_name: None,
+            roots: Vec::new(),
+            content_enabled: false,
+            ocr_enabled: true,
+            ocr_engine: OcrEngine::Tesseract,
+            hotkey: "Alt+Space".into(),
+            agent_opt_in: false,
+            skipped: false,
+        });
+        let error = result.unwrap_err().to_string();
+        assert!(error.contains("Select Windows OCR"));
+        assert!(!engine.settings().onboarding_complete);
+        assert!(!dir.join("settings.json").exists());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn settings_reject_unavailable_ocr_engine() {
+        let dir = scratch_dir("settings-unsupported-ocr");
+        let engine = make_engine(&dir, None);
+        let result = engine.update_settings(SettingsPatch {
+            ocr_engine: Some(OcrEngine::Indra),
+            ..SettingsPatch::default()
+        });
+        assert!(result.unwrap_err().to_string().contains("Select Windows OCR"));
+        assert_eq!(engine.settings().ocr_engine, OcrEngine::Windows);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn photos_ocr_filters_page_past_initial_matches() {
+        let dir = scratch_dir("photos-ocr-pagination");
+        let engine = make_engine(&dir, None);
+        let mut entries = Vec::new();
+        for i in 0..105 {
+            let path = format!(r"C:\photos\other{i}.png");
+            entries.push(ps_index::IndexEntry {
+                path: path.clone(),
+                name: format!("other{i}.png"),
+                ext: "png".into(),
+                kind: EntryKind::File,
+                size: 10,
+                modified: 1,
+            });
+            engine
+                .db
+                .ocr_upsert(
+                    &path,
+                    &format!("hash-{i}"),
+                    "pagination pagination",
+                    "en",
+                    10,
+                    10,
+                    10,
+                    1,
+                )
+                .unwrap();
+        }
+        let target = r"C:\photos\target.png";
+        entries.push(ps_index::IndexEntry {
+            path: target.into(),
+            name: "target.png".into(),
+            ext: "png".into(),
+            kind: EntryKind::File,
+            size: 10,
+            modified: 5,
+        });
+        engine
+            .db
+            .ocr_upsert(target, "target-hash", "pagination", "en", 10, 10, 10, 5)
+            .unwrap();
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(entries);
+        engine.sync_filename_entries();
+        engine.settings.write().unwrap().indexing.ocr_enabled = true;
+        let mut request = SearchRequest::new(41, "pagination");
+        request.scope = SearchScope::Photos;
+        request.filters.under_path = Some(r"C:\photos".into());
+        request.filters.modified_after = Some(5);
+        let results = engine.search(&request).results;
+        let paths: Vec<_> = results
+            .iter()
+            .filter(|result| result.kind == SourceKind::OcrText)
+            .filter_map(|result| result.path.as_deref())
+            .collect();
+        assert_eq!(paths, vec![target]);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn app_scope_never_includes_recent_files() {
         let dir = scratch_dir("app_recent_scope");
         let engine = make_engine(&dir, None);
-        engine.sources.write().unwrap().recent.push(ps_sources::RecentEntry {
-            path: r"C:\docs\report.txt".into(),
-            name: "report.txt".into(),
-            last_used_ms: 1,
-        });
+        engine
+            .sources
+            .write()
+            .unwrap()
+            .recent
+            .push(ps_sources::RecentEntry {
+                path: r"C:\docs\report.txt".into(),
+                name: "report.txt".into(),
+                last_used_ms: 1,
+            });
         let mut request = SearchRequest::new(1, "report");
         request.scope = SearchScope::Apps;
-        assert!(engine.search(&request).results.iter().all(|r| r.kind == SourceKind::Application));
+        assert!(engine
+            .search(&request)
+            .results
+            .iter()
+            .all(|r| r.kind == SourceKind::Application));
         request.query = "file:report".into();
-        assert!(engine.search(&request).results.iter().all(|r| r.kind == SourceKind::Application));
+        assert!(engine
+            .search(&request)
+            .results
+            .iter()
+            .all(|r| r.kind == SourceKind::Application));
         request.query.clear();
-        assert!(engine.search(&request).results.iter().all(|r| r.kind == SourceKind::Application));
+        assert!(engine
+            .search(&request)
+            .results
+            .iter()
+            .all(|r| r.kind == SourceKind::Application));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -3234,7 +3712,11 @@ mod tests {
 
         let mut apps_with_file_prefix = SearchRequest::new(29, "file:report");
         apps_with_file_prefix.scope = SearchScope::Apps;
-        assert!(engine.search(&apps_with_file_prefix).results.iter().all(|r| r.kind == SourceKind::Application));
+        assert!(engine
+            .search(&apps_with_file_prefix)
+            .results
+            .iter()
+            .all(|r| r.kind == SourceKind::Application));
         let mut files = SearchRequest::new(30, "report");
         files.scope = SearchScope::Files;
         let resp = engine.search(&files);
@@ -3242,7 +3724,10 @@ mod tests {
         assert!(
             resp.results.iter().all(|r| r.kind == SourceKind::File),
             "FILES scope must not return folders: {:?}",
-            resp.results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+            resp.results
+                .iter()
+                .map(|r| (&r.title, r.kind))
+                .collect::<Vec<_>>()
         );
 
         let mut folders = SearchRequest::new(31, "report");
@@ -3252,7 +3737,10 @@ mod tests {
         assert!(
             resp.results.iter().all(|r| r.kind == SourceKind::Folder),
             "FOLDERS scope must not return files: {:?}",
-            resp.results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+            resp.results
+                .iter()
+                .map(|r| (&r.title, r.kind))
+                .collect::<Vec<_>>()
         );
 
         // ALL keeps the two groups and both are present.
@@ -3338,18 +3826,18 @@ mod tests {
             resp.results[0].meta.label.as_deref(),
             Some("LINK"),
             "pinned item must rank first: {:?}",
-            resp.results.iter().map(|r| r.meta.label.clone()).collect::<Vec<_>>()
+            resp.results
+                .iter()
+                .map(|r| r.meta.label.clone())
+                .collect::<Vec<_>>()
         );
         // Category labels map to the UI badge vocabulary.
-        let labels: Vec<String> = resp
-            .results
-            .iter()
-            .filter_map(|r| r.meta.label.clone())
-            .collect();
+        let labels: Vec<String> = resp.results.iter().filter_map(|r| r.meta.label.clone()).collect();
         assert!(labels.contains(&"LINK".to_string()));
         assert!(labels.contains(&"TEXT".to_string()));
-        assert!(labels.iter().all(|l| ["LINK", "EMAIL", "PATH", "CODE", "IMAGE", "TEXT"]
-            .contains(&l.as_str())));
+        assert!(labels
+            .iter()
+            .all(|l| ["LINK", "EMAIL", "PATH", "CODE", "IMAGE", "TEXT"].contains(&l.as_str())));
 
         // Disabling privacy stops clipboard results immediately.
         let mut settings = engine.settings();
@@ -3448,7 +3936,12 @@ mod tests {
                 ..Default::default()
             })
             .unwrap();
-        let capture = engine.clipboard_listener.lock().unwrap().as_ref().map(|(_, capture)| *capture);
+        let capture = engine
+            .clipboard_listener
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|(_, capture)| *capture);
         assert_eq!(
             capture,
             Some(ClipboardCapture {
@@ -3500,7 +3993,10 @@ mod tests {
             resp.results.len(),
             3,
             "empty clipboard query must list recent rows: {:?}",
-            resp.results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+            resp.results
+                .iter()
+                .map(|r| (&r.title, r.kind))
+                .collect::<Vec<_>>()
         );
         assert!(
             resp.results.iter().all(|r| r.kind == SourceKind::Clipboard),
@@ -3510,13 +4006,12 @@ mod tests {
             resp.results[0].meta.label.as_deref(),
             Some("LINK"),
             "pinned row must rank first: {:?}",
-            resp.results.iter().map(|r| r.meta.label.clone()).collect::<Vec<_>>()
+            resp.results
+                .iter()
+                .map(|r| r.meta.label.clone())
+                .collect::<Vec<_>>()
         );
-        let labels: Vec<String> = resp
-            .results
-            .iter()
-            .filter_map(|r| r.meta.label.clone())
-            .collect();
+        let labels: Vec<String> = resp.results.iter().filter_map(|r| r.meta.label.clone()).collect();
         assert!(labels.contains(&"EMAIL".to_string()), "labels: {labels:?}");
         assert!(labels.contains(&"TEXT".to_string()), "labels: {labels:?}");
 
@@ -3540,7 +4035,10 @@ mod tests {
         assert!(
             resp.results.is_empty(),
             "privacy off must hide clipboard history: {:?}",
-            resp.results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>()
+            resp.results
+                .iter()
+                .map(|r| (&r.title, r.kind))
+                .collect::<Vec<_>>()
         );
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -3639,11 +4137,12 @@ mod tests {
         for (name, token, format) in cases {
             let path = fixture(name);
             assert!(path.is_file(), "missing fixture {name}");
-            let result = preview_result(
+            let mut result = preview_result(
                 &format!("file:{}", path.to_string_lossy().to_lowercase()),
                 SourceKind::File,
                 Some(&path.to_string_lossy()),
             );
+            result.match_ranges = vec![TextRange { start: 0, end: 3 }];
             let payload = preview_for(&engine, &result, 4_000);
             assert_eq!(payload.format, format, "{name} format");
             assert_eq!(payload.status, PreviewStatus::Ok, "{name} status");
@@ -3654,7 +4153,14 @@ mod tests {
                 payload.unsupported_reason
             );
             let text = payload.text.as_deref().unwrap_or("");
-            assert!(text.contains(token), "{name} preview text missing token: {text:?}");
+            assert!(
+                text.contains(token),
+                "{name} preview text missing token: {text:?}"
+            );
+            assert!(
+                payload.highlight_ranges.is_empty(),
+                "filename offsets must not highlight extracted body text"
+            );
             assert!(payload.fields.iter().any(|field| field.label == "Size"));
         }
         let _ = std::fs::remove_dir_all(&dir);
@@ -3686,17 +4192,32 @@ mod tests {
         }
         // Scanned PDF specifically explains why there is no body.
         let path = fixture("scanned.pdf");
-        let result = preview_result(
-            "file:scanned",
-            SourceKind::File,
-            Some(&path.to_string_lossy()),
-        );
-        let payload = preview_for(&engine, &result, 4_000);
-        assert!(payload
+        let result = preview_result("file:scanned", SourceKind::File, Some(&path.to_string_lossy()));
+        let first = preview_for(&engine, &result, 4_000);
+        assert!(first
             .unsupported_reason
             .as_deref()
             .unwrap_or("")
             .contains("text layer"));
+        engine
+            .db
+            .ocr_upsert(
+                &path.to_string_lossy(),
+                "test-hash",
+                "SCANNED-PDF-OCR-2026 recognized text",
+                "en",
+                0,
+                0,
+                0,
+                0,
+            )
+            .unwrap();
+        let payload = preview_for(&engine, &result, 4_000);
+        assert!(payload
+            .ocr_text
+            .as_deref()
+            .unwrap_or("")
+            .contains("SCANNED-PDF-OCR-2026"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -3709,7 +4230,16 @@ mod tests {
         let path_string = path.to_string_lossy().to_string();
         engine
             .db
-            .ocr_upsert(&path_string, "test-hash", "IMAGE-OCR-PROBE-2026 screenshot preview audit", "en", 900, 260)
+            .ocr_upsert(
+                &path_string,
+                "test-hash",
+                "IMAGE-OCR-PROBE-2026 screenshot preview audit",
+                "en",
+                900,
+                260,
+                0,
+                0,
+            )
             .unwrap();
         let result = preview_result(
             &format!("file:{}", path_string.to_lowercase()),
@@ -3733,36 +4263,6 @@ mod tests {
     }
 
     #[test]
-    fn preview_cache_is_bounded_and_reused() {
-        let dir = scratch_dir("preview-cache");
-        let engine = make_engine(&dir, None);
-        let path = fixture("notes.txt");
-        let result = preview_result(
-            "file:cache-probe",
-            SourceKind::File,
-            Some(&path.to_string_lossy()),
-        );
-        engine.remember_results(std::slice::from_ref(&result));
-        let request = PreviewRequest {
-            result_id: result.id.clone(),
-            max_chars: Some(2_000),
-        };
-        let first = engine.preview(&request);
-        assert_eq!(engine.preview_cache_len(), 1);
-        let second = engine.preview(&request);
-        assert_eq!(first, second, "cached payload must be identical");
-        assert_eq!(engine.preview_cache_len(), 1, "cache must not duplicate");
-        // A different maxChars is a different cache entry.
-        let wider = engine.preview(&PreviewRequest {
-            result_id: result.id.clone(),
-            max_chars: Some(4_000),
-        });
-        assert_eq!(engine.preview_cache_len(), 2);
-        assert!(wider.text.as_deref().unwrap_or("").len() >= first.text.as_deref().unwrap_or("").len());
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
     fn preview_unknown_result_is_honest_and_path_ids_resolve() {
         let dir = scratch_dir("preview-unknown");
         let engine = make_engine(&dir, None);
@@ -3782,11 +4282,29 @@ mod tests {
             result_id: id,
             max_chars: None,
         });
-        assert!(payload
-            .text
-            .as_deref()
-            .unwrap_or("")
-            .contains("ZEBRA-TXT-2026"));
+        assert!(payload.text.as_deref().unwrap_or("").contains("ZEBRA-TXT-2026"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn deleting_empty_ocr_result_removes_stale_searchable_text() {
+        let dir = scratch_dir("ocr-empty-result");
+        let engine = make_engine(&dir, None);
+        let path = r"C:\images\changed.png";
+        engine
+            .db
+            .ocr_upsert(path, "old-hash", "STALE-OCR-PROBE-2026", "en", 10, 10, 10, 1)
+            .unwrap();
+        assert_eq!(engine.db.ocr_search("STALE-OCR-PROBE-2026", 5).unwrap().len(), 1);
+
+        engine.db.ocr_delete(path).unwrap();
+
+        assert!(engine.db.ocr_text_for_path(path).is_none());
+        assert!(engine
+            .db
+            .ocr_search("STALE-OCR-PROBE-2026", 5)
+            .unwrap()
+            .is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -3929,7 +4447,10 @@ mod tests {
         let path_string = thumb_path.to_string_lossy().to_string();
         let before = preview::thumbnail_cache_len();
         let first = preview::thumbnail_data_url(&path_string);
-        assert!(first.as_deref().unwrap_or("").starts_with("data:image/png;base64,"));
+        assert!(first
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("data:image/png;base64,"));
         assert_eq!(preview::thumbnail_cache_len(), before + 1);
         let second = preview::thumbnail_data_url(&path_string);
         assert_eq!(first, second);
@@ -3995,7 +4516,10 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert!(contains_ci("Rust Programming Language", "programming"));
         assert!(contains_ci("Rust Programming Language", "rust"));
-        assert!(contains_ci("Rust Programming Language", "PROGRAMMING".to_lowercase().as_str()));
+        assert!(contains_ci(
+            "Rust Programming Language",
+            "PROGRAMMING".to_lowercase().as_str()
+        ));
         assert!(!contains_ci("Example Domain", "rust"));
     }
 
@@ -4031,7 +4555,11 @@ mod tests {
         clipboard.title = "copied preview text".to_string();
         let payload = preview_for(&engine, &clipboard, 2_000);
         assert_eq!(payload.format, "clipboard");
-        assert!(payload.text.as_deref().unwrap_or("").contains("copied preview text"));
+        assert!(payload
+            .text
+            .as_deref()
+            .unwrap_or("")
+            .contains("copied preview text"));
         let folder = preview_result("file:folder", SourceKind::Folder, Some(r"C:\Users\Example"));
         let payload = preview_for(&engine, &folder, 2_000);
         assert_eq!(payload.format, "folder");
@@ -4116,11 +4644,7 @@ mod tests {
         assert_eq!(result.meta.image_width, Some(8));
         assert_eq!(result.meta.image_height, Some(4));
         assert_eq!(result.meta.mime.as_deref(), Some("image/png"));
-        let thumbnail = result
-            .meta
-            .thumbnail_data_url
-            .as_deref()
-            .unwrap_or("");
+        let thumbnail = result.meta.thumbnail_data_url.as_deref().unwrap_or("");
         assert!(thumbnail.starts_with("data:image/png;base64,"));
         assert!(
             thumbnail.len() <= 128 * 1024,

@@ -246,8 +246,18 @@ fn read_one_dir(path: &str, excl: &Exclusions) -> Result<DirRead, ()> {
             });
         }
     }
-    out.files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then_with(|| a.name.cmp(&b.name)));
-    out.dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then_with(|| a.name.cmp(&b.name)));
+    out.files.sort_by(|a, b| {
+        a.name
+            .to_lowercase()
+            .cmp(&b.name.to_lowercase())
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    out.dirs.sort_by(|a, b| {
+        a.name
+            .to_lowercase()
+            .cmp(&b.name.to_lowercase())
+            .then_with(|| a.name.cmp(&b.name))
+    });
     Ok(out)
 }
 
@@ -297,10 +307,8 @@ pub fn scan(options: ScanOptions<'_>) -> (FilenameIndex, ScanStats) {
                 cancelled = true;
                 break;
             }
-            let results: Vec<Result<DirRead, ()>> = frontier
-                .par_iter()
-                .map(|dir| read_one_dir(dir, &excl))
-                .collect();
+            let results: Vec<Result<DirRead, ()>> =
+                frontier.par_iter().map(|dir| read_one_dir(dir, &excl)).collect();
             let mut next: Vec<String> = Vec::new();
             for result in results {
                 let dr = match result {
@@ -318,13 +326,7 @@ pub fn scan(options: ScanOptions<'_>) -> (FilenameIndex, ScanStats) {
                 }
                 for d in dr.dirs {
                     let _child_id = builder.intern_dir(&d.path);
-                    builder.push_entry(
-                        parent_id,
-                        &d.name,
-                        EntryKind::Folder,
-                        0,
-                        d.modified,
-                    );
+                    builder.push_entry(parent_id, &d.name, EntryKind::Folder, 0, d.modified);
                     root_count += 1;
                     next.push(d.path);
                 }
@@ -416,7 +418,10 @@ mod tests {
         paths.sort();
         assert!(paths.iter().any(|p| p.ends_with("alpha.txt")));
         assert!(paths.iter().any(|p| p.ends_with("beta.pdf")));
-        assert!(paths.iter().any(|p| p.ends_with("secret.md")), "hidden dirs are indexed");
+        assert!(
+            paths.iter().any(|p| p.ends_with("secret.md")),
+            "hidden dirs are indexed"
+        );
         assert!(!paths.iter().any(|p| p.contains("node_modules")));
         assert!(!paths.iter().any(|p| p.contains("sub\\target")));
         assert!(progress_calls > 0);

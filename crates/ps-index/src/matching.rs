@@ -60,7 +60,10 @@ pub(crate) fn eq_ci(a: &str, b: &str) -> bool {
 /// ASCII-insensitive byte-slice equality (non-ASCII bytes compared exactly).
 #[inline]
 pub(crate) fn eq_ci_bytes(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| fold_byte(*x) == fold_byte(*y))
+    a.len() == b.len()
+        && a.iter()
+            .zip(b.iter())
+            .all(|(x, y)| fold_byte(*x) == fold_byte(*y))
 }
 
 /// Does hay start with needle case-insensitively?
@@ -161,10 +164,7 @@ fn unicode_ci_find(hay: &str, needle: &str, from: usize) -> Option<(usize, usize
     if needle_chars.is_empty() {
         return Some((from, from));
     }
-    let starts: Vec<(usize, char)> = hay
-        .char_indices()
-        .filter(|(i, _)| *i >= from)
-        .collect();
+    let starts: Vec<(usize, char)> = hay.char_indices().filter(|(i, _)| *i >= from).collect();
     let mut idx = 0;
     while idx < starts.len() {
         if char_eq_ci(starts[idx].1, needle_chars[0]) {
@@ -486,14 +486,7 @@ pub(crate) fn match_name_into(
         return None;
     }
     if !plan.multi {
-        return match_token(
-            name,
-            stem,
-            &plan.lower,
-            &plan.terms_chars[0],
-            allow_typo,
-            ranges,
-        );
+        return match_token(name, stem, &plan.lower, &plan.terms_chars[0], allow_typo, ranges);
     }
     let mut worst = f32::MAX;
     let mut scratch = Vec::new();

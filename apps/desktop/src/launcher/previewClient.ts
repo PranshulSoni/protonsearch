@@ -10,14 +10,33 @@ import type { PreviewPayload, SearchResult } from "../bridge/types";
 
 const DEFAULT_MAX_CHARS = 12_000;
 const DEBOUNCE_MS = 120;
+const REQUEST_TIMEOUT_MS = 8_000;
+const MAX_CACHE_ENTRIES = 32;
 
 export type PreviewLoader = (resultId: string, maxChars: number) => Promise<PreviewPayload>;
 
 let loader: PreviewLoader = (resultId, maxChars) => api.getPreview(resultId, maxChars);
 const cache = new Map<string, PreviewPayload>();
+const inFlight = new Map<string, Promise<PreviewPayload>>();
 
 function cacheKey(resultId: string, maxChars: number): string {
   return resultId + "::" + maxChars;
+}
+
+function loadPreview(key: string, resultId: string, maxChars: number): Promise<PreviewPayload> {
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+  const request = loader(resultId, maxChars);
+  inFlight.set(key, request);
+  void request.then(
+    () => {
+      if (inFlight.get(key) === request) inFlight.delete(key);
+    },
+    () => {
+      if (inFlight.get(key) === request) inFlight.delete(key);
+    },
+  );
+  return request;
 }
 
 /** Test / Gate-wiring seam. Pass null to restore the bridge loader. */
@@ -26,7 +45,16 @@ export function setPreviewLoader(next: PreviewLoader | null): void {
 }
 
 export function primePreviewCache(resultId: string, payload: PreviewPayload, maxChars = DEFAULT_MAX_CHARS): void {
-  cache.set(cacheKey(resultId, maxChars), payload);
+  storePreview(cacheKey(resultId, maxChars), payload);
+}
+
+function storePreview(key: string, payload: PreviewPayload): void {
+  cache.delete(key);
+  cache.set(key, payload);
+  if (cache.size > MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
 }
 
 export function clearPreviewCache(): void {
@@ -67,6 +95,8 @@ export function useLauncherPreview(
     const key = cacheKey(result.id, maxChars);
     const cached = cache.get(key);
     if (cached) {
+    cache.delete(key);
+    storePreview(key, cached);
       setState({
         status: statusFor(cached),
         payload: cached,
@@ -76,11 +106,17 @@ export function useLauncherPreview(
     }
     const token = ++tokenRef.current;
     setState({ status: "loading", payload: null, error: null });
+    let requestTimeout: number | undefined;
     const timer = window.setTimeout(() => {
-      loader(result.id, maxChars)
+      requestTimeout = window.setTimeout(() => {
+        if (token !== tokenRef.current) return;
+        tokenRef.current += 1;
+        setState({ status: "error", payload: null, error: "Preview request timed out." });
+      }, REQUEST_TIMEOUT_MS);
+      loadPreview(key, result.id, maxChars)
         .then((payload) => {
           if (token !== tokenRef.current) return;
-          cache.set(key, payload);
+        storePreview(key, payload);
           setState({
             status: statusFor(payload),
             payload,
@@ -92,13 +128,23 @@ export function useLauncherPreview(
           setState({
             status: "error",
             payload: null,
-            error: error instanceof Error ? error.message : "Preview is unavailable right now.",
+            error:
+              error instanceof Error
+                ? error.message
+                : typeof error === "string" && error.trim()
+                  ? error
+                  : "Preview is unavailable right now.",
           });
+        })
+        .finally(() => {
+          if (requestTimeout !== undefined) window.clearTimeout(requestTimeout);
         });
     }, DEBOUNCE_MS);
     return () => {
       window.clearTimeout(timer);
+      if (requestTimeout !== undefined) window.clearTimeout(requestTimeout);
       tokenRef.current += 1;
+      cache.delete(key);
     };
   }, [enabled, result, maxChars, nonce]);
 
@@ -112,6 +158,7 @@ export function useLauncherPreview(
     ...visible,
     reload: () => {
       if (key) cache.delete(key);
+      setState({ status: "loading", payload: null, error: null });
       setNonce((value) => value + 1);
     },
   };

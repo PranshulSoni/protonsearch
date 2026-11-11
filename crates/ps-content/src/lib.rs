@@ -17,12 +17,10 @@ pub mod index;
 pub mod legacy;
 
 pub use extract::{
-    detect_kind, extract_text, extract_text_with, is_supported, ExtractedDocument, ExtractOptions,
+    detect_kind, extract_text, extract_text_with, is_supported, ExtractOptions, ExtractedDocument,
     DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT,
 };
-pub use index::{
-    query_terms, sanitize_fts_query, ContentIndex, IndexBatchSummary,
-};
+pub use index::{query_terms, sanitize_fts_query, ContentIndex, IndexBatchSummary};
 pub use legacy::{import_legacy, LegacyImportSummary};
 
 /// Supported document families, used to bound extraction work.

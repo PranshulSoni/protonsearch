@@ -133,6 +133,25 @@ describe("desktop app shell smoke", () => {
     expect(radios).toEqual(expect.arrayContaining(["Google", "Bing", "DuckDuckGo", "YouTube"]));
   });
 
+  it("shows the working OCR engine and marks unavailable alternatives", async () => {
+    await act(async () => {
+      root.render(<App view="main" />);
+    });
+    await flush(8);
+    await act(async () => container.querySelectorAll<HTMLButtonElement>(".navbtn")[4].click());
+    await flush(4);
+    const selector = container.querySelector<HTMLSelectElement>("#ocr-engine");
+    expect(selector?.value).toBe("windows");
+    expect([...((selector?.options ?? []) as HTMLOptionsCollection)].map((option) => [option.value, option.disabled])).toEqual([
+      ["windows", false],
+      ["pp_ocr_v6", true],
+      ["indra", true],
+      ["tesseract", true],
+    ]);
+    expect(container.textContent).toContain("No OCR engine or model downloads are available here.");
+    expect(container.textContent).toContain("license requires acceptance before download");
+  });
+
   it("lists detected agent runtimes and the honest recent-runs state", async () => {
     window.localStorage.clear();
     await act(async () => {

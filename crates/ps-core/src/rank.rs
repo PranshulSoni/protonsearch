@@ -11,7 +11,6 @@
 //! hits live in tier 0; semantic/agent hits live in tier 2 and can therefore
 //! never displace them.
 
-
 use ps_ipc::{SearchResult, SourceKind};
 
 /// One candidate before ordering. Sources produce these; the coordinator merges.
@@ -120,10 +119,26 @@ mod tests {
     #[test]
     fn merge_is_deterministic_and_orders_by_tier_then_score() {
         let hits = vec![
-            ScoredHit { score: 0.5, tier: 1, tie_break: 2 },
-            ScoredHit { score: 0.9, tier: 0, tie_break: 3 },
-            ScoredHit { score: 0.7, tier: 1, tie_break: 1 },
-            ScoredHit { score: 0.9, tier: 0, tie_break: 1 },
+            ScoredHit {
+                score: 0.5,
+                tier: 1,
+                tie_break: 2,
+            },
+            ScoredHit {
+                score: 0.9,
+                tier: 0,
+                tie_break: 3,
+            },
+            ScoredHit {
+                score: 0.7,
+                tier: 1,
+                tie_break: 1,
+            },
+            ScoredHit {
+                score: 0.9,
+                tier: 0,
+                tie_break: 1,
+            },
         ];
         let a = merge(hits.clone());
         let b = merge(hits);

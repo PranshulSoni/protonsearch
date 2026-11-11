@@ -100,7 +100,6 @@ fn appsfolder_enumeration_reports_packaged_apps() {
     }
 }
 
-
 #[test]
 fn extracts_icon_for_packaged_app_via_shell_item_factory() {
     let Ok(entries) = ps_windows::list_appsfolder() else {
@@ -126,7 +125,6 @@ fn extracts_icon_for_packaged_app_via_shell_item_factory() {
     );
     eprintln!("packaged app icon: {} (aumid {})", out.display(), entry.aumid);
 }
-
 
 #[test]
 fn icon_cache_is_keyed_by_source_identity() {
@@ -196,7 +194,6 @@ fn packaged_app_icons_render_the_app_logo_not_a_generic_document() {
     );
 }
 
-
 #[test]
 fn clipboard_listener_can_restart_after_stop() {
     // Regression: the window class stays registered for the process lifetime, so
@@ -206,8 +203,7 @@ fn clipboard_listener_can_restart_after_stop() {
     for cycle in 0..3 {
         let listener = ps_windows::ClipboardListener::start(|_snapshot| {})
             .unwrap_or_else(|error| panic!("listener start failed on cycle {cycle}: {error}"));
-        ps_windows::set_clipboard_text(&format!("listener restart cycle {cycle}"))
-            .expect("set clipboard");
+        ps_windows::set_clipboard_text(&format!("listener restart cycle {cycle}")).expect("set clipboard");
         std::thread::sleep(std::time::Duration::from_millis(30));
         listener.stop();
     }
@@ -240,7 +236,7 @@ fn resolves_a_generated_shortcut() {
 
 /// Create a .lnk through the same COM interface used in production.
 fn create_test_shortcut(path: &Path) -> anyhow::Result<()> {
-    use windows::core::{Interface, HSTRING, GUID};
+    use windows::core::{Interface, GUID, HSTRING};
     use windows::Win32::System::Com::{
         CoCreateInstance, CoInitializeEx, CoUninitialize, IPersistFile, CLSCTX_INPROC_SERVER,
         COINIT_APARTMENTTHREADED,
@@ -271,7 +267,10 @@ fn native_capabilities_probe_is_bounded_and_honest() {
     let capabilities = ps_windows::native_capabilities();
     let elapsed = started.elapsed();
     eprintln!("native capabilities probe took {elapsed:?}");
-    assert!(elapsed < std::time::Duration::from_secs(20), "probe must be bounded");
+    assert!(
+        elapsed < std::time::Duration::from_secs(20),
+        "probe must be bounded"
+    );
     assert!(
         capabilities.local_notifications.supported,
         "the local notification store is always available"
@@ -286,10 +285,17 @@ fn native_capabilities_probe_is_bounded_and_honest() {
         ("brightness", &capabilities.brightness),
         ("toast_notifications", &capabilities.toast_notifications),
     ] {
-        eprintln!("capability {name}: supported={} reason={:?}", capability.supported, capability.reason);
+        eprintln!(
+            "capability {name}: supported={} reason={:?}",
+            capability.supported, capability.reason
+        );
         if !capability.supported {
             assert!(
-                capability.reason.as_deref().map(|reason| !reason.is_empty()).unwrap_or(false),
+                capability
+                    .reason
+                    .as_deref()
+                    .map(|reason| !reason.is_empty())
+                    .unwrap_or(false),
                 "unsupported capability {name} must carry a reason"
             );
         }
@@ -313,7 +319,10 @@ fn audio_output_enumeration_and_volume_roundtrip() {
     let devices = ps_windows::list_audio_outputs().expect("list output devices");
     eprintln!("audio output devices: {devices:?}");
     assert!(!devices.is_empty());
-    assert!(devices.iter().any(|device| device.is_default), "one default expected");
+    assert!(
+        devices.iter().any(|device| device.is_default),
+        "one default expected"
+    );
     for device in devices.iter().take(5) {
         assert!(!device.id.is_empty() && !device.name.is_empty());
     }
@@ -353,7 +362,10 @@ fn brightness_roundtrip_when_supported() {
     ps_windows::set_brightness(current).expect("restore brightness");
     let after = ps_windows::get_brightness().expect("brightness after");
     let delta = (i16::from(after) - i16::from(current)).abs();
-    assert!(delta <= 2, "brightness changed unexpectedly: {current} -> {after}");
+    assert!(
+        delta <= 2,
+        "brightness changed unexpectedly: {current} -> {after}"
+    );
 }
 
 #[test]
@@ -495,9 +507,16 @@ fn bluetooth_controls_are_usable_or_honest() {
         return;
     }
     let state = ps_windows::bluetooth_radio_state().expect("Bluetooth radio state");
-    assert!(state.available, "supported Bluetooth must have an available radio");
+    assert!(
+        state.available,
+        "supported Bluetooth must have an available radio"
+    );
     let devices = ps_windows::list_bluetooth_devices().expect("paired Bluetooth devices");
-    eprintln!("bluetooth radio enabled={} paired_devices={}", state.enabled, devices.len());
+    eprintln!(
+        "bluetooth radio enabled={} paired_devices={}",
+        state.enabled,
+        devices.len()
+    );
     for device in devices.iter().take(10) {
         assert!(!device.id.is_empty());
         assert!(device.paired);

@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+onnx = ["dep:oar-ocr", "dep:image25", "oar-ocr/download-binaries"]
+ppocr-pack-download = ["dep:reqwest"]
+
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = [
     "Foundation",
@@ -15,6 +19,9 @@ windows = { workspace = true, features = [
     "Globalization",
     "Security_Cryptography",
     "Win32_System_WinRT",
+"Win32_System_JobObjects",
+"Win32_System_Threading",
+"Win32_Security",
     "Win32_Foundation",
 ] }
 
@@ -23,8 +30,12 @@ serde = { workspace = true }
 anyhow = { workspace = true }
 rusqlite = { workspace = true }
 image = { workspace = true }
+oar-ocr = { version = "=0.10.2", default-features = false, optional = true }
+image25 = { package = "image", version = "0.25.10", default-features = false, features = ["jpeg", "png", "bmp", "tiff", "webp"], optional = true }
 sha2 = "0.10"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"], optional = true }
 
 [dev-dependencies]
 rusqlite = { workspace = true }
 image = { workspace = true }
+tempfile = "3"

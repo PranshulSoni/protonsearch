@@ -31,20 +31,159 @@ pub struct ContentQuery {
 }
 
 const STOPWORDS: &[&str] = &[
-    "the", "and", "for", "are", "but", "not", "you", "all", "any", "can", "had", "her", "was",
-    "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "may", "new", "now",
-    "old", "see", "two", "who", "boy", "did", "she", "use", "way", "will", "with", "this",
-    "that", "from", "they", "have", "were", "said", "each", "which", "their", "there", "about",
-    "would", "been", "more", "when", "what", "some", "than", "into", "only", "also", "such",
-    "then", "them", "over", "very", "most", "much", "many", "just", "like", "make", "made",
-    "does", "here", "where", "while", "your", "file", "files", "data", "text", "page", "pages",
-    "https", "http", "www", "com", "org", "net", "content", "type", "true", "false", "null",
-    "line", "lines", "yes", "etc", "per", "via", "using", "used", "user", "users", "test",
-    "tests", "value", "values", "name", "names", "item", "items", "set", "sets", "add", "added",
-    "error", "info", "debug", "warn", "warning", "version", "current", "next", "first", "last",
-    "should", "could", "must", "need", "needs", "want", "wants", "thank", "thanks", "please",
-    "hello", "world", "example", "docs", "document", "documents", "note", "notes", "section",
-    "chapter", "table", "list", "generic", "default", "support", "system", "systems", "work",
+    "the",
+    "and",
+    "for",
+    "are",
+    "but",
+    "not",
+    "you",
+    "all",
+    "any",
+    "can",
+    "had",
+    "her",
+    "was",
+    "one",
+    "our",
+    "out",
+    "day",
+    "get",
+    "has",
+    "him",
+    "his",
+    "how",
+    "its",
+    "may",
+    "new",
+    "now",
+    "old",
+    "see",
+    "two",
+    "who",
+    "boy",
+    "did",
+    "she",
+    "use",
+    "way",
+    "will",
+    "with",
+    "this",
+    "that",
+    "from",
+    "they",
+    "have",
+    "were",
+    "said",
+    "each",
+    "which",
+    "their",
+    "there",
+    "about",
+    "would",
+    "been",
+    "more",
+    "when",
+    "what",
+    "some",
+    "than",
+    "into",
+    "only",
+    "also",
+    "such",
+    "then",
+    "them",
+    "over",
+    "very",
+    "most",
+    "much",
+    "many",
+    "just",
+    "like",
+    "make",
+    "made",
+    "does",
+    "here",
+    "where",
+    "while",
+    "your",
+    "file",
+    "files",
+    "data",
+    "text",
+    "page",
+    "pages",
+    "https",
+    "http",
+    "www",
+    "com",
+    "org",
+    "net",
+    "content",
+    "type",
+    "true",
+    "false",
+    "null",
+    "line",
+    "lines",
+    "yes",
+    "etc",
+    "per",
+    "via",
+    "using",
+    "used",
+    "user",
+    "users",
+    "test",
+    "tests",
+    "value",
+    "values",
+    "name",
+    "names",
+    "item",
+    "items",
+    "set",
+    "sets",
+    "add",
+    "added",
+    "error",
+    "info",
+    "debug",
+    "warn",
+    "warning",
+    "version",
+    "current",
+    "next",
+    "first",
+    "last",
+    "should",
+    "could",
+    "must",
+    "need",
+    "needs",
+    "want",
+    "wants",
+    "thank",
+    "thanks",
+    "please",
+    "hello",
+    "world",
+    "example",
+    "docs",
+    "document",
+    "documents",
+    "note",
+    "notes",
+    "section",
+    "chapter",
+    "table",
+    "list",
+    "generic",
+    "default",
+    "support",
+    "system",
+    "systems",
+    "work",
 ];
 
 fn is_cjk_char(c: char) -> bool {
@@ -124,35 +263,58 @@ pub fn generate_queries(
         .map(|(t, _)| t.clone())
         .collect();
     let plausible = |t: &str| -> bool {
-        keep_token(t)
-            && t.chars().all(|c| c.is_ascii_alphabetic())
-            && common.contains(t)
+        keep_token(t) && t.chars().all(|c| c.is_ascii_alphabetic()) && common.contains(t)
     };
 
     let mut suite: Vec<ContentQuery> = Vec::new();
     let mut used: HashSet<String> = HashSet::new();
 
     let high: Vec<&(String, u32)> = ranked.iter().filter(|(_, n)| *n >= 200).take(60).collect();
-    let medium: Vec<&(String, u32)> = ranked.iter().filter(|(_, n)| (10..=200).contains(n)).take(200).collect();
+    let medium: Vec<&(String, u32)> = ranked
+        .iter()
+        .filter(|(_, n)| (10..=200).contains(n))
+        .take(200)
+        .collect();
 
     let mut push = |id: String, category: &str, query: String, note: String| {
         if used.insert(query.clone()) {
-            suite.push(ContentQuery { id, category: category.to_string(), query, hits: 0, note });
+            suite.push(ContentQuery {
+                id,
+                category: category.to_string(),
+                query,
+                hits: 0,
+                note,
+            });
         }
     };
 
     // 8 high-df single terms (worst case for FTS posting traversal).
     for (i, (term, n)) in high.choose_n(seed, 8).into_iter().enumerate() {
-        push(format!("hi_{i}"), "single_high_df", term.to_string(), format!("document frequency >= 200 (sampled df={n})"));
+        push(
+            format!("hi_{i}"),
+            "single_high_df",
+            term.to_string(),
+            format!("document frequency >= 200 (sampled df={n})"),
+        );
     }
     // 8 medium-df single terms (typical query).
     for (i, (term, n)) in medium.choose_n(seed.wrapping_add(1), 8).into_iter().enumerate() {
-        push(format!("med_{i}"), "single_medium_df", term.to_string(), format!("sampled df={n}"));
+        push(
+            format!("med_{i}"),
+            "single_medium_df",
+            term.to_string(),
+            format!("sampled df={n}"),
+        );
     }
     // 4 FTS prefix queries.
     for (i, (term, n)) in medium.choose_n(seed.wrapping_add(2), 4).into_iter().enumerate() {
         if term.is_ascii() && term.len() >= 5 {
-            push(format!("prefix_{i}"), "prefix", format!("{}*", &term[..5]), format!("prefix of sampled df={n} term"));
+            push(
+                format!("prefix_{i}"),
+                "prefix",
+                format!("{}*", &term[..5]),
+                format!("prefix of sampled df={n} term"),
+            );
         }
     }
     // 4 two-term implicit AND queries taken from the same document.
@@ -161,10 +323,7 @@ pub fn generate_queries(
         if pair_count >= 4 {
             break;
         }
-        let terms: Vec<String> = tokenize(content)
-            .into_iter()
-            .filter(|t| plausible(t))
-            .collect();
+        let terms: Vec<String> = tokenize(content).into_iter().filter(|t| plausible(t)).collect();
         if terms.len() >= 6 {
             let a = terms[0].clone();
             let b = terms[terms.len() / 2].clone();
@@ -193,15 +352,33 @@ pub fn generate_queries(
             }
         }
         if let Some(q) = found {
-            push(format!("phrase_{phrase_count}"), "phrase", q, "three-token phrase from sampled document".to_string());
+            push(
+                format!("phrase_{phrase_count}"),
+                "phrase",
+                q,
+                "three-token phrase from sampled document".to_string(),
+            );
             phrase_count += 1;
         }
     }
     // CJK terms when the real corpus contains them.
-    let cjk_terms: Vec<&(String, u32)> = ranked.iter().filter(|(t, n)| *n >= 2 && t.chars().any(is_cjk_char)).take(30).collect();
-    for (i, (term, n)) in cjk_terms.choose_n(seed.wrapping_add(3), 3).into_iter().enumerate() {
+    let cjk_terms: Vec<&(String, u32)> = ranked
+        .iter()
+        .filter(|(t, n)| *n >= 2 && t.chars().any(is_cjk_char))
+        .take(30)
+        .collect();
+    for (i, (term, n)) in cjk_terms
+        .choose_n(seed.wrapping_add(3), 3)
+        .into_iter()
+        .enumerate()
+    {
         let short: String = term.chars().take(6).collect();
-        push(format!("cjk_{i}"), "cjk", format!("{short}*"), format!("CJK prefix query, sampled df={n}"));
+        push(
+            format!("cjk_{i}"),
+            "cjk",
+            format!("{short}*"),
+            format!("CJK prefix query, sampled df={n}"),
+        );
     }
     // 4 zero-match tokens.
     for i in 0..4 {
@@ -217,7 +394,11 @@ pub fn generate_queries(
     let mut verified = Vec::new();
     for mut q in suite {
         let hits: i64 = conn
-            .query_row("SELECT COUNT(*) FROM files_fts WHERE files_fts MATCH ?1", [q.query.as_str()], |r| r.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM files_fts WHERE files_fts MATCH ?1",
+                [q.query.as_str()],
+                |r| r.get(0),
+            )
             .unwrap_or(-1);
         q.hits = hits.max(0) as u64;
         if q.category == "zero_match" && q.hits != 0 {
@@ -247,7 +428,11 @@ impl<'a> ChooseN<'a> for Vec<&'a (String, u32)> {
             let j = rng.below(i as u64 + 1) as usize;
             idx.swap(i, j);
         }
-        idx.into_iter().take(n).take(self.len()).map(|i| self[i]).collect()
+        idx.into_iter()
+            .take(n)
+            .take(self.len())
+            .map(|i| self[i])
+            .collect()
     }
 }
 
@@ -271,7 +456,9 @@ pub fn load_queries(path: &Path) -> anyhow::Result<Vec<ContentQuery>> {
         if line.trim().is_empty() {
             continue;
         }
-        out.push(serde_json::from_str(line).map_err(|e| anyhow::anyhow!("{}:{}: {e}", path.display(), i + 1))?);
+        out.push(
+            serde_json::from_str(line).map_err(|e| anyhow::anyhow!("{}:{}: {e}", path.display(), i + 1))?,
+        );
     }
     Ok(out)
 }
@@ -291,7 +478,9 @@ pub struct IndexFacts {
 }
 
 fn opt_sum(conn: &rusqlite::Connection, sql: &str) -> u64 {
-    conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap_or(0).max(0) as u64
+    conn.query_row(sql, [], |r| r.get::<_, i64>(0))
+        .unwrap_or(0)
+        .max(0) as u64
 }
 
 pub fn index_facts(legacy_db: &Path) -> anyhow::Result<IndexFacts> {
@@ -301,12 +490,19 @@ pub fn index_facts(legacy_db: &Path) -> anyhow::Result<IndexFacts> {
     let max_doc_bytes = opt_sum(&conn, "SELECT COALESCE(MAX(LENGTH(c1)),0) FROM files_fts_content");
     let fts_data_bytes = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(block)),0) FROM files_fts_data");
     let fts_idx_term_bytes = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(term)),0) FROM files_fts_idx");
-    let fts_content_bytes = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(c0)+LENGTH(c1)),0) FROM files_fts_content");
+    let fts_content_bytes = opt_sum(
+        &conn,
+        "SELECT COALESCE(SUM(LENGTH(c0)+LENGTH(c1)),0) FROM files_fts_content",
+    );
     let fts_docsize_bytes = opt_sum(&conn, "SELECT COALESCE(SUM(LENGTH(sz)),0) FROM files_fts_docsize");
     Ok(IndexFacts {
         documents,
         content_bytes,
-        avg_doc_bytes: if documents > 0 { content_bytes / documents } else { 0 },
+        avg_doc_bytes: if documents > 0 {
+            content_bytes / documents
+        } else {
+            0
+        },
         max_doc_bytes,
         fts_data_bytes,
         fts_idx_term_bytes,
@@ -391,15 +587,23 @@ fn now_utc() -> String {
 
 pub fn run(args: &Args) -> anyhow::Result<()> {
     let legacy_db = crate::realfiles::default_legacy_db();
-    let legacy_db = args.get("--legacy-db").map(std::path::PathBuf::from).unwrap_or(legacy_db);
-    let queries_path = std::path::PathBuf::from(args.get("--queries").unwrap_or(".bench/queries-content.jsonl"));
+    let legacy_db = args
+        .get("--legacy-db")
+        .map(std::path::PathBuf::from)
+        .unwrap_or(legacy_db);
+    let queries_path =
+        std::path::PathBuf::from(args.get("--queries").unwrap_or(".bench/queries-content.jsonl"));
     let out = std::path::PathBuf::from(args.required("--out")?);
     let iters = args.usize_or("--iters", 30)?.max(1);
     let limit = args.usize_or("--limit", 20)?;
     let cold_restarts = args.usize_or("--cold-restarts", 3)?;
 
     let queries = load_queries(&queries_path)?;
-    anyhow::ensure!(!queries.is_empty(), "query suite is empty: {}", queries_path.display());
+    anyhow::ensure!(
+        !queries.is_empty(),
+        "query suite is empty: {}",
+        queries_path.display()
+    );
 
     let memory_before = self_memory();
     let db = db_facts(&legacy_db)?;
@@ -456,7 +660,10 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
             rank_only.push(start.elapsed().as_secs_f64() * 1000.0);
         }
         let summary = summarize(&samples);
-        by_cat.entry(q.category.clone()).or_default().push(samples.clone());
+        by_cat
+            .entry(q.category.clone())
+            .or_default()
+            .push(samples.clone());
         snippet_samples.push(samples.clone());
         rank_samples.push(rank_only.clone());
         timings.push(QueryTiming {
@@ -480,7 +687,10 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         by_category: {
             let mut rows: Vec<CategoryRow> = by_cat
                 .into_iter()
-                .map(|(category, slices)| CategoryRow { category, summary: crate::stats::summarize_slices(&slices) })
+                .map(|(category, slices)| CategoryRow {
+                    category,
+                    summary: crate::stats::summarize_slices(&slices),
+                })
                 .collect();
             rows.sort_by(|a, b| a.category.cmp(&b.category));
             rows
@@ -508,12 +718,27 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                 limit.to_string(),
             ];
             let outcome = childproc::run_child_json(&child_args)?;
-            let probe_ms = outcome.value.get("rss_probe_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let probe_ms = outcome
+                .value
+                .get("rss_probe_ms")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
             wall_raw_vec.push(outcome.wall_ms);
             wall_vec.push((outcome.wall_ms - probe_ms).max(0.0));
             probe_vec.push(probe_ms);
-            open_ms_vec.push(outcome.value.get("open_ms").and_then(|v| v.as_f64()).unwrap_or(0.0));
-            let qs = outcome.value.get("queries").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+            open_ms_vec.push(
+                outcome
+                    .value
+                    .get("open_ms")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0),
+            );
+            let qs = outcome
+                .value
+                .get("queries")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
             let mut first = None;
             for q in &qs {
                 let id = q.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -548,7 +773,15 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         });
     }
 
-    let command = format!("ps-bench content --legacy-db {} --queries {} --iters {} --limit {} --cold-restarts {} --out {}", legacy_db.display(), queries_path.display(), iters, limit, cold_restarts, out.display());
+    let command = format!(
+        "ps-bench content --legacy-db {} --queries {} --iters {} --limit {} --cold-restarts {} --out {}",
+        legacy_db.display(),
+        queries_path.display(),
+        iters,
+        limit,
+        cold_restarts,
+        out.display()
+    );
 
     let report = ContentBenchReport {
         schema: RESULT_SCHEMA.to_string(),
@@ -575,23 +808,44 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     write_json(&out, &report)?;
 
     println!("ps-bench content (LEGACY v1 FTS5 baseline, read-only)");
-    println!("  db: {} ({} bytes, {} docs, content {} bytes, est. FTS shadow bytes {})", legacy_db.display(), report.legacy_db.db_bytes, report.index.documents, report.index.content_bytes, report.index.estimated_fts_bytes);
+    println!(
+        "  db: {} ({} bytes, {} docs, content {} bytes, est. FTS shadow bytes {})",
+        legacy_db.display(),
+        report.legacy_db.db_bytes,
+        report.index.documents,
+        report.index.content_bytes,
+        report.index.estimated_fts_bytes
+    );
     println!("  open_ms: {:.2}", report.open_ms);
-    println!("  warm ({} iters/query, {} queries):", iters, report.warm.queries.len());
+    println!(
+        "  warm ({} iters/query, {} queries):",
+        iters,
+        report.warm.queries.len()
+    );
     print_summary("  with snippet", &report.warm.with_snippet);
     print_summary("  rank only", &report.warm.rank_only);
     for row in &report.warm.by_category {
-        println!("  [{:18}] p50={:7.3} p95={:7.3} p99={:7.3} n={}", row.category, row.summary.p50, row.summary.p95, row.summary.p99, row.summary.count);
+        println!(
+            "  [{:18}] p50={:7.3} p95={:7.3} p99={:7.3} n={}",
+            row.category, row.summary.p50, row.summary.p95, row.summary.p99, row.summary.count
+        );
     }
     if let Some(cold) = &report.cold {
-        println!("  cold ({} process restarts): open p50={:.2} ms, first-query p50={:.2} ms, wall p50={:.0} ms",
+        println!(
+            "  cold ({} process restarts): open p50={:.2} ms, first-query p50={:.2} ms, wall p50={:.0} ms",
             cold.restarts,
             summarize(&cold.open_ms).p50,
             summarize(&cold.first_query_ms).p50,
-            summarize(&cold.wall_ms).p50);
+            summarize(&cold.wall_ms).p50
+        );
     }
     if let (Some(a), Some(b)) = (&report.memory_before, &report.memory_after_warm) {
-        println!("  process RSS: before={} MB after_warm={} MB peak={} MB", a.working_set_bytes / 1_000_000, b.working_set_bytes / 1_000_000, b.peak_working_set_bytes / 1_000_000);
+        println!(
+            "  process RSS: before={} MB after_warm={} MB peak={} MB",
+            a.working_set_bytes / 1_000_000,
+            b.working_set_bytes / 1_000_000,
+            b.peak_working_set_bytes / 1_000_000
+        );
     }
     for note in &report.limitations {
         println!("  limit: {note}");
@@ -610,7 +864,10 @@ fn print_summary(label: &str, s: &Summary) {
 /// Child process: open fresh, run every query once, emit JSON.
 pub fn cold_child(args: &Args) -> anyhow::Result<()> {
     let legacy_db = crate::realfiles::default_legacy_db();
-    let legacy_db = args.get("--legacy-db").map(std::path::PathBuf::from).unwrap_or(legacy_db);
+    let legacy_db = args
+        .get("--legacy-db")
+        .map(std::path::PathBuf::from)
+        .unwrap_or(legacy_db);
     let queries_path = std::path::PathBuf::from(args.required("--queries")?);
     let limit = args.usize_or("--limit", 20)?;
     let queries = load_queries(&queries_path)?;

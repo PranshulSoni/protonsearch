@@ -66,11 +66,7 @@ pub(crate) fn open_path(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Open in a known editor at a line/column when possible, else plain-open.
-pub(crate) fn open_path_at(
-    path: &Path,
-    line: Option<u32>,
-    column: Option<u32>,
-) -> anyhow::Result<()> {
+pub(crate) fn open_path_at(path: &Path, line: Option<u32>, column: Option<u32>) -> anyhow::Result<()> {
     if let Some(line) = line {
         if let Some(code) = find_vscode() {
             let mut goto = format!("{}:{}", path.display(), line);
@@ -98,10 +94,8 @@ fn find_vscode() -> Option<PathBuf> {
     let candidates = [
         std::env::var_os("LOCALAPPDATA")
             .map(|b| PathBuf::from(b).join("Programs/Microsoft VS Code/Code.exe")),
-        std::env::var_os("ProgramFiles")
-            .map(|b| PathBuf::from(b).join("Microsoft VS Code/Code.exe")),
-        std::env::var_os("ProgramFiles(x86)")
-            .map(|b| PathBuf::from(b).join("Microsoft VS Code/Code.exe")),
+        std::env::var_os("ProgramFiles").map(|b| PathBuf::from(b).join("Microsoft VS Code/Code.exe")),
+        std::env::var_os("ProgramFiles(x86)").map(|b| PathBuf::from(b).join("Microsoft VS Code/Code.exe")),
     ];
     candidates.into_iter().flatten().find(|p| p.is_file())
 }
@@ -134,10 +128,7 @@ pub(crate) fn open_url(url: &str) -> anyhow::Result<()> {
     if trimmed.chars().any(|c| c.is_control() || c.is_whitespace()) {
         bail!("url contains control characters");
     }
-    let rest = trimmed
-        .split_once("://")
-        .map(|(_, r)| r)
-        .unwrap_or_default();
+    let rest = trimmed.split_once("://").map(|(_, r)| r).unwrap_or_default();
     let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
     if host.is_empty() || host.starts_with(':') {
         bail!("url has no host");
@@ -164,8 +155,7 @@ pub(crate) fn launch_app(app_id: &str, target: Option<&str>) -> anyhow::Result<(
         return shell_execute("open", app_id, None);
     }
     let as_folder = format!("{SHELL_APPS_FOLDER}\\{app_id}");
-    shell_execute("open", &as_folder, None)
-        .with_context(|| format!("could not launch app {app_id}"))
+    shell_execute("open", &as_folder, None).with_context(|| format!("could not launch app {app_id}"))
 }
 
 /// Resolve a Windows .lnk via COM (IShellLinkW + IPersistFile).
@@ -185,11 +175,7 @@ pub(crate) fn resolve_shortcut(lnk: &Path) -> anyhow::Result<ShortcutInfo> {
 
         let mut path_buf = [0u16; 1024];
         let target = link
-            .GetPath(
-                &mut path_buf,
-                std::ptr::null_mut::<WIN32_FIND_DATAW>(),
-                0,
-            )
+            .GetPath(&mut path_buf, std::ptr::null_mut::<WIN32_FIND_DATAW>(), 0)
             .ok()
             .map(|_| PathBuf::from(utf16_buf_to_string(&path_buf)))
             .filter(|p| !p.as_os_str().is_empty());
@@ -284,9 +270,7 @@ pub(crate) fn list_appsfolder() -> anyhow::Result<Vec<AppsFolderEntry>> {
 
 fn display_name(folder: &IShellFolder, child: *const ITEMIDLIST) -> anyhow::Result<String> {
     unsafe {
-        if let Ok(item) =
-            SHCreateItemWithParent::<&IShellFolder, IShellItem2>(None, folder, child)
-        {
+        if let Ok(item) = SHCreateItemWithParent::<&IShellFolder, IShellItem2>(None, folder, child) {
             if let Ok(name) = item.GetDisplayName(SIGDN_NORMALDISPLAY) {
                 let s = pwstr_to_string(name);
                 free_pwstr(name);

@@ -33,6 +33,7 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     density: "comfortable",
     motion: "system",
     launchAtLogin: true,
+    ocrEngine: "windows",
     indexing: {
       roots: [],
       excludedPaths: [],

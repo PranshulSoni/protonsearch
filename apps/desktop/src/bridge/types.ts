@@ -6,6 +6,7 @@ export const DATA_SCHEMA_VERSION = 1;
 
 export type SearchScope =
   | "all"
+  | "photos"
   | "files"
   | "folders"
   | "content"
@@ -218,6 +219,18 @@ export interface IndexingSettings {
   respectPowerState: boolean;
   paused: boolean;
 }
+export type OcrEngine = "windows" | "pp_ocr_v6" | "indra" | "tesseract";
+export type OcrEngineAvailability = "available" | "not_installed";
+export interface OcrEngineOption {
+  engine: OcrEngine;
+  availability: OcrEngineAvailability;
+}
+export const OCR_ENGINE_OPTIONS: OcrEngineOption[] = [
+  { engine: "windows", availability: "available" },
+  { engine: "pp_ocr_v6", availability: "not_installed" },
+  { engine: "indra", availability: "not_installed" },
+  { engine: "tesseract", availability: "not_installed" },
+];
 
 export interface PrivacySettings {
   activityHistory: boolean;
@@ -452,6 +465,7 @@ export interface Settings {
   motion: MotionPreference;
   launchAtLogin: boolean;
   indexing: IndexingSettings;
+  ocrEngine: OcrEngine;
   privacy: PrivacySettings;
   agent: AgentSettings;
   semantic: SemanticSettings;
@@ -472,6 +486,7 @@ export interface SettingsPatch {
   motion?: MotionPreference;
   launchAtLogin?: boolean;
   indexing?: IndexingSettings;
+  ocrEngine?: OcrEngine;
   privacy?: PrivacySettings;
   agent?: AgentSettings;
   semantic?: SemanticSettings;
@@ -512,6 +527,7 @@ export interface OnboardingInput {
   roots: RootConfig[];
   contentEnabled: boolean;
   ocrEnabled: boolean;
+  ocrEngine: OcrEngine;
   hotkey: string;
   agentOptIn: boolean;
   skipped?: boolean;
