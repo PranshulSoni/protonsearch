@@ -2,10 +2,8 @@
 
 - Date: 2026-11-09
 - Owner: L2-A4 (agent sidecar); wired into the Tauri shell by L0
-- Decision (user): **for agentic purposes drop Hermes and adopt the installed Pi
-  coding-agent CLI as the v2 agent runtime.** The embedded Pydantic AI sidecar
-  (`agent-sidecar/`, `crates/ps-agent` legacy client) is kept as an optional
-  fallback and is not deleted.
+- Pi is the only active desktop agent runtime. Legacy Python implementation,
+  historical records and configurations remain available on disk for compatibility.
 - Contract: frozen ps-ipc `AgentRunRequest` / `AgentEvent` (wire format
   unchanged). `AgentSettings` gained `runtime` (default `pi`), `pi_path`,
   `allow_writes` by L0.
@@ -163,9 +161,8 @@ CRLF tolerated). Diagnostics go to stderr. See Pi docs `docs/json.md`.
 | idle 120 s / run > 15 min / cancel | `Error { code: "idle_timeout" / "run_timeout" / "cancelled" }` + `Finished { ok: false }` | process tree killed |
 | unknown Pi event | ignored | forward compatibility |
 
-No `approval_request` is ever emitted by the Pi backend: Pi has no per-tool
-approval prompt. The Workflows approval UI is only used by the Pydantic
-fallback.
+Pi runs currently expose read-only tools. The desktop rejects per-tool approval
+messages because interactive approval transport is not implemented.
 
 UI note: `Progress` carries both streamed assistant text deltas and status
 lines. Status lines produced by this backend are exactly `tool: <name>`,
@@ -228,8 +225,7 @@ for `AgentRuntime::Pi` use `PiAgentConfig::from_settings` +
 `PiAgentClient::spawn` lazily in `agent_start` (never `setup()`/search), forward
 the callback with `app.emit("agent:event", event)`, map `agent_cancel` to
 `client.cancel()`, `agent_stop`/`quit_app` to `client.shutdown()`, and
-`agent_status` to `probe_pi` (no spawn of a run). Keep the Pydantic path for
-`AgentRuntime::Pydantic` as documented in `docs/agent/INTEGRATION.md`.
+`agent_status` to `probe_pi` (no spawn of a run). Legacy runtime settings remain readable for migration. Desktop launch and discovery always use Pi.
 
 Idle timeout and max run duration can be overridden with
 `PROTONSEARCH_AGENT_IDLE_TIMEOUT_MS` and `PROTONSEARCH_AGENT_MAX_RUN_MS`.
@@ -273,3 +269,33 @@ falling back to the `PROTONSEARCH_AGENT_THINKING` environment variable, or
    `PI_CODING_AGENT_SESSION_DIR` cannot be inherited through the parent env;
    pass it via `PiAgentConfig.extra_env` if needed (documented minimal-env
    limitation).
+
+## Desktop integration update
+
+Both Workflows and the island call the same `agent_start` service. Discovery
+returns Pi only. Historical legacy task records and configurations remain on disk.
+
+Workflows exposes Pi path/provider/model configuration, installation review,
+explicit installation confirmation and cancellation, and a Connect model action.
+Connect model opens Pi interactively for `/login` and `/model`. No credential
+values are accepted by these app configuration fields. Provider charges may apply.
+
+Installation uses the official npm package from registry.npmjs.org with dependency
+scripts disabled. The exact version and SHA-512 package integrity are obtained
+from npm before confirmation. npm performs integrity verification. The size shown
+is the main package's unpacked size. Dependency downloads vary. Installation is
+staged in app-owned `pi-runtime`, preserves the previous installation and rolls
+back activation failures. External Pi installations are preserved.
+
+Commands are `pi_install_status`, `pi_install_plan`, `pi_install`,
+`pi_install_cancel`, and `pi_connect`. Setup and installation run on workers.
+Search does not invoke these services. JSON event mode remains the current
+one-process-per-run adapter. RPC would be needed for interactive per-tool approval
+and continuation within the same Pi process. Write/shell access remains disabled
+until that approval path is implemented and tested.
+
+Sources verified on 2026-11-11
+- https://pi.dev/docs/latest/quickstart
+- https://pi.dev/docs/latest/windows
+- https://pi.dev/docs/latest/rpc
+- https://pi.dev/docs/latest/rpc-extension-ui

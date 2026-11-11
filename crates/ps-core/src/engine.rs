@@ -16,6 +16,11 @@ use ps_ipc::*;
 
 use crate::catalog;
 use crate::db::EngineDb;
+use crate::rank::{
+    relevance_class, usage_signal, MatchKind, CATEGORY_ACTION, CATEGORY_APP, CATEGORY_BROWSER,
+    CATEGORY_CALCULATOR, CATEGORY_CLIPBOARD, CATEGORY_CONTENT, CATEGORY_FILE, CATEGORY_FOLDER, CATEGORY_GIT,
+    CATEGORY_WEB, CLASS_FALLBACK,
+};
 
 mod preview;
 
@@ -29,6 +34,13 @@ const PREVIEW_DEFAULT_CHARS: usize = 8_000;
 const PREVIEW_MAX_CHARS: usize = 32_000;
 const PREVIEW_MIN_CHARS: usize = 200;
 
+/// A persisted filename index older than this is rescanned at startup, and a
+/// running app refreshes the index and app list this often, so renamed, moved
+/// or deleted items and (un)installed apps do not linger.
+const REFRESH_INTERVAL_MS: i64 = 30 * 60 * 1000;
+/// Results checked against the disk before they are shown (the visible rows
+/// plus keyboard reach); missing ones are dropped and forgotten.
+const VERIFIED_RESULTS: usize = 12;
 const STATE_STARTING: u8 = 0;
 const STATE_READY: u8 = 1;
 const STATE_INDEXING: u8 = 2;
@@ -132,7 +144,21 @@ struct Ranked {
     tier: u8,
     priority: u8,
     score: f32,
+    /// Last tie-break inside a source (lower first).
+    order: u32,
     result: SearchResult,
+}
+
+/// How often and how recently something was opened or launched.
+#[derive(Debug, Clone, Copy, Default)]
+struct Usage {
+    count: u32,
+    last_ms: i64,
+}
+
+/// History key for a launched app.
+fn app_usage_key(target: &str) -> String {
+    format!("app:{}", target.to_lowercase())
 }
 
 use preview::ResultRegistry;
@@ -167,6 +193,17 @@ pub struct Engine {
     /// One-shot confirmation state for destructive native commands: a request
     /// must be repeated through confirm_destructive within 15 seconds.
     pending_destructive: Mutex<Option<(NativeCommand, i64)>>,
+    /// Open/launch history per lower-case path (or app_usage_key): the
+    /// secondary ranking signal. Seeded from the activity log and the Windows
+    /// Recent folder, updated whenever a result is opened.
+    usage: RwLock<HashMap<String, Usage>>,
+    /// Folded app names for matching, keyed by a fingerprint of the app list.
+    prepared_apps: Mutex<Option<(u64, Arc<Vec<crate::appmatch::PreparedApp>>)>>,
+    /// The periodic index/app refresher is running.
+    refresher_started: AtomicBool,
+    /// Check shown results against the disk (off only for tests whose
+    /// fixtures use paths that do not exist).
+    verify_paths: AtomicBool,
 }
 
 impl Engine {
@@ -217,6 +254,13 @@ impl Engine {
         };
         let content_documents = content.as_ref().map(|c| c.stats().documents).unwrap_or(0);
         let ocr_documents = db.ocr_count();
+        let mut usage: HashMap<String, Usage> = HashMap::new();
+        for (kind, key, count, last_ms) in db.usage_history().unwrap_or_default() {
+            let key = if kind == "launch" { app_usage_key(&key) } else { key.to_lowercase() };
+            let slot = usage.entry(key).or_default();
+            slot.count = slot.count.saturating_add(count);
+            slot.last_ms = slot.last_ms.max(last_ms);
+        }
 
         // A pending one-time legacy migration is real background work, so the
         // UI must show Starting until the pipeline has actually finished.
@@ -240,7 +284,12 @@ impl Engine {
             index: RwLock::new(index),
             content: RwLock::new(content.map(Arc::new)),
             db,
-            sources: RwLock::new(ps_sources::Sources::default()),
+            // Last known app list: apps are searchable the moment the app
+            // starts, not only after the background Start Menu scan.
+            sources: RwLock::new(ps_sources::Sources {
+                apps: load_app_cache(&data_dir),
+                ..ps_sources::Sources::default()
+            }),
             state: AtomicU8::new(initial_state),
             phase: Mutex::new("waiting".to_string()),
             filename_entries: AtomicU64::new(filename_entries),
@@ -257,6 +306,10 @@ impl Engine {
             clipboard_listener: Mutex::new(None),
             clipboard_callback: Mutex::new(None),
             pending_destructive: Mutex::new(None),
+            usage: RwLock::new(usage),
+            prepared_apps: Mutex::new(None),
+            refresher_started: AtomicBool::new(false),
+            verify_paths: AtomicBool::new(true),
         };
         this.sync_clipboard_listener();
         Ok(this)
@@ -299,6 +352,24 @@ impl Engine {
         }
         let engine = Arc::clone(&self);
         *guard = Some(std::thread::spawn(move || run_background(engine)));
+        drop(guard);
+        if !self.refresher_started.swap(true, Ordering::SeqCst) {
+            let engine = Arc::downgrade(&self);
+            let spawned = std::thread::Builder::new()
+                .name("ps-refresh".into())
+                .spawn(move || refresh_loop(engine));
+            if spawned.is_err() {
+                self.refresher_started.store(false, Ordering::SeqCst);
+            }
+        }
+    }
+
+    fn background_running(&self) -> bool {
+        self.background
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|handle| !handle.is_finished()))
+            .unwrap_or(false)
     }
 
     // -- search ------------------------------------------------------------
@@ -347,6 +418,7 @@ impl Engine {
                             tier: 0,
                             priority: 8,
                             score: 1000.0 - (i as f32 * 1.0),
+                            order: 0,
                             result: clipboard_result(&entry),
                         });
                         hits += 1;
@@ -371,6 +443,7 @@ impl Engine {
                             tier: 0,
                             priority: 8,
                             score: 1000.0 - (hits as f32 * 1.0),
+                            order: 0,
                             result: ocr_result(hit, &settings),
                         });
                         hits += 1;
@@ -391,10 +464,12 @@ impl Engine {
                         if ps_ocr::IMAGE_EXTENSIONS.contains(&ext.as_str())
                             || ps_content::is_supported(p)
                         {
+                            // After the OCR rows above.
                             ranked.push(Ranked {
-                                tier: 0,
+                                tier: 1,
                                 priority: 7,
                                 score: 800.0 - (hits as f32 * 1.0),
+                                order: 0,
                                 result: recent_result(entry),
                             });
                             hits += 1;
@@ -414,21 +489,52 @@ impl Engine {
             let sources = self.sources.read().unwrap();
             let mut recent: Vec<&ps_sources::RecentEntry> = sources.recent.iter().collect();
             recent.sort_by(|a, b| b.last_used_ms.cmp(&a.last_used_ms));
-            for entry in recent.into_iter().filter(|_| scope == SearchScope::All).take(5) {
+            for entry in recent.into_iter().filter(|_| scope == SearchScope::All).take(5 + VERIFIED_RESULTS) {
                 ranked.push(Ranked {
                     tier: 0,
                     priority: 1,
                     score: 1.0,
+                    order: 0,
                     result: recent_result(entry),
                 });
             }
             drop(sources);
-            let results = finalize(ranked, limit);
+            let results = self.drop_missing(finalize(ranked, limit + VERIFIED_RESULTS), 5.min(limit));
             self.remember_results(&results);
             return self.response(req, query_text, results, timings, started, &settings);
         }
 
-        // Tier 0: calculator, native commands, quicklinks/snippets, apps, recents.
+        // Ranking for All / Files / Folders / Apps: the tier is the relevance
+        // class of how the NAME matched (rank::relevance_class), the priority the
+        // category (Apps, Folders, Files, documents/OCR, other sources) and the
+        // score the open/launch history plus closeness inside the class; the
+        // order field holds each source's stable tie-breaks. Relevance always
+        // wins over category. Other filters keep their established ordering.
+        let ranked_scope = matches!(
+            scope,
+            SearchScope::All | SearchScope::Files | SearchScope::Folders | SearchScope::Apps
+        );
+        let now = now_ms();
+        let usage = self.usage.read().unwrap_or_else(|err| err.into_inner());
+        let history = |key: &str| {
+            usage
+                .get(key)
+                .map(|entry| usage_signal(entry.count, entry.last_ms, now))
+                .unwrap_or(0.0)
+        };
+        let name_query = ps_index::NameQuery::new(&filename_query);
+        // Class of a non-file row from its title; text that matched only
+        // elsewhere (a URL, a commit body, clipboard text) is a content match.
+        let title_class = |title: &str| {
+            let kind = name_query
+                .as_ref()
+                .and_then(|query| query.matches(title))
+                .map(|(score, _)| MatchKind::from(ps_index::NameMatch::from_score(score)))
+                .unwrap_or(MatchKind::ContentOnly);
+            relevance_class(kind, scope)
+        };
+
+        // Calculator, native commands, workflows, web fallback, apps, recents.
         let tier_start = Instant::now();
         let mut tier0_hits = 0usize;
         if scope_allows(scope, SourceKind::Calculator) {
@@ -437,8 +543,9 @@ impl Engine {
             {
                 ranked.push(Ranked {
                     tier: 0,
-                    priority: 0,
+                    priority: CATEGORY_CALCULATOR,
                     score: 1000.0,
+                    order: 0,
                     result: calculator_result(calc),
                 });
                 tier0_hits += 1;
@@ -446,36 +553,45 @@ impl Engine {
         }
         if scope_allows(scope, SourceKind::Command) || scope == SearchScope::All {
             let sources = self.sources.read().unwrap();
-            for action in catalog::match_actions(&query_text).into_iter().take(4) {
+            let actions = catalog::match_actions(&query_text).into_iter().take(4).map(command_result);
+            let workflows = match_workflows(&sources.workflows, &terms)
+                .into_iter()
+                .take(3)
+                .map(workflow_result);
+            for (i, result) in actions.chain(workflows).enumerate() {
+                let (tier, priority, score) = if ranked_scope {
+                    (title_class(&result.title), CATEGORY_ACTION, 0.0)
+                } else {
+                    (0, 1, 900.0 - i as f32)
+                };
                 ranked.push(Ranked {
-                    tier: 0,
-                    priority: 1,
-                    score: 900.0 - ranked.len() as f32,
-                    result: command_result(action),
-                });
-                tier0_hits += 1;
-            }
-            for workflow in match_workflows(&sources.workflows, &terms).into_iter().take(3) {
-                ranked.push(Ranked {
-                    tier: 0,
-                    priority: 1,
-                    score: 880.0,
-                    result: workflow_result(workflow),
+                    tier,
+                    priority,
+                    score,
+                    order: i as u32,
+                    result,
                 });
                 tier0_hits += 1;
             }
             drop(sources);
         }
         // Direct web search: offered in the All and Web scopes so the "Web"
-        // filter is genuinely useful without a browser-history entry.
+        // filter is genuinely useful without a browser-history entry. In All it
+        // is the fallback after every real match.
         let web_scope_ok = matches!(scope, SearchScope::All | SearchScope::Browser);
         if settings.web_search_enabled && web_scope_ok {
             let trimmed = query_text.trim();
             if !trimmed.is_empty() && trimmed.chars().count() <= 160 {
+                let (tier, priority, score) = if scope == SearchScope::All {
+                    (CLASS_FALLBACK, CATEGORY_WEB, 0.0)
+                } else {
+                    (0, 9, 200.0)
+                };
                 ranked.push(Ranked {
-                    tier: 0,
-                    priority: 9,
-                    score: 200.0,
+                    tier,
+                    priority,
+                    score,
+                    order: 0,
                     result: web_search_result(trimmed, settings.web_search_engine),
                 });
                 tier0_hits += 1;
@@ -483,29 +599,64 @@ impl Engine {
         }
         if scope_allows(scope, SourceKind::Application) {
             let sources = self.sources.read().unwrap();
-            for (app, score) in match_apps(&sources.apps, &terms).into_iter().take(5) {
+            let prepared = self.prepared_apps(&sources.apps);
+            let folded = crate::appmatch::fold_query(&filename_query);
+            let mut hits: Vec<(usize, crate::appmatch::AppHit, f32)> = prepared
+                .iter()
+                .enumerate()
+                .filter_map(|(i, app)| crate::appmatch::match_app(app, &folded).map(|hit| (i, hit)))
+                .map(|(i, hit)| (i, hit, history(&app_usage_key(&sources.apps[i].target))))
+                .collect();
+            hits.sort_by(|a, b| {
+                a.1.kind
+                    .cmp(&b.1.kind)
+                    .then_with(|| b.2.total_cmp(&a.2))
+                    .then_with(|| b.1.quality.total_cmp(&a.1.quality))
+                    .then_with(|| a.0.cmp(&b.0))
+            });
+            hits.truncate(if scope == SearchScope::Apps { limit } else { 8 });
+            let first_app = ranked.len();
+            for (order, (i, hit, signal)) in hits.into_iter().enumerate() {
+                let mut result = app_result(&sources.apps[i]);
+                result.match_ranges = hit
+                    .ranges
+                    .iter()
+                    .map(|&(start, end)| TextRange { start, end })
+                    .collect();
                 ranked.push(Ranked {
-                    tier: 0,
-                    priority: 2,
-                    score,
-                    result: app_result(app),
+                    tier: relevance_class(hit.kind.into(), scope),
+                    priority: CATEGORY_APP,
+                    score: signal * 1000.0 + hit.quality * 999.0,
+                    order: order as u32,
+                    result,
                 });
                 tier0_hits += 1;
             }
-            if scope == SearchScope::All && terms.len() == 1 {
-                for entry in sources
-                    .recent
-                    .iter()
-                    .filter(|r| r.name.to_lowercase().contains(&terms[0]))
-                    .take(3)
-                {
-                    ranked.push(Ranked {
-                        tier: 0,
-                        priority: 4,
-                        score: 600.0,
-                        result: recent_result(entry),
-                    });
-                    tier0_hits += 1;
+            disambiguate_apps(&mut ranked[first_app..]);
+            // Recently used files (Windows Recent folder): matched by name like
+            // indexed files. A row for a path the index also returns collapses
+            // into the index row (merge_results dedupes by path).
+            if scope == SearchScope::All {
+                if let Some(query) = &name_query {
+                    for (i, entry) in sources.recent.iter().enumerate() {
+                        let Some((score, ranges)) = query.matches(&entry.name) else {
+                            continue;
+                        };
+                        let mut result = recent_result(entry);
+                        result.match_ranges = ranges
+                            .iter()
+                            .map(|&(start, end)| TextRange { start, end })
+                            .collect();
+                        let kind = MatchKind::from(ps_index::NameMatch::from_score(score));
+                        ranked.push(Ranked {
+                            tier: relevance_class(kind, scope),
+                            priority: CATEGORY_FILE,
+                            score: history(&entry.path.to_lowercase()) * 1000.0 + score * 999.0,
+                            order: u32::MAX / 2 + i as u32,
+                            result,
+                        });
+                        tier0_hits += 1;
+                    }
                 }
             }
             drop(sources);
@@ -517,7 +668,8 @@ impl Engine {
             hits: tier0_hits,
         });
 
-        // Tier 1: filename index.
+        // Filename index (names only: a matching folder higher up the path does
+        // not make the entries below it match).
         if scope_allows(scope, SourceKind::File) || scope_allows(scope, SourceKind::Folder) {
             let tier_start = Instant::now();
             let mut extensions: Vec<String> = if scope == SearchScope::Photos {
@@ -585,22 +737,64 @@ impl Engine {
                 min_size: filters.min_size,
                 max_size: filters.max_size,
             };
-            let file_hits = {
+            let mut rows: Vec<(SearchResult, u8, f32)> = Vec::new();
+            {
                 let index = self.index.read().unwrap();
-                index.search_filtered(&filename_query, limit.saturating_mul(2), &entry_filter)
-            };
-            let mut hits = 0usize;
-            for hit in &file_hits {
-                let index = self.index.read().unwrap();
-                if let Some((result, tier)) = file_result(&index, hit, &settings) {
-                    let priority = if result.kind == SourceKind::Folder { 3 } else { 3 };
+                for hit in index.search_filtered(&filename_query, limit.saturating_mul(2), &entry_filter) {
+                    if let Some((result, tier)) = file_result(&index, &hit, &settings) {
+                        rows.push((result, tier, hit.score));
+                    }
+                }
+            }
+            let hits = rows.len();
+            if ranked_scope {
+                // Tie-breaks inside a class: shallower folders first (the
+                // "main" one), then newer, then shorter names, then path.
+                let depth = |result: &SearchResult| {
+                    if result.kind == SourceKind::Folder {
+                        path_depth(result.path.as_deref().unwrap_or(""))
+                    } else {
+                        0
+                    }
+                };
+                let mut sorted: Vec<usize> = (0..rows.len()).collect();
+                sorted.sort_by(|&a, &b| {
+                    let (left, right) = (&rows[a].0, &rows[b].0);
+                    depth(left)
+                        .cmp(&depth(right))
+                        .then_with(|| right.meta.modified.cmp(&left.meta.modified))
+                        .then_with(|| left.title.chars().count().cmp(&right.title.chars().count()))
+                        .then_with(|| left.id.cmp(&right.id))
+                });
+                let mut order = vec![0u32; rows.len()];
+                for (position, &row) in sorted.iter().enumerate() {
+                    order[row] = position as u32;
+                }
+                for (i, (result, _, index_score)) in rows.into_iter().enumerate() {
+                    let kind = MatchKind::from(ps_index::NameMatch::from_score(index_score));
+                    let priority = if result.kind == SourceKind::Folder {
+                        CATEGORY_FOLDER
+                    } else {
+                        CATEGORY_FILE
+                    };
+                    let key = result.path.as_deref().unwrap_or("").to_lowercase();
                     ranked.push(Ranked {
-                        tier,
+                        tier: relevance_class(kind, scope),
                         priority,
-                        score: result.score,
+                        score: history(&key) * 1000.0 + index_score * 999.0,
+                        order: order[i],
                         result,
                     });
-                    hits += 1;
+                }
+            } else {
+                for (result, tier, _) in rows {
+                    ranked.push(Ranked {
+                        tier,
+                        priority: 3,
+                        score: result.score,
+                        order: 0,
+                        result,
+                    });
                 }
             }
             timings.push(TierTiming {
@@ -611,21 +805,30 @@ impl Engine {
             });
         }
 
-        // Tier budget: a tier can only change the response while fewer than
-        // `limit` results are already strictly better than that tier's ceiling.
-        // This is an exact optimization (finalize orders by tier then score), so
-        // skipping a tier here cannot change the returned results.
+        // Budget: a slower source runs only while it could still change the
+        // returned rows. For the ranked filters that means fewer than `limit`
+        // rows already rank in a better class than a content-only match.
+        let content_class = relevance_class(MatchKind::ContentOnly, scope);
         let count_above = |ceiling: f32| {
             ranked
                 .iter()
                 .filter(|entry| entry.tier <= 1 && entry.score > ceiling)
                 .count()
         };
-        let content_worth_it = count_above(500.0) < limit || scope == SearchScope::Ocr;
-        let sources_worth_it = count_above(400.0) < limit;
-        let ocr_worth_it = count_above(300.0) < limit || scope == SearchScope::Ocr;
+        let better_than_content = ranked.iter().filter(|entry| entry.tier < content_class).count();
+        let content_worth_it = if ranked_scope {
+            better_than_content < limit
+        } else {
+            count_above(500.0) < limit || scope == SearchScope::Ocr
+        };
+        let sources_worth_it = ranked_scope || count_above(400.0) < limit;
+        let ocr_worth_it = if ranked_scope {
+            better_than_content < limit
+        } else {
+            count_above(300.0) < limit || scope == SearchScope::Ocr
+        };
 
-        // Tier 1: indexed content, clipboard, browser, git.
+        // Indexed document text, clipboard, browser, git.
         if content_worth_it && settings.indexing.content_enabled && content_scope_allows(scope) {
             let tier_start = Instant::now();
             let mut hits = 0usize;
@@ -634,16 +837,19 @@ impl Engine {
                 let result = content.search(intent_text.as_ref(), remaining);
                 match result {
                     Ok(content_hits) => {
-                        for hit in content_hits {
-                            let (tier, score) = if scope == SearchScope::Ocr {
-                                (0, 800.0)
+                        for (i, hit) in content_hits.into_iter().enumerate() {
+                            let (tier, priority, score) = if scope == SearchScope::Ocr {
+                                (0, 3, 800.0)
+                            } else if ranked_scope {
+                                (content_class, CATEGORY_CONTENT, 0.0)
                             } else {
-                                (1, 500.0)
+                                (1, 3, 500.0)
                             };
                             ranked.push(Ranked {
                                 tier,
-                                priority: 3,
+                                priority,
                                 score,
+                                order: i as u32,
                                 result: content_result(hit, &settings),
                             });
                             hits += 1;
@@ -679,34 +885,55 @@ impl Engine {
                 .take(10)
                 .enumerate()
             {
+                let result = clipboard_result(&entry);
+                let (tier, priority, score) = if ranked_scope {
+                    (title_class(&result.title), CATEGORY_CLIPBOARD, 0.0)
+                } else {
+                    (1, 8, 1000.0 - i as f32)
+                };
                 ranked.push(Ranked {
-                    tier: 1,
-                    priority: 8,
-                    score: 1000.0 - (i as f32 * 1.0),
-                    result: clipboard_result(&entry),
+                    tier,
+                    priority,
+                    score,
+                    order: i as u32,
+                    result,
                 });
                 source_hits += 1;
             }
         }
         let sources = self.sources.read().unwrap();
         if sources_worth_it && scope_allows(scope, SourceKind::BrowserHistory) {
-            for entry in match_browser(&sources.browser, &terms).into_iter().take(4) {
+            for (i, entry) in match_browser(&sources.browser, &terms).into_iter().take(4).enumerate() {
+                let result = browser_result(entry);
+                let (tier, priority, score) = if ranked_scope {
+                    (title_class(&result.title), CATEGORY_BROWSER, 0.0)
+                } else {
+                    (1, 6, 380.0)
+                };
                 ranked.push(Ranked {
-                    tier: 1,
-                    priority: 6,
-                    score: 380.0,
-                    result: browser_result(entry),
+                    tier,
+                    priority,
+                    score,
+                    order: i as u32,
+                    result,
                 });
                 source_hits += 1;
             }
         }
         if sources_worth_it && scope_allows(scope, SourceKind::GitCommit) {
-            for entry in match_git(&sources.git, &terms).into_iter().take(4) {
+            for (i, entry) in match_git(&sources.git, &terms).into_iter().take(4).enumerate() {
+                let result = git_result(entry);
+                let (tier, priority, score) = if ranked_scope {
+                    (title_class(&result.title), CATEGORY_GIT, 0.0)
+                } else {
+                    (1, 7, 360.0)
+                };
                 ranked.push(Ranked {
-                    tier: 1,
-                    priority: 7,
-                    score: 360.0,
-                    result: git_result(entry),
+                    tier,
+                    priority,
+                    score,
+                    order: i as u32,
+                    result,
                 });
                 source_hits += 1;
             }
@@ -721,7 +948,7 @@ impl Engine {
             });
         }
 
-        // Tier 2: OCR text (already extracted; never run OCR during a query).
+        // OCR text (already extracted; never run OCR during a query).
         if ocr_worth_it && settings.indexing.ocr_enabled && scope_allows(scope, SourceKind::OcrText) {
             let tier_start = Instant::now();
             let mut hits = 0usize;
@@ -734,16 +961,19 @@ impl Engine {
             };
             match ocr_hits {
                 Ok(ocr_hits) => {
-                    for hit in ocr_hits {
-                        let (tier, score) = if scope == SearchScope::Ocr {
-                            (0, 900.0)
+                    for (i, hit) in ocr_hits.into_iter().enumerate() {
+                        let (tier, priority, score) = if scope == SearchScope::Ocr {
+                            (0, 3, 900.0)
+                        } else if ranked_scope {
+                            (content_class, CATEGORY_CONTENT, 0.0)
                         } else {
-                            (2, 300.0)
+                            (2, 3, 300.0)
                         };
                         ranked.push(Ranked {
                             tier,
-                            priority: 3,
+                            priority,
                             score,
+                            order: i as u32,
                             result: ocr_result(hit, &settings),
                         });
                         hits += 1;
@@ -758,8 +988,9 @@ impl Engine {
                 hits,
             });
         }
+        drop(usage);
 
-        let results = finalize(ranked, limit);
+        let results = self.drop_missing(finalize(ranked, limit + VERIFIED_RESULTS), limit);
         self.remember_results(&results);
         let response = self.response(req, query_text.clone(), results, timings, started, &settings);
         if settings.privacy.activity_history && !query_text.trim().is_empty() {
@@ -816,6 +1047,84 @@ impl Engine {
     }
 
     // -- preview -----------------------------------------------------------
+
+    /// Folded app names for matching, rebuilt only when the app list changes.
+    fn prepared_apps(&self, apps: &[ps_sources::AppEntry]) -> Arc<Vec<crate::appmatch::PreparedApp>> {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        for app in apps {
+            app.name.hash(&mut hasher);
+            app.target.hash(&mut hasher);
+        }
+        let fingerprint = hasher.finish();
+        let mut slot = self.prepared_apps.lock().unwrap_or_else(|err| err.into_inner());
+        if let Some((kept, prepared)) = slot.as_ref() {
+            if *kept == fingerprint {
+                return Arc::clone(prepared);
+            }
+        }
+        let prepared: Arc<Vec<crate::appmatch::PreparedApp>> = Arc::new(
+            apps.iter()
+                .map(|app| crate::appmatch::PreparedApp::new(&app.name, &app.target))
+                .collect(),
+        );
+        *slot = Some((fingerprint, Arc::clone(&prepared)));
+        prepared
+    }
+
+    /// Deleted, moved or renamed items must not linger as results: the first
+    /// rows (the visible ones plus keyboard reach) are checked against the
+    /// disk, missing ones are dropped and forgotten by the filename index and
+    /// the recent list. One metadata lookup per row.
+    fn drop_missing(&self, mut results: Vec<SearchResult>, limit: usize) -> Vec<SearchResult> {
+        if !self.verify_paths.load(Ordering::Relaxed) {
+            results.truncate(limit);
+            return results;
+        }
+        let mut kept: Vec<SearchResult> = Vec::with_capacity(limit.min(results.len()));
+        let mut stale: Vec<String> = Vec::new();
+        for result in results {
+            if kept.len() >= limit {
+                break;
+            }
+            if kept.len() < VERIFIED_RESULTS {
+                if let Some(path) = checkable_path(&result) {
+                    if !Path::new(path).exists() {
+                        stale.push(path.to_string());
+                        continue;
+                    }
+                }
+            }
+            kept.push(result);
+        }
+        if !stale.is_empty() {
+            if let Ok(mut index) = self.index.write() {
+                for path in &stale {
+                    index.remove_path(path);
+                }
+            }
+            if let Ok(mut sources) = self.sources.write() {
+                sources
+                    .recent
+                    .retain(|entry| !stale.iter().any(|path| path.eq_ignore_ascii_case(&entry.path)));
+            }
+            self.sync_filename_entries();
+        }
+        kept
+    }
+
+    /// Count an opened path or launched app toward its history signal.
+    fn record_usage(&self, action: &ActionSpec) {
+        let key = match action {
+            ActionSpec::OpenPath { path, .. } | ActionSpec::RevealPath { path } => path.to_lowercase(),
+            ActionSpec::LaunchApp { app_id, .. } => app_usage_key(app_id),
+            _ => return,
+        };
+        if let Ok(mut usage) = self.usage.write() {
+            let entry = usage.entry(key).or_default();
+            entry.count = entry.count.saturating_add(1);
+            entry.last_ms = now_ms();
+        }
+    }
 
     fn remember_results(&self, results: &[SearchResult]) {
         // Preview only needs the display/metadata fields; drop the icon payload
@@ -1098,6 +1407,9 @@ impl Engine {
     }
 
     pub fn clear_activity(&self) -> anyhow::Result<u64> {
+        if let Ok(mut usage) = self.usage.write() {
+            usage.clear();
+        }
         self.db.clear_activity()
     }
 
@@ -1319,6 +1631,7 @@ impl Engine {
             let _ = self
                 .db
                 .log_activity(kind, &title, Some(&outcome.message), path.as_deref());
+            self.record_usage(&action);
         }
         outcome
     }
@@ -1731,6 +2044,17 @@ fn run_background_inner(engine: &Arc<Engine>) {
         let settings = engine.settings_snapshot();
         let legacy = engine.config.legacy_db.clone();
         let (sources, warnings) = ps_sources::Sources::load(&settings, legacy.as_deref());
+        if !sources.apps.is_empty() {
+            save_app_cache(&engine.config.data_dir, &sources.apps);
+        }
+        // Files opened through Explorer count as recently used.
+        if let Ok(mut usage) = engine.usage.write() {
+            for entry in &sources.recent {
+                let slot = usage.entry(entry.path.to_lowercase()).or_default();
+                slot.count = slot.count.max(1);
+                slot.last_ms = slot.last_ms.max(entry.last_used_ms);
+            }
+        }
         if let Ok(mut guard) = engine.sources.write() {
             *guard = sources;
         }
@@ -1746,13 +2070,18 @@ fn run_background_inner(engine: &Arc<Engine>) {
     let roots = engine.configured_roots();
     if !roots.is_empty() {
         let current_roots: Vec<String> = roots.iter().map(|root| ps_index::normalize_root(root)).collect();
+        let empty = engine.index.read().unwrap().is_empty();
         let rescan = engine.force_rescan.swap(false, Ordering::SeqCst) || {
             let index = engine.index.read().unwrap();
-            index.is_empty() || index.roots() != current_roots.as_slice()
+            empty
+                || index.roots() != current_roots.as_slice()
+                || now_ms() - index.built_at() > REFRESH_INTERVAL_MS
         };
         if rescan {
             engine.set_phase("scanning files");
-            scan_into_index(engine, &roots);
+            // Only a first scan counts up from zero; refreshing an existing
+            // index keeps the shown count steady until the new one swaps in.
+            scan_into_index(engine, &roots, empty);
             engine.save_index();
         }
     }
@@ -1807,14 +2136,73 @@ fn finish_background(engine: &Arc<Engine>) {
     engine.last_updated.store(now_ms(), Ordering::SeqCst);
 }
 
-fn scan_into_index(engine: &Arc<Engine>, roots: &[PathBuf]) {
+const APP_CACHE_FILE: &str = "apps-cache.json";
+
+fn load_app_cache(data_dir: &Path) -> Vec<ps_sources::AppEntry> {
+    std::fs::read(data_dir.join(APP_CACHE_FILE))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+fn save_app_cache(data_dir: &Path, apps: &[ps_sources::AppEntry]) {
+    if let Ok(bytes) = serde_json::to_vec(apps) {
+        let _ = std::fs::write(data_dir.join(APP_CACHE_FILE), bytes);
+    }
+}
+
+/// Keeps the filename index and the app list current while the app runs, so
+/// created, renamed, moved or deleted items and (un)installed apps show up
+/// without a manual rebuild. Holds only a weak handle: it never keeps the
+/// engine alive and stops with it.
+fn refresh_loop(engine: std::sync::Weak<Engine>) {
+    let mut last_refresh = Instant::now();
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        let Some(engine) = engine.upgrade() else {
+            return;
+        };
+        if engine.shutdown.load(Ordering::SeqCst) {
+            engine.refresher_started.store(false, Ordering::SeqCst);
+            return;
+        }
+        if (last_refresh.elapsed().as_millis() as i64) < REFRESH_INTERVAL_MS
+            || engine.paused.load(Ordering::SeqCst)
+            || engine.background_running()
+        {
+            continue;
+        }
+        last_refresh = Instant::now();
+        let roots = engine.configured_roots();
+        if !roots.is_empty() {
+            scan_into_index(&engine, &roots, false);
+            if !engine.shutdown.load(Ordering::SeqCst) {
+                engine.save_index();
+            }
+        }
+        let (apps, _) = ps_sources::apps::scan();
+        if !apps.is_empty() {
+            save_app_cache(&engine.config.data_dir, &apps);
+            if let Ok(mut sources) = engine.sources.write() {
+                sources.apps = apps;
+            }
+        }
+    }
+}
+
+/// Rebuild the filename index from disk. `report_progress` publishes the
+/// running count (first scan); a quiet refresh keeps the shown count steady.
+/// A scan cut short by shutdown never replaces the live index.
+fn scan_into_index(engine: &Arc<Engine>, roots: &[PathBuf], report_progress: bool) {
     let settings = engine.settings_snapshot();
     let excluded = settings.indexing.excluded_paths.clone();
     let junk: Vec<String> = Vec::new();
     let cancelled = || engine.shutdown.load(Ordering::SeqCst);
     let counter = Arc::clone(engine);
     let mut progress = move |count: usize| {
-        counter.filename_entries.store(count as u64, Ordering::Relaxed);
+        if report_progress {
+            counter.filename_entries.store(count as u64, Ordering::Relaxed);
+        }
     };
     let options = ps_index::ScanOptions {
         roots,
@@ -1825,6 +2213,9 @@ fn scan_into_index(engine: &Arc<Engine>, roots: &[PathBuf]) {
         progress: &mut progress,
     };
     let (mut index, stats) = ps_index::scan(options);
+    if engine.shutdown.load(Ordering::SeqCst) {
+        return;
+    }
     let root_strings: Vec<String> = roots.iter().map(|root| ps_index::normalize_root(root)).collect();
     index.set_roots(root_strings);
     if stats.errors > 0 {
@@ -2245,10 +2636,60 @@ fn finalize(ranked: Vec<Ranked>, limit: usize) -> Vec<SearchResult> {
             tier: item.tier,
             score: item.score,
             priority: item.priority,
+            order: item.order,
             result: item.result,
         })
         .collect();
     crate::rank::merge_results(items, limit)
+}
+
+/// Number of folders above a path (for "the shallower folder first").
+fn path_depth(path: &str) -> usize {
+    path.bytes().filter(|b| *b == b'\\' || *b == b'/').count()
+}
+
+/// Same app name from different installs: show where each one lives.
+fn disambiguate_apps(rows: &mut [Ranked]) {
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    for row in rows.iter() {
+        *seen.entry(row.result.title.to_lowercase()).or_default() += 1;
+    }
+    for row in rows.iter_mut() {
+        if seen.get(&row.result.title.to_lowercase()).copied().unwrap_or(0) < 2 {
+            continue;
+        }
+        let path = row.result.path.as_deref().unwrap_or("");
+        let location = if path.to_ascii_lowercase().starts_with("shell:appsfolder") {
+            "Microsoft Store app".to_string()
+        } else {
+            Path::new(path)
+                .parent()
+                .map(|folder| folder.display().to_string())
+                .unwrap_or_default()
+        };
+        if !location.is_empty() {
+            row.result.subtitle = format!("Application \u{b7} {location}");
+        }
+    }
+}
+
+/// Filesystem path behind a result that can be checked cheaply. Network
+/// (UNC) paths are skipped: a stat there can block for seconds.
+fn checkable_path(result: &SearchResult) -> Option<&str> {
+    let path = result.path.as_deref()?;
+    if path.starts_with("\\\\") || path.to_ascii_lowercase().starts_with("shell:") {
+        return None;
+    }
+    match result.kind {
+        SourceKind::File
+        | SourceKind::Folder
+        | SourceKind::Recent
+        | SourceKind::Document
+        | SourceKind::ContentMatch
+        | SourceKind::OcrText
+        | SourceKind::Application => Some(path),
+        _ => None,
+    }
 }
 
 /// Merge UI-supplied filters with filters parsed from the query text; both are
@@ -2278,22 +2719,6 @@ fn merged_filters(parsed: &SearchFilters, request: &SearchFilters) -> SearchFilt
     merged.min_size = parsed.min_size.or(request.min_size);
     merged.max_size = parsed.max_size.or(request.max_size);
     merged
-}
-
-fn match_apps<'a>(
-    apps: &'a [ps_sources::AppEntry],
-    terms: &[String],
-) -> Vec<(&'a ps_sources::AppEntry, f32)> {
-    let mut hits: Vec<(&ps_sources::AppEntry, f32)> = apps
-        .iter()
-        .filter_map(|app| score_text(&app.name, terms).map(|score| (app, score)))
-        .collect();
-    hits.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.0.name.cmp(&b.0.name))
-    });
-    hits
 }
 
 fn match_browser<'a>(
@@ -2404,39 +2829,6 @@ fn match_workflows<'a>(
             terms.iter().all(|term| haystack.contains(term))
         })
         .collect()
-}
-
-/// Score a display text against query terms: exact 1000, prefix 900, word
-/// prefix 800, substring 700, else None. Shorter text wins ties.
-fn score_text(text: &str, terms: &[String]) -> Option<f32> {
-    if terms.is_empty() {
-        return None;
-    }
-    let lower = text.to_lowercase();
-    if terms.len() == 1 {
-        let term = &terms[0];
-        if lower == *term {
-            return Some(1000.0);
-        }
-        if lower.starts_with(term.as_str()) {
-            return Some(950.0 - text.len() as f32 * 0.1);
-        }
-        if lower
-            .split(|c: char| !c.is_alphanumeric())
-            .any(|word| word.starts_with(term.as_str()))
-        {
-            return Some(900.0 - text.len() as f32 * 0.1);
-        }
-        if lower.contains(term.as_str()) {
-            return Some(820.0 - text.len() as f32 * 0.1);
-        }
-        return None;
-    }
-    if terms.iter().all(|term| lower.contains(term.as_str())) {
-        Some(700.0 - text.len() as f32 * 0.1)
-    } else {
-        None
-    }
 }
 
 fn display_path(path: &str, settings: &Settings) -> String {
@@ -3229,13 +3621,367 @@ mod tests {
         dir
     }
 
+    /// Engine for fixtures with made-up paths: results are not checked
+    /// against the disk (see stale_results_are_dropped_and_forgotten).
     fn make_engine(dir: &Path, legacy: Option<PathBuf>) -> Engine {
-        Engine::open(EngineConfig {
+        let engine = Engine::open(EngineConfig {
             data_dir: dir.to_path_buf(),
             legacy_db: legacy,
             version: "test".to_string(),
         })
-        .unwrap()
+        .unwrap();
+        engine.verify_paths.store(false, Ordering::Relaxed);
+        engine
+    }
+
+    // -- filter ranking (All / Files / Folders / Apps) ------------------------
+
+    fn entry(path: &str, kind: EntryKind, modified: i64) -> ps_index::IndexEntry {
+        let name = path.rsplit('\\').next().unwrap().to_string();
+        let ext = match kind {
+            EntryKind::File => name.rsplit_once('.').map(|(_, ext)| ext.to_string()).unwrap_or_default(),
+            _ => String::new(),
+        };
+        ps_index::IndexEntry {
+            path: path.into(),
+            name,
+            ext,
+            kind,
+            size: 1,
+            modified,
+        }
+    }
+
+    fn app(name: &str, target: &str) -> ps_sources::AppEntry {
+        ps_sources::AppEntry {
+            id: target.into(),
+            name: name.into(),
+            target: target.into(),
+            icon_path: None,
+            keywords: Vec::new(),
+        }
+    }
+
+    fn ranked(engine: &Engine, query: &str, scope: SearchScope) -> Vec<(SourceKind, String)> {
+        let mut request = SearchRequest::new(1, query);
+        request.scope = scope;
+        engine
+            .search(&request)
+            .results
+            .into_iter()
+            .map(|result| (result.kind, result.title))
+            .collect()
+    }
+
+    fn ranking_engine(name: &str, entries: Vec<ps_index::IndexEntry>, apps: Vec<ps_sources::AppEntry>) -> (PathBuf, Engine) {
+        let dir = scratch_dir(name);
+        let engine = make_engine(&dir, None);
+        engine.settings.write().unwrap().web_search_enabled = false;
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(entries);
+        engine.sync_filename_entries();
+        engine.sources.write().unwrap().apps = apps;
+        (dir, engine)
+    }
+
+    #[test]
+    fn all_ranks_relevance_first_then_apps_folders_files() {
+        let (dir, engine) = ranking_engine(
+            "rank-all",
+            vec![
+                entry(r"C:\work\budget", EntryKind::Folder, 1),
+                entry(r"C:\work\budget.xlsx", EntryKind::File, 1),
+                entry(r"C:\work\budget planner notes.txt", EntryKind::File, 1),
+                entry(r"C:\work\budgets.xlsx", EntryKind::File, 1),
+                entry(r"C:\old\b_u_d_g_e_t.txt", EntryKind::File, 99),
+            ],
+            vec![
+                app("Budget", r"C:\apps\budget-app.exe"),
+                app("Home Budget Pro", r"C:\apps\hbp.exe"),
+                app("Budgeteer", r"C:\apps\bgt.exe"),
+            ],
+        );
+        let rows = ranked(&engine, "budget", SearchScope::All);
+        let expected = vec![
+            // exact names: app, then folder, then file (the stem is the name)
+            (SourceKind::Application, "Budget".to_string()),
+            (SourceKind::Folder, "budget".to_string()),
+            (SourceKind::File, "budget.xlsx".to_string()),
+            // whole-word matches
+            (SourceKind::Application, "Home Budget Pro".to_string()),
+            (SourceKind::File, "budget planner notes.txt".to_string()),
+            // prefixes
+            (SourceKind::Application, "Budgeteer".to_string()),
+            (SourceKind::File, "budgets.xlsx".to_string()),
+            // weak fuzzy last even though it is the newest file
+            (SourceKind::File, "b_u_d_g_e_t.txt".to_string()),
+        ];
+        assert_eq!(rows, expected);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn all_puts_an_installed_app_above_files_named_after_it() {
+        // Real-data case: deep toolchain files called chrome.dart buried
+        // Google Chrome; the app's own alias (chrome.exe) is its name in All.
+        let (dir, engine) = ranking_engine(
+            "rank-all-alias",
+            vec![
+                entry(r"C:\sdk\flutter\lib\web\chrome.dart", EntryKind::File, 50),
+                entry(r"C:\sdk\flutter\dev\chrome.dart", EntryKind::File, 50),
+            ],
+            vec![app("Google Chrome", r"C:\Program Files\Google\Chrome\Application\chrome.exe")],
+        );
+        let rows = ranked(&engine, "chrome", SearchScope::All);
+        assert_eq!(rows[0], (SourceKind::Application, "Google Chrome".to_string()), "{rows:?}");
+        assert_eq!(rows.len(), 3);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn all_never_puts_a_weaker_app_above_an_exact_file() {
+        let (dir, engine) = ranking_engine(
+            "rank-all-exact-file",
+            vec![entry(r"C:\notes\notes.txt", EntryKind::File, 1)],
+            vec![
+                app("Sticky Notes", r"C:\apps\stickynotes.exe"),
+                app("Notesnook", r"C:\apps\nn.exe"),
+            ],
+        );
+        let rows = ranked(&engine, "notes", SearchScope::All);
+        assert_eq!(rows[0], (SourceKind::File, "notes.txt".to_string()), "{rows:?}");
+        assert_eq!(rows.len(), 3, "{rows:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn files_filter_follows_its_ladder_and_history() {
+        let (dir, engine) = ranking_engine(
+            "rank-files",
+            vec![
+                entry(r"C:\a\report", EntryKind::File, 1),
+                entry(r"C:\a\report.pdf", EntryKind::File, 1),
+                entry(r"C:\a\annual-report.txt", EntryKind::File, 1),
+                entry(r"C:\a\reports.txt", EntryKind::File, 1),
+                entry(r"C:\a\annual-reports.txt", EntryKind::File, 1),
+                entry(r"C:\a\myreport.txt", EntryKind::File, 1),
+                entry(r"C:\a\r_e_p_o_r_t.txt", EntryKind::File, 9_999),
+                entry(r"C:\a\report-folder", EntryKind::Folder, 1),
+            ],
+            vec![app("Report Builder", r"C:\apps\rb.exe")],
+        );
+        let names: Vec<String> = ranked(&engine, "report", SearchScope::Files).into_iter().map(|(_, t)| t).collect();
+        assert_eq!(
+            names,
+            vec![
+                "report",
+                "report.pdf",
+                "annual-report.txt",
+                "reports.txt",
+                "annual-reports.txt",
+                "myreport.txt",
+                "r_e_p_o_r_t.txt",
+            ],
+            "full name, stem, token, prefix, word prefix, substring, fuzzy; files only"
+        );
+
+        // Inside one class: opened files first, then the newest.
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![
+            entry(r"C:\a\plan.docx", EntryKind::File, 10),
+            entry(r"C:\b\plan.docx", EntryKind::File, 50),
+            entry(r"C:\c\plan.docx", EntryKind::File, 30),
+        ]);
+        let paths = |engine: &Engine| -> Vec<String> {
+            let mut request = SearchRequest::new(2, "plan");
+            request.scope = SearchScope::Files;
+            engine.search(&request).results.into_iter().filter_map(|r| r.path).collect()
+        };
+        assert_eq!(paths(&engine), vec![r"C:\b\plan.docx", r"C:\c\plan.docx", r"C:\a\plan.docx"]);
+        engine.usage.write().unwrap().insert(
+            r"c:\a\plan.docx".into(),
+            Usage {
+                count: 6,
+                last_ms: now_ms(),
+            },
+        );
+        assert_eq!(paths(&engine)[0], r"C:\a\plan.docx", "frequently opened file first");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn folders_filter_shows_only_folders_shallow_first() {
+        let (dir, engine) = ranking_engine(
+            "rank-folders",
+            vec![
+                entry(r"C:\Users\X\Documents\old\backup\Projects", EntryKind::Folder, 9),
+                entry(r"C:\Users\X\Documents\Projects", EntryKind::Folder, 1),
+                entry(r"C:\Users\X\Documents\Projects.zip", EntryKind::File, 5),
+                entry(r"C:\Users\X\Documents\Side Projects", EntryKind::Folder, 1),
+            ],
+            Vec::new(),
+        );
+        let mut request = SearchRequest::new(3, "projects");
+        request.scope = SearchScope::Folders;
+        let results = engine.search(&request).results;
+        let paths: Vec<&str> = results.iter().filter_map(|r| r.path.as_deref()).collect();
+        assert_eq!(
+            paths,
+            vec![
+                r"C:\Users\X\Documents\Projects",
+                r"C:\Users\X\Documents\old\backup\Projects",
+                r"C:\Users\X\Documents\Side Projects",
+            ]
+        );
+        assert!(results.iter().all(|r| r.kind == SourceKind::Folder));
+        assert_ne!(results[0].subtitle, results[1].subtitle, "same-name folders show their location");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn apps_filter_uses_aliases_history_and_keeps_installs_apart() {
+        let (dir, engine) = ranking_engine(
+            "rank-apps",
+            vec![entry(r"C:\Users\X\chrome", EntryKind::Folder, 1)],
+            vec![
+                app("Chrome Remote Desktop", r"C:\apps\remoting_host.exe"),
+                app("Google Chrome", r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+                app("Visual Studio Code", r"C:\Users\X\AppData\Local\Programs\Microsoft VS Code\Code.exe"),
+                app("Python 3.12", r"C:\Python312\python.exe"),
+                app("Python 3.12", r"C:\Users\X\AppData\Local\Programs\Python\Python312\python.exe"),
+                app("Google Docs", r"C:\apps\docs.exe"),
+                app("Google Drive", r"C:\apps\drive.exe"),
+            ],
+        );
+        let apps = ranked(&engine, "chrome", SearchScope::Apps);
+        assert_eq!(apps[0].1, "Google Chrome", "the exe alias beats a name prefix: {apps:?}");
+        assert!(apps.iter().all(|(kind, _)| *kind == SourceKind::Application));
+        assert_eq!(ranked(&engine, "vscode", SearchScope::Apps)[0].1, "Visual Studio Code");
+        assert_eq!(ranked(&engine, "vsc", SearchScope::Apps)[0].1, "Visual Studio Code");
+        assert_eq!(ranked(&engine, "crome", SearchScope::Apps)[0].1, "Google Chrome", "one typo");
+
+        let mut request = SearchRequest::new(4, "python");
+        request.scope = SearchScope::Apps;
+        let pythons = engine.search(&request).results;
+        assert_eq!(pythons.len(), 2, "two installs stay distinguishable");
+        assert_ne!(pythons[0].subtitle, pythons[1].subtitle);
+
+        let google = ranked(&engine, "google d", SearchScope::Apps);
+        assert_eq!(google[0].1, "Google Docs", "alphabetical without history");
+        engine.usage.write().unwrap().insert(
+            app_usage_key(r"C:\apps\drive.exe"),
+            Usage {
+                count: 12,
+                last_ms: now_ms(),
+            },
+        );
+        assert_eq!(ranked(&engine, "google d", SearchScope::Apps)[0].1, "Google Drive", "launched often");
+
+        // Uninstalled: gone from the app list, gone from results.
+        engine
+            .sources
+            .write()
+            .unwrap()
+            .apps
+            .retain(|app| app.name != "Chrome Remote Desktop");
+        assert!(!ranked(&engine, "chrome", SearchScope::Apps)
+            .iter()
+            .any(|(_, title)| title == "Chrome Remote Desktop"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn one_letter_queries_only_match_word_starts() {
+        let (dir, engine) = ranking_engine(
+            "rank-one-letter",
+            vec![
+                entry(r"C:\a\report.txt", EntryKind::File, 1),
+                entry(r"C:\a\annual-review.txt", EntryKind::File, 1),
+                entry(r"C:\a\barn.txt", EntryKind::File, 1),
+            ],
+            vec![app("Notepad", r"C:\apps\notepad.exe")],
+        );
+        let rows = ranked(&engine, "r", SearchScope::Files);
+        let names: Vec<&str> = rows.iter().map(|(_, title)| title.as_str()).collect();
+        assert_eq!(names, vec!["report.txt", "annual-review.txt"]);
+        assert!(ranked(&engine, "e", SearchScope::Apps).is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn name_and_ocr_matches_for_one_file_show_once() {
+        let (dir, engine) = ranking_engine(
+            "rank-dedupe",
+            vec![
+                entry(r"C:\docs\invoice.pdf", EntryKind::File, 1),
+                entry(r"C:\docs\scan-0042.png", EntryKind::File, 1),
+            ],
+            Vec::new(),
+        );
+        engine.settings.write().unwrap().indexing.ocr_enabled = true;
+        for path in [r"C:\docs\invoice.pdf", r"C:\docs\scan-0042.png"] {
+            engine
+                .db
+                .ocr_upsert(path, "hash", "invoice total amount due", "en", 10, 10, 10, 1)
+                .unwrap();
+        }
+        let mut request = SearchRequest::new(5, "invoice");
+        request.scope = SearchScope::All;
+        let results = engine.search(&request).results;
+        let invoice_rows = results
+            .iter()
+            .filter(|r| r.path.as_deref() == Some(r"C:\docs\invoice.pdf"))
+            .count();
+        assert_eq!(invoice_rows, 1, "{:?}", results.iter().map(|r| (&r.title, r.kind)).collect::<Vec<_>>());
+        assert_eq!(results[0].kind, SourceKind::File, "the name match is the one shown");
+        let last = results.last().unwrap();
+        assert_eq!(last.kind, SourceKind::OcrText, "text-only match comes after name matches");
+
+        request.scope = SearchScope::Files;
+        let files = engine.search(&request).results;
+        assert!(files.iter().all(|r| r.kind == SourceKind::File));
+        assert!(!files.iter().any(|r| r.path.as_deref() == Some(r"C:\docs\scan-0042.png")), "no content-only rows in Files");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn stale_results_are_dropped_and_forgotten() {
+        let dir = scratch_dir("rank-stale");
+        let files = dir.join("files");
+        std::fs::create_dir_all(&files).unwrap();
+        let keep = files.join("quarterly-keep.txt");
+        let gone = files.join("quarterly-gone.txt");
+        std::fs::write(&keep, "x").unwrap();
+        std::fs::write(&gone, "x").unwrap();
+        let engine = Engine::open(EngineConfig {
+            data_dir: dir.clone(),
+            legacy_db: None,
+            version: "test".into(),
+        })
+        .unwrap();
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![
+            entry(keep.to_str().unwrap(), EntryKind::File, 1),
+            entry(gone.to_str().unwrap(), EntryKind::File, 1),
+        ]);
+        std::fs::remove_file(&gone).unwrap();
+        let mut request = SearchRequest::new(6, "quarterly");
+        request.scope = SearchScope::Files;
+        let titles: Vec<String> = engine.search(&request).results.into_iter().map(|r| r.title).collect();
+        assert_eq!(titles, vec!["quarterly-keep.txt"]);
+        assert!(engine.index.read().unwrap().search("quarterly-gone", 5).is_empty(), "forgotten by the index");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn web_fallback_is_the_last_row_in_all() {
+        let (dir, engine) = ranking_engine(
+            "rank-web",
+            vec![entry(r"C:\a\budget.xlsx", EntryKind::File, 1), entry(r"C:\a\b_u_d_g_e_t.md", EntryKind::File, 1)],
+            Vec::new(),
+        );
+        engine.settings.write().unwrap().web_search_enabled = true;
+        let rows = ranked(&engine, "budget", SearchScope::All);
+        assert_eq!(rows[0], (SourceKind::File, "budget.xlsx".to_string()));
+        assert_eq!(rows.last().unwrap().0, SourceKind::Action, "{rows:?}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

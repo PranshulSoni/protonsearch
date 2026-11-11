@@ -261,7 +261,7 @@ function status(): EngineStatus {
       { id: "recent", label: "Recent files", enabled: true, itemCount: 40, state: "ready" },
       { id: "git", label: "Git repositories", enabled: settings.privacy.gitIndexing, itemCount: 15, state: "ready" },
     ],
-    agent: { state: "not_configured", runtime: null, model: null, detail: "Optional Python sidecar is not running" },
+    agent: { state: "not_configured", runtime: null, model: null, detail: "Pi is not configured" },
     lastUpdated: Date.now() - 60000,
     warnings: MOCK_STATE === "error" ? ["Pictures root is unavailable (device disconnected)"] : [],
   };
@@ -588,58 +588,8 @@ export const mockBridge = {
       available: true,
       detail: "Detected on PATH. Read-only in this alpha.",
     };
-    const codexMissing = {
-      id: "codex",
-      name: "Codex",
-      kind: "cli",
-      version: null,
-      path: null,
-      available: false,
-      detail: "Not found on PATH.",
-    };
-    const codex = {
-      id: "codex",
-      name: "Codex",
-      kind: "cli",
-      version: "0.9.2",
-      path: "C:\\Users\\you\\AppData\\Roaming\\npm\\codex.cmd",
-      available: true,
-      detail: "Detected on PATH.",
-    };
-    const opencode = {
-      id: "opencode",
-      name: "OpenCode",
-      kind: "cli",
-      version: "0.12.4",
-      path: "C:\\Users\\you\\AppData\\Roaming\\npm\\opencode.cmd",
-      available: true,
-      detail: "Detected on PATH.",
-    };
-    const clineMissing = {
-      id: "cline",
-      name: "Cline",
-      kind: "cli",
-      version: null,
-      path: null,
-      available: false,
-      detail: "Not found on PATH.",
-    };
-    const antigravityMissing = {
-      id: "antigravity",
-      name: "Antigravity",
-      kind: "cli",
-      version: null,
-      path: null,
-      available: false,
-      detail: "Not found on PATH.",
-    };
-    if (MOCK_AGENTS === "none") return [];
-    if (MOCK_AGENTS === "multi") {
-      return [pi, codex, opencode, clineMissing, antigravityMissing];
-    }
-    return [pi, codexMissing];
+    return MOCK_AGENTS === "none" ? [] : [pi];
   },
-
   async agentTasks(): Promise<import("./types").AgentTask[]> {
     return [];
   },
@@ -671,6 +621,13 @@ export const mockBridge = {
       detail: "Browser preview: the optional Python sidecar is only available in the desktop app.",
     };
   },
+  async piInstallStatus(): Promise<import("./types").PiInstallStatus> {
+    return { state: "not_installed", path: null, version: null, nodeOk: false, authenticationConfigured: false, installationMethod: null, gitBashAvailable: false, detail: "Pi requires the desktop application." };
+  },
+  async piInstallPlan(): Promise<import("./types").PiInstallPlan> { throw new Error("Pi installation requires the desktop application."); },
+  async piInstall(): Promise<void> { throw new Error("Pi installation requires the desktop application."); },
+  async piInstallCancel(): Promise<void> {},
+  async piConnect(): Promise<void> { throw new Error("Pi connection requires the desktop application."); },
   async agentStart(): Promise<void> {
     throw new Error("Agent workflows require the desktop app (browser preview has no sidecar).");
   },

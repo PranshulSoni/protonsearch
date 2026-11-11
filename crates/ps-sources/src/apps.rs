@@ -96,41 +96,7 @@ pub fn scan_with_icons(icon_cache_dir: &Path) -> (Vec<AppEntry>, Vec<String>) {
         Err(error) => warnings.push(format!("AppsFolder enumeration unavailable: {error}")),
     }
 
-    // Pass 1: dedupe by normalized identity (target+args / AUMID).
-    let mut seen_classic: HashSet<String> = HashSet::new();
-    let mut seen_packaged: HashSet<String> = HashSet::new();
-    let mut by_identity: Vec<RawApp> = Vec::new();
-    for app in raw {
-        if app.packaged {
-            if !seen_packaged.insert(app.identity.clone()) {
-                continue;
-            }
-        } else if !seen_classic.insert(app.identity.clone()) {
-            continue;
-        }
-        by_identity.push(app);
-    }
-
-    // Pass 2: one row per normalized display name. Preference order:
-    // classic app without args > classic app with args > packaged app, so the
-    // Start Menu/classic entry wins over its AppsFolder duplicate.
-    by_identity.sort_by(|a, b| {
-        dedupe_preference(a)
-            .cmp(&dedupe_preference(b))
-            .then_with(|| {
-                normalize_display_name(&a.display_name).cmp(&normalize_display_name(&b.display_name))
-            })
-            .then_with(|| a.entry.target.cmp(&b.entry.target))
-    });
-    let mut seen_names: HashSet<String> = HashSet::new();
-    let mut deduped: Vec<RawApp> = Vec::new();
-    for app in by_identity {
-        let name = normalize_display_name(&app.display_name);
-        if name.is_empty() || !seen_names.insert(name) {
-            continue;
-        }
-        deduped.push(app);
-    }
+    let deduped = dedupe_apps(raw);
 
     // Attach real icons (bounded), then sort for a stable UI order.
     let mut out: Vec<AppEntry> = Vec::with_capacity(deduped.len());
@@ -180,6 +146,59 @@ pub fn scan_with_icons(icon_cache_dir: &Path) -> (Vec<AppEntry>, Vec<String>) {
             .then_with(|| a.target.cmp(&b.target))
     });
     (out, warnings)
+}
+
+/// Collapse shortcuts that launch the same program (see the passes below).
+fn dedupe_apps(raw: Vec<RawApp>) -> Vec<RawApp> {
+    // Pass 1: dedupe by normalized identity (target+args / AUMID).
+    let mut seen_classic: HashSet<String> = HashSet::new();
+    let mut seen_packaged: HashSet<String> = HashSet::new();
+    let mut by_identity: Vec<RawApp> = Vec::new();
+    for app in raw {
+        if app.packaged {
+            if !seen_packaged.insert(app.identity.clone()) {
+                continue;
+            }
+        } else if !seen_classic.insert(app.identity.clone()) {
+            continue;
+        }
+        by_identity.push(app);
+    }
+
+    // Pass 2: one row per program and display name. Preference order:
+    // classic app without args > classic app with args > packaged app, so the
+    // plain Start Menu shortcut wins over an argument variant of the same
+    // program and over its AppsFolder twin. Classic shortcuts with the same name
+    // that launch *different* programs are separate installs and both stay; the
+    // engine shows each one's location.
+    by_identity.sort_by(|a, b| {
+        dedupe_preference(a)
+            .cmp(&dedupe_preference(b))
+            .then_with(|| {
+                normalize_display_name(&a.display_name).cmp(&normalize_display_name(&b.display_name))
+            })
+            .then_with(|| a.entry.target.cmp(&b.entry.target))
+    });
+    let mut seen_names: HashSet<String> = HashSet::new();
+    let mut seen_programs: HashSet<(String, String)> = HashSet::new();
+    let mut deduped: Vec<RawApp> = Vec::new();
+    for app in by_identity {
+        let name = normalize_display_name(&app.display_name);
+        if name.is_empty() {
+            continue;
+        }
+        let keep = if app.packaged {
+            !seen_names.contains(&name)
+        } else {
+            let program = app.identity.split('#').next().unwrap_or(&app.identity).to_string();
+            seen_programs.insert((name.clone(), program))
+        };
+        if keep {
+            seen_names.insert(name);
+            deduped.push(app);
+        }
+    }
+    deduped
 }
 
 fn collect_start_menu(root: &Path, apps: &mut Vec<RawApp>, warnings: &mut Vec<String>) {
@@ -346,4 +365,74 @@ fn start_menu_roots() -> Vec<PathBuf> {
         );
     }
     roots
+}
+
+#[cfg(test)]
+mod dedupe_tests {
+    use super::*;
+
+    fn classic(name: &str, target: &str, args: Option<&str>) -> RawApp {
+        RawApp {
+            identity: classic_identity(Path::new(target), args),
+            entry: AppEntry {
+                id: target.into(),
+                name: name.into(),
+                target: target.into(),
+                icon_path: None,
+                keywords: Vec::new(),
+            },
+            packaged: false,
+            display_name: name.into(),
+            has_args: args.is_some(),
+        }
+    }
+
+    fn packaged(name: &str, aumid: &str) -> RawApp {
+        RawApp {
+            identity: format!("aumid:{}", aumid.to_lowercase()),
+            entry: AppEntry {
+                id: aumid.into(),
+                name: name.into(),
+                target: format!("shell:AppsFolder\\{aumid}"),
+                icon_path: None,
+                keywords: Vec::new(),
+            },
+            packaged: true,
+            display_name: name.into(),
+            has_args: false,
+        }
+    }
+
+    #[test]
+    fn same_program_collapses_but_separate_installs_stay() {
+        let apps = dedupe_apps(vec![
+            // The same shortcut in the machine and the user Start Menu.
+            classic("Google Chrome", r"C:\Chrome\chrome.exe", None),
+            classic("Google Chrome", r"C:\Chrome\chrome.exe", None),
+            // Same program and name with arguments: the plain shortcut wins.
+            classic("Google Chrome", r"C:\Chrome\chrome.exe", Some("--profile-directory=Default")),
+            // A differently named variant of the same program stays.
+            classic("Chrome (Work)", r"C:\Chrome\chrome.exe", Some("--profile-directory=Work")),
+            // The Store twin of a Start Menu shortcut yields to it.
+            packaged("Google Chrome", "Chrome.App"),
+            // Two installs of the same product in different folders both stay.
+            classic("Python 3.12", r"C:\Python312\python.exe", None),
+            classic("Python 3.12", r"C:\Users\X\Python312\python.exe", None),
+        ]);
+        let mut rows: Vec<(String, String)> = apps
+            .iter()
+            .map(|app| (app.entry.name.clone(), app.entry.target.clone()))
+            .collect();
+        rows.sort();
+        assert_eq!(
+            rows,
+            vec![
+                ("Chrome (Work)".to_string(), r"C:\Chrome\chrome.exe".to_string()),
+                ("Google Chrome".to_string(), r"C:\Chrome\chrome.exe".to_string()),
+                ("Python 3.12".to_string(), r"C:\Python312\python.exe".to_string()),
+                ("Python 3.12".to_string(), r"C:\Users\X\Python312\python.exe".to_string()),
+            ]
+        );
+        assert!(apps.iter().all(|app| !app.packaged));
+    }
 }

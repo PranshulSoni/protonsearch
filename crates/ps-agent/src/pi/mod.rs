@@ -22,12 +22,15 @@
 //! The allowlist and workspace limit what the model is offered, not what the
 //! process can reach on the filesystem. See docs/agent/PI_INTEGRATION.md.
 
+pub mod install;
+pub mod status;
 mod args;
 mod client;
 mod env;
 mod events;
 mod probe;
 mod process;
+pub use process::connect_pi;
 mod redact;
 
 use std::path::Path;
@@ -94,8 +97,10 @@ impl PiAgentConfig {
     /// `<data_dir>/agent-workspace`; callers can override it with
     /// [`PiAgentConfig::with_workspace`].
     pub fn from_settings(settings: &AgentSettings, data_dir: &Path) -> Result<Self, AgentError> {
-        let explicit = settings.pi_path.as_deref().map(Path::new);
+        let managed = install::managed_launcher(data_dir);
+        let explicit = settings.pi_path.as_deref().map(Path::new).or_else(|| managed.is_file().then_some(managed.as_path()));
         let pi = probe_pi_cached(explicit).ok_or(AgentError::NotAvailable)?;
+        if !pi.node_ok { return Err(AgentError::Pi("Pi requires Node.js 22.19 or newer.".into())); }
         if !pi_version_supported(&pi.version) {
             return Err(AgentError::Pi(format!(
                 "Pi {} is older than the supported minimum {}.{}.{}; update Pi",

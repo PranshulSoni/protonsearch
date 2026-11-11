@@ -84,14 +84,18 @@ export interface ScopedSearchState {
   error: string | null;
 }
 
+/** How long the previous rows may stand in while the next answer is pending. */
+export const STALE_RESULTS_MS = 250;
+
 export function useIslandSearch(
   scope: SearchScope,
   query: string,
   enabled: boolean,
   revision = 0,
 ): ScopedSearchState {
-  const [state, setState] = useState<ScopedSearchState & { scope: SearchScope }>({
+  const [state, setState] = useState<ScopedSearchState & { scope: SearchScope; query: string }>({
     scope,
+    query,
     results: [],
     total: 0,
     pending: enabled,
@@ -100,23 +104,42 @@ export function useIslandSearch(
   const tokenRef = useRef(0);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      // An answer still in flight for the old request must not land later.
+      tokenRef.current += 1;
+      return;
+    }
     const token = ++tokenRef.current;
     // Keystroke path: no artificial debounce (the launcher searches immediately).
-    // Keep the previous rows on screen while the next response is in flight; a
-    // pending-only state update is avoided when results already exist, which
-    // removes a full list unmount/remount per keystroke.
-    setState((current) =>
-      current.pending || current.results.length > 0
+    // The previous rows stay while the next answer is in flight, so a fast
+    // answer swaps them in place (no flicker, no height jump, also when the
+    // filter changes). They never pass for current results: rows of the empty
+    // query (the compact pill showed none) are dropped at once, and any rows
+    // still standing after STALE_RESULTS_MS give way to the loading state.
+    setState((current) => {
+      if (current.results.length > 0 && !current.query.trim() && query.trim()) {
+        return { ...current, scope, query, results: [], total: 0, pending: true, error: null };
+      }
+      return current.pending || current.results.length > 0
         ? current
-        : { ...current, pending: true, error: null },
-    );
+        : { ...current, pending: true, error: null };
+    });
+    const staleTimer = window.setTimeout(() => {
+      if (token !== tokenRef.current) return;
+      setState((current) =>
+        current.results.length > 0
+          ? { ...current, scope, query, results: [], total: 0, pending: true, error: null }
+          : current,
+      );
+    }, STALE_RESULTS_MS);
     void api
       .search({ requestId: Date.now() + token, query, scope, limit: SEARCH_LIMIT })
       .then((response) => {
         if (token !== tokenRef.current) return;
+        window.clearTimeout(staleTimer);
         setState({
           scope,
+          query,
           results: response.results,
           total: response.total,
           pending: false,
@@ -125,17 +148,20 @@ export function useIslandSearch(
       })
       .catch((error: unknown) => {
         if (token !== tokenRef.current) return;
+        window.clearTimeout(staleTimer);
         setState({
           scope,
+          query,
           results: [],
           total: 0,
           pending: false,
           error: error instanceof Error ? error.message : "Search is unavailable right now.",
         });
       });
+    return () => window.clearTimeout(staleTimer);
   }, [enabled, scope, query, revision]);
 
-  return state.scope === scope ? state : { results: [], total: 0, pending: enabled, error: null };
+  return state;
 }
 
 export type ClipTab = "all" | "text" | "images" | "links" | "code" | "files" | "pinned";

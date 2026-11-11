@@ -76,8 +76,17 @@ export function breakpointHeight(view: IslandCardView, stageWidth: number): numb
   return row.wide;
 }
 
-export function expandedSearchHeight(matches: number): number {
-  return Math.min(460, 185 + 53 * Math.max(0, Math.min(matches, 5)));
+/** Result rows the expanded search shows at once. */
+export const ISLAND_VISIBLE_ROWS = 5;
+
+/**
+ * Expanded search height for `matches` rows under `labels` group labels. One
+ * label is part of the base height; rows stay in ranked order, so another label
+ * starts wherever the result type changes, and each needs its own line.
+ */
+export function expandedSearchHeight(matches: number, labels = 1): number {
+  const rows = Math.max(0, Math.min(matches, ISLAND_VISIBLE_ROWS));
+  return Math.min(460, 185 + 53 * rows) + 24 * Math.max(0, labels - 1);
 }
 
 export function islandCardDims(input: {
@@ -86,6 +95,8 @@ export function islandCardDims(input: {
   stageWidth: number;
   compact: boolean;
   searchMatches?: number;
+  /** Group labels among the shown search rows (see expandedSearchHeight). */
+  searchLabels?: number;
 }): IslandCardDims {
   const { card, variant = "default", stageWidth, compact } = input;
   if (card === "search" && compact) {
@@ -93,7 +104,7 @@ export function islandCardDims(input: {
   }
   const baseWidth = card === "search" ? SEARCH_EXPANDED_WIDTH : NOMINAL_WIDTH[card];
   let height = breakpointHeight(card, stageWidth);
-  if (card === "search") height = expandedSearchHeight(input.searchMatches ?? 0);
+  if (card === "search") height = expandedSearchHeight(input.searchMatches ?? 0, input.searchLabels ?? 1);
   if (card === "media" && variant === "media-output") {
     height = stageWidth > 520 ? 342 : 365;
   }

@@ -55,6 +55,23 @@ fn reject_cmd_metacharacters(arg: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Explicit user action opens Pi's own interactive authentication flow.
+pub fn connect_pi(pi_path: &Path, workspace: &Path) -> Result<(), crate::AgentError> {
+    reject_cmd_metacharacters(&pi_path.to_string_lossy()).map_err(crate::AgentError::Pi)?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut command = Command::new("cmd.exe");
+        command.args(["/d", "/s", "/k"]);
+        command.raw_arg(format!("\"\"{}\"\"", pi_path.display()));
+        command.current_dir(workspace).creation_flags(0x00000010);
+        command.spawn().map_err(crate::AgentError::Spawn)?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    { let _ = workspace; Err(crate::AgentError::Pi("Open Pi in your terminal to connect a provider.".into())) }
+}
+
 /// Build the command used to invoke the Pi CLI.
 ///
 /// * `.cmd`/`.bat` launchers: `cmd.exe /d /s /c ""<launcher>" "<arg>" ..."`

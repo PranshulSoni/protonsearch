@@ -700,3 +700,23 @@ export type AgentEvent =
   | { type: "output"; text: string; finalAnswer: boolean }
   | { type: "error"; code: string; message: string }
   | { type: "finished"; ok: boolean; durationMs: number };
+
+export interface PiInstallStatus {
+  state: "not_installed" | "needs_authentication" | "ready" | "running" | "version_mismatch" | "error";
+  path: string | null;
+  version: string | null;
+  nodeOk: boolean;
+  authenticationConfigured: boolean;
+  installationMethod: string | null;
+  gitBashAvailable: boolean;
+  detail: string;
+}
+export interface PiInstallPlan {
+  version: string;
+  unpackedBytes: number;
+  integrity: string;
+  license: string;
+  destination: string;
+  sourceUrl: string;
+  dependenciesSizeKnown: boolean;
+}

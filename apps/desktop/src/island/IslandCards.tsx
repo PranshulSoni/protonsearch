@@ -7,9 +7,11 @@ import type {
 } from "../bridge/types";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../bridge/api";
+import { buildAgentRunRequest, createAgentRunId } from "../app/agentRun";
 import { useTodos } from "../lib/todoStore";
 import { Logo } from "../components/Logo";
-import { groupResults } from "../lib/results";
+import { groupResultsInRankOrder } from "../lib/results";
+import { ISLAND_VISIBLE_ROWS } from "./islandDims";
 import { SharedResultRow } from "../launcher/SharedResultRow";
 import { IslandIcon, type IslandIconName } from "./IslandIcon";
 import {
@@ -113,27 +115,16 @@ export function SearchCard({
   placeholder: string;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  // Every new result set starts on its top hit, even when its length matches
+  // the previous one, so Enter never opens a row from the last keystroke.
   useEffect(() => {
     setActiveIndex(0);
-  }, [results.length]);
+  }, [results]);
   const hasQuery = query.trim().length > 0;
   const zeroResults = hasQuery && !pending && !error && results.length === 0;
-  // Same pure grouping/order as the Normal Launcher; labels scroll with rows.
-  const groupedResults = useMemo(() => groupResults(results), [results]);
-  const orderedResults = useMemo(
-    () => groupedResults.flatMap((group) => group.items.map((item) => item.result)),
-    [groupedResults],
-  );
-  const visibleGroups = useMemo(() => {
-    let remainingRows = 5;
-    return groupedResults
-      .map((group) => {
-        const items = group.items.slice(0, Math.max(0, remainingRows));
-        remainingRows -= items.length;
-        return { ...group, items };
-      })
-      .filter((group) => group.items.length > 0);
-  }, [groupedResults]);
+  // Ranked order is kept; a label starts wherever the result type changes.
+  const visibleGroups = useMemo(() => groupResultsInRankOrder(results, ISLAND_VISIBLE_ROWS), [results]);
+  const orderedResults = results;
   const rowIndexById = useMemo(
     () => new Map(orderedResults.map((result, index) => [result.id, index] as const)),
     [orderedResults],
@@ -200,7 +191,12 @@ export function SearchCard({
                 role="radio"
                 aria-checked={scope === filter.id}
                 className={"island-filter" + (scope === filter.id ? " is-active" : "")}
-                onClick={() => onScope(filter.id)}
+                // Keep typing focus in the search box when a filter is clicked.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onScope(filter.id);
+                  inputRef.current?.focus();
+                }}
               >
                 {filter.label}
               </button>
@@ -225,7 +221,7 @@ export function SearchCard({
                   className="island-result-group"
                   role="group"
                   aria-labelledby={"island-group-" + groupIndex}
-                  key={group.kind}
+                  key={group.label + "-" + group.items[0].index}
                 >
                   <div
                     className="island-group-label"
@@ -259,13 +255,6 @@ export function SearchCard({
           {hasQuery && !zeroResults ? (
             <footer className="island-result-foot">
               <span>{total} local results</span>
-              <span className="island-kbd-hints">
-                <kbd>↑</kbd>
-                <kbd>↓</kbd>
-                <span>navigate</span>
-                <kbd>Enter</kbd>
-                <span>open</span>
-              </span>
             </footer>
           ) : null}
         </>
@@ -411,6 +400,7 @@ export function AgentsCard({
 }) {
   const [newPrompt, setNewPrompt] = useState("");
   const [launching, setLaunching] = useState(false);
+  const [launchError, setLaunchError] = useState<string | null>(null);
   const configured = status != null && status.state !== "not_configured";
   const selected = tasks[0] ?? null;
   const selectedProgress =
@@ -420,14 +410,12 @@ export function AgentsCard({
     e.preventDefault();
     if (!newPrompt.trim() || launching) return;
     setLaunching(true);
+    setLaunchError(null);
     try {
-      await api.agentStart({
-        runId: "run-" + Date.now(),
-        prompt: newPrompt.trim(),
-      });
+      await api.agentStart(buildAgentRunRequest(createAgentRunId(), newPrompt.trim()));
       setNewPrompt("");
-    } catch {
-      // ignore
+    } catch (reason) {
+      setLaunchError(String(reason));
     } finally {
       setLaunching(false);
     }
@@ -438,7 +426,7 @@ export function AgentsCard({
       <CardHead
         card="agent"
         title="Agents"
-        subtitle={configured ? "Tasks and active subagents" : "Agent runtime isn't configured"}
+        subtitle={configured ? "Pi tasks" : "Pi is not configured"}
       />
       <div className="island-divider" />
       {!configured ? (
@@ -448,11 +436,12 @@ export function AgentsCard({
         />
       ) : (
         <>
+          {launchError ? <p role="alert">{launchError}</p> : null}
           <form className="island-agent-new" onSubmit={handleLaunch} style={{ display: "flex", gap: "6px", margin: "6px 12px 10px" }}>
             <input
               className="island-search-input"
               style={{ flex: 1, height: "30px", fontSize: "12px", padding: "0 10px", background: "rgba(255,255,255,0.06)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.08)", color: "#fff" }}
-              placeholder="Ask an agent to do something…"
+              placeholder="Ask Pi to do something…"
               value={newPrompt}
               onChange={(e) => setNewPrompt(e.target.value)}
               disabled={launching}
@@ -537,11 +526,7 @@ export function AgentsCard({
                 <IslandIcon name="play" size={14} /> Resume
               </button>
             ) : null}
-            {selected && !selected.controls.canPause && !selected.controls.canResume ? (
-              <span className="island-agent-note">
-                No pause or resume action is available for this task.
-              </span>
-            ) : null}
+
           </div>
           {selected?.permissions ? (
             <p className="island-honest-note">
@@ -740,21 +725,22 @@ export function UnsupportedCard({
 }
 
 export function TodoCard({ onOpenMain }: { onOpenMain?: () => void }) {
-  const { todos, addTodo, toggleTodo } = useTodos();
+  const { todos, error, addTodo, toggleTodo } = useTodos();
   const [draft, setDraft] = useState("");
   const activeTodos = todos.filter((t) => !t.completed);
   const completedCount = todos.length - activeTodos.length;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (draft.trim()) {
-      addTodo(draft.trim());
+      if (!(await addTodo(draft.trim()))) return;
       setDraft("");
     }
   };
 
   return (
     <div className="island-card island-todo-card">
+      {error ? <p role="alert">{error}</p> : null}
       <CardHead
         card="bell"
         title="To-do"

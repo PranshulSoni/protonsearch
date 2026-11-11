@@ -32,10 +32,12 @@ use rayon::prelude::*;
 
 pub use scan::{default_excluded_paths, scan, scan_roots, walk_paths, ScanOptions, DEFAULT_JUNK_DIRS};
 
+pub use matching::{NameMatch, NameQuery};
+
 use matching::{
-    bloom_add, cmp_ci, ends_with_ci, eq_ci, find_ci, match_name_into, score_for_segment, segment_level,
-    segment_level_multi, starts_with_ci, to_utf16_ranges, typo_only_match, QueryPlan, PATH_MAX_SCORE,
-    SCORE_EXACT_NAME, SCORE_PREFIX, SCORE_SCALE, SCORE_SPANNING, SCORE_SUBSTRING, SCORE_TYPO,
+    bloom_add, cmp_ci, ends_with_ci, eq_ci, find_ci, match_name_into, starts_with_ci, to_utf16_ranges,
+    typo_only_match, QueryPlan, SCORE_EXACT_NAME, SCORE_EXACT_TOKEN, SCORE_PREFIX, SCORE_SCALE,
+    SCORE_SPANNING, SCORE_SUBSTRING, SCORE_TYPO,
 };
 
 /// Below this many entries the rayon wake-up cost dominates, so scans run
@@ -785,10 +787,13 @@ impl FilenameIndex {
             return Vec::new();
         }
         let prefix = self.search_prefix_plan(&plan, limit, filter);
+        // The scan can still find whole-word matches, which outrank a prefix;
+        // one- and two-letter queries keep the cheap prefix-only answer.
+        let floor = if plan.char_len <= 2 { SCORE_PREFIX } else { SCORE_EXACT_TOKEN };
         if prefix.len() >= limit
             && prefix
                 .last()
-                .map(|h| h.score >= SCORE_PREFIX - 1e-4)
+                .map(|h| h.score >= floor - 1e-4)
                 .unwrap_or(false)
         {
             return prefix;
@@ -819,8 +824,7 @@ impl FilenameIndex {
         self.search_prefix_plan(&plan, limit, filter)
     }
 
-    /// Tier-1 search: word-boundary, substring, path-segment, fuzzy and typo
-    /// matches. Never returns exact/prefix-only duplicates of tier 0 as such;
+    /// Tier-1 search: word-boundary, substring, fuzzy and typo name matches. Never returns exact/prefix-only duplicates of tier 0 as such;
     /// callers may merge and de-duplicate by entry index.
     pub fn search_scan(&self, query: &str, limit: usize) -> Vec<FileHit> {
         self.search_scan_filtered(query, limit, &EntryFilter::default())
@@ -905,20 +909,7 @@ impl FilenameIndex {
             let typo_hits = self.scan_typo_phase(plan, limit, filter);
             name_hits = self.merge_hits(name_hits, typo_hits, limit);
         }
-        let need_path = name_hits.len() < limit
-            || name_hits
-                .last()
-                .map(|h| h.score < PATH_MAX_SCORE + 1e-4)
-                .unwrap_or(true);
-        if !need_path {
-            return name_hits;
-        }
-        let levels = self.dir_levels(plan);
-        if levels.iter().all(|&l| l == 0) {
-            return name_hits;
-        }
-        let path_hits = self.scan_path_phase(limit, filter, &levels);
-        self.merge_hits(name_hits, path_hits, limit)
+        name_hits
     }
 
     fn scan_name_phase(&self, plan: &QueryPlan, limit: usize, filter: &EntryFilter<'_>) -> Vec<FileHit> {
@@ -1023,71 +1014,6 @@ impl FilenameIndex {
                 if !self.filter_pass(filter, i, under.as_deref()) {
                     continue;
                 }
-                top.push(Candidate {
-                    idx: i as u32,
-                    score: (score * SCORE_SCALE) as i64,
-                    name_len: r.name_len,
-                    modified: r.modified,
-                    ranges: Vec::new(),
-                });
-            }
-            top.items
-        });
-        self.merge_candidates(partials, limit)
-    }
-
-    fn dir_levels(&self, plan: &QueryPlan) -> Vec<u8> {
-        let qlen = plan.lower.len();
-        let nd = self.dirs.len();
-        const DIR_CHUNK: usize = 65_536;
-        let parts: Vec<Vec<u8>> = parallel_chunks(nd, DIR_CHUNK, |c| {
-            let start = c * DIR_CHUNK;
-            let end = ((c + 1) * DIR_CHUNK).min(nd);
-            let mut out = Vec::with_capacity(end - start);
-            for d in start..end {
-                let level = if !plan.bloom_pass(self.dir_blooms[d]) {
-                    0
-                } else {
-                    let path = self.dir_path_slice(d);
-                    if path.len() < qlen {
-                        0
-                    } else if plan.multi {
-                        segment_level_multi(path, &plan.terms)
-                    } else {
-                        segment_level(path, &plan.lower)
-                    }
-                };
-                out.push(level);
-            }
-            out
-        });
-        let mut levels = Vec::with_capacity(nd);
-        for mut part in parts {
-            levels.append(&mut part);
-        }
-        levels
-    }
-
-    fn scan_path_phase(&self, limit: usize, filter: &EntryFilter<'_>, levels: &[u8]) -> Vec<FileHit> {
-        let under = self.compute_under(filter);
-        let n = self.entries.len();
-        let partials: Vec<Vec<Candidate>> = parallel_chunks(n, SCAN_CHUNK, |c| {
-            let mut top = TopK::new(self, limit);
-            let start = c * SCAN_CHUNK;
-            let end = ((c + 1) * SCAN_CHUNK).min(n);
-            for i in start..end {
-                let r = &self.entries[i];
-                if r.kind == KIND_TOMBSTONE {
-                    continue;
-                }
-                let level = levels.get(r.dir as usize).copied().unwrap_or(0);
-                if level == 0 {
-                    continue;
-                }
-                if !self.filter_pass(filter, i, under.as_deref()) {
-                    continue;
-                }
-                let score = score_for_segment(level);
                 top.push(Candidate {
                     idx: i as u32,
                     score: (score * SCORE_SCALE) as i64,

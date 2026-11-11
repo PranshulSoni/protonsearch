@@ -24,11 +24,13 @@ import {
 import {
   islandCardDims,
   islandCardLabel,
+  ISLAND_VISIBLE_ROWS,
   islandWindowWidth,
   visibleIslandCards,
   type IslandVariant,
 } from "./islandDims";
 import { markTyping, recordFrames } from "../lib/perfProbe";
+import { groupResultsInRankOrder } from "../lib/results";
 import "./island.css";
 
 // Memoized card bodies: typing in Search must not re-render hidden card DOM
@@ -129,12 +131,18 @@ export default function IslandView() {
     (typeof screen !== "undefined" ? screen.availWidth : 0) ||
     1150;
 
+  // Group labels among the shown rows: each one adds a line to the height.
+  const searchLabels = useMemo(
+    () => groupResultsInRankOrder(searchState.results, ISLAND_VISIBLE_ROWS).length,
+    [searchState.results],
+  );
   const dims = islandCardDims({
     card: activeCard,
     variant,
     stageWidth,
     compact,
     searchMatches: searchState.results.length,
+    searchLabels,
   });
   // task-58: every summon starts as the compact oval search pill, regardless of
   // the configured default card. Expanding begins on a user click or typing.
@@ -229,6 +237,7 @@ export default function IslandView() {
           stageWidth,
           compact: nextCompact,
           searchMatches: searchState.results.length,
+          searchLabels,
         });
         scheduleGeometry(currentDims.height);
         if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
@@ -259,6 +268,7 @@ export default function IslandView() {
         stageWidth,
         compact: nextCompact,
         searchMatches: searchState.results.length,
+        searchLabels,
       });
       scheduleGeometry(targetDims.height, prefersReducedMotion() ? 0 : 670);
       recordFrames(`island-switch:${activeCard}>${card}`, 800);
@@ -281,7 +291,7 @@ export default function IslandView() {
         }, 250);
       }, 120);
     },
-    [activeCard, cards, compact, query, scheduleGeometry, searchState.results.length, stageWidth, variant],
+    [activeCard, cards, compact, query, scheduleGeometry, searchLabels, searchState.results.length, stageWidth, variant],
   );
   switchCardRef.current = switchCard;
 
@@ -308,6 +318,7 @@ export default function IslandView() {
         stageWidth,
         compact,
         searchMatches: searchState.results.length,
+        searchLabels,
       });
       scheduleGeometry(target.height);
       setVariant("default");
@@ -326,7 +337,7 @@ export default function IslandView() {
     }
     scheduleGeometry(dims.height, 0);
     requestHide();
-    }, [activeCard, compact, dims.height, requestHide, scheduleGeometry, searchState.results.length, stageWidth, variant]);
+    }, [activeCard, compact, dims.height, requestHide, scheduleGeometry, searchLabels, searchState.results.length, stageWidth, variant]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

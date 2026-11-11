@@ -412,7 +412,7 @@ export interface AgentView {
 }
 
 /**
- * The Python agent is optional and may not exist in this build. Never report
+ * Pi is optional and may not exist in this build. Never report
  * "running" unless the engine actually says so.
  */
 export function describeAgent(
@@ -429,7 +429,7 @@ export function describeAgent(
     return {
       tone: "ok",
       stateLabel: "Running",
-      detail: "The sidecar is running for the current workflow only.",
+      detail: "Pi is running the current workflow.",
       runtime,
       model,
       installed: true,

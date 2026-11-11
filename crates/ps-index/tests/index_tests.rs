@@ -206,8 +206,11 @@ fn unicode_cjk_hidden_and_long_paths() {
     let hidden = index.search("gitignore", 5);
     assert!(!hidden.is_empty(), "hidden files are indexed");
 
-    let long_hit = index.search("nested_directory_09", 5);
-    assert!(!long_hit.is_empty(), "path segment of a long path matches");
+    // Names only: a folder in the path does not make the files below it match,
+    // but a query with a separator still searches the full path.
+    assert!(index.search("nested_directory_09", 5).is_empty());
+    let long_hit = index.search("nested_directory_09\\deep_leaf", 5);
+    assert!(!long_hit.is_empty(), "full-path query reaches a long path");
 }
 
 #[test]
@@ -217,6 +220,7 @@ fn ranking_order_is_exact_stem_prefix_word_substring_path_fuzzy() {
         entry("C:\\a\\report.pdf", EntryKind::File, 1, 2),
         entry("C:\\a\\reports.txt", EntryKind::File, 1, 3),
         entry("C:\\a\\annual-report.txt", EntryKind::File, 1, 4),
+        entry("C:\\a\\annual-reports.txt", EntryKind::File, 1, 9),
         entry("C:\\a\\myreport.txt", EntryKind::File, 1, 5),
         entry("C:\\a\\r_e_p_o_r_t.txt", EntryKind::File, 1, 6),
         entry("C:\\a\\other.txt", EntryKind::File, 1, 7),
@@ -228,20 +232,28 @@ fn ranking_order_is_exact_stem_prefix_word_substring_path_fuzzy() {
     let pos = |n: &str| names.iter().position(|x| *x == n).unwrap_or(usize::MAX);
     assert!(pos("report") < pos("report.pdf"), "exact name first: {names:?}");
     assert!(
-        pos("report.pdf") < pos("reports.txt"),
-        "stem before prefix: {names:?}"
+        pos("report.pdf") < pos("annual-report.txt"),
+        "stem before exact token: {names:?}"
     );
     assert!(
-        pos("reports.txt") < pos("annual-report.txt"),
+        pos("annual-report.txt") < pos("reports.txt"),
+        "exact token before prefix: {names:?}"
+    );
+    assert!(
+        pos("reports.txt") < pos("annual-reports.txt"),
         "prefix before word-prefix: {names:?}"
     );
     assert!(
-        pos("annual-report.txt") < pos("myreport.txt"),
+        pos("annual-reports.txt") < pos("myreport.txt"),
         "word-prefix before substring: {names:?}"
     );
     assert!(
         pos("myreport.txt") < pos("r_e_p_o_r_t.txt"),
         "substring before fuzzy: {names:?}"
+    );
+    assert!(
+        !names.contains(&"other.txt"),
+        "a matching folder higher up the path is not a match: {names:?}"
     );
 }
 

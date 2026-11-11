@@ -87,6 +87,27 @@ export function groupResults(results: SearchResult[]): ResultGroup[] {
   return [...groups.values()].sort((a, b) => orderFor(a.kind) - orderFor(b.kind));
 }
 
+/**
+ * Island grouping: rows keep the engine's ranked order (relevance first, then
+ * Apps / Folders / Files / documents, then history) and a group label starts
+ * wherever the result type changes. Grouping never moves a row, so a weaker app
+ * can not be shown above a better file just because apps form a group. Only the
+ * first `limit` ranked rows are grouped (the rows the island shows).
+ */
+export function groupResultsInRankOrder(results: SearchResult[], limit = results.length): ResultGroup[] {
+  const groups: ResultGroup[] = [];
+  results.slice(0, limit).forEach((result, index) => {
+    const label = GROUP_LABELS[result.kind] ?? "RESULTS";
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) {
+      last.items.push({ result, index });
+    } else {
+      groups.push({ kind: result.kind, label, items: [{ result, index }] });
+    }
+  });
+  return groups;
+}
+
 export function resultIdentity(result: SearchResult): string {
   return result.id;
 }

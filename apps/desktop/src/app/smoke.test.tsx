@@ -165,7 +165,8 @@ describe("desktop app shell smoke", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("Agents");
     expect(text).toContain("Pi");
-    expect(text).toContain("Codex");
+    expect(text).not.toContain("Codex");
+    expect(text).not.toContain("OpenCode");
     expect(text).toContain("Available");
     expect(text).toContain("No runs yet.");
     expect(container.querySelector("#workflows-agents")).not.toBeNull();

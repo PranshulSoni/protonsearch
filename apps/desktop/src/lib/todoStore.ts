@@ -1,157 +1,113 @@
 import { useCallback, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { isTauriRuntime } from "../bridge/api";
 
 export interface TodoItem {
   id: string;
   title: string;
   completed: boolean;
   createdAt: number;
-  completedAt?: number;
-  dueDate?: string; // e.g. "2026-11-11" or "today"
-  priority?: "low" | "medium" | "high";
-  notes?: string;
+  updatedAt?: number;
+  completedAt?: number | null;
+  dueDate?: string | null;
+  priority?: "low" | "medium" | "high" | null;
+  notes?: string | null;
+  timezone?: string | null;
+  pinned?: boolean;
+  position?: number;
+  association?: string | null;
 }
-
 const STORAGE_KEY = "protonsearch_todos_v2";
 const BROADCAST_EVENT = "protonsearch:todos-changed";
 
-const SEED_TODOS: TodoItem[] = [
-  {
-    id: "todo-1",
-    title: "Press Alt + Space to open the Dynamic Island",
-    completed: false,
-    createdAt: Date.now() - 3600000,
-    priority: "high",
-  },
-  {
-    id: "todo-2",
-    title: "Configure your indexed folders in Search & Indexing",
-    completed: false,
-    createdAt: Date.now() - 1800000,
-    priority: "medium",
-  },
-  {
-    id: "todo-3",
-    title: "Try searching screenshots with OCR",
-    completed: false,
-    createdAt: Date.now() - 900000,
-    priority: "low",
-  },
-];
-
 export function getStoredTodos(): TodoItem[] {
-  if (typeof window === "undefined") return SEED_TODOS;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_TODOS));
-      return SEED_TODOS;
-    }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : SEED_TODOS;
-  } catch {
-    return SEED_TODOS;
-  }
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return [];
+  const items: unknown = JSON.parse(raw);
+  if (!Array.isArray(items)) throw new Error("Saved tasks could not be read");
+  return items;
 }
-
-export function saveStoredTodos(todos: TodoItem[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
-    window.dispatchEvent(new CustomEvent(BROADCAST_EVENT));
-  } catch {
-    // ignore local storage errors
-  }
+export function saveStoredTodos(items: TodoItem[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  window.dispatchEvent(new Event(BROADCAST_EVENT));
 }
-
+function payload(item: TodoItem) {
+  return {
+    ...item, updatedAt: item.updatedAt ?? item.createdAt,
+    completedAt: item.completedAt ?? null, notes: item.notes ?? null,
+    dueDate: item.dueDate ?? null, timezone: item.timezone ?? null,
+    priority: item.priority ?? null, pinned: item.pinned ?? false,
+    position: item.position ?? -item.createdAt, association: item.association ?? null,
+  };
+}
 export function useTodos() {
-  const [todos, setTodos] = useState<TodoItem[]>(getStoredTodos);
-
-  const reload = useCallback(() => {
-    setTodos(getStoredTodos());
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const reload = useCallback(async () => {
+    try {
+      setTodos(isTauriRuntime() ? await invoke<TodoItem[]>("todos_list") : getStoredTodos());
+      setError(null);
+    } catch (reason) { setError(String(reason)); }
   }, []);
-
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) reload();
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    const refresh = () => { void reload(); };
+    const start = async () => {
+      if (isTauriRuntime()) {
+        unlisten = await listen("todos:changed", refresh);
+        if (disposed) { unlisten(); return; }
+        // The original browser copy remains available after an idempotent import.
+        const items = getStoredTodos().map(payload);
+        await invoke("todos_import", { items, source: "browser-v2" });
+      }
+      if (!disposed) await reload();
     };
-    const onCustom = () => reload();
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(BROADCAST_EVENT, onCustom);
+    void start().catch((reason) => { if (!disposed) setError(String(reason)); });
+    window.addEventListener(BROADCAST_EVENT, refresh);
+    window.addEventListener("storage", refresh);
     return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(BROADCAST_EVENT, onCustom);
+      disposed = true;
+      unlisten?.();
+      window.removeEventListener(BROADCAST_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
     };
   }, [reload]);
-
-  const addTodo = useCallback(
-    (title: string, dueDate?: string, priority: "low" | "medium" | "high" = "medium") => {
-      const trimmed = title.trim();
-      if (!trimmed) return;
-      const next: TodoItem = {
-        id: "todo-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
-        title: trimmed,
-        completed: false,
-        createdAt: Date.now(),
-        dueDate,
-        priority,
-      };
-      setTodos((prev) => {
-        const updated = [next, ...prev];
-        saveStoredTodos(updated);
-        return updated;
-      });
-    },
-    [],
-  );
-
-  const toggleTodo = useCallback((id: string) => {
-    setTodos((prev) => {
-      const updated = prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              completed: !t.completed,
-              completedAt: !t.completed ? Date.now() : undefined,
-            }
-          : t,
-      );
-      saveStoredTodos(updated);
-      return updated;
-    });
-  }, []);
-
-  const deleteTodo = useCallback((id: string) => {
-    setTodos((prev) => {
-      const updated = prev.filter((t) => t.id !== id);
-      saveStoredTodos(updated);
-      return updated;
-    });
-  }, []);
-
+  const mutate = useCallback(async (saved: TodoItem[], deleted: string[] = []) => {
+    try {
+      if (isTauriRuntime()) {
+        for (const item of saved) await invoke("todos_save", { item: payload(item) });
+        for (const id of deleted) await invoke("todos_delete", { id });
+      } else {
+        const items = new Map(getStoredTodos().map((item) => [item.id, item]));
+        for (const item of saved) items.set(item.id, item);
+        for (const id of deleted) items.delete(id);
+        saveStoredTodos([...items.values()]);
+      }
+      await reload();
+      return true;
+    } catch (reason) { setError(String(reason)); return false; }
+  }, [reload]);
+  const addTodo = useCallback(async (title: string, dueDate?: string, priority: "low" | "medium" | "high" = "medium") => {
+    if (!title.trim()) return false;
+    return mutate([{ id: crypto.randomUUID(), title: title.trim(), completed: false,
+      createdAt: Date.now(), dueDate, priority }]);
+  }, [mutate]);
   const updateTodo = useCallback((id: string, patch: Partial<TodoItem>) => {
-    setTodos((prev) => {
-      const updated = prev.map((t) => (t.id === id ? { ...t, ...patch } : t));
-      saveStoredTodos(updated);
-      return updated;
-    });
-  }, []);
-
+    const item = todos.find((task) => task.id === id);
+    if (item) void mutate([{ ...item, ...patch, id, createdAt: item.createdAt, updatedAt: Date.now() }]);
+  }, [todos, mutate]);
+  const toggleTodo = useCallback((id: string) => {
+    const item = todos.find((task) => task.id === id);
+    if (item) updateTodo(id, { completed: !item.completed, completedAt: item.completed ? null : Date.now() });
+  }, [todos, updateTodo]);
+  const deleteTodo = useCallback((id: string) => {
+    if (window.confirm("Delete this task?")) void mutate([], [id]);
+  }, [mutate]);
   const clearCompleted = useCallback(() => {
-    setTodos((prev) => {
-      const updated = prev.filter((t) => !t.completed);
-      saveStoredTodos(updated);
-      return updated;
-    });
-  }, []);
-
-  return {
-    todos,
-    addTodo,
-    toggleTodo,
-    deleteTodo,
-    updateTodo,
-    clearCompleted,
-    reload,
-  };
+    const ids = todos.filter((item) => item.completed).map((item) => item.id);
+    if (ids.length && window.confirm("Delete completed tasks?")) void mutate([], ids);
+  }, [todos, mutate]);
+  return { todos, error, addTodo, toggleTodo, deleteTodo, updateTodo, clearCompleted, reload };
 }

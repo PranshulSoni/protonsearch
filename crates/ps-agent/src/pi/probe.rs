@@ -293,7 +293,11 @@ pub fn probe_pi_cached(explicit: Option<&Path>) -> Option<PiInfo> {
 
 /// Run a command with piped stdio and a timeout, draining both pipes on
 /// separate threads. Output capture is capped (PI-SEC-08).
-pub(crate) fn run_capture(mut command: Command, timeout: Duration) -> Result<Capture, crate::AgentError> {
+pub(crate) fn run_capture(command: Command, timeout: Duration) -> Result<Capture, crate::AgentError> {
+    run_capture_cancellable(command, timeout, &std::sync::atomic::AtomicBool::new(false))
+}
+
+pub(crate) fn run_capture_cancellable(mut command: Command, timeout: Duration, cancelled: &std::sync::atomic::AtomicBool) -> Result<Capture, crate::AgentError> {
     command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -312,7 +316,7 @@ pub(crate) fn run_capture(mut command: Command, timeout: Duration) -> Result<Cap
         match child.try_wait() {
             Ok(Some(status)) => break Some(status),
             Ok(None) => {
-                if Instant::now() >= deadline {
+                if Instant::now() >= deadline || cancelled.load(std::sync::atomic::Ordering::Relaxed) {
                     timed_out = true;
                     let pid = child.id();
                     let _ = child.kill();
@@ -341,10 +345,12 @@ fn read_limited(pipe: Option<impl Read>, limit: usize) -> (String, bool) {
         return (String::new(), false);
     };
     let mut buffer = Vec::new();
-    let mut limited = pipe.take(limit as u64 + 1);
+    let mut pipe = pipe;
+    let mut limited = (&mut pipe).take(limit as u64 + 1);
     let _ = limited.read_to_end(&mut buffer);
     let truncated = buffer.len() > limit;
     buffer.truncate(limit);
+    let _ = std::io::copy(&mut pipe, &mut std::io::sink());
     (String::from_utf8_lossy(&buffer).into_owned(), truncated)
 }
 
@@ -363,6 +369,18 @@ mod tests {
         assert_eq!(parse_version("1.5.0\n").as_deref(), Some("1.5.0"));
         assert_eq!(parse_version("v1.5.0\nextra").as_deref(), Some("1.5.0"));
         assert_eq!(parse_version("no digits here"), None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cancelled_capture_terminates_the_child() {
+        let cancelled = std::sync::atomic::AtomicBool::new(true);
+        let mut command = Command::new("powershell.exe");
+        command.args(["-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 20"]);
+        let started = Instant::now();
+        let result = run_capture_cancellable(command, Duration::from_secs(30), &cancelled).unwrap();
+        assert!(result.timed_out);
+        assert!(started.elapsed() < Duration::from_secs(5));
     }
 
     #[test]
@@ -398,8 +416,10 @@ mod tests {
     #[test]
     fn capture_output_is_capped() {
         let payload = vec![b'x'; MAX_CAPTURE_BYTES + 1024];
-        let (text, truncated) = read_limited(Some(Cursor::new(payload)), MAX_CAPTURE_BYTES);
+        let mut input = Cursor::new(payload);
+        let (text, truncated) = read_limited(Some(&mut input), MAX_CAPTURE_BYTES);
         assert!(truncated);
         assert_eq!(text.len(), MAX_CAPTURE_BYTES);
+        assert_eq!(input.position(), (MAX_CAPTURE_BYTES + 1024) as u64);
     }
 }

@@ -6,17 +6,17 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 mod monitors;
 
-use ps_agent::{AgentClient, AgentEvent, PiAgentClient, PiAgentConfig};
+use ps_agent::{AgentEvent, PiAgentClient, PiAgentConfig};
 use ps_core::{Engine, EngineConfig};
 use ps_ipc::agent_task::DetectedAgent;
 use ps_ipc::{
-    ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest, AgentRuntime,
+    ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest,
     AgentState, AgentStatus, EngineStatus, IndexCommand, LauncherMode, MonitorInfo, NativeCommand,
     OnboardingInput, OnboardingState, OpenOutcome, SearchRequest, SearchResponse, Settings, SettingsPatch,
 };
@@ -133,7 +133,6 @@ struct AppState {
     data_dir: PathBuf,
     /// Optional Python agent sidecar. Created only when a workflow is started;
     /// never touched by search, startup or settings.
-    agent: Mutex<Option<AgentClient>>,
     /// Pi CLI agent (default runtime). Spawned only when a workflow starts.
     pi_agent: Mutex<Option<PiAgentClient>>,
     /// Cached agent discovery for the Workflows Agents section.
@@ -1040,11 +1039,7 @@ fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
             client.shutdown();
         }
     }
-    if let Ok(mut slot) = state.agent.lock() {
-        if let Some(client) = slot.take() {
-            client.shutdown();
-        }
-    }
+
     app.exit(0);
 }
 
@@ -1073,170 +1068,24 @@ fn set_hotkey(app: AppHandle, state: tauri::State<'_, AppState>, hotkey: String)
 
 fn probe_agent_status(state: &AppState) -> AgentStatus {
     let settings = state.engine.settings();
-    if settings.agent.runtime == AgentRuntime::Pi {
-        let probed = ps_agent::probe_pi_cached(settings.agent.pi_path.as_deref().map(std::path::Path::new));
-        let running = state
-            .pi_agent
-            .lock()
-            .ok()
-            .and_then(|slot| slot.as_ref().map(|client| client.is_running()))
-            .unwrap_or(false);
-        return match probed {
-            Some(info) => AgentStatus {
-                state: if running {
-                    AgentState::Running
-                } else {
-                    AgentState::Stopped
-                },
-                runtime: Some(format!("Pi {}", info.version)),
-                model: settings.agent.model.clone(),
-                detail: Some(format!(
-                    "Read-only tools. Launcher: {} ({}).",
-                    info.path.display(),
-                    match info.source {
-                        ps_agent::PiSource::Explicit => "explicit",
-                        ps_agent::PiSource::Env => "environment",
-                        ps_agent::PiSource::Managed => "managed install",
-                        ps_agent::PiSource::Path => "PATH (least trusted)",
-                    }
-                )),
-            },
-            None => AgentStatus {
-                state: AgentState::NotConfigured,
-                runtime: Some("Pi".into()),
-                model: None,
-                detail: Some(
-                    "The Pi CLI agent was not found. Install it from pi.dev or set its path in Preferences."
-                        .into(),
-                ),
-            },
-        };
-    }
-    let config = ps_agent::default_config(&state.data_dir);
-    let running = state
-        .agent
-        .lock()
-        .ok()
-        .and_then(|slot| slot.as_ref().map(|client| client.is_alive()))
-        .unwrap_or(false);
-    match config {
-        None => AgentStatus {
-            state: AgentState::NotConfigured,
-            runtime: None,
-            model: None,
-            detail: Some("Optional Python sidecar runtime is not installed.".into()),
+    let running = state.pi_agent.lock().ok()
+        .and_then(|slot| slot.as_ref().map(|client| client.is_running())).unwrap_or(false);
+    let status = ps_agent::pi::status::status(&state.data_dir,
+        settings.agent.pi_path.as_deref().map(Path::new), settings.agent.provider.as_deref(), running);
+    AgentStatus {
+        state: match status.state {
+            "running" => AgentState::Running,
+            "not_installed" => AgentState::NotConfigured,
+            "version_mismatch" | "error" => AgentState::Error,
+            _ => AgentState::Stopped,
         },
-        Some(config) => AgentStatus {
-            state: if running {
-                AgentState::Running
-            } else {
-                AgentState::Stopped
-            },
-            runtime: Some("pydantic-ai (optional sidecar)".into()),
-            model: config.model.clone(),
-            detail: Some(if running {
-                "Agent sidecar is running for the current workflow.".into()
-            } else {
-                "Starts only when you run a workflow.".into()
-            }),
-        },
+        runtime: Some(status.version.map(|version| format!("Pi {version}")).unwrap_or_else(|| "Pi".into())),
+        model: settings.agent.model,
+        detail: Some(status.detail),
     }
 }
 
-fn locate_agent_on_path(exe: &str) -> Option<std::path::PathBuf> {
-    let mut cmd = std::process::Command::new("where");
-    cmd.arg(exe);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    let output = cmd.output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let text = String::from_utf8_lossy(&output.stdout);
-    text.lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(std::path::PathBuf::from)
-        .filter(|path| path.is_file())
-        .max_by_key(|path| match path.extension().and_then(|value| value.to_str()) {
-            Some(ext) if ext.eq_ignore_ascii_case("exe") => 3,
-            Some(ext) if ext.eq_ignore_ascii_case("cmd") => 2,
-            Some(ext) if ext.eq_ignore_ascii_case("bat") => 1,
-            _ => 0,
-        })
-}
-
-/// Run the agent CLI version command with a hard 2.5 s bound and a 64 KiB cap.
-fn bounded_agent_version(path: &std::path::Path) -> Option<String> {
-    let text = path.to_string_lossy();
-    if text
-        .chars()
-        .any(|c| matches!(c, '&' | '|' | '<' | '>' | '^' | '"' | '%' | '\r' | '\n'))
-    {
-        return None;
-    }
-    let ext = path
-        .extension()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    let mut cmd = if matches!(ext.as_str(), "cmd" | "bat") {
-        let mut c = std::process::Command::new("cmd");
-        c.args(["/d", "/s", "/c", &format!("\"{text}\" --version")]);
-        c
-    } else {
-        let mut c = std::process::Command::new(path);
-        c.arg("--version");
-        c
-    };
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    let mut child = cmd.spawn().ok()?;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(2500);
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) => {
-                if std::time::Instant::now() > deadline {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return None;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(40));
-            }
-            Err(_) => {
-                let _ = child.kill();
-                return None;
-            }
-        }
-    }
-    use std::io::Read;
-    let mut buffer = String::new();
-    if let Some(mut stdout) = child.stdout.take() {
-        let _ = stdout.take(64 * 1024).read_to_string(&mut buffer);
-    }
-    if buffer.trim().is_empty() {
-        if let Some(mut stderr) = child.stderr.take() {
-            let _ = stderr.take(64 * 1024).read_to_string(&mut buffer);
-        }
-    }
-    let first = buffer
-        .lines()
-        .map(|line| line.trim())
-        .find(|line| !line.is_empty())?;
-    Some(first.chars().take(80).collect())
-}
-
-/// Detected local agent CLIs (Pi first, then other installed coding agents).
+/// Detected Pi installation.
 #[tauri::command]
 async fn detect_agents(app: AppHandle) -> Result<Vec<DetectedAgent>, String> {
     run_blocking(move || detect_agents_blocking(&app.state::<AppState>())).await
@@ -1250,7 +1099,9 @@ fn detect_agents_blocking(state: &AppState) -> Vec<DetectedAgent> {
     }
     let settings = state.engine.settings();
     let mut agents = Vec::new();
-    if let Some(info) = ps_agent::probe_pi_cached(settings.agent.pi_path.as_deref().map(std::path::Path::new))
+    let managed = ps_agent::pi::install::managed_launcher(&state.data_dir);
+    let selected = settings.agent.pi_path.as_deref().map(Path::new).or_else(|| managed.is_file().then_some(managed.as_path()));
+    if let Some(info) = ps_agent::probe_pi_cached(selected)
     {
         agents.push(DetectedAgent {
             id: "pi".into(),
@@ -1262,29 +1113,60 @@ fn detect_agents_blocking(state: &AppState) -> Vec<DetectedAgent> {
             detail: Some("Default agent runtime. Read-only in this alpha.".into()),
         });
     }
-    for (exe, name, detail) in [
-        ("codex", "Codex CLI", "OpenAI Codex coding agent"),
-        ("opencode", "OpenCode", "OpenCode coding agent"),
-        ("cline", "Cline", "Cline coding agent"),
-        ("agy", "Antigravity", "Antigravity agent"),
-    ] {
-        if let Some(path) = locate_agent_on_path(exe) {
-            let version = bounded_agent_version(&path);
-            agents.push(DetectedAgent {
-                id: exe.into(),
-                name: name.into(),
-                kind: "agent".into(),
-                version,
-                path: Some(path.to_string_lossy().into_owned()),
-                available: true,
-                detail: Some(detail.into()),
-            });
-        }
-    }
     if let Ok(mut cache) = state.agents.lock() {
         *cache = Some(agents.clone());
     }
     agents
+}
+
+#[tauri::command]
+async fn pi_install_status(app: AppHandle, refresh: Option<bool>) -> Result<ps_agent::pi::status::PiInstallStatus, String> {
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        if refresh.unwrap_or(false) {
+            ps_agent::clear_probe_cache();
+            if let Ok(mut cache) = state.agents.lock() { *cache = None; }
+        }
+        let settings = state.engine.settings();
+        let running = state.pi_agent.lock().ok().and_then(|slot| slot.as_ref().map(|client| client.is_running())).unwrap_or(false);
+        ps_agent::pi::status::status(&state.data_dir, settings.agent.pi_path.as_deref().map(Path::new), settings.agent.provider.as_deref(), running)
+    }).await
+}
+
+#[tauri::command]
+async fn pi_install_plan(state: tauri::State<'_, AppState>) -> Result<ps_agent::pi::install::PiInstallPlan, String> {
+    let data_dir = state.data_dir.clone();
+    run_blocking(move || ps_agent::pi::install::plan(&data_dir).map_err(|error| error.to_string())).await?
+}
+
+#[tauri::command]
+async fn pi_install(app: AppHandle, version: String, confirmed: bool) -> Result<(), String> {
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        ps_agent::pi::install::install(&state.data_dir, &version, confirmed, || {
+            let slot = state.pi_agent.lock().map_err(|_| ps_agent::AgentError::Busy)?;
+            if slot.as_ref().is_some_and(|client| client.is_running()) {
+                return Err(ps_agent::AgentError::Busy);
+            }
+            Ok(())
+        }).map_err(|error| error.to_string())?;
+        if let Ok(mut cache) = state.agents.lock() { *cache = None; }
+        Ok(())
+    }).await?
+}
+
+#[tauri::command]
+fn pi_install_cancel() { ps_agent::pi::install::cancel_install(); }
+
+#[tauri::command]
+async fn pi_connect(app: AppHandle) -> Result<(), String> {
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        let settings = state.engine.settings();
+        let config = PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|error| error.to_string())?;
+        std::fs::create_dir_all(&config.workspace).map_err(|error| error.to_string())?;
+        ps_agent::pi::connect_pi(&config.pi.path, &config.workspace).map_err(|error| error.to_string())
+    }).await?
 }
 
 #[tauri::command]
@@ -1293,113 +1175,86 @@ async fn agent_status(app: AppHandle) -> Result<AgentStatus, String> {
 }
 
 #[tauri::command]
-fn agent_start(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-    request: AgentRunRequest,
-) -> Result<(), String> {
+async fn agent_start(app: AppHandle, request: AgentRunRequest) -> Result<(), String> {
+    run_blocking(move || agent_start_blocking(&app, &app.state::<AppState>(), request)).await?
+}
+
+fn agent_start_blocking(app: &AppHandle, state: &AppState, request: AgentRunRequest) -> Result<(), String> {
     let settings = state.engine.settings();
+    if ps_agent::pi::install::is_installing() { return Err("Wait for Pi installation to finish.".into()); }
     if !settings.agent.enabled {
         return Err("Agent workflows are disabled in Preferences.".into());
     }
-    if settings.agent.runtime == AgentRuntime::Pi {
-        let mut config = PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
-            "The Pi CLI agent is not available. Install it from pi.dev or set its path in Preferences."
-                .to_string()
-        })?;
-        // ALPHA SAFETY GATE (security re-review RR-02): Pi runs read-only until
-        // a server-side per-run consent token exists; persisted settings can
-        // never silently enable edits/shell.
-        config.allow_writes = false;
-        let task = state
-            .agent_tasks
-            .begin_pi(
-                &request,
-                &config.pi,
-                settings.agent.model.clone(),
-                config.allow_writes,
-                None,
-            )
-            .map_err(|_| "The workflow could not be recorded.".to_string())?;
-        // The canonical task id becomes the runtime run id so events map 1:1.
-        let mut run_request = request.clone();
-        run_request.run_id = task.id.clone();
-        let mut slot = state.pi_agent.lock().map_err(|e| e.to_string())?;
-        if slot.is_none() {
-            let handle = app.clone();
-            let tasks = Arc::clone(&state.agent_tasks);
-            let task_id = task.id.clone();
-            let client = PiAgentClient::spawn(config, move |event: &AgentEvent| {
-                let _ = tasks.apply_event(&task_id, event);
-                let _ = handle.emit("agent:event", event);
-            })
-            .map_err(|_| "The Pi CLI agent could not be started.".to_string())?;
-            *slot = Some(client);
-        }
-        return slot
-            .as_ref()
-            .ok_or_else(|| "The Pi CLI agent is unavailable.".to_string())?
-            .send_run(&run_request)
-            .map_err(|err| match err {
-                ps_agent::AgentError::Busy => "A workflow is already running.".to_string(),
-                _ => "The Pi workflow could not be started.".to_string(),
-            });
+    let mut config = PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
+        "The Pi CLI agent is not available. Install it from pi.dev or set its path in Preferences."
+            .to_string()
+    })?;
+    // ALPHA SAFETY GATE (security re-review RR-02): Pi runs read-only until
+    // a server-side per-run consent token exists; persisted settings can
+    // never silently enable edits/shell.
+    config.allow_writes = false;
+    let mut slot = state.pi_agent.lock().map_err(|e| e.to_string())?;
+    if ps_agent::pi::install::is_installing() { return Err("Wait for Pi installation to finish.".into()); }
+    if slot.as_ref().is_some_and(|client| client.is_running()) {
+        return Err("A Pi workflow is already running.".into());
     }
-    let mut slot = state.agent.lock().map_err(|e| e.to_string())?;
-    let needs_spawn = slot.as_ref().map(|client| !client.is_alive()).unwrap_or(true);
-    if needs_spawn {
-        let config = ps_agent::default_config(&state.data_dir).ok_or_else(|| {
-            "The optional Python agent runtime is not installed on this machine.".to_string()
-        })?;
+    let task = state
+        .agent_tasks
+        .begin_pi(
+            &request,
+            &config.pi,
+            settings.agent.model.clone(),
+            config.allow_writes,
+            None,
+        )
+        .map_err(|_| "The workflow could not be recorded.".to_string())?;
+    // The canonical task id becomes the runtime run id so events map 1:1.
+    let mut run_request = request.clone();
+    run_request.run_id = task.id.clone();
+    if let Some(previous) = slot.take() { previous.shutdown(); }
+    if slot.is_none() {
         let handle = app.clone();
-        let client = AgentClient::spawn(config, move |event: &AgentEvent| {
+        let tasks = Arc::clone(&state.agent_tasks);
+        let task_id = task.id.clone();
+        let client = PiAgentClient::spawn(config, move |event: &AgentEvent| {
+            let _ = tasks.apply_event(&task_id, event);
             let _ = handle.emit("agent:event", event);
         })
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| {
+            state.agent_tasks.mark_launch_failed(&task.id, "spawn_failed", "The Pi CLI agent could not be started.");
+            "The Pi CLI agent could not be started.".to_string()
+        })?;
         *slot = Some(client);
     }
-    slot.as_ref()
-        .ok_or_else(|| "Agent sidecar is unavailable.".to_string())?
-        .send_run(&request)
-        .map_err(|e| e.to_string())
+    return slot
+        .as_ref()
+        .ok_or_else(|| "The Pi CLI agent is unavailable.".to_string())?
+        .send_run(&run_request)
+        .map_err(|err| {
+            state.agent_tasks.mark_launch_failed(&task.id, "run_failed", "The Pi workflow could not be started.");
+            match err {
+                ps_agent::AgentError::Busy => "A workflow is already running.".to_string(),
+                _ => "The Pi workflow could not be started.".to_string(),
+            }
+        });
+
 }
 
 #[tauri::command]
 fn agent_cancel(state: tauri::State<'_, AppState>, run_id: Option<String>) -> Result<(), String> {
-    if state.engine.settings().agent.runtime == AgentRuntime::Pi {
-        for task in state.agent_tasks.tasks(10) {
-            if !task.state.is_terminal() {
-                let _ = state.agent_tasks.cancel(&task.id, "user cancelled");
-            }
+    let slot = state.pi_agent.lock().map_err(|error| error.to_string())?;
+    if let Some(client) = slot.as_ref() {
+        if run_id.as_ref().is_some_and(|id| client.run_id().as_ref() != Some(id)) {
+            return Err("That Pi workflow is no longer running.".into());
         }
-        let slot = state.pi_agent.lock().map_err(|e| e.to_string())?;
-        return match slot.as_ref() {
-            Some(client) => client
-                .cancel()
-                .map_err(|_| "The Pi workflow could not be cancelled.".to_string()),
-            None => Ok(()),
-        };
+        client.cancel().map_err(|error| error.to_string())?;
     }
-    let slot = state.agent.lock().map_err(|e| e.to_string())?;
-    match slot.as_ref() {
-        Some(client) => client.cancel(run_id.as_deref()).map_err(|e| e.to_string()),
-        None => Ok(()),
-    }
+    Ok(())
 }
 
 #[tauri::command]
-fn agent_approve(state: tauri::State<'_, AppState>, response: AgentApprovalResponse) -> Result<(), String> {
-    if state.engine.settings().agent.runtime == AgentRuntime::Pi {
-        return Err(
-            "Pi runs do not ask for per-tool approval; file edits and shell access are opted in before the run."
-                .into(),
-        );
-    }
-    let slot = state.agent.lock().map_err(|e| e.to_string())?;
-    match slot.as_ref() {
-        Some(client) => client.approve(&response).map_err(|e| e.to_string()),
-        None => Err("No agent workflow is running.".into()),
-    }
+fn agent_approve(_state: tauri::State<'_, AppState>, _response: AgentApprovalResponse) -> Result<(), String> {
+    Err("Pi currently runs with read-only tools. Per-tool approvals are unavailable.".into())
 }
 
 #[tauri::command]
@@ -1409,11 +1264,7 @@ fn agent_stop(state: tauri::State<'_, AppState>) {
             client.shutdown();
         }
     }
-    if let Ok(mut slot) = state.agent.lock() {
-        if let Some(client) = slot.take() {
-            client.shutdown();
-        }
-    }
+
 }
 
 /// Capability-gated snapshot of the native integrations the island/settings
@@ -1806,6 +1657,42 @@ impl Drop for PreviewPermit {
 }
 
 #[tauri::command]
+async fn todos_import(state: tauri::State<'_, AppState>, items: Vec<ps_core::todo::TodoItem>, source: String) -> Result<(), String> {
+    let path = state.data_dir.join("index.db");
+    run_blocking(move || ps_core::todo::TodoStore::open(&path)?.import(&items, &source))
+        .await?
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn todos_list(state: tauri::State<'_, AppState>) -> Result<Vec<ps_core::todo::TodoItem>, String> {
+    let path = state.data_dir.join("index.db");
+    run_blocking(move || ps_core::todo::TodoStore::open(&path)?.list())
+        .await?
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn todos_save(app: AppHandle, state: tauri::State<'_, AppState>, item: ps_core::todo::TodoItem) -> Result<(), String> {
+    let path = state.data_dir.join("index.db");
+    run_blocking(move || ps_core::todo::TodoStore::open(&path)?.save(&item))
+        .await?
+        .map_err(|error| error.to_string())?;
+    let _ = app.emit("todos:changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+async fn todos_delete(app: AppHandle, state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
+    let path = state.data_dir.join("index.db");
+    run_blocking(move || ps_core::todo::TodoStore::open(&path)?.delete(&id))
+        .await?
+        .map_err(|error| error.to_string())?;
+    let _ = app.emit("todos:changed", ());
+    Ok(())
+}
+
+#[tauri::command]
 fn agent_tasks(state: tauri::State<'_, AppState>, limit: Option<usize>) -> Vec<ps_agent::AgentTask> {
     state.agent_tasks.tasks(limit.unwrap_or(50).min(200))
 }
@@ -1953,7 +1840,6 @@ dispatch_window_action(app, toggle_primary_launcher);
             app.manage(AppState {
                 engine: engine.clone(),
                 data_dir,
-                agent: Mutex::new(None),
                 pi_agent: Mutex::new(None),
                 agents: Mutex::new(None),
                 agent_tasks,
@@ -2039,8 +1925,17 @@ dispatch_window_action(app, toggle_primary_launcher);
             quit_app,
             set_hotkey,
             agent_status,
+            pi_install_status,
+            pi_install_plan,
+            pi_install,
+            pi_install_cancel,
+            pi_connect,
             detect_agents,
             agent_tasks,
+            todos_list,
+            todos_import,
+            todos_save,
+            todos_delete,
             agent_task_tree,
             agent_task,
             agent_permissions,
@@ -2080,11 +1975,7 @@ dispatch_window_action(app, toggle_primary_launcher);
                             client.shutdown();
                         }
                     }
-                    if let Ok(mut slot) = state.agent.lock() {
-                        if let Some(client) = slot.take() {
-                            client.shutdown();
-                        }
-                    }
+
                 }
             }
         });

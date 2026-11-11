@@ -196,6 +196,22 @@ impl EngineDb {
         Ok(removed as u64)
     }
 
+    /// How often and when last each path was opened or each app launched:
+    /// (kind, path-or-launch-target, count, last timestamp). Launch rows store
+    /// the app target as their title.
+    pub fn usage_history(&self) -> anyhow::Result<Vec<(String, String, u32, i64)>> {
+        let conn = self.lock()?;
+        let mut stmt = conn.prepare(
+            "SELECT kind, COALESCE(path, title), COUNT(*), MAX(timestamp) FROM activity \
+             WHERE kind IN ('open', 'launch') GROUP BY kind, COALESCE(path, title)",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let count: i64 = row.get(2)?;
+            Ok((row.get(0)?, row.get(1)?, count.clamp(0, u32::MAX as i64) as u32, row.get(3)?))
+        })?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+
     // -- OCR -----------------------------------------------------------------
 
     pub fn ocr_count(&self) -> u64 {

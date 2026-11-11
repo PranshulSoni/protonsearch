@@ -64,7 +64,7 @@ Measured and captured with the real app over a real user profile (131,199 indexe
 | Screenshot OCR search | Pipeline implemented (Windows.Media.Ocr); native engine measured; end-to-end UI run pending | crates/ps-ocr; docs/performance/BENCHMARKS.md |
 | Legacy v1 migration (settings, 89,813 file rows, 14,609 document texts) | Works, source read-only and hash-verified | docs/implementation/GATE_LOG.md; migration tests |
 | Desktop app (Home / Search & Indexes / Activity / Workflows / Preferences), onboarding, dark mode, hotkey capture | Works | real-app-*.png; 241 frontend tests |
-| Optional Python agent sidecar (Pydantic AI, on-demand, approval-gated) | Sidecar + Rust client + shell commands work; Workflows panel integration in progress | crates/ps-agent (14 tests), agent-sidecar (18 tests) |
+| Pi agent workflows (on demand) | Pi installation checks, supervised runs and durable task history | crates/ps-agent (14 tests), agent-sidecar (18 tests) |
 | Marketing/telemetry/silent downloads | None. Ever. | settings model has telemetry forced off |
 
 Verified in the v10 release candidate (source 4e9f589, unsigned internal alpha, 2026-11-10): real previews for TXT/code/Markdown/JSON/CSV/PDF/DOCX/XLSX/images/OCR with explicit unsupported and stale-file fallbacks; clipboard text+image history with island thumbnails and restart persistence; V9 Dynamic Island with 8 cards/dots/motion; two-launcher settings/placement/card manager; agent task APIs with read-only Pi gate. Still open: matched-term preview highlight, island preview hookup, native Media/Wi-Fi/Bluetooth (post-alpha milestone 2), live Pi provider verification, signed installer/updater, mixed-DPI/High-Contrast/multi-monitor evidence.
@@ -96,7 +96,7 @@ ProtonSearch.exe (Tauri 2 host, Rust)
 ├── ps-sources   applications, recent files, clipboard, browser history/bookmarks, Git, calculator
 ├── ps-windows   Win32 helpers (icons, shell open, clipboard, AppsFolder, windows)
 ├── ps-ocr       OCR extraction pipeline (Windows.Media.Ocr) — in progress
-├── ps-agent     optional Python sidecar client (process lifecycle + JSONL protocol)
+├── ps-agent     Pi process supervision and durable task history
 └── ps-ipc       versioned contract shared by all layers and mirrored in TypeScript
 ```
 
@@ -114,7 +114,7 @@ That script renders the app icon source, regenerates all platform icon sizes (`n
 
 ## Build and run (Windows)
 
-Prerequisites: Rust 1.99+ (MSVC), Node 26+, WebView2 (preinstalled on Windows 11), Python 3.14 only if you want the optional agent sidecar.
+Prerequisites: Rust 1.99+ (MSVC), Node 26+, WebView2 (preinstalled on Windows 11). Pi workflows require Pi and its Node.js prerequisite.
 
 ```powershell
 # frontend dependencies

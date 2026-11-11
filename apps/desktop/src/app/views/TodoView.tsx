@@ -6,7 +6,7 @@ import { EmptyState, Icon, Panel, RouteHeading } from "../ui";
 type FilterTab = "all" | "active" | "completed" | "high" | "today";
 
 export default function TodoView() {
-  const { todos, addTodo, toggleTodo, deleteTodo, updateTodo, clearCompleted } = useTodos();
+  const { todos, error, addTodo, toggleTodo, deleteTodo, updateTodo, clearCompleted } = useTodos();
   const [filter, setFilter] = useState<FilterTab>("all");
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<"low" | "medium" | "high">("medium");
@@ -30,10 +30,10 @@ export default function TodoView() {
   const activeCount = useMemo(() => todos.filter((t) => !t.completed).length, [todos]);
   const completedCount = useMemo(() => todos.filter((t) => t.completed).length, [todos]);
 
-  const handleAdd = (e?: React.FormEvent) => {
+  const handleAdd = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newTitle.trim()) return;
-    addTodo(newTitle, newDueDate || undefined, newPriority);
+    if (!(await addTodo(newTitle, newDueDate || undefined, newPriority))) return;
     setNewTitle("");
     setNewDueDate("");
     setNewPriority("medium");
@@ -57,6 +57,7 @@ export default function TodoView() {
   return (
     <div className="view">
       <RouteHeading eyebrow={SECTION_EYEBROWS.todo}>To-do</RouteHeading>
+      {error ? <p role="alert">{error}</p> : null}
       <p className="page-lead">
         Keep track of your active tasks, reminders and notes with local-only storage.
       </p>

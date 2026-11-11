@@ -398,9 +398,7 @@ setMuted.mockRestore();
     expect(element.querySelectorAll(".island-agent-row").length).toBe(1);
     // Neither control is available for this task: no ambiguous disabled pair.
     expect(element.querySelectorAll(".island-agent-button").length).toBe(0);
-    expect(element.querySelector(".island-agent-note")?.textContent).toContain(
-      "No pause or resume action is available",
-    );
+    expect(element.querySelector(".island-agent-note")).toBeNull();
     expect(element.querySelector(".island-progress-fill")).not.toBeNull();
   });
 });

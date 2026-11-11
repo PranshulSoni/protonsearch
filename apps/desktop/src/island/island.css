@@ -414,21 +414,6 @@ html[data-window="island"] #root {
   color: #87979c;
 }
 
-.island-kbd-hints {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.island-kbd-hints kbd {
-  font: inherit;
-  font-size: 10px;
-  color: #d2dce1;
-  border: 1px solid #33434a;
-  border-radius: 4px;
-  padding: 0 4px;
-}
-
 .island-skeleton {
   display: flex;
   flex-direction: column;
@@ -1128,10 +1113,6 @@ html[data-window="island"] #root {
 
 .island-surface--narrow .island-snippet {
   max-height: 84px;
-}
-
-.island-surface--narrow .island-kbd-hints span {
-  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2506,4 +2487,9 @@ html[data-window="island"] #root {
 .island-scrollable {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+/* Island rows: no match-source badge (Filename / Content / OCR). */
+.island-result-row .provenance-badge {
+  display: none;
 }

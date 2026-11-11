@@ -5,6 +5,8 @@ import type {
   AgentApprovalResponse,
   AgentRunRequest,
   AgentStatus,
+  PiInstallStatus,
+  PiInstallPlan,
   AgentTask,
   AgentTaskNode,
   AgentPermissionState,
@@ -43,6 +45,11 @@ type Bridge = {
   setHotkey(hotkey: string): Promise<Settings>;
   confirmNativeAction(command: NativeCommand): Promise<OpenOutcome>;
   agentStatus(): Promise<AgentStatus>;
+  piInstallStatus(refresh?: boolean): Promise<PiInstallStatus>;
+  piInstallPlan(): Promise<PiInstallPlan>;
+  piInstall(version: string, confirmed: boolean): Promise<void>;
+  piInstallCancel(): Promise<void>;
+  piConnect(): Promise<void>;
   detectAgents(): Promise<DetectedAgent[]>;
   listMonitors(): Promise<MonitorInfo[]>;
   showIsland(): Promise<void>;
@@ -123,6 +130,11 @@ const tauriBridge: Bridge = {
     invoke<void>("notifications_dismiss", { notificationId }),
   notificationsClear: () => invoke<void>("notifications_clear"),
   perfMark: (label, epochMs) => invoke<void>("perf_mark", { label, epochMs }),
+  piInstallStatus: (refresh = false) => invoke<PiInstallStatus>("pi_install_status", { refresh }),
+  piInstallPlan: () => invoke<PiInstallPlan>("pi_install_plan"),
+  piInstall: (version, confirmed) => invoke<void>("pi_install", { version, confirmed }),
+  piInstallCancel: () => invoke<void>("pi_install_cancel"),
+  piConnect: () => invoke<void>("pi_connect"),
   agentStart: (request) => invoke<void>("agent_start", { request }),
   agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),
   agentApprove: (response) => invoke<void>("agent_approve", { response }),

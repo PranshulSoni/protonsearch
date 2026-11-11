@@ -10,7 +10,7 @@
 //! * watchdog — idle-timeout and max-duration kills via taskkill /T.
 
 use std::collections::VecDeque;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStderr, ChildStdout, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
@@ -417,7 +417,7 @@ fn read_stdout(
     let mut buffer = Vec::new();
     loop {
         buffer.clear();
-        match reader.read_until(b'\n', &mut buffer) {
+        match (&mut reader).take((MAX_LINE_BYTES + 1) as u64).read_until(b'\n', &mut buffer) {
             Ok(0) => break,
             Ok(_) => {
                 shared.touch();

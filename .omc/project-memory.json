@@ -435,12 +435,6 @@
       "type": "directory"
     },
     {
-      "path": "apps/desktop/src/island/islandNativeCards.ts",
-      "accessCount": 5.989604534297211,
-      "lastAccessed": 1794292757883,
-      "type": "file"
-    },
-    {
       "path": "apps/desktop/src/island/NativeCards.tsx",
       "accessCount": 4.159873686305318,
       "lastAccessed": 1794333155360,
@@ -457,12 +451,6 @@
       "accessCount": 5.976344358113125,
       "lastAccessed": 1794293193805,
       "type": "directory"
-    },
-    {
-      "path": "tools/benchmark/hotkey-activate.ps1",
-      "accessCount": 2.993831012908249,
-      "lastAccessed": 1794292930665,
-      "type": "file"
     },
     {
       "path": "apps/desktop/src",
@@ -489,24 +477,6 @@
       "type": "directory"
     },
     {
-      "path": "apps/desktop/src/lib/perfProbe.ts",
-      "accessCount": 1,
-      "lastAccessed": 1794292746890,
-      "type": "file"
-    },
-    {
-      "path": "apps/desktop/src/lib/perfProbe.test.ts",
-      "accessCount": 1,
-      "lastAccessed": 1794292747392,
-      "type": "file"
-    },
-    {
-      "path": "docs/performance/V10_BENCHMARK_PLAN.md",
-      "accessCount": 1,
-      "lastAccessed": 1794292798980,
-      "type": "directory"
-    },
-    {
       "path": "tools/benchmark/island-leak.mjs",
       "accessCount": 4.998057690981933,
       "lastAccessed": 1794293095903,
@@ -516,12 +486,6 @@
       "path": "tools/benchmark/idle-curve.mjs",
       "accessCount": 4.998039939934005,
       "lastAccessed": 1794293097250,
-      "type": "file"
-    },
-    {
-      "path": "docs/qa/g8-verify-round3/capture-release.ps1",
-      "accessCount": 1,
-      "lastAccessed": 1794292930372,
       "type": "file"
     },
     {
@@ -714,6 +678,42 @@
       "path": "crates/ps-windows/examples/native_probe.rs",
       "accessCount": 1,
       "lastAccessed": 1794333430349,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-index/src/matching.rs",
+      "accessCount": 2.9876827038383276,
+      "lastAccessed": 1794395807798,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-index/tests/index_tests.rs",
+      "accessCount": 2.9999700922343364,
+      "lastAccessed": 1794395154928,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-core/src/appmatch.rs",
+      "accessCount": 3.9441814589940645,
+      "lastAccessed": 1794397696061,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-core/src/db.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794395806297,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-sources/src/apps.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794396408018,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-core/src/engine.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794397697641,
       "type": "file"
     }
   ],

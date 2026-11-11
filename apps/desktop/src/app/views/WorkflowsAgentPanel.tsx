@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp } from "../../App";
 import { api } from "../../bridge/api";
+import { PiSetup } from "./PiSetup";
 import type { AgentStatus } from "../../bridge/types";
 import { isAbsoluteWindowsPath, normalizeWindowsPath } from "../roots";
 import {
@@ -327,6 +328,7 @@ export default function PiAgentPanel() {
       hint="Pi starts only for a prompt you start here, then stops. Read-only in this alpha."
       actions={<SavedStamp show={savedKey === "agent"} />}
     >
+      <PiSetup onChanged={refreshStatus} />
       <div className="config-row">
         <div className="config-main">
           <div className="config-title">

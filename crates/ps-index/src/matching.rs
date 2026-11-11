@@ -350,27 +350,101 @@ impl QueryPlan {
 // ---------------------------------------------------------------------------
 
 /// Score for each match class. Ordering is part of the product contract:
-/// exact name > exact stem > prefix > word-boundary prefix > substring >
-/// path segment > fuzzy subsequence > typo.
+/// exact name > exact stem > exact token > prefix > ordered word prefix >
+/// substring > strong fuzzy > weak fuzzy (typo). Only names are matched; a
+/// folder further up the path never makes an entry match.
 pub(crate) const SCORE_EXACT_NAME: f32 = 1.00;
 pub(crate) const SCORE_EXACT_STEM: f32 = 0.97;
+/// The query is one whole word of the name ("report" in "Project Report.docx").
+pub(crate) const SCORE_EXACT_TOKEN: f32 = 0.955;
 pub(crate) const SCORE_PREFIX: f32 = 0.94;
 pub(crate) const SCORE_WORD_PREFIX: f32 = 0.90;
 pub(crate) const SCORE_SUBSTRING: f32 = 0.85;
-pub(crate) const SCORE_PATH_SEGMENT: f32 = 0.80;
-pub(crate) const SCORE_PATH_PREFIX: f32 = 0.78;
-pub(crate) const SCORE_PATH_SUBSTRING: f32 = 0.76;
 pub(crate) const SCORE_SPANNING: f32 = 0.83;
 pub(crate) const SCORE_FUZZY_BASE: f32 = 0.60;
 pub(crate) const SCORE_FUZZY_SPAN: f32 = 0.14;
+/// Fuzzy matches at or above this are compact enough to count as "strong".
+pub(crate) const SCORE_STRONG_FUZZY: f32 = 0.65;
 pub(crate) const SCORE_TYPO: f32 = 0.55;
-/// Highest score the path phase can produce; used to skip it when the name
-/// phase already filled the top-k above this value.
-pub(crate) const PATH_MAX_SCORE: f32 = SCORE_PATH_SEGMENT;
+/// A subsequence spread over more than this many chars per query char is noise.
+const FUZZY_MAX_SPREAD: usize = 3;
+
+/// Match class of a name hit, strongest first. Callers rank by this class
+/// before any category or history signal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NameMatch {
+    ExactName,
+    ExactStem,
+    ExactToken,
+    Prefix,
+    WordPrefix,
+    Substring,
+    StrongFuzzy,
+    WeakFuzzy,
+}
+
+impl NameMatch {
+    /// Class of a hit score returned by this crate.
+    pub fn from_score(score: f32) -> Self {
+        const EPS: f32 = 1e-4;
+        if score >= SCORE_EXACT_NAME - EPS {
+            Self::ExactName
+        } else if score >= SCORE_EXACT_STEM - EPS {
+            Self::ExactStem
+        } else if score >= SCORE_EXACT_TOKEN - EPS {
+            Self::ExactToken
+        } else if score >= SCORE_PREFIX - EPS {
+            Self::Prefix
+        } else if score >= SCORE_WORD_PREFIX - EPS {
+            Self::WordPrefix
+        } else if score >= SCORE_SPANNING - EPS {
+            Self::Substring
+        } else if score >= SCORE_STRONG_FUZZY - EPS {
+            Self::StrongFuzzy
+        } else {
+            Self::WeakFuzzy
+        }
+    }
+}
+
+/// A query prepared once to match names that are not in an index (recently
+/// opened files, page titles) with exactly the index's rules.
+pub struct NameQuery {
+    plan: QueryPlan,
+}
+
+impl NameQuery {
+    /// `None` for an empty query or a path query (those need the index).
+    pub fn new(query: &str) -> Option<Self> {
+        let plan = QueryPlan::new(query);
+        (!plan.is_empty() && !plan.has_sep).then_some(Self { plan })
+    }
+
+    /// Score (see [`NameMatch::from_score`]) and UTF-16 highlight ranges.
+    pub fn matches(&self, name: &str) -> Option<(f32, Vec<(usize, usize)>)> {
+        let stem = &name[..name.len() - stem_cut(name)];
+        let mut ranges = Vec::new();
+        let score = match_name_into(name, stem, &self.plan, true, &mut ranges)?;
+        Some((score, to_utf16_ranges(name, &ranges)))
+    }
+}
+
+#[cfg(test)]
+fn match_name_query(name: &str, query: &str) -> Option<(f32, Vec<(usize, usize)>)> {
+    NameQuery::new(query)?.matches(name)
+}
+
+/// Bytes to drop from a name to get its stem (the extension and its dot).
+fn stem_cut(name: &str) -> usize {
+    match name.rfind('.') {
+        Some(0) | None => 0,
+        Some(dot) => name.len() - dot,
+    }
+}
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct NameMatch {
+pub(crate) struct ScoredName {
     pub score: f32,
     /// Byte ranges inside the name that matched.
     pub byte_ranges: Vec<(usize, usize)>,
@@ -381,99 +455,93 @@ fn is_word_boundary(c: char) -> bool {
     matches!(
         c,
         ' ' | '\t' | '-' | '_' | '.' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | '+' | '&' | '#' | '@' | '~'
-    )
+    ) || c == '/'
+        || c == '\\'
 }
 
-fn boundary_before(s: &str, pos: usize) -> bool {
-    if pos == 0 {
+/// Case or letter/digit change between two adjacent chars ("myReport",
+/// "PDFReport" before the R, "report2024").
+#[inline]
+fn is_case_or_digit_change(prev: char, cur: char, after: Option<char>) -> bool {
+    (prev.is_lowercase() && cur.is_uppercase())
+        || (prev.is_uppercase() && cur.is_uppercase() && after.map(char::is_lowercase).unwrap_or(false))
+        || (prev.is_alphabetic() && cur.is_numeric())
+        || (prev.is_numeric() && cur.is_alphabetic())
+}
+
+/// Does a word of `s` start at byte `pos`?
+fn word_start(s: &str, pos: usize) -> bool {
+    let Some(prev) = s[..pos].chars().next_back() else {
+        return true;
+    };
+    if is_word_boundary(prev) {
         return true;
     }
-    match s[..pos].chars().next_back() {
-        Some(c) => is_word_boundary(c) || c == '/' || c == '\\',
+    let mut rest = s[pos..].chars();
+    match rest.next() {
+        Some(cur) => is_case_or_digit_change(prev, cur, rest.next()),
         None => true,
     }
 }
 
-/// Path-segment classification for a directory path: 3 = whole segment,
-/// 2 = segment prefix, 1 = substring somewhere, 0 = no match.
-pub(crate) fn segment_level(path: &str, needle: &str) -> u8 {
-    if needle.is_empty() || path.is_empty() {
-        return 0;
+/// Does a word of `s` end at byte `end`?
+fn word_end(s: &str, end: usize) -> bool {
+    let mut rest = s[end..].chars();
+    let Some(next) = rest.next() else {
+        return true;
+    };
+    if is_word_boundary(next) {
+        return true;
     }
-    let mut best = 0u8;
-    let mut from = 0usize;
-    let mut attempts = 0;
-    while attempts < 12 {
-        attempts += 1;
-        let Some((start, end)) = find_ci_from(path, needle, from) else {
-            break;
-        };
-        let before = boundary_before(path, start);
-        let after = end == path.len()
-            || path[end..]
-                .chars()
-                .next()
-                .map(|c| c == '/' || c == '\\')
-                .unwrap_or(true);
-        let level = if before && after {
-            3
-        } else if before {
-            2
-        } else {
-            1
-        };
-        if level > best {
-            best = level;
-        }
-        if best == 3 {
-            break;
-        }
-        from = start + 1;
-    }
-    best
-}
-
-/// Multi-term path classification: every term must appear; the weakest match
-/// determines the level.
-pub(crate) fn segment_level_multi(path: &str, terms: &[String]) -> u8 {
-    let mut best = 3u8;
-    for term in terms {
-        let level = segment_level(path, term);
-        if level == 0 {
-            return 0;
-        }
-        best = best.min(level);
-    }
-    if terms.is_empty() {
-        0
-    } else {
-        best
+    match s[..end].chars().next_back() {
+        Some(prev) => is_case_or_digit_change(prev, next, rest.next()),
+        None => true,
     }
 }
 
-pub(crate) fn score_for_segment(level: u8) -> f32 {
-    match level {
-        3 => SCORE_PATH_SEGMENT,
-        2 => SCORE_PATH_PREFIX,
-        1 => SCORE_PATH_SUBSTRING,
-        _ => 0.0,
+/// Byte ranges of the words of a name: runs between separators, also split at
+/// case and letter/digit changes.
+fn name_words(name: &str) -> Vec<(usize, usize)> {
+    let mut words = Vec::new();
+    let mut start: Option<usize> = None;
+    for (i, c) in name.char_indices() {
+        if is_word_boundary(c) {
+            if let Some(s) = start.take() {
+                words.push((s, i));
+            }
+            continue;
+        }
+        match start {
+            None => start = Some(i),
+            Some(s) if i > s && word_start(name, i) => {
+                words.push((s, i));
+                start = Some(i);
+            }
+            Some(_) => {}
+        }
     }
+    if let Some(s) = start {
+        words.push((s, name.len()));
+    }
+    words
 }
 
 /// Full name match evaluation (compatibility wrapper; used by tests).
 #[allow(dead_code)]
-pub(crate) fn match_name(name: &str, stem: &str, plan: &QueryPlan) -> Option<NameMatch> {
+pub(crate) fn match_name(name: &str, stem: &str, plan: &QueryPlan) -> Option<ScoredName> {
     let mut ranges = Vec::new();
     let score = match_name_into(name, stem, plan, true, &mut ranges)?;
-    Some(NameMatch {
+    Some(ScoredName {
         score,
         byte_ranges: ranges,
     })
 }
 
 /// Allocation-free name match evaluation. allow_typo is only set for the
-/// dedicated typo pass. Multi-term queries require every term to match; the
-/// score is the weakest term's score so ordering stays deterministic.
+/// dedicated typo pass. Multi-term queries are first compared word-by-word as
+/// a phrase; otherwise every term must match and the weakest term decides,
+/// except that terms all landing on word starts in typed order are an ordered
+/// word-prefix match (out of order they only count as substring strength).
 pub(crate) fn match_name_into(
     name: &str,
     stem: &str,
@@ -488,14 +556,93 @@ pub(crate) fn match_name_into(
     if !plan.multi {
         return match_token(name, stem, &plan.lower, &plan.terms_chars[0], allow_typo, ranges);
     }
+    if let Some(score) = match_phrase(name, stem, &plan.terms, ranges) {
+        return Some(score);
+    }
     let mut worst = f32::MAX;
+    let mut ordered = true;
+    let mut last_start: Option<usize> = None;
     let mut scratch = Vec::new();
     for (i, term) in plan.terms.iter().enumerate() {
         let score = match_token(name, stem, term, &plan.terms_chars[i], allow_typo, &mut scratch)?;
         worst = worst.min(score);
+        if let Some(&(start, _)) = scratch.first() {
+            if last_start.map(|prev| start <= prev).unwrap_or(false) {
+                ordered = false;
+            }
+            last_start = Some(start);
+        }
         ranges.extend_from_slice(&scratch);
     }
+    ranges.sort_unstable();
+    ranges.dedup_by(|next, kept| {
+        if next.0 <= kept.1 {
+            kept.1 = kept.1.max(next.1);
+            true
+        } else {
+            false
+        }
+    });
+    if worst >= SCORE_WORD_PREFIX - 1e-6 {
+        return Some(if ordered { SCORE_WORD_PREFIX } else { SCORE_SUBSTRING });
+    }
     Some(worst)
+}
+
+/// A multi-word query against the name's words: separators in the name ("_",
+/// "-", ".", case changes) all stand for the spaces typed in the query. Every
+/// term but the last must equal a word; the last may be a prefix of one.
+fn match_phrase(name: &str, stem: &str, terms: &[String], ranges: &mut Vec<(usize, usize)>) -> Option<f32> {
+    let words = name_words(name);
+    let n = terms.len();
+    if n == 0 || words.len() < n {
+        return None;
+    }
+    let stem_words = if stem.len() != name.len() {
+        words.iter().filter(|(_, end)| *end <= stem.len()).count()
+    } else {
+        usize::MAX
+    };
+    let mut best: Option<(f32, usize, usize)> = None;
+    for k in 0..=words.len() - n {
+        let mut exact = true;
+        let mut end = 0usize;
+        let mut ok = true;
+        for (j, term) in terms.iter().enumerate() {
+            let (ws, we) = words[k + j];
+            let word = &name[ws..we];
+            if eq_ci(word, term) {
+                end = we;
+            } else if j == n - 1 && starts_with_ci(word, term) {
+                exact = false;
+                end = ws + prefix_match_len(word, term);
+            } else {
+                ok = false;
+                break;
+            }
+        }
+        if !ok {
+            continue;
+        }
+        let score = if exact && k == 0 && n == words.len() {
+            SCORE_EXACT_NAME
+        } else if exact && k == 0 && n == stem_words {
+            SCORE_EXACT_STEM
+        } else if exact {
+            SCORE_EXACT_TOKEN
+        } else if k == 0 {
+            SCORE_PREFIX
+        } else {
+            SCORE_WORD_PREFIX
+        };
+        if best.map(|(kept, _, _)| score > kept).unwrap_or(true) {
+            best = Some((score, words[k].0, end));
+        }
+    }
+    let (score, start, end) = best?;
+    ranges.clear();
+    ranges.push((start, end));
+    Some(score)
 }
 
 fn match_token(
@@ -517,45 +664,54 @@ fn match_token(
         ranges.push((0, stem.len()));
         return Some(SCORE_EXACT_STEM);
     }
-    // 3. prefix
-    if starts_with_ci(name, q) {
-        let end = prefix_match_len(name, q);
-        ranges.push((0, end));
-        return Some(SCORE_PREFIX);
-    }
-    // 4/5. substring; prefer a word-boundary occurrence when one exists.
+    // 3-6. occurrences: whole word > prefix > word start > anywhere. A query
+    // that starts/ends with a separator (".pdf") brings its own boundary.
+    let q_starts_word = qchars.first().map(|c| is_word_boundary(*c)).unwrap_or(false);
+    let q_ends_word = qchars.last().map(|c| is_word_boundary(*c)).unwrap_or(false);
+    let mut found: Option<(f32, usize, usize)> = None;
     let mut from = 0usize;
-    let mut found: Option<(usize, usize, bool)> = None;
     let mut attempts = 0;
-    while attempts < 8 {
+    while attempts < 12 {
         attempts += 1;
         let Some((start, end)) = find_ci_from(name, q, from) else {
             break;
         };
-        let boundary = boundary_before(name, start);
-        if boundary {
-            found = Some((start, end, true));
-            break;
-        }
-        if found.is_none() {
-            found = Some((start, end, false));
-        }
-        from = start + 1;
-    }
-    if let Some((start, end, boundary)) = found {
-        ranges.push((start, end));
-        return Some(if boundary {
+        let starts = q_starts_word || word_start(name, start);
+        let class = if starts && (q_ends_word || word_end(name, end)) {
+            SCORE_EXACT_TOKEN
+        } else if start == 0 {
+            SCORE_PREFIX
+        } else if starts {
             SCORE_WORD_PREFIX
         } else {
             SCORE_SUBSTRING
-        });
+        };
+        if found.map(|(kept, _, _)| class > kept).unwrap_or(true) {
+            found = Some((class, start, end));
+        }
+        if class >= SCORE_EXACT_TOKEN {
+            break;
+        }
+        from = start + 1;
     }
-    // 6. fuzzy subsequence
-    if let Some((score, byte_ranges)) = fuzzy_match(name, qchars) {
-        *ranges = byte_ranges;
-        return Some(score);
+    // One Latin letter somewhere inside a word is not a useful match.
+    if let Some((class, _, _)) = found {
+        if class <= SCORE_SUBSTRING && qchars.len() < 2 && q.is_ascii() {
+            found = None;
+        }
     }
-    // 7. single-typo (Damerau-Levenshtein distance <= 1) against stem/name
+    if let Some((class, start, end)) = found {
+        ranges.push((start, end));
+        return Some(class);
+    }
+    // 7. fuzzy subsequence (3+ chars, bounded spread)
+    if qchars.len() >= 3 {
+        if let Some((score, byte_ranges)) = fuzzy_match(name, qchars) {
+            *ranges = byte_ranges;
+            return Some(score);
+        }
+    }
+    // 8. single-typo (Damerau-Levenshtein distance <= 1) against stem/name
     if allow_typo && typo_match(name, stem, qchars) {
         return Some(SCORE_TYPO);
     }
@@ -614,6 +770,9 @@ pub(crate) fn fuzzy_match(name: &str, q: &[char]) -> Option<(f32, Vec<(usize, us
     }
     let first = first?;
     let span_chars = name[first..last_end].chars().count().max(1);
+    if span_chars > q.len() * FUZZY_MAX_SPREAD {
+        return None;
+    }
     let span_quality = (q.len() as f32 / span_chars as f32).clamp(0.0, 1.0);
     let run_quality = (consecutive as f32 / q.len() as f32).clamp(0.0, 1.0);
     let quality = 0.5 * span_quality + 0.5 * run_quality;
@@ -651,6 +810,9 @@ fn fuzzy_match_ascii(name: &str, q: &[char]) -> Option<(f32, Vec<(usize, usize)>
     }
     let first = first?;
     let span_chars = last_end - first;
+    if span_chars > q.len() * FUZZY_MAX_SPREAD {
+        return None;
+    }
     let span_quality = (q.len() as f32 / span_chars.max(1) as f32).clamp(0.0, 1.0);
     let run_quality = (consecutive as f32 / q.len() as f32).clamp(0.0, 1.0);
     let quality = 0.5 * span_quality + 0.5 * run_quality;
@@ -862,16 +1024,88 @@ mod tests {
         let p = QueryPlan::new("report");
         let exact = match_name("report", "report", &p).unwrap();
         let stem = match_name("report.pdf", "report", &p).unwrap();
+        let token = match_name("annual-report.txt", "annual-report", &p).unwrap();
         let prefix = match_name("reports.txt", "reports", &p).unwrap();
-        let word = match_name("annual-report.txt", "annual-report", &p).unwrap();
+        let word = match_name("annual-reports.txt", "annual-reports", &p).unwrap();
         let sub = match_name("myreport.txt", "myreport", &p).unwrap();
         let fuzzy = match_name("r_e_p_o_r_t.txt", "r_e_p_o_r_t", &p).unwrap();
         assert!(exact.score > stem.score);
-        assert!(stem.score > prefix.score);
+        assert!(stem.score > token.score);
+        assert!(token.score > prefix.score);
         assert!(prefix.score > word.score);
         assert!(word.score > sub.score);
         assert!(sub.score > fuzzy.score);
         assert_eq!(exact.byte_ranges, vec![(0, 6)]);
+        assert_eq!(token.byte_ranges, vec![(7, 13)]);
+        assert_eq!(NameMatch::from_score(token.score), NameMatch::ExactToken);
+        assert_eq!(NameMatch::from_score(word.score), NameMatch::WordPrefix);
+        assert_eq!(NameMatch::from_score(fuzzy.score), NameMatch::WeakFuzzy);
+    }
+
+    #[test]
+    fn camel_case_and_digits_are_word_boundaries() {
+        let p = QueryPlan::new("report");
+        let camel = match_name("MyReport.docx", "MyReport", &p).unwrap();
+        assert_eq!(NameMatch::from_score(camel.score), NameMatch::ExactToken);
+        let acronym = match_name("PDFReport.docx", "PDFReport", &p).unwrap();
+        assert_eq!(NameMatch::from_score(acronym.score), NameMatch::ExactToken);
+        let p = QueryPlan::new("2024");
+        let digits = match_name("report2024.xlsx", "report2024", &p).unwrap();
+        assert_eq!(NameMatch::from_score(digits.score), NameMatch::ExactToken);
+        // Extension-shaped queries carry their own boundary.
+        let p = QueryPlan::new(".pdf");
+        let ext = match_name("report.pdf", "report", &p).unwrap();
+        assert_eq!(NameMatch::from_score(ext.score), NameMatch::ExactToken);
+    }
+
+    #[test]
+    fn multi_word_queries_compare_words_in_order() {
+        let p = QueryPlan::new("project report");
+        let stem = match_name("Project_Report.docx", "Project_Report", &p).unwrap();
+        assert_eq!(NameMatch::from_score(stem.score), NameMatch::ExactStem);
+        assert_eq!(stem.byte_ranges, vec![(0, 14)]);
+        let token = match_name("2024 Project Report final.docx", "2024 Project Report final", &p).unwrap();
+        assert_eq!(NameMatch::from_score(token.score), NameMatch::ExactToken);
+        let p = QueryPlan::new("project rep");
+        let prefix = match_name("Project Report.docx", "Project Report", &p).unwrap();
+        assert_eq!(NameMatch::from_score(prefix.score), NameMatch::Prefix);
+        assert_eq!(prefix.byte_ranges, vec![(0, 11)]);
+        let p = QueryPlan::new("proj fin");
+        let ordered = match_name("project-report-final.pdf", "project-report-final", &p).unwrap();
+        assert_eq!(NameMatch::from_score(ordered.score), NameMatch::WordPrefix);
+        let p = QueryPlan::new("fin proj");
+        let unordered = match_name("project-report-final.pdf", "project-report-final", &p).unwrap();
+        assert_eq!(NameMatch::from_score(unordered.score), NameMatch::Substring);
+        assert!(unordered.byte_ranges.windows(2).all(|w| w[0].1 <= w[1].0), "ranges sorted");
+    }
+
+    #[test]
+    fn short_queries_do_not_fuzzy_match() {
+        // A single letter only matches at a word start.
+        let p = QueryPlan::new("r");
+        assert!(match_name("report.txt", "report", &p).is_some());
+        assert!(match_name("annual-report.txt", "annual-report", &p).is_some());
+        assert!(match_name("barn.txt", "barn", &p).is_none());
+        // Two letters: substring yes, scattered subsequence no.
+        let p = QueryPlan::new("rt");
+        assert!(match_name("report.txt", "report", &p).is_some());
+        assert!(match_name("r_a_t.md", "r_a_t", &p).is_none());
+        // A long, thinly spread subsequence is not a match.
+        let p = QueryPlan::new("abc");
+        assert!(match_name("a_very_long_bxxxxxxxxxxxxxxxxxc.txt", "a_very_long_bxxxxxxxxxxxxxxxxxc", &p).is_none());
+        // One-letter non-Latin queries still find text inside a name.
+        let p = QueryPlan::new("告");
+        assert!(match_name("报告.pdf", "报告", &p).is_some());
+    }
+
+    #[test]
+    fn standalone_match_uses_index_rules() {
+        let (score, ranges) = match_name_query("Quarterly Report.xlsx", "report").unwrap();
+        assert_eq!(NameMatch::from_score(score), NameMatch::ExactToken);
+        assert_eq!(ranges, vec![(10, 16)]);
+        let (score, _) = match_name_query("budget.xlsx", "budget").unwrap();
+        assert_eq!(NameMatch::from_score(score), NameMatch::ExactStem);
+        assert!(match_name_query("budget.xlsx", "zzz").is_none());
     }
 
     #[test]

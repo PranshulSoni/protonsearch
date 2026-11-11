@@ -519,8 +519,7 @@ export default function PreferencesView({
               </div>
             </dl>
             <p className="field-help">
-              No model is downloaded without asking. Installing and configuring the runtime is not
-              available in this build.
+              Configure Pi, connect a model or review installation in Workflows.
             </p>
           </div>
         </section>
