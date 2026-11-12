@@ -1,0 +1,5 @@
+Quarterly preview audit notes
+
+This plain-text file exists to test the file/text preview pipeline.
+Unique token: ZEBRA-TXT-2026.
+Second paragraph with the same token repeated: ZEBRA-TXT-2026.

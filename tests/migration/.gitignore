@@ -1,0 +1,8 @@
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+fixture_manifest.json
+__pycache__/
+.tmp/
+harness/target/

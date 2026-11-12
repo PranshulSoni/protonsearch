@@ -1,0 +1,168 @@
+{
+  "label": "04-card-03b-agent-hierarchy",
+  "extra": {},
+  "viewport": {
+    "w": 860,
+    "h": 700,
+    "dpr": 1
+  },
+  "island": {
+    "box": {
+      "x": 170,
+      "y": 79,
+      "w": 520,
+      "h": 411
+    },
+    "classes": "island",
+    "style": {
+      "width": "520px",
+      "height": "411px",
+      "border-radius": "34px",
+      "background-color": "rgb(13, 16, 18)",
+      "border-color": "rgb(46, 53, 56)",
+      "border-width": "1px",
+      "box-shadow": "rgba(20, 32, 40, 0.25) 0px 26px 54px 0px, rgba(27, 32, 32, 0.15) 0px 3px 8px 0px",
+      "top": "22px",
+      "left": "429px",
+      "transform": "matrix(1, 0, 0, 1, -260, 0)",
+      "transition": "width 0.55s cubic-bezier(0.22, 1, 0.36, 1), height 0.55s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.5s cubic-bezier(0.22, 1, 0.36, 1), transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s, visibility",
+      "opacity": "1",
+      "visibility": "visible"
+    }
+  },
+  "inner": {
+    "box": {
+      "x": 171,
+      "y": 80,
+      "w": 518,
+      "h": 378
+    },
+    "style": {
+      "height": "378px",
+      "overflow-y": "hidden",
+      "transform": "matrix(1, 0, 0, 1, 0, 0)",
+      "opacity": "1"
+    }
+  },
+  "dots": {
+    "count": 8,
+    "navBox": {
+      "x": 171,
+      "y": 458,
+      "w": 518,
+      "h": 31
+    },
+    "navStyle": {
+      "height": "31px",
+      "top": "378px",
+      "right": "0px",
+      "left": "0px",
+      "bottom": "0px",
+      "gap": "5px",
+      "background-color": "rgb(16, 20, 22)",
+      "border-top": "1px solid rgb(38, 44, 48)",
+      "position": "absolute"
+    },
+    "active": "Go to Agents card",
+    "samples": [
+      {
+        "box": {
+          "x": 352.5,
+          "y": 459,
+          "w": 14,
+          "h": 30
+        },
+        "dot": {
+          "x": 357,
+          "y": 471.5,
+          "w": 5,
+          "h": 5
+        },
+        "dotStyle": {
+          "width": "5px",
+          "height": "5px",
+          "border-radius": "999px",
+          "background-color": "rgb(101, 113, 118)",
+          "transition": "background 0.2s, width 0.3s cubic-bezier(0.22, 1, 0.36, 1), transform 0.22s"
+        }
+      },
+      {
+        "box": {
+          "x": 371.5,
+          "y": 459,
+          "w": 14,
+          "h": 30
+        },
+        "dot": {
+          "x": 376,
+          "y": 471.5,
+          "w": 5,
+          "h": 5
+        },
+        "dotStyle": {
+          "width": "5px",
+          "height": "5px",
+          "border-radius": "999px",
+          "background-color": "rgb(101, 113, 118)",
+          "transition": "background 0.2s, width 0.3s cubic-bezier(0.22, 1, 0.36, 1), transform 0.22s"
+        }
+      }
+    ]
+  },
+  "fonts": {
+    "searchInput": null,
+    "cardH2": {
+      "font-size": "16px",
+      "font-weight": "700",
+      "letter-spacing": "-0.64px",
+      "line-height": "19.2px",
+      "color": "rgb(246, 247, 248)"
+    },
+    "cardP": {
+      "font-size": "11px",
+      "line-height": "15.95px",
+      "color": "rgb(155, 167, 174)"
+    },
+    "itemStrong": null,
+    "itemSmall": null,
+    "filter": null,
+    "resultFoot": null,
+    "inlineNav": null,
+    "clipTitle": {
+      "font-size": "11.5px",
+      "font-weight": "700"
+    },
+    "clipSmall": {
+      "font-size": "10px",
+      "color": "rgb(138, 154, 164)"
+    },
+    "snippet": null,
+    "chooseTitle": null,
+    "chooseMeta": null,
+    "settingTile": null,
+    "settingToggle": null,
+    "settingExpand": null,
+    "agentStatus": {
+      "font-size": "9px",
+      "padding": "4px 7px",
+      "border-radius": "5px",
+      "color": "rgb(185, 205, 214)"
+    },
+    "agentBtn": {
+      "font-size": "11px",
+      "min-height": "33px",
+      "padding": "8px 11px",
+      "border-radius": "7px"
+    },
+    "notificationTitle": null,
+    "notificationBody": null
+  },
+  "counts": {
+    "results": 0,
+    "filters": 0,
+    "clipRows": 5,
+    "agents": 5,
+    "settings": 0,
+    "notifications": 0
+  }
+}

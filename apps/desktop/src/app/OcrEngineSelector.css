@@ -1,0 +1,134 @@
+/* OCR engine list, used by Search & Indexing, Settings and onboarding. Colours and
+   spacing come from styles/tokens.css so it matches the rest of the app. */
+
+.ocr-engines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ocr-engines-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ocr-engines-title {
+  margin: 0;
+  color: var(--ps-ink);
+  font-size: var(--ps-text-strong);
+  font-weight: var(--ps-fw-strong);
+}
+
+.ocr-engines-lead {
+  margin: 0;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+  line-height: 1.55;
+}
+
+.ocr-engine-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .ocr-engine-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.ocr-engine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--ps-border) solid var(--ps-line);
+  border-radius: var(--ps-radius-row);
+  background: var(--ps-surface-raised);
+}
+
+.ocr-engine.is-current {
+  border-color: var(--ps-accent);
+}
+
+.ocr-engine-head,
+.ocr-engine-meta,
+.ocr-engine-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ocr-engine-name {
+  color: var(--ps-ink);
+  font-size: var(--ps-text-strong);
+  font-weight: var(--ps-fw-strong);
+}
+
+.ocr-engine-current {
+  margin-left: auto;
+  color: var(--ps-accent);
+  font-size: var(--ps-text-meta);
+  font-weight: var(--ps-fw-semibold);
+}
+
+.ocr-engine-desc,
+.ocr-engine-license {
+  margin: 0;
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+  line-height: 1.55;
+}
+
+.ocr-engine-foot {
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: var(--ps-border) solid var(--ps-line-soft);
+}
+
+.ocr-engine-status {
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+}
+
+.ocr-engine-status.is-installed {
+  color: var(--ps-positive);
+}
+
+.ocr-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-1);
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: ocr-spin var(--ps-dur-loop) linear infinite;
+}
+
+@keyframes ocr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocr-spinner {
+    animation: none;
+  }
+}
+
+.ocr-engine-notice {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.8;
+}

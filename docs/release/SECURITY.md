@@ -1,0 +1,108 @@
+# Security — ProtonSearch v2 (consolidated release view)
+
+This is the release-facing summary. The full legacy threat model is in
+**docs/security/SECURITY_RISK_REGISTER.md** (Gate 0, commit de0ef19); the v2 code review is in
+**docs/security/V2_SECURITY_REVIEW.md** (no criticals; must-fixes listed). Nothing here replaces
+those documents.
+
+## 1. Legacy exposure that must be handled before any v2 release
+
+| # | Severity | Issue | Action |
+|---|---|---|---|
+| S-01 | **CRITICAL** | A full AI API key was committed to git history (masked sk-Hr...***, 67 chars; commits 41b56c8, 1bfe506, 11f0dfe, d55c3ad). Repo is public. | **Rotate/revoke the key now.** History rewrite is secondary. Add secret scanning to CI. |
+| S-02 | **CRITICAL** | Legacy updater fetches mutable update.json, downloads an EXE to %TEMP%, runs it with no signature/hash check (settings_ui.rs:677-900). | v2 must ship a signed manifest (Ed25519/minisign pinned key) + SHA-256 + Authenticode signer pin before executing any update. G7 gate. |
+| S-03 | HIGH | Legacy Hermes gateway uses a static default key ("hermes") on loopback with terminal/computer_use tools enabled (ai.rs:519-622). | v2 sidecar: random per-install token, loopback peer checks, tools off by default, explicit approvals. |
+| S-04 | HIGH | Legacy stores AI keys plaintext in SQLite and passes them on child argv (settings_ui.rs:1145, main.rs:4925-4928). | v2: DPAPI/Credential Manager; never argv; no plaintext keys in DB/logs. |
+| S-05 | HIGH | Legacy "run powershell ..." search prefix executes arbitrary PowerShell without confirmation (main.rs:4479-4545). | v2 must not ship this path; if kept, explicit confirmation + allowlist. |
+| S-06 | HIGH | Fetched web content can prompt-inject a tool-enabled agent; URL fetch is SSRF-capable (ai.rs:1163-1172,1248-1266). | Treat fetched content as data; disable tools for summarize; block private/loopback IPs; audit agent actions. |
+| S-07 | HIGH | Legacy clipboard capture + Windows-history import persists secrets/screenshots without opt-in (main.rs:1937-1999,11704-11826). | v2 clipboard capture opt-in/off by default, source-app exclusions, TTL; never send clipboard to AI implicitly. |
+
+Other findings (S-08...S-20) and positive controls are in the register.
+
+## 1b. v2 code review status (2026-11-09)
+
+docs/security/V2_SECURITY_REVIEW.md reviewed migration, engine, Tauri command surface,
+ps-windows and ps-content. No criticals were found. Post-review fixes verified: migration retry
+state (V2-01), DB+WAL+SHM fingerprinting (V2-02), imported-count reporting (V2-03), server-side
+15 s confirmation handshake for destructive native actions (V2-04), CDP disabled in release
+builds (V2-05), clipboard opt-in by default (V2-06), migration URI encoding (V2-09). Residual
+risks: clipboard DIB pixel cap (V2-07), app-target validation depth (V2-08), activity-log
+retention UX (V2-10). See the review document for file:line evidence.
+
+## 1c. Pi agent runtime — replaces legacy Hermes (G6)
+
+The v2 agent runtime is the installed Pi coding-agent CLI (replaces Hermes; the embedded
+Pydantic AI sidecar is kept as an optional fallback). Full review:
+docs/security/PI_AGENT_SECURITY.md. Code-verified controls: read-only tool allowlist by default
+(read,grep,find,ls), writes/shell only with persisted settings.agent.allow_writes, prompt sent
+via stdin (never the command line), CREATE_NO_WINDOW, 4 MiB JSONL cap, idle 120 s / max 15 min
+timeouts, taskkill /T tree cancellation, redacted stderr/tool previews, no API keys read by
+ProtonSearch.
+
+Re-review status (task-17, 2026-11-10): PI-SEC-01 (MCP off), 02 (extensions/skills/
+prompt-templates off), 03 (context files off), 04 (final-Output redaction + broadened shapes),
+05 (minimal child env), 06 (offline/telemetry controls), 07 (launcher validation), 08 (cached/
+capped probe), 09 (pid-reuse narrowing), 14 (prompt caps) and 15 (minimum Pi version) are
+implemented and independently verified: cargo test -p ps-agent -> 71 passed (51 unit + 16 Pi E2E
++ 4 legacy), cargo check -p protonsearch-v2 -> exit 0, real probe 1.5.0 source=Managed.
+Full evidence: docs/security/PI_AGENT_SECURITY.md section 7.
+
+Remaining gate for enabling the Workflows UI:
+1. RR-01 (must): Workflows UI copy currently claims files outside the workspace are not exposed —
+   false (Pi has no sandbox). Fix the disclosure (no OS sandbox, no per-tool approval, workspace
+   is the default folder not a boundary, provider egress) in the same change.
+2. RR-02 (must before write-enabled workflows): per-run write consent is UI-only and persisted as
+   settings.agent.allow_writes; there is no server-side per-run confirmation token. Ship
+   read-only workflows now; add a confirm_writes handshake (like confirm_native_action) or
+   non-persistent write consent before exposing the write toggle.
+3. Should-fix before RC: RR-03 cached status probe, RR-04 explicit Pi shutdown in quit_app,
+   RR-05 show resolved Pi path/source, RR-06 integration-doc correction.
+Residuals: no Job Object (app-crash orphan), PATH fallback, live inference with PI_OFFLINE
+unverified, provider vars forwarded when writes enabled, no per-tool approval/no sandbox.
+
+Should-fix: PI-SEC-03 (--no-context-files), PI-SEC-06 (PI_OFFLINE/PI_SKIP_VERSION_CHECK/
+PI_TELEMETRY=0), PI-SEC-07 (launcher path policy), PI-SEC-08 (probe cache/capture cap),
+PI-SEC-09 (Job Object kill-on-close). High assurance: run Pi in a container/VM or dedicated
+account (Pi docs containerization.md).
+
+## 2. v2 security requirements (release gates)
+
+1. **No secrets in the repo or build artifacts.** CI secret scan must pass. No embedded or
+   shared operator keys in clients — BYO key.
+2. **Credential storage:** Windows DPAPI or Credential Manager; redact from logs, crash
+   dumps, command lines and support bundles.
+3. **Update integrity:** signed manifest + artifact SHA-256 + Authenticode signer pin; bounded
+   download; no execution without verification (G7).
+4. **Agent surface:** read-only by default; loopback token auth + peer check; tool calls require
+   approval; file/web content is never treated as instructions (G6).
+5. **Data minimisation:** clipboard capture opt-in/off; exclude hidden/credential paths by
+   default; migration never imports AI keys silently (G4/G5).
+6. **Migration safety:** legacy DB opened read-only; no legacy uninstaller invocation; rollback
+   snapshot before import (G4).
+7. **Installer:** per-user, no elevation requirement; uninstall keeps user data by default and
+   asks separately for deletion (G7).
+8. **Dependency hygiene:** cargo audit/cargo deny + lockfile review; licence notices generated
+   (see THIRD_PARTY_LICENSES.md) at G7.
+
+## 3. Disclosure policy
+
+Report vulnerabilities **privately** via GitHub Security Advisories on
+github.com/PranshulSoni/protonsearch ("Security -> Advisories -> Report a vulnerability").
+Do not open a public issue for a vulnerability. Do not publish exploit details before a fix
+and key rotation are available. (No private email address is invented here; the maintainer
+must add one explicitly if desired.)
+
+## 4. Secret-handling rules for this repository
+
+- Never print, commit, paste into issues, or test real keys.
+- Report leaked material as masked prefix + length + file:line, and rotate immediately.
+- Any key ever committed is considered compromised forever (forks/caches).
+- Do not add service credentials to CI; workflows use permissions: contents: read only.
+
+## 5. Audit/gate commitments (G7)
+
+- cargo audit (or cargo deny check advisories) clean or documented exceptions.
+- Secret scan clean on the release commit.
+- Installer signature verified (signtool verify /pa) and recorded.
+- SHA256SUMS published and signed; update manifest signature verified.
+- No unsafe expansion without review in ps-windows (Win32 confinement).

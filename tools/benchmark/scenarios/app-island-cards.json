@@ -1,0 +1,16 @@
+{
+  "name": "app-island-card-switches",
+  "label": "app-island-cards",
+  "kind": "cdp",
+  "pageUrlIncludes": "index.html",
+  "viewport": { "width": 1440, "height": 900 },
+  "deviceScaleFactor": 1,
+  "setup": "",
+  "switchKey": "Control+ArrowDown",
+  "note": "Template for the future React Dynamic Island. The app run must be launched with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 and the island must already be visible; adjust setup/switchKey to the implemented handlers. Not run until the island ships.",
+  "warmup": 3,
+  "repeats": 24,
+  "measureMs": 650,
+  "transitionSelector": "#island",
+  "contentSelector": ".island-card h2"
+}

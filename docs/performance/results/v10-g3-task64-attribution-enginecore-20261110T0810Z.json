@@ -1,0 +1,128 @@
+{
+  "schema": "protonsearch-v2/task64-attribution/1",
+  "generatedAtUtc": "20261110T0810Z",
+  "sources": {
+    "appSession": "docs/performance/results/task64-payload-split-617b6df.json (perf-bench pre-fix debug session) and task64-payload-split-364be8a.json (perf-bench re-run on lead's island-debounce fix)",
+    "engineProbe": "docs/performance/results/v10-g3-payload-summary-enginecore-20261110T0733Z.json (engine probe, 139,386-entry copy)"
+  },
+  "singleInputEvent": {
+    "inputToFirstVisible": {
+      "p50": 15.8,
+      "p95": 16.3,
+      "min": 11,
+      "unit": "ms"
+    },
+    "directInvokeWall": {
+      "p50": 7.9,
+      "p95": 9.2,
+      "unit": "ms"
+    },
+    "engineTookMs": {
+      "p50": 1.2,
+      "p95": 2.2,
+      "unit": "ms"
+    },
+    "payloadChars": {
+      "p50": 46342,
+      "p95": 54101,
+      "min": 41381,
+      "max": 54101
+    },
+    "split": {
+      "engine": "1-2 ms",
+      "ipcReturnSerializeTransferParse": "~6.7 ms",
+      "reactCommitPaint": "~8 ms"
+    },
+    "longTasksOver50ms": 0
+  },
+  "steadyStateTyping": {
+    "scenario": "char-by-char input events ~50 ms apart, results already visible",
+    "firstCharMs": [
+      15.8,
+      16
+    ],
+    "subsequentKeystrokeMs": [
+      106,
+      108
+    ],
+    "resultDomChangeMs": [
+      94,
+      96
+    ],
+    "payloadDependence": "none - same ~106 ms for 41 KB and 54 KB prefixes",
+    "longTasksOver50ms": 0,
+    "attribution": "engine ~1-2 ms and invoke ~8 ms are unchanged; the extra ~90 ms is UI-side (island input debounce 24 ms in useIslandSearch + full result-list re-render/paint in the debug WebView), not payload or engine work"
+  },
+  "enginePayloadMap": {
+    "typingKeystrokeJsonBytes": {
+      "min": 37896,
+      "max": 55113,
+      "average": 45591,
+      "limit": 30
+    },
+    "breakdown": {
+      "actions": 14073,
+      "iconDataUrls": 3682,
+      "subtitles": 3506,
+      "paths": 3333,
+      "nullLiterals": 367
+    },
+    "appsScope": {
+      "json": 14915,
+      "iconBytes": 11834,
+      "iconSharePercent": 79
+    },
+    "clipboardCard": {
+      "json": 55794,
+      "thumbnailBytes": 49734,
+      "thumbnailSharePercent": 89
+    }
+  },
+  "crossChecks": {
+    "nulls": "perf-bench page walk 356-386 nulls/response; engine probe avg 367 - consistent",
+    "actions": "perf-bench page walk reports 4,948-6,117 chars; engine serde bytes 11.8-16 KB (their walk likely sums a subset such as action path chars) - engine number is authoritative for wire size",
+    "icons": "perf-bench page walk icon chars = 0 for this data dir/profile; engine probe with sources loaded measured 0-13,230 B of icon data URLs per response - engine number authoritative"
+  },
+  "engineSideReductionsLanded": [
+    "cached app icon data URLs (path+mtime+len, bounded 256): app-matching prefixes 0.60-0.64 -> 0.44-0.48 ms p50 debug, payload unchanged",
+    "cached clipboard thumbnail data URLs (bounded 128): clipboard card search 0.94 -> 0.68 ms, payload unchanged",
+    "preview registry trims icon/action payloads: no payload change, less per-keystroke cloning"
+  ],
+  "conclusions": [
+    "Engine is not the lag: 1-2 ms of a 15.8 ms first-visible and of a ~106 ms steady-state keystroke.",
+    "First keystroke is under the 30 ms p95 target already (16.3 ms p95) once payload/IPC/render are split.",
+    "Steady-state ~90 ms extra is independent of payload size -> UI-side render/queue (debounce 24 ms + 30-row list re-render in debug WebView), not IPC or engine.",
+    "Payload size wins remain available but would not fix steady-state typing: ps-ipc skip_serializing_if (~8-11 KB), asset-protocol app icons (~10-13 KB), lazy clipboard thumbnails.",
+    "Post-fix re-run on 364be8a confirms the attribution: steady-state keystrokes dropped from ~106-108 ms to 42-56 ms with identical engine/IPC payload numbers. No engine follow-up is needed for the typing tail."
+  ],
+  "recommendedNextSteps": [
+    "None for engine: lead's island debounce fix (364be8a) resolved the steady-state tail; engine remains ~1-2 ms and payload unchanged.",
+    "ps-ipc: skip_serializing_if for Option/empty fields (lead-owned, no visible change).",
+    "No engine follow-up needed for the typing tail; engine-side reductions are CPU-only and already landed."
+  ],
+  "caveats": [
+    "perf-bench card rows in the session JSON are a probe artifact (fixed 420 ms wait) and were not used.",
+    "payloadChars is JSON.stringify length (UTF-16 chars, app-visible lower bound), not raw wire bytes.",
+    "steady-state rows used programmatic input events; no long tasks >50 ms were recorded, so render work may be split across frames."
+  ],
+  "postFixRerun": {
+    "build": "364be8a (island debounce 80 -> 24 ms; engine/IPC unchanged)",
+    "singleInputToFirstVisible": {
+      "p50": 8.5,
+      "p95": 16.9,
+      "unit": "ms"
+    },
+    "subsequentKeystrokeMs": [
+      42,
+      56
+    ],
+    "resultDomChangeMs": [
+      36,
+      45
+    ],
+    "engineMs": 1.2,
+    "directInvokeWallP50": 9,
+    "payloadChars": 46342,
+    "conclusion": "Lead's debounce fix removed the ~90 ms steady-state tail; pre-fix 106-108 ms rows are superseded. Engine/IPC payload were unchanged, confirming the tail was UI-side scheduling/render, not engine or payload."
+  }
+}

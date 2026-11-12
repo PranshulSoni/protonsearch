@@ -1,0 +1,201 @@
+{
+  "schema": "ps-task64-payload/1",
+  "kind": "engine-payload-ipc-react-split",
+  "status": "ok",
+  "capturedAt": "2026-11-10T07:49:13.504Z",
+  "host": {
+    "hostname": "PranshulAsus"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe",
+    "exeBytes": 20696064,
+    "exeMtime": "2026-11-10T07:48:51.203Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "prefixes": [
+      "r",
+      "re",
+      "rea",
+      "read",
+      "readm",
+      "readme",
+      "s",
+      "sc",
+      "scre",
+      "screenshot",
+      "p",
+      "pro",
+      "project"
+    ],
+    "profile": "island-primary (debug + CDP)",
+    "gitHead": "93dd9b5da0aae694df3f1073f07ca69238f36461",
+    "gitDirty": 24,
+    "appPid": 37372
+  },
+  "measurements": {
+    "indexReady": {
+      "state": "indexing",
+      "entries": 131199
+    },
+    "coldMemory": {
+      "label": "cold-idle",
+      "totalWorkingSetMiB": 407.9,
+      "totalPrivateMiB": 204.8,
+      "processCount": 9
+    },
+    "typing": {
+      "rows": [
+        {
+          "prefix": "r",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "re",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "rea",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "read",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "readm",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "readme",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "s",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "sc",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "scre",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "screenshot",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "p",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "pro",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "prefix": "project",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        }
+      ],
+      "inputToVisibleMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null
+      },
+      "inputToChangedMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null
+      },
+      "directWallMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null
+      },
+      "payloadChars": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null
+      }
+    },
+    "steadyStateTyping": [
+      {
+        "error": "Error: page.evaluate: Target page, context or browser has been closed",
+        "query": "readme"
+      },
+      {
+        "error": "Error: page.evaluate: Target page, context or browser has been closed",
+        "query": "screenshot"
+      }
+    ],
+    "cards": {
+      "rows": [
+        {
+          "card": "Search",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "card": "Media",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "card": "Clipboard",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "card": "Agents",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "card": "Quick Settings",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "card": "Notifications",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "card": "Browser",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        },
+        {
+          "card": "Git",
+          "error": "Error: page.evaluate: Target page, context or browser has been closed"
+        }
+      ],
+      "ms": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null
+      }
+    },
+    "memoryAfterProbe": {
+      "label": "after-probe",
+      "totalWorkingSetMiB": 0,
+      "totalPrivateMiB": 0,
+      "processCount": 0
+    }
+  },
+  "blocked": [],
+  "limitations": [
+    "Shell does not log raw SearchResponse bytes; payloadChars is JSON.stringify(response).length from a direct page-side invoke (the same object the app receives after IPC parse), so it is a lower bound for wire bytes (no framing) and an upper-bound proxy for parse input size.",
+    "The app's own search invoke is captured at module import, so engineWall for the app's call is not interceptable; directInvoke wall/took_ms are measured with an identical request on the same page (same engine/DB/cache state).",
+    "Typing rows: each prefix typed into an empty island search input via the native value setter + input event (single input event per prefix, like a paste of the prefix), then wait for the result signature to change + double rAF.",
+    "Card rows: Ctrl+ArrowDown-driven card switches from the search card; open->rendered = keydown dispatch -> heading text changes -> double rAF; long tasks observed during the window."
+  ]
+}

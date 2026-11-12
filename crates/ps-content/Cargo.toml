@@ -1,0 +1,25 @@
+[package]
+name = "ps-content"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+rusqlite = { workspace = true }
+walkdir = { workspace = true }
+memchr = "2"
+
+# Extraction pipeline (bounded, background only; never per-query).
+pdf-extract = "0.10"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+quick-xml = "0.42"
+encoding_rs = "0.8"
+sha2 = "0.10"
+
+[dev-dependencies]
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+pdf-extract = "0.10"
+rusqlite = { workspace = true }

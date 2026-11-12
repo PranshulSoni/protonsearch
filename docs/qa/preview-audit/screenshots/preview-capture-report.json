@@ -1,0 +1,1196 @@
+{
+  "capturedAt": "2026-11-09T20:40:24.326Z",
+  "settingsProbe": {
+    "contentEnabled": true,
+    "ocrEnabled": true,
+    "roots": [
+      {
+        "path": "C:\\Users\\Pranshul\\Desktop",
+        "mode": "content_and_ocr",
+        "enabled": true
+      },
+      {
+        "path": "C:\\Users\\Pranshul\\Documents",
+        "mode": "content",
+        "enabled": true
+      },
+      {
+        "path": "C:\\Users\\Pranshul\\Downloads",
+        "mode": "names_only",
+        "enabled": true
+      },
+      {
+        "path": "C:\\Users\\Pranshul\\Pictures",
+        "mode": "content_and_ocr",
+        "enabled": true
+      }
+    ],
+    "resultLimit": 30
+  },
+  "engine": {
+    "state": "ready",
+    "files": 139386,
+    "docs": 16848,
+    "ocr": 373
+  },
+  "scenarios": [
+    {
+      "scenario": "file-txt",
+      "query": "notes.txt",
+      "selectedRow": "TXTNOTES.txtProjects / bpe-paper / experiments / ultra_v22 Oct",
+      "preview": {
+        "present": true,
+        "note": "Preview not available — press Enter to open.",
+        "snippet": null,
+        "text": "TXTTHIRD_PARTY_NOTICES.txtFileC:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\agent-sidecar\\.venv-nanobot\\Lib\\site-packages\\nanobot\\tui\\bin\\THIRD_PARTY_NOTICES.txtPreview not available — press Enter to open.Size214 KBModified9 hours agoOpenReveal in ExplorerCopy path"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-file-txt.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.198279
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 40,
+          "tookMs": 2.988439
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 12,
+          "tookMs": 19.482435
+        },
+        {
+          "tier": 1,
+          "label": "sources",
+          "hits": 1,
+          "tookMs": 7.064445
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.280203
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"notes.txt\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "pydevd_modify_bytecode",
+          "path": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_frame_eval\\pydevd_modify_bytecode.py",
+          "snippet": "…jumps:\n    # https://github.com/python/cpython/blob/3.6/Objects/lnotab_notes.txt\n\n    # Usually use a stop line -1, but if that'd be…",
+          "label": "line 85",
+          "line": 85
+        },
+        {
+          "kind": "content_match",
+          "title": "to-work-model.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\src\\ui\\my-work\\src\\live\\to-work-model.test.ts",
+          "snippet": "…true, sourcePath: '/w/.scratch/report.html' },\n    { kind: 'file', title: 'notes.txt', url: '/api/deliverables/22/notes-ab12cd34.txt', available: true, deliverable: true },\n    { kind: 'page…",
+          "label": "line 268",
+          "line": 268
+        },
+        {
+          "kind": "content_match",
+          "title": "pending-restore.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\backup\\pending-restore.test.ts",
+          "snippet": "…nested/claude-mem-x.db')).toBeNull();\n    expect(resolveSnapshotInside('/data/backups/auto', 'notes.txt')).toBeNull();\n  });\n});\n\ndescribe('applyPendingRestore', () => {\n  it('does nothing when no restore is staged…",
+          "label": "line 58",
+          "line": 58
+        },
+        {
+          "kind": "content_match",
+          "title": "codex-file-context.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\cli\\adapters\\codex-file-context.test.ts",
+          "snippet": "…filesystem__read_file', {\n      paths: ['README.md', 'notes.txt', 'missing.txt'],\n    }, tmpDir);\n\n    expect(paths).toEqual(['README.md', 'notes.txt']);\n  });\n\n  it('extracts MCP exact read/view…",
+          "label": "line 14",
+          "line": 14
+        },
+        {
+          "kind": "content_match",
+          "title": "hermes-installer.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\hermes-installer.test.ts",
+          "snippet": "…pyc'), 'compiled');\n    writeFileSync(join(plugin, 'notes.txt'), 'mine');\n    expect(uninstallHermesIntegration()).toBe(0);\n    expect(readdirSync(plugin)).toEqual(['notes.txt']);\n  });\n\n  it('uninstall with nothing installed is…",
+          "label": "line 305",
+          "line": 305
+        },
+        {
+          "kind": "content_match",
+          "title": "backup-routes.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\worker\\http\\routes\\backup-routes.test.ts",
+          "snippet": "…utimesSync(join(tempRoot, name), new Date(), new Date());\n      }\n      writeFileSync(join(tempRoot, 'notes.txt'), 'not a snapshot');\n\n      const mockDbManager = { getBackupManager: () => null };\n      const chains = buildChains(new…",
+          "label": "line 206",
+          "line": 206
+        },
+        {
+          "kind": "content_match",
+          "title": "session-routes-network-hint.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\worker\\http\\routes\\session-routes-network-hint.test.ts",
+          "snippet": "…Map<number, ActiveSession> }).sessions.set(session.sessionDbId, session);\n  sessionManager.getMessageBuffer().enqueue(session.sessionDbId, {\n    type: 'observation',\n    tool_name: 'Read',\n    tool_input: '{\"file_path\":\"notes.txt…",
+          "label": "line 66",
+          "line": 66
+        },
+        {
+          "kind": "content_match",
+          "title": "execute",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\bpe-paper\\common\\execute\\execute.bat",
+          "snippet": "…echo          Install MinGW-w64 g++ or build manually per experiments/ultra_v2/NOTES.txt\n        exit /b 0\n    )\n    echo [AUTO-BUILD] Ultra V2 ^(g++ direct…",
+          "label": "line 442",
+          "line": 442
+        },
+        {
+          "kind": "content_match",
+          "title": "execute",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\bpe-paper\\common\\execute\\execute.sh",
+          "snippet": "…see experiments/ultra_v2/NOTES.txt)\n  pure_ultra_v2: V2 algorithm with training and elapsed time output\nDatasets:\n  file=train.en.ddfreq          (small, ~3…",
+          "label": "line 34",
+          "line": 34
+        },
+        {
+          "kind": "content_match",
+          "title": "combine.test",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\document-vault\\Testing\\tests\\combine.test.ts",
+          "snippet": "…1)], 'front.pdf', { type: 'application/pdf' });\n  const bad = new File(['notes'], 'notes.txt', { type: 'text/plain' });\n  await assert.rejects(combineFrontAndBack(good, bad), (error: unknown…",
+          "label": "line 58",
+          "line": 58
+        },
+        {
+          "kind": "content_match",
+          "title": "formats.test",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\document-vault\\Testing\\tests\\formats.test.ts",
+          "snippet": "…equal(detectFileMimeType('x.json', '', new Uint8Array()), 'application/json');\n  assert.equal(detectFileMimeType('notes.txt', '', head('plain text notes')), 'text/plain');\n  assert.equal(detectFileMimeType('notes.unknown…",
+          "label": "line 141",
+          "line": 141
+        },
+        {
+          "kind": "content_match",
+          "title": "test_image_files",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\firetv-workspace\\cleanyourtv-custom\\tests\\test_image_files.py",
+          "snippet": "…self.write(\"notes.txt\", b\"iVBORw0KGgoAAAANSUhEUg\" + b\"A\" * 40)\n        self.assertEqual([], list(image_files(self.root)))\n\n\nif __name__ == \"__main__\":\n    unittest.main()",
+          "label": "line 148",
+          "line": 148
+        },
+        {
+          "kind": "clipboard",
+          "title": "C:\\Users\\Pranshul\\Documents\\notes.txt",
+          "path": null,
+          "snippet": null,
+          "label": "PATH",
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "NOTES.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\bpe-paper\\experiments\\ultra_v2\\NOTES.txt",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "THIRD_PARTY_NOTICES.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\agent-sidecar\\.venv-nanobot\\Lib\\site-packages\\nanobot\\tui\\bin\\THIRD_PARTY_NOTICES.txt",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "THIRD-PARTY-NOTICES.TXT",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\wallpapers\\.tools\\dotnet\\sdk\\10.0.401\\Sdks\\Microsoft.NET.Sdk.WindowsDesktop\\THIRD-PARTY-NOTICES.TXT",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "ThirdPartyNotices.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\wallpapers\\.tools\\dotnet\\ThirdPartyNotices.txt",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "Week11Notes.pdf.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Codex\\2026-10-16\\also-make-sure-to-refer-the\\work\\condensed\\Week11Notes.pdf.txt",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "Week12Notes.pdf.txt",
+          "path": "C:\\Users\\Pranshul\\Documents\\Codex\\2026-10-16\\also-make-sure-to-refer-the\\work\\condensed\\Week12Notes.pdf.txt",
+          "snippet": null,
+          "label": null,
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "file-pdf",
+      "query": "report.pdf",
+      "selectedRow": "PYtest_pdf_windowsC: / Users / Pranshul / .claude / plugins / marketplaces / thedotmack / claude-mem-cursor / skills / agent-cost-report / scripts / testsline 47",
+      "preview": {
+        "present": true,
+        "note": null,
+        "snippet": "Line 185…with open(os.path.join(self.tmp, \"report.pdf\"), \"wb\") as fh: fh.write(PDF)\n        path, msg, _, _ = self.mac(fake=FakeChrome(pdf=b\"%PDF…",
+        "text": "PYtest_renderMatch in documentC:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\claude-mem-cursor\\skills\\agent-cost-report\\scripts\\tests\\test_render.pyLine 185…with open(os.path.join(self.tmp, \"report.pdf\"), \"wb\") as fh: fh.write(PDF)\n        path, msg, _, _ = self.mac(fake=FakeChrome(pdf=b\"%PDF…Line185Open"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-file-pdf.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.191155
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 0,
+          "tookMs": 3.6129591
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 12,
+          "tookMs": 5.842711
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.298013
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"report.pdf\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "test_pdf_windows",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\claude-mem-cursor\\skills\\agent-cost-report\\scripts\\tests\\test_pdf_windows.py",
+          "snippet": "…assertIsNone(path)\n        self.assertIn(\"PDF skipped\", message)\n        self.assertFalse((self.out / \"report.pdf\").exists())\n\n    def test_explicit_chrome_path_still_produces_pdf(self):\n        path…",
+          "label": "line 47",
+          "line": 47
+        },
+        {
+          "kind": "content_match",
+          "title": "test_render",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\claude-mem-cursor\\skills\\agent-cost-report\\scripts\\tests\\test_render.py",
+          "snippet": "…with open(os.path.join(self.tmp, \"report.pdf\"), \"wb\") as fh: fh.write(PDF)\n        path, msg, _, _ = self.mac(fake=FakeChrome(pdf=b\"%PDF…",
+          "label": "line 185",
+          "line": 185
+        },
+        {
+          "kind": "content_match",
+          "title": "test_pdf_windows",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\claude-mem-grok-bot\\skills\\agent-cost-report\\scripts\\tests\\test_pdf_windows.py",
+          "snippet": "…assertIsNone(path)\n        self.assertIn(\"PDF skipped\", message)\n        self.assertFalse((self.out / \"report.pdf\").exists())\n\n    def test_explicit_chrome_path_still_produces_pdf(self):\n        path…",
+          "label": "line 47",
+          "line": 47
+        },
+        {
+          "kind": "content_match",
+          "title": "test_render",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\claude-mem-grok-bot\\skills\\agent-cost-report\\scripts\\tests\\test_render.py",
+          "snippet": "…with open(os.path.join(self.tmp, \"report.pdf\"), \"wb\") as fh: fh.write(PDF)\n        path, msg, _, _ = self.mac(fake=FakeChrome(pdf=b\"%PDF…",
+          "label": "line 185",
+          "line": 185
+        },
+        {
+          "kind": "content_match",
+          "title": "test_pdf_windows",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\cowork\\skills\\agent-cost-report\\scripts\\tests\\test_pdf_windows.py",
+          "snippet": "…assertIsNone(path)\n        self.assertIn(\"PDF skipped\", message)\n        self.assertFalse((self.out / \"report.pdf\").exists())\n\n    def test_explicit_chrome_path_still_produces_pdf(self):\n        path…",
+          "label": "line 47",
+          "line": 47
+        },
+        {
+          "kind": "content_match",
+          "title": "test_render",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\cowork\\skills\\agent-cost-report\\scripts\\tests\\test_render.py",
+          "snippet": "…with open(os.path.join(self.tmp, \"report.pdf\"), \"wb\") as fh: fh.write(PDF)\n        path, msg, _, _ = self.mac(fake=FakeChrome(pdf=b\"%PDF…",
+          "label": "line 185",
+          "line": 185
+        },
+        {
+          "kind": "content_match",
+          "title": "test_pdf_windows",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\openclaw\\skills\\agent-cost-report\\scripts\\tests\\test_pdf_windows.py",
+          "snippet": "…assertIsNone(path)\n        self.assertIn(\"PDF skipped\", message)\n        self.assertFalse((self.out / \"report.pdf\").exists())\n\n    def test_explicit_chrome_path_still_produces_pdf(self):\n        path…",
+          "label": "line 47",
+          "line": 47
+        },
+        {
+          "kind": "content_match",
+          "title": "test_render",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\openclaw\\skills\\agent-cost-report\\scripts\\tests\\test_render.py",
+          "snippet": "…with open(os.path.join(self.tmp, \"report.pdf\"), \"wb\") as fh: fh.write(PDF)\n        path, msg, _, _ = self.mac(fake=FakeChrome(pdf=b\"%PDF…",
+          "label": "line 185",
+          "line": 185
+        },
+        {
+          "kind": "content_match",
+          "title": "test_pdf_windows",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\plugin\\skills\\agent-cost-report\\scripts\\tests\\test_pdf_windows.py",
+          "snippet": "…assertIsNone(path)\n        self.assertIn(\"PDF skipped\", message)\n        self.assertFalse((self.out / \"report.pdf\").exists())\n\n    def test_explicit_chrome_path_still_produces_pdf(self):\n        path…",
+          "label": "line 47",
+          "line": 47
+        },
+        {
+          "kind": "content_match",
+          "title": "test_render",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\plugin\\skills\\agent-cost-report\\scripts\\tests\\test_render.py",
+          "snippet": "…with open(os.path.join(self.tmp, \"report.pdf\"), \"wb\") as fh: fh.write(PDF)\n        path, msg, _, _ = self.mac(fake=FakeChrome(pdf=b\"%PDF…",
+          "label": "line 185",
+          "line": 185
+        },
+        {
+          "kind": "content_match",
+          "title": "deliverables-capture.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\cli\\deliverables-capture.test.ts",
+          "snippet": "…checkout, 'missing.pdf'), checkout, roots)).toBeNull();\n    expect(resolveCandidatePath('https://example.com/report.pdf', checkout, roots)).toBeNull();\n    expect(warnings).not.toHaveBeenCalled();\n  });\n\n  it('roots are the…",
+          "label": "line 103",
+          "line": 103
+        },
+        {
+          "kind": "content_match",
+          "title": "test_upload_toctou_race",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\open-notebook\\tests\\test_upload_toctou_race.py",
+          "snippet": "…futures = [\n            pool.submit(write_fn, upload_folder, \"report.pdf\", f\"content-{i}\".encode())\n            for i in range(n)\n        ]\n        return [f.result() for f in…",
+          "label": "line 59",
+          "line": 59
+        }
+      ]
+    },
+    {
+      "scenario": "file-docx",
+      "query": "report.docx",
+      "selectedRow": "DOCPractical_2_Report.docxNirma / BTech 3rd Year / DAV / prac23 Oct",
+      "preview": {
+        "present": true,
+        "note": "Preview not available — press Enter to open.",
+        "snippet": null,
+        "text": "DOCPractical_3_Report.docxFileC:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\DAV\\prac3\\Practical_3_Report.docxPreview not available — press Enter to open.Size38 KBModified3 OctOpenReveal in ExplorerCopy path"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-file-docx.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.401308
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 4,
+          "tookMs": 4.366896
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 2,
+          "tookMs": 3.2140262
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.615022
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"report.docx\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "325a346b45ca16edb8ee56be662cc222db991b0e1bb93856f3fb361ee445ba05",
+          "path": "C:\\Users\\Pranshul\\.cline\\data\\settings\\composio\\325a346b45ca16edb8ee56be662cc222db991b0e1bb93856f3fb361ee445ba05.json",
+          "snippet": "…true\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\t\t\t\"type\": \"array\",\n\t\t\t\t\t\t\t\t\t\t\"items\": {\n\t\t\t\t\t\t\t\t\t\t\t\"type\": \"object\",\n\t\t\t\t\t\t\t\t\t\t\t\"title\": \"FileUploadable\",\n\t\t\t\t\t\t\t\t\t\t\t\"required\": [\n\t\t\t\t\t\t\t\t\t\t\t\t\"name\",\n\t\t\t\t\t\t\t\t\t\t\t\t\"mimetype\",\n\t\t\t\t\t\t\t\t\t\t\t\t\"s3key\"\n\t\t\t\t\t\t\t\t\t\t\t],\n\t\t\t\t\t\t\t\t\t\t\t\"properties\": {\n\t\t\t\t\t\t\t\t\t\t\t\t\"name\": {\n\t\t\t\t\t\t\t\t\t\t\t\t\t\"type\": \"string\",\n\t\t\t\t\t\t\t\t\t\t\t\t\t\"title\": \"Name\",\n\t\t\t\t\t\t\t\t\t\t\t\t\t\"examples\": [\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\"document.pdf\",\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\"image.jpg\",\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\"report…",
+          "label": "line 336",
+          "line": 336
+        },
+        {
+          "kind": "content_match",
+          "title": "build_practical_3_docx",
+          "path": "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\DAV\\prac3\\build_practical_3_docx.py",
+          "snippet": "…Path(__file__).resolve().parent\nTABLES = BASE / \"tables\"\nOUTPUT = BASE / \"Practical_3_Report.docx\"\n\nNAVY = \"000000\"\nBLUE = \"000000\"\nDARK_BLUE = \"000000\"\nLIGHT_BLUE = \"F0F0F0\"\nLIGHT…",
+          "label": "line 17",
+          "line": 17
+        },
+        {
+          "kind": "file",
+          "title": "Practical_2_Report.docx",
+          "path": "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\DAV\\prac2\\Practical_2_Report.docx",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "Practical_3_Report.docx",
+          "path": "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\DAV\\prac3\\Practical_3_Report.docx",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "Innovative_Assignment_Morse_Code_Report_Updated.docx",
+          "path": "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\MI\\Assignment\\Innovative_Assignment_Morse_Code_Report_Updated.docx",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "Practical 9_File Transfer Server Supporting Concurrent Clients.docx",
+          "path": "C:\\Users\\Pranshul\\Downloads\\Study Materials\\Coursework\\Practical 9_File Transfer Server Supporting Concurrent Clients.docx",
+          "snippet": null,
+          "label": null,
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "file-xlsx",
+      "query": "sheet.xlsx",
+      "selectedRow": "TSm13-formats.specProjects / document-vault / Testing / testsIn document",
+      "preview": {
+        "present": true,
+        "note": null,
+        "snippet": null,
+        "text": "Search the web for \"sheet.xlsx\"ActionDirect search with GoogleActionDirect search with GoogleOpen"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-file-xlsx.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.168596
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 0,
+          "tookMs": 2.36273
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 1,
+          "tookMs": 0.8228
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.267143
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"sheet.xlsx\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "m13-formats.spec",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\document-vault\\Testing\\tests\\m13-formats.spec.ts",
+          "snippet": "…Buffer {\n  const workbook = XLSX.utils.book_new();\n  const sheet = XLSX.utils.aoa_to_sheet([\n    ['Item', 'Amount'],\n    ['Rent', '1200'],\n    ['Groceries', '450'],\n  ]);\n  XLSX.utils.book_append…",
+          "label": "In document",
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "file-image",
+      "query": "diagram.png",
+      "selectedRow": "PNGdiagram.pngProjects / PlayTorrio-Rebuilt / .toolchains / flutter / bin / cache / dart-sdk / bin / resources / devtools / assets / icons / inspector28 Apr",
+      "preview": {
+        "present": true,
+        "note": "Preview not available — press Enter to open.",
+        "snippet": null,
+        "text": "PNGdiagram.pngFileC:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\bin\\cache\\dart-sdk\\bin\\resources\\devtools\\assets\\icons\\inspector\\diagram.pngPreview not available — press Enter to open.Size129 BModified29 AprOpenReveal in ExplorerCopy path"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-file-image.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.256457
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 40,
+          "tookMs": 2.2974288
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 8,
+          "tookMs": 34.517235
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.25408298
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"diagram.png\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "generate-corpus",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\scripts\\media\\generate-corpus.ts",
+          "snippet": "…20', 'chart measures counts'] }] });\n\n  const diagram = await image('diagram.png', svg(\n    text(40, 55, 'Private media pipeline') + '<defs><marker id=\"arrow\" markerWidth=\"10\" markerHeight…",
+          "label": "line 48",
+          "line": 48
+        },
+        {
+          "kind": "content_match",
+          "title": "manifest",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\fixtures\\media-v1\\corpus\\manifest.json",
+          "snippet": "…20\",\n            \"chart measures counts\"\n          ]\n        }\n      ]\n    },\n    {\n      \"id\": \"diagram\",\n      \"kind\": \"diagram\",\n      \"recipe\": \"screenshot-v1\",\n      \"images\": [\n        {\n          \"file\": \"diagram.png\",\n          \"sha256\": \"5c3a23e58a73ad1f16cb0c1725c0575556ab5c727352628b010c57afa7d0925e\",\n          \"width\": 960,\n          \"height\": 640,\n          \"label\": \"event1_image1…",
+          "label": "line 121",
+          "line": 121
+        },
+        {
+          "kind": "content_match",
+          "title": "index",
+          "path": "C:\\Users\\Pranshul\\Documents\\NITU-2.5.0-win-x64\\web\\index.html",
+          "snippet": "…uid(), kind: \"image\", text: \"Architecture_Diagram.png\", name: \"Architecture_Diagram.png\", pinned: false, created: Date.now() - 1000 * 60 * 70 }\n\n\n\n\n\n\n\n  ];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  if (!state.selectedNote && state.notes…",
+          "label": "In document",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "helix-design-app",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\nitu-source\\helix-design-app.html",
+          "snippet": "…uid(), kind: \"image\", text: \"Architecture_Diagram.png\", name: \"Architecture_Diagram.png\", pinned: false, created: Date.now() - 1000 * 60 * 70 }\n\n\n\n\n\n\n\n  ];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  if (!state.selectedNote && state.notes…",
+          "label": "In document",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "index",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\nitu-source\\Nitu.Windows\\web\\index.html",
+          "snippet": "…uid(), kind: \"image\", text: \"Architecture_Diagram.png\", name: \"Architecture_Diagram.png\", pinned: false, created: Date.now() - 1000 * 60 * 70 }\n\n\n\n\n\n\n\n  ];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  if (!state.selectedNote && state.notes…",
+          "label": "In document",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "index",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\nitu-source\\release\\web\\index.html",
+          "snippet": "…uid(), kind: \"image\", text: \"Architecture_Diagram.png\", name: \"Architecture_Diagram.png\", pinned: false, created: Date.now() - 1000 * 60 * 70 }\n\n\n\n\n\n\n\n  ];\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  if (!state.selectedNote && state.notes…",
+          "label": "In document",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "extracted_script",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\nitu-source\\tests\\extracted_script.js",
+          "snippet": "…uid(), kind: \"image\", text: \"Architecture_Diagram.png\", name: \"Architecture_Diagram.png\", pinned: false, created: Date.now() - 1000 * 60 * 70 }\n\n\n\n  ];\n\n\n\n\n\n\n\n  if (!state.selectedNote && state.notes…",
+          "label": "line 708",
+          "line": 708
+        },
+        {
+          "kind": "content_match",
+          "title": "test_syntax",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\nitu-source\\tests\\test_syntax.js",
+          "snippet": "…uid(), kind: \"image\", text: \"Architecture_Diagram.png\", name: \"Architecture_Diagram.png\", pinned: false, created: Date.now() - 1000 * 60 * 70 }\n\n\n\n  ];\n\n\n\n\n\n\n\n  if (!state.selectedNote && state.notes…",
+          "label": "line 716",
+          "line": 716
+        },
+        {
+          "kind": "file",
+          "title": "diagram.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\flutter\\bin\\cache\\dart-sdk\\bin\\resources\\devtools\\assets\\icons\\inspector\\diagram.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "diagram.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\bin\\cache\\dart-sdk\\bin\\resources\\devtools\\assets\\icons\\inspector\\diagram.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "diagram@2x.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\flutter\\bin\\cache\\dart-sdk\\bin\\resources\\devtools\\assets\\icons\\inspector\\diagram@2x.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "diagram@2x.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\bin\\cache\\dart-sdk\\bin\\resources\\devtools\\assets\\icons\\inspector\\diagram@2x.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "golden_platform_view_rotate_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\ScenariosUITests\\golden_platform_view_rotate_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "golden_platform_view_rotate_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\ScenariosUITests\\golden_platform_view_rotate_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "golden_platform_view_opacity_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\ScenariosUITests\\golden_platform_view_opacity_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "golden_platform_view_opacity_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\ScenariosUITests\\golden_platform_view_opacity_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "golden_platform_view_clippath_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\ScenariosUITests\\golden_platform_view_clippath_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "golden_platform_view_clippath_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\ScenariosUITests\\golden_platform_view_clippath_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "golden_platform_view_transform_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\ScenariosUITests\\golden_platform_view_transform_impeller_iPhone SE (3rd generation)_18.2_simulator.png",
+          "snippet": null,
+          "label": null,
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "file-binary",
+      "query": "blob.bin",
+      "selectedRow": "BINsnapshot_blob.binProjects / docvault-electron / release / win-unpacked3 days ago",
+      "preview": {
+        "present": true,
+        "note": null,
+        "snippet": "Line 143…assert.equal(detectFileMimeType('notes.unknown', '', head('plain text notes')), 'text/plain');\n  assert.equal(detectFileMimeType('blob.bin', '', bytes(0x00, 0x01, 0x02, 0x03)), 'application/octet-stream');\n});",
+        "text": "TSformats.testMatch in documentC:\\Users\\Pranshul\\Documents\\Projects\\document-vault\\Testing\\tests\\formats.test.tsLine 143…assert.equal(detectFileMimeType('notes.unknown', '', head('plain text notes')), 'text/plain');\n  assert.equal(detectFileMimeType('blob.bin', '', bytes(0x00, 0x01, 0x02, 0x03)), 'application/octet-stream');\n});Line143Open"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-file-binary.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.293264
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 1,
+          "tookMs": 2.7533522
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 1,
+          "tookMs": 0.848921
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.682699
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"blob.bin\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "formats.test",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\document-vault\\Testing\\tests\\formats.test.ts",
+          "snippet": "…assert.equal(detectFileMimeType('notes.unknown', '', head('plain text notes')), 'text/plain');\n  assert.equal(detectFileMimeType('blob.bin', '', bytes(0x00, 0x01, 0x02, 0x03)), 'application/octet-stream');\n});",
+          "label": "line 143",
+          "line": 143
+        },
+        {
+          "kind": "file",
+          "title": "snapshot_blob.bin",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\docvault-electron\\release\\win-unpacked\\snapshot_blob.bin",
+          "snippet": null,
+          "label": null,
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "content-pdf",
+      "query": "WALRUS-PDF-2026",
+      "selectedRow": "Search the web for \"WALRUS-PDF-2026\"Direct search with GoogleWeb",
+      "preview": {
+        "present": true,
+        "note": null,
+        "snippet": null,
+        "text": "Search the web for \"WALRUS-PDF-2026\"ActionDirect search with GoogleActionDirect search with GoogleOpen"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-content-pdf.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.258832
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 0,
+          "tookMs": 0.71713
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 0,
+          "tookMs": 0.54141
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.21252699
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"WALRUS-PDF-2026\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "content-docx",
+      "query": "KOALA-DOCX-2026",
+      "selectedRow": "Search the web for \"KOALA-DOCX-2026\"Direct search with GoogleWeb",
+      "preview": {
+        "present": true,
+        "note": null,
+        "snippet": null,
+        "text": "Search the web for \"KOALA-DOCX-2026\"ActionDirect search with GoogleActionDirect search with GoogleOpen"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-content-docx.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.267143
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 0,
+          "tookMs": 0.712381
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 0,
+          "tookMs": 0.746813
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.218464
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"KOALA-DOCX-2026\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "content-xlsx",
+      "query": "TIGER-XLSX-2026",
+      "selectedRow": "Search the web for \"TIGER-XLSX-2026\"Direct search with GoogleWeb",
+      "preview": {
+        "present": true,
+        "note": null,
+        "snippet": null,
+        "text": "Search the web for \"TIGER-XLSX-2026\"ActionDirect search with GoogleActionDirect search with GoogleOpen"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-content-xlsx.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.18759401
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 0,
+          "tookMs": 0.62926996
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 0,
+          "tookMs": 0.540222
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 1.306032
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"TIGER-XLSX-2026\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "ocr-image",
+      "query": "IMAGE-OCR-PROBE-2026",
+      "selectedRow": "Search the web for \"IMAGE-OCR-PROBE-2026\"Direct search with GoogleWeb",
+      "preview": {
+        "present": true,
+        "note": null,
+        "snippet": null,
+        "text": "Search the web for \"IMAGE-OCR-PROBE-2026\"ActionDirect search with GoogleActionDirect search with GoogleOpen"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-ocr-image.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.31463498
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 0,
+          "tookMs": 0.818051
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 0,
+          "tookMs": 1.1220001
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.369251
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"IMAGE-OCR-PROBE-2026\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        }
+      ]
+    },
+    {
+      "scenario": "scanned-pdf",
+      "query": "scanned",
+      "selectedRow": "MDFlutter-build-release-channels.mdProjects / PlayTorrio-Rebuilt / .toolchains / flutter / docs / releases30 Apr",
+      "preview": {
+        "present": true,
+        "note": "Preview not available — press Enter to open.",
+        "snippet": null,
+        "text": "JSjavascriptSemanticReturnedReferences.jsFileC:\\Users\\Pranshul\\Documents\\Projects\\rea\\dist\\domain\\javascript\\javascriptSemanticReturnedReferences.jsPreview not available — press Enter to open.Size12 KBModified24 OctOpenReveal in ExplorerCopy path"
+      },
+      "screenshot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\preview-audit\\screenshots\\preview-scanned-pdf.png",
+      "timings": [
+        {
+          "tier": 0,
+          "label": "exact + actions + apps",
+          "hits": 1,
+          "tookMs": 0.36806402
+        },
+        {
+          "tier": 1,
+          "label": "filename index",
+          "hits": 40,
+          "tookMs": 29.540068
+        },
+        {
+          "tier": 1,
+          "label": "indexed content",
+          "hits": 12,
+          "tookMs": 32.54394
+        },
+        {
+          "tier": 2,
+          "label": "OCR text",
+          "hits": 0,
+          "tookMs": 0.344318
+        }
+      ],
+      "ipc": [
+        {
+          "kind": "action",
+          "title": "Search the web for \"scanned\"",
+          "path": null,
+          "snippet": null,
+          "label": "Web",
+          "line": null
+        },
+        {
+          "kind": "content_match",
+          "title": "SKILL",
+          "path": "C:\\Users\\Pranshul\\.agents\\skills\\pdf\\SKILL.md",
+          "snippet": "…pip install pytesseract pdf2image\nimport pytesseract\nfrom pdf2image import convert_from_path\n\n# Convert PDF to images\nimages = convert_from_path('scanned.pdf')\n\n# OCR each…",
+          "label": "line 3",
+          "line": 3
+        },
+        {
+          "kind": "content_match",
+          "title": "capture",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\src\\services\\media\\capture.ts",
+          "snippet": "…string | undefined;\n  const privateLabels = labelsInsideMemoryTags(scanned, scanned.candidates);\n\n  for (const candidate of scanned.candidates) {\n    if (privateLabels.has(candidate.label)) continue;\n    try {\n      if (!platform || !identity…",
+          "label": "line 187",
+          "line": 187
+        },
+        {
+          "kind": "content_match",
+          "title": "DedupRoutes",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\src\\services\\worker\\http\\routes\\DedupRoutes.ts",
+          "snippet": "…Date.now() - startedAt,\n      });\n      res.json({ scanned });\n    } finally {\n      DedupRoutes.scanInProgress = false;\n    }\n  });\n}",
+          "label": "line 99",
+          "line": 99
+        },
+        {
+          "kind": "content_match",
+          "title": "ingress.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\media\\ingress.test.ts",
+          "snippet": "…SHAPES.mcp_base64, ...globWithFiveThousandFilenames }, 'capture');\n    expect(scanned.candidates).toHaveLength(1);\n    expect(JSON.stringify(scanned.toolResponse)).not.toContain(PNG_HEAD);\n    expect(JSON.stringify(scanned.toolResponse…",
+          "label": "line 24",
+          "line": 24
+        },
+        {
+          "kind": "content_match",
+          "title": "incomplete-session.test",
+          "path": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\tests\\services\\prompt-import\\incomplete-session.test.ts",
+          "snippet": "…async options => {\n          scanned = await scanOwnerPrompts({ ...options, onProgress(progress) {\n            options.onProgress?.(progress);\n            if (!replaced && progress.phase === 'reading' && progress.bytesDone === 0) {\n              // A real post-discovery open…",
+          "label": "line 42",
+          "line": 42
+        },
+        {
+          "kind": "content_match",
+          "title": "SKILL",
+          "path": "C:\\Users\\Pranshul\\.claude\\skills\\pdf\\SKILL.md",
+          "snippet": "…pip install pytesseract pdf2image\nimport pytesseract\nfrom pdf2image import convert_from_path\n\n# Convert PDF to images\nimages = convert_from_path('scanned.pdf')\n\n# OCR each…",
+          "label": "line 3",
+          "line": 3
+        },
+        {
+          "kind": "content_match",
+          "title": "SKILL",
+          "path": "C:\\Users\\Pranshul\\.cline\\skills\\pdf\\SKILL.md",
+          "snippet": "…pip install pytesseract pdf2image\nimport pytesseract\nfrom pdf2image import convert_from_path\n\n# Convert PDF to images\nimages = convert_from_path('scanned.pdf')\n\n# OCR each…",
+          "label": "line 3",
+          "line": 3
+        },
+        {
+          "kind": "content_match",
+          "title": "cli_metrics",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\bpe-paper\\common\\include\\cli_metrics.h",
+          "snippet": "…t queue_rebuilds = 0;\n    std::uint64_t bucket_scanned_entries = 0;\n    std::uint64_t bucket_scanned_buckets = 0;\n    std::uint64_t bucket_reductions = 0…",
+          "label": "line 52",
+          "line": 52
+        },
+        {
+          "kind": "content_match",
+          "title": "Screenshot 2026-04-21 233450",
+          "path": "C:\\Users\\Pranshul\\Pictures\\Backup-Photos\\Screenshots\\Screenshot 2026-04-21 233450.png",
+          "snippet": "…inner relation) So if outer relation has many records, the inner relation gets scanned many times. That is why choice of outer relation matters.",
+          "label": "line 1",
+          "line": 1
+        },
+        {
+          "kind": "content_match",
+          "title": "Screenshot 2026-04-23 013824",
+          "path": "C:\\Users\\Pranshul\\Pictures\\Backup-Photos\\Screenshots\\Screenshot 2026-04-23 013824.png",
+          "snippet": "ACTIVE EXPORT error Messages Completed Message does not have a reply INTERRUPTED EXPORT Misariiiiiiiii Queued Media Failed Resume Discard 0 messages scanned, 0 media…",
+          "label": "line 1",
+          "line": 1
+        },
+        {
+          "kind": "content_match",
+          "title": "Screenshot 2026-04-23 014137",
+          "path": "C:\\Users\\Pranshul\\Pictures\\Backup-Photos\\Screenshots\\Screenshot 2026-04-23 014137.png",
+          "snippet": "…undefined (reading 'msgChunks') Cannot read properties of undefined (reading •msgChunks') INTERRUPTED EXPORT Misariiiiiiiii Resume Disca 857 messages scanned, 0 media files downloaded so far.",
+          "label": "line 1",
+          "line": 1
+        },
+        {
+          "kind": "content_match",
+          "title": "Screenshot 2026-06-23 223159",
+          "path": "C:\\Users\\Pranshul\\Pictures\\Backup-Photos\\Screenshots\\Screenshot 2026-06-23 223159.png",
+          "snippet": "…took the screenshot after launching the app, the indexer hasn't scanned it yet. To the new screenshot immediately: for Images This plan describe…",
+          "label": "line 1",
+          "line": 1
+        },
+        {
+          "kind": "file",
+          "title": "Flutter-build-release-channels.md",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\flutter\\docs\\releases\\Flutter-build-release-channels.md",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "Flutter-build-release-channels.md",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\docs\\releases\\Flutter-build-release-channels.md",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "javascriptSemanticReturnedReferences.js",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\rea\\dist\\domain\\javascript\\javascriptSemanticReturnedReferences.js",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "javascriptSemanticReturnedReferences.ts",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\rea\\src\\domain\\javascript\\javascriptSemanticReturnedReferences.ts",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "stream_channel.data.json",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\open-notebook\\.mypy_cache\\3.12\\langgraph\\stream\\stream_channel.data.json",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "system_channels.dart",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\flutter\\packages\\flutter\\lib\\src\\services\\system_channels.dart",
+          "snippet": null,
+          "label": null,
+          "line": null
+        },
+        {
+          "kind": "file",
+          "title": "system_channels.dart",
+          "path": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\packages\\flutter\\lib\\src\\services\\system_channels.dart",
+          "snippet": null,
+          "label": null,
+          "line": null
+        }
+      ]
+    }
+  ]
+}

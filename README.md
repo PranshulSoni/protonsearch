@@ -1,203 +1,154 @@
-<p align="center">
-  <img src="icons/ProtonSearchLogo.png" alt="ProtonSearch logo" width="150" />
-</p>
+<p align="center"><img src="assets/brand/protonsearch-mark.svg" width="96" height="96" alt="ProtonSearch logo" /></p>
 
-<h1 align="center">ProtonSearch</h1>
+# ProtonSearch
 
-<p align="center">
-  <em>Find everything on your PC. From one shortcut.</em>
-</p>
+**Find anything on your PC from one keyboard shortcut — files, folders, documents, apps, actions, clipboard, browser history, Git activity and (optionally) text inside screenshots.**
 
-<p align="center">
-  <img alt="platform" src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square" />
-  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-green?style=flat-square" /></a>
-  <a href="https://github.com/PranshulSoni/protonsearch/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/PranshulSoni/protonsearch?style=flat-square&label=stars&color=yellow" /></a>
-  <a href="https://github.com/PranshulSoni/protonsearch/releases"><img src="https://badgen.net/github/release/PranshulSoni/protonsearch" alt="Release"/></a>
-</p>
+ProtonSearch is a fast, local-first, Windows-native search and command centre. Press **Alt + Space**, type what you remember, press **Enter**. Nothing leaves your device unless you explicitly enable an external integration.
 
-ProtonSearch is a fast, local-first Windows launcher that helps users find and open anything already on their PC from one keyboard shortcut.
+> **Project Phoenix — v2 alpha.** This branch is a ground-up rebuild of the v1 Win32/Slint application into a modular Rust engine + Tauri 2 / React desktop app. The legacy app is preserved in `protonsearch/` and is still buildable for comparison. v2 is an alpha: the sections below mark what is verified, what is partial and what is not implemented.
 
-A fast, local-first Windows launcher to search apps, files, browser history, clipboard, OCR text, Git activity, your activity timeline, settings, commands, and AI chats from one shortcut.
 
-> **Formerly OmniSearch.** ProtonSearch is the same project under a new name. If you're upgrading from an OmniSearch install, your search index, settings, clipboard history, snippets, and AI configuration all carry over automatically on first launch — nothing to reconfigure.
+## v10 release candidate (2026-11-10) — unsigned internal alpha
 
-<p align="center">
-  <img src="icons/newbanner.png" alt="ProtonSearch banner" />
-</p>
+Source commit 4e9f589; artifacts in dist-installer/ (binary + NSIS setup + BUILD_INFO + SHA256SUMS).
+SIGNED=false — do not distribute publicly.
 
-## Why ProtonSearch?
+### Verified on the RC
+- Suites: cargo workspace 306 passed / 0 failed / 1 pre-existing ignored; frontend 18 files /
+  241 tests passed; production build clean.
+- P0-1 previews: 14 live formats including DOCX/XLSX/PNG+OCR/JSON/CSV/Unicode, honest unsupported
+  (binary/scanned PDF), large-file truncation and stale-file error; matched-term highlight is the
+  one open condition (BUG-G8-01).
+- P0-2 clipboard images: real .NET clipboard image captured live (320x200 PNG), bounded thumbnail
+  in IPC and island Images tab, restart persistence verified; UI paste-back path remains a
+  verification item (harness-level paste-back passes).
+- Launcher/island: Normal Launcher v2 (All/Files/Folders/Apps, quick destinations, previews) and
+  the V9 Dynamic Island renderer (8 cards, dots, wheel/swipe, motion) captured on real Windows.
 
-Your work is already on your PC, but Windows spreads it across too many places.
+### Benchmarks (honest)
+| Metric | Result | Target | Status |
+|---|---:|---:|---|
+| Content v2 retrieval p95 | 8.984 ms (official quiet, n=960) | 30 ms | MET |
+| Release hotkey to window visible p95 | 14.289 ms | 50 ms | MET |
+| Selection paint | 6 ms | 16 ms | MET |
+| Input to first visible result p95 (debug) | 38.2 ms | 30 ms | NOT MET |
+| Idle process-tree working set | 786.9 MiB | ~150 MB budget | NOT MET |
 
-Apps are in Start Menu. Files are in Explorer. Browser pages are hidden in history. Clipboard items disappear. Screenshots need OCR. Git activity lives somewhere else. AI chats become another place to manually search.
+### Artifact hashes (unsigned)
+- ProtonSearch.exe: 3010FBEED2AE5BB9EA0FC91960F0D8325BBF5BC589D9F3596B631BEFB6FE15EF (20,750,336 B)
+- ProtonSearch_2.0.0-alpha.1_x64-setup.exe: F5D15C2D89CA2857C6DDB71B9289645A693B37C958AAA462E7B662CEBD6FBF8D (5,567,529 B)
 
-ProtonSearch brings all of it into one fast, keyboard-first command center. Press `Alt + Space`, type what you remember, and open the right thing instantly.
+### Honest blockers / recommendation
+Unsigned installer (no public distribution), installer upgrade/uninstall drill not run, single
+monitor only (mixed-DPI/High-Contrast/multi-monitor untested), idle memory and debug input latency
+over budget, native media/Wi-Fi/Bluetooth post-alpha milestone 2, no live Pi provider credentials,
+preview highlight open. Deployment-ready locally as an unsigned internal alpha: YES. Public release
+signed off: NO. Full detail: docs/release/ACCEPTANCE_REPORT.md and
+docs/implementation/V10_G8_VERIFICATION_ROUND2.md.
 
-## What Makes It Different?
+---
 
-- **One search box for everything** — apps, files, folders, browser history, clipboard, OCR text, Git activity, notes, your activity timeline, Steam games, settings, commands, and AI chats.
-- **Local-first by design** — your indexed data stays on your PC.
-- **Built for speed** — native Rust/Win32 app with SQLite FTS5 search.
-- **Keyboard-first workflow** — open with `Alt + Space`, search naturally, press `Enter`.
-- **Visual search** — circle any part of your screen and search it instantly with Google Lens.
-- **Built-in calculator and unit converter** — type `15% of 340` or `5 km to miles` and get the answer directly in your results.
-- **Custom quicklinks and snippets** — trigger your own keyword-based site searches and reusable text expansions without leaving the search bar.
-- **Window and desktop management** — snap, move, and resize windows, and switch between them and virtual desktops, all from the keyboard.
-- **A real clipboard workflow** — search clipboard history, pin important items, select multiple clips, copy images, edit text clips, and paste combined selections.
-- **Hermes agent support** — use Hermes to run autonomous tasks, execute approved commands, and help control your PC from the launcher.
-- **Made for Windows power users** — replaces the friction of jumping between Start Menu, File Explorer, browser history, Settings, and AI tools.
+## What works today (verified on this machine)
 
-## Demo Video
+Measured and captured with the real app over a real user profile (131,199 indexed entries):
 
-<!-- [This text is completely hidden in preview mode](https://github.com/user-attachments/assets/d37e6edf-e9ba-46a8-98e5-5a96454c4971) -->
-<video src="https://github.com/user-attachments/assets/d37e6edf-e9ba-46a8-98e5-5a96454c4971" controls width="100%">
-  Your browser does not support the video tag.
-</video>
+| Area | State | Evidence |
+|---|---|---|
+| Global hotkey launcher (Alt+Space, pre-warmed, frameless) | Works | docs/qa/visual/app-captures/real-launcher-*.png |
+| Filename/folder search, exact + prefix + fuzzy, grouped results | Works | 50 real matches for "arch"; 8.4–12.6 ms warm input-to-visible (debug build) |
+| Calculator ("2+2", "15% of 340", unit conversion) | Works | engine tier 0; unit-tested in crates/ps-sources |
+| Native actions (lock, sleep, shutdown, restart, empty bin, Settings, Task Manager, Terminal) | Results + engine wiring work; execution lands with ps-windows actions | crates/ps-core catalog + ps-sources actions |
+| Document/code content search (PDF, DOCX, XLSX, text, Markdown, source) | Works when content indexing is enabled; retrieval speed target not met yet | crates/ps-content FTS5 + extractors (16 tests); docs/performance |
+| Applications, browser history/bookmarks, recent files, Git, clipboard sources | Implemented and visible with real data | real-launcher-long-list.png; crates/ps-sources |
+| Screenshot OCR search | Pipeline implemented (Windows.Media.Ocr); native engine measured; end-to-end UI run pending | crates/ps-ocr; docs/performance/BENCHMARKS.md |
+| Legacy v1 migration (settings, 89,813 file rows, 14,609 document texts) | Works, source read-only and hash-verified | docs/implementation/GATE_LOG.md; migration tests |
+| Desktop app (Home / Search & Indexes / Activity / Workflows / Preferences), onboarding, dark mode, hotkey capture | Works | real-app-*.png; 241 frontend tests |
+| Pi agent workflows (on demand) | Pi installation checks, supervised runs and durable task history | crates/ps-agent (14 tests), agent-sidecar (18 tests) |
+| Marketing/telemetry/silent downloads | None. Ever. | settings model has telemetry forced off |
 
-## Star On GitHub
+Verified in the v10 release candidate (source 4e9f589, unsigned internal alpha, 2026-11-10): real previews for TXT/code/Markdown/JSON/CSV/PDF/DOCX/XLSX/images/OCR with explicit unsupported and stale-file fallbacks; clipboard text+image history with island thumbnails and restart persistence; V9 Dynamic Island with 8 cards/dots/motion; two-launcher settings/placement/card manager; agent task APIs with read-only Pi gate. Still open: matched-term preview highlight, island preview hookup, native Media/Wi-Fi/Bluetooth (post-alpha milestone 2), live Pi provider verification, signed installer/updater, mixed-DPI/High-Contrast/multi-monitor evidence.
 
-If ProtonSearch looks useful, star the repo so more Windows users can find it:
+## Measured performance (honest, reproducible)
 
-[Star ProtonSearch on GitHub](https://github.com/PranshulSoni/protonsearch)
+Engine-only, release build, this repo's benchmark harness (`cargo run -p ps-bench -- ...`):
 
-## Installation
+| Corpus | warm p50 | warm p95 | build time | engine memory |
+|---|---:|---:|---:|---:|
+| 10k realistic paths | 0.070 ms | 0.584 ms | 15 ms | 1.2 MB |
+| 100k | 0.600 ms | 2.195 ms | 220 ms | 12.4 MB |
+| 1M | 2.713 ms | 7.583 ms | 3.5 s | 110 MB (~115 B/entry) |
 
-> **Recommended install**
->
-> Run this in Windows PowerShell:
->
-> ```powershell
-> curl.exe -fsSL https://raw.githubusercontent.com/PranshulSoni/protonsearch/main/scripts/install.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -
-> ```
->
-> This downloads the latest ProtonSearch release from GitHub and opens the Windows installer.
+Committed engine hash `3906836`, 22 fixed queries x 30 iterations (n=660 per corpus), release profile, this machine.
+Targets from the brief: 100k warm p95 < 5 ms is **met** (2.195 ms); 1M warm p95 < 15 ms is **met** (7.583 ms).
+Earlier pre-optimisation revision measured 5.64 / 14.93 ms and one contended run measured 28.4 ms — variance is disclosed in
+`docs/performance/BENCHMARKS.md`. Content retrieval does **not** meet its 30 ms p95 target yet (v2 p95 61.1 ms; see the report).
+Real-app input-to-visible samples on a debug build: 3.8–32.3 ms (n=4 exploratory; release-build percentile run pending).
+No "world's fastest" claim is made; the report includes an explicit veto list of claims it does not support.
 
-Manual download: get the latest Windows build from the [ProtonSearch releases page](https://github.com/PranshulSoni/protonsearch/releases), then run the installer.
-
-Already have OmniSearch installed? Just install ProtonSearch over it — your data moves over automatically, and the installer cleans up the old OmniSearch program files for you.
-
-After installation:
-
-1. Launch ProtonSearch.
-2. Press `Alt + Space`.
-3. Add or confirm indexed folders in Settings > Database.
-4. Let the first index finish.
-5. Start searching.
-
-If `Alt + Space` is already used by another app, change the launcher hotkey in Settings > Hotkeys.
-
-## What You Can Search
-
-| Source | What ProtonSearch finds |
-|---|---|
-| Apps | Installed desktop apps, Microsoft Store apps, and Windows utilities |
-| Files and folders | Indexed local files, folders, recent files, documents, downloads, and projects |
-| File content | Text inside supported documents, PDFs, Markdown, text files, and source files |
-| Images and screenshots | Image files plus OCR text extracted from screenshots, pictures, and copied clipboard images |
-| Browser data | Bookmarks and recent history from Chromium-based browsers and Firefox |
-| Clipboard | Text and image clipboard history, pinned clips, multiselect actions, image copy, editing, and bulk cleanup |
-| Git | Repositories, commits, branches, and TODO/FIXME comments |
-| Activity timeline | A unified, searchable history of browser visits, Git commits, and other tracked activity |
-| Notes | Quick local notes saved from the launcher |
-| Open windows | Currently open application windows, searchable by title |
-| Focus categories | Saved app-blocking presets for distraction-free focus sessions |
-| Games | Installed Steam library games, launched directly |
-| Windows Settings | Modern Windows Settings pages and classic Control Panel pages |
-| Commands | Local ProtonSearch actions like clipboard, agents, windows, settings, and system actions |
-| Agents | Saved AI agents, agent chats, and AI chat history |
-
-## Useful Details
-
-ProtonSearch also includes smaller workflow features that make it useful every day:
-
-- **Clipboard pinning** — keep important snippets, links, IDs, commands, and copied text at the top of clipboard search.
-- **Clipboard multiselect** — select multiple clipboard items, paste them together, or clean them up in bulk.
-- **Image clipboard support** — keep copied screenshots and images searchable by their OCR'd text, then copy them back when needed.
-- **Editable clipboard text** — fix or update a saved clipboard item before copying it again.
-- **Clipboard-first commands** — paste recent items sequentially, paste the newest screenshot, clear clipboard contents, or ask AI about clipboard text.
-- **Circle to Search** — select any region of your screen and send it straight to Google Lens for a visual search, no screenshot tool required.
-- **Quicklinks** — register your own keyword, type it followed by a query anywhere in the search bar, and jump straight to that site with your query filled in.
-- **Snippets** — save reusable text under a trigger keyword; typing the keyword alone expands it, ready to copy or paste.
-- **Calculator and unit converter** — quick math (`2+2`, `sqrt(9)*4`) and unit conversions, answered inline as you type.
-- **AI quick commands** — ask, explain, fix grammar, translate, summarize, or find bugs in text without switching apps.
-- **Content search** — search inside supported documents, code files, OCR output, screenshots, and notes instead of only matching filenames.
-- **Browser recall** — find old pages from browser bookmarks and history without opening the browser first.
-- **Windows control surface** — open Windows Settings, Control Panel pages, local commands, windows, and system actions from the same launcher.
-
-## Hermes Agents
-
-ProtonSearch includes Hermes agent integration for users who want more than search.
-
-Hermes can help with autonomous workflows such as running local tasks, executing approved commands, managing agent chats, and assisting with PC control from inside the launcher. Commands that need your approval show an inline prompt before they run. It gives ProtonSearch an agent layer without turning the search bar into a chatbot first.
-
-## Search Prefixes
-
-Prefixes are optional, but useful when you want to search one source directly.
-
-| Prefix | Use it for |
-|---|---|
-| `file:` | Files and document content |
-| `folder:` | Folders only |
-| `code:` | Source files and code content |
-| `img:`, `image:`, `screenshots:`, or `ocr:` | Image files and OCR text |
-| `bookmarks:` | Browser bookmarks |
-| `history:` | Browser history |
-| `clip:` or `clipboard:` | Clipboard history |
-| `commits:` | Git commits |
-| `todos:` | TODO/FIXME comments in your code |
-| `switch:` or `window:` | Open application windows |
-| `focus:` | Saved focus-session app-blocking categories |
-| `notes:` | Local notes |
-| `memory:` | The unified activity timeline |
-| `games:` | Installed Steam games |
-| `quicklink:` or `ql:` | Your saved quicklinks |
-| `snippet:` or `snip:` | Your saved text snippets |
-| `agents:` | Available AI agents |
-| `agentchats:` | Agent chat history |
-| `chatgpt:` | Send a prompt straight to ChatGPT |
-
-Quicklinks and snippets can also be triggered without a prefix: type a registered keyword followed by your query to fire a quicklink, or just the trigger word alone to expand a snippet.
-
-## Settings App
-
-ProtonSearch also includes a settings app for controlling the launcher.
-
-From settings you can manage:
-
-- General launcher behavior
-- Appearance/theme
-- Hotkeys
-- Agents and AI endpoint configuration
-- Indexed folders and database/index status
-
-The app runs from the Windows system tray, so the launcher can stay available in the background without keeping a large window open.
-
-## Privacy
-
-ProtonSearch is local-first.
-
-Runtime data is stored on your PC under:
+## Architecture
 
 ```text
-%APPDATA%\protonsearch
+ProtonSearch.exe (Tauri 2 host, Rust)
+├── ps-core      engine facade: tiered query coordinator, ranking, settings, activity, migration
+├── ps-index     compact in-memory filename index (arena + bloom/trigram prefilter + top-k)
+├── ps-content   SQLite FTS5 content index + extractors (PDF/DOCX/XLSX/text/code)
+├── ps-sources   applications, recent files, clipboard, browser history/bookmarks, Git, calculator
+├── ps-windows   Win32 helpers (icons, shell open, clipboard, AppsFolder, windows)
+├── ps-ocr       OCR extraction pipeline (Windows.Media.Ocr) — in progress
+├── ps-agent     Pi process supervision and durable task history
+└── ps-ipc       versioned contract shared by all layers and mirrored in TypeScript
 ```
 
-The local database stores indexed metadata, searchable text, browser items, clipboard history, chats, agents, and settings. Expensive or large data is capped where needed so the app stays responsive instead of trying to keep everything in memory.
+Design decisions and trade-offs are recorded in `docs/adr/`. The interface follows `protonsearch-v2-ui-reference.html` and `docs/design/` (tokens, screens, keyboard/accessibility).
 
-## Performance
+## Brand assets (single source of truth)
 
-ProtonSearch is a native Rust/Win32 app, not an Electron app.
+Every ProtonSearch logo — exe/taskbar/tray icon, window icon, installer icon, installer header/sidebar artwork, WebView favicons and the in-app mark — is generated from `assets/brand/protonsearch-mark.svg`:
 
-Current implementation details:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-brand-assets.ps1
+```
 
-- Native Windows UI and system integration.
-- SQLite FTS5 for fast full-text search.
-- Debounced search input to avoid doing heavy work on every keystroke.
-- Background indexing for files, browser data, Git activity, clipboard, and OCR.
+That script renders the app icon source, regenerates all platform icon sizes (`npx tauri icon`), creates the favicons and the NSIS installer artwork, and installs `favicon.ico`. Re-run it and rebuild to update the logo *everywhere*; no other file needs to be edited.
 
-The goal is simple: open fast, search fast, and stay light enough to leave running all day.
+## Build and run (Windows)
 
-## Credits
+Prerequisites: Rust 1.99+ (MSVC), Node 26+, WebView2 (preinstalled on Windows 11). Pi workflows require Pi and its Node.js prerequisite.
 
-Name of project and Tester : https://github.com/AryanMotiani \
-Marketing of the project: https://github.com/dweep-desai
+```powershell
+# frontend dependencies
+cd apps/desktop; npm ci; cd ../..
+
+# debug build + run with the Vite dev server
+cd apps/desktop
+npm run tauri dev
+
+# production build (frontend + binary + NSIS installer)
+cd apps/desktop
+npm run build
+cd src-tauri
+cargo build --release
+# optional installer: npx tauri build (see docs/release/BUILD.md)
+```
+
+Full reproducible instructions, troubleshooting (including this host's MSVC D8005/D8050 C-compiler quirk) and packaging notes live in `docs/release/BUILD.md`.
+
+## Privacy and data
+
+- All indexes and settings live in `%APPDATA%\protonsearch\v2`. A portable override exists via `PROTONSEARCH_DATA_DIR`.
+- The legacy v1 folder is opened read-only for one-time migration and is never modified (hash-verified in tests).
+- No telemetry, no accounts, no background network calls. Browser history/Git/clipboard/OCR are opt-in per source.
+- The AI/agent layer is optional, starts only when you run a workflow, and every sensitive action requires explicit approval.
+
+## Compatibility
+
+Existing ProtonSearch / OmniSearch users: v2 detects the v1 database, imports file names and extracted document text, and skips credentials. See `docs/release/MIGRATION.md`. Rollback: keep the v1 data folder; it is untouched.
+
+## Known limitations
+
+See `docs/release/KNOWN_LIMITATIONS.md` and the truthful "complete / partial / not tested" report in `docs/implementation/ACCEPTANCE_REPORT.md`.
+
+## Licence
+
+MIT. Third-party licences: `docs/release/THIRD_PARTY_LICENSES.md`.

@@ -1,0 +1,1104 @@
+{
+  "schema": "ps-bench-result/1",
+  "kind": "relevance-evaluation",
+  "host": {
+    "os": "Microsoft Windows 11 Home Single Language 10.0.26300 build 26300",
+    "cpu": "AMD Ryzen AI 9 465 w/ Radeon 880M",
+    "physical_cores": 10,
+    "logical_cores": 20,
+    "ram_bytes": 33447858176,
+    "hostname": "PRANSHULASUS",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "captured_at_local": "2026-11-09T17:18:42.9449041+05:30",
+    "captured_at_utc": "2026-11-09T11:48:42.9449041Z"
+  },
+  "generated_at_utc": "unix:1794224923",
+  "command": "ps-bench relevance --dataset .bench/real-paths.jsonl --golden tests/golden/real-corpus-golden.json --out docs/performance/results/relevance-real-20261109T1148Z.json",
+  "dataset": {
+    "path": ".bench/real-paths.jsonl",
+    "entries": 89813,
+    "bytes": 20078459,
+    "fnv1a64": "6457750a37badf7d"
+  },
+  "golden": {
+    "corpus": "real-legacy-export(read-only, machine-specific)",
+    "queries": 65,
+    "seed": 20261109
+  },
+  "aggregate": {
+    "queries": 65,
+    "scored_queries": 60,
+    "queries_with_any_result": 60,
+    "mrr_at_10": 0.9277777777777778,
+    "recall_at_10": 0.9833333333333333,
+    "exact_at_1": 1.0,
+    "pass_rate": 0.9846153846153847,
+    "zero_match_correct": 5,
+    "zero_match_total": 5
+  },
+  "per_query": [
+    {
+      "id": "real_exact_0",
+      "category": "exact",
+      "query": "c84f40d1a6431be78c17b191782f87ec7e9fb9",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\e5\\c84f40d1a6431be78c17b191782f87ec7e9fb9",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\e5\\c84f40d1a6431be78c17b191782f87ec7e9fb9"
+      ]
+    },
+    {
+      "id": "real_exact_1",
+      "category": "exact",
+      "query": "bb5ad6173434f84cc0e1054851cdea854110fd",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\e7\\bb5ad6173434f84cc0e1054851cdea854110fd",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\e7\\bb5ad6173434f84cc0e1054851cdea854110fd"
+      ]
+    },
+    {
+      "id": "real_exact_2",
+      "category": "exact",
+      "query": "5d7d3e7f49d136809a26a9e057dac11a7aaaec",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\ef\\5d7d3e7f49d136809a26a9e057dac11a7aaaec",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\ef\\5d7d3e7f49d136809a26a9e057dac11a7aaaec"
+      ]
+    },
+    {
+      "id": "real_exact_3",
+      "category": "exact",
+      "query": "1362ed54e37c1ffa4e965ecf2321f228cadce2",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\f2\\1362ed54e37c1ffa4e965ecf2321f228cadce2",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\f2\\1362ed54e37c1ffa4e965ecf2321f228cadce2"
+      ]
+    },
+    {
+      "id": "real_exact_4",
+      "category": "exact",
+      "query": "6ed20c9e91c7515c37b3f2f36a6fcaf297b80f",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\f3\\6ed20c9e91c7515c37b3f2f36a6fcaf297b80f",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\f3\\6ed20c9e91c7515c37b3f2f36a6fcaf297b80f"
+      ]
+    },
+    {
+      "id": "real_exact_5",
+      "category": "exact",
+      "query": "723f085f3aad75600c8a7ed26d154a7ac6a58c",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\f7\\723f085f3aad75600c8a7ed26d154a7ac6a58c",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\f7\\723f085f3aad75600c8a7ed26d154a7ac6a58c"
+      ]
+    },
+    {
+      "id": "real_exact_6",
+      "category": "exact",
+      "query": "c66bde0587f9b1d1054bc6a4975cd46ab8bdc3",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\fc\\c66bde0587f9b1d1054bc6a4975cd46ab8bdc3",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\3ef5b89fcb6b9d2bb3a9e3aeff8a3734e76a9f33\\d6b6d520ec51765ebc48037d7c87368f42331137\\objects\\fc\\c66bde0587f9b1d1054bc6a4975cd46ab8bdc3"
+      ]
+    },
+    {
+      "id": "real_exact_7",
+      "category": "exact",
+      "query": "2dfbc928c8bdb66907c44865168d0a51845401",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\07\\2dfbc928c8bdb66907c44865168d0a51845401",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\07\\2dfbc928c8bdb66907c44865168d0a51845401"
+      ]
+    },
+    {
+      "id": "real_exact_8",
+      "category": "exact",
+      "query": "2e405a42dea3d52b9a02dab05710345119d242",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\0c\\2e405a42dea3d52b9a02dab05710345119d242",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\0c\\2e405a42dea3d52b9a02dab05710345119d242"
+      ]
+    },
+    {
+      "id": "real_exact_9",
+      "category": "exact",
+      "query": "30bb91116142321096a837c363f7b9194a15ad",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\20\\30bb91116142321096a837c363f7b9194a15ad",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\20\\30bb91116142321096a837c363f7b9194a15ad"
+      ]
+    },
+    {
+      "id": "real_exact_10",
+      "category": "exact",
+      "query": "62455baddb3716274cabe4a0f5ace8ad77e358",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\29\\62455baddb3716274cabe4a0f5ace8ad77e358",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\29\\62455baddb3716274cabe4a0f5ace8ad77e358"
+      ]
+    },
+    {
+      "id": "real_exact_11",
+      "category": "exact",
+      "query": "7ecba4c75e00de725c9e21e96928110d4e1b06",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\3d\\7ecba4c75e00de725c9e21e96928110d4e1b06",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\3d\\7ecba4c75e00de725c9e21e96928110d4e1b06"
+      ]
+    },
+    {
+      "id": "real_exact_12",
+      "category": "exact",
+      "query": "6389b6df22a33ed8ea6b978bc6345331858e92",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\51\\6389b6df22a33ed8ea6b978bc6345331858e92",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\51\\6389b6df22a33ed8ea6b978bc6345331858e92"
+      ]
+    },
+    {
+      "id": "real_exact_13",
+      "category": "exact",
+      "query": "ba62785a8bd28eca822fd5624018f5301ac461",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\57\\ba62785a8bd28eca822fd5624018f5301ac461",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\57\\ba62785a8bd28eca822fd5624018f5301ac461"
+      ]
+    },
+    {
+      "id": "real_exact_14",
+      "category": "exact",
+      "query": "d78b639774d3b333eb5b2b59b32991a632e5e1",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\5e\\d78b639774d3b333eb5b2b59b32991a632e5e1",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\5e\\d78b639774d3b333eb5b2b59b32991a632e5e1"
+      ]
+    },
+    {
+      "id": "real_exact_15",
+      "category": "exact",
+      "query": "5630c8c7ff708268bc2db4d59bc04effd6adc2",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\7e\\5630c8c7ff708268bc2db4d59bc04effd6adc2",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\7e\\5630c8c7ff708268bc2db4d59bc04effd6adc2"
+      ]
+    },
+    {
+      "id": "real_exact_16",
+      "category": "exact",
+      "query": "977ed48ac1d6eb0336f49fb2284aaccc698d58",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\7f\\977ed48ac1d6eb0336f49fb2284aaccc698d58",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\7f\\977ed48ac1d6eb0336f49fb2284aaccc698d58"
+      ]
+    },
+    {
+      "id": "real_exact_17",
+      "category": "exact",
+      "query": "a94024dbd3ed4f9045b5a09550ea929b66caef",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\83\\a94024dbd3ed4f9045b5a09550ea929b66caef",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\83\\a94024dbd3ed4f9045b5a09550ea929b66caef"
+      ]
+    },
+    {
+      "id": "real_exact_18",
+      "category": "exact",
+      "query": "caa2e54013ac45442404c0d955f701d51fc194",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\9c\\caa2e54013ac45442404c0d955f701d51fc194",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\9c\\caa2e54013ac45442404c0d955f701d51fc194"
+      ]
+    },
+    {
+      "id": "real_exact_19",
+      "category": "exact",
+      "query": "f9e138b66af1d1a2d1b1f556a546d810e36090",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\a4\\f9e138b66af1d1a2d1b1f556a546d810e36090",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\a4\\f9e138b66af1d1a2d1b1f556a546d810e36090"
+      ]
+    },
+    {
+      "id": "real_exact_20",
+      "category": "exact",
+      "query": "e7549f54e386698d891907f1f0647ec6b2c95f",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\a8\\e7549f54e386698d891907f1f0647ec6b2c95f",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\a8\\e7549f54e386698d891907f1f0647ec6b2c95f"
+      ]
+    },
+    {
+      "id": "real_exact_21",
+      "category": "exact",
+      "query": "3e49e3941f9dfad76224d6bcc227930e557313",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\bd\\3e49e3941f9dfad76224d6bcc227930e557313",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\bd\\3e49e3941f9dfad76224d6bcc227930e557313"
+      ]
+    },
+    {
+      "id": "real_exact_22",
+      "category": "exact",
+      "query": "f3144e32e74cc11295b071a4c6b5ee7d0f8693",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\c1\\f3144e32e74cc11295b071a4c6b5ee7d0f8693",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\c1\\f3144e32e74cc11295b071a4c6b5ee7d0f8693"
+      ]
+    },
+    {
+      "id": "real_exact_23",
+      "category": "exact",
+      "query": "2a50114f722947699221d574391b8b2567d1ff",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\f5\\2a50114f722947699221d574391b8b2567d1ff",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\f5\\2a50114f722947699221d574391b8b2567d1ff"
+      ]
+    },
+    {
+      "id": "real_exact_24",
+      "category": "exact",
+      "query": "3f94f3f9c7f257c8f1f52eee227c22b5cb2680",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\f6\\3f94f3f9c7f257c8f1f52eee227c22b5cb2680",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\f6\\3f94f3f9c7f257c8f1f52eee227c22b5cb2680"
+      ]
+    },
+    {
+      "id": "real_dup_0",
+      "category": "exact_duplicate",
+      "query": ".editorconfig",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\services\\sync-hub\\.editorconfig",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.claude\\plugins\\marketplaces\\thedotmack\\services\\sync-hub\\.editorconfig",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\firetv-workspace\\cleanyourtv-custom\\.editorconfig",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\firetv-workspace\\references\\cleanyourtv\\.editorconfig"
+      ]
+    },
+    {
+      "id": "real_dup_1",
+      "category": "exact_duplicate",
+      "query": ".gitignore.tmpl",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\packages\\flutter_tools\\templates\\app\\.gitignore.tmpl",
+      "rank_of_first_expected": 6,
+      "mrr": 0.16666666666666666,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\packages\\flutter_tools\\templates\\app\\.gitignore.tmpl",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\packages\\flutter_tools\\templates\\module\\common\\.gitignore.tmpl",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\packages\\flutter_tools\\templates\\package\\.gitignore.tmpl"
+      ]
+    },
+    {
+      "id": "real_dup_2",
+      "category": "exact_duplicate",
+      "query": "00000013.jsonl",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript\\00000013.jsonl",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript\\00000013.jsonl",
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\17220898-ba03-473e-98e1-9ce56c6a95b1\\.system_generated\\logs\\chunks\\transcript_full\\00000013.jsonl",
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript_full\\00000013.jsonl"
+      ]
+    },
+    {
+      "id": "real_dup_3",
+      "category": "exact_duplicate",
+      "query": "00000014.jsonl",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript\\00000014.jsonl",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript\\00000014.jsonl",
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\17220898-ba03-473e-98e1-9ce56c6a95b1\\.system_generated\\logs\\chunks\\transcript_full\\00000014.jsonl",
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript_full\\00000014.jsonl"
+      ]
+    },
+    {
+      "id": "real_dup_4",
+      "category": "exact_duplicate",
+      "query": "00000015.jsonl",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript\\00000015.jsonl",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript\\00000015.jsonl",
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\17220898-ba03-473e-98e1-9ce56c6a95b1\\.system_generated\\logs\\chunks\\transcript_full\\00000015.jsonl",
+        "C:\\Users\\Pranshul\\.gemini\\antigravity\\brain\\a4e28af1-fb65-4719-b0a4-8f74aacac248\\.system_generated\\logs\\chunks\\transcript_full\\00000015.jsonl"
+      ]
+    },
+    {
+      "id": "real_dup_5",
+      "category": "exact_duplicate",
+      "query": "10.0.112",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Projects\\wallpapers\\.tools\\dotnet\\sdk-manifests\\10.0.100\\microsoft.net.workload.mono.toolchain.current\\10.0.112",
+      "rank_of_first_expected": 6,
+      "mrr": 0.16666666666666666,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Projects\\wallpapers\\.tools\\dotnet\\sdk-manifests\\10.0.100\\microsoft.net.workload.mono.toolchain.current\\10.0.112",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\wallpapers\\.tools\\dotnet\\sdk-manifests\\10.0.100\\microsoft.net.workload.mono.toolchain.net6\\10.0.112",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\wallpapers\\.tools\\dotnet\\sdk-manifests\\10.0.100\\microsoft.net.workload.mono.toolchain.net7\\10.0.112"
+      ]
+    },
+    {
+      "id": "real_dup_6",
+      "category": "exact_duplicate",
+      "query": "AccentColor.colorset",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios\\IosBenchmarks\\IosBenchmarks\\Assets.xcassets\\AccentColor.colorset",
+      "rank_of_first_expected": 6,
+      "mrr": 0.16666666666666666,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios\\IosBenchmarks\\IosBenchmarks\\Assets.xcassets\\AccentColor.colorset",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\FlutterAppExtensionTestHost\\FlutterAppExtensionTestHost\\Assets.xcassets\\AccentColor.colorset",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\dev\\benchmarks\\imitation_game_swiftui\\hello_world_swiftui\\Assets.xcassets\\AccentColor.colorset"
+      ]
+    },
+    {
+      "id": "real_dup_7",
+      "category": "exact_duplicate",
+      "query": "DawnGraphiteCache",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Codex\\2026-09-03\\referenced-chatgpt-conversation-this-is-an\\work\\chrome-mobile-final3-profile\\Default\\DawnGraphiteCache",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Codex\\2026-09-03\\referenced-chatgpt-conversation-this-is-an\\work\\chrome-mobile-final3-profile\\Default\\DawnGraphiteCache",
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Codex\\2026-09-03\\referenced-chatgpt-conversation-this-is-an\\work\\chrome-mobile-final3-profile\\GPUPersistentCache\\DawnGraphiteCache",
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Codex\\2026-09-03\\referenced-chatgpt-conversation-this-is-an\\work\\chrome-mobile-final2-profile\\Default\\DawnGraphiteCache"
+      ]
+    },
+    {
+      "id": "real_dup_8",
+      "category": "exact_duplicate",
+      "query": "Info_Skia.plist",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\FlutterAppExtensionTestHost\\FlutterAppExtensionTestHost\\Info_Skia.plist",
+      "rank_of_first_expected": 6,
+      "mrr": 0.16666666666666666,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\FlutterAppExtensionTestHost\\FlutterAppExtensionTestHost\\Info_Skia.plist",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\Scenarios\\Info_Skia.plist",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\PlayTorrio-Rebuilt\\.toolchains\\linuxsdk\\flutter\\engine\\src\\flutter\\testing\\ios_scenario_app\\ios\\Scenarios\\ScenariosShare\\Info_Skia.plist"
+      ]
+    },
+    {
+      "id": "real_dup_9",
+      "category": "exact_duplicate",
+      "query": "NetworkDataMigrated",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Codex\\2026-09-03\\referenced-chatgpt-conversation-this-is-an\\work\\chrome-mobile-final3-profile\\Default\\Network\\NetworkDataMigrated",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Codex\\2026-09-03\\referenced-chatgpt-conversation-this-is-an\\work\\chrome-mobile-final3-profile\\Default\\Network\\NetworkDataMigrated",
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Codex\\2026-09-03\\referenced-chatgpt-conversation-this-is-an\\work\\chrome-mobile-final3-profile\\Default\\Safe Browsing Network\\NetworkDataMigrated",
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Codex\\2026-09-03\\referenced-chatgpt-conversation-this-is-an\\work\\chrome-mobile-final2-profile\\Default\\Network\\NetworkDataMigrated"
+      ]
+    },
+    {
+      "id": "real_prefix_0",
+      "category": "prefix",
+      "query": "40b9b31e3b5b",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\f9\\40b9b31e3b5b91b129b40ba7fe369931ea5056",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\share\\opencode\\snapshot\\a72deaaa45cfe631ea714258925aab6cdf13af97\\6ad9a6782fbee0b79beb1ee27bd62b49ba735c1f\\objects\\f9\\40b9b31e3b5b91b129b40ba7fe369931ea5056"
+      ]
+    },
+    {
+      "id": "real_prefix_1",
+      "category": "prefix",
+      "query": "m00999-97f09",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.local\\state\\billion-context\\retrieve\\img\\ses_e4d3e3fefffe4Fe5nZ8Yf55SKI\\m00999-97f09e78.png",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.local\\state\\billion-context\\retrieve\\img\\ses_e4d3e3fefffe4Fe5nZ8Yf55SKI\\m00999-97f09e78.png"
+      ]
+    },
+    {
+      "id": "real_prefix_2",
+      "category": "prefix",
+      "query": "sha256-a1581",
+      "expected_set_size": 1,
+      "result_count": 4,
+      "top1": "C:\\Users\\Pranshul\\.ollama\\models\\blobs\\sha256-a1581130b4a4f41c180fe45273eca2d361d98fd8f49977b1098f22443d18cfd5",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.ollama\\models\\blobs\\sha256-a1581130b4a4f41c180fe45273eca2d361d98fd8f49977b1098f22443d18cfd5",
+        "C:\\Users\\Pranshul\\.ollama\\models\\blobs\\sha256-b5e7f3a0cc796ecae1202580b0892e212f966fba791ec74e7fc964f6b8b7525e",
+        "C:\\Users\\Pranshul\\.ollama\\models\\blobs\\sha256-ae370d884f108d16e7cc8fd5259ebc5773a0afa6e078b11f4ed7e39a27e0dfc4"
+      ]
+    },
+    {
+      "id": "real_prefix_3",
+      "category": "prefix",
+      "query": "Pasted image",
+      "expected_set_size": 5,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Obsidian Vault\\Pasted image 20260831190213.png",
+      "rank_of_first_expected": null,
+      "mrr": 0.0,
+      "recall_at_10": 0.0,
+      "exact_at_1": null,
+      "passed": false,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Obsidian Vault\\Pasted image 20260831190213.png",
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Obsidian Vault\\Pasted image 20260831190154.png",
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Obsidian Vault\\Pasted image 20260830180103.png"
+      ]
+    },
+    {
+      "id": "real_prefix_7",
+      "category": "prefix",
+      "query": "Phase 2.md",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Obsidian Vault\\Phase 2.md",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Backup-Documents\\Obsidian Vault\\Phase 2.md"
+      ]
+    },
+    {
+      "id": "real_prefix_8",
+      "category": "prefix",
+      "query": "macos-skylig",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Codex\\2026-10-18\\we-are-currently-using-the-computer\\work\\open-computer-use-review\\docs\\references\\macos-skylight-background-click.md",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Codex\\2026-10-18\\we-are-currently-using-the-computer\\work\\open-computer-use-review\\docs\\references\\macos-skylight-background-click.md"
+      ]
+    },
+    {
+      "id": "real_prefix_9",
+      "category": "prefix",
+      "query": "prune_hashma",
+      "expected_set_size": 4,
+      "result_count": 10,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\DAA\\Assignment\\ddtokens\\src\\prune_hashmap.cpp",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\DAA\\Assignment\\ddtokens\\src\\prune_hashmap.cpp",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\bpe-paper\\gpu\\metal\\build-execute\\CMakeFiles\\prune_hashmap.dir",
+        "C:\\Users\\Pranshul\\Documents\\Projects\\bpe-paper\\gpu\\opencl\\build-execute\\CMakeFiles\\prune_hashmap.dir"
+      ]
+    },
+    {
+      "id": "real_typo_0",
+      "category": "typo",
+      "query": "bootstra_offline.html",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\FSD\\PracticalsSenior\\Practical_5\\bootstrap_offline.html",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\FSD\\PracticalsSenior\\Practical_5\\bootstrap_offline.html"
+      ]
+    },
+    {
+      "id": "real_typo_1",
+      "category": "typo",
+      "query": "prac1_emu.asm",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\MI\\Practical1\\prac1a_emu.asm",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\MI\\Practical1\\prac1a_emu.asm"
+      ]
+    },
+    {
+      "id": "real_typo_2",
+      "category": "typo",
+      "query": "random_foret_default.joblib",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\ML\\Assignment\\ML_-energy_consumption_prediction\\old\\models\\random_forest_default.joblib",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\BTech 3rd Year\\ML\\Assignment\\ML_-energy_consumption_prediction\\old\\models\\random_forest_default.joblib"
+      ]
+    },
+    {
+      "id": "real_typo_3",
+      "category": "typo",
+      "query": "2CH502_I_May_2022.pdf",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2022\\2CH502_IR_May_2022.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2022\\2CH502_IR_May_2022.pdf"
+      ]
+    },
+    {
+      "id": "real_typo_4",
+      "category": "typo",
+      "query": "2EC501_SP_June_2022.pdf",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2022\\2EC501_SPE_June_2022.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2022\\2EC501_SPE_June_2022.pdf"
+      ]
+    },
+    {
+      "id": "real_typo_5",
+      "category": "typo",
+      "query": "2ME502_IR_RPR_PE_February_2022.pdf",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2022\\2ME502_IR_RPR_SPE_February_2022.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2022\\2ME502_IR_RPR_SPE_February_2022.pdf"
+      ]
+    },
+    {
+      "id": "real_typo_6",
+      "category": "typo",
+      "query": "2ECDE51_O_IRDecember 2023.pdf",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2023\\2ECDE51_O_IR_December 2023.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2023\\2ECDE51_O_IR_December 2023.pdf"
+      ]
+    },
+    {
+      "id": "real_typo_7",
+      "category": "typo",
+      "query": "2EC501-O_RR_May_2024.pdf",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2024\\2EC501-O_RPR_May_2024.pdf",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": null,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\Documents\\Nirma\\Past Papers\\2024\\2EC501-O_RPR_May_2024.pdf"
+      ]
+    },
+    {
+      "id": "real_hidden_0",
+      "category": "hidden",
+      "query": ".skill-lock.json",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.agents\\.skill-lock.json",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.agents\\.skill-lock.json"
+      ]
+    },
+    {
+      "id": "real_hidden_1",
+      "category": "hidden",
+      "query": ".vscode-test.mjs",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\meta.pyrefly-1.4.0-win32-x64\\.vscode-test.mjs",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\meta.pyrefly-1.4.0-win32-x64\\.vscode-test.mjs"
+      ]
+    },
+    {
+      "id": "real_hidden_2",
+      "category": "hidden",
+      "query": ".dockerignore.template",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-azuretools.vscode-containers-2.4.5-universal\\resources\\templates\\.dockerignore.template",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-azuretools.vscode-containers-2.4.5-universal\\resources\\templates\\.dockerignore.template"
+      ]
+    },
+    {
+      "id": "real_hidden_3",
+      "category": "hidden",
+      "query": ".gdnbaselines",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\.config\\guardian\\.gdnbaselines",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\.config\\guardian\\.gdnbaselines"
+      ]
+    },
+    {
+      "id": "real_hidden_4",
+      "category": "hidden",
+      "query": ".flake8",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\.flake8",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\.flake8"
+      ]
+    },
+    {
+      "id": "real_long_0",
+      "category": "long_path",
+      "query": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\_debug_adapter\\__main__pydevd_gen_debug_adapter_protocol.py",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\_debug_adapter\\__main__pydevd_gen_debug_adapter_protocol.py",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\_debug_adapter\\__main__pydevd_gen_debug_adapter_protocol.py"
+      ]
+    },
+    {
+      "id": "real_long_1",
+      "category": "long_path",
+      "query": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_concurrency_analyser\\pydevd_concurrency_logger.py",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_concurrency_analyser\\pydevd_concurrency_logger.py",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_concurrency_analyser\\pydevd_concurrency_logger.py"
+      ]
+    },
+    {
+      "id": "real_long_2",
+      "category": "long_path",
+      "query": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_concurrency_analyser\\pydevd_thread_wrappers.py",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_concurrency_analyser\\pydevd_thread_wrappers.py",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_concurrency_analyser\\pydevd_thread_wrappers.py"
+      ]
+    },
+    {
+      "id": "real_long_3",
+      "category": "long_path",
+      "query": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_cython.cpython-39-x86_64-linux-gnu.so",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_cython.cpython-39-x86_64-linux-gnu.so",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_bundle\\pydevd_cython.cpython-39-x86_64-linux-gnu.so"
+      ]
+    },
+    {
+      "id": "real_long_4",
+      "category": "long_path",
+      "query": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_frame_eval\\vendored\\bytecode\\tests\\test_bytecode.py",
+      "expected_set_size": 1,
+      "result_count": 1,
+      "top1": "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_frame_eval\\vendored\\bytecode\\tests\\test_bytecode.py",
+      "rank_of_first_expected": 1,
+      "mrr": 1.0,
+      "recall_at_10": 1.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": [
+        "C:\\Users\\Pranshul\\.antigravity-ide\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy\\_vendored\\pydevd\\_pydevd_frame_eval\\vendored\\bytecode\\tests\\test_bytecode.py"
+      ]
+    },
+    {
+      "id": "real_zero_0",
+      "category": "zero_match",
+      "query": "zzqx0vbnmplkjhgfdsa",
+      "expected_set_size": 0,
+      "result_count": 0,
+      "top1": null,
+      "rank_of_first_expected": null,
+      "mrr": 0.0,
+      "recall_at_10": 0.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": []
+    },
+    {
+      "id": "real_zero_1",
+      "category": "zero_match",
+      "query": "zzqx1vbnmplkjhgfdsa",
+      "expected_set_size": 0,
+      "result_count": 0,
+      "top1": null,
+      "rank_of_first_expected": null,
+      "mrr": 0.0,
+      "recall_at_10": 0.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": []
+    },
+    {
+      "id": "real_zero_2",
+      "category": "zero_match",
+      "query": "zzqx2vbnmplkjhgfdsa",
+      "expected_set_size": 0,
+      "result_count": 0,
+      "top1": null,
+      "rank_of_first_expected": null,
+      "mrr": 0.0,
+      "recall_at_10": 0.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": []
+    },
+    {
+      "id": "real_zero_3",
+      "category": "zero_match",
+      "query": "zzqx3vbnmplkjhgfdsa",
+      "expected_set_size": 0,
+      "result_count": 0,
+      "top1": null,
+      "rank_of_first_expected": null,
+      "mrr": 0.0,
+      "recall_at_10": 0.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": []
+    },
+    {
+      "id": "real_zero_4",
+      "category": "zero_match",
+      "query": "zzqx4vbnmplkjhgfdsa",
+      "expected_set_size": 0,
+      "result_count": 0,
+      "top1": null,
+      "rank_of_first_expected": null,
+      "mrr": 0.0,
+      "recall_at_10": 0.0,
+      "exact_at_1": true,
+      "passed": true,
+      "results_preview": []
+    }
+  ],
+  "engine_ready": true,
+  "notes": [
+    "metrics fixed at top-10: MRR@10, recall@10, exact-match@1; expectEmpty scored separately",
+    "expectedTop5 is the expected set for MRR/recall, not an exhaustive reference list",
+    "engine_not_ready means ps-index::search returned no results; the table is structural only",
+    "real-corpus fixture is generated from this machine's read-only legacy export; it is evidence, not a portable CI test"
+  ]
+}

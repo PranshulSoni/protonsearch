@@ -1,0 +1,346 @@
+{
+  "schema": "ps-island-switch/1",
+  "label": "baseline-acf74ce-custom-protocol",
+  "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.bench\\baseline-custom\\ProtonSearch.exe",
+  "exeSha256": "65f6546dbcfc9a93",
+  "capturedAt": "2026-11-10T06:58:57.868Z",
+  "conditions": {
+    "switches": 16,
+    "gapMs": 900,
+    "settleMs": 12000,
+    "dpiAware": true,
+    "host": "PranshulAsus",
+    "exeBytes": 21139456,
+    "exeMtime": "2026-11-10T06:57:19.986Z",
+    "gitHead": "acf74ce87661cf86d25767cd4dea67279c401c32",
+    "appPid": 40520,
+    "display": {
+      "primaryPx": "2880x1800"
+    },
+    "initialRect": {
+      "left": 882,
+      "top": -135,
+      "width": 1116,
+      "height": 435
+    }
+  },
+  "status": "invalid",
+  "summary": {
+    "switches": 16,
+    "validity": {
+      "keysSent": 16,
+      "keysSkipped": 0,
+      "respondedSwitches": 0,
+      "invalid": true
+    },
+    "firstPixelMs": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "min": null,
+      "max": null,
+      "mean": null
+    },
+    "settleMs": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "min": null,
+      "max": null,
+      "mean": null
+    },
+    "visualFrames": {
+      "count": 16,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "min": 0,
+      "max": 0,
+      "mean": 0
+    },
+    "maxVisualGapMs": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "min": null,
+      "max": null,
+      "mean": null
+    },
+    "uiLatency": {
+      "samples": 1154,
+      "count": 1,
+      "p50": 0.325,
+      "p95": 1.029,
+      "p99": 1.836,
+      "max": 24.444,
+      "rateHz": 63.81
+    },
+    "stalls": {
+      "ge50": 0,
+      "ge100": 0,
+      "ge250": 0,
+      "totalBlockedMs": 0
+    },
+    "summon": {
+      "hotkeyAtMs": 15.596,
+      "visibleMs": 16.614,
+      "focusedMs": 34.336,
+      "stalls50": 0,
+      "maxStallMs": null,
+      "totalStallMs": 0
+    },
+    "pixel": {
+      "samples": 1078,
+      "rateHz": 59.68,
+      "changes": 16
+    },
+    "frameMarks": {},
+    "appUiStalls": {
+      "count": 0,
+      "maxMs": null,
+      "list": []
+    }
+  },
+  "perSwitch": [
+    {
+      "i": 1,
+      "sent": true,
+      "keyMs": 876.68,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 2,
+      "sent": true,
+      "keyMs": 1891.77,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 3,
+      "sent": true,
+      "keyMs": 2919.05,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 4,
+      "sent": true,
+      "keyMs": 3933.81,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 5,
+      "sent": true,
+      "keyMs": 4955.12,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 6,
+      "sent": true,
+      "keyMs": 5982.28,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 7,
+      "sent": true,
+      "keyMs": 7014.48,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 8,
+      "sent": true,
+      "keyMs": 8043.77,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 9,
+      "sent": true,
+      "keyMs": 9060.28,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 10,
+      "sent": true,
+      "keyMs": 10093.27,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 11,
+      "sent": true,
+      "keyMs": 11122.19,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 12,
+      "sent": true,
+      "keyMs": 12155.06,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 13,
+      "sent": true,
+      "keyMs": 13187.69,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 14,
+      "sent": true,
+      "keyMs": 14218.59,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 15,
+      "sent": true,
+      "keyMs": 15247.49,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    },
+    {
+      "i": 16,
+      "sent": true,
+      "keyMs": 16262.45,
+      "firstPixelMs": null,
+      "settleMs": null,
+      "visualFrames": 0,
+      "maxVisualGapMs": null,
+      "uiStalls": 0,
+      "maxUiStallMs": null,
+      "rectChanges": 0,
+      "rects": []
+    }
+  ],
+  "raw": {
+    "stalls": [
+      {
+        "t": 32.206,
+        "lat": 24.444
+      }
+    ],
+    "rects": [
+      {
+        "t": 14.045,
+        "l": 882,
+        "top": -135,
+        "w": 1116,
+        "h": 435
+      }
+    ],
+    "marks": [
+      {
+        "label": "island-window-shown",
+        "relMs": 44
+      }
+    ]
+  },
+  "limitations": [
+    "external black-box timeline: pixel sampling ~59.68 Hz cannot resolve individual 120 Hz frames; use island-frame marks for pacing",
+    "first switch may include cold paths",
+    "UI latency is a WM_NULL round trip from outside (3000 ms cap): a proxy for UI-thread blocking, not per-event cost"
+  ],
+  "blocked": []
+}

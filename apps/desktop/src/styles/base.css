@@ -1,0 +1,223 @@
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent;
+}
+
+html[data-window="main"] body {
+  background: var(--stage);
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Visible focus stays on inputs; only the pointer-focused state is quiet. */
+input:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.input:focus-visible,
+.field:focus-visible,
+input[type="text"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="search"]:focus-visible {
+  outline: var(--ps-focus-width) solid var(--focus);
+  outline-offset: var(--ps-focus-offset);
+}
+
+::selection {
+  background: var(--selected);
+  color: var(--ink-strong);
+}
+
+/* Thin, quiet scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Launcher window is a transparent, frameless surface. */
+/* The native launcher window is padded by 28 logical px on every side so the
+   card shadow is never clipped; keep the card inside that breathing room. */
+html[data-window="launcher"] #root {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: transparent;
+  /* Keep in sync with LAUNCHER_SHADOW_PAD in apps/desktop/src-tauri/src/main.rs. */
+  padding: var(--ps-launcher-shadow-pad, 28px);
+}
+
+/* Shared primitives used across launcher / app / onboarding. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--line-strong);
+  background: var(--panel-raised);
+  color: var(--blue-deep);
+  border-radius: var(--radius-md);
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.btn:hover {
+  background: var(--soft);
+}
+
+.btn-primary {
+  background: #234a61;
+  border-color: #234a61;
+  color: #fafbf9;
+}
+
+.btn-primary:hover {
+  background: #2d5a73;
+}
+
+:root[data-theme="dark"] .btn-primary {
+  background: #cddde6;
+  border-color: #cddde6;
+  color: #12212a;
+}
+
+:root[data-theme="dark"] .btn-primary:hover {
+  background: #e2edf2;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.btn-ghost:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--panel-raised);
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+
+.input::placeholder {
+  color: var(--quiet);
+}
+
+.kbd {
+  display: inline-block;
+  font: 650 var(--ps-text-kbd) / 1.2 var(--font-ui);
+  color: var(--ps-kbd-ink);
+  background: var(--ps-kbd-bg);
+  border: 1px solid var(--ps-kbd-border);
+  border-radius: 4px;
+  padding: 2px 5px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Group label used by result lists. */
+.group-label {
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 760;
+  padding: 14px 13px 8px;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* Reduced motion: no transitions/animations beyond instant state changes. */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  transition: none !important;
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

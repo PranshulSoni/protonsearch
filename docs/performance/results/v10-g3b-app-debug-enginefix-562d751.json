@@ -1,0 +1,76 @@
+{
+  "schema": "ps-app-baseline/1",
+  "kind": "app-launcher-baseline",
+  "status": "blocked",
+  "capturedAt": "2026-11-09T21:42:39.228Z",
+  "host": {
+    "hostname": "PranshulAsus",
+    "platform": "win32"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe",
+    "exeBytes": 19952128,
+    "exeMtime": "2026-11-09T21:41:30.897Z",
+    "frontendDistIndex": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\apps\\desktop\\dist\\index.html",
+    "frontendDistMtime": "2026-11-09T21:32:51.550Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata-live",
+    "cdpPort": 9222,
+    "launchArgs": [],
+    "node": "v26.7.0",
+    "gitHead": "562d751e1234371ac171a009bc5c2e402dbc5c2f",
+    "gitDirty": 27,
+    "appPid": 38068,
+    "pages": [
+      {
+        "kind": "main",
+        "url": "http://localhost:5173/"
+      },
+      {
+        "kind": "launcher",
+        "url": "http://localhost:5173/"
+      }
+    ],
+    "devicePixelRatio": 1.5,
+    "windowKind": "launcher"
+  },
+  "measurements": {
+    "indexReady": {
+      "state": "unavailable",
+      "entries": 0
+    },
+    "memoryIdle": {
+      "label": "idle-hidden",
+      "mode": "memory",
+      "rootPid": 38068,
+      "capturedAtUtc": 1794260648392,
+      "processCount": 0,
+      "totalWorkingSetBytes": 0,
+      "totalPrivateBytes": 0,
+      "processes": [],
+      "cpuSecondsTotal": 0,
+      "totalWorkingSetMiB": 0,
+      "totalPrivateMiB": 0
+    },
+    "idleCpu": {
+      "mode": "cpu",
+      "rootPid": 38068,
+      "sampleSeconds": 5.006,
+      "processCount": 0,
+      "cpuSecondsDelta": 0,
+      "logicalCores": 20,
+      "cpuPctOfOneCore": 0,
+      "cpuPctOfMachine": 0
+    },
+    "searchTimingHook": "hook-error: Error: page.evaluate: Target page, context or browser has been closed"
+  },
+  "blocked": [
+    "page.evaluate: Target page, context or browser has been closed\n    at measureInputToVisible (C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\tools\\benchmark\\app-baseline.mjs:246:30)\n    at main (C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\tools\\benchmark\\app-baseline.mjs:545:49)"
+  ],
+  "limitations": [
+    "Debug Rust build + production frontend via vite preview; release-build comparison pending.",
+    "Windows display used for hotkey activation test; DPI/refresh recorded per run.",
+    "Other agents may be active on the machine; build/CPU contention is not controlled.",
+    "Playwright/CDP only measures the WebView page; native window visibility comes from Win32 polling in PowerShell.",
+    "Perf marks are opt-in (PROTONSEARCH_PERF_HOOKS=1) and written to <data_dir>/perf-marks.jsonl: launcher-window-shown (Rust), launcher-first-paint and launcher-selection-painted (frontend, via perf_mark). Epochs are same-machine wall clock (ms resolution)."
+  ]
+}

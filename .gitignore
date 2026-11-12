@@ -57,3 +57,50 @@ tray_debug.log
 # External projects
 Flow.Launcher-dev/
 icons/preview-images/demo.mp4
+
+# Agent design scratch
+.agents/design/
+
+# Benchmark scratch: generated datasets, raw run outputs, OCR corpus (reproducible via ps-bench)
+.bench/
+# v2 frontend / tooling
+apps/desktop/node_modules/
+apps/desktop/dist/
+tools/visual-qa/node_modules/
+tools/visual-qa/artifacts/
+# v2 local test/dev data (sandbox cannot write AppData)
+.devdata/
+agent-sidecar/.venv/
+agent-sidecar/.venv2/
+agent-sidecar/.venv-nanobot/
+.agents/*.exe
+.agents/*.pdb
+.agents/*.log
+.agents/notes/
+.agents/*.txt
+
+# agent sidecar scratch
+.nanobot-install.log
+scripts/smoke_run.py
+# release artifacts (built locally, not source)
+dist-installer/
+.devdata-mig/
+.devdata-mig2/
+.omc/
+
+# local dev/test data (never commit)
+.devdata*/
+
+# local agent scratch (keep .agents/AGENTS.md tracked)
+.agents/*.ps1
+.agents/*.py
+.agents/*.log
+.agents/notes/
+
+# Verification WebView2 profiles are runtime artifacts
+docs/qa/**/webview2/
+# Verification portable data profiles (runtime artifacts)
+docs/qa/**/appdata/
+docs/qa/**/webview2/
+.recovery-*/
+

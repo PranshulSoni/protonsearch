@@ -1,0 +1,26 @@
+{
+  "schema": "ps-island-switch/1",
+  "label": "recovery-before",
+  "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\release\\ProtonSearch.exe",
+  "exeSha256": "a809c8f88896dace",
+  "capturedAt": "2026-11-10T14:25:46.432Z",
+  "conditions": {
+    "switches": 8,
+    "gapMs": 900,
+    "settleMs": 8000,
+    "dpiAware": true,
+    "host": "PranshulAsus",
+    "exeBytes": 21684224,
+    "exeMtime": "2026-11-10T10:41:40.748Z",
+    "gitHead": "533fda3c0244715cd15d7d058a83d72e105c417f",
+    "appPid": 25556
+  },
+  "status": "blocked",
+  "summary": null,
+  "perSwitch": [],
+  "raw": null,
+  "limitations": [],
+  "blocked": [
+    "Error: island-probe failed: island window not visible and focused within 5000 ms of Alt+Space\n    at main (file:///C:/Users/Pranshul/Documents/Projects/protonsearch/tools/benchmark/island-switch.mjs:235:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///C:/Users/Pranshul/Documents/Projects/protonsearch/tools/benchmark/island-switch.mjs:265:3"
+  ]
+}

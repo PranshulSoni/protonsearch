@@ -1,0 +1,222 @@
+{
+  "schema": "ps-golden/1",
+  "corpus": "synthetic-deterministic-planted-anchors",
+  "seed": 20261109,
+  "entries": 10000,
+  "notes": [
+    "expectedTop1 = must be rank 1; expectedTop5 = expected set scored by MRR@10/recall@10 (not exhaustive, usually <=5 paths)",
+    "corpus is generated deterministically by ps-bench gen with the same seed; anchors are planted at every size",
+    "duplicate-name queries intentionally do not assert top-1 identity: tie ordering is engine-defined"
+  ],
+  "queries": [
+    {
+      "id": "exact_unique",
+      "category": "exact",
+      "query": "Project Phoenix Budget 2026.xlsx",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "planted unique anchor: full filename must rank first"
+    },
+    {
+      "id": "exact_quarterly",
+      "category": "exact",
+      "query": "quarterly_report_final_v2.pdf",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "planted unique anchor with version suffix"
+    },
+    {
+      "id": "exact_screenshot",
+      "category": "exact",
+      "query": "Screenshot 2026-11-09 142233.png",
+      "expected_top1": "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "planted screenshot-style anchor"
+    },
+    {
+      "id": "exact_cjk_jp",
+      "category": "cjk",
+      "query": "会議議事録_2026-11-09.docx",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\会議\\会議議事録_2026-11-09.docx",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "planted Japanese anchor: exact unicode filename"
+    },
+    {
+      "id": "exact_unicode",
+      "category": "unicode",
+      "query": "café_résumé_naïve.md",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\Notes\\café_résumé_naïve.md",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "planted accented unicode anchor"
+    },
+    {
+      "id": "exact_hidden",
+      "category": "hidden",
+      "query": ".env",
+      "expected_top1": "C:\\Users\\Pranshul\\Downloads\\.env",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "planted hidden file with leading dot"
+    },
+    {
+      "id": "exact_long_path",
+      "category": "long_path",
+      "query": "C:\\Users\\Pranshul\\Documents\\Archive\\2026\\Q3\\Backups\\Projects\\protonsearch\\apps\\desktop\\src\\components\\internal\\generated\\very_long_anchor_filename_for_path_length_testing_0001.json",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\Archive\\2026\\Q3\\Backups\\Projects\\protonsearch\\apps\\desktop\\src\\components\\internal\\generated\\very_long_anchor_filename_for_path_length_testing_0001.json",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "full 200+ char path as query; must resolve to the exact file"
+    },
+    {
+      "id": "exact_readme",
+      "category": "exact_duplicate",
+      "query": "README.md",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Projects\\protonsearch\\README.md"
+      ],
+      "expect_empty": false,
+      "rationale": "common duplicate name; planted anchor must be in top-10 (tie ranking is engine-defined)"
+    },
+    {
+      "id": "exact_index_dup",
+      "category": "exact_duplicate",
+      "query": "index.js",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Projects\\web\\src\\index.js",
+        "C:\\Users\\Pranshul\\Projects\\api\\src\\index.js",
+        "C:\\Users\\Pranshul\\Projects\\admin\\src\\index.js"
+      ],
+      "expect_empty": false,
+      "rationale": "three planted duplicates must all be found in top-10"
+    },
+    {
+      "id": "exact_package",
+      "category": "exact_duplicate",
+      "query": "package.json",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Projects\\protonsearch\\apps\\desktop\\package.json"
+      ],
+      "expect_empty": false,
+      "rationale": "very common name; planted anchor must appear in top-10"
+    },
+    {
+      "id": "prefix_screenshot",
+      "category": "prefix",
+      "query": "Screenshot 2026-11-09",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png"
+      ],
+      "expect_empty": false,
+      "rationale": "date prefix shared by screenshot-style names; anchor must be in top-10"
+    },
+    {
+      "id": "prefix_quarterly",
+      "category": "prefix",
+      "query": "quarterly_rep",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf"
+      ],
+      "expect_empty": false,
+      "rationale": "snake-case prefix"
+    },
+    {
+      "id": "multi_term_name",
+      "category": "multi_term",
+      "query": "project phoenix budget",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix\\docs\\architecture\\Project Phoenix Budget 2026.xlsx",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "all three terms are in one filename; expected first"
+    },
+    {
+      "id": "multi_term_partial",
+      "category": "multi_term",
+      "query": "quarterly report final",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf"
+      ],
+      "expect_empty": false,
+      "rationale": "terms spread inside one filename"
+    },
+    {
+      "id": "typo_quarterly",
+      "category": "typo",
+      "query": "quaterly report final",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Documents\\Finance\\2026\\Q3\\quarterly_report_final_v2.pdf"
+      ],
+      "expect_empty": false,
+      "rationale": "one deleted character; fuzzy search should still surface the anchor in top-10"
+    },
+    {
+      "id": "typo_screenshot",
+      "category": "typo",
+      "query": "screnshot 2026-11-09",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Pictures\\Screenshots\\Screenshot 2026-11-09 142233.png"
+      ],
+      "expect_empty": false,
+      "rationale": "one deleted character in first term"
+    },
+    {
+      "id": "cjk_prefix",
+      "category": "cjk",
+      "query": "会議議事録_2026-11-09",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\会議\\会議議事録_2026-11-09.docx",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "CJK filename with date; the full date makes it unique in the corpus"
+    },
+    {
+      "id": "cjk_japanese_memo",
+      "category": "cjk",
+      "query": "日本語_メモ_2026.txt",
+      "expected_top1": "C:\\Users\\Pranshul\\Documents\\日本語\\日本語_メモ_2026.txt",
+      "expected_top5": [],
+      "expect_empty": false,
+      "rationale": "mixed CJK + ASCII unique filename"
+    },
+    {
+      "id": "folder_anchor",
+      "category": "folder",
+      "query": "ProtonSearch Phoenix",
+      "expected_top1": null,
+      "expected_top5": [
+        "C:\\Users\\Pranshul\\Documents\\Projects\\ProtonSearch Phoenix"
+      ],
+      "expect_empty": false,
+      "rationale": "planted folder anchor; folder should be found"
+    },
+    {
+      "id": "zero_match",
+      "category": "zero_match",
+      "query": "zzqxvbnmplkjhgfdsa9917",
+      "expected_top1": null,
+      "expected_top5": [],
+      "expect_empty": true,
+      "rationale": "nonsense token must return no results"
+    },
+    {
+      "id": "zero_match_cjk",
+      "category": "zero_match",
+      "query": "存在しないファイル名です",
+      "expected_top1": null,
+      "expected_top5": [],
+      "expect_empty": true,
+      "rationale": "CJK nonsense must return no results"
+    }
+  ]
+}

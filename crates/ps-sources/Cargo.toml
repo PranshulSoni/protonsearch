@@ -1,0 +1,24 @@
+[package]
+name = "ps-sources"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ps-ipc = { path = "../ps-ipc" }
+ps-windows = { path = "../ps-windows" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+rusqlite = { workspace = true }
+walkdir = { workspace = true }
+winreg = { workspace = true }
+image = { workspace = true }
+sha2 = "0.10"
+
+[dev-dependencies]
+ps-ipc = { path = "../ps-ipc" }
+image = { workspace = true }
+ps-windows = { path = "../ps-windows" }
+rusqlite = { workspace = true }
+serde_json = { workspace = true }

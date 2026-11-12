@@ -1,0 +1,1759 @@
+//! ProtonSearch v2 IPC contract.
+//!
+//! This crate is the single source of truth for messages exchanged between the
+//! Rust engine, the Tauri shell and the WebView UI (and, later, the optional
+//! Python agent sidecar). It intentionally depends on serde only, so every
+//! layer can share it.
+//!
+//! Rules:
+//! - Bump PROTOCOL_VERSION on any breaking change.
+//! - Field names are camelCase on the wire; enum variants are snake_case.
+//! - The TypeScript mirror lives in apps/desktop/src/bridge/types.ts.
+//!   Keep both in sync; contract tests below document the shape.
+//! - Agent task / detected-agent DTOs live in the agent_task module (V10 single
+//!   source of truth; ps-agent re-exports them for its public API).
+
+pub mod agent_task;
+
+use serde::{Deserialize, Serialize};
+
+/// Version of the desktop <-> UI protocol.
+pub const PROTOCOL_VERSION: u32 = 1;
+
+/// Bumped whenever the on-disk v2 data layout changes incompatibly.
+pub const DATA_SCHEMA_VERSION: u32 = 1;
+
+fn default_limit() -> usize {
+    30
+}
+
+fn default_protocol() -> u32 {
+    PROTOCOL_VERSION
+}
+
+// ---------------------------------------------------------------------------
+// Query
+// ---------------------------------------------------------------------------
+
+/// Which slice of the index a query should search. All is the launcher default;
+/// scopes are used by explicit prefixes such as file: app: content: history:.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchScope {
+    #[default]
+    All,
+    Photos,
+    Files,
+    Folders,
+    Content,
+    Apps,
+    Clipboard,
+    Browser,
+    Git,
+    Ocr,
+    Actions,
+    Commands,
+    Settings,
+    Agent,
+}
+
+/// Optional structured filters layered on top of free text.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchFilters {
+    /// Restrict to specific result families (empty = all).
+    #[serde(default)]
+    pub kinds: Vec<SourceKind>,
+    /// Lower-case extensions without the dot, e.g. ["pdf", "docx"].
+    #[serde(default)]
+    pub extensions: Vec<String>,
+    /// Only results whose path starts with this prefix (search-path scope).
+    #[serde(default)]
+    pub under_path: Option<String>,
+    /// Unix milliseconds; only results modified after this instant.
+    #[serde(default)]
+    pub modified_after: Option<i64>,
+    #[serde(default)]
+    pub modified_before: Option<i64>,
+    #[serde(default)]
+    pub min_size: Option<u64>,
+    #[serde(default)]
+    pub max_size: Option<u64>,
+}
+
+/// A versioned search request. request_id is monotonic per UI session; the
+/// engine must drop responses for stale ids rather than let late tiers win.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchRequest {
+    #[serde(default = "default_protocol")]
+    pub protocol: u32,
+    pub request_id: u64,
+    pub query: String,
+    #[serde(default)]
+    pub scope: SearchScope,
+    #[serde(default)]
+    pub filters: SearchFilters,
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+}
+
+impl SearchRequest {
+    pub fn new(request_id: u64, query: impl Into<String>) -> Self {
+        Self {
+            protocol: PROTOCOL_VERSION,
+            request_id,
+            query: query.into(),
+            scope: SearchScope::All,
+            filters: SearchFilters::default(),
+            limit: default_limit(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Results
+// ---------------------------------------------------------------------------
+
+/// Result family. The UI groups results by this value and renders a badge or
+/// icon accordingly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceKind {
+    Application,
+    File,
+    Folder,
+    Document,
+    ContentMatch,
+    OcrText,
+    Clipboard,
+    BrowserHistory,
+    Bookmark,
+    Recent,
+    Action,
+    Command,
+    Calculator,
+    Quicklink,
+    Snippet,
+    GitCommit,
+    GitRepository,
+    GitTodo,
+    Setting,
+    Window,
+    Agent,
+    System,
+}
+
+impl SourceKind {
+    /// Stable group label used by the launcher UI.
+    pub fn group_label(self) -> &'static str {
+        match self {
+            SourceKind::Application => "APPLICATIONS",
+            SourceKind::File | SourceKind::Folder => "FILES",
+            SourceKind::Document | SourceKind::ContentMatch | SourceKind::OcrText => "DOCUMENTS",
+            SourceKind::Clipboard => "CLIPBOARD",
+            SourceKind::BrowserHistory | SourceKind::Bookmark => "BROWSER",
+            SourceKind::Recent => "RECENT",
+            SourceKind::Action | SourceKind::Command | SourceKind::Calculator => "ACTIONS",
+            SourceKind::Quicklink | SourceKind::Snippet => "WORKFLOWS",
+            SourceKind::GitCommit | SourceKind::GitRepository | SourceKind::GitTodo => "GIT",
+            SourceKind::Setting => "SETTINGS",
+            SourceKind::Window => "WINDOWS",
+            SourceKind::Agent => "AGENT",
+            SourceKind::System => "SYSTEM",
+        }
+    }
+}
+
+/// Highlight range within a result title, as UTF-16 code-unit offsets to match
+/// the JavaScript string model. start is inclusive, end exclusive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+/// How the UI should render the leading icon.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum IconRef {
+    /// Cached PNG of a real Windows icon; path is absolute (asset protocol).
+    AppIcon { path: String },
+    /// Real Windows icon as a self-contained PNG data URL. Used so the UI never
+    /// needs a filesystem/protocol scope to show application icons.
+    AppIconData { data: String },
+    /// File-extension badge (UI draws a letter/monogram tile).
+    FileType { ext: String },
+    /// A monogram chosen by the UI from the title.
+    Monogram,
+    /// Built-in semantic kind; UI maps it to its icon set.
+    Kind { kind: SourceKind },
+}
+
+/// Actions are always structured; no shell strings are ever interpolated.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ActionSpec {
+    /// Open a file/folder with the OS default handler.
+    OpenPath {
+        path: String,
+        #[serde(default)]
+        line: Option<u32>,
+        #[serde(default)]
+        column: Option<u32>,
+    },
+    /// Show a path in File Explorer.
+    RevealPath { path: String },
+    /// Open an http(s) URL in the default browser.
+    OpenUrl { url: String },
+    /// Launch a Start-menu / UWP application.
+    LaunchApp {
+        app_id: String,
+        #[serde(default)]
+        target: Option<String>,
+    },
+    /// Copy a string to the clipboard.
+    CopyText { text: String },
+    /// Copy an image file to the clipboard.
+    CopyImage { path: String },
+    /// Run one of the built-in, reviewed native commands.
+    RunNative { command: NativeCommand },
+    /// Execute the action described by a quicklink/snippet entry.
+    RunWorkflow { id: String },
+    /// No-op (used for disabled rows / informational results).
+    None,
+}
+
+/// Reviewed, enumerated native commands. Destructive ones require a
+/// confirmation in the UI and a permission check in the engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeCommand {
+    LockWorkstation,
+    Sleep,
+    Shutdown,
+    Restart,
+    EmptyRecycleBin,
+    OpenSettings,
+    OpenTaskManager,
+    OpenTerminal,
+    ToggleDarkMode,
+    PauseIndexing,
+    ResumeIndexing,
+}
+
+/// An extra context-menu action attached to a result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionItem {
+    pub id: String,
+    pub label: String,
+    pub action: ActionSpec,
+    #[serde(default)]
+    pub destructive: bool,
+    #[serde(default)]
+    pub shortcut: Option<String>,
+}
+
+/// Secondary details rendered as quiet metadata next to a result.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResultMeta {
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub size: Option<u64>,
+    #[serde(default)]
+    pub modified: Option<i64>,
+    #[serde(default)]
+    pub item_count: Option<u64>,
+    #[serde(default)]
+    pub line: Option<u32>,
+    #[serde(default)]
+    pub snippet: Option<String>,
+    #[serde(default)]
+    pub source_label: Option<String>,
+    /// Clipboard image rows: bounded PNG thumbnail as a data URL (safe to render
+    /// without asset-protocol scopes) and the source image dimensions.
+    #[serde(default)]
+    pub thumbnail_data_url: Option<String>,
+    #[serde(default)]
+    pub image_width: Option<u32>,
+    #[serde(default)]
+    pub image_height: Option<u32>,
+    /// MIME type of the underlying item when known (e.g. image/png).
+    #[serde(default)]
+    pub mime: Option<String>,
+    /// Clipboard rows: the item is pinned (listed first, never pruned).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pinned: bool,
+    /// Git repository rows: every local branch, most recently committed first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub branches: Vec<String>,
+    /// Browser rows: the site's favicon as an image data URL, read from the local
+    /// browser profile. None when no installed browser holds one for the host.
+    #[serde(default)]
+    pub favicon_data_url: Option<String>,
+}
+
+/// One rendered result row.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResult {
+    /// Stable identity across incremental refreshes (kind + canonical path/id).
+    pub id: String,
+    pub kind: SourceKind,
+    pub title: String,
+    pub subtitle: String,
+    #[serde(default)]
+    pub path: Option<String>,
+    pub icon: IconRef,
+    /// Higher is better. Deterministic for a given corpus + query.
+    pub score: f32,
+    #[serde(default)]
+    pub match_ranges: Vec<TextRange>,
+    #[serde(default)]
+    pub meta: ResultMeta,
+    pub action: ActionSpec,
+    #[serde(default)]
+    pub actions: Vec<ActionItem>,
+}
+
+/// Per-tier timing for the developer/perf overlay and benchmark harness.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TierTiming {
+    pub tier: u8,
+    pub label: String,
+    pub took_ms: f32,
+    pub hits: usize,
+}
+
+/// Coarse index state for the UI status dot and status bar.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SearchStatus {
+    Ready { indexed_files: u64, content_docs: u64 },
+    Indexing { indexed_files: u64, phase: String },
+    Degraded { reason: String },
+}
+
+fn default_protocol_version() -> u32 {
+    PROTOCOL_VERSION
+}
+
+/// Response to a SearchRequest.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResponse {
+    #[serde(default = "default_protocol_version")]
+    pub protocol: u32,
+    pub request_id: u64,
+    pub query: String,
+    pub results: Vec<SearchResult>,
+    pub total: usize,
+    pub took_ms: f32,
+    #[serde(default)]
+    pub timings: Vec<TierTiming>,
+    pub status: SearchStatus,
+}
+
+// ---------------------------------------------------------------------------
+// Status / settings
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IndexerState {
+    Starting,
+    Ready,
+    Indexing,
+    Paused,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RootMode {
+    /// Only names/paths; fastest, no file content is read.
+    NamesOnly,
+    /// Names + extracted text content.
+    Content,
+    /// Names + content + OCR of images/screenshots.
+    ContentAndOcr,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RootConfig {
+    pub path: String,
+    pub mode: RootMode,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_glass_level() -> u8 {
+    60
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RootStatus {
+    pub path: String,
+    pub mode: RootMode,
+    pub enabled: bool,
+    pub indexed: u64,
+    pub errors: u64,
+    pub state: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceStatus {
+    pub id: String,
+    pub label: String,
+    pub enabled: bool,
+    pub item_count: u64,
+    pub state: String,
+    #[serde(default)]
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentState {
+    NotConfigured,
+    Stopped,
+    Running,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentStatus {
+    pub state: AgentState,
+    #[serde(default)]
+    pub runtime: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub detail: Option<String>,
+}
+
+/// Aggregate engine status for the desktop app.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineStatus {
+    #[serde(default = "default_protocol_version")]
+    pub protocol: u32,
+    pub version: String,
+    pub state: IndexerState,
+    pub filename_entries: u64,
+    pub content_documents: u64,
+    /// True while every image is re-read after an OCR engine change.
+    #[serde(default)]
+    pub reindexing: bool,
+    pub ocr_documents: u64,
+    #[serde(default)]
+    pub roots: Vec<RootStatus>,
+    #[serde(default)]
+    pub sources: Vec<SourceStatus>,
+    #[serde(default)]
+    pub agent: Option<AgentStatus>,
+    /// Unix ms of the last index write.
+    #[serde(default)]
+    pub last_updated: i64,
+    /// Non-fatal degradation messages (e.g. browser DB locked).
+    #[serde(default)]
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ThemeMode {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Density {
+    #[default]
+    Comfortable,
+    Compact,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MotionPreference {
+    #[default]
+    System,
+    Reduced,
+    Full,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexingSettings {
+    pub roots: Vec<RootConfig>,
+    #[serde(default)]
+    pub excluded_paths: Vec<String>,
+    pub content_enabled: bool,
+    pub ocr_enabled: bool,
+    /// Respect Windows battery-saver / high-load states.
+    #[serde(default = "default_true")]
+    pub respect_power_state: bool,
+    #[serde(default)]
+    pub paused: bool,
+}
+
+/// OCR backend selected by the user. Unavailable engines remain representable
+/// in settings so a future build can honor the choice without changing the wire format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OcrEngine {
+    Windows,
+    PpOcrV6,
+    Indra,
+    Tesseract,
+}
+impl Default for OcrEngine {
+    fn default() -> Self {
+        Self::Windows
+    }
+}
+fn legacy_ocr_engine() -> OcrEngine {
+    OcrEngine::Windows
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OcrEngineAvailability {
+    Available,
+    NotInstalled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrEngineOption {
+    pub engine: OcrEngine,
+    pub availability: OcrEngineAvailability,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrEngineDetails {
+    pub engine: OcrEngine,
+    pub name: String,
+    pub availability: OcrEngineAvailability,
+    pub size_label: String,
+    pub speed_label: String,
+    pub badge: String,
+    pub description: String,
+    pub highlights: Vec<String>,
+    pub license: Option<String>,
+    pub download_size_bytes: Option<u64>,
+}
+
+/// Currently only Windows OCR is actionable; optional engines require a
+/// separately installed runtime/model and are never downloaded implicitly.
+pub const OCR_ENGINE_OPTIONS: [OcrEngineOption; 4] = [
+    OcrEngineOption {
+        engine: OcrEngine::Windows,
+        availability: OcrEngineAvailability::Available,
+    },
+    OcrEngineOption {
+        engine: OcrEngine::PpOcrV6,
+        availability: OcrEngineAvailability::NotInstalled,
+    },
+    OcrEngineOption {
+        engine: OcrEngine::Indra,
+        availability: OcrEngineAvailability::NotInstalled,
+    },
+    OcrEngineOption {
+        engine: OcrEngine::Tesseract,
+        availability: OcrEngineAvailability::NotInstalled,
+    },
+];
+pub fn ocr_engine_available(engine: OcrEngine) -> bool {
+    OCR_ENGINE_OPTIONS
+        .iter()
+        .any(|option| option.engine == engine && option.availability == OcrEngineAvailability::Available)
+}
+
+impl Default for IndexingSettings {
+    fn default() -> Self {
+        Self {
+            roots: Vec::new(),
+            excluded_paths: Vec::new(),
+            content_enabled: false,
+            ocr_enabled: false,
+            respect_power_state: true,
+            paused: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrivacySettings {
+    pub activity_history: bool,
+    pub clipboard_history: bool,
+    pub browser_history: bool,
+    pub git_indexing: bool,
+    /// Always false in v2; present so the UI can show "no telemetry" truthfully.
+    pub telemetry: bool,
+}
+
+impl Default for PrivacySettings {
+    fn default() -> Self {
+        Self {
+            activity_history: true,
+            // Clipboard contents can include passwords and secrets: opt-in only.
+            clipboard_history: false,
+            browser_history: false,
+            git_indexing: false,
+            telemetry: false,
+        }
+    }
+}
+
+/// Which optional agent runtime executes workflows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentRuntime {
+    /// Pi coding-agent CLI (https://pi.dev), spawned on demand as a subprocess.
+    #[default]
+    Pi,
+    /// Legacy embedded Pydantic AI sidecar (kept as an optional fallback).
+    Pydantic,
+    /// Claude Code CLI (`claude -p`).
+    Claude,
+    /// Codex CLI (`codex exec`).
+    Codex,
+    /// OpenCode CLI (`opencode run`).
+    #[serde(rename = "opencode")]
+    OpenCode,
+    /// Gemini CLI (`gemini -p`).
+    Gemini,
+}
+
+impl AgentRuntime {
+    /// Settings id: "pi", "pydantic", "claude", "codex", "opencode" or "gemini".
+    pub fn id(self) -> &'static str {
+        match self {
+            AgentRuntime::Pi => "pi",
+            AgentRuntime::Pydantic => "pydantic",
+            AgentRuntime::Claude => "claude",
+            AgentRuntime::Codex => "codex",
+            AgentRuntime::OpenCode => "opencode",
+            AgentRuntime::Gemini => "gemini",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSettings {
+    pub enabled: bool,
+    /// The default agent: Pi, or one of the CLI runtimes.
+    #[serde(default)]
+    pub runtime: AgentRuntime,
+    /// Optional explicit path to the pi launcher (pi.cmd / pi executable).
+    #[serde(default)]
+    pub pi_path: Option<String>,
+    /// When false (default) Pi runs with read-only tools only.
+    #[serde(default)]
+    pub allow_writes: bool,
+    /// Working directory for Pi runs. None -> a dedicated workspace inside the
+    /// ProtonSearch data directory (never the user's whole home by default).
+    #[serde(default)]
+    pub workspace: Option<String>,
+    /// Optional Pi thinking level; None -> Pi default (env override supported).
+    #[serde(default)]
+    pub thinking: Option<String>,
+    #[serde(default)]
+    pub provider: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Default model per CLI runtime, keyed by [`AgentRuntime::id`]. Pi uses `model`.
+    #[serde(default)]
+    pub cli_models: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub sidecar_path: Option<String>,
+}
+
+impl Default for AgentSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            runtime: AgentRuntime::Pi,
+            pi_path: None,
+            allow_writes: false,
+            workspace: None,
+            thinking: None,
+            provider: None,
+            model: None,
+            cli_models: Default::default(),
+            sidecar_path: None,
+        }
+    }
+}
+
+/// Search engine used for the "Search the web for ..." result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum WebSearchEngine {
+    #[default]
+    Google,
+    Bing,
+    DuckDuckGo,
+    YouTube,
+}
+
+impl WebSearchEngine {
+    pub fn label(self) -> &'static str {
+        match self {
+            WebSearchEngine::Google => "Google",
+            WebSearchEngine::Bing => "Bing",
+            WebSearchEngine::DuckDuckGo => "DuckDuckGo",
+            WebSearchEngine::YouTube => "YouTube",
+        }
+    }
+    pub fn search_url(self, query: &str) -> String {
+        let encoded = urlencode(query);
+        match self {
+            WebSearchEngine::Google => format!("https://www.google.com/search?q={encoded}"),
+            WebSearchEngine::Bing => format!("https://www.bing.com/search?q={encoded}"),
+            WebSearchEngine::DuckDuckGo => format!("https://duckduckgo.com/?q={encoded}"),
+            WebSearchEngine::YouTube => format!("https://www.youtube.com/results?search_query={encoded}"),
+        }
+    }
+}
+
+/// Minimal RFC 3986 query encoding (no external dependencies).
+pub fn urlencode(input: &str) -> String {
+    let mut out = String::with_capacity(input.len() * 3);
+    for byte in input.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(byte as char),
+            b' ' => out.push_str("%20"),
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SemanticSettings {
+    pub enabled: bool,
+    #[serde(default)]
+    pub model: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// v10 launcher / Dynamic Island configuration
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LauncherMode {
+    #[default]
+    Normal,
+    DynamicIsland,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum IslandCardId {
+    #[default]
+    Search,
+    Media,
+    Clipboard,
+    Agent,
+    Controls,
+    Browser,
+    Git,
+    Bell,
+}
+
+impl IslandCardId {
+    pub fn label(self) -> &'static str {
+        match self {
+            IslandCardId::Search => "Search",
+            IslandCardId::Media => "Media",
+            IslandCardId::Clipboard => "Clipboard",
+            IslandCardId::Agent => "Agents",
+            IslandCardId::Controls => "Quick Settings",
+            IslandCardId::Browser => "Browser",
+            IslandCardId::Git => "Git",
+            IslandCardId::Bell => "Notifications",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandCardConfig {
+    pub id: IslandCardId,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum IslandAnchor {
+    TopLeft,
+    #[default]
+    TopCenter,
+    TopRight,
+    CenterLeft,
+    Center,
+    CenterRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandPlacement {
+    #[serde(default)]
+    pub monitor: Option<String>,
+    #[serde(default)]
+    pub anchor: IslandAnchor,
+    #[serde(default = "default_island_offset_x")]
+    pub offset_x: i32,
+    #[serde(default = "default_island_offset_y")]
+    pub offset_y: i32,
+    #[serde(default = "default_true")]
+    pub keep_in_work_area: bool,
+    #[serde(default = "default_true")]
+    pub auto_flip_expanded: bool,
+}
+
+fn default_island_offset_x() -> i32 {
+    0
+}
+
+fn default_island_offset_y() -> i32 {
+    22
+}
+
+impl Default for IslandPlacement {
+    fn default() -> Self {
+        Self {
+            monitor: None,
+            anchor: IslandAnchor::TopCenter,
+            offset_x: default_island_offset_x(),
+            offset_y: default_island_offset_y(),
+            keep_in_work_area: true,
+            auto_flip_expanded: true,
+        }
+    }
+}
+
+fn default_island_cards() -> Vec<IslandCardConfig> {
+    [
+        IslandCardId::Search,
+        IslandCardId::Media,
+        IslandCardId::Clipboard,
+        IslandCardId::Agent,
+        IslandCardId::Controls,
+        IslandCardId::Browser,
+        IslandCardId::Git,
+        IslandCardId::Bell,
+    ]
+    .into_iter()
+    .map(|id| IslandCardConfig { id, enabled: true })
+    .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandSettings {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub placement: IslandPlacement,
+    #[serde(default = "default_island_cards")]
+    pub cards: Vec<IslandCardConfig>,
+    #[serde(default)]
+    pub default_card: IslandCardId,
+    #[serde(default = "default_true")]
+    pub show_dots: bool,
+    /// Island look: false = solid black, true = liquid glass.
+    #[serde(default)]
+    pub liquid_glass: bool,
+    /// Glass amount, 0 = clear .. 100 = frosted.
+    #[serde(default = "default_glass_level")]
+    pub liquid_glass_level: u8,
+    #[serde(default = "default_true")]
+    pub hide_on_focus_loss: bool,
+    #[serde(default = "default_true")]
+    pub skip_disabled: bool,
+    #[serde(default = "default_true")]
+    pub return_to_search: bool,
+}
+
+impl Default for IslandSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            placement: IslandPlacement::default(),
+            cards: default_island_cards(),
+            default_card: IslandCardId::Search,
+            show_dots: true,
+            liquid_glass: false,
+            liquid_glass_level: default_glass_level(),
+            hide_on_focus_loss: true,
+            skip_disabled: true,
+            return_to_search: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LauncherSettings {
+    #[serde(default)]
+    pub primary_mode: LauncherMode,
+    #[serde(default)]
+    pub island: IslandSettings,
+}
+
+/// Clipboard capture gates: history is active only when BOTH
+/// privacy.clipboard_history (master opt-in) and !clipboard.pause are true.
+/// capture_text / capture_images select which formats are stored while the
+/// master gate is open. Images are additionally bounded by the engine's
+/// thumbnail/MIME/dimension limits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipboardSettings {
+    #[serde(default = "default_true")]
+    pub capture_text: bool,
+    #[serde(default = "default_true")]
+    pub capture_images: bool,
+    #[serde(default = "default_clipboard_retention_days")]
+    pub retention_days: u32,
+    #[serde(default = "default_clipboard_max_items")]
+    pub max_items: u32,
+    #[serde(default)]
+    pub pause: bool,
+    #[serde(default)]
+    pub exclude_apps: Vec<String>,
+    #[serde(default)]
+    pub clear_on_exit: bool,
+}
+
+fn default_clipboard_retention_days() -> u32 {
+    30
+}
+
+fn default_clipboard_max_items() -> u32 {
+    500
+}
+
+impl Default for ClipboardSettings {
+    fn default() -> Self {
+        Self {
+            capture_text: true,
+            capture_images: true,
+            retention_days: default_clipboard_retention_days(),
+            max_items: default_clipboard_max_items(),
+            pause: false,
+            exclude_apps: Vec::new(),
+            clear_on_exit: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonitorInfo {
+    pub id: String,
+    pub name: String,
+    pub primary: bool,
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub work_x: i32,
+    pub work_y: i32,
+    pub work_width: u32,
+    pub work_height: u32,
+    pub scale_factor: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewRequest {
+    pub result_id: String,
+    #[serde(default)]
+    pub max_chars: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewField {
+    pub label: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PreviewStatus {
+    #[default]
+    Ok,
+    Unsupported,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewPayload {
+    pub result_id: String,
+    pub title: String,
+    pub subtitle: String,
+    pub format: String,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub snippet: Option<String>,
+    #[serde(default)]
+    pub highlight_ranges: Vec<PreviewRange>,
+    #[serde(default)]
+    pub image_data_url: Option<String>,
+    #[serde(default)]
+    pub ocr_text: Option<String>,
+    #[serde(default)]
+    pub fields: Vec<PreviewField>,
+    #[serde(default)]
+    pub status: PreviewStatus,
+    /// True when text/snippet/image was capped by a size or time budget.
+    #[serde(default)]
+    pub truncated: bool,
+    /// Short human-readable error, only when status == Error.
+    #[serde(default)]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub image_mime: Option<String>,
+    #[serde(default)]
+    pub unsupported_reason: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// v10 native controls / Quick Settings / media / notifications (read models)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlCapability {
+    pub supported: bool,
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// Allow-listed ms-settings page for OS-owned controls (e.g. Wi-Fi policy).
+    #[serde(default)]
+    pub fallback_uri: Option<String>,
+}
+
+impl ControlCapability {
+    pub fn supported() -> Self {
+        Self {
+            supported: true,
+            reason: None,
+            fallback_uri: None,
+        }
+    }
+    pub fn unsupported(reason: &str) -> Self {
+        Self {
+            supported: false,
+            reason: Some(reason.to_string()),
+            fallback_uri: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaSessionInfo {
+    pub title: String,
+    pub artist: String,
+    #[serde(default)]
+    pub album: Option<String>,
+    #[serde(default)]
+    pub artwork_data_url: Option<String>,
+    pub playing: bool,
+    #[serde(default)]
+    pub position_ms: Option<u64>,
+    #[serde(default)]
+    pub duration_ms: Option<u64>,
+    #[serde(default)]
+    pub can_seek: bool,
+    #[serde(default)]
+    pub can_shuffle: bool,
+    #[serde(default)]
+    pub shuffle: bool,
+    #[serde(default)]
+    pub can_repeat: bool,
+    #[serde(default)]
+    pub repeat: bool,
+    #[serde(default)]
+    pub app_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioDeviceInfo {
+    pub id: String,
+    pub name: String,
+    pub is_default: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WifiNetworkInfo {
+    pub ssid: String,
+    /// 0..=100 signal quality.
+    pub signal: u32,
+    /// Open / WPA2 / WPA3 / ...
+    pub security: String,
+    pub connected: bool,
+    /// A saved Windows profile exists, so connect-without-prompt is possible.
+    #[serde(default)]
+    pub has_profile: bool,
+    #[serde(default)]
+    pub connectable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BluetoothDeviceInfo {
+    pub id: String,
+    pub name: String,
+    pub connected: bool,
+    pub paired: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppNotification {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub source: String,
+    pub created_at: i64,
+    pub read: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BrightnessMethod {
+    Dxva2,
+    DdcCi,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrightnessMonitorInfo {
+    pub index: usize,
+    pub name: String,
+    pub current: u8,
+    pub minimum: u32,
+    pub maximum: u32,
+    pub method: BrightnessMethod,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlsStatus {
+    /// Whether this build can enumerate/control real media sessions.
+    pub media_capability: ControlCapability,
+    #[serde(default)]
+    pub media: Option<MediaSessionInfo>,
+    #[serde(default)]
+    pub audio_outputs: Vec<AudioDeviceInfo>,
+    #[serde(default)]
+    pub default_audio_id: Option<String>,
+    #[serde(default)]
+    pub volume_percent: Option<u8>,
+    #[serde(default)]
+    pub muted: Option<bool>,
+    pub brightness_capability: ControlCapability,
+    #[serde(default)]
+    pub brightness_percent: Option<u8>,
+    #[serde(default)]
+    pub brightness_monitors: Vec<BrightnessMonitorInfo>,
+    pub wifi: ControlCapability,
+    #[serde(default)]
+    pub wifi_enabled: Option<bool>,
+    #[serde(default)]
+    pub wifi_networks: Vec<WifiNetworkInfo>,
+    #[serde(default)]
+    pub wifi_error: Option<String>,
+    pub bluetooth: ControlCapability,
+    #[serde(default)]
+    pub bluetooth_enabled: Option<bool>,
+    #[serde(default)]
+    pub bluetooth_devices: Vec<BluetoothDeviceInfo>,
+    #[serde(default)]
+    pub bluetooth_error: Option<String>,
+    pub airplane_mode: ControlCapability,
+    pub night_light: ControlCapability,
+    pub energy_saver: ControlCapability,
+    pub notifications: ControlCapability,
+    pub toast_capability: ControlCapability,
+    #[serde(default)]
+    pub notification_unread: u64,
+    #[serde(default)]
+    pub notification_items: Vec<AppNotification>,
+}
+
+/// Actions accepted by the media/controls commands (validated server-side).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaAction {
+    Play,
+    Pause,
+    #[serde(alias = "toggle")]
+    PlayPause,
+    #[serde(alias = "next")]
+    Next,
+    #[serde(alias = "prev", alias = "back")]
+    Previous,
+    Shuffle,
+    Repeat,
+    /// Jump to a position; the command carries the target in milliseconds.
+    Seek,
+}
+
+/// Persisted user settings (v2). Stored as JSON in %APPDATA%/protonsearch/v2/settings.json.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Settings {
+    pub schema_version: u32,
+    #[serde(default)]
+    pub user_name: Option<String>,
+    pub hotkey: String,
+    pub theme: ThemeMode,
+    pub density: Density,
+    pub motion: MotionPreference,
+    pub launch_at_login: bool,
+    pub indexing: IndexingSettings,
+    /// Missing values in older settings files preserve the legacy Windows OCR path.
+    #[serde(default = "legacy_ocr_engine")]
+    pub ocr_engine: OcrEngine,
+    /// Tesseract executable saved after an in-app install or found on this PC; None = detect.
+    #[serde(default)]
+    pub tesseract_path: Option<String>,
+    pub privacy: PrivacySettings,
+    pub agent: AgentSettings,
+    pub semantic: SemanticSettings,
+    #[serde(default)]
+    pub launcher: LauncherSettings,
+    #[serde(default)]
+    pub clipboard: ClipboardSettings,
+    /// "Search the web for ..." offer in the launcher (default on).
+    #[serde(default = "default_true")]
+    pub web_search_enabled: bool,
+    #[serde(default)]
+    pub web_search_engine: WebSearchEngine,
+    pub onboarding_complete: bool,
+    #[serde(default)]
+    pub legacy_migrated: bool,
+    /// Preferred result limit in the launcher (clamped 5..=100).
+    #[serde(default = "default_result_limit")]
+    pub result_limit: usize,
+}
+
+fn default_result_limit() -> usize {
+    30
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            schema_version: DATA_SCHEMA_VERSION,
+            user_name: None,
+            hotkey: "Alt+Space".to_string(),
+            theme: ThemeMode::System,
+            density: Density::Comfortable,
+            motion: MotionPreference::System,
+            launch_at_login: false,
+            indexing: IndexingSettings::default(),
+            ocr_engine: OcrEngine::default(),
+            tesseract_path: None,
+            privacy: PrivacySettings::default(),
+            agent: AgentSettings::default(),
+            semantic: SemanticSettings::default(),
+            launcher: LauncherSettings::default(),
+            clipboard: ClipboardSettings::default(),
+            web_search_enabled: true,
+            web_search_engine: WebSearchEngine::default(),
+            onboarding_complete: false,
+            legacy_migrated: false,
+            result_limit: default_result_limit(),
+        }
+    }
+}
+
+/// Patch semantics: only Some fields are applied.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsPatch {
+    #[serde(default)]
+    pub user_name: Option<Option<String>>,
+    #[serde(default)]
+    pub hotkey: Option<String>,
+    #[serde(default)]
+    pub theme: Option<ThemeMode>,
+    #[serde(default)]
+    pub density: Option<Density>,
+    #[serde(default)]
+    pub motion: Option<MotionPreference>,
+    #[serde(default)]
+    pub launch_at_login: Option<bool>,
+    #[serde(default)]
+    pub indexing: Option<IndexingSettings>,
+    #[serde(default)]
+    pub ocr_engine: Option<OcrEngine>,
+    #[serde(default)]
+    pub tesseract_path: Option<String>,
+    #[serde(default)]
+    pub privacy: Option<PrivacySettings>,
+    #[serde(default)]
+    pub agent: Option<AgentSettings>,
+    #[serde(default)]
+    pub semantic: Option<SemanticSettings>,
+    #[serde(default)]
+    pub launcher: Option<LauncherSettings>,
+    #[serde(default)]
+    pub clipboard: Option<ClipboardSettings>,
+    #[serde(default)]
+    pub web_search_enabled: Option<bool>,
+    #[serde(default)]
+    pub web_search_engine: Option<WebSearchEngine>,
+    #[serde(default)]
+    pub result_limit: Option<usize>,
+}
+
+impl Settings {
+    /// Apply a patch in place; returns true when something changed.
+    pub fn apply(&mut self, patch: &SettingsPatch) -> bool {
+        let before = self.clone();
+        if let Some(name) = &patch.user_name {
+            self.user_name = name.clone();
+        }
+        if let Some(v) = &patch.hotkey {
+            self.hotkey = v.clone();
+        }
+        if let Some(v) = patch.theme {
+            self.theme = v;
+        }
+        if let Some(v) = patch.density {
+            self.density = v;
+        }
+        if let Some(v) = patch.motion {
+            self.motion = v;
+        }
+        if let Some(v) = patch.launch_at_login {
+            self.launch_at_login = v;
+        }
+        if let Some(v) = &patch.indexing {
+            self.indexing = v.clone();
+        }
+        if let Some(v) = patch.ocr_engine {
+            self.ocr_engine = v;
+        }
+        if let Some(v) = &patch.tesseract_path {
+            self.tesseract_path = Some(v.clone());
+        }
+        if let Some(v) = &patch.privacy {
+            self.privacy = v.clone();
+        }
+        if let Some(v) = &patch.agent {
+            self.agent = v.clone();
+        }
+        if let Some(v) = &patch.semantic {
+            self.semantic = v.clone();
+        }
+        if let Some(v) = &patch.launcher {
+            self.launcher = v.clone();
+        }
+        if let Some(v) = &patch.clipboard {
+            self.clipboard = v.clone();
+        }
+        if let Some(v) = patch.web_search_enabled {
+            self.web_search_enabled = v;
+        }
+        if let Some(v) = patch.web_search_engine {
+            self.web_search_engine = v;
+        }
+        if let Some(v) = patch.result_limit {
+            self.result_limit = v.clamp(5, 100);
+        }
+        self.privacy.telemetry = false;
+        *self != before
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding / activity
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RootSuggestion {
+    pub path: String,
+    pub label: String,
+    pub exists: bool,
+    pub default_mode: RootMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacySummary {
+    pub detected: bool,
+    #[serde(default)]
+    pub app_data_path: Option<String>,
+    #[serde(default)]
+    pub indexed_files: u64,
+    #[serde(default)]
+    pub content_documents: u64,
+    #[serde(default)]
+    pub browser_items: u64,
+    #[serde(default)]
+    pub quicklinks: u64,
+    #[serde(default)]
+    pub snippets: u64,
+    #[serde(default)]
+    pub settings: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnboardingState {
+    pub complete: bool,
+    pub legacy: LegacySummary,
+    pub suggested_roots: Vec<RootSuggestion>,
+    pub defaults: Settings,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnboardingInput {
+    #[serde(default)]
+    pub user_name: Option<String>,
+    pub roots: Vec<RootConfig>,
+    pub content_enabled: bool,
+    pub ocr_enabled: bool,
+    #[serde(default)]
+    pub ocr_engine: OcrEngine,
+    pub hotkey: String,
+    pub agent_opt_in: bool,
+    #[serde(default)]
+    pub skipped: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityKind {
+    Search,
+    Open,
+    Launch,
+    Index,
+    Workflow,
+    Error,
+    System,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityItem {
+    pub id: i64,
+    pub timestamp: i64,
+    pub kind: ActivityKind,
+    pub title: String,
+    #[serde(default)]
+    pub detail: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityQuery {
+    #[serde(default)]
+    pub limit: usize,
+    #[serde(default)]
+    pub since: Option<i64>,
+    #[serde(default)]
+    pub kinds: Vec<ActivityKind>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IndexCommand {
+    Pause,
+    Resume,
+    Rebuild,
+    RebuildContent,
+    RebuildOcr,
+    Shutdown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenOutcome {
+    pub ok: bool,
+    pub message: String,
+}
+
+// ---------------------------------------------------------------------------
+// Agent sidecar protocol (gate 6; contract fixed early on purpose)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentRunRequest {
+    pub run_id: String,
+    pub prompt: String,
+    #[serde(default)]
+    pub context_paths: Vec<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub max_steps: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", rename_all_fields = "camelCase")]
+pub enum AgentEvent {
+    Started {
+        run_id: String,
+        runtime: String,
+        model: String,
+    },
+    Plan {
+        steps: Vec<String>,
+    },
+    Progress {
+        message: String,
+        fraction: Option<f32>,
+    },
+    ApprovalRequest {
+        approval_id: String,
+        title: String,
+        detail: String,
+        action: ActionSpec,
+        destructive: bool,
+    },
+    ToolResult {
+        tool: String,
+        ok: bool,
+        preview: String,
+    },
+    Output {
+        text: String,
+        final_answer: bool,
+    },
+    Error {
+        code: String,
+        message: String,
+    },
+    Finished {
+        ok: bool,
+        duration_ms: u64,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentApprovalResponse {
+    pub run_id: String,
+    pub approval_id: String,
+    pub approved: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_settings_without_v10_fields_parse_with_defaults() {
+        let legacy = r#"{
+            "schemaVersion": 1,
+            "userName": null,
+            "hotkey": "Alt+Space",
+            "theme": "system",
+            "density": "comfortable",
+            "motion": "system",
+            "launchAtLogin": false,
+            "indexing": {"roots": [], "excludedPaths": [], "contentEnabled": false, "ocrEnabled": false, "respectPowerState": true, "paused": false},
+            "privacy": {"activityHistory": true, "clipboardHistory": false, "browserHistory": false, "gitIndexing": false, "telemetry": false},
+            "agent": {"enabled": false, "runtime": "pi", "piPath": null, "allowWrites": false, "workspace": null, "thinking": null, "provider": null, "model": null, "sidecarPath": null},
+            "semantic": {"enabled": false, "model": null},
+            "onboardingComplete": true,
+            "legacyMigrated": true,
+            "resultLimit": 30
+        }"#;
+        let settings: Settings = serde_json::from_str(legacy).unwrap();
+        assert_eq!(settings.launcher.primary_mode, LauncherMode::Normal);
+        assert!(settings.launcher.island.enabled);
+        assert_eq!(settings.launcher.island.cards.len(), 8);
+        assert_eq!(settings.launcher.island.default_card, IslandCardId::Search);
+        assert!(settings.clipboard.capture_images);
+        assert_eq!(settings.clipboard.retention_days, 30);
+        assert_eq!(settings.ocr_engine, OcrEngine::Windows);
+        assert_eq!(Settings::default().ocr_engine, OcrEngine::Windows);
+    }
+    #[test]
+    fn ocr_engine_settings_roundtrip_and_patch() {
+        let mut settings = Settings::default();
+        let patch = SettingsPatch {
+            ocr_engine: Some(OcrEngine::Indra),
+            ..SettingsPatch::default()
+        };
+        assert!(settings.apply(&patch));
+        let encoded = serde_json::to_string(&settings).unwrap();
+        let decoded: Settings = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded.ocr_engine, OcrEngine::Indra);
+        assert_eq!(
+            OCR_ENGINE_OPTIONS
+                .iter()
+                .filter(|option| option.availability == OcrEngineAvailability::Available)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn search_request_roundtrip_is_camel_case() {
+        let req = SearchRequest::new(7, "quarterly report");
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"requestId\":7"), "{json}");
+        assert!(json.contains("\"protocol\":1"), "{json}");
+        let back: SearchRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, req);
+    }
+
+    #[test]
+    fn photos_search_scope_has_a_stable_wire_name() {
+        let mut req = SearchRequest::new(8, "photo");
+        req.scope = SearchScope::Photos;
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"scope\":\"photos\""), "{json}");
+        assert_eq!(serde_json::from_str::<SearchRequest>(&json).unwrap(), req);
+    }
+
+    #[test]
+    fn legacy_requests_without_optional_fields_parse() {
+        let req: SearchRequest = serde_json::from_str(r#"{"requestId":1,"query":"x"}"#).unwrap();
+        assert_eq!(req.limit, 30);
+        assert_eq!(req.scope, SearchScope::All);
+    }
+
+    #[test]
+    fn unknown_extra_fields_are_ignored_by_default() {
+        // serde ignores unknown fields unless deny_unknown_fields is set; keep it
+        // that way for forward compatibility with newer UIs.
+        let req: SearchRequest =
+            serde_json::from_str(r#"{"requestId":2,"query":"x","futureField":true}"#).unwrap();
+        assert_eq!(req.request_id, 2);
+    }
+
+    #[test]
+    fn settings_patch_applies_only_some_fields() {
+        let mut s = Settings::default();
+        let patch = SettingsPatch {
+            theme: Some(ThemeMode::Dark),
+            privacy: Some(PrivacySettings {
+                telemetry: true,
+                ..Default::default()
+            }),
+            result_limit: Some(500),
+            ..Default::default()
+        };
+        assert!(s.apply(&patch));
+        assert_eq!(s.theme, ThemeMode::Dark);
+        assert!(!s.privacy.telemetry, "telemetry must never be enabled");
+        assert_eq!(s.result_limit, 100, "result limit is clamped");
+        assert_eq!(s.hotkey, "Alt+Space");
+    }
+
+    #[test]
+    fn action_spec_is_structured_not_shell() {
+        let action = ActionSpec::OpenPath {
+            path: "C:\\Users\\x\\a b.txt".into(),
+            line: Some(12),
+            column: None,
+        };
+        let json = serde_json::to_string(&action).unwrap();
+        assert!(json.contains("\"type\":\"open_path\""));
+        assert!(json.contains("line"));
+    }
+
+    #[test]
+    fn icons_serialize_with_type_tag() {
+        let icon = IconRef::FileType { ext: "pdf".into() };
+        let json = serde_json::to_string(&icon).unwrap();
+        assert_eq!(json, r#"{"type":"file_type","ext":"pdf"}"#);
+    }
+
+    #[test]
+    fn source_kind_group_labels_are_stable() {
+        assert_eq!(SourceKind::Application.group_label(), "APPLICATIONS");
+        assert_eq!(SourceKind::ContentMatch.group_label(), "DOCUMENTS");
+    }
+
+    #[test]
+    fn agent_events_use_camel_case_payload_fields() {
+        let event = AgentEvent::Started {
+            run_id: "run-1".into(),
+            runtime: "pydantic-ai".into(),
+            model: "test".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("\"runId\":\"run-1\""), "{json}");
+        let approval = AgentEvent::ApprovalRequest {
+            approval_id: "a1".into(),
+            title: "Open file".into(),
+            detail: "path".into(),
+            action: ActionSpec::None,
+            destructive: false,
+        };
+        let json = serde_json::to_string(&approval).unwrap();
+        assert!(json.contains("\"approvalId\":\"a1\""), "{json}");
+    }
+
+    #[test]
+    fn default_settings_are_private_by_default() {
+        let s = Settings::default();
+        assert!(!s.privacy.telemetry);
+        assert!(!s.privacy.browser_history);
+        assert!(!s.privacy.git_indexing);
+        assert!(!s.agent.enabled);
+        assert!(!s.semantic.enabled);
+        assert!(!s.indexing.content_enabled);
+        assert!(!s.indexing.ocr_enabled);
+    }
+}

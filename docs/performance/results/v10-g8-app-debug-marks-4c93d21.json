@@ -1,0 +1,657 @@
+{
+  "schema": "ps-app-baseline/1",
+  "kind": "app-launcher-baseline",
+  "status": "blocked",
+  "capturedAt": "2026-11-09T21:02:42.169Z",
+  "host": {
+    "hostname": "PranshulAsus",
+    "platform": "win32"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe",
+    "exeBytes": 19730944,
+    "exeMtime": "2026-11-09T21:02:35.555Z",
+    "frontendDistIndex": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\apps\\desktop\\dist\\index.html",
+    "frontendDistMtime": "2026-11-09T21:02:10.969Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "cdpPort": 9222,
+    "launchArgs": [],
+    "node": "v26.7.0",
+    "gitHead": "93f84d177d35f07fcc1c0ecb455af518a519e32a",
+    "gitDirty": 24,
+    "appPid": 23484,
+    "pages": [
+      {
+        "kind": "main",
+        "url": "http://localhost:5173/"
+      },
+      {
+        "kind": "launcher",
+        "url": "http://localhost:5173/"
+      },
+      {
+        "kind": "island",
+        "url": "http://localhost:5173/"
+      }
+    ],
+    "devicePixelRatio": 1.5,
+    "windowKind": "launcher"
+  },
+  "measurements": {
+    "indexReady": {
+      "state": "ready",
+      "entries": 131199,
+      "contentDocuments": 0
+    },
+    "memoryIdle": {
+      "label": "idle-hidden",
+      "mode": "memory",
+      "rootPid": 23484,
+      "capturedAtUtc": 1794258167837,
+      "processCount": 9,
+      "totalWorkingSetBytes": 790933504,
+      "totalPrivateBytes": 525066240,
+      "processes": [
+        {
+          "pid": 23484,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 63942656
+        },
+        {
+          "pid": 40228,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 141033472
+        },
+        {
+          "pid": 26816,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 14004224
+        },
+        {
+          "pid": 29728,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 254406656
+        },
+        {
+          "pid": 17584,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 45457408
+        },
+        {
+          "pid": 8716,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23347200
+        },
+        {
+          "pid": 33168,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 86822912
+        },
+        {
+          "pid": 29712,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 84414464
+        },
+        {
+          "pid": 32352,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 77504512
+        }
+      ],
+      "cpuSecondsTotal": 5.625,
+      "totalWorkingSetMiB": 754.3,
+      "totalPrivateMiB": 500.7
+    },
+    "idleCpu": {
+      "mode": "cpu",
+      "rootPid": 23484,
+      "sampleSeconds": 10.004,
+      "processCount": 9,
+      "cpuSecondsDelta": 0.438,
+      "logicalCores": 20,
+      "cpuPctOfOneCore": 4.37,
+      "cpuPctOfMachine": 0.22
+    },
+    "inputToVisible": {
+      "takes": 20,
+      "warmup": 3,
+      "measured": 20,
+      "ms": {
+        "count": 20,
+        "p50": 18.5,
+        "p95": 43.3,
+        "p99": 47.6,
+        "min": 4.2,
+        "max": 47.6,
+        "mean": 24.415
+      },
+      "samples": [
+        {
+          "take": 0,
+          "warmup": true,
+          "query": "arch",
+          "start": 15542.90000000596,
+          "visibleAt": 15549.70000000298,
+          "rows": 0,
+          "ms": 6.8
+        },
+        {
+          "take": 1,
+          "warmup": true,
+          "query": "readme",
+          "start": 15558.20000000298,
+          "visibleAt": 15605.70000000298,
+          "rows": 50,
+          "ms": 47.5
+        },
+        {
+          "take": 2,
+          "warmup": true,
+          "query": "proton",
+          "start": 15610.90000000596,
+          "visibleAt": 15622.40000000596,
+          "rows": 50,
+          "ms": 11.5
+        },
+        {
+          "take": 3,
+          "warmup": false,
+          "query": "index",
+          "start": 15625.70000000298,
+          "visibleAt": 15663.90000000596,
+          "rows": 50,
+          "ms": 38.2
+        },
+        {
+          "take": 4,
+          "warmup": false,
+          "query": "report",
+          "start": 15667.40000000596,
+          "visibleAt": 15680.70000000298,
+          "rows": 50,
+          "ms": 13.3
+        },
+        {
+          "take": 5,
+          "warmup": false,
+          "query": "screenshot",
+          "start": 15683.5,
+          "visibleAt": 15722.10000000894,
+          "rows": 50,
+          "ms": 38.6
+        },
+        {
+          "take": 6,
+          "warmup": false,
+          "query": "会議",
+          "start": 15724.5,
+          "visibleAt": 15745,
+          "rows": 50,
+          "ms": 20.5
+        },
+        {
+          "take": 7,
+          "warmup": false,
+          "query": "café",
+          "start": 15761.40000000596,
+          "visibleAt": 15765.60000000894,
+          "rows": 1,
+          "ms": 4.2
+        },
+        {
+          "take": 8,
+          "warmup": false,
+          "query": "zzzz-no-match",
+          "start": 15773.800000011921,
+          "visibleAt": 15805.60000000894,
+          "rows": 1,
+          "ms": 31.8
+        },
+        {
+          "take": 9,
+          "warmup": false,
+          "query": "pdf",
+          "start": 15808.5,
+          "visibleAt": 15822.300000011921,
+          "rows": 1,
+          "ms": 13.8
+        },
+        {
+          "take": 10,
+          "warmup": false,
+          "query": "arch",
+          "start": 15825,
+          "visibleAt": 15864.800000011921,
+          "rows": 50,
+          "ms": 39.8
+        },
+        {
+          "take": 11,
+          "warmup": false,
+          "query": "readme",
+          "start": 15868.70000000298,
+          "visibleAt": 15880.800000011921,
+          "rows": 50,
+          "ms": 12.1
+        },
+        {
+          "take": 12,
+          "warmup": false,
+          "query": "proton",
+          "start": 15884,
+          "visibleAt": 15931.60000000894,
+          "rows": 50,
+          "ms": 47.6
+        },
+        {
+          "take": 13,
+          "warmup": false,
+          "query": "index",
+          "start": 15934.5,
+          "visibleAt": 15947.70000000298,
+          "rows": 50,
+          "ms": 13.2
+        },
+        {
+          "take": 14,
+          "warmup": false,
+          "query": "report",
+          "start": 15951.40000000596,
+          "visibleAt": 15988.800000011921,
+          "rows": 50,
+          "ms": 37.4
+        },
+        {
+          "take": 15,
+          "warmup": false,
+          "query": "screenshot",
+          "start": 15991.40000000596,
+          "visibleAt": 16005.60000000894,
+          "rows": 50,
+          "ms": 14.2
+        },
+        {
+          "take": 16,
+          "warmup": false,
+          "query": "会議",
+          "start": 16008.5,
+          "visibleAt": 16039.70000000298,
+          "rows": 1,
+          "ms": 31.2
+        },
+        {
+          "take": 17,
+          "warmup": false,
+          "query": "café",
+          "start": 16043.800000011921,
+          "visibleAt": 16055.70000000298,
+          "rows": 1,
+          "ms": 11.9
+        },
+        {
+          "take": 18,
+          "warmup": false,
+          "query": "zzzz-no-match",
+          "start": 16059.300000011921,
+          "visibleAt": 16097.60000000894,
+          "rows": 1,
+          "ms": 38.3
+        },
+        {
+          "take": 19,
+          "warmup": false,
+          "query": "pdf",
+          "start": 16101.20000000298,
+          "visibleAt": 16119.70000000298,
+          "rows": 50,
+          "ms": 18.5
+        },
+        {
+          "take": 20,
+          "warmup": false,
+          "query": "arch",
+          "start": 16124.10000000894,
+          "visibleAt": 16130.70000000298,
+          "rows": 50,
+          "ms": 6.6
+        },
+        {
+          "take": 21,
+          "warmup": false,
+          "query": "readme",
+          "start": 16137.300000011921,
+          "visibleAt": 16180.60000000894,
+          "rows": 50,
+          "ms": 43.3
+        },
+        {
+          "take": 22,
+          "warmup": false,
+          "query": "proton",
+          "start": 16183.5,
+          "visibleAt": 16197.300000011921,
+          "rows": 50,
+          "ms": 13.8
+        }
+      ]
+    },
+    "engineIpc": {
+      "takes": 10,
+      "wallMs": {
+        "count": 10,
+        "p50": 17.6,
+        "p95": 22.6,
+        "p99": 22.6,
+        "min": 14.4,
+        "max": 22.6,
+        "mean": 17.96
+      },
+      "engineTookMs": {
+        "count": 10,
+        "p50": 11.911,
+        "p95": 16.477,
+        "p99": 16.477,
+        "min": 3.665,
+        "max": 16.477,
+        "mean": 11.997
+      },
+      "samples": [
+        {
+          "take": 0,
+          "query": "arch",
+          "wallMs": 19.600000008940697,
+          "tookMs": 3.665201,
+          "results": 50
+        },
+        {
+          "take": 1,
+          "query": "readme",
+          "wallMs": 19.799999997019768,
+          "tookMs": 14.530198,
+          "results": 50
+        },
+        {
+          "take": 2,
+          "query": "proton",
+          "wallMs": 20.200000002980232,
+          "tookMs": 15.693756,
+          "results": 50
+        },
+        {
+          "take": 3,
+          "query": "index",
+          "wallMs": 18.299999997019768,
+          "tookMs": 12.721938,
+          "results": 50
+        },
+        {
+          "take": 4,
+          "query": "report",
+          "wallMs": 22.600000008940697,
+          "tookMs": 16.477375,
+          "results": 50
+        },
+        {
+          "take": 5,
+          "query": "screenshot",
+          "wallMs": 16.700000002980232,
+          "tookMs": 11.526325,
+          "results": 50
+        },
+        {
+          "take": 6,
+          "query": "会議",
+          "wallMs": 14.400000005960464,
+          "tookMs": 10.420948,
+          "results": 1
+        },
+        {
+          "take": 7,
+          "query": "café",
+          "wallMs": 15.800000011920929,
+          "tookMs": 11.911012,
+          "results": 1
+        },
+        {
+          "take": 8,
+          "query": "zzzz-no-match",
+          "wallMs": 14.599999994039536,
+          "tookMs": 10.686903,
+          "results": 1
+        },
+        {
+          "take": 9,
+          "query": "pdf",
+          "wallMs": 17.600000008940697,
+          "tookMs": 12.339627,
+          "results": 50
+        }
+      ]
+    },
+    "selectionPaint": {
+      "takes": 20,
+      "measured": 0,
+      "ms": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "min": null,
+        "max": null,
+        "mean": null
+      },
+      "note": "t0 = page Date.now() immediately before Playwright ArrowUp/Down; mark = launcher-selection-painted epoch (Date.now at one rAF after the keydown handler). Includes CDP key dispatch and IPC/file write are excluded (epoch captured in page).",
+      "samples": [
+        {
+          "take": 0,
+          "startEpoch": 1794258181145,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 1,
+          "startEpoch": 1794258181386,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 2,
+          "startEpoch": 1794258181625,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 3,
+          "startEpoch": 1794258181860,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 4,
+          "startEpoch": 1794258182101,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 5,
+          "startEpoch": 1794258182336,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 6,
+          "startEpoch": 1794258182575,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 7,
+          "startEpoch": 1794258182814,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 8,
+          "startEpoch": 1794258183053,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 9,
+          "startEpoch": 1794258183293,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 10,
+          "startEpoch": 1794258183533,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 11,
+          "startEpoch": 1794258183769,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 12,
+          "startEpoch": 1794258184008,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 13,
+          "startEpoch": 1794258184242,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 14,
+          "startEpoch": 1794258184483,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 15,
+          "startEpoch": 1794258184718,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 16,
+          "startEpoch": 1794258184954,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 17,
+          "startEpoch": 1794258185194,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 18,
+          "startEpoch": 1794258185430,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        },
+        {
+          "take": 19,
+          "startEpoch": 1794258185667,
+          "markEpoch": null,
+          "ms": null,
+          "labels": []
+        }
+      ]
+    },
+    "memoryVisibleResults": {
+      "label": "visible-results",
+      "mode": "memory",
+      "rootPid": 23484,
+      "capturedAtUtc": 1794258186679,
+      "processCount": 9,
+      "totalWorkingSetBytes": 856035328,
+      "totalPrivateBytes": 532480000,
+      "processes": [
+        {
+          "pid": 23484,
+          "name": "ProtonSearch.exe",
+          "wsBytes": 66433024
+        },
+        {
+          "pid": 40228,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 145977344
+        },
+        {
+          "pid": 26816,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 14004224
+        },
+        {
+          "pid": 29728,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 253214720
+        },
+        {
+          "pid": 17584,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 45559808
+        },
+        {
+          "pid": 8716,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 23347200
+        },
+        {
+          "pid": 33168,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 85671936
+        },
+        {
+          "pid": 29712,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 146771968
+        },
+        {
+          "pid": 32352,
+          "name": "msedgewebview2.exe",
+          "wsBytes": 75055104
+        }
+      ],
+      "cpuSecondsTotal": 11.484,
+      "totalWorkingSetMiB": 816.4,
+      "totalPrivateMiB": 507.8
+    }
+  },
+  "blocked": [
+    "page.evaluate: Target page, context or browser has been closed\n    at installActivationMarks (C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\tools\\benchmark\\app-baseline.mjs:275:18)\n    at measureHotkey (C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\tools\\benchmark\\app-baseline.mjs:296:11)\n    at async main (C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\tools\\benchmark\\app-baseline.mjs:497:49)"
+  ],
+  "limitations": [
+    "Debug Rust build + production frontend via vite preview; release-build comparison pending.",
+    "Windows display used for hotkey activation test; DPI/refresh recorded per run.",
+    "Other agents may be active on the machine; build/CPU contention is not controlled.",
+    "Playwright/CDP only measures the WebView page; native window visibility comes from Win32 polling in PowerShell.",
+    "Perf marks are opt-in (PROTONSEARCH_PERF_HOOKS=1) and written to <data_dir>/perf-marks.jsonl: launcher-window-shown (Rust), launcher-first-paint and launcher-selection-painted (frontend, via perf_mark). Epochs are same-machine wall clock (ms resolution)."
+  ]
+}

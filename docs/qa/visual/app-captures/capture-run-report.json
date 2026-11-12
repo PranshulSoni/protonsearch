@@ -1,0 +1,143 @@
+{
+ "capturedAt": "2026-11-09T12:10:16.593Z",
+ "states": [
+  {
+   "name": "real-launcher-empty",
+   "input": "",
+   "count": "",
+   "options": 0,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 256,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-empty.png"
+  },
+  {
+   "name": "real-launcher-architecture",
+   "input": "arch",
+   "count": "50 matches",
+   "options": 50,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 480,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-architecture.png"
+  },
+  {
+   "name": "real-launcher-preview",
+   "input": "arch",
+   "count": "50 matches",
+   "options": 50,
+   "preview": true,
+   "menu": false,
+   "confirm": null,
+   "width": 1180,
+   "height": 480,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearchCtrl+Space Close previewEsc Close",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-preview.png"
+  },
+  {
+   "name": "real-launcher-context-menu",
+   "input": "arch",
+   "count": "50 matches",
+   "options": 50,
+   "preview": false,
+   "menu": true,
+   "confirm": null,
+   "width": 820,
+   "height": 480,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-context-menu.png"
+  },
+  {
+   "name": "real-launcher-zero",
+   "input": "zzzzzz-no-such-file",
+   "count": "No matches",
+   "options": 0,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 256,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearchEsc Clear",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-zero.png"
+  },
+  {
+   "name": "real-launcher-one-match",
+   "input": "ARCHITECTURE-091877e3.json",
+   "count": "1 match",
+   "options": 1,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 256,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-one-match.png"
+  },
+  {
+   "name": "real-launcher-long-list",
+   "input": "a",
+   "count": "50 matches",
+   "options": 50,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 480,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear",
+   "path": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\visual\\app-captures\\real-launcher-long-list.png"
+  }
+ ],
+ "latencies": [
+  {
+   "query": "arch",
+   "tookMs": 39.899999998509884,
+   "options": 50
+  },
+  {
+   "query": "readme",
+   "tookMs": 35.79999999701977,
+   "options": 50
+  },
+  {
+   "query": "protonserch",
+   "tookMs": 35.100000001490116,
+   "options": 19
+  },
+  {
+   "query": "a",
+   "tookMs": 40.899999998509884,
+   "options": 50
+  }
+ ],
+ "confirmProbe": {
+  "query": "shutdown",
+  "before": {
+   "input": "shutdown",
+   "count": "50 matches",
+   "options": 50,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 480,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Clear"
+  },
+  "afterEnter": {
+   "input": "",
+   "count": "",
+   "options": 0,
+   "preview": false,
+   "menu": false,
+   "confirm": null,
+   "width": 820,
+   "height": 256,
+   "footer": "Indexing…·1,31,199 items·Open ProtonSearch↑ ↓ NavigateEnter OpenEsc Close"
+  }
+ }
+}

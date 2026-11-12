@@ -1,0 +1,147 @@
+{
+  "label": "05-reduced-motion-compact",
+  "extra": {},
+  "viewport": {
+    "w": 430,
+    "h": 700,
+    "dpr": 1
+  },
+  "island": {
+    "box": {
+      "x": 10,
+      "y": 79,
+      "w": 410,
+      "h": 66
+    },
+    "classes": "island compact",
+    "style": {
+      "width": "410px",
+      "height": "66px",
+      "border-radius": "999px",
+      "background-color": "rgb(13, 16, 18)",
+      "border-color": "rgb(46, 53, 56)",
+      "border-width": "1px",
+      "box-shadow": "rgba(20, 32, 40, 0.25) 0px 26px 54px 0px, rgba(27, 32, 32, 0.15) 0px 3px 8px 0px",
+      "top": "22px",
+      "left": "214px",
+      "transform": "matrix(1, 0, 0, 1, -205, 0)",
+      "transition": "none",
+      "opacity": "1",
+      "visibility": "visible"
+    }
+  },
+  "inner": {
+    "box": {
+      "x": 11,
+      "y": 80,
+      "w": 408,
+      "h": 64
+    },
+    "style": {
+      "height": "64px",
+      "overflow-y": "hidden",
+      "transform": "matrix(1, 0, 0, 1, 0, 0)",
+      "opacity": "1"
+    }
+  },
+  "dots": {
+    "count": 8,
+    "navBox": {
+      "x": 313,
+      "y": 94,
+      "w": 95,
+      "h": 38
+    },
+    "navStyle": {
+      "height": "38px",
+      "top": "14px",
+      "right": "11px",
+      "left": "302px",
+      "bottom": "12px",
+      "gap": "1px",
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border-top": "0px none rgb(246, 247, 248)",
+      "position": "absolute"
+    },
+    "active": "Go to Search card",
+    "samples": [
+      {
+        "box": {
+          "x": 313,
+          "y": 94.5,
+          "w": 11,
+          "h": 37
+        },
+        "dot": {
+          "x": 315.5,
+          "y": 110,
+          "w": 6,
+          "h": 6
+        },
+        "dotStyle": {
+          "width": "6px",
+          "height": "6px",
+          "border-radius": "999px",
+          "background-color": "rgb(199, 220, 231)",
+          "transition": "none"
+        }
+      },
+      {
+        "box": {
+          "x": 325,
+          "y": 94.5,
+          "w": 11,
+          "h": 37
+        },
+        "dot": {
+          "x": 328.5,
+          "y": 111,
+          "w": 4,
+          "h": 4
+        },
+        "dotStyle": {
+          "width": "4px",
+          "height": "4px",
+          "border-radius": "999px",
+          "background-color": "rgb(101, 113, 118)",
+          "transition": "none"
+        }
+      }
+    ]
+  },
+  "fonts": {
+    "searchInput": {
+      "font-size": "13px",
+      "font-weight": "400",
+      "letter-spacing": "-0.455px",
+      "color": "rgb(246, 247, 248)"
+    },
+    "cardH2": null,
+    "cardP": null,
+    "itemStrong": null,
+    "itemSmall": null,
+    "filter": null,
+    "resultFoot": null,
+    "inlineNav": null,
+    "clipTitle": null,
+    "clipSmall": null,
+    "snippet": null,
+    "chooseTitle": null,
+    "chooseMeta": null,
+    "settingTile": null,
+    "settingToggle": null,
+    "settingExpand": null,
+    "agentStatus": null,
+    "agentBtn": null,
+    "notificationTitle": null,
+    "notificationBody": null
+  },
+  "counts": {
+    "results": 0,
+    "filters": 0,
+    "clipRows": 0,
+    "agents": 0,
+    "settings": 0,
+    "notifications": 0
+  }
+}

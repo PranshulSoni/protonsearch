@@ -1,0 +1,235 @@
+{
+ "task": "task-54 island quality fixes + design-review polish",
+ "capturedAt": "2026-11-10T05:24:21.472Z",
+ "beforeBuild": "pre task-54 dist (vite preview)",
+ "afterBuild": "task-54 final build with milestone-2 controls + polish",
+ "background": "synthetic white Notepad-like text window",
+ "captures": [
+  {
+   "file": "task54-after-card-switch.png",
+   "phase": "after",
+   "state": "card-switch"
+  },
+  {
+   "file": "task54-after-compact-1150.png",
+   "phase": "after",
+   "state": "compact-1150"
+  },
+  {
+   "file": "task54-after-compact-430.png",
+   "phase": "after",
+   "state": "compact-430"
+  },
+  {
+   "file": "task54-after-compact-860.png",
+   "phase": "after",
+   "state": "compact-860"
+  },
+  {
+   "file": "task54-after-controls-brightness-fallback-1150.png",
+   "phase": "after",
+   "state": "controls-brightness-fallback-1150"
+  },
+  {
+   "file": "task54-after-controls-bt-1150.png",
+   "phase": "after",
+   "state": "controls-bt-1150"
+  },
+  {
+   "file": "task54-after-controls-bt-430.png",
+   "phase": "after",
+   "state": "controls-bt-430"
+  },
+  {
+   "file": "task54-after-controls-bt-860.png",
+   "phase": "after",
+   "state": "controls-bt-860"
+  },
+  {
+   "file": "task54-after-controls-idle-1150.png",
+   "phase": "after",
+   "state": "controls-idle-1150"
+  },
+  {
+   "file": "task54-after-controls-idle-430.png",
+   "phase": "after",
+   "state": "controls-idle-430"
+  },
+  {
+   "file": "task54-after-controls-idle-860.png",
+   "phase": "after",
+   "state": "controls-idle-860"
+  },
+  {
+   "file": "task54-after-controls-wifi-1150.png",
+   "phase": "after",
+   "state": "controls-wifi-1150"
+  },
+  {
+   "file": "task54-after-controls-wifi-430.png",
+   "phase": "after",
+   "state": "controls-wifi-430"
+  },
+  {
+   "file": "task54-after-controls-wifi-860.png",
+   "phase": "after",
+   "state": "controls-wifi-860"
+  },
+  {
+   "file": "task54-after-enter-0ms.png",
+   "phase": "after",
+   "state": "enter-0ms"
+  },
+  {
+   "file": "task54-after-enter-180ms.png",
+   "phase": "after",
+   "state": "enter-180ms"
+  },
+  {
+   "file": "task54-after-enter-90ms-paused.png",
+   "phase": "after",
+   "state": "enter-90ms-paused"
+  },
+  {
+   "file": "task54-after-enter-90ms.png",
+   "phase": "after",
+   "state": "enter-90ms"
+  },
+  {
+   "file": "task54-after-exit-0ms.png",
+   "phase": "after",
+   "state": "exit-0ms"
+  },
+  {
+   "file": "task54-after-exit-120ms.png",
+   "phase": "after",
+   "state": "exit-120ms"
+  },
+  {
+   "file": "task54-after-exit-60ms-paused.png",
+   "phase": "after",
+   "state": "exit-60ms-paused"
+  },
+  {
+   "file": "task54-after-exit-60ms.png",
+   "phase": "after",
+   "state": "exit-60ms"
+  },
+  {
+   "file": "task54-after-notifications-0-1150.png",
+   "phase": "after",
+   "state": "notifications-0-1150"
+  },
+  {
+   "file": "task54-after-notifications-0-430.png",
+   "phase": "after",
+   "state": "notifications-0-430"
+  },
+  {
+   "file": "task54-after-notifications-0-860.png",
+   "phase": "after",
+   "state": "notifications-0-860"
+  },
+  {
+   "file": "task54-after-notifications-1-1150.png",
+   "phase": "after",
+   "state": "notifications-1-1150"
+  },
+  {
+   "file": "task54-after-notifications-1-430.png",
+   "phase": "after",
+   "state": "notifications-1-430"
+  },
+  {
+   "file": "task54-after-notifications-1-860.png",
+   "phase": "after",
+   "state": "notifications-1-860"
+  },
+  {
+   "file": "task54-after-notifications-3-1150.png",
+   "phase": "after",
+   "state": "notifications-3-1150"
+  },
+  {
+   "file": "task54-after-notifications-3-430.png",
+   "phase": "after",
+   "state": "notifications-3-430"
+  },
+  {
+   "file": "task54-after-notifications-3-860.png",
+   "phase": "after",
+   "state": "notifications-3-860"
+  },
+  {
+   "file": "task54-after-reduced-compact-1150.png",
+   "phase": "after",
+   "state": "reduced-compact-1150"
+  },
+  {
+   "file": "task54-after-reduced-search-1150.png",
+   "phase": "after",
+   "state": "reduced-search-1150"
+  },
+  {
+   "file": "task54-after-search-1150.png",
+   "phase": "after",
+   "state": "search-1150"
+  },
+  {
+   "file": "task54-after-search-430.png",
+   "phase": "after",
+   "state": "search-430"
+  },
+  {
+   "file": "task54-after-search-860.png",
+   "phase": "after",
+   "state": "search-860"
+  },
+  {
+   "file": "task54-before-compact-1150.png",
+   "phase": "before",
+   "state": "compact-1150"
+  },
+  {
+   "file": "task54-before-compact-430.png",
+   "phase": "before",
+   "state": "compact-430"
+  },
+  {
+   "file": "task54-before-controls-1150.png",
+   "phase": "before",
+   "state": "controls-1150"
+  },
+  {
+   "file": "task54-before-controls-430.png",
+   "phase": "before",
+   "state": "controls-430"
+  },
+  {
+   "file": "task54-before-notifications-1150.png",
+   "phase": "before",
+   "state": "notifications-1150"
+  },
+  {
+   "file": "task54-before-notifications-430.png",
+   "phase": "before",
+   "state": "notifications-430"
+  },
+  {
+   "file": "task54-before-search-1150.png",
+   "phase": "before",
+   "state": "search-1150"
+  },
+  {
+   "file": "task54-before-search-430.png",
+   "phase": "before",
+   "state": "search-430"
+  }
+ ],
+ "notes": [
+  "After captures include paused enter 90ms / exit 60ms frames (animationPlayState paused / Web Animations currentTime=60) in addition to 0/90/180 and 0/60/120 endpoint timing shots.",
+  "Quick Settings captures now show the labelled Audio output row and external chevron cues on Airplane/Night light/Energy saver; forced-fixture brightness-unsupported capture shows the reason + Open display settings fallback.",
+  "Wi-Fi and Bluetooth drilldowns use real mock networks/devices with Connect/Open network settings/Manage.",
+  "No desktop text or ghost card inside the island bbox; only native shadow pad transparent."
+ ]
+}

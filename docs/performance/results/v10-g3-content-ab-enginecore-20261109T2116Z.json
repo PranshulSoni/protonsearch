@@ -1,0 +1,33 @@
+﻿{
+    "commands":  [
+                     "cargo run --release -p ps-content --example content_perf_probe -- .bench/v2-content.db .bench/queries-content.jsonl 20 20",
+                     "cargo run --release -p ps-bench -- content-v2 --v2-db .bench/v2-content.db --queries .bench/queries-content.jsonl --iters 30 --limit 20 --keep-db --no-import --cold-restarts 0 --out \u003cjson\u003e"
+                 ],
+    "iterations":  20,
+    "db":  ".bench/v2-content.db",
+    "method":  "interleaved A/B in one process (old then new per iteration) to cancel machine-load drift",
+    "new":  {
+                "p50":  2.31,
+                "p99":  39.03,
+                "n":  640,
+                "p95":  28.66,
+                "implementation":  "ps-content Rust snippet over 32KB text prefix + ASCII-folded line scan"
+            },
+    "queries":  ".bench/queries-content.jsonl",
+    "caveat":  "Formal content-v2 before/after JSONs were captured during a contended window (CPU load ~74%); treat their deltas as directional and re-run quiet for acceptance.",
+    "quietSingleProcess":  {
+                               "limit20_p95":  11.67,
+                               "limit12_p95":  8.99,
+                               "note":  "same DB, no concurrent builds; used for the \u003c30ms target read"
+                           },
+    "old":  {
+                "p50":  8.94,
+                "p99":  63.16,
+                "n":  640,
+                "p95":  41.85,
+                "implementation":  "FTS5 snippet() + 128KB text fetch + lowercase line scan (pre-task-42)"
+            },
+    "limit":  20,
+    "schema":  "protonsearch-v2/content-ab/1",
+    "generatedAtUtc":  ""
+}

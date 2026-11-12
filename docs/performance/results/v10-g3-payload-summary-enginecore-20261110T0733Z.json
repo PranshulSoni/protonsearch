@@ -1,0 +1,85 @@
+{
+    "dataset":  ".devdata-perf64/v2 (copy of .devdata-live/v2; 139,386 files, 16,848 content docs; sources loaded via PROTONSEARCH_DATA_DIR so apps/browser/clipboard come from the copy)",
+    "typingPayload":  {
+                          "jsonBytes":  {
+                                            "average":  45591,
+                                            "min":  37896,
+                                            "limit":  30,
+                                            "results":  30,
+                                            "max":  55113
+                                        },
+                          "breakdownAverageBytes":  {
+                                                        "subtitles":  3506,
+                                                        "actions":  14073,
+                                                        "paths":  3333,
+                                                        "serializeP50Ms":  0.08,
+                                                        "nullLiterals":  367,
+                                                        "iconDataUrls":  3682
+                                                    },
+                          "worstCasePrefixes":  [
+                                                    {
+                                                        "query":  "r",
+                                                        "actions":  13365,
+                                                        "engineP50Ms":  0.48,
+                                                        "json":  55113,
+                                                        "icons":  13230
+                                                    },
+                                                    {
+                                                        "query":  "s",
+                                                        "actions":  13283,
+                                                        "engineP50Ms":  0.44,
+                                                        "json":  52454,
+                                                        "icons":  10526
+                                                    },
+                                                    {
+                                                        "query":  "re",
+                                                        "actions":  12360,
+                                                        "engineP50Ms":  0.47,
+                                                        "json":  51647,
+                                                        "icons":  13544
+                                                    }
+                                                ]
+                      },
+    "recommendations":  [
+                            "ps-ipc (lead-owned): add serde skip_serializing_if for Option/empty fields - ~367 nulls per keystroke payload (roughly 8-11 KB incl. keys) with no visible change.",
+                            "shell/UI (lead/UI-owned): switch app rows from inline app_icon_data to IconRef::AppIcon path via asset protocol - saves 10-13 KB per keystroke when app rows appear; requires UI change.",
+                            "UI: cache icon data URLs by data hash and memoize result rows; clipboard card thumbnails (49.7 KB/card) should be fetched lazily per visible card if possible.",
+                            "Engine action list (14 KB/keystroke) is a visible context-menu feature; do not drop it without UI change."
+                        ],
+    "engineSafeReductions":  [
+                                 {
+                                     "effect":  "engine search on app-matching prefixes 0.60-0.64 -\u003e 0.44-0.48 ms debug; payload bytes unchanged",
+                                     "change":  "cached application icon data URLs (path+mtime+len keyed, bounded 256)"
+                                 },
+                                 {
+                                     "effect":  "clipboard card search 0.94 -\u003e 0.68 ms debug; payload bytes unchanged",
+                                     "change":  "cached clipboard thumbnail data URLs (path+mtime+len keyed, bounded 128)"
+                                 },
+                                 {
+                                     "effect":  "no payload change; less per-keystroke cloning/memory",
+                                     "change":  "preview result registry stores trimmed rows (no icon payload / action list)"
+                                 }
+                             ],
+    "profile":  "debug engine probe (app debug profile)",
+    "appsScope":  {
+                      "rows":  5,
+                      "engineP50Ms":  0.16,
+                      "iconBytes":  11834,
+                      "json":  14915,
+                      "iconSharePercent":  79
+                  },
+    "clipboardCard":  {
+                          "thumbnailBytes":  49734,
+                          "engineP50Ms":  0.68,
+                          "rows":  8,
+                          "json":  55794,
+                          "thumbnailSharePercent":  89
+                      },
+    "commands":  [
+                     "cargo run -p ps-core --example payload_perf_probe -- .devdata-perf64/v2 target/payload-perf-after-debug.json (with PROTONSEARCH_DATA_DIR=\u003crepo\u003e/.devdata-perf64 and PS_PROBE_BACKGROUND=1 for sources)"
+                 ],
+    "caveat":  "Engine-only probe: React/IPC parse attribution needs the single app measurement session requested from perf-bench.",
+    "payloadUnchangedProof":  "rows with changed icon/action/result composition between before and after: 0",
+    "schema":  "protonsearch-v2/payload-perf/1",
+    "generatedAtUtc":  "20261110T0733Z"
+}

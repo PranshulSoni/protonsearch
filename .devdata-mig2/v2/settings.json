@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "userName": "Pranshul",
+  "hotkey": "Alt+Space",
+  "theme": "light",
+  "density": "comfortable",
+  "motion": "system",
+  "launchAtLogin": false,
+  "indexing": {
+    "roots": [
+      {
+        "path": "C:\\Users\\Pranshul\\Documents",
+        "mode": "content",
+        "enabled": true
+      },
+      {
+        "path": "C:\\Users\\Pranshul\\Desktop",
+        "mode": "names_only",
+        "enabled": true
+      },
+      {
+        "path": "C:\\Users\\Pranshul\\Downloads",
+        "mode": "names_only",
+        "enabled": true
+      }
+    ],
+    "excludedPaths": [],
+    "contentEnabled": true,
+    "ocrEnabled": false,
+    "respectPowerState": true,
+    "paused": false
+  },
+  "privacy": {
+    "activityHistory": true,
+    "clipboardHistory": true,
+    "browserHistory": true,
+    "gitIndexing": true,
+    "telemetry": false
+  },
+  "agent": {
+    "enabled": false,
+    "provider": null,
+    "model": null,
+    "sidecarPath": null
+  },
+  "semantic": {
+    "enabled": false,
+    "model": null
+  },
+  "onboardingComplete": true,
+  "legacyMigrated": true,
+  "resultLimit": 30
+}

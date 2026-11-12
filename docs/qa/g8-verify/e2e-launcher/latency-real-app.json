@@ -1,0 +1,43 @@
+{
+  "outDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\docs\\qa\\g8-verify\\e2e-launcher",
+  "pages": 3,
+  "measurements": [
+    {
+      "label": "architecture",
+      "query": "arch",
+      "start": 3585.7999999970198,
+      "visibleAt": 3604.7999999970198,
+      "rows": 0,
+      "tookMs": 19,
+      "changed": true
+    },
+    {
+      "label": "recent-exact",
+      "query": "readme",
+      "start": 4093.8999999910593,
+      "visibleAt": 4096.5999999940395,
+      "rows": 12,
+      "tookMs": 2.7000000029802322,
+      "changed": true
+    },
+    {
+      "label": "typo",
+      "query": "protonserch",
+      "start": 4583,
+      "visibleAt": 4588.0999999940395,
+      "rows": 3,
+      "tookMs": 5.0999999940395355,
+      "changed": true
+    },
+    {
+      "label": "zero",
+      "query": "zzzzzz-no-such-file",
+      "start": 5058.29999999702,
+      "visibleAt": 5062.399999991059,
+      "rows": 1,
+      "tookMs": 4.0999999940395355,
+      "changed": true
+    }
+  ],
+  "capturedAt": "2026-11-09T21:32:37.469Z"
+}

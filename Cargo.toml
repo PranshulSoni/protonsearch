@@ -1,0 +1,52 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ps-ipc",
+    "crates/ps-core",
+    "crates/ps-index",
+    "crates/ps-content",
+    "crates/ps-sources",
+    "crates/ps-windows",
+    "crates/ps-ocr",
+    "crates/ps-agent",
+    "crates/ps-bench",
+    "apps/desktop/src-tauri",
+]
+exclude = ["protonsearch", "agent-sidecar"]
+
+[workspace.package]
+version = "2.0.0-alpha.1"
+edition = "2021"
+license = "MIT"
+authors = ["Pranshul Soni"]
+repository = "https://github.com/PranshulSoni/protonsearch"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+walkdir = "2.5"
+rayon = "1.10"
+rusqlite = { version = "0.31", features = ["bundled"] }
+windows = { version = "0.58", features = [] }
+winreg = "0.56"
+image = "0.24"
+notify = "6"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true
+# No panic=abort: a malformed document must never abort the whole app; the
+# extraction workers catch panics and the search engine degrades gracefully.
+
+[profile.bench]
+inherits = "release"
+
+[profile.dev]
+opt-level = 1
+# The host MSVC toolchain intermittently fails (D8050) while writing /Z7 debug
+# records for the bundled SQLite C build. Dev builds do not need debug info.
+debug = 0

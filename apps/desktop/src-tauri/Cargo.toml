@@ -1,0 +1,36 @@
+[package]
+name = "protonsearch-v2"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "ProtonSearch v2 desktop shell (Tauri 2)"
+
+[[bin]]
+name = "ProtonSearch"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png", "unstable"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+ps-ipc = { path = "../../../crates/ps-ipc" }
+ps-core = { path = "../../../crates/ps-core" }
+ps-sources = { path = "../../../crates/ps-sources" }
+ps-windows = { path = "../../../crates/ps-windows" }
+webview2-com = "0.39"
+windows-core = "0.62"
+ps-agent = { path = "../../../crates/ps-agent" }
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }

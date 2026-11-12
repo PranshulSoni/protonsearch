@@ -1,0 +1,948 @@
+html[data-window="island"],
+html[data-window="island"] body,
+html[data-window="island"] #root {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+:root {
+  --island-panel: #000000;
+  --island-border: #222224;
+  --island-text: #f6f7f8;
+  --island-muted: #9ba3ae;
+  --island-ink-3: #8b9aa3;
+  --island-dot-idle: #657176;
+  --island-dot-active: #c7dce7;
+  --island-footer: #000000;
+  --island-footer-border: transparent;
+  --island-raised: #1c1c1c;
+  --island-icon: #9ca3af;
+  --island-focus: #a3a3a3;
+  --island-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Summon/dismiss; keep in step with OPEN_MS / CLOSE_MS in IslandView.tsx. */
+  --island-dur-open: 420ms;
+  --island-dur-close: 150ms;
+  /* Damped spring (ratio 0.65): reaches size at ~30%, overshoots ~7%, settles. */
+  --island-spring: linear(
+    0, 0.061 4%, 0.205 8%, 0.383 12%, 0.561 16%, 0.719 20%, 0.848 24%, 0.943 28%,
+    1.007 32%, 1.046 36%, 1.064 40%, 1.068 44%, 1.063 48%, 1.052 52%, 1.034 58%,
+    1.018 64%, 1.006 70%, 0.998 78%, 0.995 86%, 0.996 93%, 1
+  );
+  /* Where the surface sits before it pops in and after it tucks away. */
+  --island-tucked: translateY(-14px) scale(0.6, 0.5);
+  --island-dot-dur: 300ms;
+  --island-dots-h: 31px;
+  --island-dots-h-compact: 38px;
+}
+
+/* The native island window adds 96 px transparent shadow padding on each side
+   (ISLAND_SHADOW_PAD); the surface itself is centred inside it. */
+
+.island-host {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+  padding: 112px;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+/* The native window can be briefly larger than the surface; keep the surface on its anchor edge. */
+
+.island-host[data-anchor$="_left"] { justify-content: flex-start; }
+
+.island-host[data-anchor$="_right"] { justify-content: flex-end; }
+
+.island-host[data-anchor^="center"] { align-items: center; }
+
+.island-host[data-anchor^="bottom"] { align-items: flex-end; }
+
+.island-surface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  box-sizing: border-box;
+  isolation: isolate;
+  contain: paint;
+  background: var(--island-panel);
+  background-clip: padding-box;
+  border: 1px solid var(--island-border);
+  border-top-color: #333336;
+  border-radius: 34px;
+  color: var(--island-text);
+  box-shadow:
+    0 26px 54px rgba(20, 32, 40, 0.25),
+    0 3px 8px rgba(27, 32, 32, 0.15);
+  overflow: hidden;
+  font-family: "Inter Variable", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: -0.015em;
+  /* Size and radius morph through motion's layout animation (IslandView), not CSS transitions. */
+  outline: none;
+}
+
+/* Summon/dismiss: the surface pops out of its anchor edge (the top by default)
+   on a spring and tucks back the same way. */
+
+.island-surface {
+  transform-origin: 50% 0;
+}
+
+.island-host[data-anchor^="center"] .island-surface {
+  transform-origin: 50% 50%;
+  --island-tucked: scale(0.6, 0.5);
+}
+
+.island-host[data-anchor^="bottom"] .island-surface {
+  transform-origin: 50% 100%;
+  --island-tucked: translateY(14px) scale(0.6, 0.5);
+}
+
+/* While the native window is hidden the surface waits tucked and transparent, so
+   the first frame of the next summon is empty rather than the last drawn state. */
+
+.island-surface--hidden {
+  opacity: 0;
+  transform: var(--island-tucked);
+  transition: none;
+}
+
+/* The fade is short and separate from the spring: the pill is visible from the
+   first frame, so the growth itself is what the eye reads as the pop. */
+
+.island-surface--opening {
+  animation:
+    island-pop-in var(--island-dur-open) var(--island-spring) both,
+    island-fade-in 90ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+@keyframes island-pop-in {
+  from {
+    transform: var(--island-tucked);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes island-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.island-surface--compact {
+  border-radius: 999px;
+  cursor: text;
+}
+
+.island-surface--expanded .island-inner {
+  height: calc(100% - var(--island-dots-h));
+  flex: 0 0 calc(100% - var(--island-dots-h));
+  max-height: calc(100% - var(--island-dots-h));
+}
+
+.island-inner {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--island-panel);
+}
+
+.island-inner--compact {
+  height: 100%;
+}
+
+.island-surface--closing {
+  animation: island-pop-out var(--island-dur-close) cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes island-pop-out {
+  to {
+    opacity: 0;
+    transform: var(--island-tucked);
+  }
+}
+
+/* ---------- Search ---------- */
+
+.island-search {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.island-search-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.island-search-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 65px;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+
+.island-search--compact .island-search-row {
+  padding: 0 124px 0 18px;
+  height: 100%;
+}
+
+.island-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  /* Authoritative V9 P-mark colours, scoped to the island only; the light facet
+     keeps the mark legible on the graphite surface. */
+  --ps-brand-body: #3173a8;
+  --ps-brand-facet: #dbe6ed;
+}
+
+.island-brand .logo,
+.island-brand svg {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px;
+  display: block;
+  flex: none;
+}
+
+.island-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--island-text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.island-search-input::placeholder {
+  color: var(--ps-fg-3);
+}
+
+.island-search-input:focus-visible {
+  outline: none;
+}
+
+/* V9 keeps search focus visible on the island outline without an inset line. */
+
+.island-search-row > svg {
+  color: var(--island-muted);
+  flex: none;
+}
+
+.island-filters {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 10px 7px;
+  border-top: 1px solid var(--ps-line);
+  padding-top: 7px;
+}
+
+.island-filter {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: var(--ps-fg-2);
+  font: inherit;
+  font-size: 11px;
+  padding: 7px 8px;
+  min-height: 29px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.island-filter:hover {
+  background: var(--ps-hover);
+  color: var(--ps-fg);
+}
+
+/* The shared pill (AnimatedTabs) paints the active background. */
+
+.island-filter.is-active {
+  background: transparent;
+  color: var(--ps-hi);
+}
+
+.island-filter:focus-visible {
+  outline: 2px solid var(--ps-hi);
+  outline-offset: 1px;
+}
+
+.island-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 7px 11px;
+  box-sizing: border-box;
+}
+
+.island-result-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  min-height: 50px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--island-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+/* The shared highlight pill (HighlightRow) paints the hovered and selected row. */
+
+.island-result-row:focus-visible {
+  outline: 2px solid var(--ps-hi);
+  outline-offset: -2px;
+}
+
+.island-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+}
+
+.island-skeleton-row {
+  height: 50px;
+  border-radius: 8px;
+  background: var(--ps-raised);
+  animation: island-skeleton 1.2s ease-in-out infinite;
+}
+
+@keyframes island-skeleton {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------- Shared cards ---------- */
+
+.island-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 17px 22px 14px;
+  box-sizing: border-box;
+  background: var(--island-panel);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3c474a transparent;
+}
+
+.island-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.island-card::-webkit-scrollbar-thumb {
+  background: #3c474a;
+  border-radius: 999px;
+}
+
+.island-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-height: 42px;
+}
+
+.island-icon-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--island-raised);
+  color: var(--island-icon);
+}
+
+.island-card-heading {
+  min-width: 0;
+}
+
+.island-card-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 19.2px;
+  letter-spacing: -0.04em;
+  color: var(--island-text);
+}
+
+.island-card-heading p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 15.95px;
+  color: var(--island-muted);
+}
+
+.island-divider {
+  flex: none;
+  height: 1px;
+  background: var(--ps-line);
+  margin: 13px 0;
+}
+
+.island-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 110px;
+  padding: 16px;
+  text-align: center;
+  color: var(--island-muted);
+}
+
+.island-empty strong {
+  font-size: 12px;
+  color: var(--island-text);
+  font-weight: 600;
+}
+
+.island-empty span {
+  font-size: 10px;
+  color: var(--island-ink-3);
+}
+
+/* ---------- Unsupported cards ---------- */
+
+.island-unsupported {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  padding: 16px 8px;
+  text-align: center;
+  color: var(--island-muted);
+}
+
+.island-unsupported-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--island-raised);
+  color: var(--island-icon);
+}
+
+.island-unsupported strong {
+  font-size: 13px;
+  color: var(--island-text);
+}
+
+.island-unsupported span {
+  max-width: 300px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.island-unsupported-note {
+  color: var(--island-ink-3);
+}
+
+/* ---------- Page dots ---------- */
+
+.island-dots {
+  position: absolute;
+  isolation: isolate;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--island-dots-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: var(--island-footer);
+  border-top: 1px solid var(--island-footer-border);
+  z-index: 3;
+  /* The compact rule swaps the keyframe name, so the dots fade into their new spot on every expand/collapse. */
+  animation: island-fade-in 220ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+.island-dot-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* V9 visual pitch is 14px + 5px gap; the invisible 24x30 hit area is centred
+     on the dot without widening the row. */
+  min-width: 14px;
+  height: 30px;
+  padding: 9px 3px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.island-dot-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 24px;
+  transform: translateX(-50%);
+}
+
+.island-dot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--island-dot-idle);
+  transition:
+    background 200ms,
+    width var(--island-dot-dur) var(--island-ease),
+    transform 220ms var(--island-ease);
+}
+
+.island-dot-button.is-active .island-dot {
+  width: 16px;
+  background: var(--island-dot-active);
+}
+
+.island-dot-button:hover .island-dot {
+  transform: scale(1.12);
+}
+
+.island-dot-button:focus-visible {
+  outline: 2px solid var(--island-focus);
+  outline-offset: -3px;
+  border-radius: 7px;
+}
+
+.island-dots--compact {
+  position: absolute;
+  top: 14px;
+  right: 15px;
+  left: auto;
+  bottom: auto;
+  height: var(--island-dots-h-compact);
+  gap: 1px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  z-index: 4;
+  animation-name: island-fade-in-compact;
+}
+
+@keyframes island-fade-in-compact {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.island-dots--compact .island-dot-button {
+  min-width: 11px;
+  height: 37px;
+  padding: 11px 0;
+}
+
+.island-dots--compact .island-dot {
+  width: 4px;
+  height: 4px;
+}
+
+.island-dots--compact .island-dot-button.is-active .island-dot {
+  width: 6px;
+  height: 4px;
+}
+
+/* ---------- Responsive (exactly 520 / 380 on the STAGE, not the padded
+   native window; classes are applied from the measured stage width) ---------- */
+
+.island-surface--mid .island-search-row {
+  padding: 0 12px;
+  gap: 9px;
+}
+
+.island-surface--mid .island-search--compact .island-search-row,
+.island-surface--narrow .island-search--compact .island-search-row {
+  padding-right: 112px;
+}
+
+.island-surface--mid .island-search-input {
+  font-size: 13px;
+}
+
+.island-surface--mid .island-card {
+  padding: 15px 15px 12px;
+}
+
+.island-surface--mid .island-card-heading h2 {
+  font-size: 15px;
+}
+
+.island-surface--mid .island-dots--compact {
+  right: 11px;
+}
+
+.island-surface--narrow .island-card {
+  padding: 14px 13px 11px;
+}
+
+.island-surface--narrow .island-search-row {
+  padding: 0 12px;
+  gap: 8px;
+}
+
+.island-surface--narrow .island-search-input {
+  font-size: 12px;
+}
+
+.island-surface--narrow .island-card-heading h2 {
+  font-size: 15px;
+}
+
+.island-surface--narrow .island-card-heading p {
+  font-size: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .island-surface,
+  .island-surface .island-inner,
+  .island-dot,
+  .island-skeleton-row {
+      transition: none !important;
+      animation: none !important;
+    }
+}
+
+/* ---------- task-54 V9 refinements ---------- */
+
+.island-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--island-ink-3, #8b9aa3);
+  line-height: 14px;
+  padding: 8px 4px 4px;
+}
+
+.island-result-group + .island-result-group .island-group-label {
+  padding-top: 6px;
+}
+
+.island-search .fileicon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--ps-active);
+  color: var(--island-icon);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.island-search .fileicon--real img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.island-search .fileicon-glyph {
+  width: 18px;
+  height: 18px;
+}
+
+.island-search .result-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.island-search .filename {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--island-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-search .filepath {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--island-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.island-search .result-meta {
+  flex: none;
+  font-size: 10px;
+  color: var(--island-ink-3);
+}
+
+.island-result-row {
+  border: 1px solid transparent;
+  box-sizing: border-box;
+}
+
+/* card/row shells are always opaque; alpha is only shadow/border/focus. */
+
+.island-surface,
+.island-inner,
+.island-card,
+.island-result-row {
+  background-clip: padding-box;
+}
+
+/* task-58: prewarmed card slots; inactive cards stay mounted but unpainted. */
+
+.island-card-slot {
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--island-panel);
+}
+
+.island-card-slot[aria-hidden="true"] {
+  display: none !important;
+}
+
+/* No scrollbar bars inside the island surface. */
+
+.island-surface,
+.island-surface * {
+  scrollbar-width: none;
+}
+
+.island-surface *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.island-zero {
+  padding: 4px 2px;
+  font-size: 11px;
+  color: var(--ps-fg-2);
+}
+
+/* ---------- task-62 exact anatomy ---------- */
+
+/* Custom smooth dark-mode scrollbar */
+
+.island-scrollable::-webkit-scrollbar {
+  width: 4px;
+}
+
+.island-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.island-scrollable::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+  transition: background 0.15s ease;
+}
+
+.island-scrollable::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.island-scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+/* Island rows: no match-source badge (Filename / Content / OCR). */
+
+.island-result-row .provenance-badge {
+  display: none;
+}
+
+/* IslandView measures a card at its natural height: nothing stretches while
+   data-measuring is set. In @layer base so these !important rules outrank the
+   layered !important Tailwind utilities (earlier layers win for !important). */
+@layer base {
+  .island-card-slot[data-measuring] {
+    height: auto !important;
+    max-height: none !important;
+    flex: none !important;
+  }
+
+  .island-card-slot[data-measuring] * {
+    flex-grow: 0 !important;
+    flex-basis: auto !important;
+  }
+
+  .island-card-slot[data-measuring] [data-radix-scroll-area-viewport] {
+    height: auto !important;
+  }
+}
+
+/* Liquid glass style (Island settings). The window is transparent, so there is no
+   backdrop to blur: a translucent tint keeps text legible over any desktop, and a
+   sheen plus specular rim give the glass edge. */
+.island-surface--glass {
+  --island-panel: transparent;
+  --island-footer: transparent;
+  --ps-raised: rgba(255, 255, 255, 0.07);
+  --ps-hover: rgba(255, 255, 255, 0.1);
+  --ps-active: rgba(255, 255, 255, 0.14);
+  --ps-line: rgba(255, 255, 255, 0.14);
+  --island-raised: rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02) 42%, rgba(255, 255, 255, 0.06)),
+    rgba(10, 12, 16, calc(0.08 + var(--glass, 0.6) * 0.52)); /* --glass: 0 clear .. 1 frosted */
+  border-color: rgba(255, 255, 255, 0.22);
+  border-top-color: rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(18px) saturate(170%);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.5),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 28px rgba(255, 255, 255, 0.05),
+    0 26px 54px rgba(0, 0, 0, 0.35);
+}
+
+/* Light app theme: IslandView adds .island-surface--light when the app theme resolves to
+   light. Every token below re-resolves on the surface, so cards, icons and the logo follow. */
+.island-surface--light {
+  --island-panel: #f3f5f7;
+  --island-footer: #f3f5f7;
+  --island-border: #d2d9e0;
+  --island-text: #15191e;
+  --island-muted: #4b555f;
+  --island-ink-3: #626d77;
+  --island-raised: #ffffff;
+  --island-icon: #3d4650;
+  --island-focus: #2a333d;
+  --island-dot-idle: #aab3bc;
+  --island-dot-active: #1c242c;
+  border-top-color: var(--island-border);
+  color: var(--island-text);
+}
+
+/* Liquid glass, light app theme: only slightly white (0.06 to 0.46 with the glass amount)
+   with dark text tokens. --glass: 0 clear .. 1 frosted. */
+.island-surface--glass.island-surface--light {
+  --island-panel: transparent;
+  --island-footer: transparent;
+  --island-raised: rgba(20, 28, 36, 0.05);
+  --ps-raised: rgba(20, 28, 36, 0.05);
+  --ps-hover: rgba(20, 28, 36, 0.08);
+  --ps-active: rgba(20, 28, 36, 0.12);
+  --ps-line: rgba(20, 28, 36, 0.12);
+  background: rgba(255, 255, 255, calc(0.06 + var(--glass, 0.6) * 0.4));
+  border-color: rgba(20, 28, 36, 0.16);
+  border-top-color: rgba(20, 28, 36, 0.22);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.6),
+    inset -1px -1px 0 rgba(20, 28, 36, 0.06),
+    0 26px 54px rgba(20, 28, 36, 0.18);
+}
+
+/* Light only: the P mark needs an edge on a pale surface, and the scrollbars must show. */
+.island-surface--light .island-brand .logo {
+  filter: drop-shadow(0 1px 1px rgba(20, 28, 36, 0.3));
+}
+
+.island-surface--light .island-scrollable {
+  scrollbar-color: rgba(20, 28, 36, 0.2) transparent;
+}
+
+.island-surface--light .island-scrollable::-webkit-scrollbar-thumb {
+  background: rgba(20, 28, 36, 0.2);
+}
+
+/* Liquid glass drops. In @layer base so these !important rules beat the layered
+   !important Tailwind utilities. The slider thumb is a lens: its backdrop (the track
+   and fill under it) is bent by the #ps-liquid filter and squishes while dragged. */
+@layer base {
+  .island-surface--glass .ps-glass-pill {
+    background: rgba(255, 255, 255, 0.1) !important;
+    box-shadow:
+      inset 1px 1px 0 rgba(255, 255, 255, 0.55),
+      inset -1px -1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 0 8px rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .ps-thumb {
+    width: 30px !important;
+    height: 20px !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    backdrop-filter: url(#ps-liquid) saturate(180%) brightness(1.15) !important;
+    box-shadow:
+      inset 1px 1px 0 rgba(255, 255, 255, 0.85),
+      inset -1px -1px 1px rgba(255, 255, 255, 0.3),
+      inset 0 0 6px rgba(255, 255, 255, 0.35),
+      0 2px 8px rgba(0, 0, 0, 0.35) !important;
+    transition: scale 180ms cubic-bezier(0.3, 1.5, 0.6, 1) !important;
+  }
+
+  .peer:active ~ div .ps-thumb {
+    scale: 1.18 0.86;
+  }
+
+  .island-surface--light .ps-glass-pill {
+    background: rgba(20, 28, 36, 0.06) !important;
+    box-shadow:
+      inset 1px 1px 0 rgba(255, 255, 255, 0.7),
+      inset -1px -1px 0 rgba(20, 28, 36, 0.08),
+      inset 0 0 8px rgba(20, 28, 36, 0.05) !important;
+  }
+
+  .island-surface--light .ps-thumb {
+    background: rgba(255, 255, 255, 0.7) !important;
+    box-shadow:
+      inset 1px 1px 0 #ffffff,
+      inset -1px -1px 1px rgba(20, 28, 36, 0.15),
+      0 2px 8px rgba(20, 28, 36, 0.25) !important;
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schema": "ps-island-perf/1",
+  "kind": "island-performance",
+  "status": "blocked",
+  "capturedAt": "2026-11-10T05:25:54.373Z",
+  "host": {
+    "hostname": "PranshulAsus",
+    "platform": "win32"
+  },
+  "conditions": {
+    "exe": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\target\\debug\\ProtonSearch.exe",
+    "exeBytes": 20377088,
+    "exeMtime": "2026-11-10T05:16:43.931Z",
+    "frontendDistMtime": "2026-11-10T05:22:40.211Z",
+    "dataDir": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch\\.devdata",
+    "port": 9222,
+    "assumedRefreshHz": 120,
+    "cycles": 20,
+    "takes": 20,
+    "openTakes": 8,
+    "attachOnly": false,
+    "gitHead": "8857bc792d582d307d0438d86acff3f9b6d592e0",
+    "gitDirty": 28,
+    "appPid": 25824
+  },
+  "measurements": {},
+  "blocked": [
+    "Error: no launcher page found\n    at main (file:///C:/Users/Pranshul/Documents/Projects/protonsearch/tools/benchmark/island-perf.mjs:308:26)"
+  ],
+  "limitations": [
+    "Debug build + CDP drive the real island WebView; headless frame counting is not used - WebView2 runs on the real display.",
+    "Frame interval p50/p95/p99 are rAF intervals inside the island page during a 900-1000 ms window; dropped = interval > 1.5 x assumed refresh period (default 120 Hz for this host, period 8.333 ms).",
+    "Activation first-open vs warm-open is measured with the real global hotkey (SendInput) and perf marks; the lazy window creation cost is isolated by whether the island page existed before the hotkey.",
+    "Process-tree memory is PowerShell/CIM Working Set + private bytes with command lines; WebView2 child roles are inferred from command lines, not guessed.",
+    "Root-cause attribution is evidence-based (CDP Performance Layout/Recalc/Script/Task durations + page resize events + long tasks), not a visual guess."
+  ]
+}

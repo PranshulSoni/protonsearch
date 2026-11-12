@@ -1,0 +1,721 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1794329117207,
+  "projectRoot": "C:\\Users\\Pranshul\\Documents\\Projects\\protonsearch",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Rust",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "Cargo.toml"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "cargo",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cargo build",
+    "testCommand": "cargo test",
+    "lintCommand": "cargo clippy",
+    "devCommand": "cargo run",
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "assets",
+      "docs",
+      "scripts",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "agent-sidecar": {
+      "path": "agent-sidecar",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1794329117120,
+      "keyFiles": [
+        "README.md",
+        "requirements.lock.txt",
+        "requirements.txt"
+      ]
+    },
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117120,
+      "keyFiles": []
+    },
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1794329117121,
+      "keyFiles": [
+        "catalog.bin"
+      ]
+    },
+    "audit-runtime": {
+      "path": "audit-runtime",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1794329117122,
+      "keyFiles": [
+        "index.db"
+      ]
+    },
+    "crates": {
+      "path": "crates",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117122,
+      "keyFiles": []
+    },
+    "dist-installer": {
+      "path": "dist-installer",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1794329117123,
+      "keyFiles": [
+        "BUILD_INFO.txt",
+        "ProtonSearch.exe",
+        "ProtonSearch_2.0.0-alpha.1_x64-setup.exe",
+        "SHA256SUMS.txt"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1794329117125,
+      "keyFiles": []
+    },
+    "icons": {
+      "path": "icons",
+      "purpose": null,
+      "fileCount": 27,
+      "lastAccessed": 1794329117126,
+      "keyFiles": [
+        "agent-history.ico",
+        "AgentChat.ico",
+        "AgentLogo.ico",
+        "AgentLogo.png",
+        "AgentLogo_small.png"
+      ]
+    },
+    "launcher_source_icons": {
+      "path": "launcher_source_icons",
+      "purpose": null,
+      "fileCount": 22,
+      "lastAccessed": 1794329117127,
+      "keyFiles": [
+        "agent-history.png",
+        "all.png",
+        "browser-bookmarks.png",
+        "browser-history.png",
+        "clipboard-history.png"
+      ]
+    },
+    "ocr-tmp": {
+      "path": "ocr-tmp",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1794329117128,
+      "keyFiles": [
+        "img_000_ui_light.png",
+        "manifest.jsonl"
+      ]
+    },
+    "packaging": {
+      "path": "packaging",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117128,
+      "keyFiles": []
+    },
+    "protonsearch": {
+      "path": "protonsearch",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1794329117129,
+      "keyFiles": [
+        "build.rs",
+        "Cargo.lock",
+        "Cargo.toml",
+        "installer.iss",
+        "test_ai_prefixes.db"
+      ]
+    },
+    "ps-migration-fixture-0xkhdylt": {
+      "path": "ps-migration-fixture-0xkhdylt",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117129,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-2hzraxw_": {
+      "path": "ps-migration-fixture-2hzraxw_",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117130,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-2m5gy5aa": {
+      "path": "ps-migration-fixture-2m5gy5aa",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117131,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-37xmg0hw": {
+      "path": "ps-migration-fixture-37xmg0hw",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117131,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-3kh6q3d0": {
+      "path": "ps-migration-fixture-3kh6q3d0",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117132,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-3uav_sgw": {
+      "path": "ps-migration-fixture-3uav_sgw",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117132,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-6myd3jkw": {
+      "path": "ps-migration-fixture-6myd3jkw",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117133,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-a3nf8thn": {
+      "path": "ps-migration-fixture-a3nf8thn",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117133,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-ax_dn9wq": {
+      "path": "ps-migration-fixture-ax_dn9wq",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117133,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-b7hr28c8": {
+      "path": "ps-migration-fixture-b7hr28c8",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117134,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-dhpp25sl": {
+      "path": "ps-migration-fixture-dhpp25sl",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117135,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-eyaa8ywa": {
+      "path": "ps-migration-fixture-eyaa8ywa",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117135,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-fqwcq7fy": {
+      "path": "ps-migration-fixture-fqwcq7fy",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117135,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-f_fx_4ah": {
+      "path": "ps-migration-fixture-f_fx_4ah",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117136,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-hcezp_8g": {
+      "path": "ps-migration-fixture-hcezp_8g",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117136,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-j4f39rn_": {
+      "path": "ps-migration-fixture-j4f39rn_",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117136,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-jgii0kop": {
+      "path": "ps-migration-fixture-jgii0kop",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117137,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-juhk161t": {
+      "path": "ps-migration-fixture-juhk161t",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117138,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-l4_dxwlq": {
+      "path": "ps-migration-fixture-l4_dxwlq",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117139,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-otdkrwxq": {
+      "path": "ps-migration-fixture-otdkrwxq",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117139,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-pqxvg7wn": {
+      "path": "ps-migration-fixture-pqxvg7wn",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117140,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-q9zolgyr": {
+      "path": "ps-migration-fixture-q9zolgyr",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117140,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-rkx7832t": {
+      "path": "ps-migration-fixture-rkx7832t",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117141,
+      "keyFiles": []
+    },
+    "ps-migration-fixture-s7yj4owq": {
+      "path": "ps-migration-fixture-s7yj4owq",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794329117141,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 8,
+      "lastAccessed": 1794329117142,
+      "keyFiles": [
+        "benchmark_embeddings.py",
+        "build-brand-assets.ps1",
+        "build-installer.ps1",
+        "convert_logos.py",
+        "embed_catalog.py"
+      ]
+    },
+    "target": {
+      "path": "target",
+      "purpose": null,
+      "fileCount": 24,
+      "lastAccessed": 1794329117143,
+      "keyFiles": [
+        "CACHEDIR.TAG",
+        "checkpoint_copy.py",
+        "content-after.json",
+        "content-before.json",
+        "dbq.py"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 0,
+      "lastAccessed": 1794329117144,
+      "keyFiles": []
+    },
+    "tmp-setup-test": {
+      "path": "tmp-setup-test",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1794329117145,
+      "keyFiles": [
+        "setup.exe"
+      ]
+    },
+    "tools": {
+      "path": "tools",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1794329117145,
+      "keyFiles": [
+        "capture-app.ps1"
+      ]
+    },
+    "agent-sidecar\\scripts": {
+      "path": "agent-sidecar\\scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1794329117146,
+      "keyFiles": [
+        "measure_import.py",
+        "measure_sidecar.py"
+      ]
+    },
+    "agent-sidecar\\tests": {
+      "path": "agent-sidecar\\tests",
+      "purpose": "Test files",
+      "fileCount": 2,
+      "lastAccessed": 1794329117147,
+      "keyFiles": [
+        "test_protocol.py",
+        "test_scripted_sidecar.py"
+      ]
+    },
+    "protonsearch\\src": {
+      "path": "protonsearch\\src",
+      "purpose": "Source code",
+      "fileCount": 16,
+      "lastAccessed": 1794329117151,
+      "keyFiles": [
+        "ai.rs",
+        "applog.rs",
+        "browser_indexer.rs"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "apps/desktop/src-tauri/src/main.rs",
+      "accessCount": 41.53900912919227,
+      "lastAccessed": 1794330766121,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island/IslandView.tsx",
+      "accessCount": 13.115938880951443,
+      "lastAccessed": 1794333181946,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/island/island.css",
+      "accessCount": 4.615577995888486,
+      "lastAccessed": 1794332758521,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island/NativeCards.tsx",
+      "accessCount": 4.159873686305318,
+      "lastAccessed": 1794333155360,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src/island/IslandCards.tsx",
+      "accessCount": 2.978603074767395,
+      "lastAccessed": 1794294210776,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 5.976344358113125,
+      "lastAccessed": 1794293193805,
+      "type": "directory"
+    },
+    {
+      "path": "apps/desktop/src",
+      "accessCount": 4.985840447141019,
+      "lastAccessed": 1794293121889,
+      "type": "directory"
+    },
+    {
+      "path": "crates/ps-sources/src/notifications.rs",
+      "accessCount": 1.9966594961284732,
+      "lastAccessed": 1794292930971,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/island/island.test.tsx",
+      "accessCount": 5.335182632535018,
+      "lastAccessed": 1794333221694,
+      "type": "directory"
+    },
+    {
+      "path": "crates",
+      "accessCount": 2.73144914948484,
+      "lastAccessed": 1794330264530,
+      "type": "directory"
+    },
+    {
+      "path": "tools/benchmark/island-leak.mjs",
+      "accessCount": 4.998057690981933,
+      "lastAccessed": 1794293095903,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/idle-curve.mjs",
+      "accessCount": 4.998039939934005,
+      "lastAccessed": 1794293097250,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark",
+      "accessCount": 1,
+      "lastAccessed": 1794293102473,
+      "type": "directory"
+    },
+    {
+      "path": "docs/qa/g8-verify-round4/native-driver.ps1",
+      "accessCount": 18.9323925020904,
+      "lastAccessed": 1794293853131,
+      "type": "file"
+    },
+    {
+      "path": "docs/qa/g8-verify-round4/seed-notifications.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1794293121046,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src/launcher",
+      "accessCount": 1,
+      "lastAccessed": 1794293140286,
+      "type": "directory"
+    },
+    {
+      "path": "tools/benchmark/island-probe.ps1",
+      "accessCount": 4.995105908815589,
+      "lastAccessed": 1794293858790,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/island-switch.mjs",
+      "accessCount": 11.97910186216348,
+      "lastAccessed": 1794293872288,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/README.md",
+      "accessCount": 1.9998836478955093,
+      "lastAccessed": 1794293356482,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/island-perf.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1794293354714,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/after-summon.png",
+      "accessCount": 1,
+      "lastAccessed": 1794293610244,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/after1-summon.png",
+      "accessCount": 1,
+      "lastAccessed": 1794293720279,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/baseline-custom-summon.png",
+      "accessCount": 1,
+      "lastAccessed": 1794293891328,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/typed.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294027557,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/ctrldown.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294027917,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/after-click-type.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294079165,
+      "type": "file"
+    },
+    {
+      "path": "tools/benchmark/island-typing.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1794294124135,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/launcher-typed.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294198631,
+      "type": "file"
+    },
+    {
+      "path": ".bench/diag/island-after-click-type.png",
+      "accessCount": 1,
+      "lastAccessed": 1794294282667,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src-tauri/src",
+      "accessCount": 1,
+      "lastAccessed": 1794329130711,
+      "type": "directory"
+    },
+    {
+      "path": ".recovery-shots/e1-after.png",
+      "accessCount": 1,
+      "lastAccessed": 1794329445659,
+      "type": "file"
+    },
+    {
+      "path": ".recovery-shots/stuck-shell-launch.png",
+      "accessCount": 1,
+      "lastAccessed": 1794329701247,
+      "type": "file"
+    },
+    {
+      "path": ".recovery-shots/altspace-medium.png",
+      "accessCount": 1,
+      "lastAccessed": 1794330382629,
+      "type": "file"
+    },
+    {
+      "path": "scripts/run-release.ps1",
+      "accessCount": 1.9958902913299081,
+      "lastAccessed": 1794331275788,
+      "type": "file"
+    },
+    {
+      "path": "apps/desktop/src-tauri/Cargo.toml",
+      "accessCount": 1,
+      "lastAccessed": 1794330766952,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/src/imp/winrt.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794333369179,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/src/imp/media.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794333369951,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/src/imp/notifications.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794333370825,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/src/lib.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794333395693,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/src/imp/mod.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794333396568,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/Cargo.toml",
+      "accessCount": 1,
+      "lastAccessed": 1794333397576,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/src/imp/capabilities.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794333398537,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/src/imp/toast.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794333399502,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-windows/examples/native_probe.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794333430349,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-index/src/matching.rs",
+      "accessCount": 2.9876827038383276,
+      "lastAccessed": 1794395807798,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-index/tests/index_tests.rs",
+      "accessCount": 2.9999700922343364,
+      "lastAccessed": 1794395154928,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-core/src/appmatch.rs",
+      "accessCount": 3.9441814589940645,
+      "lastAccessed": 1794397696061,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-core/src/db.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794395806297,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-sources/src/apps.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794396408018,
+      "type": "file"
+    },
+    {
+      "path": "crates/ps-core/src/engine.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794397697641,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

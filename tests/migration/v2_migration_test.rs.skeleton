@@ -1,0 +1,33 @@
+// NOT COMPILED - skeleton for the v2 migration integration test.
+// Status: BLOCKED until ps-core exposes the migration API documented in README.md.
+//
+// Intended location once the API lands: crates/ps-core/tests/legacy_migration.rs
+// (owned by engine-core; rel-recon only owns tests/migration/**).
+//
+// Required API (proposed):
+//   ps_core::migration::{migrate_legacy_db, MigrationOptions, MigrationReport}
+//   - opens the legacy DB read-only and WAL-aware
+//   - never writes to the legacy path
+//   - imports the tables listed in tests/migration/README.md
+//   - refuses to import ai_settings key material by default
+//
+// Test outline:
+//
+// use std::path::PathBuf;
+//
+// #[test]
+// fn migration_imports_fixture_without_mutating_source() {
+//     // 1. Generate the synthetic fixture with tests/migration/make_legacy_fixture.py
+//     //    into a temp dir (PROTONSEARCH_DATA_DIR also points at the temp dir).
+//     // 2. sha256(legacy_db) before.
+//     // 3. let report = ps_core::migration::migrate_legacy_db(&legacy, &v2_db, &opts)?;
+//     // 4. assert!(report.source_unchanged);
+//     // 5. assert_eq!(sha256(legacy_db) after, before);
+//     // 6. assert_eq!(report.files, 12); assert_eq!(report.browser_items, 4);
+//     //    assert_eq!(report.quicklinks, 2); assert_eq!(report.snippets, 1);
+//     //    assert_eq!(report.memory_events, 5);
+//     // 7. assert ai_settings api_key was NOT imported (report must expose skipped keys).
+//     // 8. assert v2 DB contains no copy of legacy secrets/temp files.
+//     // 9. Run twice: second run must be idempotent or fail with a clear "already migrated" error.
+//     let _legacy: PathBuf = todo!("blocked on ps_core migration API");
+// }

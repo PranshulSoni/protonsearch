@@ -1,0 +1,72 @@
+﻿{
+    "dataset":  {
+                    "dataDir":  ".devdata-perf51/v2 (copy of .devdata-live/v2)",
+                    "contentDocuments":  16848,
+                    "ocrDocuments":  373,
+                    "filenameEntries":  139386
+                },
+    "profile":  "debug (app debug build profile); release row included",
+    "maxP95":  {
+                   "afterDebug":  8.82,
+                   "afterRelease":  6.71,
+                   "beforeDebug":  112.12
+               },
+    "slowShapes":  [
+                       {
+                           "query":  "readme",
+                           "afterDebugP50":  0.3,
+                           "afterDebugP95":  0.33,
+                           "beforeP95":  45.99,
+                           "beforeP50":  29.37
+                       },
+                       {
+                           "query":  "index",
+                           "afterDebugP50":  0.46,
+                           "afterDebugP95":  0.5,
+                           "beforeP95":  65.95,
+                           "beforeP50":  40.4
+                       },
+                       {
+                           "query":  "screenshot",
+                           "afterDebugP50":  0.42,
+                           "afterDebugP95":  0.47,
+                           "beforeP95":  112.12,
+                           "beforeP50":  62.89
+                       }
+                   ],
+    "commands":  [
+                     "cargo run -p ps-core --example search_perf_probe -- .devdata-perf51/v2 20 target/search-perf-before-debug.json",
+                     "cargo run -p ps-core --example search_perf_probe -- .devdata-perf51/v2 20 target/search-perf-after-debug.json",
+                     "cargo run --release -p ps-core --example search_perf_probe -- .devdata-perf51/v2 20 target/search-perf-after-release.json",
+                     "cargo run --release -p ps-bench -- filename --dataset .bench/dataset-100k.jsonl --index-bin .bench/index-100k.bin --queries .bench/queries.jsonl --iters 10 --limit 50 --out target/filename-100k-after.json",
+                     "cargo run --release -p ps-bench -- filename --dataset .bench/dataset-1m.jsonl --index-bin .bench/index-1m.bin --queries .bench/queries.jsonl --iters 10 --limit 50 --out target/filename-1m-after.json"
+                 ],
+    "caveat":  "Engine-only timings. App input-\u003efirst-visible also includes IPC serialization and UI render; perf-bench should re-run the debug app scenario for the end-to-end number.",
+    "schema":  "protonsearch-v2/search-perf/1",
+    "fixes":  [
+                  "ps-index scores (0..1) scaled to the coordinator 0..1000 scale; exact/prefix filename results are tier 0 again (previously every filename row was tier 1 and content synthetic 500 outranked them)",
+                  "exact tier-budget early exit: skip content/sources/OCR tiers once the page limit is already filled by strictly better results (output-identical by construction)",
+                  "content tier limit reduced to remaining page slots (4..12)",
+                  "browser matcher no longer lowercases and formats a haystack per row (thousands of allocations per query)",
+                  "WAL auto-checkpoint disabled; explicit PASSIVE checkpoints from the background indexer, and activity retention pruning amortized to 1/64 writes"
+              ],
+    "filenameRegression":  {
+                               "1m":  {
+                                          "verdict":  "no regression",
+                                          "p50":  2.231,
+                                          "baselineV10":  9.31,
+                                          "p95":  6.993,
+                                          "p99":  7.263,
+                                          "target":  "p95 \u003c= 15ms"
+                                      },
+                               "100k":  {
+                                            "verdict":  "no regression",
+                                            "p50":  0.481,
+                                            "baselineV10":  1.153,
+                                            "p95":  1.111,
+                                            "p99":  1.71,
+                                            "target":  "p95 \u003c= 5ms"
+                                        }
+                           },
+    "generatedAtUtc":  "20261109T2136Z"
+}
