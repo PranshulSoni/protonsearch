@@ -28,13 +28,13 @@ import {
   rootDisplayName,
   samePath,
   setRootMode,
-  unusedSuggestions,
   validateExcludedPath,
   validateRootPath,
 } from "../roots";
 import { SECTION_EYEBROWS } from "../sections";
 import { sourceIconName } from "../sourceIcons";
 import { OcrEngineSelector } from "../OcrEngineSelector";
+import "./IndexesView.css";
 import {
   Callout,
   Dot,
@@ -51,11 +51,16 @@ import {
 
 type RebuildCommand = Extract<IndexCommand, "rebuild" | "rebuild_content" | "rebuild_ocr">;
 
-const DEPTH_OPTIONS: { value: RootMode; label: string }[] = [
+// Two indexing modes. A location saved as "content" (documents only, from the older
+// three-way choice) is shown as OCR until it is chosen again; see the note in the row.
+const MODE_OPTIONS: { value: RootMode; label: string }[] = [
   { value: "names_only", label: "File names" },
-  { value: "content", label: "Inside files" },
-  { value: "content_and_ocr", label: "Inside files & images (OCR)" },
+  { value: "content_and_ocr", label: "OCR" },
 ];
+
+function modeOf(mode: RootMode): RootMode {
+  return mode === "names_only" ? "names_only" : "content_and_ocr";
+}
 
 const REBUILD: Record<RebuildCommand, { label: string; confirm: string }> = {
   rebuild: {
@@ -64,14 +69,14 @@ const REBUILD: Record<RebuildCommand, { label: string; confirm: string }> = {
       "Rebuild the index? Search stays available while filenames are re-scanned. This can take a few minutes and uses more CPU.",
   },
   rebuild_content: {
-    label: "Rebuild content…",
+    label: "Rebuild document OCR…",
     confirm:
-      "Rebuild the content index? Extracted document text is read again in the background and search stays available.",
+      "Rebuild document OCR? Document text is read again in the background and search stays available.",
   },
   rebuild_ocr: {
-    label: "Rebuild OCR…",
+    label: "Rebuild image OCR…",
     confirm:
-      "Rebuild the OCR index? Screenshots and images are read again in the background; this uses the most CPU.",
+      "Rebuild image OCR? Screenshots and images are read again in the background. This uses the most CPU.",
   },
 };
 
@@ -85,7 +90,7 @@ function rootTone(root: RootStatus): "ok" | "busy" | "warn" | "error" {
 }
 
 export default function IndexesView({ focusSource }: { focusSource?: string | null }) {
-  const { settings, status, onboarding, updateSettings, indexCommand, refreshStatus } = useApp();
+  const { settings, status, updateSettings, indexCommand, refreshStatus } = useApp();
   const { savedKey, markSaved } = useSavedStamp();
   const [actionError, setActionError] = useState<{
     title: string;
@@ -113,7 +118,6 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
   const unavailableRoots = (status?.roots ?? []).filter(
     (root) => root.enabled && !HEALTHY_ROOT_STATES.has(root.state),
   );
-  const suggestions = unusedSuggestions(onboarding?.suggestedRoots ?? [], roots);
 
   useEffect(() => {
     if (!focusSource) return;
@@ -159,10 +163,6 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       setRootError(null);
       setAdding(false);
     })();
-  };
-
-  const addSuggested = (path: string, mode: RootMode) => {
-    void patchIndexing({ roots: [...roots, { path, mode, enabled: true }] });
   };
 
   const rememberTrigger = () => {
@@ -292,10 +292,6 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       <p className="page-lead">
         Choose what ProtonSearch can find, without blocking the fast filename index.
       </p>
-      <Callout tone="note">
-        Names-only search keeps working even when content and OCR are off.
-      </Callout>
-
       {actionError ? (
         <StateNotice
           role="alert"
@@ -309,7 +305,7 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       <Panel
         id="indexes-locations"
         title="Locations"
-        hint="Filename search works everywhere. Content and OCR run in bounded background jobs and never block the launcher."
+        hint="File names: names and paths only. OCR: documents and images too."
         actions={<SavedStamp show={savedKey === "locations"} />}
       >
         {roots.length === 0 ? (
@@ -346,12 +342,15 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                       "Waiting for the engine to report this location"
                     )}
                   </div>
+                  {root.mode === "content" ? (
+                    <p className="config-desc">Reads documents only. Select OCR to include images.</p>
+                  ) : null}
                 </div>
                 <div className="config-actions">
                   <SegmentedControl
-                    label={"Index depth for " + root.path}
-                    value={root.mode}
-                    options={DEPTH_OPTIONS}
+                    label={"Mode for " + root.path}
+                    value={modeOf(root.mode)}
+                    options={MODE_OPTIONS}
                     onChange={(mode) => changeMode(root.path, mode)}
                   />
                   <button
@@ -448,16 +447,6 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
             <button type="button" className="btn" onClick={() => setAdding(true)}>
               Add location…
             </button>
-            {suggestions.map((suggestion) => (
-              <button
-                key={suggestion.path}
-                type="button"
-                className="linkbtn"
-                onClick={() => addSuggested(suggestion.path, suggestion.defaultMode)}
-              >
-                Add {suggestion.label}
-              </button>
-            ))}
           </div>
         )}
         {rootError ? (
@@ -474,64 +463,57 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       <Panel
         id="indexes-capabilities"
         title="Search depth"
-        hint="The launcher never waits for extraction. These jobs run in bounded background work and can be paused."
+        hint="Applies to locations set to OCR."
         actions={<SavedStamp show={savedKey === "capabilities"} />}
       >
         <div className="config-list">
           <div className="config-row">
             <div className="config-main">
-              <div className="config-title">Document and code content</div>
+              <div className="config-title">Document OCR</div>
               <p className="config-desc">
-                Extracts text from PDF, Office documents, Markdown and source code in the
-                background. Adds CPU and disk reads while it runs.
+                Read text inside PDFs, Office documents, Markdown and source code.
               </p>
             </div>
             <Switch
               checked={settings.indexing.contentEnabled}
-              label="Document and code content indexing"
+              label="Document OCR"
               onChange={setContentEnabled}
             />
           </div>
           <div className="config-row">
             <div className="config-main">
-              <div className="config-title">Screenshot OCR</div>
-              <p className="config-desc">
-                Reads text from images and screenshots on this PC, then searches the stored text.
-                The heaviest mode; OCR never runs during a search.
-              </p>
+              <div className="config-title">Image OCR</div>
+              <p className="config-desc">Read text in screenshots and photos.</p>
             </div>
             <Switch
               checked={settings.indexing.ocrEnabled}
-              label="Screenshot OCR indexing"
+              label="Image OCR"
               onChange={setOcrEnabled}
             />
           </div>
-          {settings.indexing.ocrEnabled && (
-            <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--ps-border-subtle, rgba(255,255,255,0.08))" }}>
-              <div style={{ marginBottom: "0.5rem", fontSize: "0.85rem", fontWeight: 500, color: "var(--ps-text-dim)" }}>OCR Engine &amp; Models</div>
-              <OcrEngineSelector
-                value={settings.ocrEngine}
-                onChange={(ocrEngine) => void updateSettings({ ocrEngine })}
-              />
-            </div>
-          )}
         </div>
         {!settings.indexing.contentEnabled ? (
           <Callout tone="warn" role="status">
-            Content extraction is off, so locations set to content are indexed by filename only.
+            Document OCR is off. Documents in OCR locations are indexed by filename only.
           </Callout>
         ) : null}
         {!settings.indexing.ocrEnabled ? (
           <Callout tone="warn" role="status">
-            OCR is off, so images and screenshots are indexed by filename only.
+            Image OCR is off. Images in OCR locations are indexed by filename only.
           </Callout>
         ) : null}
+        <div className="indexes-engines">
+          <OcrEngineSelector
+            value={settings.ocrEngine}
+            onChange={(ocrEngine) => updateSettings({ ocrEngine })}
+          />
+        </div>
       </Panel>
 
       <Panel
         id="indexes-status"
         title="Index status"
-        hint="Status comes directly from the local engine. No estimated percentages are shown."
+        hint="Reported by the local engine. No estimates are shown."
         actions={<SavedStamp show={savedKey === "status"} />}
       >
         {status ? (
@@ -546,15 +528,15 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                 Refresh
               </button>
             </div>
-            <p className="muted">
-              {status.state === "error"
-                ? "New files aren't being added. Existing search still works."
-                : status.state === "paused"
-                  ? "Existing results stay searchable, but new files are not being picked up."
-                  : status.state === "starting"
-                    ? "The local engine is warming up."
-                    : "Everything you enabled is searchable on this device."}
-            </p>
+            {status.state === "error" ? (
+              <p className="muted">New files aren&apos;t being added. Existing search still works.</p>
+            ) : status.state === "paused" ? (
+              <p className="muted">
+                Existing results stay searchable, but new files are not being picked up.
+              </p>
+            ) : status.state === "starting" ? (
+              <p className="muted">The local engine is warming up.</p>
+            ) : null}
             <dl className="metric-list">
               <div className="metric-row">
                 <dt>Files</dt>
@@ -574,13 +556,11 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
               </div>
             </dl>
             {warningSummary ? (
-              <details className="skipped-items-disclosure" style={{ marginTop: "1rem", padding: "0.75rem 1rem", background: "var(--ps-surface-subtle, rgba(255,255,255,0.03))", borderRadius: "8px", border: "1px solid var(--ps-border-subtle, rgba(255,255,255,0.06))" }}>
-                <summary style={{ cursor: "pointer", fontWeight: 500, fontSize: "0.85rem", color: "var(--ps-text-muted)" }}>
-                  Review skipped items ({status.warnings.length})
-                </summary>
-                <div style={{ marginTop: "0.5rem", fontSize: "0.825rem", color: "var(--ps-text-dim)", lineHeight: 1.5 }}>
+              <details className="indexes-disclosure">
+                <summary>Review skipped items ({status.warnings.length})</summary>
+                <div className="indexes-disclosure-body">
                   <p>{warningSummary.body}</p>
-                  {warningSummary.details && <p style={{ marginTop: "0.25rem", opacity: 0.85 }}>{warningSummary.details}</p>}
+                  {warningSummary.details && <p>{warningSummary.details}</p>}
                 </div>
               </details>
             ) : null}
@@ -744,7 +724,7 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       <Panel
         id="indexes-sources"
         title="Sources"
-        hint="Every source is read locally from this PC. Privacy switches apply immediately."
+        hint="Turn each source on or off. Changes apply immediately."
         actions={<SavedStamp show={savedKey === "sources"} />}
       >
         {sources.length === 0 ? (
@@ -774,7 +754,7 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
                       <Dot tone={info.tone} />
                     </div>
                     <div className="config-sub">{sourceStatusText(source, info.enabled)}</div>
-                    <p className="config-desc">{info.description}</p>
+                    {info.privacyKey ? null : <p className="config-desc">{info.description}</p>}
                     {source.state === "error" ? (
                       <p className="row-state">
                         <Icon name="alert" size={16} />
@@ -829,7 +809,6 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
       <Panel
         id="indexes-storage"
         title="Storage & diagnostics"
-        hint="Counts and states are reported by the local engine; no estimates are added."
       >
         <dl className="metric-list">
           <div className="metric-row">
@@ -853,9 +832,6 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
             <dd>{relativeTime(status?.lastUpdated)}</dd>
           </div>
         </dl>
-        <p className="field-help">
-          Index data is stored under %APPDATA%\protonsearch\v2 and never leaves this PC.
-        </p>
       </Panel>
     </div>
   );

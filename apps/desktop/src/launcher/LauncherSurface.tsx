@@ -1308,7 +1308,7 @@ const LauncherSurface = forwardRef<LauncherSurfaceHandle, LauncherSurfaceProps>(
         data-testid="launcher"
       >
         <div className="searchline">
-          <Logo size={29} />
+          <Logo size={36} />
           <input
             ref={inputRef}
             className="search-input"

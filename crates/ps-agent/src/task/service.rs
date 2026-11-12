@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use ps_ipc::{AgentEvent, AgentRunRequest};
 
+use crate::cli::CliAgent;
 use crate::error::AgentError;
 use crate::pi::PiInfo;
 
@@ -84,6 +85,18 @@ impl AgentTaskService {
         )
     }
 
+    /// Convenience for the CLI runtimes (Claude Code, Codex, OpenCode, Gemini).
+    pub fn begin_cli(
+        &self,
+        request: &AgentRunRequest,
+        agent: CliAgent,
+        version: &str,
+        model: Option<String>,
+        parent_id: Option<String>,
+    ) -> Result<AgentTask, AgentError> {
+        self.begin(request, &AgentTaskLaunch::for_cli(agent, version, model, parent_id))
+    }
+
     /// Convenience for the optional Pydantic fallback runtime.
     pub fn begin_pydantic(
         &self,
@@ -125,6 +138,20 @@ impl AgentTaskService {
     /// Mark the task cancelled before/after asking the runtime to kill the
     /// process. Returns the snapshot to display (and whose run id identifies the
     /// process to kill); None if the task already finished.
+    /// Remove a task and its follow-ups from the history.
+    pub fn delete(&self, task_id: &str) -> usize {
+        self.store.delete(task_id)
+    }
+
+    /// Rename a task's title. None for an unknown id or a blank title.
+    pub fn rename(&self, task_id: &str, title: &str) -> Option<AgentTask> {
+        let task = self.store.rename(task_id, title);
+        if let Some(task) = &task {
+            self.notify(task);
+        }
+        task
+    }
+
     pub fn cancel(&self, task_id: &str, reason: &str) -> Option<AgentTask> {
         let task = self.store.cancel(task_id, reason);
         if let Some(task) = &task {

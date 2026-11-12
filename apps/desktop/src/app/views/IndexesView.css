@@ -1,0 +1,34 @@
+/* Search & Indexing page. Panels, rows, switches and callouts come from ui.css and
+   desktop.css; only the parts unique to this page live here. */
+
+.indexes-engines {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: var(--ps-border) solid var(--ps-line-soft);
+}
+
+.indexes-disclosure {
+  margin-top: var(--space-3);
+}
+
+.indexes-disclosure summary {
+  cursor: pointer;
+  color: var(--ps-ink);
+  font-size: var(--ps-text-small);
+  font-weight: var(--ps-fw-semibold);
+}
+
+.indexes-disclosure-body {
+  margin-top: var(--space-2);
+  color: var(--ps-ink-2);
+  font-size: var(--ps-text-meta);
+  line-height: 1.55;
+}
+
+.indexes-disclosure-body p {
+  margin: 0;
+}
+
+.indexes-disclosure-body p + p {
+  margin-top: var(--space-1);
+}

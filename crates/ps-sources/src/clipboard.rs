@@ -54,7 +54,7 @@ const ALLOWED_IMAGE_MIMES: &[&str] = &["image/png", "image/jpeg"];
 const CLASSIFY_SAMPLE_BYTES: usize = 16 * 1024;
 const MAX_BACKFILL_ROWS: usize = 10_000;
 /// Retention: unpinned history is pruned to this many rows.
-pub const MAX_HISTORY_ITEMS: u64 = 1000;
+pub const MAX_HISTORY_ITEMS: u64 = 250;
 /// Retention: unpinned image files are pruned beyond this cache size.
 pub const MAX_IMAGE_CACHE_BYTES: u64 = 256 * 1024 * 1024;
 
@@ -483,6 +483,21 @@ pub fn delete(db_path: &Path, id: i64) -> Result<bool> {
         remove_owned_files(files);
     }
     Ok(changed > 0)
+}
+
+/// Drop every unpinned item and its image files (called once at app start).
+pub fn clear_unpinned(db_path: &Path) -> Result<usize> {
+    let conn = open_or_create(db_path)?;
+    let files: Vec<(Option<String>, Option<String>)> = {
+        let mut statement = conn.prepare("SELECT image_path, thumbnail_path FROM clipboard_history WHERE pinned = 0")?;
+        let rows = statement.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        rows.flatten().collect()
+    };
+    let removed = conn.execute("DELETE FROM clipboard_history WHERE pinned = 0", [])?;
+    for pair in files {
+        remove_owned_files(Some(pair));
+    }
+    Ok(removed)
 }
 
 /// Best-effort import of the legacy v1 clipboard_history table (read-only).

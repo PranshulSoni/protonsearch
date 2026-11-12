@@ -100,6 +100,11 @@ export interface ResultMeta {
   imageWidth?: number | null;
   imageHeight?: number | null;
   mime?: string | null;
+  /** Clipboard rows: pinned items are listed first. */
+  pinned?: boolean;
+  branches?: string[];
+  /** Browser rows: the site's favicon from the local browser profile. */
+  faviconDataUrl?: string | null;
 }
 
 export interface SearchResult {
@@ -201,6 +206,7 @@ export interface EngineStatus {
   protocol: number;
   version: string;
   state: IndexerState;
+  reindexing?: boolean;
   filenameEntries: number;
   contentDocuments: number;
   ocrDocuments: number;
@@ -252,7 +258,7 @@ export interface PrivacySettings {
   telemetry: boolean;
 }
 
-export type AgentRuntime = "pi" | "pydantic";
+export type AgentRuntime = "pi" | "pydantic" | "claude" | "codex" | "opencode" | "gemini";
 
 export interface AgentSettings {
   enabled: boolean;
@@ -263,6 +269,8 @@ export interface AgentSettings {
   thinking?: string | null;
   provider?: string | null;
   model?: string | null;
+  /** Default model per CLI runtime (claude, codex, opencode, gemini). Pi uses `model`. */
+  cliModels?: Record<string, string>;
   sidecarPath?: string | null;
 }
 
@@ -316,6 +324,8 @@ export interface IslandSettings {
   cards: IslandCardConfig[];
   defaultCard: IslandCardId;
   showDots: boolean;
+  liquidGlass?: boolean;
+  liquidGlassLevel?: number;
   hideOnFocusLoss: boolean;
   skipDisabled: boolean;
   returnToSearch: boolean;
@@ -575,7 +585,7 @@ export interface OpenOutcome {
   message: string;
 }
 
-export type AgentTaskRuntime = "pi" | "pydantic" | "unknown";
+export type AgentTaskRuntime = "pi" | "pydantic" | "claude" | "codex" | "opencode" | "gemini" | "unknown";
 export type AgentTaskState =
   | "queued"
   | "running"
@@ -641,6 +651,7 @@ export interface AgentTask {
   writeAccess: boolean;
   controls: AgentTaskControls;
   restarts: AgentTaskRestart[];
+  answer?: string | null;
   model: string | null;
 }
 
@@ -676,6 +687,12 @@ export interface AgentRunRequest {
   contextPaths?: string[];
   model?: string | null;
   maxSteps?: number | null;
+}
+
+/** A model from `pi --list-models`. A run sends it as `provider/id`. */
+export interface AgentModel {
+  provider: string;
+  id: string;
 }
 
 export interface AgentApprovalResponse {

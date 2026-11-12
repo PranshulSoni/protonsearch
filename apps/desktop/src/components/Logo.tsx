@@ -46,11 +46,12 @@ export function AppTileLogo({ size = 32, className }: { size?: number; className
   return <Logo size={size} className={className} variant="tile" />;
 }
 
-export function Wordmark({ size = 29 }: { size?: number }) {
+/** The P logo is the first letter of "Proton Search", so the text starts at "roton". */
+export function Wordmark({ size = 22 }: { size?: number }) {
   return (
-    <span className="brand">
-      <Logo size={size} />
-      <span>ProtonSearch</span>
+    <span className="wordmark" role="img" aria-label="ProtonSearch">
+      <Logo size={size} className="wordmark-logo" />
+      <span className="brand-name">roton Search</span>
     </span>
   );
 }

@@ -28,6 +28,8 @@ pub const MAX_SUMMARY_CHARS: usize = 200;
 pub const MAX_LOG_CHARS: usize = 300;
 /// Stored error message length.
 pub const MAX_ERROR_CHARS: usize = 400;
+/// Final answers shown in the island chat (memory only, never persisted).
+pub const MAX_ANSWER_CHARS: usize = 16_000;
 
 /// Launch parameters for a new task, independent of the runtime client. The DTO
 /// itself (AgentTask) is in ps-ipc; this is host-side launch policy and stays in
@@ -54,6 +56,16 @@ impl AgentTaskLaunch {
             runtime_version: Some(info.version.clone()),
             model,
             allow_writes,
+            parent_id,
+        }
+    }
+
+    pub fn for_cli(agent: crate::cli::CliAgent, version: &str, model: Option<String>, parent_id: Option<String>) -> Self {
+        Self {
+            runtime: agent.task_runtime(),
+            runtime_version: Some(version.to_string()),
+            model,
+            allow_writes: false,
             parent_id,
         }
     }
@@ -160,6 +172,7 @@ mod tests {
             controls: AgentTaskControls::for_state(AgentTaskState::Running),
             restarts: Vec::new(),
             model: Some("fake-model".into()),
+            answer: None,
         }
     }
 

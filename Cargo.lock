@@ -4151,6 +4151,7 @@ version = "2.0.0-alpha.1"
 dependencies = [
  "anyhow",
  "ps-ipc",
+ "rusqlite",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

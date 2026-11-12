@@ -1,1 +1,1 @@
-Rendered from assets/brand/protonsearch-mark.svg by tools/brand/render-brand-assets.mjs
+Rendered from assets/brand/protonsearch-tile.webp by tools/visual-qa/brand-raster.mjs, then npx tauri icon src-tauri/icons/source-icon.png

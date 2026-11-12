@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 import { StateNotice } from "./ui";
 import {
   DEFAULT_HOTKEY,
-  HOTKEY_CONFLICT_NOTE,
   chordFromKeyboardEvent,
   displayHotkey,
   hotkeyCapTokens,
@@ -38,9 +37,6 @@ export function HotkeyCapture({ value, onCommit, help, disabled }: HotkeyCapture
 
   const caps = hotkeyCapTokens(value);
   const currentDisplay = displayHotkey(value);
-  const helpText =
-    help ??
-    "Use at least one of Ctrl, Alt, Shift, or Win. The change applies immediately; Windows rejects a shortcut another app already owns.";
 
   useEffect(() => {
     if (!status) return;
@@ -162,11 +158,11 @@ export function HotkeyCapture({ value, onCommit, help, disabled }: HotkeyCapture
           Reset to Alt+Space
         </button>
       </div>
-      <p className="field-help" id="hotkey-capture-help">
-        {capturing
-          ? "Press the shortcut now. Escape cancels; Tab moves focus without cancelling capture."
-          : helpText}
-      </p>
+      {capturing || help ? (
+        <p className="field-help" id="hotkey-capture-help">
+          {capturing ? "Press the new shortcut. Esc cancels." : help}
+        </p>
+      ) : null}
       <span className="sr-only" role="status" aria-live="polite">
         {liveMessage}
       </span>
@@ -176,30 +172,14 @@ export function HotkeyCapture({ value, onCommit, help, disabled }: HotkeyCapture
         </p>
       ) : null}
       {error ? (
-        <StateNotice
-          className="state-inline"
-          role="alert"
-          title={
-            /reserved by Windows/i.test(error)
-              ? "That shortcut isn't available."
-              : "That shortcut isn't valid."
-          }
-          body={
-            /reserved by Windows/i.test(error)
-              ? "Another app is already using it. Choose a different combination."
-              : "Use at least one of Ctrl, Alt, Shift, or Win."
-          }
-        />
+        <StateNotice className="state-inline" role="alert" title="That shortcut isn't valid." body={error} />
       ) : null}
       {commitFailed ? (
         <StateNotice
           className="state-inline"
           title="That shortcut isn't available."
-          body="Another app is already using it. Choose a different combination."
+          body="Another app may already be using it."
         />
-      ) : null}
-      {!capturing && !error && !commitFailed ? (
-        <p className="field-help">{HOTKEY_CONFLICT_NOTE}</p>
       ) : null}
     </div>
   );

@@ -241,16 +241,15 @@ impl PiAgentClient {
         std::fs::write(&system_prompt_path, pi_safety_preamble(config.allow_writes))
             .map_err(AgentError::Io)?;
 
-        let model = request
-            .model
-            .clone()
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty())
-            .or_else(|| config.model.clone());
+        let per_run = request.model.as_deref().map(str::trim).filter(|value| !value.is_empty());
+        let model = per_run.map(str::to_string).or_else(|| config.model.clone());
+        // "provider/id" names its own provider (the Agents card sends that form), so
+        // the settings provider is not paired with it.
+        let provider = if per_run.is_some_and(|value| value.contains('/')) { None } else { config.provider.as_deref() };
         let args = build_pi_run_args(&PiRunArgsSpec {
             allow_writes: config.allow_writes,
             model: model.as_deref(),
-            provider: config.provider.as_deref(),
+            provider,
             thinking: config.thinking.as_deref(),
             system_prompt_file: Some(&system_prompt_path),
         })?;

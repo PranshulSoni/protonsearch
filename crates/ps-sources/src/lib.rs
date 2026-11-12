@@ -136,6 +136,9 @@ pub enum GitEntry {
         path: String,
         name: String,
         branch: Option<String>,
+        /// Every local branch, most recently committed first (Git card branch picker).
+        #[serde(default)]
+        branches: Vec<String>,
     },
     Commit {
         repo: String,
@@ -175,6 +178,8 @@ pub struct Sources {
     pub recent: Vec<RecentEntry>,
     pub clipboard: Vec<ClipboardEntry>,
     pub browser: Vec<BrowserEntry>,
+    /// Host -> favicon as an image data URL, for the hosts browsed most recently.
+    pub favicons: std::collections::HashMap<String, String>,
     pub git: Vec<GitEntry>,
     pub workflows: Vec<WorkflowEntry>,
 }
@@ -189,7 +194,7 @@ impl Sources {
     /// Testable variant with explicit v2 database and icon-cache paths.
     pub fn load_with_paths(
         settings: &ps_ipc::Settings,
-        legacy_db: Option<&Path>,
+        _legacy_db: Option<&Path>,
         v2_db: &Path,
         icon_cache: &Path,
     ) -> (Self, Vec<String>) {
@@ -207,14 +212,12 @@ impl Sources {
         warnings.append(&mut recent_warnings);
 
         if settings.privacy.clipboard_history {
-            if let Some(legacy) = legacy_db {
-                let _ = clipboard::import_legacy_clipboard(v2_db, legacy);
-            }
-            // Windows exposes no readable clipboard-history store, so seed the
+            // History is per session (cleared at every start), so the v1 history
+            // is no longer imported. Windows exposes no readable clipboard-history store, so seed the
             // current clipboard once; the live listener (started by the engine)
             // appends every subsequent change.
             let _ = clipboard::capture_current(v2_db, &default_clipboard_images_dir());
-            sources.clipboard = clipboard::list_recent(v2_db, 200);
+            sources.clipboard = clipboard::list_recent(v2_db, clipboard::MAX_HISTORY_ITEMS as usize);
         }
 
         if settings.privacy.browser_history {

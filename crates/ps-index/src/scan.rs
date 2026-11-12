@@ -285,6 +285,12 @@ pub fn scan(options: ScanOptions<'_>) -> (FilenameIndex, ScanStats) {
     let mut builder = IndexBuilder::new();
     let mut errors = 0usize;
     let mut cancelled = false;
+    // Measured with `ps-bench walk` on a 186k-directory NTFS tree: 6 threads ran ~35%
+    // faster than the global 20-thread pool. A private pool also keeps scans off the query pool.
+    let walk_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(6)
+        .build()
+        .expect("ps-index walk pool");
 
     for root in options.roots {
         let root_str = normalize_root(root);
@@ -307,8 +313,8 @@ pub fn scan(options: ScanOptions<'_>) -> (FilenameIndex, ScanStats) {
                 cancelled = true;
                 break;
             }
-            let results: Vec<Result<DirRead, ()>> =
-                frontier.par_iter().map(|dir| read_one_dir(dir, &excl)).collect();
+            let results: Vec<Result<DirRead, ()>> = walk_pool
+                .install(|| frontier.par_iter().map(|dir| read_one_dir(dir, &excl)).collect());
             let mut next: Vec<String> = Vec::new();
             for result in results {
                 let dr = match result {

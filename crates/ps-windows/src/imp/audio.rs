@@ -7,8 +7,8 @@ use anyhow::{bail, Context};
 use windows::core::{Interface, GUID, PROPVARIANT, PWSTR};
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
 use windows::Win32::Media::Audio::{
-    eConsole, eMultimedia, eRender, ERole, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
-    DEVICE_STATE_ACTIVE,
+    eCommunications, eConsole, eMultimedia, eRender, ERole, IMMDevice, IMMDeviceCollection,
+    IMMDeviceEnumerator, DEVICE_STATE_ACTIVE,
 };
 use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PropVariantToStringAlloc};
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ};
@@ -186,14 +186,19 @@ pub fn set_default_output(device_id: &str) -> anyhow::Result<()> {
         let vtable = *(policy as *mut *const usize);
         let set_default: SetDefaultEndpointFn = std::mem::transmute(*vtable.add(13));
         let wide: Vec<u16> = device_id.encode_utf16().chain(std::iter::once(0)).collect();
-        for role in [eConsole, eMultimedia] {
+        // Every role is attempted so one that Windows refuses cannot leave the others
+        // behind; the first refusal is reported once all three have been tried.
+        let mut failure = None;
+        for role in [eConsole, eMultimedia, eCommunications] {
             let hr = set_default(policy, wide.as_ptr(), role);
-            if hr.is_err() {
-                let _ = (Interface::vtable(&unknown).Release)(raw);
-                bail!("IPolicyConfig::SetDefaultEndpoint failed: {hr:?}");
+            if hr.is_err() && failure.is_none() {
+                failure = Some(hr);
             }
         }
         let _ = (Interface::vtable(&unknown).Release)(raw);
+        if let Some(hr) = failure {
+            bail!("IPolicyConfig::SetDefaultEndpoint failed: {hr:?}");
+        }
     }
     Ok(())
 }

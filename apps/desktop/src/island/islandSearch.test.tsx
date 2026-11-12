@@ -79,7 +79,7 @@ describe("rank-order grouping", () => {
 
   it("grows the island by one line per extra label", () => {
     expect(expandedSearchHeight(5)).toBe(expandedSearchHeight(5, 1));
-    expect(expandedSearchHeight(5, 3) - expandedSearchHeight(5, 1)).toBe(48);
+    expect(expandedSearchHeight(2, 3) - expandedSearchHeight(2, 1)).toBe(48);
     expect(expandedSearchHeight(9, 1)).toBe(expandedSearchHeight(5, 1));
   });
 });
@@ -94,7 +94,6 @@ describe("island search card", () => {
         scope="all"
         onScope={() => undefined}
         results={results}
-        total={results.length}
         pending={false}
         error={null}
         onOpen={onOpen}

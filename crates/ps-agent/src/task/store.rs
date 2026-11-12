@@ -13,7 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use ps_ipc::AgentEvent;
 
@@ -24,12 +24,17 @@ use super::model::*;
 const AGENTS_DIR: &str = "agents";
 const TASKS_FILE: &str = "tasks.json";
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// The pre-database tasks.json, read once to import it.
+#[derive(Debug, Deserialize)]
 struct TasksFile {
-    schema_version: u32,
     tasks: Vec<AgentTask>,
 }
+
+const TASKS_TABLE: &str = "CREATE TABLE IF NOT EXISTS agent_tasks (
+    id TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL,
+    payload TEXT NOT NULL
+)";
 
 #[derive(Default)]
 struct StoreInner {
@@ -67,7 +72,33 @@ pub struct AgentTaskStore {
 
 /// Where the task history file is stored for a v2 data dir.
 pub fn tasks_path(data_dir: &Path) -> PathBuf {
-    data_dir.join(AGENTS_DIR).join(TASKS_FILE)
+    data_dir.join("index.db")
+}
+
+/// Every stored task payload, for tests that check what reaches disk.
+pub fn persisted_text(data_dir: &Path) -> String {
+    let Ok(conn) = open_db(&tasks_path(data_dir)) else { return String::new() };
+    conn.prepare("SELECT payload FROM agent_tasks")
+        .and_then(|mut statement| {
+            let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+            Ok(rows.flatten().collect::<Vec<_>>().join("
+"))
+        })
+        .unwrap_or_default()
+}
+
+fn open_db(path: &Path) -> Result<rusqlite::Connection, AgentError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(AgentError::Io)?;
+    }
+    let conn = rusqlite::Connection::open(path).map_err(db_error)?;
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(5000));
+    conn.execute(TASKS_TABLE, []).map_err(db_error)?;
+    Ok(conn)
+}
+
+fn db_error(error: rusqlite::Error) -> AgentError {
+    AgentError::Io(std::io::Error::other(error.to_string()))
 }
 
 impl AgentTaskStore {
@@ -75,7 +106,13 @@ impl AgentTaskStore {
     /// moved aside rather than silently overwriting user history.
     pub fn open(data_dir: &Path, redactions: Vec<String>) -> Result<Self, AgentError> {
         let path = tasks_path(data_dir);
+        let legacy = data_dir.join(AGENTS_DIR).join(TASKS_FILE);
         let mut tasks = load_tasks(&path);
+        // The first open after the move to the database imports the old tasks.json once.
+        let migrate = tasks.is_empty() && legacy.is_file();
+        if migrate {
+            tasks = load_legacy_json(&legacy);
+        }
         let mut recovered = false;
         let now = now_ms();
         for task in tasks.iter_mut() {
@@ -105,8 +142,11 @@ impl AgentTaskStore {
             inner: Mutex::new(StoreInner { tasks }),
             persist_error: Mutex::new(None),
         };
-        if recovered {
+        if recovered || migrate {
             store.persist_current();
+        }
+        if migrate && store.last_persist_error().is_none() {
+            let _ = fs::remove_file(&legacy);
         }
         Ok(store)
     }
@@ -214,6 +254,7 @@ impl AgentTaskStore {
             controls: AgentTaskControls::for_state(AgentTaskState::Queued),
             restarts: Vec::new(),
             model: launch.model.clone(),
+            answer: None,
         };
         task.push_log(
             AgentTaskLogLevel::Info,
@@ -313,8 +354,9 @@ impl AgentTaskStore {
                 );
                 changed = true;
             }
-            AgentEvent::Output { final_answer, .. } => {
+            AgentEvent::Output { text, final_answer } => {
                 if *final_answer {
+                    task.answer = Some(redact_truncate(text, &self.redactions, MAX_ANSWER_CHARS));
                     task.push_log(AgentTaskLogLevel::Info, "final answer ready".into(), now);
                     changed = true;
                 }
@@ -438,6 +480,33 @@ impl AgentTaskStore {
         cancelled
     }
 
+    /// Remove a task and its follow-ups (its direct children). Returns how many went.
+    pub fn delete(&self, id: &str) -> usize {
+        let mut inner = self.lock_inner();
+        let before = inner.tasks.len();
+        inner.tasks.retain(|task| task.id != id && task.parent_id.as_deref() != Some(id));
+        let removed = before - inner.tasks.len();
+        if removed > 0 {
+            let _ = self.persist_locked(&inner);
+        }
+        removed
+    }
+
+    /// Rename a task. None for an unknown id or a blank title.
+    pub fn rename(&self, id: &str, title: &str) -> Option<AgentTask> {
+        let title = title.trim();
+        if title.is_empty() {
+            return None;
+        }
+        let mut inner = self.lock_inner();
+        let task = inner.tasks.iter_mut().find(|task| task.id == id)?;
+        task.title = redact_truncate(title, &self.redactions, MAX_TITLE_CHARS);
+        task.updated_at = now_ms();
+        let snapshot = task.clone();
+        let _ = self.persist_locked(&inner);
+        Some(snapshot)
+    }
+
     /// Retry persistence explicitly; mutation methods persist best-effort and
     /// record any failure here.
     pub fn flush(&self) -> Result<(), AgentError> {
@@ -493,12 +562,23 @@ impl AgentTaskStore {
     }
 
     fn persist_locked(&self, inner: &StoreInner) -> Result<(), AgentError> {
-        let payload = TasksFile {
-            schema_version: TASKS_SCHEMA_VERSION,
-            tasks: inner.tasks.clone(),
-        };
-        let json = serde_json::to_string_pretty(&payload)?;
-        let result = write_atomic(&self.path, json.as_bytes());
+        let result = (|| {
+            let mut conn = open_db(&self.path)?;
+            let tx = conn.transaction().map_err(db_error)?;
+            tx.execute("DELETE FROM agent_tasks", []).map_err(db_error)?;
+            for task in &inner.tasks {
+                // Answers stay in memory: the history never stores assistant output.
+                let mut task = task.clone();
+                task.answer = None;
+                let payload = serde_json::to_string(&task)?;
+                tx.execute(
+                    "INSERT INTO agent_tasks (id, created_at, payload) VALUES (?1, ?2, ?3)",
+                    rusqlite::params![task.id, task.created_at, payload],
+                )
+                .map_err(db_error)?;
+            }
+            tx.commit().map_err(db_error)
+        })();
         let mut error_slot = self
             .persist_error
             .lock()
@@ -512,6 +592,17 @@ impl AgentTaskStore {
 }
 
 fn load_tasks(path: &Path) -> Vec<AgentTask> {
+    let Ok(conn) = open_db(path) else { return Vec::new() };
+    // A row that no longer parses is skipped rather than failing the whole history.
+    conn.prepare("SELECT payload FROM agent_tasks")
+        .and_then(|mut statement| {
+            let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+            Ok(rows.flatten().filter_map(|json| serde_json::from_str(&json).ok()).collect())
+        })
+        .unwrap_or_default()
+}
+
+fn load_legacy_json(path: &Path) -> Vec<AgentTask> {
     let Ok(text) = fs::read_to_string(path) else {
         return Vec::new();
     };
@@ -529,20 +620,6 @@ fn load_tasks(path: &Path) -> Vec<AgentTask> {
             Vec::new()
         }
     }
-}
-
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), AgentError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(AgentError::Io)?;
-    }
-    let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, bytes).map_err(AgentError::Io)?;
-    // std::fs::rename does not reliably replace an existing file on Windows.
-    if path.exists() {
-        fs::remove_file(path).map_err(AgentError::Io)?;
-    }
-    fs::rename(&tmp, path).map_err(AgentError::Io)?;
-    Ok(())
 }
 
 fn unique_id(tasks: &[AgentTask], base: &str) -> String {
@@ -851,13 +928,22 @@ mod tests {
             },
         );
         store.flush().expect("flush");
-        let raw = fs::read_to_string(tasks_path(&dir)).expect("tasks file");
+        let raw = persisted_text(&dir);
         assert!(!raw.contains(secret), "secret persisted");
         assert!(
             !raw.contains("assistant output must not be stored"),
             "output persisted"
         );
         assert!(!raw.contains("tool read completed"), "tool preview persisted");
+        // The island chat still reads the answer from memory.
+        assert_eq!(
+            store.task("run-9").unwrap().answer.as_deref(),
+            Some("assistant output must not be stored")
+        );
+        store.begin_task("run-10", "follow-up", &launch_pi(false));
+        store.inner.lock().unwrap().tasks[0].parent_id = Some("run-9".into());
+        assert_eq!(store.delete("run-9"), 2, "a thread is deleted with its follow-ups");
+        assert!(store.task("run-10").is_none());
         let _ = fs::remove_dir_all(dir);
     }
 
@@ -950,6 +1036,21 @@ mod tests {
             AgentTaskState::Cancelled
         );
         assert_eq!(store.task("done").expect("done").state, AgentTaskState::Completed);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn rename_trims_caps_length_and_ignores_blank_or_unknown_ids() {
+        let dir = scratch_dir("rename");
+        let store = AgentTaskStore::open(&dir, Vec::new()).unwrap();
+        store.begin_task("run-12", "original prompt", &launch_pi(false));
+        let renamed = store.rename("run-12", "  Budget review  ").expect("renamed");
+        assert_eq!(renamed.title, "Budget review");
+        let long = store.rename("run-12", &"x".repeat(500)).expect("renamed");
+        assert!(long.title.chars().count() <= MAX_TITLE_CHARS + 1);
+        assert!(store.rename("run-12", "   ").is_none());
+        assert!(store.rename("missing", "Budget").is_none());
+        assert_eq!(store.task("run-12").expect("task").title, long.title);
         let _ = fs::remove_dir_all(dir);
     }
 }

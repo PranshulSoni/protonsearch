@@ -3,8 +3,9 @@
 // document.title updates and the five workspace routes.
 
 import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { useApp } from "../App";
-import { Logo } from "../components/Logo";
+import { Wordmark } from "../components/Logo";
 import HomeView from "./views/HomeView";
 import IndexesView from "./views/IndexesView";
 import WorkflowsView from "./views/WorkflowsView";
@@ -24,7 +25,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: "home", label: "Home", icon: "home" },
   { id: "indexes", label: "Search & Indexing", icon: "search" },
-  { id: "workflows", label: "Workflows", icon: "workflows" },
+  { id: "workflows", label: "Agentic workflows", icon: "workflows" },
   { id: "todo", label: "To-do", icon: "todo" },
   { id: "preferences", label: "Settings", icon: "settings" },
 ];
@@ -39,6 +40,7 @@ export default function DesktopApp() {
   const [opening, setOpening] = useState(() => !takeOnboardingCrossfade());
   const navRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const mainRef = useRef<HTMLElement>(null);
+  const reduceMotion = useReducedMotion();
 
   const userName = settings.userName?.trim() || null;
   const initial = userName ? userName.charAt(0).toUpperCase() : null;
@@ -112,10 +114,7 @@ export default function DesktopApp() {
 
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span aria-hidden="true">
-            <Logo size={29} />
-          </span>
-          <span className="brand-name">ProtonSearch</span>
+          <Wordmark />
         </div>
         <nav aria-label="Main">
           <p className="sidebar-label" id="nav-label">
@@ -157,13 +156,20 @@ export default function DesktopApp() {
       </aside>
 
       <main id="main" className="app-main" tabIndex={-1} ref={mainRef}>
-        <div className="workspace">
+        {/* Keyed on the route: each change replays a short fade and rise; reduced motion skips it. */}
+        <motion.div
+          key={section}
+          className="workspace"
+          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
           {section === "home" ? <HomeView onNavigate={navigate} /> : null}
           {section === "indexes" ? <IndexesView focusSource={pendingSource} /> : null}
           {section === "workflows" ? <WorkflowsView /> : null}
           {section === "todo" ? <TodoView /> : null}
           {section === "preferences" ? <PreferencesView onNavigate={navigate} /> : null}
-        </div>
+        </motion.div>
       </main>
 
       <div className="sr-only" role="status" aria-live="polite">

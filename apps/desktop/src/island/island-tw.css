@@ -1,0 +1,132 @@
+/* `important`: styles/base.css resets button/input font and colour and draws a global focus outline
+   outside any layer, which would otherwise beat every layered utility. */
+@import "tailwindcss" source(none) important;
+@import "tw-animate-css";
+
+/* Scan only island code: utilities used elsewhere in the app must not leak into this window. */
+@source "../island";
+@source "../components/ui";
+
+/*
+ * Island-only styles. IslandView is the only importer (App lazy-loads it), so
+ * Tailwind's preflight never reaches the launcher or main window. Dark by default;
+ * .island-surface--light swaps the palette.
+ * Palette: docs/design/ISLAND_V10_REDESIGN.md.
+ */
+
+:root {
+  --ps-surface: #000000;
+  --ps-raised: #151a1d;
+  --ps-hover: #1b2226;
+  --ps-active: #22303a;
+  --ps-line: #262d31;
+  --ps-fg: #eef1f3;
+  --ps-fg-2: #a3adb4;
+  --ps-fg-3: #6f7a82;
+  --ps-hi: #9cc3dc;
+  --ps-ok: #7fc8a0;
+  --ps-warn: #e2b86b;
+  --ps-danger: #e5847a;
+
+  /* shadcn/ui roles, mapped onto the palette above. */
+  --background: var(--ps-surface);
+  --foreground: var(--ps-fg);
+  --card: var(--ps-raised);
+  --card-foreground: var(--ps-fg);
+  --popover: var(--ps-raised);
+  --popover-foreground: var(--ps-fg);
+  --primary: var(--ps-hi);
+  --primary-foreground: var(--ps-surface);
+  --secondary: var(--ps-raised);
+  --secondary-foreground: var(--ps-fg);
+  --muted: var(--ps-raised);
+  --muted-foreground: var(--ps-fg-2);
+  --accent: var(--ps-active);
+  --accent-foreground: var(--ps-fg);
+  --destructive: var(--ps-danger);
+  --border: var(--ps-line);
+  --input: var(--ps-line);
+  --ring: var(--ps-hi);
+  --radius: 14px;
+}
+
+/* Light app theme: IslandView adds .island-surface--light to the surface, and each token below
+   re-resolves there. The shadcn roles are re-mapped too, since :root already resolved them. */
+.island-surface--light {
+  --ps-surface: #f3f5f7;
+  --ps-raised: #ffffff;
+  --ps-hover: #e6eaee;
+  --ps-active: #d8e0e7;
+  --ps-line: #d2d9e0;
+  --ps-fg: #15191e;
+  --ps-fg-2: #4b555f;
+  --ps-fg-3: #626d77;
+  --ps-hi: #2a6a96;
+  --ps-ok: #2b7a50;
+  --ps-warn: #9a6512;
+  --ps-danger: #b8433a;
+
+  --background: var(--ps-surface);
+  --foreground: var(--ps-fg);
+  --card: var(--ps-raised);
+  --card-foreground: var(--ps-fg);
+  --popover: var(--ps-raised);
+  --popover-foreground: var(--ps-fg);
+  --primary: var(--ps-hi);
+  --primary-foreground: var(--ps-surface);
+  --secondary: var(--ps-raised);
+  --secondary-foreground: var(--ps-fg);
+  --muted: var(--ps-raised);
+  --muted-foreground: var(--ps-fg-2);
+  --accent: var(--ps-active);
+  --accent-foreground: var(--ps-fg);
+  --destructive: var(--ps-danger);
+  --border: var(--ps-line);
+  --input: var(--ps-line);
+  --ring: var(--ps-hi);
+}
+
+@theme inline {
+  /* Spec tokens. `hi` is the one accent. */
+  --color-surface: var(--ps-surface);
+  --color-raised: var(--ps-raised);
+  --color-hover: var(--ps-hover);
+  --color-active: var(--ps-active);
+  --color-line: var(--ps-line);
+  --color-fg: var(--ps-fg);
+  --color-fg-2: var(--ps-fg-2);
+  --color-fg-3: var(--ps-fg-3);
+  --color-hi: var(--ps-hi);
+  --color-ok: var(--ps-ok);
+  --color-warn: var(--ps-warn);
+  --color-danger: var(--ps-danger);
+
+  /* shadcn/ui names, same palette. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-tile: 14px;
+  --radius-row: 10px;
+
+  --font-sans: "Inter Variable", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}

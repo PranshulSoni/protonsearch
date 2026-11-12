@@ -17,6 +17,8 @@ use ps_bench::queries;
 use ps_bench::realfiles;
 #[cfg(feature = "engine")]
 use ps_bench::relevance;
+#[cfg(feature = "engine")]
+use ps_bench::walk;
 
 fn main() {
     let raw: Vec<String> = std::env::args().skip(1).collect();
@@ -54,6 +56,8 @@ fn run(cmd: &str, args: &Args) -> anyhow::Result<()> {
         "golden-synth" => cmd_golden_synth(args),
         #[cfg(feature = "engine")]
         "golden-real" => cmd_golden_real(args),
+        #[cfg(feature = "engine")]
+        "walk" => walk::run(args),
         "env" => {
             println!("{}", serde_json::to_string_pretty(ps_bench::env::host_info())?);
             Ok(())
@@ -257,6 +261,8 @@ usage:
   ps-bench ocr-corpus [--out-dir .bench/ocr-corpus] [--count 0]  ground-truth OCR corpus
   ps-bench ocr [--manifest .bench/ocr-corpus/manifest.jsonl] [--passes 2] --out <json>
                                                                  OCR speed + accuracy (Windows.Media.Ocr)
+  ps-bench walk --root <dir> [--runs 3] [--materialize <dataset.jsonl>]
+                                                                 scanner wall time (run 1 cold, rest warm)
   ps-bench env                                                   host facts (JSON)
 See docs/performance/METHODOLOGY.md. No network calls; no telemetry."
     );

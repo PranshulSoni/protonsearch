@@ -46,13 +46,28 @@ const STATE_READY: u8 = 1;
 const STATE_INDEXING: u8 = 2;
 const STATE_PAUSED: u8 = 3;
 const STATE_ERROR: u8 = 4;
-fn ensure_ocr_engine_available(engine: OcrEngine, data_dir: &Path) -> anyhow::Result<()> {
-    let (engine_name, model_dir) = match engine {
+/// Folder of the Tesseract executable saved from the app; None lets ps-ocr detect it.
+fn tesseract_dir(settings: &Settings) -> Option<PathBuf> {
+    settings
+        .tesseract_path
+        .as_deref()
+        .and_then(|path| Path::new(path).parent())
+        .map(Path::to_path_buf)
+}
+
+/// The ps-ocr engine id and model folder for a saved OCR engine. The settings check and
+/// indexing both use it, so the engine that is checked is the one that reads the images.
+fn ocr_backend(engine: OcrEngine, data_dir: &Path, settings: &Settings) -> (&'static str, Option<PathBuf>) {
+    match engine {
         OcrEngine::Windows => ("windows", None),
         OcrEngine::PpOcrV6 => ("pp_ocr_v6", Some(data_dir.join("models").join("ppocrv6"))),
         OcrEngine::Indra => ("indra", Some(data_dir.join("models").join("indra"))),
-        OcrEngine::Tesseract => ("tesseract", None),
-    };
+        OcrEngine::Tesseract => ("tesseract", tesseract_dir(settings)),
+    }
+}
+
+fn ensure_ocr_engine_available(engine: OcrEngine, data_dir: &Path, settings: &Settings) -> anyhow::Result<()> {
+    let (engine_name, model_dir) = ocr_backend(engine, data_dir, settings);
     if !ps_ocr::is_engine_available(engine_name, model_dir.as_deref()) {
         anyhow::bail!(
             "OCR engine {:?} is unavailable. Select Windows OCR in settings; optional engines are not installed.",
@@ -183,6 +198,8 @@ pub struct Engine {
     paused: AtomicBool,
     shutdown: AtomicBool,
     force_rescan: AtomicBool,
+    /// Set when the OCR engine changes; cleared once indexing is ready again.
+    reindexing: AtomicBool,
     legacy_summary: Mutex<Option<LegacySummary>>,
     /// Recently returned results, so a preview request can resolve resultId -> row.
     recent_results: Mutex<ResultRegistry>,
@@ -301,6 +318,7 @@ impl Engine {
             paused: AtomicBool::new(false),
             shutdown: AtomicBool::new(false),
             force_rescan: AtomicBool::new(false),
+            reindexing: AtomicBool::new(false),
             legacy_summary: Mutex::new(None),
             recent_results: Mutex::new(ResultRegistry::default()),
             clipboard_listener: Mutex::new(None),
@@ -496,8 +514,9 @@ impl Engine {
                     let want_history = filters.kinds.is_empty()
                         || filters.kinds.contains(&SourceKind::BrowserHistory);
 
-                    let mut bookmarks: Vec<&ps_sources::BrowserEntry> = sources
-                        .browser
+                    // History lives in the database; read the newest pages from it.
+                    let stored = self.db.browser(&[], 2_000);
+                    let mut bookmarks: Vec<&ps_sources::BrowserEntry> = stored
                         .iter()
                         .filter(|e| e.bookmark && want_bookmarks)
                         .collect();
@@ -507,8 +526,7 @@ impl Engine {
                             .then_with(|| b.visit_count.cmp(&a.visit_count))
                     });
 
-                    let mut history: Vec<&ps_sources::BrowserEntry> = sources
-                        .browser
+                    let mut history: Vec<&ps_sources::BrowserEntry> = stored
                         .iter()
                         .filter(|e| !e.bookmark && want_history)
                         .collect();
@@ -532,7 +550,7 @@ impl Engine {
                             priority: 6,
                             score: 2000.0 - i as f32,
                             order: i as u32,
-                            result: browser_result(entry),
+                            result: browser_result(entry, &sources.favicons),
                         });
                         hits += 1;
                     }
@@ -542,7 +560,7 @@ impl Engine {
                             priority: 6,
                             score: 1900.0 - i as f32,
                             order: i as u32,
-                            result: browser_result(entry),
+                            result: browser_result(entry, &sources.favicons),
                         });
                         hits += 1;
                     }
@@ -553,7 +571,7 @@ impl Engine {
                                 priority: 6,
                                 score: 500.0 - i as f32,
                                 order: (top_bookmark_slots + i) as u32,
-                                result: browser_result(entry),
+                                result: browser_result(entry, &sources.favicons),
                             });
                             hits += 1;
                         }
@@ -562,6 +580,33 @@ impl Engine {
                 timings.push(TierTiming {
                     tier: 0,
                     label: "browser history".to_string(),
+                    took_ms: tier_start.elapsed().as_secs_f64() as f32 * 1000.0,
+                    hits,
+                });
+                let results = finalize(ranked, limit);
+                self.remember_results(&results);
+                return self.response(req, query_text, results, timings, started, &settings);
+            }
+            if scope == SearchScope::Git {
+                // The Git card: every repository, then recent commits.
+                let tier_start = Instant::now();
+                let mut hits = 0usize;
+                if settings.privacy.git_indexing {
+                    let sources = self.sources.read().unwrap();
+                    for (i, entry) in git_activity(&sources.git, limit).into_iter().enumerate() {
+                        ranked.push(Ranked {
+                            tier: 0,
+                            priority: 7,
+                            score: 1000.0 - i as f32,
+                            order: i as u32,
+                            result: git_result(entry),
+                        });
+                        hits += 1;
+                    }
+                }
+                timings.push(TierTiming {
+                    tier: 0,
+                    label: "git activity".to_string(),
                     took_ms: tier_start.elapsed().as_secs_f64() as f32 * 1000.0,
                     hits,
                 });
@@ -991,7 +1036,7 @@ impl Engine {
                 || scope_allows(scope, SourceKind::Bookmark))
         {
             let browser_limit = if scope == SearchScope::Browser { limit } else { 4 };
-            for (i, entry) in match_browser(&sources.browser, &terms)
+            for (i, entry) in match_browser(&self.db.browser(&terms, 500), &terms)
                 .into_iter()
                 .filter(|entry| {
                     let kind = if entry.bookmark {
@@ -1004,7 +1049,7 @@ impl Engine {
                 .take(browser_limit)
                 .enumerate()
             {
-                let result = browser_result(entry);
+                let result = browser_result(entry, &sources.favicons);
                 let (tier, priority, score) = if ranked_scope {
                     (title_class(&result.title), CATEGORY_BROWSER, 0.0)
                 } else {
@@ -1374,7 +1419,7 @@ impl Engine {
                 id: "browser".into(),
                 label: "Browser history & bookmarks".into(),
                 enabled: settings.privacy.browser_history,
-                item_count: sources.browser.len() as u64,
+                item_count: self.db.browser_count(),
                 state: if settings.privacy.browser_history {
                     "ready"
                 } else {
@@ -1452,6 +1497,7 @@ impl Engine {
                 }),
             }),
             last_updated: self.last_updated.load(Ordering::Relaxed),
+            reindexing: self.reindexing.load(Ordering::SeqCst),
             warnings: self.warnings.lock().map(|w| w.clone()).unwrap_or_default(),
         }
     }
@@ -1462,8 +1508,9 @@ impl Engine {
 
     pub fn update_settings(&self, patch: SettingsPatch) -> anyhow::Result<Settings> {
         if let Some(engine) = patch.ocr_engine {
-            ensure_ocr_engine_available(engine, &self.config.data_dir)?;
+            ensure_ocr_engine_available(engine, &self.config.data_dir, &self.settings_snapshot())?;
         }
+        let previous_engine = self.settings_snapshot().ocr_engine;
         let (next, changed) = {
             let mut guard = self
                 .settings
@@ -1474,6 +1521,12 @@ impl Engine {
         };
         if changed {
             self.save_settings(&next)?;
+            if next.ocr_engine != previous_engine {
+                // OCR results are keyed by engine, so a rescan re-reads every image.
+                self.reindexing.store(true, Ordering::SeqCst);
+                self.force_rescan.store(true, Ordering::SeqCst);
+                self.set_state(STATE_STARTING);
+            }
             if patch.privacy.is_some() || patch.clipboard.is_some() {
                 // Enabling/disabling/pausing clipboard capture takes effect at once.
                 self.sync_clipboard_listener();
@@ -1481,14 +1534,13 @@ impl Engine {
             if patch.privacy.is_some() {
                 if next.privacy.browser_history {
                     let (browser, warnings) = ps_sources::browser::scan_configured(&next.privacy);
-                    if let Ok(mut sources) = self.sources.write() {
-                        sources.browser = browser;
-                    }
+                    self.set_browser(browser);
                     for warning in warnings {
                         self.push_warning(warning);
                     }
                 } else if let Ok(mut sources) = self.sources.write() {
-                    sources.browser.clear();
+                    let _ = self.db.store_browser(&[]);
+                    sources.favicons.clear();
                 }
             }
             if patch.indexing.is_some() || patch.privacy.is_some() {
@@ -1530,7 +1582,8 @@ impl Engine {
         let models_dir = self.config.data_dir.join("models");
         let ppocr_available = ps_ocr::is_engine_available("pp_ocr_v6", Some(&models_dir.join("ppocrv6")));
         let indra_available = ps_ocr::is_engine_available("indra", Some(&models_dir.join("indra")));
-        let tesseract_available = ps_ocr::is_engine_available("tesseract", None);
+        let tesseract_available =
+            ps_ocr::is_engine_available("tesseract", tesseract_dir(&self.settings_snapshot()).as_deref());
         let windows_available = ps_ocr::is_engine_available("windows", None);
 
         vec![
@@ -1545,7 +1598,7 @@ impl Engine {
                 size_label: "~6.1 MB".to_string(),
                 speed_label: "Ultra-Fast (~30ms/img)".to_string(),
                 badge: "Recommended".to_string(),
-                description: "Lightweight state-of-the-art neural model pack. Best balance of speed, accuracy, and resource efficiency for desktop screenshots, PDFs, and documents.".to_string(),
+                description: "Compact model pack for screenshots, PDFs and printed text.".to_string(),
                 highlights: vec![
                     "High accuracy on screenshots, PDFs & text".to_string(),
                     "Ultra-fast local inference (~30ms/image)".to_string(),
@@ -1565,7 +1618,7 @@ impl Engine {
                 size_label: "Built-in (0 MB)".to_string(),
                 speed_label: "Fast (~45ms/img)".to_string(),
                 badge: "Built-in".to_string(),
-                description: "Native Windows media recognition service. Works out of the box with zero downloads, fully local and privacy-safe.".to_string(),
+                description: "Built into Windows 10 and 11. Nothing to download.".to_string(),
                 highlights: vec![
                     "Built into Windows 10 & 11".to_string(),
                     "Zero setup or downloads required".to_string(),
@@ -1585,13 +1638,13 @@ impl Engine {
                 size_label: "~27 MB".to_string(),
                 speed_label: "Deep (~120ms/img)".to_string(),
                 badge: "Multilingual & Skewed".to_string(),
-                description: "Specialized deep learning model designed for complex multi-language scripts, rotated documents, and heavily distorted scans.".to_string(),
+                description: "Stronger on skewed, rotated and multilingual text.".to_string(),
                 highlights: vec![
                     "Specialized in skewed and rotated text".to_string(),
                     "Extended multilingual script coverage".to_string(),
-                    "Requires research license acceptance".to_string(),
+                    "Research and non-commercial use".to_string(),
                 ],
-                license: Some("Research & Non-Commercial (Acceptance required)".to_string()),
+                license: Some("Research & non-commercial".to_string()),
                 download_size_bytes: Some(27_000_000),
             },
             ps_ipc::OcrEngineDetails {
@@ -1605,7 +1658,7 @@ impl Engine {
                 size_label: "External CLI".to_string(),
                 speed_label: "Traditional (~150ms/img)".to_string(),
                 badge: "Extensible".to_string(),
-                description: "Classic open-source OCR engine using the system-installed Tesseract CLI and customizable traineddata language packages.".to_string(),
+                description: "Open-source engine that uses your installed Tesseract.".to_string(),
                 highlights: vec![
                     "Uses system Tesseract installation".to_string(),
                     "Extensible with custom traineddata packs".to_string(),
@@ -1615,6 +1668,15 @@ impl Engine {
                 download_size_bytes: None,
             },
         ]
+    }
+
+    /// Installs Tesseract with winget, then saves the executable it finds for OCR.
+    pub fn install_tesseract_ocr(&self) -> anyhow::Result<Settings> {
+        let path = ps_ocr::tesseract::Tesseract::install_with_winget()?;
+        self.update_settings(SettingsPatch {
+            tesseract_path: Some(path.display().to_string()),
+            ..Default::default()
+        })
     }
 
     pub fn download_ocr_engine(&self, engine: ps_ipc::OcrEngine) -> anyhow::Result<Settings> {
@@ -1660,8 +1722,8 @@ impl Engine {
     }
 
     pub fn complete_onboarding(&self, input: OnboardingInput) -> anyhow::Result<Settings> {
-        ensure_ocr_engine_available(input.ocr_engine, &self.config.data_dir)?;
         let mut settings = self.settings_snapshot();
+        ensure_ocr_engine_available(input.ocr_engine, &self.config.data_dir, &settings)?;
         settings.user_name = input
             .user_name
             .map(|name| name.trim().to_string())
@@ -1871,6 +1933,9 @@ impl Engine {
 
     fn set_state(&self, state: u8) {
         self.state.store(state, Ordering::SeqCst);
+        if state == STATE_READY {
+            self.reindexing.store(false, Ordering::SeqCst);
+        }
     }
 
     fn set_phase(&self, phase: &str) {
@@ -1925,6 +1990,16 @@ impl Engine {
 
     fn clipboard_db_path(&self) -> PathBuf {
         self.config.data_dir.join(DB_FILE)
+    }
+
+    /// Replace the stored browser history (it lives in the database, not in memory)
+    /// and the favicons read for it. The icon files are read before the lock is taken.
+    fn set_browser(&self, browser: Vec<ps_sources::BrowserEntry>) {
+        let favicons = favicon_data_urls(&browser);
+        let _ = self.db.store_browser(&browser);
+        if let Ok(mut sources) = self.sources.write() {
+            sources.favicons = favicons;
+        }
     }
 
     /// Master gate for clipboard capture: privacy.clipboard_history must be on
@@ -2156,7 +2231,7 @@ fn run_background_inner(engine: &Arc<Engine>) {
     {
         let settings = engine.settings_snapshot();
         let legacy = engine.config.legacy_db.clone();
-        let (sources, warnings) = ps_sources::Sources::load(&settings, legacy.as_deref());
+        let (mut sources, warnings) = ps_sources::Sources::load(&settings, legacy.as_deref());
         if !sources.apps.is_empty() {
             save_app_cache(&engine.config.data_dir, &sources.apps);
         }
@@ -2168,8 +2243,12 @@ fn run_background_inner(engine: &Arc<Engine>) {
                 slot.last_ms = slot.last_ms.max(entry.last_used_ms);
             }
         }
+        let favicons = favicon_data_urls(&sources.browser);
+        // The scanned history moves to the database; only its favicons stay in memory.
+        let _ = engine.db.store_browser(&std::mem::take(&mut sources.browser));
         if let Ok(mut guard) = engine.sources.write() {
             *guard = sources;
+            guard.favicons = favicons;
         }
         for warning in warnings {
             engine.push_warning(warning);
@@ -2303,9 +2382,7 @@ fn refresh_loop(engine: std::sync::Weak<Engine>) {
         let settings = engine.settings_snapshot();
         if settings.privacy.browser_history {
             let (browser, _) = ps_sources::browser::scan_configured(&settings.privacy);
-            if let Ok(mut sources) = engine.sources.write() {
-                sources.browser = browser;
-            }
+            engine.set_browser(browser);
         }
     }
 }
@@ -2403,12 +2480,7 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
     if !settings.indexing.ocr_enabled {
         return;
     }
-    let (engine_name, model_dir) = match settings.ocr_engine {
-        OcrEngine::Windows => ("windows", None),
-        OcrEngine::PpOcrV6 => ("pp_ocr_v6", Some(engine.config.data_dir.join("models").join("ppocrv6"))),
-        OcrEngine::Indra => ("indra", Some(engine.config.data_dir.join("models").join("indra"))),
-        OcrEngine::Tesseract => ("tesseract", None),
-    };
+    let (engine_name, model_dir) = ocr_backend(settings.ocr_engine, &engine.config.data_dir, &settings);
     if !ps_ocr::is_engine_available(engine_name, model_dir.as_deref()) {
         engine.push_warning(format!(
             "OCR engine {:?} is unavailable or missing local assets; select an available engine in settings.",
@@ -2421,31 +2493,58 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
         let index = engine.index.read().unwrap();
         ocr_candidates(&index, &modes)
     };
-    let mut indexed = 0usize;
-    let mut processed = 0usize;
-    for (path, size, modified) in candidates {
+    let queue = Mutex::new(candidates.into_iter());
+    let processed = AtomicU64::new(0);
+    std::thread::scope(|scope| {
+        for _ in 0..ocr_worker_count() {
+            scope.spawn(|| ocr_worker(engine, &queue, &processed, engine_name, model_dir.as_deref()));
+        }
+    });
+    engine
+        .ocr_documents
+        .store(engine.db.ocr_count(), Ordering::SeqCst);
+    let _ = engine.db.checkpoint();
+    engine.last_updated.store(now_ms(), Ordering::SeqCst);
+    let _ = roots;
+}
+
+/// Parallel OCR calls for the screenshot pass: half the logical cores, never above
+/// ps-ocr's cap (calls beyond the cap fail fast there instead of queueing).
+fn ocr_worker_count() -> usize {
+    std::thread::available_parallelism().map_or(1, |n| (n.get() / 2).clamp(1, ps_ocr::MAX_OCR_WORKERS))
+}
+
+/// Takes candidates from the shared queue until it is empty or indexing is paused
+/// or shut down. A failing file only adds a warning.
+fn ocr_worker(
+    engine: &Engine,
+    queue: &Mutex<std::vec::IntoIter<(String, u64, i64)>>,
+    processed: &AtomicU64,
+    engine_name: &str,
+    model_dir: Option<&Path>,
+) {
+    loop {
         if engine.shutdown.load(Ordering::SeqCst) || engine.paused.load(Ordering::SeqCst) {
             break;
         }
-        processed += 1;
-        if processed % 128 == 0 {
+        let Some((path, size, modified)) = queue.lock().unwrap().next() else {
+            break;
+        };
+        let processed_now = processed.fetch_add(1, Ordering::SeqCst) + 1;
+        if processed_now % 128 == 0 {
             let _ = engine.db.checkpoint();
         }
-        let hash = quick_hash(&path, size, modified);
+        // Keyed by engine: switching engines makes every stored result stale.
+        let hash = format!("{engine_name}:{}", quick_hash(&path, size, modified));
         if engine.db.ocr_has(&path, &hash) {
             if let Err(err) = engine.db.ocr_update_metadata(&path, size, modified) {
                 engine.push_warning(format!("OCR metadata update failed for {path}: {err}"));
             }
             continue;
         }
-        match ps_ocr::extract_image_with_engine(
-            Path::new(&path),
-            16_777_216,
-            engine_name,
-            model_dir.as_deref(),
-        ) {
+        match ps_ocr::extract_image_with_engine(Path::new(&path), 16_777_216, engine_name, model_dir) {
             Ok(Some(document)) if !document.text.trim().is_empty() => {
-                match engine.db.ocr_upsert(
+                if let Err(err) = engine.db.ocr_upsert(
                     &path,
                     &hash,
                     &document.text,
@@ -2455,8 +2554,7 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
                     size,
                     modified,
                 ) {
-                    Ok(()) => indexed += 1,
-                    Err(err) => engine.push_warning(format!("OCR indexing failed for {path}: {err}")),
+                    engine.push_warning(format!("OCR indexing failed for {path}: {err}"));
                 }
             }
             Ok(_) => {
@@ -2467,14 +2565,8 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
             Err(err) => engine.push_warning(format!("OCR failed for {path}: {err}")),
         }
     }
-    engine
-        .ocr_documents
-        .store(engine.db.ocr_count(), Ordering::SeqCst);
-    let _ = engine.db.checkpoint();
-    engine.last_updated.store(now_ms(), Ordering::SeqCst);
-    let _ = roots;
-    let _ = indexed;
 }
+
 fn ocr_candidates(index: &FilenameIndex, modes: &[(String, u8)]) -> Vec<(String, u64, i64)> {
     index
         .entries()
@@ -3161,6 +3253,14 @@ fn app_icon_cache_len() -> usize {
     app_icon_cache().lock().map(|cache| cache.len()).unwrap_or(0)
 }
 
+/// Host -> image data URL for the most recently browsed hosts.
+fn favicon_data_urls(browser: &[ps_sources::BrowserEntry]) -> HashMap<String, String> {
+    ps_sources::browser::favicons(browser)
+        .into_iter()
+        .map(|(host, (mime, bytes))| (host, format!("data:{mime};base64,{}", base64_encode(&bytes))))
+        .collect()
+}
+
 /// Minimal base64 encoder (icons only; no dependency needed).
 fn base64_encode(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -3328,7 +3428,10 @@ fn trim_for_registry(result: &SearchResult) -> SearchResult {
         icon: IconRef::Monogram,
         score: result.score,
         match_ranges: result.match_ranges.clone(),
-        meta: result.meta.clone(),
+        meta: ResultMeta {
+            favicon_data_url: None,
+            ..result.meta.clone()
+        },
         action: result.action.clone(),
         actions: Vec::new(),
     }
@@ -3390,9 +3493,10 @@ fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
         meta: ResultMeta {
             modified: Some(entry.timestamp_ms),
             // Category drives the UI badge/filter: LINK, EMAIL, PATH, CODE,
-            // IMAGE, FILES or TEXT (pinned state is carried in the subtitle).
+            // IMAGE, FILES or TEXT; `pinned` marks pinned items.
             label: Some(clip_category_label(entry.category).to_string()),
             thumbnail_data_url,
+            pinned: entry.pinned,
             image_width: entry.width,
             image_height: entry.height,
             mime: entry.mime.clone().or_else(|| {
@@ -3420,7 +3524,10 @@ fn clipboard_result(entry: &ps_sources::ClipboardEntry) -> SearchResult {
     }
 }
 
-fn browser_result(entry: &ps_sources::BrowserEntry) -> SearchResult {
+fn browser_result(
+    entry: &ps_sources::BrowserEntry,
+    favicons: &HashMap<String, String>,
+) -> SearchResult {
     let is_url = entry.url.starts_with("http://") || entry.url.starts_with("https://");
     SearchResult {
         id: format!("browser:{}", entry.url.to_lowercase()),
@@ -3454,6 +3561,8 @@ fn browser_result(entry: &ps_sources::BrowserEntry) -> SearchResult {
             } else {
                 format!("{} · {} visits", entry.source, entry.visit_count.max(1))
             }),
+            favicon_data_url: ps_sources::browser::host_of(&entry.url)
+                .and_then(|host| favicons.get(&host).cloned()),
             ..ResultMeta::default()
         },
         action: if is_url {
@@ -3469,9 +3578,37 @@ fn browser_result(entry: &ps_sources::BrowserEntry) -> SearchResult {
     }
 }
 
-fn git_result(entry: &ps_sources::GitEntry) -> SearchResult {
+/// Rows for the Git card: every repository (newest commit first) so the card can
+/// offer them all, then up to `limit` commits newest first.
+fn git_activity(entries: &[ps_sources::GitEntry], limit: usize) -> Vec<&ps_sources::GitEntry> {
+    use ps_sources::GitEntry;
+    let mut commits: Vec<(&GitEntry, i64, &str)> = entries
+        .iter()
+        .filter_map(|entry| match entry {
+            GitEntry::Commit { repo, date_ms, .. } => Some((entry, *date_ms, repo.as_str())),
+            _ => None,
+        })
+        .collect();
+    commits.sort_by_key(|(_, date_ms, _)| std::cmp::Reverse(*date_ms));
+    let newest = |path: &str| commits.iter().find(|(_, _, repo)| *repo == path).map_or(i64::MIN, |(_, date_ms, _)| *date_ms);
+    let mut repos: Vec<(&GitEntry, i64)> = entries
+        .iter()
+        .filter_map(|entry| match entry {
+            GitEntry::Repo { path, .. } => Some((entry, newest(path))),
+            _ => None,
+        })
+        .collect();
+    repos.sort_by_key(|(_, date_ms)| std::cmp::Reverse(*date_ms));
+    repos
+        .into_iter()
+        .map(|(entry, _)| entry)
+        .chain(commits.into_iter().take(limit).map(|(entry, _, _)| entry))
+        .collect()
+}
+
+pub fn git_result(entry: &ps_sources::GitEntry) -> SearchResult {
     match entry {
-        ps_sources::GitEntry::Repo { path, name, branch } => SearchResult {
+        ps_sources::GitEntry::Repo { path, name, branch, branches } => SearchResult {
             id: format!("git:repo:{}", path.to_lowercase()),
             kind: SourceKind::GitRepository,
             title: name.clone(),
@@ -3485,7 +3622,10 @@ fn git_result(entry: &ps_sources::GitEntry) -> SearchResult {
             },
             score: 0.0,
             match_ranges: Vec::new(),
-            meta: ResultMeta::default(),
+            meta: ResultMeta {
+                branches: branches.clone(),
+                ..ResultMeta::default()
+            },
             action: ActionSpec::OpenPath {
                 path: path.clone(),
                 line: None,
@@ -4253,6 +4393,28 @@ mod tests {
     }
 
     #[test]
+    fn ocr_workers_take_each_candidate_once_and_stop_when_paused() {
+        let dir = scratch_dir("ocr-workers");
+        let engine = make_engine(&dir, None);
+        // Non-image names: extraction returns early, so only the queue and pause logic run.
+        let candidates: Vec<(String, u64, i64)> =
+            (0..40).map(|i| (format!(r"C:\pool\note-{i}.txt"), 1, 1)).collect();
+        let queue = Mutex::new(candidates.into_iter());
+        let processed = AtomicU64::new(0);
+        engine.paused.store(true, Ordering::SeqCst);
+        ocr_worker(&engine, &queue, &processed, "windows", None);
+        assert_eq!(processed.load(Ordering::SeqCst), 0, "a paused worker takes nothing");
+        engine.paused.store(false, Ordering::SeqCst);
+        std::thread::scope(|scope| {
+            for _ in 0..ocr_worker_count() {
+                scope.spawn(|| ocr_worker(&engine, &queue, &processed, "windows", None));
+            }
+        });
+        assert_eq!(processed.load(Ordering::SeqCst), 40);
+        assert!(queue.lock().unwrap().next().is_none());
+    }
+
+    #[test]
     fn ocr_candidates_include_images_past_legacy_limit_and_empty_files() {
         let entries = (0..450)
             .map(|i| ps_index::IndexEntry {
@@ -4741,6 +4903,19 @@ mod tests {
     }
 
     #[test]
+    fn ocr_backend_follows_the_saved_engine() {
+        let dir = scratch_dir("ocr-backend");
+        let engine = make_engine(&dir, None);
+        let settings = engine.settings();
+        let data = Path::new("data");
+        assert_eq!(ocr_backend(settings.ocr_engine, data, &settings), ("windows", None));
+        assert_eq!(ocr_backend(OcrEngine::PpOcrV6, data, &settings), ("pp_ocr_v6", Some(data.join("models").join("ppocrv6"))));
+        assert_eq!(ocr_backend(OcrEngine::Indra, data, &settings), ("indra", Some(data.join("models").join("indra"))));
+        assert_eq!(ocr_backend(OcrEngine::Tesseract, data, &settings), ("tesseract", None));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn photos_ocr_filters_page_past_initial_matches() {
         let dir = scratch_dir("photos-ocr-pagination");
         let engine = make_engine(&dir, None);
@@ -4980,6 +5155,8 @@ mod tests {
                 .map(|r| r.meta.label.clone())
                 .collect::<Vec<_>>()
         );
+        assert!(resp.results[0].meta.pinned, "the pinned row carries the flag");
+        assert!(resp.results[1..].iter().all(|r| !r.meta.pinned));
         // Category labels map to the UI badge vocabulary.
         let labels: Vec<String> = resp.results.iter().filter_map(|r| r.meta.label.clone()).collect();
         assert!(labels.contains(&"LINK".to_string()));
@@ -5673,6 +5850,86 @@ mod tests {
     }
 
     #[test]
+    fn git_scope_lists_the_newest_repository_then_commits_for_the_card() {
+        let dir = scratch_dir("git-card");
+        let engine = make_engine(&dir, None);
+        engine.settings.write().unwrap().privacy.git_indexing = true;
+        let commit = |hash: &str, repo: &str, date_ms: i64| ps_sources::GitEntry::Commit {
+            repo: repo.into(),
+            hash: hash.into(),
+            message: format!("message {hash}"),
+            author: "Dev".into(),
+            date_ms,
+        };
+        {
+            let mut sources = engine.sources.write().unwrap();
+            sources.git = vec![
+                ps_sources::GitEntry::Repo { path: "C:/old".into(), name: "old".into(), branch: None, branches: Vec::new() },
+                ps_sources::GitEntry::Repo {
+                    path: "C:/new".into(),
+                    name: "new".into(),
+                    branch: Some("main".into()),
+                    branches: vec!["main".into(), "dev".into()],
+                },
+                commit("aaaaaaaa1", "C:/old", 10),
+                commit("bbbbbbbb2", "C:/new", 30),
+                commit("cccccccc3", "C:/new", 20),
+            ];
+        }
+        let search = |query: &str| {
+            engine.search(&SearchRequest {
+                protocol: PROTOCOL_VERSION,
+                request_id: 1,
+                query: query.into(),
+                scope: SearchScope::Git,
+                filters: SearchFilters::default(),
+                limit: 10,
+            })
+        };
+        let results = search("").results;
+        let titles: Vec<&str> = results.iter().map(|r| r.title.as_str()).collect();
+        assert_eq!(titles, ["new", "old", "message bbbbbbbb2", "message cccccccc3", "message aaaaaaaa1"]);
+        assert_eq!(results[0].meta.branches, ["main", "dev"]);
+        engine.settings.write().unwrap().privacy.git_indexing = false;
+        assert!(search("").results.is_empty(), "git indexing off lists nothing");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn browser_rows_carry_the_favicon_of_their_host() {
+        let dir = scratch_dir("browser-favicon");
+        let engine = make_engine(&dir, None);
+        engine.settings.write().unwrap().privacy.browser_history = true;
+        {
+            let mut sources = engine.sources.write().unwrap();
+            engine.db.store_browser(&[ps_sources::BrowserEntry {
+                url: "https://www.example.com/a".into(),
+                title: "Example".into(),
+                source: "Chrome".into(),
+                visit_count: 1,
+                last_visit_ms: 10,
+                bookmark: false,
+            }]).unwrap();
+            sources
+                .favicons
+                .insert("example.com".into(), "data:image/png;base64,AAAA".into());
+        }
+        let response = engine.search(&SearchRequest {
+            protocol: PROTOCOL_VERSION,
+            request_id: 1,
+            query: String::new(),
+            scope: SearchScope::Browser,
+            filters: SearchFilters::default(),
+            limit: 10,
+        });
+        assert_eq!(
+            response.results[0].meta.favicon_data_url.as_deref(),
+            Some("data:image/png;base64,AAAA")
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn browser_scope_returns_empty_and_full_query_results_across_browsers() {
         let dir = scratch_dir("browser-scope");
         let engine = make_engine(&dir, None);
@@ -5681,7 +5938,6 @@ mod tests {
             settings.privacy.browser_history = true;
         }
         {
-            let mut sources = engine.sources.write().unwrap();
             let mut list = vec![ps_sources::BrowserEntry {
                 url: "https://example.com/bm".into(),
                 title: "Saved Docs".into(),
@@ -5700,7 +5956,7 @@ mod tests {
                     bookmark: false,
                 });
             }
-            sources.browser = list;
+            engine.db.store_browser(&list).unwrap();
         }
 
         // Empty query in Browser scope must return both recent history and bookmarks.

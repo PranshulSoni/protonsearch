@@ -24,6 +24,8 @@ pub mod realfiles;
 #[cfg(feature = "engine")]
 pub mod relevance;
 pub mod stats;
+#[cfg(feature = "engine")]
+pub mod walk;
 
 use std::path::Path;
 

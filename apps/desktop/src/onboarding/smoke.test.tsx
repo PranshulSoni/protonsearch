@@ -67,8 +67,8 @@ describe("onboarding smoke", () => {
     const selector = container.querySelector<HTMLSelectElement>("#ocr-engine");
     expect(selector?.value).toBe("windows");
     expect(selector?.querySelector<HTMLOptionElement>('option[value="pp_ocr_v6"]')?.disabled).toBe(true);
-    expect(container.textContent).toContain("Built into Windows and available now.");
-    expect(container.textContent).toContain("Not configured in ProtonSearch.");
+    expect(container.textContent).toContain("Built into Windows 10 and 11. Nothing to download.");
+    expect(container.textContent).toContain("Open-source engine that uses your installed Tesseract.");
   });
 
   it("runs the seven-step flow, keeps progress local and completes through the bridge", async () => {

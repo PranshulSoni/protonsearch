@@ -34,6 +34,7 @@ windows = { workspace = true, features = [
     "Foundation",
     "Foundation_Collections",
     "Media_Control",
+    "Storage_Streams",
     "Devices_Radios",
     "Devices_Bluetooth",
     "Devices_Enumeration",

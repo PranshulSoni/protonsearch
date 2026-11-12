@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  HOTKEY_CONFLICT_NOTE,
   chordFromKeyboardEvent,
   displayHotkey,
   normalizeHotkey,
@@ -130,8 +129,21 @@ describe("normalizeHotkey and displayHotkey", () => {
     expect(displayHotkey("")).toBe("");
   });
 
-  it("documents the registration conflict behaviour", () => {
-    expect(HOTKEY_CONFLICT_NOTE).toMatch(/Win\+L/);
+  it("records keys that event.key reports oddly (IME, Shift, backslash)", () => {
+    const flags = { ctrlKey: false, altKey: false, shiftKey: false, metaKey: false };
+    expect(chordFromKeyboardEvent({ ...flags, key: " ", code: "Space", altKey: true, shiftKey: true })).toEqual(
+      expect.objectContaining({ ok: true, accelerator: "Alt+Shift+Space" }),
+    );
+    expect(chordFromKeyboardEvent({ ...flags, key: "Process", code: "Space", altKey: true, shiftKey: true })).toEqual(
+      expect.objectContaining({ ok: true, accelerator: "Alt+Shift+Space" }),
+    );
+    expect(chordFromKeyboardEvent({ ...flags, key: "!", code: "Digit1", ctrlKey: true, shiftKey: true })).toEqual(
+      expect.objectContaining({ ok: true, accelerator: "Ctrl+Shift+1" }),
+    );
+    expect(chordFromKeyboardEvent({ ...flags, key: "\\", code: "Backslash", ctrlKey: true })).toEqual(
+      expect.objectContaining({ ok: true, accelerator: "Ctrl+\\" }),
+    );
+    expect(chordFromKeyboardEvent({ ...flags, key: "Process", code: "ShiftLeft", shiftKey: true })).toBeNull();
   });
 });
 

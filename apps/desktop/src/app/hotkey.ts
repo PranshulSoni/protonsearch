@@ -22,10 +22,6 @@ export type HotkeyValidation =
 
 export const DEFAULT_HOTKEY = "Alt+Space";
 
-/** Shown next to hotkey capture controls: reserved combos and live behaviour. */
-export const HOTKEY_CONFLICT_NOTE =
-  "Windows reserves combinations such as Alt+Tab, Alt+F4 and Win+L. If another app already owns a shortcut, Windows rejects it and the previous shortcut stays active.";
-
 const MODIFIER_ALIASES: Record<string, "ctrl" | "alt" | "shift" | "win"> = {
   ctrl: "ctrl",
   control: "ctrl",
@@ -96,8 +92,8 @@ const KEY_ALIASES: Record<string, string> = {
   ".": ".",
   slash: "/",
   "/": "/",
-  backslash: "\\\\",
-  "\\\\": "\\\\",
+  backslash: "\\",
+  "\\": "\\",
   semicolon: ";",
   ";": ";",
   quote: "'",
@@ -277,11 +273,15 @@ function buildDisplay(parts: HotkeyParts): string {
 
 export interface KeyboardChordEvent {
   key: string;
+  /** Physical key name (KeyboardEvent.code); lets IME and Shift-typed keys still resolve. */
+  code?: string;
   ctrlKey: boolean;
   altKey: boolean;
   shiftKey: boolean;
   metaKey: boolean;
 }
+
+const MODIFIER_CODE = /^(?:(?:Shift|Control|Alt|Meta|OS)(?:Left|Right)?|AltGraph|CapsLock|NumLock|ScrollLock|Fn|FnLock)$/;
 
 const MODIFIER_ONLY_KEYS = new Set([
   "Control",
@@ -316,19 +316,70 @@ const NAMED_EVENT_KEYS: Record<string, string> = {
 
 const PUNCTUATION_EVENT_KEYS = new Set(["-", "=", ",", ".", "/", ";", "'", "[", "]", "\\", "\`"]);
 
+/** Physical key names for keys that event.key does not report as a usable name. */
+const CODE_EVENT_KEYS: Record<string, string> = {
+  Space: "Space",
+  Tab: "Tab",
+  Enter: "Enter",
+  Escape: "Escape",
+  Backspace: "Backspace",
+  Delete: "Delete",
+  Insert: "Insert",
+  Home: "Home",
+  End: "End",
+  PageUp: "PageUp",
+  PageDown: "PageDown",
+  ArrowUp: "ArrowUp",
+  ArrowDown: "ArrowDown",
+  ArrowLeft: "ArrowLeft",
+  ArrowRight: "ArrowRight",
+  PrintScreen: "PrintScreen",
+  Pause: "Pause",
+  Minus: "-",
+  Equal: "=",
+  Comma: ",",
+  Period: ".",
+  Slash: "/",
+  Semicolon: ";",
+  Quote: "'",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Backslash: "\\",
+  Backquote: "`",
+  NumpadAdd: "NumpadAdd",
+  NumpadSubtract: "NumpadSubtract",
+  NumpadMultiply: "NumpadMultiply",
+  NumpadDivide: "NumpadDivide",
+  NumpadDecimal: "NumpadDecimal",
+  NumpadEnter: "NumpadEnter",
+  NumpadEqual: "NumpadEqual",
+};
+
+function codeEventToken(code: string): string | null {
+  const letter = /^Key([A-Z])$/.exec(code);
+  if (letter) return letter[1];
+  const digit = /^(Digit|Numpad)([0-9])$/.exec(code);
+  if (digit) return digit[1] === "Numpad" ? "Numpad" + digit[2] : digit[2];
+  if (/^F([1-9]|1[0-2])$/.test(code)) return code;
+  return CODE_EVENT_KEYS[code] ?? null;
+}
+
+/**
+ * Token for the main key. event.key is the first choice, but it is not stable:
+ * an IME reports "Process", dead keys report "Dead", and Shift turns Digit1 into
+ * "!". The physical code (what global-hotkey registers) covers those cases.
+ */
 function eventKeyToken(event: KeyboardChordEvent): string | null {
   const key = event.key;
-  if (!key) return null;
-  if (key === " ") return "Space";
-  if (key === "Tab") return "Tab";
-  if (key.length === 1) {
-    if (/^[a-zA-Z]$/.test(key)) return key.toUpperCase();
-    if (/^[0-9]$/.test(key)) return key;
-    if (PUNCTUATION_EVENT_KEYS.has(key)) return key;
-    return null;
-  }
-  if (/^F([1-9]|1[0-2])$/.test(key)) return key;
-  return NAMED_EVENT_KEYS[key] ?? null;
+  let token: string | null = null;
+  if (key === " ") token = "Space";
+  else if (key === "Tab") token = "Tab";
+  else if (key.length === 1) {
+    if (/^[a-zA-Z]$/.test(key)) token = key.toUpperCase();
+    else if (/^[0-9]$/.test(key) || PUNCTUATION_EVENT_KEYS.has(key)) token = key;
+  } else if (/^F([1-9]|1[0-2])$/.test(key)) token = key;
+  else token = NAMED_EVENT_KEYS[key] ?? null;
+  return token ?? (event.code ? codeEventToken(event.code) : null);
 }
 
 /**
@@ -337,7 +388,7 @@ function eventKeyToken(event: KeyboardChordEvent): string | null {
  * error for keys that cannot be part of a global shortcut.
  */
 export function chordFromKeyboardEvent(event: KeyboardChordEvent): HotkeyValidation | null {
-  if (MODIFIER_ONLY_KEYS.has(event.key)) return null;
+  if (MODIFIER_ONLY_KEYS.has(event.key) || (event.code && MODIFIER_CODE.test(event.code))) return null;
   const token = eventKeyToken(event);
   if (!token) {
     return {

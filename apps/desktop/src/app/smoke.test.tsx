@@ -58,7 +58,7 @@ describe("desktop app shell smoke", () => {
     expect(navButtons.map((button) => button.textContent?.trim())).toEqual([
       "Home",
       "Search & Indexing",
-      "Workflows",
+      "Agentic workflows",
       "To-do",
       "Settings",
     ]);
@@ -68,9 +68,9 @@ describe("desktop app shell smoke", () => {
 
     const routes: Array<{ navIndex: number; heading: string }> = [
       { navIndex: 1, heading: "Search & Indexing" },
-      { navIndex: 2, heading: "Workflows" },
+      { navIndex: 2, heading: "Agentic workflows" },
       { navIndex: 3, heading: "To-do" },
-      { navIndex: 4, heading: "Make it yours" },
+      { navIndex: 4, heading: "Settings" },
     ];
     for (const route of routes) {
       await act(async () => {
@@ -126,7 +126,7 @@ describe("desktop app shell smoke", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("Offer web search results");
     expect(text).toContain("DuckDuckGo");
-    expect(text).toContain("Opens the result in your browser");
+    expect(text).toContain("Used by the web search result.");
     const radios = [...container.querySelectorAll('[role="radio"]')].map((node) =>
       node.textContent?.trim(),
     );
@@ -138,7 +138,7 @@ describe("desktop app shell smoke", () => {
       root.render(<App view="main" />);
     });
     await flush(8);
-    await act(async () => container.querySelectorAll<HTMLButtonElement>(".navbtn")[4].click());
+    await act(async () => container.querySelectorAll<HTMLButtonElement>(".navbtn")[1].click());
     await flush(4);
     const selector = container.querySelector<HTMLSelectElement>("#ocr-engine");
     expect(selector?.value).toBe("windows");
@@ -148,11 +148,12 @@ describe("desktop app shell smoke", () => {
       ["indra", true],
       ["tesseract", true],
     ]);
-    expect(container.textContent).toContain("No OCR engine or model downloads are available here.");
-    expect(container.textContent).toContain("license requires acceptance before download");
+    // Each engine that is not installed offers an Install button.
+    expect([...container.querySelectorAll("button")].filter((button) => button.textContent === "Install")).toHaveLength(3);
+    expect(container.textContent).not.toContain("acceptance");
   });
 
-  it("lists detected agent runtimes and the honest recent-runs state", async () => {
+  it("lists every agent runtime with its install state", async () => {
     window.localStorage.clear();
     await act(async () => {
       root.render(<App view="main" />);
@@ -165,10 +166,12 @@ describe("desktop app shell smoke", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("Agents");
     expect(text).toContain("Pi");
-    expect(text).not.toContain("Codex");
-    expect(text).not.toContain("OpenCode");
-    expect(text).toContain("Available");
-    expect(text).toContain("No runs yet.");
+    expect(text).toContain("Claude Code");
+    expect(text).toContain("Codex");
+    expect(text).toContain("OpenCode");
+    expect(text).toContain("Gemini CLI");
+    expect(text).toContain("Installed · 1.5.0");
+    expect(text).toContain("Not installed");
     expect(container.querySelector("#workflows-agents")).not.toBeNull();
   });
 

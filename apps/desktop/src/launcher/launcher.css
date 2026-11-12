@@ -264,8 +264,8 @@ html[data-window="launcher"] body #root {
 
 .searchline .logo {
   flex: none;
-  width: 29px;
-  height: 29px;
+  width: 36px;
+  height: 36px;
 }
 
 .search-input {
@@ -1102,8 +1102,8 @@ html[data-window="launcher"] body #root {
   }
 
   .searchline .logo {
-    width: 26px;
-    height: 26px;
+    width: 32px;
+    height: 32px;
   }
 
   .results {

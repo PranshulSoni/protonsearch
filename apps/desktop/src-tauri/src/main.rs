@@ -135,10 +135,18 @@ struct AppState {
     /// never touched by search, startup or settings.
     /// Pi CLI agent (default runtime). Spawned only when a workflow starts.
     pi_agent: Mutex<Option<PiAgentClient>>,
+    /// The Claude Code / Codex / OpenCode / Gemini run in progress, if any.
+    cli_run: Arc<Mutex<Option<CliRun>>>,
     /// Cached agent discovery for the Workflows Agents section.
     agents: Mutex<Option<Vec<DetectedAgent>>>,
     /// Persisted runtime-agnostic agent task history/state (Agents card).
     agent_tasks: Arc<ps_agent::AgentTaskService>,
+}
+
+/// A CLI agent run in progress: its task id and the flag that stops it.
+struct CliRun {
+    task_id: String,
+    cancel: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Position the frameless launcher near the top-center of the monitor under the
@@ -469,7 +477,7 @@ fn build_tray(app: &AppHandle, active_hotkey: &str) -> tauri::Result<()> {
 
     // Explicit tray icon: never depend on default_window_icon(), which can be
     // absent and would silently produce an invisible tray entry.
-    let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
+    let tray_icon = tauri::image::Image::from_bytes(tray_icon_bytes())
         .map_err(|err| tauri::Error::AssetNotFound(err.to_string()))?;
     let tooltip = format!("ProtonSearch — {active_hotkey} to search");
     let builder = TrayIconBuilder::with_id("protonsearch-tray")
@@ -516,6 +524,22 @@ fn build_tray(app: &AppHandle, active_hotkey: &str) -> tauri::Result<()> {
 /// Test-only escape hatch: when PROTONSEARCH_CDP_PORT is set the WebView2
 /// renderer opens a loopback DevTools socket so the E2E harness can drive the
 /// real app (screenshots + latency). Not set in production; loopback only.
+/// The tray draws at the system small-icon size (16/20/24 px at 100/125/150%);
+/// an exact-size bitmap stays sharp where a scaled-down 32 px one blurs.
+fn tray_icon_bytes() -> &'static [u8] {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSMICON};
+        match unsafe { GetSystemMetrics(SM_CXSMICON) } {
+            ..=16 => return include_bytes!("../icons/tray-16.png"),
+            17..=20 => return include_bytes!("../icons/tray-20.png"),
+            21..=24 => return include_bytes!("../icons/tray-24.png"),
+            _ => {}
+        }
+    }
+    include_bytes!("../icons/32x32.png")
+}
+
 /// The embedded app icon (PNG). Used for both windows so the title bar and
 /// taskbar entries are never blank, independent of bundle icon resolution.
 fn window_icon() -> tauri::Result<tauri::image::Image<'static>> {
@@ -876,6 +900,8 @@ async fn update_settings(
     candidate.apply(&patch);
     validate_settings(&candidate)?;
     let settings = state.engine.update_settings(patch).map_err(|e| e.to_string())?;
+    // The island window is prewarmed and keeps its own copy; it re-reads on this event.
+    let _ = app.emit("settings:changed", settings.clone());
     // The Pi launcher path may have changed; drop the cached probe and agent list.
     ps_agent::clear_probe_cache();
     if let Ok(mut cache) = state.agents.lock() {
@@ -965,6 +991,24 @@ async fn get_ocr_engines(
 }
 
 #[tauri::command]
+async fn install_tesseract_ocr(state: tauri::State<'_, AppState>) -> Result<Settings, String> {
+    let engine_instance = state.engine.clone();
+    run_blocking(move || engine_instance.install_tesseract_ocr())
+        .await?
+        .map_err(|e| e.to_string())
+}
+
+/// Opens Windows language settings, where the OCR language for Windows OCR is added.
+#[tauri::command]
+fn open_windows_language_settings() -> Result<(), String> {
+    std::process::Command::new("explorer")
+        .arg("ms-settings:regionlanguage")
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn download_ocr_engine(
     state: tauri::State<'_, AppState>,
     engine: ps_ipc::OcrEngine,
@@ -1034,6 +1078,7 @@ async fn show_main(app: AppHandle) {
 fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
     let _ = state.engine.index_command(IndexCommand::Shutdown);
     let _ = state.agent_tasks.stop_all("app quit");
+    cancel_cli_run(&state);
     if let Ok(mut slot) = state.pi_agent.lock() {
         if let Some(client) = slot.take() {
             client.shutdown();
@@ -1043,18 +1088,27 @@ fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
     app.exit(0);
 }
 
-/// Validate and live-apply a new global shortcut. Restores the previous one if
-/// the new combination cannot be registered (e.g. another app owns it).
+/// Startup fallbacks when the saved shortcut is owned by another app (e.g. PowerToys owns Alt+Space).
+const HOTKEY_FALLBACKS: [&str; 2] = ["Alt+Shift+Space", "Ctrl+Alt+Space"];
+
+/// Validate and live-apply a new global shortcut. If the new combination cannot be
+/// registered (e.g. another app owns it), the shortcut that was live before is restored.
 #[tauri::command]
 fn set_hotkey(app: AppHandle, state: tauri::State<'_, AppState>, hotkey: String) -> Result<Settings, String> {
     let candidate = hotkey.trim().to_string();
     if candidate.is_empty() || candidate.len() > 64 {
         return Err("Enter a shortcut such as Alt+Space.".into());
     }
-    let previous = state.engine.settings().hotkey;
-    let _ = app.global_shortcut().unregister_all();
-    if let Err(err) = app.global_shortcut().register(candidate.as_str()) {
-        let _ = app.global_shortcut().register(previous.as_str());
+    let shortcuts = app.global_shortcut();
+    // The live shortcut can be a startup fallback, so probe for it rather than trust the saved value.
+    let live = std::iter::once(state.engine.settings().hotkey)
+        .chain(HOTKEY_FALLBACKS.iter().map(|s| s.to_string()))
+        .find(|s| shortcuts.is_registered(s.as_str()));
+    let _ = shortcuts.unregister_all();
+    if let Err(err) = shortcuts.register(candidate.as_str()) {
+        if let Some(live) = live {
+            let _ = shortcuts.register(live.as_str());
+        }
         return Err(format!("That shortcut is unavailable: {err}"));
     }
     let mut patch = SettingsPatch::default();
@@ -1068,6 +1122,24 @@ fn set_hotkey(app: AppHandle, state: tauri::State<'_, AppState>, hotkey: String)
 
 fn probe_agent_status(state: &AppState) -> AgentStatus {
     let settings = state.engine.settings();
+    if let Some(agent) = ps_agent::CliAgent::from_id(settings.agent.runtime.id()) {
+        // Only the default CLI is probed here, so the island's first status read stays quick.
+        let found = ps_agent::cli::probe(agent);
+        let running = state.cli_run.lock().map(|slot| slot.is_some()).unwrap_or(false);
+        return AgentStatus {
+            state: match (found.is_some(), running) {
+                (false, _) => AgentState::NotConfigured,
+                (true, true) => AgentState::Running,
+                (true, false) => AgentState::Stopped,
+            },
+            runtime: Some(match found.as_ref() {
+                Some(info) => format!("{} {}", agent.name(), info.version),
+                None => agent.name().to_string(),
+            }),
+            model: configured_model(&settings.agent, agent.id()),
+            detail: None,
+        };
+    }
     let running = state.pi_agent.lock().ok()
         .and_then(|slot| slot.as_ref().map(|client| client.is_running())).unwrap_or(false);
     let status = ps_agent::pi::status::status(&state.data_dir,
@@ -1085,10 +1157,32 @@ fn probe_agent_status(state: &AppState) -> AgentStatus {
     }
 }
 
-/// Detected Pi installation.
+/// Pi and the four CLIs. Agents that are not installed are listed as unavailable.
 #[tauri::command]
-async fn detect_agents(app: AppHandle) -> Result<Vec<DetectedAgent>, String> {
-    run_blocking(move || detect_agents_blocking(&app.state::<AppState>())).await
+async fn detect_agents(app: AppHandle, refresh: Option<bool>) -> Result<Vec<DetectedAgent>, String> {
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        if refresh.unwrap_or(false) {
+            ps_agent::clear_probe_cache();
+            if let Ok(mut cache) = state.agents.lock() {
+                *cache = None;
+            }
+        }
+        detect_agents_blocking(&state)
+    })
+    .await
+}
+
+fn detected_agent(id: &str, name: &str, found: Option<(String, PathBuf)>) -> DetectedAgent {
+    DetectedAgent {
+        id: id.into(),
+        name: name.into(),
+        kind: "agent".into(),
+        version: found.as_ref().map(|(version, _)| version.clone()),
+        path: found.as_ref().map(|(_, path)| path.to_string_lossy().into_owned()),
+        available: found.is_some(),
+        detail: None,
+    }
 }
 
 fn detect_agents_blocking(state: &AppState) -> Vec<DetectedAgent> {
@@ -1098,20 +1192,19 @@ fn detect_agents_blocking(state: &AppState) -> Vec<DetectedAgent> {
         }
     }
     let settings = state.engine.settings();
-    let mut agents = Vec::new();
     let managed = ps_agent::pi::install::managed_launcher(&state.data_dir);
     let selected = settings.agent.pi_path.as_deref().map(Path::new).or_else(|| managed.is_file().then_some(managed.as_path()));
-    if let Some(info) = ps_agent::probe_pi_cached(selected)
-    {
-        agents.push(DetectedAgent {
-            id: "pi".into(),
-            name: "Pi".into(),
-            kind: "agent".into(),
-            version: Some(info.version.clone()),
-            path: Some(info.path.to_string_lossy().into_owned()),
-            available: true,
-            detail: Some("Default agent runtime. Read-only in this alpha.".into()),
-        });
+    let mut agents = vec![detected_agent(
+        "pi",
+        "Pi",
+        ps_agent::probe_pi_cached(selected).map(|info| (info.version, info.path)),
+    )];
+    for agent in ps_agent::CliAgent::ALL {
+        agents.push(detected_agent(
+            agent.id(),
+            agent.name(),
+            ps_agent::cli::probe(agent).map(|info| (info.version, info.path)),
+        ));
     }
     if let Ok(mut cache) = state.agents.lock() {
         *cache = Some(agents.clone());
@@ -1174,16 +1267,230 @@ async fn agent_status(app: AppHandle) -> Result<AgentStatus, String> {
     run_blocking(move || probe_agent_status(&app.state::<AppState>())).await
 }
 
+/// Models for one agent (default: the default agent). Pi lists with `pi --list-models`,
+/// OpenCode with `opencode models`; the other CLIs take a typed name and list nothing.
 #[tauri::command]
-async fn agent_start(app: AppHandle, request: AgentRunRequest) -> Result<(), String> {
-    run_blocking(move || agent_start_blocking(&app, &app.state::<AppState>(), request)).await?
+async fn agent_models(app: AppHandle, agent_id: Option<String>) -> Result<Vec<ps_agent::pi::PiModel>, String> {
+    run_blocking(move || {
+        let state = app.state::<AppState>();
+        let settings = state.engine.settings();
+        let id = agent_id.unwrap_or_else(|| settings.agent.runtime.id().to_string());
+        if id == "pi" {
+            return PiAgentConfig::from_settings(&settings.agent, &state.data_dir)
+                .map(|config| ps_agent::pi::list_pi_models(&config))
+                .unwrap_or_default();
+        }
+        ps_agent::CliAgent::from_id(&id).map(ps_agent::cli::list_models).unwrap_or_default()
+    })
+    .await
 }
 
-fn agent_start_blocking(app: &AppHandle, state: &AppState, request: AgentRunRequest) -> Result<(), String> {
+/// Test button: Pi's install probe, or one word from a CLI through its configured model.
+#[tauri::command]
+async fn agent_test(app: AppHandle, agent_id: String) -> Result<String, String> {
+    run_blocking(move || agent_test_blocking(&app.state::<AppState>(), &agent_id)).await?
+}
+
+fn agent_test_blocking(state: &AppState, agent_id: &str) -> Result<String, String> {
+    let settings = state.engine.settings();
+    if agent_id == "pi" {
+        let managed = ps_agent::pi::install::managed_launcher(&state.data_dir);
+        let selected = settings.agent.pi_path.as_deref().map(Path::new).or_else(|| managed.is_file().then_some(managed.as_path()));
+        let info = ps_agent::probe_pi(selected).ok_or("Pi is not installed or did not start.")?;
+        if !info.node_ok {
+            return Err("Pi needs Node.js 22.19 or newer.".into());
+        }
+        return Ok(format!("Pi {}", info.version));
+    }
+    let agent = ps_agent::CliAgent::from_id(agent_id).ok_or("Unknown agent.")?;
+    let (launcher, version) = detected_cli(state, agent)?;
+    let workspace = agent_workspace(state, &settings.agent);
+    let model = configured_model(&settings.agent, agent.id());
+    ps_agent::cli::check(agent, &launcher, &workspace, model.as_deref()).map_err(|error| error.message)?;
+    Ok(format!("{} {version}", agent.name()))
+}
+
+/// The launcher and version of an installed CLI, from the detection cache.
+fn detected_cli(state: &AppState, agent: ps_agent::CliAgent) -> Result<(PathBuf, String), String> {
+    detect_agents_blocking(state)
+        .into_iter()
+        .find(|entry| entry.id == agent.id() && entry.available)
+        .and_then(|entry| Some((PathBuf::from(entry.path?), entry.version.unwrap_or_default())))
+        .ok_or_else(|| format!("{} is not installed or not on PATH.", agent.name()))
+}
+
+/// Pi keeps its default model in `model`; the CLIs keep theirs in `cli_models`.
+fn configured_model(agent: &ps_ipc::AgentSettings, runtime_id: &str) -> Option<String> {
+    let value = if runtime_id == "pi" { agent.model.clone() } else { agent.cli_models.get(runtime_id).cloned() };
+    value.map(|value| value.trim().to_string()).filter(|value| !value.is_empty())
+}
+
+/// Working folder for runs: the configured one, else the Pi workspace under the data folder.
+fn agent_workspace(state: &AppState, agent: &ps_ipc::AgentSettings) -> PathBuf {
+    agent.workspace.as_deref().map(PathBuf::from).unwrap_or_else(|| state.data_dir.join(ps_agent::pi::DEFAULT_WORKSPACE_DIR_NAME))
+}
+
+/// Stops the CLI run in progress, if any. Its task ends as cancelled.
+fn cancel_cli_run(state: &AppState) {
+    if let Ok(slot) = state.cli_run.lock() {
+        if let Some(run) = slot.as_ref() {
+            run.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+}
+
+#[tauri::command]
+async fn agent_start(
+    app: AppHandle,
+    request: AgentRunRequest,
+    parent_id: Option<String>,
+    runtime: Option<ps_ipc::AgentRuntime>,
+) -> Result<(), String> {
+    run_blocking(move || agent_start_blocking(&app, &app.state::<AppState>(), request, parent_id, runtime)).await?
+}
+
+/// Pi runs without a session, so a follow-up carries the earlier turns of its thread.
+fn thread_prompt(tasks: &[ps_agent::AgentTask], root: &str, skip: &str, message: &str) -> String {
+    let mut turns: Vec<&ps_agent::AgentTask> = tasks
+        .iter()
+        .filter(|task| task.id != skip && (task.id == root || task.parent_id.as_deref() == Some(root)))
+        .collect();
+    turns.sort_by_key(|task| task.created_at);
+    let mut prompt = String::from("Continue this conversation. Earlier turns:\n");
+    for task in turns {
+        let reply = task
+            .answer
+            .as_deref()
+            .or(task.error.as_ref().map(|error| error.message.as_str()))
+            .unwrap_or("(no answer)");
+        prompt.push_str(&format!("\nUser: {}\nAssistant: {reply}\n", task.prompt_summary));
+    }
+    prompt.push_str(&format!("\nUser: {message}"));
+    prompt
+}
+
+/// Delete an agent thread (a task and its follow-ups), stopping its run first.
+#[tauri::command]
+fn agent_delete(state: tauri::State<'_, AppState>, task_id: String) -> Result<(), String> {
+    if let Ok(slot) = state.pi_agent.lock() {
+        if let Some(client) = slot.as_ref() {
+            let running = client.run_id();
+            let in_thread = running.as_deref() == Some(task_id.as_str())
+                || running
+                    .and_then(|id| state.agent_tasks.task(&id))
+                    .is_some_and(|task| task.parent_id.as_deref() == Some(task_id.as_str()));
+            if in_thread {
+                let _ = client.cancel();
+            }
+        }
+    }
+    if let Ok(slot) = state.cli_run.lock() {
+        if let Some(run) = slot.as_ref() {
+            let in_thread = run.task_id == task_id
+                || state.agent_tasks.task(&run.task_id).is_some_and(|task| task.parent_id.as_deref() == Some(task_id.as_str()));
+            if in_thread {
+                run.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    }
+    state.agent_tasks.delete(&task_id);
+    Ok(())
+}
+
+/// Rename an agent thread (the title shown on the card and in the chat header).
+#[tauri::command]
+fn agent_rename(state: tauri::State<'_, AppState>, task_id: String, title: String) -> Result<(), String> {
+    state
+        .agent_tasks
+        .rename(&task_id, &title)
+        .map(|_| ())
+        .ok_or_else(|| "That agent no longer exists.".to_string())
+}
+
+/// Starts a run in Claude Code, Codex, OpenCode or Gemini and records it as a task.
+/// The process runs on its own thread; its events reach the card like Pi's do.
+fn agent_start_cli(
+    app: &AppHandle,
+    state: &AppState,
+    agent: ps_agent::CliAgent,
+    settings: &ps_ipc::AgentSettings,
+    request: AgentRunRequest,
+    parent_id: Option<String>,
+) -> Result<(), String> {
+    let (launcher, version) = detected_cli(state, agent)?;
+    let model = request.model.clone().or_else(|| configured_model(settings, agent.id()));
+    let workspace = agent_workspace(state, settings);
+    let mut slot = state.cli_run.lock().map_err(|e| e.to_string())?;
+    let pi_busy = state.pi_agent.lock().ok().and_then(|pi| pi.as_ref().map(|client| client.is_running())).unwrap_or(false);
+    if slot.is_some() || pi_busy {
+        return Err("An agent run is already in progress.".into());
+    }
+    let task = state
+        .agent_tasks
+        .begin_cli(&request, agent, &version, model.clone(), parent_id.clone())
+        .map_err(|_| "The run could not be recorded.".to_string())?;
+    let prompt = match parent_id.as_deref() {
+        Some(root) => thread_prompt(&state.agent_tasks.tasks(200), root, &task.id, &request.prompt),
+        None => request.prompt.clone(),
+    };
+    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    *slot = Some(CliRun { task_id: task.id.clone(), cancel: Arc::clone(&cancel) });
+    drop(slot);
+    let run_id = task.id.clone();
+    let tasks = Arc::clone(&state.agent_tasks);
+    let runs = Arc::clone(&state.cli_run);
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let emit = |event: AgentEvent| {
+            let _ = tasks.apply_event(&run_id, &event);
+            let _ = handle.emit("agent:event", &event);
+        };
+        emit(AgentEvent::Started {
+            run_id: run_id.clone(),
+            runtime: agent.name().to_string(),
+            model: model.clone().unwrap_or_else(|| "default".to_string()),
+        });
+        let started = std::time::Instant::now();
+        let result = ps_agent::cli::run(agent, &launcher, &workspace, &prompt, model.as_deref(), ps_agent::cli::RUN_TIMEOUT, &cancel);
+        let duration_ms = started.elapsed().as_millis() as u64;
+        match result {
+            Ok(answer) => {
+                emit(AgentEvent::Output { text: answer, final_answer: true });
+                emit(AgentEvent::Finished { ok: true, duration_ms });
+            }
+            Err(error) => {
+                emit(AgentEvent::Error { code: error.code.to_string(), message: error.message });
+                emit(AgentEvent::Finished { ok: false, duration_ms });
+            }
+        }
+        if let Ok(mut slot) = runs.lock() {
+            if slot.as_ref().is_some_and(|run| run.task_id == run_id) {
+                *slot = None;
+            }
+        }
+    });
+    Ok(())
+}
+
+fn agent_start_blocking(
+    app: &AppHandle,
+    state: &AppState,
+    request: AgentRunRequest,
+    parent_id: Option<String>,
+    // The agent this run uses; the default agent when the caller does not pick one.
+    runtime: Option<ps_ipc::AgentRuntime>,
+) -> Result<(), String> {
     let settings = state.engine.settings();
     if ps_agent::pi::install::is_installing() { return Err("Wait for Pi installation to finish.".into()); }
     if !settings.agent.enabled {
         return Err("Agent workflows are disabled in Preferences.".into());
+    }
+    let runtime = runtime.unwrap_or(settings.agent.runtime);
+    if let Some(agent) = ps_agent::CliAgent::from_id(runtime.id()) {
+        return agent_start_cli(app, state, agent, &settings.agent, request, parent_id);
+    }
+    if state.cli_run.lock().map(|run| run.is_some()).unwrap_or(false) {
+        return Err("An agent run is already in progress.".into());
     }
     let mut config = PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
         "The Pi CLI agent is not available. Install it from pi.dev or set its path in Preferences."
@@ -1203,14 +1510,17 @@ fn agent_start_blocking(app: &AppHandle, state: &AppState, request: AgentRunRequ
         .begin_pi(
             &request,
             &config.pi,
-            settings.agent.model.clone(),
+            request.model.clone().or_else(|| settings.agent.model.clone()),
             config.allow_writes,
-            None,
+            parent_id.clone(),
         )
         .map_err(|_| "The workflow could not be recorded.".to_string())?;
     // The canonical task id becomes the runtime run id so events map 1:1.
     let mut run_request = request.clone();
     run_request.run_id = task.id.clone();
+    if let Some(root) = parent_id.as_deref() {
+        run_request.prompt = thread_prompt(&state.agent_tasks.tasks(200), root, &task.id, &request.prompt);
+    }
     if let Some(previous) = slot.take() { previous.shutdown(); }
     if slot.is_none() {
         let handle = app.clone();
@@ -1242,6 +1552,12 @@ fn agent_start_blocking(app: &AppHandle, state: &AppState, request: AgentRunRequ
 
 #[tauri::command]
 fn agent_cancel(state: tauri::State<'_, AppState>, run_id: Option<String>) -> Result<(), String> {
+    if let Some(run) = state.cli_run.lock().map_err(|error| error.to_string())?.as_ref() {
+        if run_id.as_ref().map_or(true, |id| *id == run.task_id) {
+            run.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+            return Ok(());
+        }
+    }
     let slot = state.pi_agent.lock().map_err(|error| error.to_string())?;
     if let Some(client) = slot.as_ref() {
         if run_id.as_ref().is_some_and(|id| client.run_id().as_ref() != Some(id)) {
@@ -1259,6 +1575,7 @@ fn agent_approve(_state: tauri::State<'_, AppState>, _response: AgentApprovalRes
 
 #[tauri::command]
 fn agent_stop(state: tauri::State<'_, AppState>) {
+    cancel_cli_run(&state);
     if let Ok(mut slot) = state.pi_agent.lock() {
         if let Some(client) = slot.take() {
             client.shutdown();
@@ -1309,11 +1626,11 @@ fn media_info(session: ps_windows::MediaSession) -> ps_ipc::MediaSessionInfo {
         title: session.title,
         artist: session.artist,
         album: session.album,
-        artwork_data_url: None,
+        artwork_data_url: session.artwork_data_url,
         playing: session.playing,
         position_ms: session.position_ms,
         duration_ms: session.duration_ms,
-        can_seek: false,
+        can_seek: session.can_seek,
         can_shuffle: false,
         shuffle: false,
         can_repeat: false,
@@ -1474,12 +1791,14 @@ fn build_controls_status(data_dir: &std::path::Path) -> ps_ipc::ControlsStatus {
 
 #[tauri::command]
 async fn control_set_wifi(enabled: bool) -> Result<(), String> {
-    run_native(move || ps_windows::set_wifi_radio(enabled).map_err(|error| format!("{error:#}"))).await?
+    // Off the native-controls lock (as control_set_audio_output): radio changes are already
+    // serialised by the WinRT radio worker, so a toggle must not wait for the status probe.
+    run_blocking(move || ps_windows::set_wifi_radio(enabled).map_err(|error| format!("{error:#}"))).await?
 }
 
 #[tauri::command]
 async fn control_set_bluetooth(enabled: bool) -> Result<(), String> {
-    run_native(move || ps_windows::set_bluetooth_radio(enabled).map_err(|error| format!("{error:#}"))).await?
+    run_blocking(move || ps_windows::set_bluetooth_radio(enabled).map_err(|error| format!("{error:#}"))).await?
 }
 
 #[tauri::command]
@@ -1529,7 +1848,9 @@ async fn control_set_brightness(percent: u8) -> Result<(), String> {
 
 #[tauri::command]
 async fn control_set_audio_output(device_id: String) -> Result<(), String> {
-    run_native(move || {
+    // Off the native-controls lock: a switch must not queue behind the whole
+    // Quick Settings probe that get_controls_status holds that lock for.
+    run_blocking(move || {
         ps_windows::set_audio_output(&device_id)
             .map_err(|_| "Couldn't switch the audio output device.".to_string())
     })
@@ -1537,18 +1858,51 @@ async fn control_set_audio_output(device_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn control_media(action: ps_ipc::MediaAction) -> Result<(), String> {
+async fn control_media(action: ps_ipc::MediaAction, position_ms: Option<u64>) -> Result<(), String> {
     let command = match action {
         ps_ipc::MediaAction::Play => ps_windows::MediaCommand::Play,
         ps_ipc::MediaAction::Pause => ps_windows::MediaCommand::Pause,
         ps_ipc::MediaAction::PlayPause => ps_windows::MediaCommand::PlayPause,
         ps_ipc::MediaAction::Next => ps_windows::MediaCommand::Next,
         ps_ipc::MediaAction::Previous => ps_windows::MediaCommand::Previous,
+        ps_ipc::MediaAction::Seek => ps_windows::MediaCommand::Seek(
+            position_ms.ok_or_else(|| "Seeking needs a position.".to_string())?,
+        ),
         ps_ipc::MediaAction::Shuffle | ps_ipc::MediaAction::Repeat => {
             return Err("Shuffle and repeat can't be changed from here.".to_string());
         }
     };
     run_blocking(move || ps_windows::media_command(command).map_err(|error| format!("{error:#}"))).await?
+}
+
+/// Newest commits on one local branch of a repository, for the Git card's branch picker.
+#[tauri::command]
+async fn git_branch_commits(repo: String, branch: String) -> Result<Vec<ps_ipc::SearchResult>, String> {
+    run_blocking(move || ps_sources::git::branch_commits(std::path::Path::new(&repo), &branch))
+        .await?
+        .map(|entries| entries.iter().map(ps_core::engine::git_result).collect())
+        .map_err(|error| format!("{error:#}"))
+}
+
+/// Pin or unpin one clipboard history item (`clip:<row id>`). The island and
+/// launcher refresh through the same event a new capture raises.
+#[tauri::command]
+async fn clipboard_set_pinned(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    id: String,
+    pinned: bool,
+) -> Result<(), String> {
+    let row: i64 = id
+        .strip_prefix("clip:")
+        .and_then(|row| row.parse().ok())
+        .ok_or_else(|| "Unknown clipboard item.".to_string())?;
+    let db_path = state.data_dir.join("index.db");
+    run_blocking(move || ps_sources::clipboard::set_pinned(&db_path, row, pinned))
+        .await?
+        .map_err(|error| error.to_string())?;
+    let _ = app.emit("clipboard:change", ());
+    Ok(())
 }
 
 #[tauri::command]
@@ -1717,6 +2071,7 @@ fn agent_permissions(
 
 #[tauri::command]
 fn agent_stop_all(state: tauri::State<'_, AppState>) -> Vec<ps_agent::AgentTask> {
+    cancel_cli_run(&state);
     let tasks = state.agent_tasks.stop_all("user stopped all");
     if let Ok(mut slot) = state.pi_agent.lock() {
         if let Some(client) = slot.take() {
@@ -1772,6 +2127,15 @@ fn app_info() -> serde_json::Value {
     })
 }
 
+/// Windows account name for the Home greeting, first letter capitalised.
+#[tauri::command]
+fn os_user_name() -> Option<String> {
+    let name = std::env::var("USERNAME").ok()?;
+    let mut chars = name.trim().chars();
+    let first = chars.next()?;
+    Some(first.to_uppercase().chain(chars).collect())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -1795,6 +2159,8 @@ dispatch_window_action(app, toggle_primary_launcher);
             };
             step("engine: opening");
             let data_dir = ps_core::paths::v2_data_dir();
+            // Clipboard history lasts one session: unpinned items are cleared at every start.
+            let _ = ps_sources::clipboard::clear_unpinned(&data_dir.join("index.db"));
             let config = engine_config(data_dir.clone());
             let engine = Arc::new(Engine::open(config).map_err(|e| format!("engine init: {e}"))?);
             let clip_app = app.handle().clone();
@@ -1841,6 +2207,7 @@ dispatch_window_action(app, toggle_primary_launcher);
                 engine: engine.clone(),
                 data_dir,
                 pi_agent: Mutex::new(None),
+                cli_run: Arc::new(Mutex::new(None)),
                 agents: Mutex::new(None),
                 agent_tasks,
             });
@@ -1853,9 +2220,8 @@ dispatch_window_action(app, toggle_primary_launcher);
             let mut active_hotkey = shortcut.clone();
             if let Err(err) = app.global_shortcut().register(shortcut.as_str()) {
                 eprintln!("[setup] global shortcut '{shortcut}' could not be registered: {err}");
-                let fallbacks = ["Alt+Shift+Space", "Ctrl+Alt+Space"];
                 let mut registered = false;
-                for fallback in fallbacks {
+                for fallback in HOTKEY_FALLBACKS {
                     if app.global_shortcut().register(fallback).is_ok() {
                         active_hotkey = fallback.to_string();
                         registered = true;
@@ -1869,8 +2235,6 @@ dispatch_window_action(app, toggle_primary_launcher);
                         &format!("'{shortcut}' is in use by another app (e.g. PowerToys). Press '{active_hotkey}' to search."),
                     );
                 }
-            } else {
-                let _ = app.global_shortcut().register("Alt+Shift+Space");
             }
 
             step("tray: building");
@@ -1912,6 +2276,8 @@ dispatch_window_action(app, toggle_primary_launcher);
             complete_onboarding,
             get_ocr_engines,
             download_ocr_engine,
+            install_tesseract_ocr,
+            open_windows_language_settings,
             index_command,
             set_launcher_geometry,
             list_monitors,
@@ -1925,6 +2291,8 @@ dispatch_window_action(app, toggle_primary_launcher);
             quit_app,
             set_hotkey,
             agent_status,
+            agent_models,
+            agent_test,
             pi_install_status,
             pi_install_plan,
             pi_install,
@@ -1932,6 +2300,8 @@ dispatch_window_action(app, toggle_primary_launcher);
             pi_connect,
             detect_agents,
             agent_tasks,
+            agent_delete,
+            agent_rename,
             todos_list,
             todos_import,
             todos_save,
@@ -1958,12 +2328,15 @@ dispatch_window_action(app, toggle_primary_launcher);
             control_set_brightness,
             control_set_audio_output,
             control_media,
+            clipboard_set_pinned,
+            git_branch_commits,
             get_media_session,
             show_local_toast,
             notifications_list,
             notifications_dismiss,
             notifications_clear,
             app_info,
+            os_user_name,
         ])
         .build(tauri::generate_context!())
         .expect("error while building ProtonSearch")

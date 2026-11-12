@@ -12,7 +12,6 @@ export function PiSetup({ onChanged }: { onChanged: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [path, setPath] = useState(settings.agent.piPath ?? "");
   const [provider, setProvider] = useState(settings.agent.provider ?? "");
-  const [model, setModel] = useState(settings.agent.model ?? "");
   const refresh = useCallback(async () => {
     setStatus(await api.piInstallStatus(true));
     onChanged();
@@ -39,13 +38,12 @@ export function PiSetup({ onChanged }: { onChanged: () => void }) {
       <form onSubmit={(event) => {
         event.preventDefault();
         void perform(async () => {
-          await updateSettings({ agent: { ...settings.agent, runtime: "pi",
-            piPath: path.trim() || null, provider: provider.trim() || null, model: model.trim() || null } });
+          await updateSettings({ agent: { ...settings.agent,
+            piPath: path.trim() || null, provider: provider.trim() || null } });
         });
       }}>
         <label>Pi executable path<input className="input" value={path} onChange={(event) => setPath(event.target.value)} placeholder="Automatic detection" /></label>
         <label>Provider<input className="input" value={provider} onChange={(event) => setProvider(event.target.value)} placeholder="Pi default" /></label>
-        <label>Model<input className="input" value={model} onChange={(event) => setModel(event.target.value)} placeholder="Pi default" /></label>
         <button type="submit" className="btn" disabled={busy}>Save Pi configuration</button>
       </form>
       <div className="config-actions">
@@ -53,7 +51,6 @@ export function PiSetup({ onChanged }: { onChanged: () => void }) {
         <button type="button" className="btn" disabled={busy || !status?.path} onClick={() => void perform(() => api.piConnect())}>Connect model</button>
         <button type="button" className="btn" disabled={busy} onClick={() => void perform(async () => setPlan(await api.piInstallPlan()))}>Review Pi installation</button>
       </div>
-      <p>Connect model opens Pi in a terminal. Use /login, then /model. Credentials stay in Pi. Provider charges may apply.</p>
       {plan ? <div role="group" aria-label="Confirm Pi installation">
         <p>Install Pi {plan.version} · {plan.license}</p>
         <p>Package size {(plan.unpackedBytes / 1048576).toFixed(1)} MB unpacked. Additional dependency downloads vary.</p>

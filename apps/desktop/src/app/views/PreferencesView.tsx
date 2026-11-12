@@ -1,47 +1,37 @@
-// Preferences route: shortcut, appearance, privacy, indexing, agent, diagnostics
-// and about. Autosave with a 2 s "Saved" stamp; every toggle persists through
-// update_settings and surfaces bridge errors instead of pretending success.
+// Settings: a section list on the left and the selected section on the right.
+// Every change saves as it is made; one inline status line reports the result.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../../App";
 import { api } from "../../bridge/api";
-import type {
-  AppInfo,
-  Density,
-  MotionPreference,
-  SettingsPatch,
-  ThemeMode,
-  WebSearchEngine,
-} from "../../bridge/types";
+import type { AppInfo, IslandSettings, SettingsPatch, ThemeMode, WebSearchEngine } from "../../bridge/types";
 import { formatNumber } from "../../lib/format";
-import { indexCountText, relativeTime, stateLabel, summarizeWarnings } from "../describe";
+import { lookFrom, writeIslandLook } from "../../lib/islandLook";
+import { indexCountText, relativeTime, stateLabel } from "../describe";
 import { HotkeyCapture } from "../HotkeyInput";
-import { OcrEngineSelector } from "../OcrEngineSelector";
+import { normalizeIslandSettings } from "../islandLogic";
 import { SECTION_EYEBROWS, type Section } from "../sections";
-import {
-  Icon,
-  RouteHeading,
-  SavedStamp,
-  SegmentedControl,
-  StateNotice,
-  Switch,
-  useSavedStamp,
-  type IconName,
-} from "../ui";
-import { CARD_META } from "../islandLogic";
+import { RouteHeading, SegmentedControl, StateNotice, Switch } from "../ui";
 import IntegrationsSettings from "./IntegrationsSettings";
-import OnboardingSettings from "./OnboardingSettings";
-import IslandSettingsView from "./IslandSettingsView";
+import IslandCardsSettings from "./IslandSettingsView";
+import { PrefRow } from "./PrefRow";
+import "./settings.css";
+
+type SectionId = "general" | "appearance" | "privacy" | "cards" | "windows" | "diagnostics";
+
+const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: "general", label: "General" },
+  { id: "appearance", label: "Appearance" },
+  { id: "privacy", label: "Privacy & history" },
+  { id: "cards", label: "Cards & order" },
+  { id: "windows", label: "Windows integration" },
+  { id: "diagnostics", label: "Diagnostics" },
+];
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "System" },
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
-];
-
-const DENSITY_OPTIONS: { value: Density; label: string }[] = [
-  { value: "comfortable", label: "Comfortable" },
-  { value: "compact", label: "Compact" },
 ];
 
 const WEB_SEARCH_ENGINES: { value: WebSearchEngine; label: string }[] = [
@@ -51,31 +41,40 @@ const WEB_SEARCH_ENGINES: { value: WebSearchEngine; label: string }[] = [
   { value: "you_tube", label: "YouTube" },
 ];
 
-const MOTION_OPTIONS: { value: MotionPreference; label: string }[] = [
-  { value: "system", label: "System" },
-  { value: "full", label: "Full" },
-  { value: "reduced", label: "Reduced" },
-];
+const SAVED = "Saved";
+const SAVE_FAILED = "Couldn't save. The previous setting is still active.";
 
-export default function PreferencesView({
-  onNavigate,
-}: {
-  onNavigate: (section: Section) => void;
-}) {
+interface Notice {
+  tone: "ok" | "error";
+  text: string;
+}
+
+function ValueRow({ title, value }: { title: string; value: string }) {
+  return (
+    <PrefRow title={title}>
+      <span className="prefs-row-value">{value}</span>
+    </PrefRow>
+  );
+}
+
+export default function PreferencesView({ onNavigate }: { onNavigate: (section: Section) => void }) {
   const { settings, status, updateSettings, refreshStatus } = useApp();
-  const { savedKey, markSaved } = useSavedStamp();
-  const [actionError, setActionError] = useState<{
-    title: string;
-    body: string;
-    retry?: () => void;
-  } | null>(null);
-  const [limitDraft, setLimitDraft] = useState(String(settings.resultLimit));
+  const [section, setSection] = useState<SectionId>("general");
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
-  const warningSummary = summarizeWarnings(status?.warnings ?? []);
+  const noticeTimer = useRef<number | null>(null);
+
+  const flash = useCallback((text: string, tone: Notice["tone"] = "ok") => {
+    if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
+    setNotice({ text, tone });
+    noticeTimer.current = window.setTimeout(() => setNotice(null), tone === "error" ? 5000 : 2500);
+  }, []);
 
   useEffect(() => {
-    setLimitDraft(String(settings.resultLimit));
-  }, [settings.resultLimit]);
+    return () => {
+      if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -90,538 +89,244 @@ export default function PreferencesView({
     };
   }, []);
 
-  type SettingsCard =
-    | "general"
-    | "cards"
-    | "behavior"
-    | "integrations"
-    | "onboarding";
-  const [activeCard, setActiveCard] = useState<SettingsCard>("general");
-  const [islandTab, setIslandTab] = useState<"cards" | "behavior">("cards");
-
   const apply = useCallback(
-    async (patch: SettingsPatch, stamp: string) => {
-      setActionError(null);
+    async (patch: SettingsPatch) => {
       try {
         await updateSettings(patch);
-        markSaved(stamp);
+        flash(SAVED);
       } catch {
-        setActionError({
-          title: "Couldn't save that change.",
-          body: "Your previous setting is still active.",
-          retry: () => void apply(patch, stamp),
-        });
+        flash(SAVE_FAILED, "error");
       }
     },
-    [updateSettings, markSaved],
+    [updateSettings, flash],
   );
 
-  // M2: re-register through the shell (api.setHotkey) so conflicts surface
-  // immediately, then pull the saved Settings back into app context.
-  const applyHotkey = useCallback(
-    async (accelerator: string) => {
-      await api.setHotkey(accelerator);
-      await updateSettings({});
-      markSaved("hotkey");
+  // Island changes apply at once: the view updates immediately and the writes run
+  // one at a time, each sending the newest state, so a slider drag never leaves
+  // an older value saved.
+  const launcherMode = settings.launcher.primaryMode;
+  const [island, setIsland] = useState<IslandSettings>(() => normalizeIslandSettings(settings.launcher.island));
+  const islandRef = useRef(island);
+  const confirmedRef = useRef(island);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveQueued = useRef(false);
+
+  const saveIsland = useCallback(
+    (patch: Partial<IslandSettings>) => {
+      const next = normalizeIslandSettings({ ...islandRef.current, ...patch });
+      islandRef.current = next;
+      setIsland(next);
+      if (saveQueued.current) return;
+      saveQueued.current = true;
+      saveQueue.current = saveQueue.current.then(async () => {
+        saveQueued.current = false;
+        try {
+          const saved = await updateSettings({
+            launcher: { primaryMode: launcherMode, island: islandRef.current },
+          });
+          confirmedRef.current = normalizeIslandSettings(saved.launcher.island);
+          flash(SAVED);
+        } catch {
+          islandRef.current = confirmedRef.current;
+          setIsland(confirmedRef.current);
+          flash(SAVE_FAILED, "error");
+        }
+      });
     },
-    [updateSettings, markSaved],
+    [updateSettings, launcherMode, flash],
   );
 
-  const commitLimit = () => {
-    const value = Number(limitDraft);
-    if (!Number.isFinite(value)) {
-      setLimitDraft(String(settings.resultLimit));
-      return;
-    }
-    const clamped = Math.min(100, Math.max(5, Math.round(value)));
-    setLimitDraft(String(clamped));
-    if (clamped !== settings.resultLimit) {
-      void apply({ resultLimit: clamped }, "launcher");
-    }
+  // The island window reads this cache for its first frame (see lib/islandLook).
+  useEffect(() => {
+    writeIslandLook(lookFrom(island, settings.theme));
+  }, [island, settings.theme]);
+
+  // api.setHotkey re-registers the shortcut and rejects it when another app owns it.
+  const applyHotkey = async (accelerator: string) => {
+    await api.setHotkey(accelerator);
+    await updateSettings({});
   };
 
-  const togglePrivacy = (key: keyof typeof settings.privacy, value: boolean) => {
-    void apply({ privacy: { ...settings.privacy, [key]: value } }, "privacy");
-  };
-
-  const island = settings.launcher.island;
-  const enabledCards = island.cards.filter((card) => card.enabled).length;
-  const defaultCardTitle = CARD_META[island.defaultCard]?.title ?? "Search";
-  const setupLabel = settings.onboardingComplete ? "Setup complete" : "Setup needs attention";
-  const settingsCards: {
-    id: SettingsCard;
-    title: string;
-    value: string;
-    icon: IconName;
-  }[] = [
-    { id: "general", title: "General settings", value: "Shortcut, search, appearance, privacy, indexing, agents, diagnostics", icon: "settings" },
-    { id: "cards", title: "Cards & order", value: enabledCards + "/8 cards · " + defaultCardTitle + " default", icon: "clipboard" },
-    { id: "behavior", title: "Open behavior", value: island.returnToSearch ? "Returns to Search" : "Remembers last card", icon: "workflows" },
-    { id: "integrations", title: "Windows integrations", value: "Media, Wi-Fi, Bluetooth, notifications and capture sources", icon: "shield" },
-    { id: "onboarding", title: "First-run setup", value: setupLabel, icon: "person" },
-  ];
-
-  const openCard = (card: SettingsCard) => {
-    setActiveCard(card);
-    if (card === "cards" || card === "behavior") {
-      setIslandTab(card);
-    }
-  };
+  const glassLevel = island.liquidGlassLevel ?? 60;
+  const failed = status?.state === "error";
+  const title = SECTIONS.find((entry) => entry.id === section)?.label ?? "";
 
   return (
     <div className="view">
-      <RouteHeading eyebrow={SECTION_EYEBROWS.preferences}>Make it yours</RouteHeading>
-      <p className="page-lead">
-        Customize behavior, appearance and privacy independently of search performance.
-      </p>
+      <RouteHeading eyebrow={SECTION_EYEBROWS.preferences}>Settings</RouteHeading>
+      <div className="prefs">
+        <nav className="prefs-nav" aria-label="Settings sections">
+          {SECTIONS.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className="prefs-nav-item"
+              aria-current={section === entry.id ? "page" : undefined}
+              onClick={() => setSection(entry.id)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </nav>
 
-      <nav className="settings-cards" aria-label="Settings sections">
-        {settingsCards.map((card) => (
-          <button
-            key={card.id}
-            type="button"
-            className={"settings-card" + (activeCard === card.id ? " is-active" : "")}
-            aria-pressed={activeCard === card.id}
-            onClick={() => openCard(card.id)}
-          >
-            <span className="settings-card-icon" aria-hidden="true">
-              <Icon name={card.icon} size={16} />
+        <div className="prefs-pane">
+          <div className="prefs-pane-head">
+            <h2 className="prefs-pane-title">{title}</h2>
+            <span className="prefs-status" role="status" data-tone={notice?.tone ?? "ok"}>
+              {notice?.text ?? ""}
             </span>
-            <span className="settings-card-copy">
-              <span className="settings-card-title">{card.title}</span>
-              <span className="settings-card-value">{card.value}</span>
-            </span>
-            <Icon name="arrowRight" size={14} className="settings-card-arrow" />
-          </button>
-        ))}
-      </nav>
-
-      {activeCard === "general" ? (
-        <>
-      {actionError ? (
-        <StateNotice
-          role="alert"
-          title={actionError.title}
-          body={actionError.body}
-          actionLabel={actionError.retry ? "Try again" : undefined}
-          onAction={actionError.retry}
-        />
-      ) : null}
-
-      <div className="settings-grid">
-        <section className="settings-section" aria-labelledby="prefs-hotkey">
-          <div className="settings-label">
-            <h2 id="prefs-hotkey">Launcher shortcut</h2>
-            <SavedStamp show={savedKey === "hotkey"} />
           </div>
-          <div className="panel">
-            <HotkeyCapture
-              value={settings.hotkey}
-              onCommit={applyHotkey}
-              help="Use at least one of Ctrl, Alt, Shift, or Win. The shortcut applies immediately; Windows rejects a combination another app already owns."
-            />
 
-            <dl className="metric-list">
-              <div className="metric-row">
-                <dt>Results per query</dt>
-                <dd>
-                  <input
-                    className="input input-xs"
-                    type="number"
-                    min={5}
-                    max={100}
-                    step={5}
-                    value={limitDraft}
-                    aria-label="Results per query"
-                    onChange={(event) => setLimitDraft(event.target.value)}
-                    onBlur={commitLimit}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        commitLimit();
-                      }
-                    }}
-                  />
-                </dd>
+          {section === "general" ? (
+            <>
+              <div className="prefs-group">
+                <h3 className="prefs-group-title">Launcher shortcut</h3>
+                <HotkeyCapture value={settings.hotkey} onCommit={applyHotkey} />
               </div>
-              <div className="metric-row">
-                <dt>Start with Windows</dt>
-                <dd>
+              <div className="prefs-rows prefs-group">
+                <PrefRow title="Start with Windows">
                   <Switch
                     checked={settings.launchAtLogin}
                     label="Start ProtonSearch with Windows"
-                    onChange={(next) => void apply({ launchAtLogin: next }, "hotkey")}
+                    onChange={(next) => void apply({ launchAtLogin: next })}
                   />
-                </dd>
+                </PrefRow>
               </div>
-            </dl>
-            <p className="field-help">
-              Between 5 and 100 results. Larger lists take longer to render; the engine stays the
-              same.
-            </p>
-          </div>
-        </section>
+              <div className="prefs-group">
+                <h3 className="prefs-group-title">Search</h3>
+                <div className="prefs-rows">
+                  <PrefRow
+                    title="Offer web search results"
+                    description="Adds a “Search the web for …” result to the launcher."
+                  >
+                    <Switch
+                      checked={settings.webSearchEnabled}
+                      label="Offer web search results"
+                      onChange={(next) => void apply({ webSearchEnabled: next })}
+                    />
+                  </PrefRow>
+                  <PrefRow title="Default search engine" description="Used by the web search result.">
+                    <SegmentedControl
+                      label="Default web search engine"
+                      value={settings.webSearchEngine}
+                      options={WEB_SEARCH_ENGINES}
+                      disabled={!settings.webSearchEnabled}
+                      onChange={(engine) => void apply({ webSearchEngine: engine })}
+                    />
+                  </PrefRow>
+                </div>
+              </div>
+            </>
+          ) : null}
 
+          {section === "appearance" ? (
+            <div className="prefs-rows">
+              <PrefRow title="Theme" description="System follows the Windows app theme.">
+                <SegmentedControl
+                  label="Theme"
+                  value={settings.theme}
+                  options={THEME_OPTIONS}
+                  onChange={(theme) => void apply({ theme })}
+                />
+              </PrefRow>
+              <PrefRow title="Liquid glass" description="Applies to the Dynamic Island only.">
+                <Switch
+                  checked={island.liquidGlass === true}
+                  label="Liquid glass"
+                  onChange={(next) => saveIsland({ liquidGlass: next })}
+                />
+              </PrefRow>
+              {island.liquidGlass ? (
+                <PrefRow title="Glass amount" description="Clear to frosted.">
+                  <input
+                    type="range"
+                    className="prefs-range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    aria-label="Glass amount"
+                    value={glassLevel}
+                    onChange={(event) => saveIsland({ liquidGlassLevel: Number(event.target.value) })}
+                  />
+                </PrefRow>
+              ) : null}
+              <PrefRow title="Page dots" description="One dot per enabled card.">
+                <Switch
+                  checked={island.showDots}
+                  label="Show page dots"
+                  onChange={(next) => saveIsland({ showDots: next })}
+                />
+              </PrefRow>
+            </div>
+          ) : null}
 
+          {section === "privacy" ? (
+            <div className="prefs-rows">
+              <PrefRow title="Record activity" description="Search and launch history.">
+                <Switch
+                  checked={settings.privacy.activityHistory}
+                  label="Record activity"
+                  onChange={(next) =>
+                    void apply({ privacy: { ...settings.privacy, activityHistory: next } })
+                  }
+                />
+              </PrefRow>
+              <PrefRow
+                title="Clipboard history"
+                description="Save copied text so it can appear in search. Capture starts now; earlier Windows clipboard history is not imported."
+              >
+                <Switch
+                  checked={settings.privacy.clipboardHistory}
+                  label="Save clipboard history"
+                  onChange={(next) =>
+                    void apply({ privacy: { ...settings.privacy, clipboardHistory: next } })
+                  }
+                />
+              </PrefRow>
+            </div>
+          ) : null}
 
-        <section className="settings-section" aria-labelledby="prefs-search">
-          <div className="settings-label">
-            <h2 id="prefs-search">Search</h2>
-            <SavedStamp show={savedKey === "search"} />
-          </div>
-          <div className="panel">
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Offer web search results</span>
-                <span className="pref-desc">
-                  Adds a “Search the web for …” action to launcher results. Nothing is sent until
-                  you choose it.
-                </span>
-              </div>
-              <Switch
-                checked={settings.webSearchEnabled}
-                label="Offer web search results"
-                onChange={(next) => void apply({ webSearchEnabled: next }, "search")}
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Default search engine</span>
-                <span className="pref-desc">Used by the “Search the web for …” result.</span>
-              </div>
-              <SegmentedControl
-                label="Default web search engine"
-                value={settings.webSearchEngine}
-                options={WEB_SEARCH_ENGINES}
-                disabled={!settings.webSearchEnabled}
-                onChange={(engine) => void apply({ webSearchEngine: engine }, "search")}
-              />
-            </div>
-            <p className="field-help">
-              Opens the result in your browser; nothing is sent until you choose it.
-            </p>
-          </div>
-        </section>
+          {section === "cards" ? <IslandCardsSettings island={island} onChange={saveIsland} /> : null}
 
-        <section className="settings-section" aria-labelledby="prefs-appearance">
-          <div className="settings-label">
-            <h2 id="prefs-appearance">Appearance</h2>
-            <SavedStamp show={savedKey === "appearance"} />
-          </div>
-          <div className="panel">
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Theme</span>
-                <span className="pref-desc">System follows the Windows app theme.</span>
-              </div>
-              <SegmentedControl
-                label="Theme"
-                value={settings.theme}
-                options={THEME_OPTIONS}
-                onChange={(theme) => void apply({ theme }, "appearance")}
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Density</span>
-                <span className="pref-desc">Compact tightens row pitch and control heights.</span>
-              </div>
-              <SegmentedControl
-                label="Density"
-                value={settings.density}
-                options={DENSITY_OPTIONS}
-                onChange={(density) => void apply({ density }, "appearance")}
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Motion</span>
-                <span className="pref-desc">System follows your Windows animation setting.</span>
-              </div>
-              <SegmentedControl
-                label="Motion"
-                value={settings.motion}
-                options={MOTION_OPTIONS}
-                onChange={(motion) => void apply({ motion }, "appearance")}
-              />
-            </div>
-            <div className="preview-row" aria-hidden="true">
-              <span className="preview-tile">AB</span>
-              <span className="preview-text">
-                <span className="preview-title">Result preview</span>
-                <span className="preview-sub">Title and path use the selected density</span>
-              </span>
-              <kbd className="kbd">Enter</kbd>
-            </div>
-            <p className="field-help">Preview only — real rows come from the engine.</p>
-          </div>
-        </section>
+          {section === "windows" ? <IntegrationsSettings onStatus={flash} /> : null}
 
-        <section className="settings-section" aria-labelledby="prefs-privacy">
-          <div className="settings-label">
-            <h2 id="prefs-privacy">Privacy &amp; history</h2>
-            <SavedStamp show={savedKey === "privacy"} />
-          </div>
-          <div className="panel">
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Record activity</span>
-                <span className="pref-desc">Search and launch history stays on this PC.</span>
+          {section === "diagnostics" ? (
+            <>
+              {failed ? (
+                <StateNotice
+                  tone="error"
+                  title="Indexing stopped with an error."
+                  actionLabel="Search & indexes"
+                  onAction={() => onNavigate("indexes")}
+                />
+              ) : null}
+              <div className="prefs-rows">
+                <ValueRow title="Version" value={appInfo?.version ?? status?.version ?? "Unknown"} />
+                <ValueRow title="Protocol" value={"v" + (appInfo?.protocol ?? status?.protocol ?? 1)} />
+                <ValueRow title="Data schema" value={"v" + (appInfo?.dataSchema ?? 1)} />
+                <ValueRow
+                  title="Platform"
+                  value={appInfo ? appInfo.platform + " · " + appInfo.arch : "Unknown"}
+                />
+                <ValueRow title="Index state" value={status ? stateLabel(status.state) : "Unknown"} />
+                <ValueRow title="Filename entries" value={indexCountText(status)} />
+                <ValueRow title="Document texts" value={formatNumber(status?.contentDocuments ?? 0)} />
+                <ValueRow title="OCR texts" value={formatNumber(status?.ocrDocuments ?? 0)} />
+                <ValueRow title="Last updated" value={relativeTime(status?.lastUpdated)} />
+                <ValueRow title="Data folder" value={"%APPDATA%\\protonsearch\\v2"} />
               </div>
-              <Switch
-                checked={settings.privacy.activityHistory}
-                label="Record activity"
-                onChange={(next) => togglePrivacy("activityHistory", next)}
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Clipboard history</span>
-                <span className="pref-desc">
-                  Save copied text locally so it can appear in search. Capture starts now; previous
-                  Windows clipboard history is not imported or backfilled.
-                </span>
+              <div className="prefs-actions">
+                <button type="button" className="btn" onClick={() => void refreshStatus()}>
+                  Refresh
+                </button>
+                <button type="button" className="linkbtn" onClick={() => onNavigate("indexes")}>
+                  Search &amp; indexes
+                </button>
               </div>
-              <Switch
-                checked={settings.privacy.clipboardHistory}
-                label="Save clipboard history"
-                onChange={(next) => togglePrivacy("clipboardHistory", next)}
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Browser history &amp; bookmarks</span>
-                <span className="pref-desc">Read local browser profiles; nothing is uploaded.</span>
-              </div>
-              <Switch
-                checked={settings.privacy.browserHistory}
-                label="Index browser history and bookmarks"
-                onChange={(next) => togglePrivacy("browserHistory", next)}
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Git repositories</span>
-                <span className="pref-desc">Index commits and TODO/FIXME tasks inside indexed folders.</span>
-              </div>
-              <Switch
-                checked={settings.privacy.gitIndexing}
-                label="Index Git repositories"
-                onChange={(next) => togglePrivacy("gitIndexing", next)}
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Telemetry</span>
-                <span className="pref-desc">There is no telemetry pipeline in this build.</span>
-              </div>
-              <span className="badge badge-quiet">Never sent</span>
-            </div>
-            <p className="field-help">
-              No telemetry. Nothing leaves this PC unless you opt into an agent provider. Clearing
-              history is not available in this build.
-            </p>
-          </div>
-        </section>
-
-        <section className="settings-section" aria-labelledby="prefs-indexing">
-          <div className="settings-label">
-            <h2 id="prefs-indexing">Indexing</h2>
-          </div>
-          <div className="panel">
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Background content indexing</span>
-                <span className="pref-desc">Extract text from documents and code in the background.</span>
-              </div>
-              <Switch
-                checked={settings.indexing.contentEnabled}
-                label="Background content indexing"
-                onChange={(next) =>
-                  void apply(
-                    { indexing: { ...settings.indexing, contentEnabled: next } },
-                    "indexing",
-                  )
-                }
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Screenshot OCR</span>
-                <span className="pref-desc">Extract text from images; the heaviest background mode.</span>
-              </div>
-              <Switch
-                checked={settings.indexing.ocrEnabled}
-                label="Screenshot OCR"
-                onChange={(next) =>
-                  void apply({ indexing: { ...settings.indexing, ocrEnabled: next } }, "indexing")
-                }
-              />
-            </div>
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Pause indexing on battery</span>
-                <span className="pref-desc">Respect the power-aware indexing policy.</span>
-              </div>
-              <Switch
-                checked={settings.indexing.respectPowerState}
-                label="Pause indexing on battery"
-                onChange={(next) =>
-                  void apply(
-                    { indexing: { ...settings.indexing, respectPowerState: next } },
-                    "indexing",
-                  )
-                }
-              />
-            </div>
-            <OcrEngineSelector
-              value={settings.ocrEngine}
-              onChange={(ocrEngine) => void apply({ ocrEngine }, "indexing")}
-            />
-            <div className="section-actions">
-              <button type="button" className="linkbtn" onClick={() => onNavigate("indexes")}>
-                Index health
-              </button>
-              <button type="button" className="linkbtn" onClick={() => onNavigate("indexes")}>
-                Rebuild index…
-              </button>
-            </div>
-            <p className="field-help">Filename search always works, even with content and OCR off.</p>
-          </div>
-        </section>
-
-        <section className="settings-section" aria-labelledby="prefs-agent">
-          <div className="settings-label">
-            <h2 id="prefs-agent">Agent &amp; models</h2>
-          </div>
-          <div className="panel">
-            <div className="pref-row">
-              <div className="pref-copy">
-                <span className="pref-title">Enable agent workflows</span>
-                <span className="pref-desc">Off by default; the runtime starts only for a workflow.</span>
-              </div>
-              <Switch
-                checked={settings.agent.enabled}
-                label="Enable agent workflows"
-                onChange={(next) =>
-                  void apply({ agent: { ...settings.agent, enabled: next } }, "agent")
-                }
-              />
-            </div>
-            <dl className="metric-list">
-              <div className="metric-row">
-                <dt>Provider</dt>
-                <dd>{settings.agent.provider ?? "No provider configured"}</dd>
-              </div>
-              <div className="metric-row">
-                <dt>Model</dt>
-                <dd>{settings.agent.model ?? "No model configured"}</dd>
-              </div>
-            </dl>
-            <p className="field-help">
-              Configure Pi, connect a model or review installation in Workflows.
-            </p>
-          </div>
-        </section>
-
-        <section className="settings-section" aria-labelledby="prefs-diagnostics">
-          <div className="settings-label">
-            <h2 id="prefs-diagnostics">Diagnostics</h2>
-          </div>
-          <div className="panel">
-            <dl className="metric-list">
-              <div className="metric-row">
-                <dt>Version</dt>
-                <dd>{appInfo?.version ?? status?.version ?? "Unknown"}</dd>
-              </div>
-              <div className="metric-row">
-                <dt>Protocol</dt>
-                <dd>v{appInfo?.protocol ?? status?.protocol ?? 1}</dd>
-              </div>
-              <div className="metric-row">
-                <dt>Data schema</dt>
-                <dd>v{appInfo?.dataSchema ?? 1}</dd>
-              </div>
-              <div className="metric-row">
-                <dt>Platform</dt>
-                <dd>
-                  {appInfo ? appInfo.platform + " · " + appInfo.arch : "Unknown"}
-                </dd>
-              </div>
-              <div className="metric-row">
-                <dt>Index state</dt>
-                <dd>{status ? stateLabel(status.state) : "Unknown"}</dd>
-              </div>
-              <div className="metric-row">
-                <dt>Filename entries</dt>
-                <dd>{indexCountText(status)}</dd>
-              </div>
-              <div className="metric-row">
-                <dt>Document texts</dt>
-                <dd>{formatNumber(status?.contentDocuments ?? 0)}</dd>
-              </div>
-              <div className="metric-row">
-                <dt>OCR texts</dt>
-                <dd>{formatNumber(status?.ocrDocuments ?? 0)}</dd>
-              </div>
-              <div className="metric-row">
-                <dt>Last updated</dt>
-                <dd>{relativeTime(status?.lastUpdated)}</dd>
-              </div>
-            </dl>
-            {warningSummary ? (
-              <StateNotice
-                tone="warn"
-                title="Index needs attention."
-                body={warningSummary.body}
-                details={warningSummary.details}
-                actionLabel="Open Search & indexes"
-                onAction={() => onNavigate("indexes")}
-              />
-            ) : null}
-            <div className="section-actions">
-              <button type="button" className="btn" onClick={() => void refreshStatus()}>
-                Refresh diagnostics
-              </button>
-              <button type="button" className="linkbtn" onClick={() => onNavigate("indexes")}>
-                Search &amp; indexes
-              </button>
-            </div>
-            <p className="field-help">
-              Data is stored under %APPDATA%\protonsearch\v2. First-run setup runs once; change
-              those choices in Search &amp; indexes, Privacy &amp; history, and Appearance.
-            </p>
-          </div>
-        </section>
-
-        <section className="settings-section" aria-labelledby="prefs-about">
-          <div className="settings-label">
-            <h2 id="prefs-about">About</h2>
-          </div>
-          <div className="panel">
-            <p className="about-line">
-              ProtonSearch {appInfo?.version ?? status?.version ?? ""} — local-first. No account.
-            </p>
-            <p className="field-help">
-              Search, indexing, OCR and history run on this PC. Optional agent workflows are the
-              only surface that can reach a provider, and only after you configure one.
-            </p>
-          </div>
-        </section>
+            </>
+          ) : null}
+        </div>
       </div>
-        </>
-      ) : activeCard === "integrations" ? (
-        <IntegrationsSettings />
-      ) : activeCard === "onboarding" ? (
-        <OnboardingSettings onSelectCard={openCard} onNavigateRoute={onNavigate} />
-      ) : (
-        <IslandSettingsView
-          key={activeCard}
-          initialTab={islandTab}
-          embedded
-          onNavigate={(tab) => openCard(tab === "island" ? "cards" : tab as SettingsCard)}
-        />
-      )}
     </div>
   );
 }

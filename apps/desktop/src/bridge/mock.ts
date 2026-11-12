@@ -385,7 +385,7 @@ export const mockBridge = {
         sizeLabel: "Built-in (0 MB)",
         speedLabel: "Fast (~45ms/img)",
         badge: "Built-in",
-        description: "Built into Windows and available now. Keeps OCR local and preserves the current working engine.",
+        description: "Built into Windows 10 and 11. Nothing to download.",
         highlights: [
           "Built into Windows 10 & 11",
           "Zero setup or downloads required",
@@ -401,7 +401,7 @@ export const mockBridge = {
         sizeLabel: "~6.1 MB",
         speedLabel: "Ultra-Fast (~30ms/img)",
         badge: "Recommended",
-        description: "Compact and designed for speed; approximately 6.1 MB of models, plus a runtime.",
+        description: "Compact model pack for screenshots, PDFs and printed text.",
         highlights: [
           "High accuracy on screenshots, PDFs & text",
           "Ultra-fast local inference (~30ms/image)",
@@ -412,28 +412,28 @@ export const mockBridge = {
       },
       {
         engine: "indra",
-        name: "Indra",
+        name: "Indra OCR",
         availability: "not_installed",
         sizeLabel: "~27 MB",
         speedLabel: "Deep (~120ms/img)",
         badge: "Multilingual & Skewed",
-        description: "Designed for higher-quality text recognition, including skewed and multilingual text; approximately 27 MB of models. Its license requires acceptance before download.",
+        description: "Stronger on skewed, rotated and multilingual text.",
         highlights: [
           "Specialized in skewed and rotated text",
           "Extended multilingual script coverage",
-          "Requires research license acceptance",
+          "Research and non-commercial use",
         ],
-        license: "Research & Non-Commercial (Acceptance required)",
+        license: "Research & non-commercial",
         downloadSizeBytes: 27000000,
       },
       {
         engine: "tesseract",
-        name: "Tesseract",
+        name: "Tesseract OCR",
         availability: "not_installed",
         sizeLabel: "External CLI",
         speedLabel: "Traditional (~150ms/img)",
         badge: "Extensible",
-        description: "A traditional OCR engine with separately installed language data; download size depends on the languages selected. Not configured in ProtonSearch.",
+        description: "Open-source engine that uses your installed Tesseract.",
         highlights: [
           "Uses system Tesseract installation",
           "Extensible with custom traineddata packs",
@@ -444,6 +444,10 @@ export const mockBridge = {
       },
     ];
   },
+  async installTesseractOcr(): Promise<Settings> {
+    return settings;
+  },
+  async openWindowsLanguageSettings(): Promise<void> {},
   async downloadOcrEngine(engine: import("./types").OcrEngine): Promise<Settings> {
     settings = { ...settings, ocrEngine: engine };
     return settings;
@@ -547,6 +551,10 @@ export const mockBridge = {
   async connectWifi(): Promise<void> {},
   async openSettings(): Promise<void> {},
   async mediaCommand(): Promise<void> {},
+  async setClipboardPinned(): Promise<void> {},
+  async gitBranchCommits(): Promise<SearchResult[]> {
+    return [];
+  },
   async getMediaSession(): Promise<import("./types").MediaSessionInfo | null> {
     return null;
   },
@@ -579,16 +587,29 @@ export const mockBridge = {
   async perfMark(): Promise<void> {},
 
   async detectAgents(): Promise<import("./types").DetectedAgent[]> {
-    const pi = {
-      id: "pi",
-      name: "Pi",
-      kind: "cli",
-      version: "1.5.0",
-      path: "C:\\Users\\you\\.pi\\agent\\bin\\pi.cmd",
-      available: true,
-      detail: "Detected on PATH. Read-only in this alpha.",
-    };
-    return MOCK_AGENTS === "none" ? [] : [pi];
+    // default: Pi, Claude Code and OpenCode installed; ?agents=multi has Codex instead; ?agents=none has none.
+    const installed: Record<string, string> =
+      MOCK_AGENTS === "none"
+        ? {}
+        : MOCK_AGENTS === "multi"
+          ? { pi: "1.5.0", claude: "2.1.318", codex: "0.167.0" }
+          : { pi: "1.5.0", claude: "2.1.318", opencode: "2.2.7" };
+    const catalog = [
+      { id: "pi", name: "Pi" },
+      { id: "claude", name: "Claude Code" },
+      { id: "codex", name: "Codex" },
+      { id: "opencode", name: "OpenCode" },
+      { id: "gemini", name: "Gemini CLI" },
+    ];
+    return catalog.map(({ id, name }) => ({
+      id,
+      name,
+      kind: "agent",
+      version: installed[id] ?? null,
+      path: id in installed ? `C:\\Users\\you\\bin\\${id}.cmd` : null,
+      available: id in installed,
+      detail: null,
+    }));
   },
   async agentTasks(): Promise<import("./types").AgentTask[]> {
     return [];
@@ -613,6 +634,13 @@ export const mockBridge = {
   async agentPause(): Promise<void> {},
   async agentResume(): Promise<void> {},
 
+  async agentModels(agentId?: string | null): Promise<import("./types").AgentModel[]> {
+    return agentId == null || agentId === "pi" ? [{ provider: "opencode", id: "beam-free" }] : [];
+  },
+  async agentTest(): Promise<string> {
+    throw new Error("Agent tests require the desktop app.");
+  },
+
   async agentStatus(): Promise<import("./types").AgentStatus> {
     return {
       state: "not_configured",
@@ -628,6 +656,8 @@ export const mockBridge = {
   async piInstall(): Promise<void> { throw new Error("Pi installation requires the desktop application."); },
   async piInstallCancel(): Promise<void> {},
   async piConnect(): Promise<void> { throw new Error("Pi connection requires the desktop application."); },
+  async agentDelete(): Promise<void> {},
+  async agentRename(): Promise<void> {},
   async agentStart(): Promise<void> {
     throw new Error("Agent workflows require the desktop app (browser preview has no sidecar).");
   },
@@ -643,6 +673,9 @@ export const mockBridge = {
   async showLauncher(): Promise<void> {},
   async showMain(): Promise<void> {},
   async quitApp(): Promise<void> {},
+  async osUserName(): Promise<string | null> {
+    return "Pranshul";
+  },
   async appInfo(): Promise<AppInfo> {
     return { name: "ProtonSearch", version: "2.0.0-alpha.1", protocol: 1, dataSchema: 1, platform: "windows", arch: "x86_64", perfHooks: false };
   },

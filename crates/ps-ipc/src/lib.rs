@@ -285,6 +285,16 @@ pub struct ResultMeta {
     /// MIME type of the underlying item when known (e.g. image/png).
     #[serde(default)]
     pub mime: Option<String>,
+    /// Clipboard rows: the item is pinned (listed first, never pruned).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pinned: bool,
+    /// Git repository rows: every local branch, most recently committed first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub branches: Vec<String>,
+    /// Browser rows: the site's favicon as an image data URL, read from the local
+    /// browser profile. None when no installed browser holds one for the host.
+    #[serde(default)]
+    pub favicon_data_url: Option<String>,
 }
 
 /// One rendered result row.
@@ -383,6 +393,10 @@ pub struct RootConfig {
     pub enabled: bool,
 }
 
+fn default_glass_level() -> u8 {
+    60
+}
+
 fn default_true() -> bool {
     true
 }
@@ -441,6 +455,9 @@ pub struct EngineStatus {
     pub state: IndexerState,
     pub filename_entries: u64,
     pub content_documents: u64,
+    /// True while every image is re-read after an OCR engine change.
+    #[serde(default)]
+    pub reindexing: bool,
     pub ocr_documents: u64,
     #[serde(default)]
     pub roots: Vec<RootStatus>,
@@ -617,12 +634,36 @@ pub enum AgentRuntime {
     Pi,
     /// Legacy embedded Pydantic AI sidecar (kept as an optional fallback).
     Pydantic,
+    /// Claude Code CLI (`claude -p`).
+    Claude,
+    /// Codex CLI (`codex exec`).
+    Codex,
+    /// OpenCode CLI (`opencode run`).
+    #[serde(rename = "opencode")]
+    OpenCode,
+    /// Gemini CLI (`gemini -p`).
+    Gemini,
+}
+
+impl AgentRuntime {
+    /// Settings id: "pi", "pydantic", "claude", "codex", "opencode" or "gemini".
+    pub fn id(self) -> &'static str {
+        match self {
+            AgentRuntime::Pi => "pi",
+            AgentRuntime::Pydantic => "pydantic",
+            AgentRuntime::Claude => "claude",
+            AgentRuntime::Codex => "codex",
+            AgentRuntime::OpenCode => "opencode",
+            AgentRuntime::Gemini => "gemini",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentSettings {
     pub enabled: bool,
+    /// The default agent: Pi, or one of the CLI runtimes.
     #[serde(default)]
     pub runtime: AgentRuntime,
     /// Optional explicit path to the pi launcher (pi.cmd / pi executable).
@@ -642,6 +683,9 @@ pub struct AgentSettings {
     pub provider: Option<String>,
     #[serde(default)]
     pub model: Option<String>,
+    /// Default model per CLI runtime, keyed by [`AgentRuntime::id`]. Pi uses `model`.
+    #[serde(default)]
+    pub cli_models: std::collections::BTreeMap<String, String>,
     #[serde(default)]
     pub sidecar_path: Option<String>,
 }
@@ -657,6 +701,7 @@ impl Default for AgentSettings {
             thinking: None,
             provider: None,
             model: None,
+            cli_models: Default::default(),
             sidecar_path: None,
         }
     }
@@ -845,6 +890,12 @@ pub struct IslandSettings {
     pub default_card: IslandCardId,
     #[serde(default = "default_true")]
     pub show_dots: bool,
+    /// Island look: false = solid black, true = liquid glass.
+    #[serde(default)]
+    pub liquid_glass: bool,
+    /// Glass amount, 0 = clear .. 100 = frosted.
+    #[serde(default = "default_glass_level")]
+    pub liquid_glass_level: u8,
     #[serde(default = "default_true")]
     pub hide_on_focus_loss: bool,
     #[serde(default = "default_true")]
@@ -861,6 +912,8 @@ impl Default for IslandSettings {
             cards: default_island_cards(),
             default_card: IslandCardId::Search,
             show_dots: true,
+            liquid_glass: false,
+            liquid_glass_level: default_glass_level(),
             hide_on_focus_loss: true,
             skip_disabled: true,
             return_to_search: true,
@@ -1185,6 +1238,8 @@ pub enum MediaAction {
     Previous,
     Shuffle,
     Repeat,
+    /// Jump to a position; the command carries the target in milliseconds.
+    Seek,
 }
 
 /// Persisted user settings (v2). Stored as JSON in %APPDATA%/protonsearch/v2/settings.json.
@@ -1203,6 +1258,9 @@ pub struct Settings {
     /// Missing values in older settings files preserve the legacy Windows OCR path.
     #[serde(default = "legacy_ocr_engine")]
     pub ocr_engine: OcrEngine,
+    /// Tesseract executable saved after an in-app install or found on this PC; None = detect.
+    #[serde(default)]
+    pub tesseract_path: Option<String>,
     pub privacy: PrivacySettings,
     pub agent: AgentSettings,
     pub semantic: SemanticSettings,
@@ -1239,6 +1297,7 @@ impl Default for Settings {
             launch_at_login: false,
             indexing: IndexingSettings::default(),
             ocr_engine: OcrEngine::default(),
+            tesseract_path: None,
             privacy: PrivacySettings::default(),
             agent: AgentSettings::default(),
             semantic: SemanticSettings::default(),
@@ -1273,6 +1332,8 @@ pub struct SettingsPatch {
     pub indexing: Option<IndexingSettings>,
     #[serde(default)]
     pub ocr_engine: Option<OcrEngine>,
+    #[serde(default)]
+    pub tesseract_path: Option<String>,
     #[serde(default)]
     pub privacy: Option<PrivacySettings>,
     #[serde(default)]
@@ -1318,6 +1379,9 @@ impl Settings {
         }
         if let Some(v) = patch.ocr_engine {
             self.ocr_engine = v;
+        }
+        if let Some(v) = &patch.tesseract_path {
+            self.tesseract_path = Some(v.clone());
         }
         if let Some(v) = &patch.privacy {
             self.privacy = v.clone();

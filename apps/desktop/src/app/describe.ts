@@ -47,6 +47,9 @@ export function indexHealth(status: EngineStatus | null): IndexHealth {
             detail: "Everything you enabled is searchable on this device.",
           };
     case "indexing":
+      if (status.reindexing) {
+        return { tone: "busy", label: "Reindexing", detail: "Re-reading your images with the new OCR engine. Search keeps working meanwhile." };
+      }
       return {
         tone: "busy",
         label: "Indexing",
@@ -62,6 +65,9 @@ export function indexHealth(status: EngineStatus | null): IndexHealth {
         detail: "Existing results stay searchable, but new files are not being picked up.",
       };
     case "starting":
+      if (status.reindexing) {
+        return { tone: "busy", label: "Reindexing", detail: "Re-reading your images with the new OCR engine. Search keeps working meanwhile." };
+      }
       return {
         tone: "busy",
         label: "Starting",
@@ -274,7 +280,7 @@ export function greetingForTimestamp(timestamp = Date.now(), locale?: string): s
   return "Good evening";
 }
 
-/** "Good morning, Pranshul." or the neutral "Good morning." fallback. */
+/** "Good morning, Sam." or the neutral "Good morning." fallback. */
 export function greetingLine(userName: string | null | undefined, now = Date.now()): string {
   const greeting = greetingForTimestamp(now);
   const name = (userName ?? "").trim();

@@ -26,6 +26,15 @@ pub enum AgentTaskRuntime {
     Pi,
     /// Embedded Pydantic AI sidecar (optional fallback).
     Pydantic,
+    /// Claude Code CLI (`claude -p`).
+    Claude,
+    /// Codex CLI (`codex exec`).
+    Codex,
+    /// OpenCode CLI (`opencode run`).
+    #[serde(rename = "opencode")]
+    OpenCode,
+    /// Gemini CLI (`gemini -p`).
+    Gemini,
     /// Unknown/legacy producer; keep the record rather than dropping it.
     #[default]
     Unknown,
@@ -36,6 +45,10 @@ impl AgentTaskRuntime {
         match self {
             AgentTaskRuntime::Pi => "pi",
             AgentTaskRuntime::Pydantic => "pydantic",
+            AgentTaskRuntime::Claude => "claude",
+            AgentTaskRuntime::Codex => "codex",
+            AgentTaskRuntime::OpenCode => "opencode",
+            AgentTaskRuntime::Gemini => "gemini",
             AgentTaskRuntime::Unknown => "unknown",
         }
     }
@@ -267,6 +280,10 @@ pub struct AgentTask {
     pub restarts: Vec<AgentTaskRestart>,
     #[serde(default)]
     pub model: Option<String>,
+    /// Pi's final answer, kept in memory for the island chat only: the task
+    /// history file never stores assistant output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer: Option<String>,
 }
 
 impl AgentTask {
@@ -355,6 +372,7 @@ mod tests {
             controls: AgentTaskControls::for_state(AgentTaskState::Running),
             restarts: Vec::new(),
             model: Some("fake-model".into()),
+            answer: None,
         }
     }
 

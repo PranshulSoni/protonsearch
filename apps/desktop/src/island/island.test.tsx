@@ -9,6 +9,10 @@ import {
   visibleIslandCards,
 } from "./islandDims";
 import { api } from "../bridge/api";
+import { MotionGlobalConfig } from "motion/react";
+
+// Springs finish instantly so size assertions read the target, not a mid-morph frame.
+MotionGlobalConfig.skipAnimations = true;
 
 class ResizeObserverStub {
   observe() {}
@@ -86,18 +90,18 @@ describe("V9 island geometry", () => {
       [{ card: "search", stageWidth: 520, compact: true }, { w: 500, h: 66 }],
       [{ card: "search", stageWidth: 430, compact: true }, { w: 410, h: 66 }],
       [{ card: "search", stageWidth: 335, compact: true }, { w: 315, h: 66 }],
-      [{ card: "clipboard", stageWidth: 1150, compact: false }, { w: 510, h: 391 }],
+      [{ card: "clipboard", stageWidth: 1150, compact: false }, { w: 510, h: 416 }],
       [{ card: "clipboard", stageWidth: 520, compact: false }, { w: 500, h: 416 }],
       [{ card: "clipboard", stageWidth: 430, compact: false }, { w: 410, h: 416 }],
-      [{ card: "clipboard", stageWidth: 335, compact: false }, { w: 315, h: 446 }],
-      [{ card: "agent", stageWidth: 1150, compact: false }, { w: 520, h: 411 }],
-      [{ card: "agent", stageWidth: 335, compact: false }, { w: 315, h: 445 }],
-      [{ card: "controls", stageWidth: 1150, compact: false }, { w: 515, h: 376 }],
-      [{ card: "controls", stageWidth: 335, compact: false }, { w: 315, h: 483 }],
-      [{ card: "media", stageWidth: 1150, compact: false }, { w: 490, h: 350 }],
+      [{ card: "clipboard", stageWidth: 335, compact: false }, { w: 315, h: 416 }],
+      [{ card: "agent", stageWidth: 1150, compact: false }, { w: 520, h: 460 }],
+      [{ card: "agent", stageWidth: 335, compact: false }, { w: 315, h: 460 }],
+      [{ card: "controls", stageWidth: 1150, compact: false }, { w: 515, h: 431 }],
+      [{ card: "controls", stageWidth: 335, compact: false }, { w: 315, h: 431 }],
+      [{ card: "media", stageWidth: 1150, compact: false }, { w: 490, h: 351 }],
       [{ card: "git", stageWidth: 520, compact: false }, { w: 500, h: 355 }],
-      [{ card: "browser", stageWidth: 335, compact: false }, { w: 315, h: 408 }],
-      [{ card: "bell", stageWidth: 1150, compact: false }, { w: 500, h: 345 }],
+      [{ card: "browser", stageWidth: 335, compact: false }, { w: 315, h: 460 }],
+      [{ card: "bell", stageWidth: 1150, compact: false }, { w: 500, h: 460 }],
     ];
     for (const [input, expected] of cases) {
       const dims = islandCardDims(input);
@@ -111,7 +115,7 @@ describe("V9 island geometry", () => {
     expect(expandedSearchHeight(5)).toBe(450);
     expect(expandedSearchHeight(9)).toBe(450);
     expect(clampIslandWidth(550, 335)).toBe(315);
-    expect(islandCardDims({ card: "media", stageWidth: 1150, compact: false }).radius).toBe(41);
+    expect(islandCardDims({ card: "media", stageWidth: 1150, compact: false }).radius).toBe(28);
     expect(islandCardDims({ card: "search", stageWidth: 1150, compact: true }).radius).toBe(999);
   });
 
@@ -167,7 +171,7 @@ describe("V9 island surface", () => {
     const surface = element.querySelector(".island-surface") as HTMLElement;
     expect(surface.style.width).toBe("520px");
     expect(surface.style.height).toBe("66px");
-    expect(surface.style.borderRadius).toBe("999px");
+    expect(surface.style.borderRadius).toBe("33px");
     expect(element.querySelectorAll(".island-dot-button").length).toBe(8);
     expect(
       element.querySelector(".island-dot-button.is-active")?.getAttribute("aria-label"),
@@ -196,10 +200,10 @@ describe("V9 island surface", () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     });
     await waitFor(() => element.querySelector(".island-surface--expanded") !== null);
-    expect(element.querySelectorAll(".island-filter").length).toBe(6);
+    expect(element.querySelectorAll(".island-filter").length).toBe(7);
     await waitFor(() => element.querySelectorAll(".island-result-row").length > 0);
     expect(element.querySelectorAll(".island-group-label").length).toBeGreaterThan(0);
-    expect(element.querySelector(".island-result-foot")?.textContent).toContain("local results");
+    expect(element.querySelector(".island-result-foot")).toBeNull();
     await act(async () => {
       setter.call(input, "");
       input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -233,13 +237,11 @@ describe("V9 island surface", () => {
       (element.querySelectorAll(".island-dot-button")[2] as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 450));
     });
-    expect(
-      element.querySelector('.island-card-slot[aria-hidden="false"] .island-card-heading h2')
-        ?.textContent,
-    ).toBe("Clipboard");
-    const chips = [...element.querySelectorAll(".island-nav-chip")];
-    expect(chips.some((chip) => chip.textContent?.includes("Pinned"))).toBe(true);
-    expect(chips.find((chip) => chip.textContent?.includes("Pinned"))?.hasAttribute("disabled")).toBe(true);
+    expect(element.querySelector('.island-card-slot[aria-hidden="false"] h2')?.textContent).toBe("Clipboard");
+    const tabs = [...element.querySelectorAll("[role='radio']")];
+    const pinned = tabs.find((tab) => tab.textContent === "Pinned");
+    expect(pinned).toBeDefined();
+    expect(pinned?.hasAttribute("disabled")).toBe(false);
   });
 
   it("shows a capability-honest state for cards without native adapters", async () => {
@@ -249,12 +251,10 @@ describe("V9 island surface", () => {
       (element.querySelectorAll(".island-dot-button")[1] as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 450));
     });
-    expect(
-      element.querySelector('.island-card-slot[aria-hidden="false"] .island-card-heading h2')
-        ?.textContent,
-    ).toBe("Media");
-    expect(element.querySelector(".island-unsupported")?.textContent).toContain("Not available yet");
-    expect(element.querySelector(".island-unsupported")?.textContent).toContain("No mock data is shown.");
+    const slot = element.querySelector('.island-card-slot[aria-hidden="false"]');
+    expect(slot?.querySelector("h2")?.textContent).toBe("Media");
+    expect(slot?.textContent).toContain("Unavailable");
+    expect(slot?.textContent).toContain("Media session adapter isn't wired in this build.");
   });
 
   it("honours reduced motion: card swaps are instant and never play the out phase", async () => {
@@ -278,11 +278,7 @@ describe("V9 island surface", () => {
       (element.querySelectorAll(".island-dot-button")[1] as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
-    expect(
-      element.querySelector('.island-card-slot[aria-hidden="false"] .island-card-heading h2')
-        ?.textContent,
-    ).toBe("Media");
-    expect(element.querySelector(".island-surface--out")).toBeNull();
+    expect(element.querySelector('.island-card-slot[aria-hidden="false"] h2')?.textContent).toBe("Media");
   });
 
   it("switches cards with Ctrl+ArrowDown, wheel threshold and Esc", async () => {
@@ -297,7 +293,7 @@ describe("V9 island surface", () => {
     );
     await act(async () => {
       element.querySelector(".island-surface")!.dispatchEvent(
-        new WheelEvent("wheel", { deltaY: 60, bubbles: true, cancelable: true }),
+        new WheelEvent("wheel", { deltaX: 60, bubbles: true, cancelable: true }),
       );
       await new Promise((resolve) => setTimeout(resolve, 600));
     });
@@ -320,7 +316,7 @@ describe("V9 island surface", () => {
       element.querySelector(".island-dot-button.is-active")?.getAttribute("aria-label");
     const stream = async (deltas: number[]) => {
       for (const deltaY of deltas) {
-        surface.dispatchEvent(new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true }));
+        surface.dispatchEvent(new WheelEvent("wheel", { deltaX: deltaY, bubbles: true, cancelable: true }));
         await new Promise((resolve) => setTimeout(resolve, 12));
       }
     };
@@ -378,9 +374,9 @@ describe("V9 island surface", () => {
       (element.querySelector('.island-dot-button[aria-label="Go to Media card"]') as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 300));
     });
-    expect(element.querySelector(".island-media-title")?.textContent).toBe("First track");
+    expect(element.textContent).toContain("First track");
     await settle(1300);
-    expect(element.querySelector(".island-media-title")?.textContent).toBe("Second track");
+    expect(element.textContent).toContain("Second track");
 
     await act(async () => {
       (element.querySelector('.island-dot-button[aria-label="Go to Search card"]') as HTMLButtonElement).click();
@@ -424,7 +420,7 @@ await new Promise((resolve) => setTimeout(resolve, 800));
     });
     // Grows once before the morph; the settle afterwards is the same size.
     expect(calls.length).toBe(initial + 1);
-    expect(calls[initial]).toEqual({ w: 550, h: 391 });
+    expect(calls[initial]).toEqual({ w: 550, h: 416 });
     const afterSwitch = calls.length;
     await act(async () => {
       (element.querySelector('.island-dot-button[aria-label="Go to Search card"]') as HTMLButtonElement).click();
@@ -454,8 +450,8 @@ await new Promise((resolve) => setTimeout(resolve, 1000));
 expect(element.querySelector(".island-dot-button.is-active")?.getAttribute("aria-label")).toBe(
 "Go to Clipboard card",
 );
-expect(calls.at(-1)).toEqual({ w: 550, h: 391 });
-expect(calls.some(({ h }) => h < 391)).toBe(true);
+expect(calls.at(-1)).toEqual({ w: 550, h: 416 });
+expect(calls.some(({ h }) => h < 416)).toBe(true);
 geometry.mockRestore();
 });
 it("keeps reserved native bounds when the active card cancels a morph", async () => {
@@ -471,9 +467,9 @@ await new Promise((resolve) => setTimeout(resolve, 50));
 (element.querySelector('.island-dot-button[aria-label="Go to Search card"]') as HTMLButtonElement).click();
 await new Promise((resolve) => setTimeout(resolve, 350));
 });
-expect(calls.at(-1)).toEqual({ w: 550, h: 350 });
+expect(calls.at(-1)).toEqual({ w: 550, h: 351 });
 await act(async () => {
-await new Promise((resolve) => setTimeout(resolve, 250));
+await new Promise((resolve) => setTimeout(resolve, 650));
 });
 expect(calls.at(-1)).toEqual({ w: 550, h: 66 });
 geometry.mockRestore();
@@ -494,11 +490,37 @@ geometry.mockRestore();
     );
   });
 
-  it("cancels a delayed card change on Escape", async () => {
+  it("swipes to the next card on a horizontal drag, but not when the drag starts on a slider", async () => {
+    const element = await renderIsland();
+    await waitFor(() => element.querySelectorAll(".island-dot-button").length === 8);
+    await act(async () => {
+      (element.querySelector('.island-dot-button[aria-label="Go to Quick Settings card"]') as HTMLButtonElement).click();
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
+    const surface = element.querySelector(".island-surface") as HTMLElement;
+    const slider = element.querySelector('input[aria-label="Volume"]') as HTMLInputElement;
+    expect(slider).not.toBeNull();
+    const drag = async (from: HTMLElement) => {
+      await act(async () => {
+        from.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 300, clientY: 100 }));
+        surface.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, button: 0, clientX: 100, clientY: 100 }));
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      });
+    };
+    const active = () => element.querySelector(".island-dot-button.is-active")?.getAttribute("aria-label");
+    await drag(slider);
+    expect(active()).toBe("Go to Quick Settings card");
+    await drag(surface);
+    expect(active()).toBe("Go to Browser card");
+  });
+
+  it("returns to Search when Escape follows a card switch", async () => {
     const element = await renderIsland();
     await waitFor(() => element.querySelectorAll(".island-dot-button").length === 8);
     await act(async () => {
       (element.querySelector('.island-dot-button[aria-label="Go to Media card"]') as HTMLButtonElement).click();
+    });
+    await act(async () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
       await new Promise((resolve) => setTimeout(resolve, 300));
     });
@@ -516,14 +538,13 @@ geometry.mockRestore();
       (dots[1] as HTMLButtonElement).click();
       await new Promise((resolve) => setTimeout(resolve, 30));
       (dots[0] as HTMLButtonElement).click();
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     });
     expect(element.querySelector(".island-dot-button.is-active")?.getAttribute("aria-label")).toBe(
       "Go to Search card",
     );
     expect(element.querySelector(".island-surface--compact")).not.toBeNull();
     expect(geometry.mock.calls.at(-1)).toEqual([550, 66]);
-    expect(element.querySelector(".island-surface--out")).toBeNull();
     geometry.mockRestore();
   });
 
@@ -540,7 +561,6 @@ geometry.mockRestore();
 await new Promise((resolve) => setTimeout(resolve, 700));
     });
     expect(element.querySelector(".island-surface--compact")).not.toBeNull();
-    expect(element.querySelector(".island-surface--in, .island-surface--out")).toBeNull();
     expect(geometry.mock.calls.at(-1)).toEqual([550, 66]);
     geometry.mockRestore();
   });

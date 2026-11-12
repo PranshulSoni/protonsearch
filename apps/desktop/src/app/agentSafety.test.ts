@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 // RR-01/RR-02 regression guard (docs/security/PI_AGENT_SECURITY.md §7).
-const source = readFileSync("src/app/views/WorkflowsAgentPanel.tsx", "utf8");
+const source = readFileSync("src/app/views/AgentsSection.tsx", "utf8");
 
-describe("Pi panel security copy and write gate", () => {
+describe("Pi agent security copy and write gate", () => {
   it("never claims the workspace confines the agent", () => {
     expect(source).not.toContain("Files outside it are not exposed");
     expect(source).not.toContain("inside the workspace");
@@ -27,9 +27,7 @@ describe("Pi panel security copy and write gate", () => {
     expect(source).not.toContain("Allow and run");
   });
 
-  it("keeps Run gated on the enabled setting and Pi detection", () => {
-    expect(source).toContain("!settings.agent.enabled");
-    expect(source).toContain("detected");
-    expect(source).toContain("prompt.trim().length > 0");
+  it("offers the default-agent switch only for installed agents", () => {
+    expect(source).toContain("disabled={!found || isDefault}");
   });
 });

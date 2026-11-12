@@ -103,11 +103,10 @@ fn drive_run(
     }
 }
 
-fn read_tasks_file(data_dir: &Path) -> Value {
-    serde_json::from_str(
-        &fs::read_to_string(ps_agent::task::tasks_path(data_dir)).expect("tasks.json exists"),
-    )
-    .expect("tasks.json is valid json")
+/// The newest stored task row (the history lives in the app database).
+fn read_first_task(data_dir: &Path) -> Value {
+    let text = ps_agent::task::persisted_text(data_dir);
+    serde_json::from_str(text.lines().next().expect("a stored task")).expect("task row is valid json")
 }
 
 #[test]
@@ -174,7 +173,7 @@ fn pi_run_lifecycle_persists_and_survives_restart() {
     assert!(activity[0].search_text.contains("completed"));
 
     // Persisted file: no prompt secret, no assistant output, no tool payload.
-    let raw = fs::read_to_string(ps_agent::task::tasks_path(&data_dir)).expect("tasks file");
+    let raw = ps_agent::task::persisted_text(&data_dir);
     assert!(!raw.contains(secret), "prompt secret persisted");
     assert!(!raw.contains("Fake answer for"), "assistant output persisted");
     assert!(!raw.contains("tool read completed"), "tool payload persisted");
@@ -327,7 +326,7 @@ fn error_and_output_redaction_is_applied_to_persisted_state() {
     for entry in &task.log {
         assert!(!entry.message.contains(secret), "{}", entry.message);
     }
-    let raw = fs::read_to_string(ps_agent::task::tasks_path(&data_dir)).expect("tasks file");
+    let raw = ps_agent::task::persisted_text(&data_dir);
     assert!(!raw.contains(secret), "secret persisted in tasks file");
     assert!(!raw.contains("the answer contains"), "output persisted");
     let _ = fs::remove_dir_all(root);
@@ -354,9 +353,7 @@ fn persisted_file_has_expected_schema_shape() {
             duration_ms: 1,
         },
     );
-    let file = read_tasks_file(&data_dir);
-    assert_eq!(file["schemaVersion"].as_u64(), Some(1));
-    let first = &file["tasks"][0];
+    let first = &read_first_task(&data_dir);
     for key in [
         "id",
         "runtime",

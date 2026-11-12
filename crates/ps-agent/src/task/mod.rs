@@ -27,4 +27,4 @@ mod store;
 
 pub use model::*;
 pub use service::{AgentTaskListener, AgentTaskService};
-pub use store::{tasks_path, AgentTaskStore};
+pub use store::{persisted_text, tasks_path, AgentTaskStore};

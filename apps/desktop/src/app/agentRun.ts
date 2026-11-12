@@ -3,7 +3,16 @@
 // test seam). Raw provider/engine error text is never stored on the view: the
 // surface shows product copy and only a sanitized reference code in Details.
 
-import type { AgentEvent, AgentRunRequest } from "../bridge/types";
+import type { AgentEvent, AgentRunRequest, AgentRuntime } from "../bridge/types";
+
+/** The agent runtimes, in the order the Workflows page and the island card list them. */
+export const AGENT_RUNTIMES: { id: AgentRuntime; name: string }[] = [
+  { id: "pi", name: "Pi" },
+  { id: "claude", name: "Claude Code" },
+  { id: "codex", name: "Codex" },
+  { id: "opencode", name: "OpenCode" },
+  { id: "gemini", name: "Gemini CLI" },
+];
 
 export type AgentPhase = "idle" | "starting" | "running" | "finished" | "error" | "cancelled";
 export type AgentLogTone = "neutral" | "ok" | "warn" | "error";

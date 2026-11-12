@@ -1,5 +1,7 @@
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -22,10 +24,12 @@ import type {
   SettingsPatch,
 } from "./bridge/types";
 import LauncherView from "./launcher/LauncherView";
-import IslandView from "./island/IslandView";
 import DesktopApp from "./app/DesktopApp";
 import OnboardingView from "./onboarding/OnboardingView";
 import { Logo } from "./components/Logo";
+
+// Lazy: the island's Tailwind preflight CSS loads only in the island window.
+const IslandView = lazy(() => import("./island/IslandView"));
 
 export type ViewKind = "launcher" | "main" | "island";
 
@@ -266,7 +270,9 @@ export default function App({ view }: { view: ViewKind }) {
       {view === "launcher" ? (
         <LauncherView />
       ) : view === "island" ? (
-        <IslandView />
+        <Suspense fallback={null}>
+          <IslandView />
+        </Suspense>
       ) : showOnboarding ? (
         <OnboardingView />
       ) : (

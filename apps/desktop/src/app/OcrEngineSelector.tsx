@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { api } from "../bridge/api";
 import type { OcrEngine, OcrEngineDetails } from "../bridge/types";
 import "./OcrEngineSelector.css";
 
+// Fallback catalog, used only when the engine cannot be queried. Live data from
+// get_ocr_engines replaces it; keep the copy in step with crates/ps-core/src/engine.rs.
 const DEFAULT_ENGINES: OcrEngineDetails[] = [
   {
     engine: "windows",
@@ -11,12 +13,8 @@ const DEFAULT_ENGINES: OcrEngineDetails[] = [
     sizeLabel: "Built-in (0 MB)",
     speedLabel: "Fast (~45ms/img)",
     badge: "Built-in",
-    description: "Built into Windows and available now. Keeps OCR local and preserves the current working engine.",
-    highlights: [
-      "Built into Windows 10 & 11",
-      "Zero setup or downloads required",
-      "100% offline and low memory footprint",
-    ],
+    description: "Built into Windows 10 and 11. Nothing to download.",
+    highlights: [],
     license: null,
     downloadSizeBytes: null,
   },
@@ -27,44 +25,32 @@ const DEFAULT_ENGINES: OcrEngineDetails[] = [
     sizeLabel: "~6.1 MB",
     speedLabel: "Ultra-Fast (~30ms/img)",
     badge: "Recommended",
-    description: "Compact and designed for speed; approximately 6.1 MB of models, plus a runtime.",
-    highlights: [
-      "High accuracy on screenshots, PDFs & text",
-      "Ultra-fast local inference (~30ms/image)",
-      "Compact ~6.1 MB model download",
-    ],
+    description: "Compact model pack for screenshots, PDFs and printed text.",
+    highlights: [],
     license: "Apache 2.0",
     downloadSizeBytes: 6100000,
   },
   {
     engine: "indra",
-    name: "Indra",
+    name: "Indra OCR",
     availability: "not_installed",
     sizeLabel: "~27 MB",
     speedLabel: "Deep (~120ms/img)",
     badge: "Multilingual & Skewed",
-    description: "Designed for higher-quality text recognition, including skewed and multilingual text; approximately 27 MB of models. Its license requires acceptance before download.",
-    highlights: [
-      "Specialized in skewed and rotated text",
-      "Extended multilingual script coverage",
-      "Requires research license acceptance",
-    ],
-    license: "Research & Non-Commercial (Acceptance required)",
+    description: "Stronger on skewed, rotated and multilingual text.",
+    highlights: [],
+    license: "Research & non-commercial",
     downloadSizeBytes: 27000000,
   },
   {
     engine: "tesseract",
-    name: "Tesseract",
+    name: "Tesseract OCR",
     availability: "not_installed",
     sizeLabel: "External CLI",
     speedLabel: "Traditional (~150ms/img)",
     badge: "Extensible",
-    description: "A traditional OCR engine with separately installed language data; download size depends on the languages selected. Not configured in ProtonSearch.",
-    highlights: [
-      "Uses system Tesseract installation",
-      "Extensible with custom traineddata packs",
-      "Traditional open-source engine",
-    ],
+    description: "Open-source engine that uses your installed Tesseract.",
+    highlights: [],
     license: "Apache 2.0",
     downloadSizeBytes: null,
   },
@@ -72,273 +58,209 @@ const DEFAULT_ENGINES: OcrEngineDetails[] = [
 
 const ORDER: OcrEngine[] = ["windows", "pp_ocr_v6", "indra", "tesseract"];
 
+function unavailableMessage(engine: OcrEngine, name: string): string {
+  if (engine === "tesseract") {
+    return "Tesseract OCR isn't installed yet. Install it first.";
+  }
+  if (engine === "windows") {
+    return "Windows OCR needs an OCR language. Install opens Windows language settings.";
+  }
+  return `${name} isn't installed yet. Install it first.`;
+}
+
 export function OcrEngineSelector({
   value,
   onChange,
   disabled = false,
 }: {
   value: OcrEngine;
-  onChange: (engine: OcrEngine) => void;
+  onChange: (engine: OcrEngine) => void | Promise<unknown>;
   disabled?: boolean;
 }) {
+  const headingId = useId();
   const [engines, setEngines] = useState<OcrEngineDetails[]>(DEFAULT_ENGINES);
-  const [downloadingEngine, setDownloadingEngine] = useState<OcrEngine | null>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [busyEngine, setBusyEngine] = useState<OcrEngine | null>(null);
+  const [failure, setFailure] = useState<{ engine: OcrEngine; message: string } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const loadEngines = async () => {
+  // Returns the live catalog, or null when the engine cannot be reached.
+  const loadEngines = async (): Promise<OcrEngineDetails[] | null> => {
     try {
       const live = await api.getOcrEngines();
       if (live && live.length > 0) {
         setEngines(live);
+        return live;
       }
     } catch {
-      // Keep default engine catalog
+      // Keep the catalog already on screen.
     }
+    return null;
   };
 
   useEffect(() => {
     void loadEngines();
   }, []);
 
-  const handleDownload = async (engine: OcrEngine) => {
-    if (disabled || downloadingEngine) return;
-    setDownloadingEngine(engine);
-    setDownloadError(null);
+  // Availability is re-read on every choice, so an engine installed while the page
+  // is open can be selected without reloading.
+  const select = async (engine: OcrEngine) => {
+    if (disabled || busyEngine) return;
+    setFailure(null);
+    const catalog = (await loadEngines()) ?? engines;
+    const info = catalog.find((entry) => entry.engine === engine);
+    const name = info?.name ?? engine;
+    if (info?.availability !== "available") {
+      setFailure({ engine, message: unavailableMessage(engine, name) });
+      return;
+    }
     try {
-      await api.downloadOcrEngine(engine);
-      await loadEngines();
-      onChange(engine);
-    } catch (err: unknown) {
-      setDownloadError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setDownloadingEngine(null);
+      await onChange(engine);
+      if (engine !== value) setNotice(`Switched to ${name}. All images are being reindexed in the background.`);
+    } catch {
+      setFailure({ engine, message: `Couldn't switch to ${name}. The current engine is unchanged.` });
     }
   };
 
-  const badgeClass = (badge: string) => {
-    const lower = badge.toLowerCase();
-    if (lower.includes("recommended")) return "ocr-badge recommended";
-    if (lower.includes("built-in")) return "ocr-badge builtin";
-    if (lower.includes("multilingual")) return "ocr-badge multilingual";
-    return "ocr-badge traditional";
+  const download = async (engine: OcrEngine) => {
+    if (disabled || busyEngine) return;
+    const name = engines.find((entry) => entry.engine === engine)?.name ?? engine;
+    setBusyEngine(engine);
+    setFailure(null);
+    try {
+      await api.downloadOcrEngine(engine);
+      await loadEngines();
+      await onChange(engine);
+      if (engine !== value) setNotice(`Installed ${name}. All images are being reindexed in the background.`);
+    } catch {
+      setFailure({ engine, message: `Couldn't install ${name}. The current engine is unchanged.` });
+    } finally {
+      setBusyEngine(null);
+    }
   };
 
-  // Sort engines to match canonical order: windows, pp_ocr_v6, indra, tesseract
-  const sortedEngines = [...engines].sort((a, b) => ORDER.indexOf(a.engine) - ORDER.indexOf(b.engine));
+  const installTesseract = async () => {
+    if (disabled || busyEngine) return;
+    setBusyEngine("tesseract");
+    setFailure(null);
+    try {
+      await api.installTesseractOcr();
+      await loadEngines();
+    } catch (error) {
+      setFailure({
+        engine: "tesseract",
+        message: typeof error === "string" ? error : "Couldn't install Tesseract OCR.",
+      });
+    } finally {
+      setBusyEngine(null);
+    }
+  };
+
+  const openLanguageSettings = async () => {
+    setFailure(null);
+    try {
+      await api.openWindowsLanguageSettings();
+    } catch {
+      setFailure({ engine: "windows", message: "Couldn't open Windows language settings." });
+    }
+  };
+
+  // The one action for an engine that is not installed yet.
+  const install = (engine: OcrEngine) => {
+    if (engine === "tesseract") return installTesseract();
+    if (engine === "windows") return openLanguageSettings();
+    return download(engine);
+  };
+
+  const sorted = [...engines].sort((a, b) => ORDER.indexOf(a.engine) - ORDER.indexOf(b.engine));
 
   return (
-    <div className="ocr-selector-container" data-testid="ocr-engine-options">
-      {/* Accessible native select preserving testing contract */}
+    <div className="ocr-engines" data-testid="ocr-engine-options">
+      {/* Native select kept for tests; the cards below are the interface. */}
       <select
         id="ocr-engine"
+        className="sr-only"
+        aria-hidden="true"
+        tabIndex={-1}
         value={value}
-        aria-label="OCR engine"
-        style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", border: 0 }}
-        onChange={(event) => onChange(event.currentTarget.value as OcrEngine)}
+        onChange={(event) => void select(event.currentTarget.value as OcrEngine)}
       >
-        {sortedEngines.map((opt) => (
-          <option key={opt.engine} value={opt.engine} disabled={opt.availability !== "available"}>
-            {opt.name} · {opt.availability === "available" ? "Available" : "Not installed"}
+        {sorted.map((info) => (
+          <option
+            key={info.engine}
+            value={info.engine}
+            disabled={info.availability !== "available"}
+          >
+            {info.name}
           </option>
         ))}
       </select>
 
-      <div className="ocr-selector-header">
-        <label className="ocr-selector-title" htmlFor="ocr-cards">
-          OCR Engine &amp; Models
-        </label>
-        <span className="ocr-selector-subtitle">
-          Choose which local OCR engine extracts readable text from images, screenshots, and scanned documents. All processing stays strictly local on your PC.
-        </span>
+      <div className="ocr-engines-head">
+        <h3 className="ocr-engines-title" id={headingId}>
+          OCR engines
+        </h3>
+        <p className="ocr-engines-lead">Used to read text in images and screenshots.</p>
       </div>
 
-      {downloadError ? (
-        <div className="field-error" role="alert" style={{ margin: "4px 0 8px 0" }}>
-          Download failed: {downloadError}
-        </div>
+      {failure ? (
+        <p className="field-error" role="alert">
+          {failure.message}
+        </p>
+      ) : notice ? (
+        <p className="ocr-engine-notice" role="status">
+          {notice}
+        </p>
       ) : null}
 
-      <div className="ocr-cards-grid" id="ocr-cards">
-        {sortedEngines.map((info) => {
-          const isActive = value === info.engine;
-          const isAvailable = info.availability === "available";
-          const isDownloading = downloadingEngine === info.engine;
-
+      <ul className="ocr-engine-list" aria-labelledby={headingId}>
+        {sorted.map((info) => {
+          const current = value === info.engine;
+          const installed = info.availability === "available";
           return (
-            <div
-              key={info.engine}
-              className={`ocr-card ${isActive ? "active" : ""}`}
-              onClick={() => {
-                if (isAvailable && !disabled) {
-                  onChange(info.engine);
-                }
-              }}
-            >
-              <div>
-                <div className="ocr-card-top">
-                  <div className="ocr-card-name-group">
-                    <span className="ocr-card-name">{info.name}</span>
-                    <span className={badgeClass(info.badge)}>{info.badge}</span>
-                  </div>
-                  {isActive ? (
-                    <span className="ocr-status-pill active">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      Active
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="ocr-card-metrics">
-                  <span className={`ocr-pill ${info.speedLabel.includes("Ultra") ? "fast" : ""}`}>
-                    {info.speedLabel}
-                  </span>
-                  <span className="ocr-pill">{info.sizeLabel}</span>
-                </div>
-
-                <p className="ocr-card-desc">{info.description}</p>
-
-                <ul className="ocr-card-highlights">
-                  {info.highlights.map((h, i) => (
-                    <li key={i} className="ocr-card-highlight-item">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      {h}
-                    </li>
-                  ))}
-                </ul>
+            <li key={info.engine} className={"ocr-engine" + (current ? " is-current" : "")}>
+              <div className="ocr-engine-head">
+                <span className="ocr-engine-name">{info.name}</span>
+                <span className="badge badge-quiet">{info.badge}</span>
+                {current ? <span className="ocr-engine-current">Current</span> : null}
               </div>
-
-              <div className="ocr-card-action">
-                <span className="ocr-status-pill">
-                  {isAvailable ? (
-                    <span className="ocr-status-pill available">Installed</span>
-                  ) : (
-                    <span className="ocr-status-pill uninstalled">Not installed</span>
-                  )}
+              <div className="ocr-engine-meta">
+                <span className="badge badge-quiet">{info.speedLabel}</span>
+                <span className="badge badge-quiet">{info.sizeLabel}</span>
+              </div>
+              <p className="ocr-engine-desc">{info.description}</p>
+              {info.license ? <p className="ocr-engine-license">License: {info.license}</p> : null}
+              <div className="ocr-engine-foot">
+                <span className={"ocr-engine-status" + (installed ? " is-installed" : "")}>
+                  {installed ? "Installed" : "Not installed"}
                 </span>
-
-                {isActive ? (
-                  <button
-                    type="button"
-                    className="ocr-btn ocr-btn-secondary"
-                    disabled
-                  >
-                    Current
-                  </button>
-                ) : isAvailable ? (
-                  <button
-                    type="button"
-                    className="ocr-btn ocr-btn-secondary"
-                    disabled={disabled}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onChange(info.engine);
-                    }}
-                  >
-                    Select
-                  </button>
-                ) : info.engine === "pp_ocr_v6" ? (
-                  <button
-                    type="button"
-                    className="ocr-btn ocr-btn-primary"
-                    disabled={disabled || isDownloading}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDownload("pp_ocr_v6");
-                    }}
-                  >
-                    {isDownloading ? (
-                      <>
-                        <span className="ocr-spinner" />
-                        Downloading...
-                      </>
-                    ) : (
-                      "Download (~6.1 MB)"
-                    )}
-                  </button>
-                ) : info.engine === "indra" ? (
-                  <button
-                    type="button"
-                    className="ocr-btn ocr-btn-secondary"
-                    disabled={disabled || isDownloading}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowLicenseModal(true);
-                    }}
-                  >
-                    {isDownloading ? (
-                      <>
-                        <span className="ocr-spinner" />
-                        Downloading...
-                      </>
-                    ) : (
-                      "View License & Download"
-                    )}
-                  </button>
+                {installed ? (
+                  current ? null : (
+                    <button type="button" className="btn" disabled={disabled} onClick={() => void select(info.engine)}>
+                      Select
+                    </button>
+                  )
                 ) : (
                   <button
                     type="button"
-                    className="ocr-btn ocr-btn-secondary"
-                    disabled
-                    title="Install Tesseract on system PATH to enable"
+                    className="btn btn-primary"
+                    disabled={disabled || busyEngine !== null}
+                    onClick={() => void install(info.engine)}
                   >
-                    System CLI
+                    {busyEngine === info.engine ? (
+                      <>
+                        <span className="ocr-spinner" aria-hidden="true" />
+                        Installing…
+                      </>
+                    ) : (
+                      "Install"
+                    )}
                   </button>
                 )}
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
-
-      <p className="field-help" style={{ marginTop: 8 }}>
-        Only installed engines can be selected. No OCR engine or model downloads are available here.
-      </p>
-
-      {showLicenseModal ? (
-        <div className="ocr-license-modal-backdrop" onClick={() => setShowLicenseModal(false)}>
-          <div className="ocr-license-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Indra OCR Model License</h3>
-            <p>
-              Indra is designed for higher-quality text recognition, including skewed and multilingual text; approximately 27 MB of models. Its license requires acceptance before download.
-            </p>
-            <p>
-              This model is distributed for non-commercial and research use only. Model files are downloaded directly to your local ProtonSearch data folder and are never shared or sent off your device.
-            </p>
-            <div className="ocr-license-actions">
-              <button
-                type="button"
-                className="ocr-btn ocr-btn-primary"
-                disabled={disabled || downloadingEngine === "indra"}
-                onClick={() => {
-                  setShowLicenseModal(false);
-                  void handleDownload("indra");
-                }}
-              >
-                {downloadingEngine === "indra" ? (
-                  <>
-                    <span className="ocr-spinner" />
-                    Downloading...
-                  </>
-                ) : (
-                  "Accept & Download (~27 MB)"
-                )}
-              </button>
-              <button
-                type="button"
-                className="ocr-btn ocr-btn-secondary"
-                onClick={() => setShowLicenseModal(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </ul>
     </div>
   );
 }

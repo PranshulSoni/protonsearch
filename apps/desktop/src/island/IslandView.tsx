@@ -1,21 +1,17 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { api } from "../bridge/api";
 import type { IslandCardId, SearchResult, SearchScope } from "../bridge/types";
-import {
-  AgentsCard,
-  BrowserCard,
-  ClipboardCard,
-  GitCard,
-  SearchCard,
-  TodoCard,
-  UnsupportedCard,
-} from "./IslandCards";
-import {
-  ControlsCard,
-  MediaCard,
-} from "./NativeCards";
+import { SearchCard, UnsupportedCard } from "./IslandCards";
+import { AgentsCard } from "./cards/AgentsCard";
+import { BrowserCard } from "./cards/BrowserCard";
+import { ClipboardCard } from "./cards/ClipboardCard";
+import { ControlsCard } from "./cards/ControlsCard";
+import { GitCard } from "./cards/GitCard";
+import { MediaCard } from "./cards/MediaCard";
+import { TodoCard } from "./cards/TodoCard";
 import { useIslandControls } from "./islandNativeCards";
-import { IslandPageDots } from "./IslandPageDots";
+import { GooeyNav } from "./ui/GooeyNav";
 import {
   useIslandBootstrap,
   useIslandSearch,
@@ -23,6 +19,7 @@ import {
 } from "./islandData";
 import {
   islandCardDims,
+  MAX_ISLAND_HEIGHT,
   islandCardLabel,
   ISLAND_VISIBLE_ROWS,
   islandWindowWidth,
@@ -31,6 +28,8 @@ import {
 } from "./islandDims";
 import { markTyping, recordFrames } from "../lib/perfProbe";
 import { groupResultsInRankOrder } from "../lib/results";
+import { lookFrom, readIslandLook, useResolvedTheme, writeIslandLook } from "../lib/islandLook";
+import "./island-tw.css";
 import "./island.css";
 
 // Memoized card bodies: typing in Search must not re-render hidden card DOM
@@ -49,11 +48,14 @@ const MemoTodoCard = memo(TodoCard);
  * Binding: docs/design/ISLAND_V9_SPEC.md.
  */
 
-type Phase = "idle" | "out" | "in";
-
 // Must match --island-dur-open / --island-dur-close in island.css.
 const OPEN_MS = 420;
 const CLOSE_MS = 150;
+// Longest the morph runs. The native window grows before it and shrinks after.
+const MORPH_SETTLE_MS = 600;
+// Card swap: the old card fades up and out, the new one fades in from below.
+const CARD_OUT_S = 0.14;
+const CARD_IN_S = 0.22;
 // Scroll delta that switches a card, and the silence that ends a scroll gesture.
 const WHEEL_STEP = 48;
 const WHEEL_GESTURE_GAP_MS = 160;
@@ -62,30 +64,39 @@ function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** Morph origin: the anchor edge of the surface, so it grows away from where it is pinned. */
 export default function IslandView() {
   const bootstrap = useIslandBootstrap();
   const settings = bootstrap.settings?.launcher?.island ?? null;
   const cards = useMemo(() => visibleIslandCards(settings), [settings]);
+  // Until the bootstrap settings arrive, the look cached by the settings page
+  // paints the first frame, so the surface never flashes the default style.
+  const [cachedLook] = useState(readIslandLook);
+  const look = bootstrap.settings ? lookFrom(bootstrap.settings.launcher.island, bootstrap.settings.theme) : cachedLook;
+  const resolvedTheme = useResolvedTheme(look.theme);
+  useEffect(() => {
+    if (bootstrap.settings) {
+      writeIslandLook(lookFrom(bootstrap.settings.launcher.island, bootstrap.settings.theme));
+    }
+  }, [bootstrap.settings]);
+  const reduced = useReducedMotion();
   // task-58: every summon is the compact oval search pill.
   const [activeCard, setActiveCard] = useState<IslandCardId>("search");
   const [compact, setCompact] = useState(true);
   const [variant, setVariant] = useState<IslandVariant>("default");
   const [clipTab, setClipTab] = useState<ClipTab>("all");
-  const [phase, setPhase] = useState<Phase>("idle");
   const [visibility, setVisibility] = useState<"opening" | "shown" | "closing" | "hidden">("shown");
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("all");
   const renders = (window as unknown as { __islandRenders?: number });
   renders.__islandRenders = (renders.__islandRenders ?? 0) + 1;
-  // Prefetch all card data as soon as the island webview has bootstrap settings.
-  // Card slots are already mounted, so the first switch is a render-only change
-  // (sources-content perf finding: first switches paid mount + async fetch).
+  // Prefetch all card data as soon as the island webview has bootstrap settings,
+  // so a card switch is a render-only change (sources-content perf finding).
   const controls = useIslandControls(bootstrap.ready, activeCard === "media" && visibility !== "hidden");
 
 
   const inputRef = useRef<HTMLInputElement>(null);
   const initialisedRef = useRef(false);
-  const tokenRef = useRef(0);
   const lastSwitchRef = useRef(0);
   const closeTimerRef = useRef<number | null>(null);
   const openTimerRef = useRef<number | null>(null);
@@ -99,12 +110,15 @@ export default function IslandView() {
 
   const [clipboardRevision, setClipboardRevision] = useState(0);
   const [browserRevision, setBrowserRevision] = useState(0);
+  const [gitRevision, setGitRevision] = useState(0);
 
   useEffect(() => {
     if (activeCard === "clipboard") {
       setClipboardRevision((r) => r + 1);
     } else if (activeCard === "browser") {
       setBrowserRevision((r) => r + 1);
+    } else if (activeCard === "git") {
+      setGitRevision((r) => r + 1);
     }
   }, [activeCard]);
 
@@ -116,7 +130,7 @@ export default function IslandView() {
   // Warm every card's data in parallel while the compact pill is shown.
   const clipboardState = useIslandSearch("clipboard", "", bootstrap.ready, clipboardRevision);
   const browserState = useIslandSearch("browser", "", bootstrap.ready, browserRevision);
-  const gitState = useIslandSearch("git", "", bootstrap.ready);
+  const gitState = useIslandSearch("git", "", bootstrap.ready, gitRevision);
 
   const stageParam = Number(new URLSearchParams(window.location.search).get("stage") ?? "0");
   const monitor = useMemo(() => {
@@ -158,7 +172,36 @@ export default function IslandView() {
     setScope("all");
   }, [bootstrap.ready]);
 
-  const surfaceDims = dims;
+  // Every card but search sizes to its content (measured below), up to the max height;
+  // beyond that the card's own list scrolls.
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [natural, setNatural] = useState<{ card: IslandCardId; height: number } | null>(null);
+  const fitted =
+    activeCard !== "search" && natural?.card === activeCard
+      ? Math.max(140, Math.min(MAX_ISLAND_HEIGHT, natural.height + 33)) // 33 = dots footer + borders
+      : null;
+  const surfaceDims = fitted == null ? dims : { ...dims, height: fitted };
+  useLayoutEffect(() => {
+    const slot = surfaceRef.current?.querySelector<HTMLElement>(`.island-card-slot[data-card="${activeCard}"]`);
+    if (!slot || activeCard === "search") return;
+    const measure = () => {
+      const viewports = Array.from(slot.querySelectorAll<HTMLElement>("[data-radix-scroll-area-viewport]"));
+      const scrollTops = viewports.map((viewport) => viewport.scrollTop);
+      slot.setAttribute("data-measuring", "");
+      const height = slot.offsetHeight;
+      slot.removeAttribute("data-measuring");
+      // The measuring CSS makes the viewports auto-height, which clamps scrollTop to 0.
+      viewports.forEach((viewport, index) => {
+        viewport.scrollTop = scrollTops[index];
+      });
+      // 0 means no layout engine (tests): keep the card's default size.
+      if (height) setNatural((prev) => (prev?.card === activeCard && prev.height === height ? prev : { card: activeCard, height }));
+    };
+    measure();
+    const observer = new MutationObserver(measure);
+    observer.observe(slot, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [activeCard]);
   // The native window keeps one width (the widest card); only its height follows
   // the card. Changing the width also re-centres the window, and that move lands
   // a frame apart from the resize: the whole island visibly jumped sideways at the
@@ -167,7 +210,8 @@ export default function IslandView() {
   const lastGeometryKeyRef = useRef("");
   const geometryHeightRef = useRef(surfaceDims.height);
   const geometrySettleTimerRef = useRef<number | null>(null);
-  const reportGeometry = useCallback((height: number) => {
+  // Sends the native window size. Cards never call setIslandGeometry themselves.
+  const fitWindow = useCallback((height: number) => {
     const key = windowWidth + "x" + Math.ceil(height);
     if (lastGeometryKeyRef.current === key) return;
     lastGeometryKeyRef.current = key;
@@ -176,26 +220,26 @@ export default function IslandView() {
     void api.setIslandGeometry(windowWidth, Math.ceil(height)).catch(() => undefined);
   }, [windowWidth]);
   // Grow before the morph and shrink after it, so the surface is never clipped.
-  const scheduleGeometry = useCallback((height: number, duration = 550) => {
+  const armSettle = useCallback((height: number, duration = MORPH_SETTLE_MS) => {
     if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTimerRef.current);
     if (prefersReducedMotion()) {
       geometryHeightRef.current = height;
-      reportGeometry(height);
+      fitWindow(height);
       geometrySettleTimerRef.current = null;
       return;
     }
     const reserved = Math.max(geometryHeightRef.current, height);
     geometryHeightRef.current = reserved;
-    reportGeometry(reserved);
+    fitWindow(reserved);
     geometrySettleTimerRef.current = window.setTimeout(() => {
       geometryHeightRef.current = height;
-      reportGeometry(height);
+      fitWindow(height);
       geometrySettleTimerRef.current = null;
     }, duration);
-  }, [reportGeometry]);
+  }, [fitWindow]);
   useLayoutEffect(() => {
-    scheduleGeometry(surfaceDims.height);
-  }, [scheduleGeometry, surfaceDims.height]);
+    armSettle(surfaceDims.height);
+  }, [armSettle, surfaceDims.height]);
 
   useEffect(() => {
     if (searchState.pending || typedAtRef.current === 0) return;
@@ -233,7 +277,6 @@ export default function IslandView() {
       if (!cards.includes(card)) return;
       const nextCompact = card === "search" && !query.trim();
       if (card === activeCard && nextVariant === variant) {
-        tokenRef.current += 1;
         const currentDims = islandCardDims({
           card,
           variant: nextVariant,
@@ -242,11 +285,10 @@ export default function IslandView() {
           searchMatches: searchState.results.length,
           searchLabels,
         });
-        scheduleGeometry(currentDims.height);
+        armSettle(currentDims.height);
         if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
         switchTimerRef.current = null;
         pendingSwitchRef.current = null;
-        setPhase("idle");
         setCompact(nextCompact);
         return;
       }
@@ -264,7 +306,6 @@ export default function IslandView() {
         return;
       }
       lastSwitchRef.current = now;
-      const token = ++tokenRef.current;
       const targetDims = islandCardDims({
         card,
         variant: nextVariant,
@@ -273,28 +314,13 @@ export default function IslandView() {
         searchMatches: searchState.results.length,
         searchLabels,
       });
-      scheduleGeometry(targetDims.height, prefersReducedMotion() ? 0 : 670);
+      armSettle(targetDims.height);
       recordFrames(`island-switch:${activeCard}>${card}`, 800);
-      if (prefersReducedMotion()) {
-        setActiveCard(card);
-        setCompact(nextCompact);
-        setVariant(nextVariant);
-        setPhase("idle");
-        return;
-      }
-      setPhase("out");
-      window.setTimeout(() => {
-        if (token !== tokenRef.current) return;
-        setActiveCard(card);
-        setCompact(nextCompact);
-        setVariant(nextVariant);
-        setPhase("in");
-        window.setTimeout(() => {
-          if (token === tokenRef.current) setPhase("idle");
-        }, 250);
-      }, 120);
+      setActiveCard(card);
+      setCompact(nextCompact);
+      setVariant(nextVariant);
     },
-    [activeCard, cards, compact, query, scheduleGeometry, searchLabels, searchState.results.length, stageWidth, variant],
+    [activeCard, armSettle, cards, query, searchLabels, searchState.results.length, stageWidth, variant],
   );
   switchCardRef.current = switchCard;
 
@@ -309,11 +335,9 @@ export default function IslandView() {
   );
 
   const backToCard = useCallback(() => {
-    tokenRef.current += 1;
     if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
     switchTimerRef.current = null;
     pendingSwitchRef.current = null;
-    setPhase("idle");
     if (variant !== "default") {
       const target = islandCardDims({
         card: activeCard,
@@ -323,13 +347,13 @@ export default function IslandView() {
         searchMatches: searchState.results.length,
         searchLabels,
       });
-      scheduleGeometry(target.height);
+      armSettle(target.height);
       setVariant("default");
       return;
     }
     if (!compact) {
       const target = islandCardDims({ card: "search", stageWidth, compact: true, searchMatches: searchState.results.length });
-      scheduleGeometry(target.height);
+      armSettle(target.height);
       // Expanded card -> compact search (predictable Esc chain), then hide.
       setActiveCard("search");
       setCompact(true);
@@ -338,9 +362,9 @@ export default function IslandView() {
       setScope("all");
       return;
     }
-    scheduleGeometry(dims.height, 0);
+    armSettle(dims.height, 0);
     requestHide();
-    }, [activeCard, compact, dims.height, requestHide, scheduleGeometry, searchLabels, searchState.results.length, stageWidth, variant]);
+  }, [activeCard, armSettle, compact, dims.height, requestHide, searchLabels, searchState.results.length, stageWidth, variant]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -373,12 +397,11 @@ export default function IslandView() {
         // duplicate island:shown handlers and duplicate island-open perf marks.
         const offShown = await listen("island:shown", () => {
           setClipboardRevision((r) => r + 1);
-          tokenRef.current += 1;
           if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
           switchTimerRef.current = null;
           pendingSwitchRef.current = null;
           const target = islandCardDims({ card: "search", stageWidth, compact: true, searchMatches: 0 });
-          scheduleGeometry(target.height, 0);
+          armSettle(target.height, 0);
           recordFrames("island-open", 450);
           if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
           if (openTimerRef.current != null) window.clearTimeout(openTimerRef.current);
@@ -387,7 +410,6 @@ export default function IslandView() {
           setQuery("");
           setScope("all");
           setVariant("default");
-          setPhase("idle");
           setVisibility("opening");
           openTimerRef.current = window.setTimeout(
             () => setVisibility((current) => (current === "opening" ? "shown" : current)),
@@ -423,14 +445,14 @@ export default function IslandView() {
       disposed = true;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [scheduleGeometry, stageWidth]);
+  }, [armSettle, stageWidth]);
 
   useEffect(() => {
     return () => {
       if (closeTimerRef.current != null) window.clearTimeout(closeTimerRef.current);
       if (openTimerRef.current != null) window.clearTimeout(openTimerRef.current);
       if (switchTimerRef.current != null) window.clearTimeout(switchTimerRef.current);
-if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTimerRef.current);
+      if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTimerRef.current);
     };
   }, []);
 
@@ -448,23 +470,11 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
 
   const onWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
-      const scrollable = (event.target as Element | null)?.closest(".island-scrollable, .island-results, .island-todo-list, .island-agent-list, .island-choose-list");
-      if (scrollable instanceof HTMLElement) {
-        // When the pointer is anywhere inside a scrollable content area, keep scrolling
-        // completely contained inside the list and never let it switch cards accidentally.
-        return;
-      }
-
-      // Two-finger left/right horizontal swipe switches island cards.
-      // deltaX is primary (touchpad 2-finger horizontal swipe). If deltaX is 0,
-      // fallback to deltaY so keyboard/mouse wheels or tests can still navigate.
+      // Only a two-finger left/right swipe switches cards; a vertical wheel just scrolls.
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
       const wheel = wheelRef.current;
       const now = performance.now();
-      const deltaX = event.deltaX;
-      const deltaY = event.deltaY;
-      const absX = Math.abs(deltaX);
-
-      const delta = absX > 0 ? deltaX : deltaY;
+      const delta = event.deltaX;
       const size = Math.abs(delta);
 
       if (now - wheel.at > WHEEL_GESTURE_GAP_MS) {
@@ -510,7 +520,10 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
-    pointerStartRef.current = { x: event.clientX, y: event.clientY };
+    // A drag that starts on a slider changes its value; it is not a swipe to another card.
+    // A drag on a slider or inside a text field edits it; it is not a swipe to another card.
+    const onControl = event.target instanceof Element && event.target.closest("input, textarea, [contenteditable]") !== null;
+    pointerStartRef.current = onControl ? null : { x: event.clientX, y: event.clientY };
   }, []);
 
   const onPointerUp = useCallback(
@@ -520,7 +533,8 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
       if (!start) return;
       const dx = event.clientX - start.x;
       const dy = event.clientY - start.y;
-      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy)) {
+      // Dragging across text to select it (to copy) must not switch cards.
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) && !window.getSelection()?.toString()) {
         switchRelative(dx < 0 ? 1 : -1);
       }
     },
@@ -555,7 +569,6 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
             scope={scope}
             onScope={setScope}
             results={searchState.results}
-            total={searchState.total}
             pending={searchState.pending}
             error={searchState.error}
             onOpen={openResult}
@@ -579,9 +592,11 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
         return (
           <MemoAgentsCard
             status={bootstrap.agentStatus}
+            defaultAgent={bootstrap.settings?.agent.runtime ?? "pi"}
             tasks={bootstrap.agentTasks}
             onPause={pauseAgent}
             onResume={resumeAgent}
+            onChanged={bootstrap.refresh}
           />
         );
       case "browser":
@@ -638,20 +653,10 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
     }
   };
 
-  const cardSlots = cards.map((cardId) => (
-    <div
-      key={cardId}
-      className="island-card-slot"
-      style={{ display: cardId === activeCard ? "flex" : "none" }}
-      aria-hidden={cardId !== activeCard}
-    >
-      {renderCard(cardId)}
-    </div>
-  ));
-
-  const showDots = settings?.showDots !== false;
+  const showDots = look.showDots;
+  const anchor = settings?.placement?.anchor ?? "top_center";
   const dots = showDots ? (
-    <IslandPageDots
+    <GooeyNav
       cards={cards}
       active={activeCard}
       compact={compact}
@@ -660,17 +665,35 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
   ) : null;
 
   return (
-    <div className="island-host" data-anchor={settings?.placement?.anchor ?? "top_center"}>
-      <div
+    <div className="island-host" data-anchor={anchor}>
+      {/* Liquid glass refraction (used by the glass style's slider lens via backdrop-filter). */}
+      <svg aria-hidden="true" width="0" height="0" style={{ position: "absolute" }}>
+        <filter id="ps-liquid" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.03 0.05" numOctaves="2" seed="3" result="noise" />
+          <feGaussianBlur in="noise" stdDeviation="1.2" result="map" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="9" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+      {/* Size and radius spring directly (not a layout/FLIP scale), so content never stretches mid-morph.
+          A pill's radius is half its height; springing from 999 would hold the corners round until the end. */}
+      <motion.div
+        ref={surfaceRef}
+        style={{ "--glass": look.liquidGlassLevel / 100 } as React.CSSProperties}
+        initial={false}
+        animate={{
+          width: surfaceDims.width,
+          height: surfaceDims.height,
+          borderRadius: Math.min(surfaceDims.radius, surfaceDims.height / 2),
+        }}
+        transition={reduced ? { duration: 0 } : { type: "spring", duration: 0.5, bounce: 0.2 }}
         className={[
           "island-surface",
           compact ? "island-surface--compact" : "island-surface--expanded",
-          phase === "out" ? "island-surface--out" : "",
-          phase === "in" ? "island-surface--in" : "",
+          look.liquidGlass ? "island-surface--glass" : "",
+          resolvedTheme === "light" ? "island-surface--light" : "",
           visibility === "opening" ? "island-surface--opening" : "",
           visibility === "closing" ? "island-surface--closing" : "",
           visibility === "hidden" ? "island-surface--hidden" : "",
-          activeCard === "media" ? "island-surface--media" : "",
           stageWidth <= 380
             ? "island-surface--narrow"
             : stageWidth <= 520
@@ -679,11 +702,6 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
         ]
           .filter(Boolean)
           .join(" ")}
-        style={{
-          width: surfaceDims.width + "px",
-          height: surfaceDims.height + "px",
-          borderRadius: surfaceDims.radius + "px",
-        }}
         role="region"
         aria-label="ProtonSearch island"
         tabIndex={-1}
@@ -693,10 +711,23 @@ if (geometrySettleTimerRef.current != null) window.clearTimeout(geometrySettleTi
         onClick={onSurfaceClick}
       >
         <div className={"island-inner" + (compact ? " island-inner--compact" : " island-scrollable")}>
-          {cardSlots}
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div
+              key={activeCard}
+              className="island-card-slot"
+              data-card={activeCard}
+              style={{ display: "flex" }}
+              aria-hidden={false}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: reduced ? 0 : CARD_IN_S } }}
+              exit={{ opacity: 0, y: -6, transition: { duration: reduced ? 0 : CARD_OUT_S } }}
+            >
+              {renderCard(activeCard)}
+            </motion.div>
+          </AnimatePresence>
         </div>
         {dots}
-      </div>
+      </motion.div>
     </div>
   );
 }

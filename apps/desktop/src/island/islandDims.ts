@@ -7,12 +7,7 @@ import type { IslandCardId, IslandSettings } from "../bridge/types";
  */
 
 export type IslandCardView = IslandCardId;
-export type IslandVariant =
-  | "default"
-  | "media-output"
-  | "controls-wifi"
-  | "controls-bluetooth"
-  | "agent-hierarchy";
+export type IslandVariant = "default";
 
 export interface IslandCardDims {
   width: number;
@@ -31,26 +26,22 @@ const NOMINAL_WIDTH: Record<IslandCardId, number> = {
   bell: 500,
 };
 
-const HEIGHTS: Record<IslandCardView, { wide: number; mid: number; narrow: number }> = {
-  search: { wide: 66, mid: 66, narrow: 66 },
-  media: { wide: 350, mid: 360, narrow: 360 },
-  clipboard: { wide: 391, mid: 416, narrow: 446 },
-  agent: { wide: 411, mid: 445, narrow: 445 },
-  controls: { wide: 376, mid: 400, narrow: 483 },
-  browser: { wide: 361, mid: 408, narrow: 408 },
-  git: { wide: 330, mid: 355, narrow: 355 },
-  bell: { wide: 345, mid: 385, narrow: 385 },
+/** The page-dots footer under every expanded card (--island-dots-h in island.css). */
+const DOTS_FOOTER = 31;
+
+/** Surface heights. Each card body fills what is above the footer and scrolls inside it. */
+const HEIGHTS: Record<IslandCardView, number> = {
+  search: 66,
+  media: 320 + DOTS_FOOTER,
+  clipboard: 416,
+  agent: 460,
+  controls: 400 + DOTS_FOOTER,
+  browser: 460,
+  git: 355,
+  bell: 460,
 };
 
 export const SEARCH_EXPANDED_WIDTH = 550;
-
-export function isNarrow(stageWidth: number): boolean {
-  return stageWidth <= 380;
-}
-
-export function isMid(stageWidth: number): boolean {
-  return stageWidth > 380 && stageWidth <= 520;
-}
 
 export function clampIslandWidth(nominal: number, stageWidth: number): number {
   // Captured V9 widths are stage - 20 (520->500, 430->410, 335->315); the spec's
@@ -69,15 +60,11 @@ export function islandWindowWidth(stageWidth: number): number {
   );
 }
 
-export function breakpointHeight(view: IslandCardView, stageWidth: number): number {
-  const row = HEIGHTS[view];
-  if (isNarrow(stageWidth)) return row.narrow;
-  if (isMid(stageWidth)) return row.mid;
-  return row.wide;
-}
-
 /** Result rows the expanded search shows at once. */
 export const ISLAND_VISIBLE_ROWS = 5;
+
+/** No island surface grows past this; card bodies scroll inside it. */
+export const MAX_ISLAND_HEIGHT = 460;
 
 /**
  * Expanded search height for `matches` rows under `labels` group labels. One
@@ -86,7 +73,7 @@ export const ISLAND_VISIBLE_ROWS = 5;
  */
 export function expandedSearchHeight(matches: number, labels = 1): number {
   const rows = Math.max(0, Math.min(matches, ISLAND_VISIBLE_ROWS));
-  return Math.min(460, 185 + 53 * rows) + 24 * Math.max(0, labels - 1);
+  return Math.min(MAX_ISLAND_HEIGHT, 185 + 53 * rows + 24 * Math.max(0, labels - 1));
 }
 
 export function islandCardDims(input: {
@@ -98,23 +85,17 @@ export function islandCardDims(input: {
   /** Group labels among the shown search rows (see expandedSearchHeight). */
   searchLabels?: number;
 }): IslandCardDims {
-  const { card, variant = "default", stageWidth, compact } = input;
+  const { card, stageWidth, compact } = input;
   if (card === "search" && compact) {
     return { width: clampIslandWidth(520, stageWidth), height: 66, radius: 999 };
   }
   const baseWidth = card === "search" ? SEARCH_EXPANDED_WIDTH : NOMINAL_WIDTH[card];
-  let height = breakpointHeight(card, stageWidth);
-  if (card === "search") height = expandedSearchHeight(input.searchMatches ?? 0, input.searchLabels ?? 1);
-  if (card === "media" && variant === "media-output") {
-    height = stageWidth > 520 ? 342 : 365;
-  }
-  if (card === "controls" && (variant === "controls-wifi" || variant === "controls-bluetooth")) {
-    height = stageWidth > 520 ? 366 : 418;
-  }
+  const height =
+    card === "search" ? expandedSearchHeight(input.searchMatches ?? 0, input.searchLabels ?? 1) : HEIGHTS[card];
   return {
     width: clampIslandWidth(baseWidth, stageWidth),
-    height,
-    radius: card === "media" ? 41 : 34,
+    height: Math.min(MAX_ISLAND_HEIGHT, height),
+    radius: 28,
   };
 }
 

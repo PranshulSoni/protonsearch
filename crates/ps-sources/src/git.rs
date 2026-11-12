@@ -114,7 +114,8 @@ pub fn scan_repo(repo: &Path) -> (Vec<GitEntry>, Vec<String>) {
         .unwrap_or_else(|| repo.to_string_lossy().to_string());
 
     let mut branch: Option<String> = None;
-    match run_git(repo, &["branch", "--no-color"]) {
+    let mut branches = Vec::new();
+    match run_git(repo, &["branch", "--no-color", "--sort=-committerdate"]) {
         Ok(output) => {
             let text = String::from_utf8_lossy(&output.stdout);
             for line in text.lines() {
@@ -122,8 +123,14 @@ pub fn scan_repo(repo: &Path) -> (Vec<GitEntry>, Vec<String>) {
                 if line.is_empty() {
                     continue;
                 }
-                if let Some(head) = line.strip_prefix('*') {
-                    branch = Some(head.trim().to_string());
+                // "* " marks HEAD, "+ " a branch checked out in another worktree.
+                let name = line.trim_start_matches(&['*', '+'][..]).trim();
+                if line.starts_with('*') {
+                    branch = Some(name.to_string());
+                }
+                // A detached HEAD prints "(HEAD detached at ...)", which is not a branch.
+                if !name.starts_with('(') {
+                    branches.push(name.to_string());
                 }
             }
         }
@@ -137,32 +144,11 @@ pub fn scan_repo(repo: &Path) -> (Vec<GitEntry>, Vec<String>) {
         path: repo.to_string_lossy().to_string(),
         name,
         branch,
+        branches,
     });
 
-    match run_git(
-        repo,
-        &["log", "--max-count=100", "--format=%H%x1F%an%x1F%at%x1F%s"],
-    ) {
-        Ok(output) => {
-            let text = String::from_utf8_lossy(&output.stdout);
-            for line in text.lines().take(MAX_COMMITS) {
-                let parts: Vec<&str> = line.split('\x1F').collect();
-                if parts.len() < 4 {
-                    continue;
-                }
-                let hash = parts[0].to_string();
-                let author = parts[1].to_string();
-                let date_seconds: i64 = parts[2].parse().unwrap_or(0);
-                let message = parts[3].to_string();
-                entries.push(GitEntry::Commit {
-                    repo: repo.to_string_lossy().to_string(),
-                    hash,
-                    message,
-                    author,
-                    date_ms: date_seconds.saturating_mul(1000),
-                });
-            }
-        }
+    match run_git(repo, &["log", "--max-count=100", LOG_FORMAT]) {
+        Ok(output) => entries.extend(parse_commits(repo, &output.stdout)),
         Err(error) => {
             if warnings.len() < 10 {
                 warnings.push(format!("{}: {error}", repo.display()));
@@ -172,6 +158,33 @@ pub fn scan_repo(repo: &Path) -> (Vec<GitEntry>, Vec<String>) {
 
     entries.extend(scan_todos(repo));
     (entries, warnings)
+}
+
+const LOG_FORMAT: &str = "--format=%H%x1F%an%x1F%at%x1F%s";
+
+fn parse_commits(repo: &Path, stdout: &[u8]) -> Vec<GitEntry> {
+    String::from_utf8_lossy(stdout)
+        .lines()
+        .take(MAX_COMMITS)
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split('\x1F').collect();
+            (parts.len() >= 4).then(|| GitEntry::Commit {
+                repo: repo.to_string_lossy().to_string(),
+                hash: parts[0].to_string(),
+                message: parts[3].to_string(),
+                author: parts[1].to_string(),
+                date_ms: parts[2].parse::<i64>().unwrap_or(0).saturating_mul(1000),
+            })
+        })
+        .collect()
+}
+
+/// Newest commits on one local branch, read on demand by the Git card's branch picker.
+pub fn branch_commits(repo: &Path, branch: &str) -> anyhow::Result<Vec<GitEntry>> {
+    // The refs/heads/ prefix means a branch name can never be read as a git option.
+    let rev = format!("refs/heads/{branch}");
+    let output = run_git(repo, &["log", "--max-count=100", LOG_FORMAT, &rev, "--"])?;
+    Ok(parse_commits(repo, &output.stdout))
 }
 
 fn scan_todos(repo: &Path) -> Vec<GitEntry> {

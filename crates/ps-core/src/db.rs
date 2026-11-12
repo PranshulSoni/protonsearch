@@ -29,6 +29,15 @@ pub struct OcrHit {
 }
 
 const SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS browser_history (
+    url TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    source TEXT NOT NULL,
+    visit_count INTEGER NOT NULL,
+    last_visit_ms INTEGER NOT NULL,
+    bookmark INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_browser_history_visit ON browser_history(last_visit_ms DESC);
 CREATE TABLE IF NOT EXISTS activity (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp INTEGER NOT NULL,
@@ -77,6 +86,69 @@ CREATE TABLE IF NOT EXISTS migration_state (
 "#;
 
 impl EngineDb {
+    /// Browser history lives here rather than in memory; every scan replaces it.
+    pub fn store_browser(&self, entries: &[ps_sources::BrowserEntry]) -> anyhow::Result<()> {
+        let mut conn = self.lock()?;
+        let tx = conn.transaction()?;
+        tx.execute("DELETE FROM browser_history", [])?;
+        {
+            let mut insert = tx.prepare(
+                "INSERT OR REPLACE INTO browser_history (url, title, source, visit_count, last_visit_ms, bookmark)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            )?;
+            for entry in entries {
+                insert.execute(rusqlite::params![
+                    entry.url,
+                    entry.title,
+                    entry.source,
+                    entry.visit_count,
+                    entry.last_visit_ms,
+                    entry.bookmark
+                ])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Stored pages whose title or URL contains every term (all pages for no terms), newest first.
+    pub fn browser(&self, terms: &[String], limit: usize) -> Vec<ps_sources::BrowserEntry> {
+        let Ok(conn) = self.lock() else { return Vec::new() };
+        let mut sql = String::from(
+            "SELECT url, title, source, visit_count, last_visit_ms, bookmark FROM browser_history WHERE 1",
+        );
+        for n in 1..=terms.len() {
+            sql.push_str(&format!(" AND (title LIKE ?{n} ESCAPE '\\' OR url LIKE ?{n} ESCAPE '\\')"));
+        }
+        sql.push_str(&format!(" ORDER BY last_visit_ms DESC LIMIT {limit}"));
+        let patterns: Vec<String> = terms
+            .iter()
+            .map(|term| format!("%{}%", term.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")))
+            .collect();
+        let Ok(mut statement) = conn.prepare(&sql) else { return Vec::new() };
+        statement
+            .query_map(rusqlite::params_from_iter(patterns.iter()), |row| {
+                Ok(ps_sources::BrowserEntry {
+                    url: row.get(0)?,
+                    title: row.get(1)?,
+                    source: row.get(2)?,
+                    visit_count: row.get(3)?,
+                    last_visit_ms: row.get(4)?,
+                    bookmark: row.get(5)?,
+                })
+            })
+            .map(|rows| rows.flatten().collect())
+            .unwrap_or_default()
+    }
+
+    pub fn browser_count(&self) -> u64 {
+        self.lock()
+            .ok()
+            .and_then(|conn| conn.query_row("SELECT COUNT(*) FROM browser_history", [], |row| row.get::<_, i64>(0)).ok())
+            .unwrap_or(0)
+            .max(0) as u64
+    }
+
     pub fn open(path: &Path) -> anyhow::Result<Self> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).ok();

@@ -818,6 +818,12 @@ pub struct MediaSession {
     pub playing: bool,
     pub position_ms: Option<u64>,
     pub duration_ms: Option<u64>,
+    /// The player lets other apps change its playback position.
+    #[serde(default)]
+    pub can_seek: bool,
+    /// Session thumbnail as a `data:` URL; `None` when absent or over 512 KB.
+    #[serde(default)]
+    pub artwork_data_url: Option<String>,
 }
 
 /// Transport commands a media session accepts.
@@ -828,6 +834,8 @@ pub enum MediaCommand {
     PlayPause,
     Next,
     Previous,
+    /// Jump to this many milliseconds from the start of the track.
+    Seek(u64),
 }
 
 /// The current system media session, or `None` when nothing is playing.

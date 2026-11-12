@@ -1,4 +1,4 @@
-//! Optional local Tesseract adapter. It never installs binaries or downloads data.
+//! Optional local Tesseract adapter. It runs an installed executable; installing goes only through `install_with_winget`.
 use std::io::Cursor;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -25,38 +25,10 @@ pub struct Tesseract {
 }
 
 impl Tesseract {
-    /// True when Tesseract executable is present at a standard location, TESSERACT_PATH, or PATH.
+    /// True when a usable install exists: the executable plus its language data, found the
+    /// same way the recognizer finds it (TESSERACT_PATH, the default install folder, then PATH).
     pub fn is_installed() -> bool {
-        if let Ok(path) = std::env::var("TESSERACT_PATH") {
-            if Path::new(&path).is_file() {
-                return true;
-            }
-        }
-        for candidate in [
-            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-        ] {
-            if Path::new(candidate).is_file() {
-                return true;
-            }
-        }
-        // Also check system PATH via `where` / which
-        if let Ok(output) = std::process::Command::new("where")
-            .arg("tesseract")
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .output()
-        {
-            if output.status.success() {
-                let path_str = String::from_utf8_lossy(&output.stdout);
-                if let Some(first_line) = path_str.lines().next() {
-                    let p = Path::new(first_line.trim());
-                    if p.is_file() {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+        Self::default_installed().is_ok()
     }
 
     /// Returns the path to the Tesseract executable when installed, None otherwise.
@@ -67,13 +39,13 @@ impl Tesseract {
                 return Some(p);
             }
         }
-        for candidate in [
-            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-        ] {
-            let p = Path::new(candidate);
-            if p.is_file() {
-                return Some(p.to_path_buf());
+        // The default install folders come from the environment, not a fixed drive.
+        for var in ["ProgramFiles", "ProgramFiles(x86)"] {
+            if let Some(root) = std::env::var_os(var) {
+                let p = Path::new(&root).join("Tesseract-OCR").join("tesseract.exe");
+                if p.is_file() {
+                    return Some(p);
+                }
             }
         }
         if let Ok(output) = std::process::Command::new("where")
@@ -92,6 +64,44 @@ impl Tesseract {
             }
         }
         None
+    }
+
+    /// Installs Tesseract silently with winget (no console window) and returns the executable
+    /// found afterwards. winget can exit non-zero when the package is already present, so the
+    /// re-detect decides the result and winget's output only feeds the error message.
+    pub fn install_with_winget() -> anyhow::Result<PathBuf> {
+        let output = Command::new("winget")
+            .args([
+                "install",
+                "--id",
+                "UB-Mannheim.TesseractOCR",
+                "-e",
+                "--silent",
+                "--accept-package-agreements",
+                "--accept-source-agreements",
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .creation_flags(0x08000000)
+            .output()
+            .map_err(|error| {
+                anyhow!("winget could not start ({error}). Install App Installer from the Microsoft Store.")
+            })?;
+        if let Some(path) = Self::find_executable() {
+            return Ok(path);
+        }
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let last = text.lines().map(str::trim).rfind(|line| !line.is_empty()).unwrap_or("no output");
+        let code = output
+            .status
+            .code()
+            .map_or_else(|| "no exit code".to_string(), |code| format!("exit code {code}"));
+        bail!("Tesseract is still not installed (winget {code}). Last message: {last}")
     }
 
     /// Automatically detects and initializes a local Tesseract installation using standard locations and PATH.

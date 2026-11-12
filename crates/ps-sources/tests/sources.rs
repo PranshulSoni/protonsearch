@@ -104,6 +104,11 @@ fn clipboard_records_dedupes_and_searches() {
     assert!(clipboard::set_pinned(&db, recent[0].id, true).unwrap());
     let pinned_first = clipboard::list_recent(&db, 10);
     assert!(pinned_first[0].pinned);
+    // A restart clears the session's history but keeps pinned items.
+    assert_eq!(clipboard::clear_unpinned(&db).unwrap(), 1);
+    let kept = clipboard::list_recent(&db, 10);
+    assert_eq!(kept.len(), 1);
+    assert!(kept[0].pinned);
 }
 
 /// Build a PNG with known dimensions and a gradient (test fixture).

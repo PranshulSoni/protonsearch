@@ -14,6 +14,8 @@
 //! OWNER: perf-bench.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Barrier;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -314,6 +316,80 @@ fn now_utc() -> String {
     format!("unix:{secs}")
 }
 
+/// One OCR call made by a worker: recognized text or error text, plus latency.
+struct Recognition {
+    outcome: Result<String, String>,
+    ms: f64,
+}
+
+/// One pass over `paths` on `threads` workers. Each worker opens its own engine on
+/// its own thread (engine objects are not shared across threads). The timed window
+/// starts once every engine is open, so engine creation does not count against
+/// throughput. Returns results in input order and the window's wall time in ms.
+/// Text of one image: Windows.Media.Ocr when a session is given, otherwise the ps-ocr
+/// engine `engine`, called the same way the index calls it.
+#[cfg(feature = "ocr")]
+fn recognize_image(engine: &str, model_dir: Option<&Path>, session: Option<&winrt_ocr::Session>, path: &Path) -> Result<String, String> {
+    match session {
+        Some(session) => session.recognize(path).map_err(|err| format!("{err}")),
+        None => ps_ocr::extract_image_with_engine(path, 16_777_216, engine, model_dir)
+            .map(|found| found.map(|doc| doc.text).unwrap_or_default())
+            .map_err(|err| format!("{err:#}")),
+    }
+}
+
+#[cfg(not(feature = "ocr"))]
+fn recognize_image(_engine: &str, _model_dir: Option<&Path>, session: Option<&winrt_ocr::Session>, path: &Path) -> Result<String, String> {
+    match session {
+        Some(session) => session.recognize(path).map_err(|err| format!("{err}")),
+        None => Err("ps-bench was built without the ocr feature".to_string()),
+    }
+}
+
+/// One pass over `paths` on `threads` workers with `engine` ("windows" or a ps-ocr engine id).
+fn recognize_pass(paths: &[PathBuf], threads: usize, engine: &str, model_dir: Option<&Path>) -> (Vec<Recognition>, f64) {
+    let next = AtomicUsize::new(0);
+    let ready = Barrier::new(threads + 1);
+    std::thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| {
+                scope.spawn(|| {
+                    let session = if engine == "windows" {
+                        winrt_ocr::Session::open().map(Some).map_err(|err| format!("{err}"))
+                    } else {
+                        Ok(None)
+                    };
+                    ready.wait();
+                    let mut done = Vec::new();
+                    loop {
+                        let index = next.fetch_add(1, Ordering::Relaxed);
+                        let Some(path) = paths.get(index) else { break };
+                        let recognition = match &session {
+                            Ok(session) => {
+                                let start = Instant::now();
+                                let outcome = recognize_image(engine, model_dir, session.as_ref(), path);
+                                Recognition { outcome, ms: start.elapsed().as_secs_f64() * 1000.0 }
+                            }
+                            Err(err) => Recognition { outcome: Err(err.clone()), ms: 0.0 },
+                        };
+                        done.push((index, recognition));
+                    }
+                    done
+                })
+            })
+            .collect();
+        ready.wait();
+        let started = Instant::now();
+        let mut all: Vec<(usize, Recognition)> = workers
+            .into_iter()
+            .flat_map(|worker| worker.join().expect("OCR worker panicked"))
+            .collect();
+        let wall_ms = started.elapsed().as_secs_f64() * 1000.0;
+        all.sort_by_key(|(index, _)| *index);
+        (all.into_iter().map(|(_, recognition)| recognition).collect(), wall_ms)
+    })
+}
+
 pub fn run(args: &Args) -> anyhow::Result<()> {
     let manifest_path = PathBuf::from(
         args.get("--manifest")
@@ -321,7 +397,17 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     );
     let out = PathBuf::from(args.required("--out")?);
     let passes = args.usize_or("--passes", 2)?.max(1);
+    let threads = args.usize_or("--threads", 1)?.max(1);
     let limit = args.usize_or("--limit", 0)?;
+    // "windows" is Windows.Media.Ocr; any other id is a ps-ocr engine. pp_ocr_v6 and indra
+    // read their packs from <--models>/ppocrv6 and <--models>/indra (the app's models folder).
+    let engine_id = args.get("--engine").unwrap_or("windows").to_string();
+    let engine_label = if engine_id == "windows" { "windows.media.ocr".to_string() } else { engine_id.clone() };
+    let model_dir = match engine_id.as_str() {
+        "pp_ocr_v6" => Some(PathBuf::from(args.required("--models")?).join("ppocrv6")),
+        "indra" => Some(PathBuf::from(args.required("--models")?).join("indra")),
+        _ => None,
+    };
     let manifest_path = if manifest_path.is_absolute() {
         manifest_path
     } else {
@@ -377,28 +463,28 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     let mut pass_reports: Vec<PassReport> = Vec::new();
     let mut first_error = String::new();
     for pass in 1..=passes {
-        let wall_start = Instant::now();
+        let paths: Vec<PathBuf> = subset.iter().map(|entry| base_dir.join(&entry.file)).collect();
+        let (recognitions, wall_ms) = recognize_pass(&paths, threads, &engine_id, model_dir.as_deref());
         let mut latencies: Vec<f64> = Vec::new();
         let mut cers: Vec<f64> = Vec::new();
         let mut exact = 0usize;
         let mut chars = 0usize;
         let mut errors = 0usize;
         let mut image_errors = 0usize;
-        for entry in &subset {
-            let path = base_dir.join(&entry.file);
-            let start = Instant::now();
-            let recognized = match session.recognize(&path) {
+        for (entry, recognition) in subset.iter().zip(recognitions) {
+            let ms = recognition.ms;
+            let recognized = match recognition.outcome {
                 Ok(text) => text,
                 Err(err) => {
                     if first_error.is_empty() {
-                        first_error = format!("{err}");
+                        first_error = err.clone();
                     }
                     image_errors += 1;
                     per_image.push(ImageResult {
                         file: entry.file.clone(),
                         scenario: entry.scenario.clone(),
                         pass,
-                        ms: start.elapsed().as_secs_f64() * 1000.0,
+                        ms,
                         cer: 1.0,
                         errors: 0,
                         chars: 0,
@@ -409,7 +495,6 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                     continue;
                 }
             };
-            let ms = start.elapsed().as_secs_f64() * 1000.0;
             let (cer, errs, n) = cer(&entry.text, &recognized);
             let norm_gt = normalize(&entry.text);
             let norm_rec = normalize(&recognized);
@@ -434,7 +519,6 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
                 recognized: recognized.chars().take(400).collect(),
             });
         }
-        let wall_ms = wall_start.elapsed().as_secs_f64() * 1000.0;
         let mut sorted_cer = cers.clone();
         sorted_cer.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let median_cer = if sorted_cer.is_empty() {
@@ -503,14 +587,14 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
         kind: "ocr-benchmark".to_string(),
         status: if failed { "failed".to_string() } else { "ok".to_string() },
         reason: if failed {
-            format!("Windows.Media.Ocr session opened (language={language}) but every image failed: {first_error}")
+            format!("{engine_label} recognized no image (language={language}): {first_error}")
         } else {
-            format!("Windows.Media.Ocr session opened, language={language}")
+            format!("{engine_label}, language={language}")
         },
         host: host_info().clone(),
         generated_at_utc: now_utc(),
-        command: format!("ps-bench ocr --manifest {} --passes {} --out {}", manifest_path.display(), passes, out.display()),
-        engine: "windows.media.ocr".to_string(),
+        command: format!("ps-bench ocr --manifest {} --passes {} --threads {} --engine {} --out {}", manifest_path.display(), passes, threads, engine_id, out.display()),
+        engine: engine_label.clone(),
         languages,
         session_open_ms,
         passes: pass_reports,
@@ -526,7 +610,7 @@ pub fn run(args: &Args) -> anyhow::Result<()> {
     };
     write_json(&out, &report)?;
 
-    println!("ps-bench ocr: status={} engine=windows.media.ocr language={language} session_open_ms={session_open_ms:.1}", report.status);
+    println!("ps-bench ocr: status={} engine={engine_label} language={language} threads={threads} session_open_ms={session_open_ms:.1}", report.status);
     if failed {
         println!("  FAILED: every image failed; error: {first_error}");
         println!("  results: {}", out.display());

@@ -4,7 +4,6 @@ import { SEARCH_LIMIT } from "../launcher/launcherLayout";
 import type {
   AgentStatus,
   AgentTask,
-  DetectedAgent,
   EngineStatus,
   IslandSettings,
   MonitorInfo,
@@ -19,7 +18,6 @@ export interface IslandBootstrap {
   settings: Settings | null;
   status: EngineStatus | null;
   monitors: MonitorInfo[];
-  agents: DetectedAgent[];
   agentStatus: AgentStatus | null;
   agentTasks: AgentTask[];
   ready: boolean;
@@ -29,7 +27,6 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [status, setStatus] = useState<EngineStatus | null>(null);
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
-  const [agents, setAgents] = useState<DetectedAgent[]>([]);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
   const [ready, setReady] = useState(false);
@@ -41,7 +38,6 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
       api.getSettings(),
       api.getStatus(),
       api.listMonitors(),
-      api.detectAgents(),
       api.agentStatus(),
       api.agentTasks(50),
     ]).then((results) => {
@@ -49,15 +45,32 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
       if (results[0].status === "fulfilled") setSettings(results[0].value);
       if (results[1].status === "fulfilled") setStatus(results[1].value);
       if (results[2].status === "fulfilled") setMonitors(results[2].value);
-      if (results[3].status === "fulfilled") setAgents(results[3].value);
-      if (results[4].status === "fulfilled") setAgentStatus(results[4].value);
-      if (results[5]?.status === "fulfilled") setAgentTasks(results[5].value);
+      if (results[3].status === "fulfilled") setAgentStatus(results[3].value);
+      if (results[4]?.status === "fulfilled") setAgentTasks(results[4].value);
       setReady(true);
     });
     return () => {
       cancelled = true;
     };
   }, [nonce]);
+
+  // The shell emits settings:changed after each saved change. The island window
+  // is prewarmed, so without this it keeps the snapshot it loaded at startup.
+  useEffect(() => {
+    let disposed = false;
+    let off: (() => void) | undefined;
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) => listen<Settings>("settings:changed", (event) => setSettings(event.payload)))
+      .then((unlisten) => {
+        if (disposed) unlisten();
+        else off = unlisten;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      off?.();
+    };
+  }, []);
 
   // Do not refresh the entire bootstrap on every island focus: that fired six
   // IPC calls + React commits during the open path and showed up as a 30-54 ms
@@ -69,7 +82,6 @@ export function useIslandBootstrap(): IslandBootstrap & { refresh: () => void } 
     settings,
     status,
     monitors,
-    agents,
     agentStatus,
     agentTasks,
     ready,
@@ -194,8 +206,17 @@ export function clipboardKind(result: SearchResult): Exclude<ClipTab, "all" | "p
 
 export function filterClipboard(results: SearchResult[], tab: ClipTab): SearchResult[] {
   const filtered =
-    tab === "all" ? results : tab === "pinned" ? [] : results.filter((result) => clipboardKind(result) === tab);
-  return [...filtered].sort((a, b) => (b.meta?.modified ?? 0) - (a.meta?.modified ?? 0));
+    tab === "all"
+      ? results
+      : tab === "pinned"
+        ? results.filter((result) => result.meta?.pinned)
+        : results.filter((result) => clipboardKind(result) === tab);
+  // Pinned clips lead, then newest first.
+  return [...filtered].sort(
+    (a, b) =>
+      Number(b.meta?.pinned ?? false) - Number(a.meta?.pinned ?? false) ||
+      (b.meta?.modified ?? 0) - (a.meta?.modified ?? 0),
+  );
 }
 
 export function relativeTime(timestamp?: number | null): string {

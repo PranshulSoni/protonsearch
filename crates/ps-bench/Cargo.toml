@@ -24,7 +24,8 @@ engine = ["dep:ps-index"]
 # Enables the v2 content benchmark through ps-content.
 content = ["dep:ps-content"]
 # Enables the OCR extraction + OcrIndex retrieval baseline through ps-ocr.
-ocr = ["dep:ps-ocr"]
+# onnx: the bench measures PP-OCRv6 and Indra for real, not a fallback engine.
+ocr = ["dep:ps-ocr", "ps-ocr/onnx"]
 
 [dependencies]
 ps-ipc = { path = "../ps-ipc" }

@@ -28,9 +28,12 @@ mod args;
 mod client;
 mod env;
 mod events;
+mod models;
 mod probe;
 mod process;
 pub use process::connect_pi;
+pub(crate) use process::pi_command;
+pub(crate) use probe::{run_child_capture, run_child_capture_with_input};
 mod redact;
 
 use std::path::Path;
@@ -49,6 +52,7 @@ pub use args::{
 pub use client::PiAgentClient;
 pub use env::{is_child_env_allowed, PROVIDER_ENV_VARS};
 pub use events::PiEventMapper;
+pub use models::{list_pi_models, PiModel};
 pub use probe::{
     clear_probe_cache, locate_pi, locate_pi_with_source, node_version_ok, pi_version_supported, pid_alive,
     probe_pi, probe_pi_cached, PiInfo, PiSource, MAX_CAPTURE_BYTES, MIN_NODE_VERSION, MIN_PI_VERSION,

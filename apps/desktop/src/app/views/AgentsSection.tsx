@@ -1,202 +1,301 @@
-// Pi-only Agent runtime section at the top of Workflows (argon branch).
-// Exclusively surfaces the Pi coding-agent runtime detected by the shell
-// (detect_agents) and recent local Pi workflow runs.
+// Agents on the Workflows page: Pi and the four agent CLIs, one row each. The
+// "Default agent" choice sets the agent the island Agents card runs; a row shows
+// the install state, runs a one-word Test, and sets that agent's default model.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useApp } from "../../App";
 import { api } from "../../bridge/api";
-import type { DetectedAgent } from "../../bridge/types";
-import {
-  agentRunStatusLabel,
-  loadAgentRunHistory,
-  subscribeAgentRuns,
-  type AgentRunRecord,
-} from "../agentRunHistory";
-import { formatElapsed } from "../agentRun";
-import {
-  getAgentActivity,
-  subscribeAgentActivity,
-  type AgentActivity,
-} from "../agentActivity";
-import { relativeTime } from "../describe";
-import { EmptyState, Icon, Panel, StateNotice } from "../ui";
+import type { AgentModel, AgentRuntime, AgentSettings, DetectedAgent } from "../../bridge/types";
+import { AGENT_RUNTIMES } from "../agentRun";
+import { Panel, StateNotice } from "../ui";
 import { PiSetup } from "./PiSetup";
 
-/** Middle-ellipsis for long runtime paths; full value stays in the title. */
+type TestResult =
+  | { status: "running" }
+  | { status: "passed"; detail: string }
+  | { status: "failed"; message: string };
+
+/** Middle-ellipsis for long paths; the full value stays in the title. */
 function middleEllipsis(value: string, max = 72): string {
   if (value.length <= max) return value;
   const half = Math.floor((max - 1) / 2);
   return value.slice(0, half) + "…" + value.slice(value.length - (max - 1 - half));
 }
 
-export interface AgentsSectionProps {
-  onUsePi?: () => void;
+/** Pi keeps its default model in `model`; each CLI keeps its own in `cliModels`. */
+function modelOf(agent: AgentSettings, id: AgentRuntime): string | null {
+  return id === "pi" ? (agent.model ?? null) : (agent.cliModels?.[id] ?? null);
 }
 
-export default function AgentsSection({ onUsePi }: AgentsSectionProps = {}) {
-  const [piAgent, setPiAgent] = useState<DetectedAgent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [selectedPi, setSelectedPi] = useState(true);
-  const [showSetup, setShowSetup] = useState(false);
-  const [runs, setRuns] = useState<AgentRunRecord[]>(() =>
-    loadAgentRunHistory().filter((r) => r.runtime.toLowerCase().includes("pi"))
-  );
-  const [activity, setActivity] = useState<AgentActivity>(() => getAgentActivity());
+function withModel(agent: AgentSettings, id: AgentRuntime, value: string | null): AgentSettings {
+  if (id === "pi") return { ...agent, model: value };
+  const cliModels = { ...agent.cliModels };
+  if (value) cliModels[id] = value;
+  else delete cliModels[id];
+  return { ...agent, cliModels };
+}
 
-  const loadPiAgent = useCallback(async () => {
-    setLoading(true);
-    setLoadError(false);
+interface AgentRowProps {
+  name: string;
+  found: DetectedAgent | null;
+  stateLabel: string;
+  isDefault: boolean;
+  open: boolean;
+  test: TestResult | undefined;
+  model: string | null;
+  models: AgentModel[];
+  onToggle: () => void;
+  onTest: () => void;
+  onUseDefault: () => void;
+  onModel: (value: string | null) => void;
+  children: ReactNode;
+}
+
+function AgentRow({
+  name,
+  found,
+  stateLabel,
+  isDefault,
+  open,
+  test,
+  model,
+  models,
+  onToggle,
+  onTest,
+  onUseDefault,
+  onModel,
+  children,
+}: AgentRowProps) {
+  const running = test?.status === "running";
+  const options = models.map((item) => `${item.provider}/${item.id}`);
+  if (model && !options.includes(model)) options.unshift(model);
+  return (
+    <li className="agent-row">
+      <div className="agent-row-head">
+        <button type="button" className="agent-row-toggle" aria-expanded={open} onClick={onToggle}>
+          <span className="agent-row-name">{name}</span>
+          <span className={found ? "agent-row-state" : "agent-row-state is-missing"}>{stateLabel}</span>
+          {isDefault ? <span className="agent-row-default">Default</span> : null}
+        </button>
+        <span className="agent-row-result" aria-live="polite">
+          {running ? <span className="muted">Testing…</span> : null}
+          {test?.status === "passed" ? <span className="agent-test-pass">Passed · {test.detail}</span> : null}
+          {test?.status === "failed" ? (
+            <span className="agent-test-fail" title={test.message}>
+              Failed · {test.message}
+            </span>
+          ) : null}
+        </span>
+        <button type="button" className="btn" aria-label={`Test ${name}`} disabled={!found || running} onClick={onTest}>
+          Test
+        </button>
+      </div>
+      {open ? (
+        <div className="agent-config">
+          {found?.path ? (
+            <p className="agent-path" title={found.path}>
+              {middleEllipsis(found.path)}
+            </p>
+          ) : null}
+          <div className="agent-config-row">
+            <label className="agent-field">
+              <span>Default model</span>
+              {models.length > 0 ? (
+                <select className="input" value={model ?? ""} onChange={(event) => onModel(event.target.value || null)}>
+                  <option value="">Agent default</option>
+                  {options.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  key={model ?? ""}
+                  className="input"
+                  defaultValue={model ?? ""}
+                  placeholder="Agent default"
+                  onBlur={(event) => onModel(event.target.value.trim() || null)}
+                />
+              )}
+            </label>
+            <button type="button" className="btn" disabled={!found || isDefault} onClick={onUseDefault}>
+              {isDefault ? "Default agent" : "Use as default agent"}
+            </button>
+          </div>
+          {children}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+export default function AgentsSection() {
+  const { settings, updateSettings } = useApp();
+  const [detected, setDetected] = useState<DetectedAgent[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<AgentRuntime | null>(null);
+  const [tests, setTests] = useState<Partial<Record<AgentRuntime, TestResult>>>({});
+  const [models, setModels] = useState<Partial<Record<AgentRuntime, AgentModel[]>>>({});
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = useCallback(async (refresh: boolean) => {
+    setLoadError(null);
     try {
-      const detected = await api.detectAgents();
-      const pi = detected.find((agent) => agent.id === "pi") ?? null;
-      setPiAgent(pi);
-    } catch {
-      setPiAgent(null);
-      setLoadError(true);
-    } finally {
-      setLoading(false);
+      setDetected(await api.detectAgents(refresh));
+    } catch (reason) {
+      setLoadError(String(reason));
     }
   }, []);
 
-  useEffect(() => {
-    void loadPiAgent();
-  }, [loadPiAgent]);
+  const refreshAll = useCallback(() => {
+    setTests({});
+    setModels({});
+    void load(true);
+  }, [load]);
 
   useEffect(() => {
-    return subscribeAgentRuns(() =>
-      setRuns(loadAgentRunHistory().filter((r) => r.runtime.toLowerCase().includes("pi")))
+    void load(false);
+  }, [load]);
+
+  // Model lists load once per row, when the row is first opened.
+  useEffect(() => {
+    if (openId === null || models[openId] !== undefined) return;
+    let current = true;
+    api.agentModels(openId).then(
+      (list) => {
+        if (current) setModels((previous) => ({ ...previous, [openId]: list }));
+      },
+      () => {
+        if (current) setModels((previous) => ({ ...previous, [openId]: [] }));
+      },
     );
-  }, []);
+    return () => {
+      current = false;
+    };
+  }, [openId, models]);
 
-  useEffect(() => {
-    return subscribeAgentActivity(() => setActivity(getAgentActivity()));
-  }, []);
-
-  const handleUsePi = () => {
-    setSelectedPi(true);
-    if (onUsePi) {
-      onUsePi();
-    } else {
-      const panelEl = document.querySelector(".workflows-agent-panel, [data-panel='pi-workflow']");
-      panelEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  const runTest = async (id: AgentRuntime) => {
+    setTests((previous) => ({ ...previous, [id]: { status: "running" } }));
+    try {
+      const detail = await api.agentTest(id);
+      setTests((previous) => ({ ...previous, [id]: { status: "passed", detail } }));
+    } catch (reason) {
+      setTests((previous) => ({ ...previous, [id]: { status: "failed", message: String(reason) } }));
     }
   };
+
+  const useAsDefault = async (id: AgentRuntime) => {
+    setNotice(null);
+    try {
+      await updateSettings({ agent: { ...settings.agent, enabled: true, runtime: id } });
+    } catch (reason) {
+      setNotice(String(reason));
+    }
+  };
+
+  const setModel = async (id: AgentRuntime, value: string | null) => {
+    if (value === modelOf(settings.agent, id)) return;
+    setNotice(null);
+    try {
+      await updateSettings({ agent: withModel(settings.agent, id, value) });
+    } catch (reason) {
+      setNotice(String(reason));
+    }
+  };
+
+  const defaultId: AgentRuntime = settings.agent.runtime ?? "pi";
+  const piDetails = (
+    <>
+      <PiSetup onChanged={refreshAll} />
+      <div className="agent-safety">
+        <p>
+          Pi runs with your Windows permissions. Read tools can open any file you can read; the workspace is the default
+          working folder, not a sandbox.
+        </p>
+        <p>There is no per-tool approval. File edits and shell access are disabled in this alpha.</p>
+        <p>When a run starts, your prompt, context and tool output are sent to the configured provider.</p>
+      </div>
+    </>
+  );
 
   return (
     <Panel
       id="workflows-agents"
       title="Agents"
-      hint="Local Pi coding-agent runtime and execution status on this machine."
+      actions={
+        <button type="button" className="btn" onClick={refreshAll}>
+          Refresh
+        </button>
+      }
     >
-      {loading ? (
-        <p className="muted" aria-busy="true">
-          Checking Pi runtime…
-        </p>
-      ) : null}
-
-      {!loading && loadError ? (
+      {loadError ? (
         <StateNotice
           tone="error"
-          title="Pi runtime check failed"
-          body="Could not query local Pi installation."
+          title="Agents could not be checked"
+          body={loadError}
           actionLabel="Retry"
-          onAction={() => void loadPiAgent()}
+          onAction={refreshAll}
         />
       ) : null}
-
-      {!loading && !loadError && (!piAgent || !piAgent.available) ? (
-        <div className="pi-agent-missing">
-          <EmptyState
-            title="Pi agent runtime not detected"
-            body="Install or configure the Pi CLI runtime below to enable local agent workflows."
-          />
-          <div style={{ marginTop: 12 }}>
-            <PiSetup onChanged={() => void loadPiAgent()} />
-          </div>
-        </div>
-      ) : null}
-
-      {!loading && !loadError && piAgent && piAgent.available ? (
-        <>
-          <ul className="agent-catalog">
-            <li key={piAgent.id} className="agent-catalog-row">
-              <span className="agent-catalog-icon" aria-hidden="true">
-                <Icon name="workflows" />
-              </span>
-              <span className="agent-catalog-main">
-                <span className="agent-catalog-title">{piAgent.name || "Pi"}</span>
-                <span className="agent-default-tag">Primary Runtime</span>
-                {piAgent.version ? (
-                  <span className="agent-badge">v{piAgent.version}</span>
-                ) : null}
-                {activity.active ? (
-                  <span className="agent-badge agent-badge--running">
-                    <span className="agent-run-dot agent-run-dot--ok" aria-hidden="true" />
-                    Running
-                  </span>
-                ) : (
-                  <span className="agent-badge agent-badge--available">Available</span>
-                )}
-              </span>
-              {piAgent.path ? (
-                <span className="agent-catalog-path" title={piAgent.path}>
-                  {middleEllipsis(piAgent.path)}
-                </span>
-              ) : null}
-              <span className="agent-catalog-detail">
-                {piAgent.detail ?? "Pi coding-agent runtime ready for local workflows."}
-              </span>
-              <span className="agent-catalog-actions" style={{ display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setShowSetup((prev) => !prev)}
-                >
-                  {showSetup ? "Hide setup" : "Configure"}
-                </button>
-                {selectedPi ? (
-                  <span className="badge badge-quiet">Active</span>
-                ) : (
-                  <button type="button" className="btn" onClick={handleUsePi}>
-                    Use Pi
-                  </button>
-                )}
-              </span>
-            </li>
-          </ul>
-
-          {showSetup ? (
-            <div style={{ marginTop: 12 }}>
-              <PiSetup onChanged={() => void loadPiAgent()} />
-            </div>
-          ) : null}
-        </>
-      ) : null}
-
-      <div className="agent-runs">
-        <h3 className="agent-section-label">Recent Pi runs</h3>
-        {runs.length === 0 ? (
-          <p className="muted">No runs yet.</p>
-        ) : (
-          <ol className="agent-run-list">
-            {runs.slice(0, 4).map((run) => (
-              <li key={run.runId} className="agent-run-row">
-                <span className={"agent-run-status agent-run-" + run.status}>
-                  <span className={"agent-run-dot agent-run-dot--" + run.status} aria-hidden="true" />
-                  {agentRunStatusLabel(run.status)}
-                </span>
-                <span className="agent-run-meta">
-                  Pi · {relativeTime(run.endedAt)} · {formatElapsed(run.durationMs)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-        <p className="field-help">
-          Run history stays on this PC and keeps status, time and duration only – never prompts,
-          tool output or paths.
+      <label className="agent-field">
+        <span>Default agent</span>
+        <select className="input" value={defaultId} onChange={(event) => void useAsDefault(event.target.value as AgentRuntime)}>
+          {AGENT_RUNTIMES.map((entry) => {
+            const installed = detected?.some((item) => item.id === entry.id && item.available) ?? false;
+            return (
+              <option key={entry.id} value={entry.id} disabled={!installed}>
+                {installed ? entry.name : `${entry.name} (not installed)`}
+              </option>
+            );
+          })}
+        </select>
+      </label>
+      <ul className="agent-list">
+        {AGENT_RUNTIMES.map((entry) => {
+          const found = detected?.find((item) => item.id === entry.id && item.available) ?? null;
+          const stateLabel =
+            detected === null
+              ? loadError
+                ? "Not checked"
+                : "Checking…"
+              : found
+                ? found.version
+                  ? `Installed · ${found.version}`
+                  : "Installed"
+                : "Not installed";
+          return (
+            <AgentRow
+              key={entry.id}
+              name={entry.name}
+              found={found}
+              stateLabel={stateLabel}
+              isDefault={defaultId === entry.id}
+              open={openId === entry.id}
+              test={tests[entry.id]}
+              model={modelOf(settings.agent, entry.id)}
+              models={models[entry.id] ?? []}
+              onToggle={() => setOpenId((current) => (current === entry.id ? null : entry.id))}
+              onTest={() => void runTest(entry.id)}
+              onUseDefault={() => void useAsDefault(entry.id)}
+              onModel={(value) => void setModel(entry.id, value)}
+            >
+              {entry.id === "pi" ? (
+                piDetails
+              ) : (
+                <p className="agent-safety">
+                  {entry.name} runs with your Windows permissions. Your prompt is sent to its model provider.
+                </p>
+              )}
+            </AgentRow>
+          );
+        })}
+      </ul>
+      {notice ? (
+        <p role="alert" className="agent-notice">
+          {notice}
         </p>
-      </div>
+      ) : null}
     </Panel>
   );
 }

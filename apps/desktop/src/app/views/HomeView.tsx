@@ -1,243 +1,154 @@
-// Home route: greeting, launcher entry, recent activity, index coverage and
-// source management. Real EngineStatus/activity data only; honest empty states.
+// Home route: greeting, launcher button, indexed-file count and per-source switches.
+// Real EngineStatus and Settings data only.
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "../../App";
-import type { ActivityItem } from "../../bridge/types";
-import { formatNumber } from "../../lib/format";
+import { api } from "../../bridge/api";
+import type { EngineStatus } from "../../bridge/types";
 import {
   describeSource,
-  greetingLine,
+  greetingForTimestamp,
   hasIndexCount,
-  indexCounts,
-  indexHealth,
   indexCountText,
-  recentAccessed,
   relativeTime,
   sourceStatusText,
+  type SourceInfo,
 } from "../describe";
-import { useOpenLauncher } from "../hooks";
 import { displayHotkey } from "../hotkey";
 import type { Section } from "../sections";
 import { SECTION_EYEBROWS } from "../sections";
 import { sourceIconName } from "../sourceIcons";
-import { Dot, EmptyState, Icon, RouteHeading, StateNotice } from "../ui";
+import { Icon, RouteHeading, StateNotice, Switch } from "../ui";
+
+/** What the indexer is doing right now, or null while the first count is pending. */
+function indexNote(status: EngineStatus): string | null {
+  if (!hasIndexCount(status)) return null;
+  switch (status.state) {
+    case "indexing":
+      return "Indexing in the background";
+    case "paused":
+      return "Indexing is paused";
+    case "error":
+      return "Indexing stopped";
+    default:
+      return status.lastUpdated ? "Updated " + relativeTime(status.lastUpdated) : null;
+  }
+}
 
 export default function HomeView({
   onNavigate,
 }: {
   onNavigate: (section: Section, sourceId?: string) => void;
 }) {
-  const { settings, status, getActivity, refreshStatus } = useApp();
-  const openLauncher = useOpenLauncher();
-  const [recent, setRecent] = useState<ActivityItem[] | null>(null);
-  const [activityError, setActivityError] = useState(false);
-
-  const loadActivity = useCallback(async () => {
-    try {
-      const items = await getActivity({ limit: 40 });
-      setRecent(items);
-      setActivityError(false);
-    } catch {
-      setRecent([]);
-      setActivityError(true);
-    }
-  }, [getActivity]);
+  const { settings, status, updateSettings, refreshStatus } = useApp();
+  const [osName, setOsName] = useState<string | null>(null);
+  const [failedSource, setFailedSource] = useState<SourceInfo | null>(null);
 
   useEffect(() => {
-    void loadActivity();
-  }, [loadActivity]);
+    let alive = true;
+    api
+      .osUserName()
+      .then((name) => {
+        if (alive) setOsName(name);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
-  const health = indexHealth(status);
-  const counts = indexCounts(status);
-  const accessed = recent ? recentAccessed(recent) : [];
-  const userName = settings.userName?.trim() || null;
-  const sources = status?.sources ?? [];
+  const greeting = greetingForTimestamp() + (osName ? ", " + osName : "");
   const shortcut = displayHotkey(settings.hotkey);
+  const sources = status?.sources ?? [];
+  const note = status ? indexNote(status) : null;
+
+  const openIsland = () => {
+    api.showIsland().catch(() => undefined);
+  };
+
+  const toggleSource = async (info: SourceInfo) => {
+    if (!info.privacyKey) return;
+    const key = info.privacyKey;
+    setFailedSource(null);
+    try {
+      await updateSettings({ privacy: { ...settings.privacy, [key]: !settings.privacy[key] } });
+    } catch {
+      setFailedSource(info);
+    }
+  };
 
   return (
     <div className="view">
-      <RouteHeading eyebrow={SECTION_EYEBROWS.home}>{greetingLine(userName)}</RouteHeading>
-      <p className="page-lead">Everything on your computer, within reach.</p>
+      <RouteHeading eyebrow={SECTION_EYEBROWS.home}>{greeting}</RouteHeading>
 
-      <button
-        type="button"
-        className="launcher-entry"
-        onClick={openLauncher}
-        title={shortcut ? "Open the launcher (" + shortcut + ")" : "Open the launcher"}
-      >
-        <Icon name="search" size={16} className="launcher-entry-glyph" />
-        <span className="launcher-entry-text">Find a file, open an app, or run an action…</span>
-        <Icon name="arrowUpRight" size={16} className="launcher-entry-arrow" />
-      </button>
-
-      {status && (status.state === "paused" || status.state === "error") ? (
-        <StateNotice
-          tone={status.state === "error" ? "error" : "warn"}
-          role={status.state === "error" ? "alert" : "status"}
-          title={
-            status.state === "error"
-              ? "Indexing stopped."
-              : "Indexing is paused."
-          }
-          body="New files aren't being added. Existing search still works."
-          actionLabel="Open Search & Indexing"
-          onAction={() => onNavigate("indexes")}
-        />
-      ) : null}
-
-      <div className="home-columns">
-        <section className="home-section" aria-labelledby="home-recent">
-          <div className="section-head">
-            <h2 id="home-recent">Recently accessed</h2>
-          </div>
-          {recent === null ? (
-            <p className="muted" aria-busy="true">
-              Loading recent activity…
-            </p>
-          ) : accessed.length === 0 ? (
-            <EmptyState
-              title="Nothing opened recently."
-              body="Files and apps you open from the launcher will appear here."
-              action={
-                <button type="button" className="btn" onClick={openLauncher}>
-                  Open the launcher
-                </button>
-              }
-            />
-          ) : (
-            <ul className="recent-list">
-              {accessed.map((item) => (
-                <li className="recent-row" key={item.id}>
-                  <span className="recent-icon" aria-hidden="true">
-                    <Icon name={item.kind === "launch" ? "grid" : "folder"} size={16} />
-                  </span>
-                  <span className="recent-text">
-                    <span className="recent-title">{item.title}</span>
-                    <span className="recent-sub">
-                      {item.detail ?? item.path ?? (item.kind === "launch" ? "Launched" : "Opened")}
-                    </span>
-                  </span>
-                  <span className="recent-time">{relativeTime(item.timestamp)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {activityError ? (
-            <StateNotice
-              title="Couldn't load activity."
-              body="Your history stays on this PC."
-              actionLabel="Try again"
-              onAction={() => void loadActivity()}
-            />
-          ) : null}
-          <div className="section-actions">
-            <button type="button" className="btn" onClick={() => onNavigate("indexes")}>
-              Manage sources
-            </button>
-          </div>
-        </section>
-
-        <section className="home-section" aria-labelledby="home-index">
-          <div className="section-head">
-            <h2 id="home-index">Your index</h2>
-            {status ? (
-              <span className="index-state">
-                <Dot tone={health.tone} />
-                {health.label}
-              </span>
-            ) : null}
-          </div>
-          {status === null ? (
-            <StateNotice
-              title="Couldn't read the index status."
-              body="The local search engine didn't respond. Your settings are unaffected."
-              actionLabel="Try again"
-              onAction={() => void refreshStatus()}
-            />
-          ) : !hasIndexCount(status) ? (
-            <>
-              <p className="index-stat">{indexCountText(status)}</p>
-              <p className="index-stat-sub">The local index is warming up.</p>
-              <p className="index-state-note">
-                Indexed counts appear as soon as the engine reports them.
-              </p>
-            </>
-          ) : counts.total === 0 ? (
-            <EmptyState
-              title="Nothing indexed yet."
-              body="Add a folder to start building the index. It stays on this PC."
-              action={
-                <button type="button" className="btn" onClick={() => onNavigate("indexes")}>
-                  Add location
-                </button>
-              }
-            />
-          ) : (
-            <>
-              <p className="index-stat">{indexCountText(status)}</p>
-              <p className="index-stat-sub">items indexed on this PC</p>
-              <p className="index-state-note">
-                {status.state === "indexing"
-                  ? "Indexing in the background"
-                  : health.tone === "error"
-                    ? "Existing results stay searchable"
-                    : "Updated " + relativeTime(status.lastUpdated)}
-              </p>
-              <dl className="metric-list">
-                <div className="metric-row">
-                  <dt>Documents</dt>
-                  <dd>{formatNumber(counts.documents)}</dd>
-                </div>
-                <div className="metric-row">
-                  <dt>Applications</dt>
-                  <dd>{formatNumber(counts.applications)}</dd>
-                </div>
-                <div className="metric-row">
-                  <dt>Images &amp; OCR</dt>
-                  <dd>{formatNumber(counts.imagesOcr)}</dd>
-                </div>
-                <div className="metric-row">
-                  <dt>Other files</dt>
-                  <dd>{formatNumber(counts.otherFiles)}</dd>
-                </div>
-              </dl>
-            </>
-          )}
-        </section>
+      <div className="home-launch">
+        <button type="button" className="btn btn-primary" onClick={openIsland}>
+          Open launcher
+          {shortcut ? <span className="kbd">{shortcut}</span> : null}
+        </button>
       </div>
 
-      <section className="home-section home-sources" aria-labelledby="home-sources">
+      <div className="home-stat">
+        <p className="home-stat-label">Indexed files</p>
+        {status ? (
+          <>
+            <p className="index-stat">{indexCountText(status)}</p>
+            {note ? <p className="home-stat-note">{note}</p> : null}
+          </>
+        ) : (
+          <>
+            <p className="index-stat">—</p>
+            <p className="home-stat-note">
+              Couldn&apos;t read the index status.{" "}
+              <button type="button" className="linkbtn" onClick={() => void refreshStatus()}>
+                Try again
+              </button>
+            </p>
+          </>
+        )}
+      </div>
+
+      <section className="home-sources" aria-labelledby="home-sources">
         <div className="section-head">
           <h2 id="home-sources">Sources</h2>
           <button type="button" className="linkbtn" onClick={() => onNavigate("indexes")}>
             Manage all sources
           </button>
         </div>
+        {failedSource ? (
+          <StateNotice
+            tone="warn"
+            title="Couldn't save that change."
+            body="Your previous setting is still active."
+            actionLabel="Try again"
+            onAction={() => void toggleSource(failedSource)}
+          />
+        ) : null}
         {sources.length === 0 ? (
-          <p className="muted">The local engine has not reported any sources yet.</p>
+          <p className="home-empty">The local engine has not reported any sources yet.</p>
         ) : (
-          <ul className="source-list">
+          <ul className="home-source-grid">
             {sources.map((source) => {
               const info = describeSource(source, settings);
               return (
-                <li key={source.id}>
-                  <button
-                    type="button"
-                    className="source-row"
-                    onClick={() => onNavigate("indexes", source.id)}
-                  >
-                    <span className="source-icon" aria-hidden="true">
-                      <Icon name={sourceIconName(source.id)} size={16} />
-                    </span>
-                    <span className="source-main">
-                      <span className="source-title">{info.title}</span>
-                      <span className="source-meta">
-                        {sourceStatusText(source, info.enabled)}
-                      </span>
-                    </span>
-                    <Dot tone={info.tone} />
-                  </button>
+                <li className="home-source" key={source.id}>
+                  <span className="home-source-icon" aria-hidden="true">
+                    <Icon name={sourceIconName(source.id)} size={16} />
+                  </span>
+                  <div className="home-source-body">
+                    <p className="home-source-title">{info.title}</p>
+                    <p className="home-source-desc">{info.description}</p>
+                    <p className="home-source-meta">{sourceStatusText(source, info.enabled)}</p>
+                  </div>
+                  {info.privacyKey ? (
+                    <Switch
+                      checked={info.enabled}
+                      label={info.title + " enabled"}
+                      onChange={() => void toggleSource(info)}
+                    />
+                  ) : (
+                    <span className="badge">Always on</span>
+                  )}
                 </li>
               );
             })}

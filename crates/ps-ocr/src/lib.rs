@@ -49,7 +49,8 @@ pub const MAX_LONG_EDGE: u32 = 4096;
 pub const MAX_IMAGE_PIXELS: u64 = 16_000_000;
 /// Per-image wall-clock budget.
 pub const OCR_TIMEOUT: Duration = Duration::from_secs(20);
-const MAX_OCR_WORKERS: usize = 4;
+/// Cap on concurrent recognitions; calls beyond it fail fast rather than queue.
+pub const MAX_OCR_WORKERS: usize = 4;
 static OCR_WORKERS: OnceLock<Arc<WorkerLimit>> = OnceLock::new();
 
 struct WorkerLimit {
@@ -159,13 +160,13 @@ pub fn content_hash_file(path: &Path) -> anyhow::Result<String> {
 }
 
 /// True when the specified engine is available.
-pub fn is_engine_available(engine: &str, _model_dir: Option<&Path>) -> bool {
+pub fn is_engine_available(engine: &str, model_dir: Option<&Path>) -> bool {
     match engine {
         "windows" => available(),
         "pp_ocr_v6" => {
             #[cfg(feature = "onnx")]
             {
-                if let Some(dir) = _model_dir {
+                if let Some(dir) = model_dir {
                     dir.join("pp-ocrv6_tiny_det.onnx").is_file()
                         && dir.join("pp-ocrv6_tiny_rec.onnx").is_file()
                         && dir.join("ppocrv6_tiny_dict.txt").is_file()
@@ -179,7 +180,7 @@ pub fn is_engine_available(engine: &str, _model_dir: Option<&Path>) -> bool {
         "indra" => {
             #[cfg(feature = "onnx")]
             {
-                if let Some(dir) = _model_dir {
+                if let Some(dir) = model_dir {
                     (dir.join("det.onnx").is_file()
                         && dir.join("rec.onnx").is_file()
                         && dir.join("order.onnx").is_file()
@@ -193,7 +194,11 @@ pub fn is_engine_available(engine: &str, _model_dir: Option<&Path>) -> bool {
             #[cfg(not(feature = "onnx"))]
             false
         }
-        "tesseract" => tesseract::Tesseract::is_installed(),
+        "tesseract" => match model_dir {
+            // A saved install folder counts only while it still holds the executable.
+            Some(dir) if dir.join("tesseract.exe").is_file() => true,
+            _ => tesseract::Tesseract::is_installed(),
+        },
         _ => false,
     }
 }
@@ -248,21 +253,21 @@ pub fn extract_image_with_engine(
             }))
         }
         "tesseract" => {
-            let tess = if let Some(dir) = model_dir {
-                tesseract::Tesseract::new(
+            // A saved install folder is used while it still holds the executable; otherwise
+            // detection runs. A missing install is an error, not a silent switch to another engine.
+            let tess = match model_dir.filter(|dir| dir.join("tesseract.exe").is_file()) {
+                Some(dir) => tesseract::Tesseract::new(
                     dir.join("tesseract.exe"),
                     dir.join("tessdata"),
                     "eng",
-                )
-            } else {
-                tesseract::Tesseract::default_installed()
+                )?,
+                None => tesseract::Tesseract::default_installed()?,
             };
-            match tess {
-                Ok(tess) => tess.recognize(path, max_pixels),
-                Err(_) => extract_image(path, max_pixels),
-            }
+            tess.recognize(path, max_pixels)
         }
-        _ => extract_image(path, max_pixels),
+        "windows" => extract_image(path, max_pixels),
+        // An engine this build cannot run is an error, never a silent switch to Windows OCR.
+        other => bail!("OCR engine {other} is not available in this build"),
     }
 }
 
@@ -282,8 +287,10 @@ pub fn extract_image_timed(path: &Path, max_pixels: u64) -> anyhow::Result<(Opti
     std::thread::Builder::new()
         .name("ps-ocr-worker".into())
         .spawn(move || {
-            let _permit = permit;
             let result = recognize_bounded(&owned, max_pixels);
+            // Free the slot before the caller can see the result: a full pool that
+            // calls again right away would otherwise find this slot still taken.
+            drop(permit);
             let _ = sender.send(result);
         })
         .map_err(|error| anyhow!("spawning OCR worker: {error}"))?;
