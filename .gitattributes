@@ -1,2 +1,4 @@
 *.onnx filter=lfs diff=lfs merge=lfs -text
 *.bin filter=lfs diff=lfs merge=lfs -text
+# PDF xref tables hold byte offsets; CRLF conversion corrupts them.
+*.pdf binary

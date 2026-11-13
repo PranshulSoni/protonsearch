@@ -4917,7 +4917,8 @@ mod tests {
             roots: Vec::new(),
             content_enabled: false,
             ocr_enabled: true,
-            ocr_engine: OcrEngine::Tesseract,
+            // Indra models live in the scratch data dir, so it is never installed here.
+            ocr_engine: OcrEngine::Indra,
             hotkey: "Alt+Space".into(),
             agent_opt_in: false,
             skipped: false,
