@@ -1,12 +1,12 @@
-//! Agent task and detected-agent DTOs (V10 single source of truth).
+//! Agent task DTOs (V10 single source of truth).
 //!
-//! These types were previously defined in crates/ps-agent/src/task/model.rs and
-//! the Tauri shell (DetectedAgent). They now live in ps-ipc so the Rust engine,
-//! the Tauri shell and the TypeScript bridge all share one contract:
+//! These types were previously defined in crates/ps-agent/src/task/model.rs. They
+//! now live in ps-ipc so the Rust engine, the Tauri shell and the TypeScript
+//! bridge all share one contract:
 //!
 //! * all structs serialize camelCase, all enums snake_case (wire format);
 //! * JSON shapes are byte-identical to the pre-move definitions; the contract
-//!   tests below pin two full AgentTask fixtures plus a DetectedAgent fixture;
+//!   tests below pin two full AgentTask fixtures;
 //! * ps-agent re-exports these types (its crate-root API is unchanged), and
 //!   apps/desktop/src/bridge/types.ts is the mirrored TypeScript contract.
 //!
@@ -26,17 +26,10 @@ pub enum AgentTaskRuntime {
     Pi,
     /// Embedded Pydantic AI sidecar (optional fallback).
     Pydantic,
-    /// Claude Code CLI (`claude -p`).
-    Claude,
-    /// Codex CLI (`codex exec`).
-    Codex,
-    /// OpenCode CLI (`opencode run`).
-    #[serde(rename = "opencode")]
-    OpenCode,
-    /// Gemini CLI (`gemini -p`).
-    Gemini,
-    /// Unknown/legacy producer; keep the record rather than dropping it.
+    /// Unknown/legacy producer (including the CLI agents older builds ran);
+    /// keep the record rather than dropping it.
     #[default]
+    #[serde(other)]
     Unknown,
 }
 
@@ -45,10 +38,6 @@ impl AgentTaskRuntime {
         match self {
             AgentTaskRuntime::Pi => "pi",
             AgentTaskRuntime::Pydantic => "pydantic",
-            AgentTaskRuntime::Claude => "claude",
-            AgentTaskRuntime::Codex => "codex",
-            AgentTaskRuntime::OpenCode => "opencode",
-            AgentTaskRuntime::Gemini => "gemini",
             AgentTaskRuntime::Unknown => "unknown",
         }
     }
@@ -322,25 +311,6 @@ pub struct AgentTaskActivity {
     pub search_text: String,
 }
 
-/// A locally detected agent runtime shown in the Workflows Agents section.
-///
-/// Moved here from the Tauri shell (apps/desktop/src-tauri/src/main.rs) so the
-/// shell, engine and TS bridge share one DetectedAgent contract.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DetectedAgent {
-    pub id: String,
-    pub name: String,
-    pub kind: String,
-    #[serde(default)]
-    pub version: Option<String>,
-    #[serde(default)]
-    pub path: Option<String>,
-    pub available: bool,
-    #[serde(default)]
-    pub detail: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -438,6 +408,8 @@ mod tests {
         let task: AgentTask = serde_json::from_str(minimal).unwrap();
         assert_eq!(task.id, "old");
         assert_eq!(task.runtime, AgentTaskRuntime::Unknown);
+        let legacy: AgentTask = serde_json::from_str(&minimal.replace("{", r#"{"runtime":"codex","#)).unwrap();
+        assert_eq!(legacy.runtime, AgentTaskRuntime::Unknown, "removed CLI runtimes still load");
         assert_eq!(task.progress.kind, AgentTaskProgressKind::Indeterminate);
         assert!(task.log.is_empty());
         assert!(task.restarts.is_empty());
@@ -495,28 +467,5 @@ mod tests {
         let json = serde_json::to_string(&node).unwrap();
         assert!(json.contains("\"children\":[{\"task\":{"), "{json}");
         assert!(json.contains("\"canResume\":false"), "{json}");
-    }
-
-    #[test]
-    fn detected_agent_fixture_is_stable() {
-        let agent = DetectedAgent {
-            id: "pi".into(),
-            name: "Pi".into(),
-            kind: "agent".into(),
-            version: Some("1.5.0".into()),
-            path: Some("C:/Users/x/.pi/agent/bin/pi.cmd".into()),
-            available: true,
-            detail: Some("Default agent runtime. Read-only in this alpha.".into()),
-        };
-        assert_eq!(
-            serde_json::to_string(&agent).unwrap(),
-            r#"{"id":"pi","name":"Pi","kind":"agent","version":"1.5.0","path":"C:/Users/x/.pi/agent/bin/pi.cmd","available":true,"detail":"Default agent runtime. Read-only in this alpha."}"#
-        );
-        let parsed: DetectedAgent = serde_json::from_str(
-            r#"{"id":"pi","name":"Pi","kind":"agent","version":null,"path":null,"available":false,"detail":null}"#,
-        )
-        .unwrap();
-        assert!(!parsed.available);
-        assert!(parsed.version.is_none());
     }
 }

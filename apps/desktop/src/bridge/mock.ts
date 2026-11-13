@@ -22,9 +22,6 @@ const params = new URLSearchParams(typeof location !== "undefined" ? location.se
 const MOCK_ONBOARDING = params.get("onboard") === "1";
 const MOCK_STATE = params.get("state") ?? "ready";
 const MOCK_SLOW_MS = params.get("slow") === "1" ? 1200 : 0;
-// Agent-catalog fixtures for visual QA: default = Pi detected + Codex missing,
-// ?agents=none = no runtimes, ?agents=multi = several CLIs including misses.
-const MOCK_AGENTS = params.get("agents") ?? "default";
 const MOCK_MONITORS = params.get("monitors") ?? "single";
 const USER = "C:\\Users\\Pranshul";
 
@@ -57,7 +54,7 @@ let settings: Settings = {
     gitIndexing: true,
     telemetry: false,
   },
-  agent: { enabled: false, runtime: "pi", piPath: null, allowWrites: false, workspace: null, thinking: null, provider: null, model: null, sidecarPath: null },
+  agent: { enabled: false, piPath: null, allowWrites: false, workspace: null, thinking: null, provider: null, model: null, sidecarPath: null },
   launcher: {
     primaryMode: "normal",
     island: {
@@ -383,7 +380,7 @@ export const mockBridge = {
         name: "Windows OCR",
         availability: "available",
         sizeLabel: "Built-in (0 MB)",
-        speedLabel: "Fast (~45ms/img)",
+        speedLabel: "Fastest (~55ms/img)",
         badge: "Built-in",
         description: "Built into Windows 10 and 11. Nothing to download.",
         highlights: [
@@ -399,12 +396,12 @@ export const mockBridge = {
         name: "PP-OCRv6",
         availability: "not_installed",
         sizeLabel: "~6.1 MB",
-        speedLabel: "Ultra-Fast (~30ms/img)",
+        speedLabel: "Most accurate (~165ms/img)",
         badge: "Recommended",
         description: "Compact model pack for screenshots, PDFs and printed text.",
         highlights: [
           "High accuracy on screenshots, PDFs & text",
-          "Ultra-fast local inference (~30ms/image)",
+          "Most accurate in our test: 96% of characters read correctly",
           "Compact ~6.1 MB model download",
         ],
         license: "Apache 2.0",
@@ -415,7 +412,7 @@ export const mockBridge = {
         name: "Indra OCR",
         availability: "not_installed",
         sizeLabel: "~27 MB",
-        speedLabel: "Deep (~120ms/img)",
+        speedLabel: "~150ms/img",
         badge: "Multilingual & Skewed",
         description: "Stronger on skewed, rotated and multilingual text.",
         highlights: [
@@ -431,7 +428,7 @@ export const mockBridge = {
         name: "Tesseract OCR",
         availability: "not_installed",
         sizeLabel: "External CLI",
-        speedLabel: "Traditional (~150ms/img)",
+        speedLabel: "Slowest (~650ms/img)",
         badge: "Extensible",
         description: "Open-source engine that uses your installed Tesseract.",
         highlights: [
@@ -586,31 +583,6 @@ export const mockBridge = {
   },
   async perfMark(): Promise<void> {},
 
-  async detectAgents(): Promise<import("./types").DetectedAgent[]> {
-    // default: Pi, Claude Code and OpenCode installed; ?agents=multi has Codex instead; ?agents=none has none.
-    const installed: Record<string, string> =
-      MOCK_AGENTS === "none"
-        ? {}
-        : MOCK_AGENTS === "multi"
-          ? { pi: "1.5.0", claude: "2.1.318", codex: "0.167.0" }
-          : { pi: "1.5.0", claude: "2.1.318", opencode: "2.2.7" };
-    const catalog = [
-      { id: "pi", name: "Pi" },
-      { id: "claude", name: "Claude Code" },
-      { id: "codex", name: "Codex" },
-      { id: "opencode", name: "OpenCode" },
-      { id: "gemini", name: "Gemini CLI" },
-    ];
-    return catalog.map(({ id, name }) => ({
-      id,
-      name,
-      kind: "agent",
-      version: installed[id] ?? null,
-      path: id in installed ? `C:\\Users\\you\\bin\\${id}.cmd` : null,
-      available: id in installed,
-      detail: null,
-    }));
-  },
   async agentTasks(): Promise<import("./types").AgentTask[]> {
     return [];
   },
@@ -634,11 +606,8 @@ export const mockBridge = {
   async agentPause(): Promise<void> {},
   async agentResume(): Promise<void> {},
 
-  async agentModels(agentId?: string | null): Promise<import("./types").AgentModel[]> {
-    return agentId == null || agentId === "pi" ? [{ provider: "opencode", id: "beam-free" }] : [];
-  },
-  async agentTest(): Promise<string> {
-    throw new Error("Agent tests require the desktop app.");
+  async agentModels(): Promise<import("./types").AgentModel[]> {
+    return [{ provider: "opencode", id: "beam-free" }];
   },
 
   async agentStatus(): Promise<import("./types").AgentStatus> {
@@ -656,6 +625,15 @@ export const mockBridge = {
   async piInstall(): Promise<void> { throw new Error("Pi installation requires the desktop application."); },
   async piInstallCancel(): Promise<void> {},
   async piConnect(): Promise<void> { throw new Error("Pi connection requires the desktop application."); },
+  async piProviders(): Promise<import("./types").PiProvider[]> {
+    return [
+      { id: "openai", name: "OpenAI", custom: false, saved: false, fromEnv: false, baseUrl: null, models: [] },
+      { id: "opencode", name: "OpenCode Zen", custom: false, saved: false, fromEnv: true, baseUrl: null, models: [] },
+    ];
+  },
+  async piProviderSave(): Promise<import("./types").PiProvider[]> { throw new Error("Providers require the desktop application."); },
+  async piEndpointSave(): Promise<import("./types").PiProvider[]> { throw new Error("Providers require the desktop application."); },
+  async piProviderRemove(): Promise<import("./types").PiProvider[]> { throw new Error("Providers require the desktop application."); },
   async agentDelete(): Promise<void> {},
   async agentRename(): Promise<void> {},
   async agentStart(): Promise<void> {

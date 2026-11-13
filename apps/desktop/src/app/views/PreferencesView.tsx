@@ -1,12 +1,13 @@
 // Settings: a section list on the left and the selected section on the right.
 // Every change saves as it is made; one inline status line reports the result.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../../App";
 import { api } from "../../bridge/api";
 import type { AppInfo, IslandSettings, SettingsPatch, ThemeMode, WebSearchEngine } from "../../bridge/types";
 import { formatNumber } from "../../lib/format";
 import { lookFrom, writeIslandLook } from "../../lib/islandLook";
+import { checkForUpdate, RELEASES_PAGE, type UpdateCheck } from "../../lib/updates";
 import { indexCountText, relativeTime, stateLabel } from "../describe";
 import { HotkeyCapture } from "../HotkeyInput";
 import { normalizeIslandSettings } from "../islandLogic";
@@ -53,6 +54,54 @@ function ValueRow({ title, value }: { title: string; value: string }) {
   return (
     <PrefRow title={title}>
       <span className="prefs-row-value">{value}</span>
+    </PrefRow>
+  );
+}
+
+// GitHub is asked only when the button is clicked.
+function UpdateRow({ version }: { version?: string }) {
+  const [check, setCheck] = useState<UpdateCheck | { kind: "checking" } | null>(null);
+
+  const run = async () => {
+    if (!version) return;
+    setCheck({ kind: "checking" });
+    setCheck(await checkForUpdate(version));
+  };
+
+  const download = async () => {
+    const outcome = await api.openResult({ type: "open_url", url: RELEASES_PAGE }).catch(() => null);
+    if (!outcome?.ok) setCheck({ kind: "error", text: "Couldn't open the download page." });
+  };
+
+  const text = !check
+    ? ""
+    : check.kind === "checking"
+      ? "Checking…"
+      : check.kind === "current"
+        ? "You're up to date"
+        : check.kind === "available"
+          ? `Version ${check.version} is available`
+          : check.text;
+
+  return (
+    <PrefRow title="Check for updates" description={"Current version " + (version ?? "unknown")}>
+      <span className="prefs-row-value" role="status">
+        {text}
+      </span>
+      {check?.kind === "available" ? (
+        <button type="button" className="btn btn-primary" onClick={() => void download()}>
+          Download
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn"
+          disabled={!version || check?.kind === "checking"}
+          onClick={() => void run()}
+        >
+          Check now
+        </button>
+      )}
     </PrefRow>
   );
 }
@@ -216,6 +265,12 @@ export default function PreferencesView({ onNavigate }: { onNavigate: (section: 
                   </PrefRow>
                 </div>
               </div>
+              <div className="prefs-group">
+                <h3 className="prefs-group-title">Updates</h3>
+                <div className="prefs-rows">
+                  <UpdateRow version={appInfo?.version ?? status?.version} />
+                </div>
+              </div>
             </>
           ) : null}
 
@@ -237,17 +292,35 @@ export default function PreferencesView({ onNavigate }: { onNavigate: (section: 
                 />
               </PrefRow>
               {island.liquidGlass ? (
-                <PrefRow title="Glass amount" description="Clear to frosted.">
-                  <input
-                    type="range"
-                    className="prefs-range"
-                    min={0}
-                    max={100}
-                    step={1}
-                    aria-label="Glass amount"
-                    value={glassLevel}
-                    onChange={(event) => saveIsland({ liquidGlassLevel: Number(event.target.value) })}
-                  />
+                <PrefRow title="Glass amount" description="How much the island hides what's behind it.">
+                  <div className="glass-amount">
+                    <div className="glass-amount-slider">
+                      <span>Clear</span>
+                      <input
+                        type="range"
+                        className="prefs-range"
+                        min={0}
+                        max={100}
+                        step={1}
+                        aria-label="Glass amount"
+                        value={glassLevel}
+                        onChange={(event) => saveIsland({ liquidGlassLevel: Number(event.target.value) })}
+                      />
+                      <span>Frosted</span>
+                    </div>
+                    {/* Preview: the island's own tint over a sample background. */}
+                    <div
+                      className="glass-preview"
+                      aria-hidden="true"
+                      style={{ "--glass": glassLevel / 100 } as CSSProperties}
+                    >
+                      <div className="glass-preview-island">
+                        <div className="glass-preview-row glass-preview-row--search" />
+                        <div className="glass-preview-row" />
+                        <div className="glass-preview-row" />
+                      </div>
+                    </div>
+                  </div>
                 </PrefRow>
               ) : null}
               <PrefRow title="Page dots" description="One dot per enabled card.">

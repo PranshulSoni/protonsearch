@@ -304,26 +304,10 @@ pub(crate) fn run_capture_cancellable(mut command: Command, timeout: Duration, c
 
 /// Runs `command` with the environment it already has. Probes strip provider
 /// credentials; the model listing keeps them so listed models are usable.
-pub(crate) fn run_child_capture(command: Command, timeout: Duration, cancelled: &std::sync::atomic::AtomicBool) -> Result<Capture, crate::AgentError> {
-    run_child_capture_with_input(command, timeout, cancelled, None)
-}
-
-/// [`run_child_capture`] that also writes `input` to the child's stdin, then closes it.
-pub(crate) fn run_child_capture_with_input(mut command: Command, timeout: Duration, cancelled: &std::sync::atomic::AtomicBool, input: Option<&str>) -> Result<Capture, crate::AgentError> {
-    command
-        .stdin(if input.is_some() { Stdio::piped() } else { Stdio::null() })
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+pub(crate) fn run_child_capture(mut command: Command, timeout: Duration, cancelled: &std::sync::atomic::AtomicBool) -> Result<Capture, crate::AgentError> {
+    command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     configure_no_window(&mut command);
     let mut child = command.spawn().map_err(crate::AgentError::Spawn)?;
-    if let (Some(input), Some(mut stdin)) = (input, child.stdin.take()) {
-        let input = input.to_owned();
-        // Own thread: a child that never reads must not block the timeout loop.
-        thread::spawn(move || {
-            use std::io::Write;
-            let _ = stdin.write_all(input.as_bytes());
-        });
-    }
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     let stdout_thread = thread::spawn(move || read_limited(stdout, MAX_CAPTURE_BYTES));

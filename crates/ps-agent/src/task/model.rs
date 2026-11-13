@@ -1,7 +1,7 @@
 //! Agent task persistence helpers and ps-ipc DTO re-exports.
 //!
 //! V10: the wire DTOs (AgentTask, AgentTaskNode, AgentPermissionState, progress/
-//! log/restart/controls/activity types and DetectedAgent) live in
+//! log/restart/controls/activity types) live in
 //! ps-ipc::agent_task as the single source of truth. This module re-exports them
 //! so the existing ps_agent public API keeps working
 //! (ps_agent::AgentTask == ps_ipc::agent_task::AgentTask), and owns the
@@ -56,16 +56,6 @@ impl AgentTaskLaunch {
             runtime_version: Some(info.version.clone()),
             model,
             allow_writes,
-            parent_id,
-        }
-    }
-
-    pub fn for_cli(agent: crate::cli::CliAgent, version: &str, model: Option<String>, parent_id: Option<String>) -> Self {
-        Self {
-            runtime: agent.task_runtime(),
-            runtime_version: Some(version.to_string()),
-            model,
-            allow_writes: false,
             parent_id,
         }
     }

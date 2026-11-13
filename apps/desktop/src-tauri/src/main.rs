@@ -14,7 +14,6 @@ mod monitors;
 
 use ps_agent::{AgentEvent, PiAgentClient, PiAgentConfig};
 use ps_core::{Engine, EngineConfig};
-use ps_ipc::agent_task::DetectedAgent;
 use ps_ipc::{
     ActionSpec, ActivityItem, ActivityQuery, AgentApprovalResponse, AgentRunRequest,
     AgentState, AgentStatus, EngineStatus, IndexCommand, LauncherMode, MonitorInfo, NativeCommand,
@@ -135,18 +134,8 @@ struct AppState {
     /// never touched by search, startup or settings.
     /// Pi CLI agent (default runtime). Spawned only when a workflow starts.
     pi_agent: Mutex<Option<PiAgentClient>>,
-    /// The Claude Code / Codex / OpenCode / Gemini run in progress, if any.
-    cli_run: Arc<Mutex<Option<CliRun>>>,
-    /// Cached agent discovery for the Workflows Agents section.
-    agents: Mutex<Option<Vec<DetectedAgent>>>,
     /// Persisted runtime-agnostic agent task history/state (Agents card).
     agent_tasks: Arc<ps_agent::AgentTaskService>,
-}
-
-/// A CLI agent run in progress: its task id and the flag that stops it.
-struct CliRun {
-    task_id: String,
-    cancel: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Position the frameless launcher near the top-center of the monitor under the
@@ -902,11 +891,8 @@ async fn update_settings(
     let settings = state.engine.update_settings(patch).map_err(|e| e.to_string())?;
     // The island window is prewarmed and keeps its own copy; it re-reads on this event.
     let _ = app.emit("settings:changed", settings.clone());
-    // The Pi launcher path may have changed; drop the cached probe and agent list.
+    // The Pi launcher path may have changed; drop the cached probe.
     ps_agent::clear_probe_cache();
-    if let Ok(mut cache) = state.agents.lock() {
-        *cache = None;
-    }
     // Settings may change roots/depth/pause; restarting is idempotent.
     if !settings.indexing.paused {
         std::sync::Arc::clone(&state.engine).spawn_background();
@@ -1078,7 +1064,6 @@ async fn show_main(app: AppHandle) {
 fn quit_app(app: AppHandle, state: tauri::State<'_, AppState>) {
     let _ = state.engine.index_command(IndexCommand::Shutdown);
     let _ = state.agent_tasks.stop_all("app quit");
-    cancel_cli_run(&state);
     if let Ok(mut slot) = state.pi_agent.lock() {
         if let Some(client) = slot.take() {
             client.shutdown();
@@ -1122,24 +1107,6 @@ fn set_hotkey(app: AppHandle, state: tauri::State<'_, AppState>, hotkey: String)
 
 fn probe_agent_status(state: &AppState) -> AgentStatus {
     let settings = state.engine.settings();
-    if let Some(agent) = ps_agent::CliAgent::from_id(settings.agent.runtime.id()) {
-        // Only the default CLI is probed here, so the island's first status read stays quick.
-        let found = ps_agent::cli::probe(agent);
-        let running = state.cli_run.lock().map(|slot| slot.is_some()).unwrap_or(false);
-        return AgentStatus {
-            state: match (found.is_some(), running) {
-                (false, _) => AgentState::NotConfigured,
-                (true, true) => AgentState::Running,
-                (true, false) => AgentState::Stopped,
-            },
-            runtime: Some(match found.as_ref() {
-                Some(info) => format!("{} {}", agent.name(), info.version),
-                None => agent.name().to_string(),
-            }),
-            model: configured_model(&settings.agent, agent.id()),
-            detail: None,
-        };
-    }
     let running = state.pi_agent.lock().ok()
         .and_then(|slot| slot.as_ref().map(|client| client.is_running())).unwrap_or(false);
     let status = ps_agent::pi::status::status(&state.data_dir,
@@ -1157,68 +1124,12 @@ fn probe_agent_status(state: &AppState) -> AgentStatus {
     }
 }
 
-/// Pi and the four CLIs. Agents that are not installed are listed as unavailable.
-#[tauri::command]
-async fn detect_agents(app: AppHandle, refresh: Option<bool>) -> Result<Vec<DetectedAgent>, String> {
-    run_blocking(move || {
-        let state = app.state::<AppState>();
-        if refresh.unwrap_or(false) {
-            ps_agent::clear_probe_cache();
-            if let Ok(mut cache) = state.agents.lock() {
-                *cache = None;
-            }
-        }
-        detect_agents_blocking(&state)
-    })
-    .await
-}
-
-fn detected_agent(id: &str, name: &str, found: Option<(String, PathBuf)>) -> DetectedAgent {
-    DetectedAgent {
-        id: id.into(),
-        name: name.into(),
-        kind: "agent".into(),
-        version: found.as_ref().map(|(version, _)| version.clone()),
-        path: found.as_ref().map(|(_, path)| path.to_string_lossy().into_owned()),
-        available: found.is_some(),
-        detail: None,
-    }
-}
-
-fn detect_agents_blocking(state: &AppState) -> Vec<DetectedAgent> {
-    if let Ok(cache) = state.agents.lock() {
-        if let Some(agents) = cache.as_ref() {
-            return agents.clone();
-        }
-    }
-    let settings = state.engine.settings();
-    let managed = ps_agent::pi::install::managed_launcher(&state.data_dir);
-    let selected = settings.agent.pi_path.as_deref().map(Path::new).or_else(|| managed.is_file().then_some(managed.as_path()));
-    let mut agents = vec![detected_agent(
-        "pi",
-        "Pi",
-        ps_agent::probe_pi_cached(selected).map(|info| (info.version, info.path)),
-    )];
-    for agent in ps_agent::CliAgent::ALL {
-        agents.push(detected_agent(
-            agent.id(),
-            agent.name(),
-            ps_agent::cli::probe(agent).map(|info| (info.version, info.path)),
-        ));
-    }
-    if let Ok(mut cache) = state.agents.lock() {
-        *cache = Some(agents.clone());
-    }
-    agents
-}
-
 #[tauri::command]
 async fn pi_install_status(app: AppHandle, refresh: Option<bool>) -> Result<ps_agent::pi::status::PiInstallStatus, String> {
     run_blocking(move || {
         let state = app.state::<AppState>();
         if refresh.unwrap_or(false) {
             ps_agent::clear_probe_cache();
-            if let Ok(mut cache) = state.agents.lock() { *cache = None; }
         }
         let settings = state.engine.settings();
         let running = state.pi_agent.lock().ok().and_then(|slot| slot.as_ref().map(|client| client.is_running())).unwrap_or(false);
@@ -1242,9 +1153,7 @@ async fn pi_install(app: AppHandle, version: String, confirmed: bool) -> Result<
                 return Err(ps_agent::AgentError::Busy);
             }
             Ok(())
-        }).map_err(|error| error.to_string())?;
-        if let Ok(mut cache) = state.agents.lock() { *cache = None; }
-        Ok(())
+        }).map(|_| ()).map_err(|error| error.to_string())
     }).await?
 }
 
@@ -1262,81 +1171,44 @@ async fn pi_connect(app: AppHandle) -> Result<(), String> {
     }).await?
 }
 
+use ps_agent::pi::providers::{self, PiProvider};
+
+/// Providers Pi can use, from its auth.json and models.json. Keys never come back.
+#[tauri::command]
+fn pi_providers() -> Result<Vec<PiProvider>, String> {
+    providers::list(&providers::agent_dir()?)
+}
+
+#[tauri::command]
+fn pi_provider_save(provider: String, api_key: String) -> Result<Vec<PiProvider>, String> {
+    providers::save_key(&providers::agent_dir()?, &provider, &api_key)
+}
+
+#[tauri::command]
+fn pi_endpoint_save(name: String, base_url: String, api_key: String, models: Vec<String>) -> Result<Vec<PiProvider>, String> {
+    providers::save_endpoint(&providers::agent_dir()?, &name, &base_url, &api_key, &models)
+}
+
+#[tauri::command]
+fn pi_provider_remove(provider: String) -> Result<Vec<PiProvider>, String> {
+    providers::remove(&providers::agent_dir()?, &provider)
+}
+
 #[tauri::command]
 async fn agent_status(app: AppHandle) -> Result<AgentStatus, String> {
     run_blocking(move || probe_agent_status(&app.state::<AppState>())).await
 }
 
-/// Models for one agent (default: the default agent). Pi lists with `pi --list-models`,
-/// OpenCode with `opencode models`; the other CLIs take a typed name and list nothing.
+/// Models Pi can run (`pi --list-models`); empty when Pi is missing.
 #[tauri::command]
-async fn agent_models(app: AppHandle, agent_id: Option<String>) -> Result<Vec<ps_agent::pi::PiModel>, String> {
+async fn agent_models(app: AppHandle) -> Result<Vec<ps_agent::pi::PiModel>, String> {
     run_blocking(move || {
         let state = app.state::<AppState>();
-        let settings = state.engine.settings();
-        let id = agent_id.unwrap_or_else(|| settings.agent.runtime.id().to_string());
-        if id == "pi" {
-            return PiAgentConfig::from_settings(&settings.agent, &state.data_dir)
-                .map(|config| ps_agent::pi::list_pi_models(&config))
-                .unwrap_or_default();
-        }
-        ps_agent::CliAgent::from_id(&id).map(ps_agent::cli::list_models).unwrap_or_default()
+        PiAgentConfig::from_settings(&state.engine.settings().agent, &state.data_dir)
+            .map(|config| ps_agent::pi::list_pi_models(&config))
+            .unwrap_or_default()
     })
     .await
-}
-
-/// Test button: Pi's install probe, or one word from a CLI through its configured model.
-#[tauri::command]
-async fn agent_test(app: AppHandle, agent_id: String) -> Result<String, String> {
-    run_blocking(move || agent_test_blocking(&app.state::<AppState>(), &agent_id)).await?
-}
-
-fn agent_test_blocking(state: &AppState, agent_id: &str) -> Result<String, String> {
-    let settings = state.engine.settings();
-    if agent_id == "pi" {
-        let managed = ps_agent::pi::install::managed_launcher(&state.data_dir);
-        let selected = settings.agent.pi_path.as_deref().map(Path::new).or_else(|| managed.is_file().then_some(managed.as_path()));
-        let info = ps_agent::probe_pi(selected).ok_or("Pi is not installed or did not start.")?;
-        if !info.node_ok {
-            return Err("Pi needs Node.js 22.19 or newer.".into());
-        }
-        return Ok(format!("Pi {}", info.version));
-    }
-    let agent = ps_agent::CliAgent::from_id(agent_id).ok_or("Unknown agent.")?;
-    let (launcher, version) = detected_cli(state, agent)?;
-    let workspace = agent_workspace(state, &settings.agent);
-    let model = configured_model(&settings.agent, agent.id());
-    ps_agent::cli::check(agent, &launcher, &workspace, model.as_deref()).map_err(|error| error.message)?;
-    Ok(format!("{} {version}", agent.name()))
-}
-
-/// The launcher and version of an installed CLI, from the detection cache.
-fn detected_cli(state: &AppState, agent: ps_agent::CliAgent) -> Result<(PathBuf, String), String> {
-    detect_agents_blocking(state)
-        .into_iter()
-        .find(|entry| entry.id == agent.id() && entry.available)
-        .and_then(|entry| Some((PathBuf::from(entry.path?), entry.version.unwrap_or_default())))
-        .ok_or_else(|| format!("{} is not installed or not on PATH.", agent.name()))
-}
-
-/// Pi keeps its default model in `model`; the CLIs keep theirs in `cli_models`.
-fn configured_model(agent: &ps_ipc::AgentSettings, runtime_id: &str) -> Option<String> {
-    let value = if runtime_id == "pi" { agent.model.clone() } else { agent.cli_models.get(runtime_id).cloned() };
-    value.map(|value| value.trim().to_string()).filter(|value| !value.is_empty())
-}
-
-/// Working folder for runs: the configured one, else the Pi workspace under the data folder.
-fn agent_workspace(state: &AppState, agent: &ps_ipc::AgentSettings) -> PathBuf {
-    agent.workspace.as_deref().map(PathBuf::from).unwrap_or_else(|| state.data_dir.join(ps_agent::pi::DEFAULT_WORKSPACE_DIR_NAME))
-}
-
-/// Stops the CLI run in progress, if any. Its task ends as cancelled.
-fn cancel_cli_run(state: &AppState) {
-    if let Ok(slot) = state.cli_run.lock() {
-        if let Some(run) = slot.as_ref() {
-            run.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
-        }
-    }
 }
 
 #[tauri::command]
@@ -1344,9 +1216,8 @@ async fn agent_start(
     app: AppHandle,
     request: AgentRunRequest,
     parent_id: Option<String>,
-    runtime: Option<ps_ipc::AgentRuntime>,
 ) -> Result<(), String> {
-    run_blocking(move || agent_start_blocking(&app, &app.state::<AppState>(), request, parent_id, runtime)).await?
+    run_blocking(move || agent_start_blocking(&app, &app.state::<AppState>(), request, parent_id)).await?
 }
 
 /// Pi runs without a session, so a follow-up carries the earlier turns of its thread.
@@ -1384,15 +1255,6 @@ fn agent_delete(state: tauri::State<'_, AppState>, task_id: String) -> Result<()
             }
         }
     }
-    if let Ok(slot) = state.cli_run.lock() {
-        if let Some(run) = slot.as_ref() {
-            let in_thread = run.task_id == task_id
-                || state.agent_tasks.task(&run.task_id).is_some_and(|task| task.parent_id.as_deref() == Some(task_id.as_str()));
-            if in_thread {
-                run.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
-            }
-        }
-    }
     state.agent_tasks.delete(&task_id);
     Ok(())
 }
@@ -1407,90 +1269,16 @@ fn agent_rename(state: tauri::State<'_, AppState>, task_id: String, title: Strin
         .ok_or_else(|| "That agent no longer exists.".to_string())
 }
 
-/// Starts a run in Claude Code, Codex, OpenCode or Gemini and records it as a task.
-/// The process runs on its own thread; its events reach the card like Pi's do.
-fn agent_start_cli(
-    app: &AppHandle,
-    state: &AppState,
-    agent: ps_agent::CliAgent,
-    settings: &ps_ipc::AgentSettings,
-    request: AgentRunRequest,
-    parent_id: Option<String>,
-) -> Result<(), String> {
-    let (launcher, version) = detected_cli(state, agent)?;
-    let model = request.model.clone().or_else(|| configured_model(settings, agent.id()));
-    let workspace = agent_workspace(state, settings);
-    let mut slot = state.cli_run.lock().map_err(|e| e.to_string())?;
-    let pi_busy = state.pi_agent.lock().ok().and_then(|pi| pi.as_ref().map(|client| client.is_running())).unwrap_or(false);
-    if slot.is_some() || pi_busy {
-        return Err("An agent run is already in progress.".into());
-    }
-    let task = state
-        .agent_tasks
-        .begin_cli(&request, agent, &version, model.clone(), parent_id.clone())
-        .map_err(|_| "The run could not be recorded.".to_string())?;
-    let prompt = match parent_id.as_deref() {
-        Some(root) => thread_prompt(&state.agent_tasks.tasks(200), root, &task.id, &request.prompt),
-        None => request.prompt.clone(),
-    };
-    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    *slot = Some(CliRun { task_id: task.id.clone(), cancel: Arc::clone(&cancel) });
-    drop(slot);
-    let run_id = task.id.clone();
-    let tasks = Arc::clone(&state.agent_tasks);
-    let runs = Arc::clone(&state.cli_run);
-    let handle = app.clone();
-    std::thread::spawn(move || {
-        let emit = |event: AgentEvent| {
-            let _ = tasks.apply_event(&run_id, &event);
-            let _ = handle.emit("agent:event", &event);
-        };
-        emit(AgentEvent::Started {
-            run_id: run_id.clone(),
-            runtime: agent.name().to_string(),
-            model: model.clone().unwrap_or_else(|| "default".to_string()),
-        });
-        let started = std::time::Instant::now();
-        let result = ps_agent::cli::run(agent, &launcher, &workspace, &prompt, model.as_deref(), ps_agent::cli::RUN_TIMEOUT, &cancel);
-        let duration_ms = started.elapsed().as_millis() as u64;
-        match result {
-            Ok(answer) => {
-                emit(AgentEvent::Output { text: answer, final_answer: true });
-                emit(AgentEvent::Finished { ok: true, duration_ms });
-            }
-            Err(error) => {
-                emit(AgentEvent::Error { code: error.code.to_string(), message: error.message });
-                emit(AgentEvent::Finished { ok: false, duration_ms });
-            }
-        }
-        if let Ok(mut slot) = runs.lock() {
-            if slot.as_ref().is_some_and(|run| run.task_id == run_id) {
-                *slot = None;
-            }
-        }
-    });
-    Ok(())
-}
-
 fn agent_start_blocking(
     app: &AppHandle,
     state: &AppState,
     request: AgentRunRequest,
     parent_id: Option<String>,
-    // The agent this run uses; the default agent when the caller does not pick one.
-    runtime: Option<ps_ipc::AgentRuntime>,
 ) -> Result<(), String> {
     let settings = state.engine.settings();
     if ps_agent::pi::install::is_installing() { return Err("Wait for Pi installation to finish.".into()); }
     if !settings.agent.enabled {
-        return Err("Agent workflows are disabled in Preferences.".into());
-    }
-    let runtime = runtime.unwrap_or(settings.agent.runtime);
-    if let Some(agent) = ps_agent::CliAgent::from_id(runtime.id()) {
-        return agent_start_cli(app, state, agent, &settings.agent, request, parent_id);
-    }
-    if state.cli_run.lock().map(|run| run.is_some()).unwrap_or(false) {
-        return Err("An agent run is already in progress.".into());
+        return Err("Agent runs are off. Turn them on in Agentic workflows.".into());
     }
     let mut config = PiAgentConfig::from_settings(&settings.agent, &state.data_dir).map_err(|_| {
         "The Pi CLI agent is not available. Install it from pi.dev or set its path in Preferences."
@@ -1552,12 +1340,6 @@ fn agent_start_blocking(
 
 #[tauri::command]
 fn agent_cancel(state: tauri::State<'_, AppState>, run_id: Option<String>) -> Result<(), String> {
-    if let Some(run) = state.cli_run.lock().map_err(|error| error.to_string())?.as_ref() {
-        if run_id.as_ref().map_or(true, |id| *id == run.task_id) {
-            run.cancel.store(true, std::sync::atomic::Ordering::Relaxed);
-            return Ok(());
-        }
-    }
     let slot = state.pi_agent.lock().map_err(|error| error.to_string())?;
     if let Some(client) = slot.as_ref() {
         if run_id.as_ref().is_some_and(|id| client.run_id().as_ref() != Some(id)) {
@@ -1575,7 +1357,6 @@ fn agent_approve(_state: tauri::State<'_, AppState>, _response: AgentApprovalRes
 
 #[tauri::command]
 fn agent_stop(state: tauri::State<'_, AppState>) {
-    cancel_cli_run(&state);
     if let Ok(mut slot) = state.pi_agent.lock() {
         if let Some(client) = slot.take() {
             client.shutdown();
@@ -2071,7 +1852,6 @@ fn agent_permissions(
 
 #[tauri::command]
 fn agent_stop_all(state: tauri::State<'_, AppState>) -> Vec<ps_agent::AgentTask> {
-    cancel_cli_run(&state);
     let tasks = state.agent_tasks.stop_all("user stopped all");
     if let Ok(mut slot) = state.pi_agent.lock() {
         if let Some(client) = slot.take() {
@@ -2207,8 +1987,6 @@ dispatch_window_action(app, toggle_primary_launcher);
                 engine: engine.clone(),
                 data_dir,
                 pi_agent: Mutex::new(None),
-                cli_run: Arc::new(Mutex::new(None)),
-                agents: Mutex::new(None),
                 agent_tasks,
             });
             if perf_hooks_enabled() {
@@ -2292,13 +2070,15 @@ dispatch_window_action(app, toggle_primary_launcher);
             set_hotkey,
             agent_status,
             agent_models,
-            agent_test,
             pi_install_status,
             pi_install_plan,
             pi_install,
             pi_install_cancel,
             pi_connect,
-            detect_agents,
+            pi_providers,
+            pi_provider_save,
+            pi_endpoint_save,
+            pi_provider_remove,
             agent_tasks,
             agent_delete,
             agent_rename,

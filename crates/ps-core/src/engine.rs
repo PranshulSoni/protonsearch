@@ -200,6 +200,8 @@ pub struct Engine {
     force_rescan: AtomicBool,
     /// Set when the OCR engine changes; cleared once indexing is ready again.
     reindexing: AtomicBool,
+    /// Images still queued in the running OCR pass; 0 when idle.
+    ocr_pending: AtomicU64,
     legacy_summary: Mutex<Option<LegacySummary>>,
     /// Recently returned results, so a preview request can resolve resultId -> row.
     recent_results: Mutex<ResultRegistry>,
@@ -319,6 +321,7 @@ impl Engine {
             shutdown: AtomicBool::new(false),
             force_rescan: AtomicBool::new(false),
             reindexing: AtomicBool::new(false),
+            ocr_pending: AtomicU64::new(0),
             legacy_summary: Mutex::new(None),
             recent_results: Mutex::new(ResultRegistry::default()),
             clipboard_listener: Mutex::new(None),
@@ -388,6 +391,15 @@ impl Engine {
             .ok()
             .and_then(|guard| guard.as_ref().map(|handle| !handle.is_finished()))
             .unwrap_or(false)
+    }
+
+    /// Queues a full pass (rescan, content, OCR). A pass that is already running takes
+    /// it on before it reports Ready (see run_background); paused indexing stays Paused.
+    fn request_pass(&self) {
+        self.force_rescan.store(true, Ordering::SeqCst);
+        if !self.paused.load(Ordering::SeqCst) && !self.background_running() {
+            self.set_state(STATE_STARTING);
+        }
     }
 
     // -- search ------------------------------------------------------------
@@ -1498,6 +1510,7 @@ impl Engine {
             }),
             last_updated: self.last_updated.load(Ordering::Relaxed),
             reindexing: self.reindexing.load(Ordering::SeqCst),
+            ocr_pending: self.ocr_pending.load(Ordering::SeqCst),
             warnings: self.warnings.lock().map(|w| w.clone()).unwrap_or_default(),
         }
     }
@@ -1522,10 +1535,9 @@ impl Engine {
         if changed {
             self.save_settings(&next)?;
             if next.ocr_engine != previous_engine {
-                // OCR results are keyed by engine, so a rescan re-reads every image.
+                // OCR results are keyed by engine, so the next pass re-reads every image.
                 self.reindexing.store(true, Ordering::SeqCst);
-                self.force_rescan.store(true, Ordering::SeqCst);
-                self.set_state(STATE_STARTING);
+                self.request_pass();
             }
             if patch.privacy.is_some() || patch.clipboard.is_some() {
                 // Enabling/disabling/pausing clipboard capture takes effect at once.
@@ -1549,7 +1561,6 @@ impl Engine {
                     self.set_state(STATE_PAUSED);
                 } else {
                     self.paused.store(false, Ordering::SeqCst);
-                    self.force_rescan.store(false, Ordering::SeqCst);
                     // Unpausing with no worker running is "Starting" until the
                     // shell re-spawns the background pipeline, not "Indexing".
                     let running = self
@@ -1586,6 +1597,9 @@ impl Engine {
             ps_ocr::is_engine_available("tesseract", tesseract_dir(&self.settings_snapshot()).as_deref());
         let windows_available = ps_ocr::is_engine_available("windows", None);
 
+        // Speeds: `ps-bench ocr` warm mean over 60 real screenshots, one thread (2026-11-13).
+        // Accuracy: characters read correctly on the synthetic .bench/ocr200 corpus.
+        // Re-measure before changing these labels.
         vec![
             ps_ipc::OcrEngineDetails {
                 engine: ps_ipc::OcrEngine::PpOcrV6,
@@ -1596,12 +1610,12 @@ impl Engine {
                     ps_ipc::OcrEngineAvailability::NotInstalled
                 },
                 size_label: "~6.1 MB".to_string(),
-                speed_label: "Ultra-Fast (~30ms/img)".to_string(),
+                speed_label: "Most accurate (~165ms/img)".to_string(),
                 badge: "Recommended".to_string(),
                 description: "Compact model pack for screenshots, PDFs and printed text.".to_string(),
                 highlights: vec![
                     "High accuracy on screenshots, PDFs & text".to_string(),
-                    "Ultra-fast local inference (~30ms/image)".to_string(),
+                    "Most accurate in our test: 96% of characters read correctly".to_string(),
                     "Compact ~6.1 MB model download".to_string(),
                 ],
                 license: Some("Apache 2.0".to_string()),
@@ -1616,7 +1630,7 @@ impl Engine {
                     ps_ipc::OcrEngineAvailability::NotInstalled
                 },
                 size_label: "Built-in (0 MB)".to_string(),
-                speed_label: "Fast (~45ms/img)".to_string(),
+                speed_label: "Fastest (~55ms/img)".to_string(),
                 badge: "Built-in".to_string(),
                 description: "Built into Windows 10 and 11. Nothing to download.".to_string(),
                 highlights: vec![
@@ -1636,7 +1650,7 @@ impl Engine {
                     ps_ipc::OcrEngineAvailability::NotInstalled
                 },
                 size_label: "~27 MB".to_string(),
-                speed_label: "Deep (~120ms/img)".to_string(),
+                speed_label: "~150ms/img".to_string(),
                 badge: "Multilingual & Skewed".to_string(),
                 description: "Stronger on skewed, rotated and multilingual text.".to_string(),
                 highlights: vec![
@@ -1656,7 +1670,7 @@ impl Engine {
                     ps_ipc::OcrEngineAvailability::NotInstalled
                 },
                 size_label: "External CLI".to_string(),
-                speed_label: "Traditional (~150ms/img)".to_string(),
+                speed_label: "Slowest (~650ms/img)".to_string(),
                 badge: "Extensible".to_string(),
                 description: "Open-source engine that uses your installed Tesseract.".to_string(),
                 highlights: vec![
@@ -1874,20 +1888,19 @@ impl Engine {
                 self.sync_filename_entries();
                 let path = self.config.data_dir.join(INDEX_FILE);
                 let _ = std::fs::remove_file(path);
-                self.force_rescan.store(true, Ordering::SeqCst);
-                self.set_state(STATE_STARTING);
+                self.request_pass();
             }
             IndexCommand::RebuildContent => {
                 if let Some(content) = self.content_handle() {
                     let _ = content.clear();
                 }
                 self.content_documents.store(0, Ordering::SeqCst);
-                self.force_rescan.store(true, Ordering::SeqCst);
+                self.request_pass();
             }
             IndexCommand::RebuildOcr => {
                 self.db.ocr_clear()?;
                 self.ocr_documents.store(0, Ordering::SeqCst);
-                self.force_rescan.store(true, Ordering::SeqCst);
+                self.request_pass();
             }
             IndexCommand::Shutdown => {
                 self.shutdown.store(true, Ordering::SeqCst);
@@ -2197,15 +2210,32 @@ impl Drop for Engine {
 /// when the work returns early (shutdown) or panics, so the UI can never stay
 /// stuck on "Indexing…" after the pipeline is done.
 fn run_background(engine: Arc<Engine>) {
-    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        run_background_inner(&engine);
-    }));
-    if outcome.is_err() {
-        engine.push_warning(
-            "background indexing stopped unexpectedly; the visible index may be partial".to_string(),
-        );
+    loop {
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run_background_inner(&engine);
+        }));
+        if outcome.is_err() {
+            engine.push_warning(
+                "background indexing stopped unexpectedly; the visible index may be partial".to_string(),
+            );
+        }
+        // A rebuild or OCR engine change requested while this pass ran gets a pass of its
+        // own before Ready: the shell cannot start one while this thread is alive.
+        if outcome.is_ok() && pass_requested(&engine) {
+            continue;
+        }
+        finish_background(&engine);
+        // Same for a request that landed while finishing.
+        if outcome.is_err() || !pass_requested(&engine) {
+            return;
+        }
     }
-    finish_background(&engine);
+}
+
+fn pass_requested(engine: &Engine) -> bool {
+    engine.force_rescan.load(Ordering::SeqCst)
+        && !engine.shutdown.load(Ordering::SeqCst)
+        && !engine.paused.load(Ordering::SeqCst)
 }
 
 fn run_background_inner(engine: &Arc<Engine>) {
@@ -2260,10 +2290,12 @@ fn run_background_inner(engine: &Arc<Engine>) {
     }
 
     let roots = engine.configured_roots();
+    // Taken even with no roots, so only a request made during this pass is left pending.
+    let forced = engine.force_rescan.swap(false, Ordering::SeqCst);
     if !roots.is_empty() {
         let current_roots: Vec<String> = roots.iter().map(|root| ps_index::normalize_root(root)).collect();
         let empty = engine.index.read().unwrap().is_empty();
-        let rescan = engine.force_rescan.swap(false, Ordering::SeqCst) || {
+        let rescan = forced || {
             let index = engine.index.read().unwrap();
             empty
                 || index.roots() != current_roots.as_slice()
@@ -2493,6 +2525,7 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
         let index = engine.index.read().unwrap();
         ocr_candidates(&index, &modes)
     };
+    engine.ocr_pending.store(candidates.len() as u64, Ordering::SeqCst);
     let queue = Mutex::new(candidates.into_iter());
     let processed = AtomicU64::new(0);
     std::thread::scope(|scope| {
@@ -2500,6 +2533,7 @@ fn index_ocr(engine: &Arc<Engine>, roots: &[PathBuf]) {
             scope.spawn(|| ocr_worker(engine, &queue, &processed, engine_name, model_dir.as_deref()));
         }
     });
+    engine.ocr_pending.store(0, Ordering::SeqCst);
     engine
         .ocr_documents
         .store(engine.db.ocr_count(), Ordering::SeqCst);
@@ -2531,8 +2565,13 @@ fn ocr_worker(
             break;
         };
         let processed_now = processed.fetch_add(1, Ordering::SeqCst) + 1;
+        engine.ocr_pending.fetch_sub(1, Ordering::SeqCst);
         if processed_now % 128 == 0 {
             let _ = engine.db.checkpoint();
+        }
+        if processed_now % 16 == 0 {
+            // Live count, so a rebuild shows progress instead of 0 until the pass ends.
+            engine.ocr_documents.store(engine.db.ocr_count(), Ordering::SeqCst);
         }
         // Keyed by engine: switching engines makes every stored result stale.
         let hash = format!("{engine_name}:{}", quick_hash(&path, size, modified));
@@ -4899,6 +4938,65 @@ mod tests {
         });
         assert!(result.unwrap_err().to_string().contains("Select Windows OCR"));
         assert_eq!(engine.settings().ocr_engine, OcrEngine::Windows);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn ocr_engine_change_reports_reindexing_and_rereads_every_image() {
+        let dir = scratch_dir("ocr-engine-change");
+        let engine = Arc::new(make_engine(&dir, None));
+        // An empty PP-OCRv6 pack counts as installed and fails on every image it reads,
+        // so a re-read shows up as an OCR warning.
+        let pack = dir.join("models").join("ppocrv6");
+        std::fs::create_dir_all(&pack).unwrap();
+        for file in ["pp-ocrv6_tiny_det.onnx", "pp-ocrv6_tiny_rec.onnx", "ppocrv6_tiny_dict.txt"] {
+            std::fs::write(pack.join(file), b"").unwrap();
+        }
+        let root = dir.join("shots");
+        std::fs::create_dir_all(&root).unwrap();
+        let image = root.join("shot.png");
+        std::fs::write(&image, b"not a png").unwrap();
+        let path = image.to_string_lossy().into_owned();
+        {
+            let mut settings = engine.settings.write().unwrap();
+            settings.indexing.ocr_enabled = true;
+            settings.indexing.roots = vec![ps_ipc::RootConfig {
+                path: root.to_string_lossy().into_owned(),
+                mode: RootMode::ContentAndOcr,
+                enabled: true,
+            }];
+        }
+        *engine.index.write().unwrap() = FilenameIndex::from_entries(vec![ps_index::IndexEntry {
+            path: path.clone(),
+            name: "shot.png".into(),
+            ext: "png".into(),
+            kind: EntryKind::File,
+            size: 9,
+            modified: 1,
+        }]);
+        // Read earlier by Windows OCR.
+        let windows_key = format!("windows:{}", quick_hash(&path, 9, 1));
+        engine.db.ocr_upsert(&path, &windows_key, "old text", "en", 1, 1, 9, 1).unwrap();
+
+        engine
+            .update_settings(SettingsPatch {
+                ocr_engine: Some(OcrEngine::PpOcrV6),
+                ..SettingsPatch::default()
+            })
+            .unwrap();
+        let status = engine.status();
+        assert!(status.reindexing, "an engine change must show Reindexing");
+        assert_eq!(status.state, IndexerState::Starting);
+        assert!(engine.force_rescan.load(Ordering::SeqCst), "an engine change must queue a pass");
+
+        // The pass reads the image again rather than keeping the Windows OCR result.
+        index_ocr(&engine, &[root]);
+        let status = engine.status();
+        assert!(status
+            .warnings
+            .iter()
+            .any(|warning| warning.starts_with("OCR failed for") && warning.contains("shot.png")));
+        assert_eq!(status.ocr_pending, 0);
         let _ = std::fs::remove_dir_all(dir);
     }
 

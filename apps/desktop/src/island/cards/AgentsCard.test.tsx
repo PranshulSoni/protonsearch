@@ -11,11 +11,6 @@ vi.mock("../../bridge/api", () => ({
     agentDelete: vi.fn(async () => undefined),
     agentRename: vi.fn(async () => undefined),
     agentModels: vi.fn(async () => []),
-    detectAgents: vi.fn(async () => [
-      { id: "pi", name: "Pi", kind: "agent", version: "1.0", path: null, available: true, detail: null },
-      { id: "claude", name: "Claude Code", kind: "agent", version: null, path: null, available: false, detail: null },
-      { id: "codex", name: "Codex", kind: "agent", version: "0.5", path: null, available: true, detail: null },
-    ]),
   },
 }));
 vi.mock("../../app/agentRun", async (importOriginal) => ({
@@ -125,7 +120,7 @@ describe("AgentsCard", () => {
     );
     await act(async () => setInput(el.querySelector<HTMLInputElement>('input[aria-label="Ask the agent…"]')!, "Summarize notes"));
     await act(async () => el.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!.click());
-    expect(api.agentStart).toHaveBeenCalledWith({ runId: "run-1", prompt: "Summarize notes", model: null }, null, "pi");
+    expect(api.agentStart).toHaveBeenCalledWith({ runId: "run-1", prompt: "Summarize notes", model: null }, null);
     expect(onChanged).toHaveBeenCalled();
   });
 
@@ -137,7 +132,7 @@ describe("AgentsCard", () => {
     expect(el.textContent).toContain("All done.");
     await act(async () => setInput(el.querySelector<HTMLInputElement>('input[aria-label="Message the agent…"]')!, "Try again"));
     await act(async () => el.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!.click());
-    expect(api.agentStart).toHaveBeenCalledWith({ runId: "run-1", prompt: "Try again", model: null }, "t2", "pi");
+    expect(api.agentStart).toHaveBeenCalledWith({ runId: "run-1", prompt: "Try again", model: null }, "t2");
     await act(async () => el.querySelector<HTMLButtonElement>('button[aria-label="Delete agent"]')!.click());
     expect(api.agentDelete).toHaveBeenCalledWith("t2");
   });
@@ -153,7 +148,7 @@ describe("AgentsCard", () => {
     expect(chip().textContent).toContain("claude-sonnet-4-6");
     await act(async () => setInput(el.querySelector<HTMLInputElement>('input[aria-label="Ask the agent…"]')!, "Summarize notes"));
     await act(async () => el.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!.click());
-    expect(api.agentStart).toHaveBeenCalledWith({ runId: "run-1", prompt: "Summarize notes", model: "opencode/claude-sonnet-4-6" }, null, "pi");
+    expect(api.agentStart).toHaveBeenCalledWith({ runId: "run-1", prompt: "Summarize notes", model: "opencode/claude-sonnet-4-6" }, null);
   });
 
   it("filters the model list, picks with the keyboard and closes on Escape", async () => {
@@ -173,23 +168,6 @@ describe("AgentsCard", () => {
     await act(async () => chip().click());
     await act(async () => key(el.querySelector<HTMLInputElement>('input[aria-label="Filter models"]')!, "Escape"));
     expect(el.querySelector('[role="listbox"][aria-label="Models"]')).toBeNull();
-  });
-
-  it("runs the agent picked in the selector and marks the agents that are not installed", async () => {
-    const el = await mount(<AgentsCard status={RUNNING} tasks={[]} onPause={vi.fn()} onResume={vi.fn()} />);
-    const agentChip = () => el.querySelector<HTMLButtonElement>('button[aria-label="Agent"]')!;
-    const options = () => [...el.querySelectorAll<HTMLButtonElement>('[role="listbox"][aria-label="Agent"] [role="option"]')];
-    expect(agentChip().textContent).toContain("Pi");
-    await act(async () => {
-      agentChip().click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-    expect(options().find((item) => item.textContent?.includes("Claude Code"))!.disabled).toBe(true);
-    await act(async () => options().find((item) => item.textContent?.includes("Codex"))!.click());
-    expect(agentChip().textContent).toContain("Codex");
-    await act(async () => setInput(el.querySelector<HTMLInputElement>('input[aria-label="Ask the agent…"]')!, "Summarize notes"));
-    await act(async () => el.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!.click());
-    expect(api.agentStart).toHaveBeenLastCalledWith({ runId: "run-1", prompt: "Summarize notes", model: null }, null, "codex");
   });
 
   it("renames an agent from its chat header", async () => {

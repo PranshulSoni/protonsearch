@@ -1380,7 +1380,7 @@
   }
 }
 
-/* Workflows page: agent rows (Pi and the CLIs) and their expanded configuration. */
+/* Workflows page: Pi settings and provider rows. */
 .agent-list {
   margin: 0;
   padding: 0;
@@ -1404,21 +1404,6 @@
   padding: var(--space-2) 0;
 }
 
-.agent-row-toggle {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px var(--space-3);
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ps-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
 .agent-row-name {
   color: var(--ps-ink);
   font-size: var(--ps-text-small);
@@ -1430,57 +1415,11 @@
   font-size: var(--ps-text-meta);
 }
 
-.agent-row-state.is-missing {
-  color: var(--ps-ink-3);
-}
-
-.agent-row-default {
-  color: var(--ps-ink-3);
-  font-size: var(--ps-text-micro);
-  font-weight: var(--ps-fw-label);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.agent-row-result {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ps-ink-2);
-  font-size: var(--ps-text-meta);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-test-pass {
-  color: var(--ps-positive);
-}
-
-.agent-test-fail {
-  color: var(--ps-negative);
-}
-
 .agent-config {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   padding: 0 0 var(--space-4);
-}
-
-.agent-path {
-  margin: 0;
-  overflow: hidden;
-  color: var(--ps-ink-3);
-  font-family: var(--ps-font-mono);
-  font-size: var(--ps-text-meta);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-config-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
 }
 
 .agent-field {

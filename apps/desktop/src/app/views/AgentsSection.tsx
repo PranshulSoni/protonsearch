@@ -1,301 +1,252 @@
-// Agents on the Workflows page: Pi and the four agent CLIs, one row each. The
-// "Default agent" choice sets the agent the island Agents card runs; a row shows
-// the install state, runs a one-word Test, and sets that agent's default model.
+// Pi on the Workflows page: its setup, the default model the island Agents card
+// runs, and the providers Pi can use. Keys go to Pi's own config and are never
+// shown again.
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useApp } from "../../App";
 import { api } from "../../bridge/api";
-import type { AgentModel, AgentRuntime, AgentSettings, DetectedAgent } from "../../bridge/types";
-import { AGENT_RUNTIMES } from "../agentRun";
-import { Panel, StateNotice } from "../ui";
+import type { AgentModel, AgentSettings, PiProvider } from "../../bridge/types";
+import { Panel, Switch } from "../ui";
 import { PiSetup } from "./PiSetup";
 
-type TestResult =
-  | { status: "running" }
-  | { status: "passed"; detail: string }
-  | { status: "failed"; message: string };
+/** The add form's choice for an OpenAI-compatible endpoint. */
+const ENDPOINT = "endpoint";
 
-/** Middle-ellipsis for long paths; the full value stays in the title. */
-function middleEllipsis(value: string, max = 72): string {
-  if (value.length <= max) return value;
-  const half = Math.floor((max - 1) / 2);
-  return value.slice(0, half) + "…" + value.slice(value.length - (max - 1 - half));
-}
+function Providers({ onChanged }: { onChanged: () => void }) {
+  const [providers, setProviders] = useState<PiProvider[]>([]);
+  const [choice, setChoice] = useState("");
+  const [name, setName] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [modelIds, setModelIds] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-/** Pi keeps its default model in `model`; each CLI keeps its own in `cliModels`. */
-function modelOf(agent: AgentSettings, id: AgentRuntime): string | null {
-  return id === "pi" ? (agent.model ?? null) : (agent.cliModels?.[id] ?? null);
-}
+  useEffect(() => {
+    api.piProviders().then(setProviders, (reason) => setError(String(reason)));
+  }, []);
 
-function withModel(agent: AgentSettings, id: AgentRuntime, value: string | null): AgentSettings {
-  if (id === "pi") return { ...agent, model: value };
-  const cliModels = { ...agent.cliModels };
-  if (value) cliModels[id] = value;
-  else delete cliModels[id];
-  return { ...agent, cliModels };
-}
+  const apply = async (action: () => Promise<PiProvider[]>): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
+    try {
+      setProviders(await action());
+      onChanged();
+      return true;
+    } catch (reason) {
+      setError(String(reason));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
 
-interface AgentRowProps {
-  name: string;
-  found: DetectedAgent | null;
-  stateLabel: string;
-  isDefault: boolean;
-  open: boolean;
-  test: TestResult | undefined;
-  model: string | null;
-  models: AgentModel[];
-  onToggle: () => void;
-  onTest: () => void;
-  onUseDefault: () => void;
-  onModel: (value: string | null) => void;
-  children: ReactNode;
-}
+  const add = async (event: FormEvent) => {
+    event.preventDefault();
+    const saved = await apply(() =>
+      choice === ENDPOINT
+        ? api.piEndpointSave(name, baseUrl, apiKey, modelIds.split(/[\s,]+/).filter(Boolean))
+        : api.piProviderSave(choice, apiKey),
+    );
+    if (saved) {
+      setChoice("");
+      setName("");
+      setBaseUrl("");
+      setModelIds("");
+      setApiKey("");
+    }
+  };
 
-function AgentRow({
-  name,
-  found,
-  stateLabel,
-  isDefault,
-  open,
-  test,
-  model,
-  models,
-  onToggle,
-  onTest,
-  onUseDefault,
-  onModel,
-  children,
-}: AgentRowProps) {
-  const running = test?.status === "running";
-  const options = models.map((item) => `${item.provider}/${item.id}`);
-  if (model && !options.includes(model)) options.unshift(model);
+  const listed = providers.filter((provider) => provider.saved || provider.fromEnv);
   return (
-    <li className="agent-row">
-      <div className="agent-row-head">
-        <button type="button" className="agent-row-toggle" aria-expanded={open} onClick={onToggle}>
-          <span className="agent-row-name">{name}</span>
-          <span className={found ? "agent-row-state" : "agent-row-state is-missing"}>{stateLabel}</span>
-          {isDefault ? <span className="agent-row-default">Default</span> : null}
-        </button>
-        <span className="agent-row-result" aria-live="polite">
-          {running ? <span className="muted">Testing…</span> : null}
-          {test?.status === "passed" ? <span className="agent-test-pass">Passed · {test.detail}</span> : null}
-          {test?.status === "failed" ? (
-            <span className="agent-test-fail" title={test.message}>
-              Failed · {test.message}
-            </span>
-          ) : null}
-        </span>
-        <button type="button" className="btn" aria-label={`Test ${name}`} disabled={!found || running} onClick={onTest}>
-          Test
-        </button>
-      </div>
-      {open ? (
-        <div className="agent-config">
-          {found?.path ? (
-            <p className="agent-path" title={found.path}>
-              {middleEllipsis(found.path)}
-            </p>
-          ) : null}
-          <div className="agent-config-row">
+    <Panel id="workflows-providers" title="Providers" hint="Models from these providers appear in the Agents card.">
+      {listed.length > 0 ? (
+        <ul className="agent-list">
+          {listed.map((provider) => (
+            <li key={provider.id} className="agent-row">
+              <div className="agent-row-head">
+                <span className="agent-row-name">{provider.name}</span>
+                <span className="agent-row-state">
+                  {provider.custom
+                    ? `${provider.baseUrl ?? ""} · ${provider.models.join(", ")}`
+                    : provider.saved
+                      ? "API key ••••••••"
+                      : "Key set in the environment"}
+                </span>
+                {provider.saved ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    aria-label={`Remove ${provider.name}`}
+                    disabled={busy}
+                    onClick={() => void apply(() => api.piProviderRemove(provider.id))}
+                  >
+                    Remove
+                  </button>
+                ) : (
+                  <span />
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">No providers yet.</p>
+      )}
+      <form className="agent-config" onSubmit={(event) => void add(event)}>
+        <label className="agent-field">
+          <span>Add a provider</span>
+          <select className="input" value={choice} onChange={(event) => setChoice(event.target.value)}>
+            <option value="">Choose a provider</option>
+            {providers
+              .filter((provider) => !provider.custom)
+              .map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name}
+                </option>
+              ))}
+            <option value={ENDPOINT}>OpenAI-compatible endpoint</option>
+          </select>
+        </label>
+        {choice === ENDPOINT ? (
+          <>
             <label className="agent-field">
-              <span>Default model</span>
-              {models.length > 0 ? (
-                <select className="input" value={model ?? ""} onChange={(event) => onModel(event.target.value || null)}>
-                  <option value="">Agent default</option>
-                  {options.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  key={model ?? ""}
-                  className="input"
-                  defaultValue={model ?? ""}
-                  placeholder="Agent default"
-                  onBlur={(event) => onModel(event.target.value.trim() || null)}
-                />
-              )}
+              <span>Name</span>
+              <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="LM Studio" />
             </label>
-            <button type="button" className="btn" disabled={!found || isDefault} onClick={onUseDefault}>
-              {isDefault ? "Default agent" : "Use as default agent"}
-            </button>
-          </div>
-          {children}
-        </div>
+            <label className="agent-field">
+              <span>Base URL</span>
+              <input
+                className="input"
+                value={baseUrl}
+                onChange={(event) => setBaseUrl(event.target.value)}
+                placeholder="http://localhost:1234/v1"
+              />
+            </label>
+            <label className="agent-field">
+              <span>Model ids</span>
+              <input
+                className="input"
+                value={modelIds}
+                onChange={(event) => setModelIds(event.target.value)}
+                placeholder="Separate with commas"
+              />
+            </label>
+          </>
+        ) : null}
+        {choice ? (
+          <>
+            <label className="agent-field">
+              <span>{choice === ENDPOINT ? "API key (optional)" : "API key"}</span>
+              <input
+                className="input"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+              />
+            </label>
+            <div className="config-actions">
+              <button type="submit" className="btn" disabled={busy}>
+                Save provider
+              </button>
+            </div>
+          </>
+        ) : null}
+      </form>
+      {error ? (
+        <p role="alert" className="agent-notice">
+          {error}
+        </p>
       ) : null}
-    </li>
+    </Panel>
   );
 }
 
 export default function AgentsSection() {
   const { settings, updateSettings } = useApp();
-  const [detected, setDetected] = useState<DetectedAgent[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<AgentRuntime | null>(null);
-  const [tests, setTests] = useState<Partial<Record<AgentRuntime, TestResult>>>({});
-  const [models, setModels] = useState<Partial<Record<AgentRuntime, AgentModel[]>>>({});
+  const [models, setModels] = useState<AgentModel[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const load = useCallback(async (refresh: boolean) => {
-    setLoadError(null);
-    try {
-      setDetected(await api.detectAgents(refresh));
-    } catch (reason) {
-      setLoadError(String(reason));
-    }
+  const loadModels = useCallback(() => {
+    api.agentModels().then(setModels, () => setModels([]));
   }, []);
+  useEffect(loadModels, [loadModels]);
 
-  const refreshAll = useCallback(() => {
-    setTests({});
-    setModels({});
-    void load(true);
-  }, [load]);
-
-  useEffect(() => {
-    void load(false);
-  }, [load]);
-
-  // Model lists load once per row, when the row is first opened.
-  useEffect(() => {
-    if (openId === null || models[openId] !== undefined) return;
-    let current = true;
-    api.agentModels(openId).then(
-      (list) => {
-        if (current) setModels((previous) => ({ ...previous, [openId]: list }));
-      },
-      () => {
-        if (current) setModels((previous) => ({ ...previous, [openId]: [] }));
-      },
-    );
-    return () => {
-      current = false;
-    };
-  }, [openId, models]);
-
-  const runTest = async (id: AgentRuntime) => {
-    setTests((previous) => ({ ...previous, [id]: { status: "running" } }));
-    try {
-      const detail = await api.agentTest(id);
-      setTests((previous) => ({ ...previous, [id]: { status: "passed", detail } }));
-    } catch (reason) {
-      setTests((previous) => ({ ...previous, [id]: { status: "failed", message: String(reason) } }));
-    }
-  };
-
-  const useAsDefault = async (id: AgentRuntime) => {
+  const save = async (agent: AgentSettings) => {
     setNotice(null);
     try {
-      await updateSettings({ agent: { ...settings.agent, enabled: true, runtime: id } });
+      await updateSettings({ agent });
     } catch (reason) {
       setNotice(String(reason));
     }
   };
 
-  const setModel = async (id: AgentRuntime, value: string | null) => {
-    if (value === modelOf(settings.agent, id)) return;
-    setNotice(null);
-    try {
-      await updateSettings({ agent: withModel(settings.agent, id, value) });
-    } catch (reason) {
-      setNotice(String(reason));
-    }
-  };
-
-  const defaultId: AgentRuntime = settings.agent.runtime ?? "pi";
-  const piDetails = (
-    <>
-      <PiSetup onChanged={refreshAll} />
-      <div className="agent-safety">
-        <p>
-          Pi runs with your Windows permissions. Read tools can open any file you can read; the workspace is the default
-          working folder, not a sandbox.
-        </p>
-        <p>There is no per-tool approval. File edits and shell access are disabled in this alpha.</p>
-        <p>When a run starts, your prompt, context and tool output are sent to the configured provider.</p>
-      </div>
-    </>
-  );
+  const model = settings.agent.model ?? null;
+  const options = models.map((item) => `${item.provider}/${item.id}`);
+  if (model && !options.includes(model)) options.unshift(model);
 
   return (
-    <Panel
-      id="workflows-agents"
-      title="Agents"
-      actions={
-        <button type="button" className="btn" onClick={refreshAll}>
-          Refresh
-        </button>
-      }
-    >
-      {loadError ? (
-        <StateNotice
-          tone="error"
-          title="Agents could not be checked"
-          body={loadError}
-          actionLabel="Retry"
-          onAction={refreshAll}
-        />
-      ) : null}
-      <label className="agent-field">
-        <span>Default agent</span>
-        <select className="input" value={defaultId} onChange={(event) => void useAsDefault(event.target.value as AgentRuntime)}>
-          {AGENT_RUNTIMES.map((entry) => {
-            const installed = detected?.some((item) => item.id === entry.id && item.available) ?? false;
-            return (
-              <option key={entry.id} value={entry.id} disabled={!installed}>
-                {installed ? entry.name : `${entry.name} (not installed)`}
-              </option>
-            );
-          })}
-        </select>
-      </label>
-      <ul className="agent-list">
-        {AGENT_RUNTIMES.map((entry) => {
-          const found = detected?.find((item) => item.id === entry.id && item.available) ?? null;
-          const stateLabel =
-            detected === null
-              ? loadError
-                ? "Not checked"
-                : "Checking…"
-              : found
-                ? found.version
-                  ? `Installed · ${found.version}`
-                  : "Installed"
-                : "Not installed";
-          return (
-            <AgentRow
-              key={entry.id}
-              name={entry.name}
-              found={found}
-              stateLabel={stateLabel}
-              isDefault={defaultId === entry.id}
-              open={openId === entry.id}
-              test={tests[entry.id]}
-              model={modelOf(settings.agent, entry.id)}
-              models={models[entry.id] ?? []}
-              onToggle={() => setOpenId((current) => (current === entry.id ? null : entry.id))}
-              onTest={() => void runTest(entry.id)}
-              onUseDefault={() => void useAsDefault(entry.id)}
-              onModel={(value) => void setModel(entry.id, value)}
+    <>
+      <Panel
+        id="workflows-agents"
+        title="Pi agent"
+        actions={
+          <div className="privacy-control">
+            <span>Agent runs</span>
+            <Switch
+              checked={settings.agent.enabled}
+              label="Agent runs"
+              onChange={(enabled) => void save({ ...settings.agent, enabled })}
+            />
+          </div>
+        }
+      >
+        <PiSetup onChanged={loadModels} />
+        <label className="agent-field">
+          <span>Default model</span>
+          {models.length > 0 ? (
+            <select
+              className="input"
+              value={model ?? ""}
+              onChange={(event) => void save({ ...settings.agent, model: event.target.value || null })}
             >
-              {entry.id === "pi" ? (
-                piDetails
-              ) : (
-                <p className="agent-safety">
-                  {entry.name} runs with your Windows permissions. Your prompt is sent to its model provider.
-                </p>
-              )}
-            </AgentRow>
-          );
-        })}
-      </ul>
-      {notice ? (
-        <p role="alert" className="agent-notice">
-          {notice}
-        </p>
-      ) : null}
-    </Panel>
+              <option value="">Pi default</option>
+              {options.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              key={model ?? ""}
+              className="input"
+              defaultValue={model ?? ""}
+              placeholder="Pi default"
+              onBlur={(event) => {
+                const value = event.target.value.trim() || null;
+                if (value !== model) void save({ ...settings.agent, model: value });
+              }}
+            />
+          )}
+        </label>
+        <div className="agent-safety">
+          <p>
+            Pi runs with your Windows permissions. Read tools can open any file you can read; the workspace is the default
+            working folder, not a sandbox.
+          </p>
+          <p>There is no per-tool approval. File edits and shell access are disabled in this alpha.</p>
+          <p>When a run starts, your prompt, context and tool output are sent to the configured provider.</p>
+        </div>
+        {notice ? (
+          <p role="alert" className="agent-notice">
+            {notice}
+          </p>
+        ) : null}
+      </Panel>
+      <Providers onChanged={loadModels} />
+    </>
   );
 }

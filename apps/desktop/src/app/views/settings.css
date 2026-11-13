@@ -141,6 +141,107 @@
   accent-color: var(--ps-accent);
 }
 
+/* Glass amount: a mock island over a colourful sample, tinted with the island's own
+   formula (island.css .island-surface--glass and its light variant).
+   --glass: 0 clear .. 1 frosted. */
+.glass-amount {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.glass-amount-slider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ps-ink-2);
+  font-size: 12px;
+}
+
+.glass-preview {
+  display: grid;
+  place-items: center;
+  height: 112px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 16% 30%, #ffd166 0 17%, transparent 18%),
+    radial-gradient(circle at 86% 76%, #ef476f 0 22%, transparent 23%),
+    linear-gradient(120deg, #118ab2, #06d6a0 50%, #8338ec);
+}
+
+.glass-preview-island {
+  display: grid;
+  gap: 8px;
+  width: 74%;
+  padding: 10px;
+  border: 1px solid rgba(20, 28, 36, 0.16);
+  border-top-color: rgba(20, 28, 36, 0.22);
+  border-radius: 18px;
+  color: #15191e;
+  background: rgba(255, 255, 255, calc(0.06 + var(--glass) * 0.4));
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.6),
+    0 10px 22px rgba(20, 28, 36, 0.18);
+}
+
+:root[data-theme="dark"] .glass-preview-island {
+  border-color: rgba(255, 255, 255, 0.22);
+  border-top-color: rgba(255, 255, 255, 0.34);
+  color: #f2f4f6;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02) 42%, rgba(255, 255, 255, 0.06)),
+    rgba(10, 12, 16, calc(0.08 + var(--glass) * 0.52));
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.5),
+    0 10px 22px rgba(0, 0, 0, 0.35);
+}
+
+/* Each row is an icon and a text bar in the island's text colour. */
+.glass-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 12px;
+}
+
+.glass-preview-row::before,
+.glass-preview-row::after {
+  content: "";
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.glass-preview-row::before {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.glass-preview-row::after {
+  width: 60%;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.glass-preview-row:last-child::after {
+  width: 42%;
+}
+
+.glass-preview-row--search {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: rgba(20, 28, 36, 0.05);
+}
+
+.glass-preview-row--search::before {
+  border-radius: 50%;
+}
+
+:root[data-theme="dark"] .glass-preview-row--search {
+  background: rgba(255, 255, 255, 0.07);
+}
+
 .prefs-actions {
   display: flex;
   flex-wrap: wrap;

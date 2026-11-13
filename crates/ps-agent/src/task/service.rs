@@ -11,7 +11,6 @@ use std::sync::{Arc, Mutex};
 
 use ps_ipc::{AgentEvent, AgentRunRequest};
 
-use crate::cli::CliAgent;
 use crate::error::AgentError;
 use crate::pi::PiInfo;
 
@@ -83,18 +82,6 @@ impl AgentTaskService {
             request,
             &AgentTaskLaunch::for_pi(info, model, allow_writes, parent_id),
         )
-    }
-
-    /// Convenience for the CLI runtimes (Claude Code, Codex, OpenCode, Gemini).
-    pub fn begin_cli(
-        &self,
-        request: &AgentRunRequest,
-        agent: CliAgent,
-        version: &str,
-        model: Option<String>,
-        parent_id: Option<String>,
-    ) -> Result<AgentTask, AgentError> {
-        self.begin(request, &AgentTaskLaunch::for_cli(agent, version, model, parent_id))
     }
 
     /// Convenience for the optional Pydantic fallback runtime.

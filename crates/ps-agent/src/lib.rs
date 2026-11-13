@@ -13,15 +13,12 @@
 //! Nothing here runs on the search path: clients are created lazily when a
 //! workflow starts. The Pi probe never makes a model call.
 
-pub mod cli;
 mod client;
 pub mod config;
 mod error;
 pub mod pi;
 mod protocol;
 pub mod task;
-
-pub use cli::{CliAgent, CliError, CliInfo};
 
 pub use client::{AgentClient, EventCallback, MAX_RESTARTS, SHUTDOWN_GRACE};
 pub use config::{

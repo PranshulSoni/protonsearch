@@ -210,6 +210,8 @@ export interface EngineStatus {
   filenameEntries: number;
   contentDocuments: number;
   ocrDocuments: number;
+  /** Images still queued in the running OCR pass; 0 when idle. */
+  ocrPending?: number;
   roots: RootStatus[];
   sources: SourceStatus[];
   agent?: AgentStatus | null;
@@ -258,19 +260,14 @@ export interface PrivacySettings {
   telemetry: boolean;
 }
 
-export type AgentRuntime = "pi" | "pydantic" | "claude" | "codex" | "opencode" | "gemini";
-
 export interface AgentSettings {
   enabled: boolean;
-  runtime?: AgentRuntime;
   piPath?: string | null;
   allowWrites?: boolean;
   workspace?: string | null;
   thinking?: string | null;
   provider?: string | null;
   model?: string | null;
-  /** Default model per CLI runtime (claude, codex, opencode, gemini). Pi uses `model`. */
-  cliModels?: Record<string, string>;
   sidecarPath?: string | null;
 }
 
@@ -585,7 +582,7 @@ export interface OpenOutcome {
   message: string;
 }
 
-export type AgentTaskRuntime = "pi" | "pydantic" | "claude" | "codex" | "opencode" | "gemini" | "unknown";
+export type AgentTaskRuntime = "pi" | "pydantic" | "unknown";
 export type AgentTaskState =
   | "queued"
   | "running"
@@ -660,16 +657,6 @@ export interface AgentTaskNode {
   children: AgentTaskNode[];
 }
 
-export interface DetectedAgent {
-  id: string;
-  name: string;
-  kind: string;
-  version: string | null;
-  path: string | null;
-  available: boolean;
-  detail: string | null;
-}
-
 export interface AppInfo {
   name: string;
   version: string;
@@ -693,6 +680,20 @@ export interface AgentRunRequest {
 export interface AgentModel {
   provider: string;
   id: string;
+}
+
+/** A provider Pi can use, from its auth.json (keys) or models.json (endpoints). Never holds a key. */
+export interface PiProvider {
+  id: string;
+  name: string;
+  /** An OpenAI-compatible endpoint. */
+  custom: boolean;
+  /** Pi's config holds a key for it. */
+  saved: boolean;
+  /** Its key is set in the environment. */
+  fromEnv: boolean;
+  baseUrl: string | null;
+  models: string[];
 }
 
 export interface AgentApprovalResponse {

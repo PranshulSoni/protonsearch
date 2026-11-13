@@ -6,14 +6,13 @@ import type {
   AgentApprovalResponse,
   AgentModel,
   AgentRunRequest,
-  AgentRuntime,
   AgentStatus,
   PiInstallStatus,
   PiInstallPlan,
+  PiProvider,
   AgentTask,
   AgentTaskNode,
   AgentPermissionState,
-  DetectedAgent,
   ControlsStatus,
   MediaSessionInfo,
   MonitorInfo,
@@ -48,20 +47,22 @@ type Bridge = {
   setHotkey(hotkey: string): Promise<Settings>;
   confirmNativeAction(command: NativeCommand): Promise<OpenOutcome>;
   agentStatus(): Promise<AgentStatus>;
-  agentModels(agentId?: string | null): Promise<AgentModel[]>;
-  agentTest(agentId: string): Promise<string>;
+  agentModels(): Promise<AgentModel[]>;
   piInstallStatus(refresh?: boolean): Promise<PiInstallStatus>;
   piInstallPlan(): Promise<PiInstallPlan>;
   piInstall(version: string, confirmed: boolean): Promise<void>;
   piInstallCancel(): Promise<void>;
   piConnect(): Promise<void>;
-  detectAgents(refresh?: boolean): Promise<DetectedAgent[]>;
+  piProviders(): Promise<PiProvider[]>;
+  piProviderSave(provider: string, apiKey: string): Promise<PiProvider[]>;
+  piEndpointSave(name: string, baseUrl: string, apiKey: string, models: string[]): Promise<PiProvider[]>;
+  piProviderRemove(provider: string): Promise<PiProvider[]>;
   listMonitors(): Promise<MonitorInfo[]>;
   showIsland(): Promise<void>;
   hideIsland(): Promise<void>;
   setIslandGeometry(width: number, height: number): Promise<void>;
   perfMark(label: string, epochMs: number): Promise<void>;
-  agentStart(request: AgentRunRequest, parentId?: string | null, runtime?: AgentRuntime | null): Promise<void>;
+  agentStart(request: AgentRunRequest, parentId?: string | null): Promise<void>;
   agentDelete(taskId: string): Promise<void>;
   agentRename(taskId: string, title: string): Promise<void>;
   agentCancel(runId?: string | null): Promise<void>;
@@ -118,9 +119,7 @@ const tauriBridge: Bridge = {
   setHotkey: (hotkey) => invoke<Settings>("set_hotkey", { hotkey }),
   confirmNativeAction: (command) => invoke<OpenOutcome>("confirm_native_action", { command }),
   agentStatus: () => invoke<AgentStatus>("agent_status"),
-  agentModels: (agentId) => invoke<AgentModel[]>("agent_models", { agentId: agentId ?? null }),
-  agentTest: (agentId) => invoke<string>("agent_test", { agentId }),
-  detectAgents: (refresh) => invoke<DetectedAgent[]>("detect_agents", { refresh: refresh ?? null }),
+  agentModels: () => invoke<AgentModel[]>("agent_models"),
   listMonitors: () => invoke<MonitorInfo[]>("list_monitors"),
   showIsland: () => invoke<void>("show_island"),
   hideIsland: () => invoke<void>("hide_island"),
@@ -153,8 +152,12 @@ const tauriBridge: Bridge = {
   piInstall: (version, confirmed) => invoke<void>("pi_install", { version, confirmed }),
   piInstallCancel: () => invoke<void>("pi_install_cancel"),
   piConnect: () => invoke<void>("pi_connect"),
-  agentStart: (request, parentId, runtime) =>
-    invoke<void>("agent_start", { request, parentId: parentId ?? null, runtime: runtime ?? null }),
+  piProviders: () => invoke<PiProvider[]>("pi_providers"),
+  piProviderSave: (provider, apiKey) => invoke<PiProvider[]>("pi_provider_save", { provider, apiKey }),
+  piEndpointSave: (name, baseUrl, apiKey, models) =>
+    invoke<PiProvider[]>("pi_endpoint_save", { name, baseUrl, apiKey, models }),
+  piProviderRemove: (provider) => invoke<PiProvider[]>("pi_provider_remove", { provider }),
+  agentStart: (request, parentId) => invoke<void>("agent_start", { request, parentId: parentId ?? null }),
   agentDelete: (taskId) => invoke<void>("agent_delete", { taskId }),
   agentRename: (taskId, title) => invoke<void>("agent_rename", { taskId, title }),
   agentCancel: (runId) => invoke<void>("agent_cancel", { runId: runId ?? null }),

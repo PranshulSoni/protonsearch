@@ -173,8 +173,10 @@ export default function App({ view }: { view: ViewKind }) {
   const updateSettings = useCallback(async (patch: SettingsPatch) => {
     const next = await api.updateSettings(patch);
     setSettings(next);
+    // An engine change, pause or new root moves the index state; show it now, not on the next poll.
+    void refreshStatus();
     return next;
-  }, []);
+  }, [refreshStatus]);
 
   const completeOnboarding = useCallback(async (input: OnboardingInput) => {
     const next = await api.completeOnboarding(input);

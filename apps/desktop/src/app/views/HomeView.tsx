@@ -57,7 +57,8 @@ export default function HomeView({
     };
   }, []);
 
-  const greeting = greetingForTimestamp() + (osName ? ", " + osName : "");
+  const displayName = settings.userName?.trim() || osName;
+  const greeting = greetingForTimestamp() + (displayName ? ", " + displayName : "");
   const shortcut = displayHotkey(settings.hotkey);
   const sources = status?.sources ?? [];
   const note = status ? indexNote(status) : null;

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowLeft, ArrowUp, Bot, ChevronDown, Pause, Pencil, Play, Trash2 } from "lucide-react";
 import { api } from "../../bridge/api";
-import type { AgentModel, AgentRuntime, AgentStatus, AgentTask, AgentTaskRuntime, AgentTaskState } from "../../bridge/types";
-import { AGENT_RUNTIMES, buildAgentRunRequest, createAgentRunId } from "../../app/agentRun";
+import type { AgentModel, AgentStatus, AgentTask, AgentTaskRuntime, AgentTaskState } from "../../bridge/types";
+import { buildAgentRunRequest, createAgentRunId } from "../../app/agentRun";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HighlightRow } from "../ui/HighlightList";
@@ -22,10 +22,6 @@ const STATE: Record<AgentTaskState, { label: string; dot: string }> = {
 const RUNTIME_TILE: Record<AgentTaskRuntime, string> = {
   pi: "Pi",
   pydantic: "Py",
-  claude: "CC",
-  codex: "Cx",
-  opencode: "OC",
-  gemini: "G",
   unknown: "?",
 };
 
@@ -39,12 +35,6 @@ function threadOf(root: AgentTask, tasks: AgentTask[]): AgentTask[] {
   return [root, ...tasks.filter((task) => task.parentId === root.id).sort((a, b) => a.createdAt - b.createdAt)];
 }
 
-interface AgentOption {
-  id: AgentRuntime;
-  name: string;
-  available: boolean;
-}
-
 function sameModel(a: AgentModel | null, b: AgentModel | null): boolean {
   return a?.provider === b?.provider && a?.id === b?.id;
 }
@@ -52,11 +42,6 @@ function sameModel(a: AgentModel | null, b: AgentModel | null): boolean {
 function Composer({
   placeholder,
   busy,
-  agents,
-  agentId,
-  defaultAgent,
-  onAgent,
-  onOpenAgents,
   models,
   model,
   onModel,
@@ -64,19 +49,13 @@ function Composer({
 }: {
   placeholder: string;
   busy: boolean;
-  /** Null until the installed agents are checked. */
-  agents: AgentOption[] | null;
-  agentId: AgentRuntime;
-  defaultAgent: AgentRuntime;
-  onAgent: (id: AgentRuntime) => void;
-  onOpenAgents: () => void;
   models: AgentModel[];
   model: AgentModel | null;
   onModel: (model: AgentModel | null) => void;
   onSend: (text: string) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
-  const [choosing, setChoosing] = useState<"model" | "agent" | null>(null);
+  const [choosing, setChoosing] = useState(false);
   // The model list's filter, and the highlighted row that Enter picks.
   const [filter, setFilter] = useState("");
   const [active, setActive] = useState(0);
@@ -89,14 +68,14 @@ function Composer({
   useEffect(() => {
     listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
   }, [highlighted]);
-  const toggle = (list: "model" | "agent") => {
+  const toggle = () => {
     setFilter("");
     setActive(0);
-    setChoosing((open) => (open === list ? null : list));
+    setChoosing((open) => !open);
   };
   const pickModel = (option: AgentModel | null) => {
     onModel(option);
-    setChoosing(null);
+    setChoosing(false);
   };
   const filterKeys = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -112,7 +91,7 @@ function Composer({
   const closeOnEscape = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Escape") return;
     event.stopPropagation();
-    setChoosing(null);
+    setChoosing(false);
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -135,25 +114,11 @@ function Composer({
         <button
           type="button"
           aria-haspopup="listbox"
-          aria-expanded={choosing === "model"}
-          onClick={() => toggle("model")}
+          aria-expanded={choosing}
+          onClick={toggle}
           className="flex h-6 max-w-[8rem] shrink-0 items-center gap-1 rounded-full px-2 text-[12px] text-fg-2 outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-hi"
         >
           <span className="truncate">{model?.id ?? "Default"}</span>
-          <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label="Agent"
-          aria-haspopup="listbox"
-          aria-expanded={choosing === "agent"}
-          onClick={() => {
-            toggle("agent");
-            onOpenAgents();
-          }}
-          className="flex h-6 max-w-[7rem] shrink-0 items-center gap-1 rounded-full px-2 text-[12px] text-fg-2 outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-hi"
-        >
-          <span className="truncate">{AGENT_RUNTIMES.find((entry) => entry.id === agentId)?.name ?? agentId}</span>
           <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
         </button>
         <button
@@ -165,7 +130,7 @@ function Composer({
           <ArrowUp size={15} strokeWidth={2} aria-hidden="true" />
         </button>
       </form>
-      {choosing === "model" ? (
+      {choosing ? (
         <div
           role="listbox"
           aria-label="Models"
@@ -201,33 +166,6 @@ function Composer({
             ))}
             {shown.length === 0 ? <p className="px-2.5 py-1.5 text-[12px] text-fg-3">No matching models.</p> : null}
           </div>
-        </div>
-      ) : null}
-      {choosing === "agent" ? (
-        <div role="listbox" aria-label="Agent" onKeyDown={closeOnEscape} className="flex flex-col gap-0.5 rounded-[12px] border border-line bg-raised p-1">
-          {agents === null ? (
-            <p className="px-2.5 py-1.5 text-[12px] text-fg-3">Checking agents…</p>
-          ) : (
-            agents.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                role="option"
-                aria-selected={option.id === agentId}
-                disabled={!option.available}
-                onClick={() => {
-                  onAgent(option.id);
-                  setChoosing(null);
-                }}
-                className="flex items-center justify-between gap-3 rounded-[8px] px-2.5 py-1.5 text-left text-[12px] text-fg outline-none hover:bg-hi/10 focus-visible:ring-2 focus-visible:ring-hi disabled:text-fg-3 disabled:hover:bg-transparent aria-selected:text-hi"
-              >
-                <span className="truncate">{option.name}</span>
-                <span className="shrink-0 text-fg-3">
-                  {!option.available ? "Not installed" : option.id === defaultAgent ? "Default" : null}
-                </span>
-              </button>
-            ))
-          )}
         </div>
       ) : null}
     </div>
@@ -323,15 +261,12 @@ function AgentRow({
 
 export function AgentsCard({
   status,
-  defaultAgent = "pi",
   tasks,
   onPause,
   onResume,
   onChanged,
 }: {
   status: AgentStatus | null;
-  /** The default agent from settings; a run uses it unless the selector picks another. */
-  defaultAgent?: AgentRuntime;
   tasks: AgentTask[];
   onPause: (taskId: string) => void;
   onResume: (taskId: string) => void;
@@ -346,29 +281,12 @@ export function AgentsCard({
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
   // Enter or Escape unmounts the input, which can fire one more blur; the first end wins.
   const renameEnded = useRef(true);
-  // The agent a run uses: the default, until the selector picks another. A pick lasts until the default changes.
-  const [picked, setPicked] = useState<AgentRuntime | null>(null);
-  const agentId = picked ?? defaultAgent;
-  useEffect(() => {
-    setPicked(null);
-  }, [defaultAgent]);
-  // Installed agents for the selector, checked the first time it opens.
-  const [agents, setAgents] = useState<AgentOption[] | null>(null);
-  const openAgents = () => {
-    if (agents !== null) return;
-    api.detectAgents().then(
-      (found) =>
-        setAgents(AGENT_RUNTIMES.map((entry) => ({ ...entry, available: found.some((item) => item.id === entry.id && item.available) }))),
-      () => setAgents(AGENT_RUNTIMES.map((entry) => ({ ...entry, available: entry.id === agentId }))),
-    );
-  };
-  // Models of the chosen agent; empty when its CLI takes a typed name. A pick lasts until the agent changes.
+  // Models Pi can run, read when the card opens.
   const [models, setModels] = useState<AgentModel[]>([]);
   const [model, setModel] = useState<AgentModel | null>(null);
   useEffect(() => {
     let current = true;
-    setModel(null);
-    api.agentModels(agentId).then(
+    api.agentModels().then(
       (list) => {
         if (current) setModels(list);
       },
@@ -379,7 +297,7 @@ export function AgentsCard({
     return () => {
       current = false;
     };
-  }, [agentId]);
+  }, []);
   const configured = status != null && status.state !== "not_configured";
   const roots = tasks.filter((task) => !task.parentId);
   const open = roots.find((task) => task.id === openId) ?? null;
@@ -390,7 +308,7 @@ export function AgentsCard({
     setError(null);
     try {
       const modelPick = model ? `${model.provider}/${model.id}` : null;
-      await api.agentStart(buildAgentRunRequest(createAgentRunId(), text, modelPick), parentId, agentId);
+      await api.agentStart(buildAgentRunRequest(createAgentRunId(), text, modelPick), parentId);
       onChanged?.();
       return true;
     } catch (reason) {
@@ -419,7 +337,7 @@ export function AgentsCard({
     return (
       <div className="flex max-h-[460px] min-h-0 flex-1 flex-col gap-3 p-4">
         <CardHeader icon={Bot} title="Agents" subtitle="Not configured" />
-        <CardEmpty title="No agent configured." hint="Choose a default agent on the Workflows page." />
+        <CardEmpty title="No agent configured." hint="Set up Pi on the Agentic workflows page." />
       </div>
     );
   }
@@ -500,11 +418,6 @@ export function AgentsCard({
           <Composer
             placeholder="Message the agent…"
             busy={busy}
-            agents={agents}
-            agentId={agentId}
-            defaultAgent={defaultAgent}
-            onAgent={setPicked}
-            onOpenAgents={openAgents}
             models={models}
             model={model}
             onModel={setModel}
@@ -521,11 +434,6 @@ export function AgentsCard({
       <Composer
         placeholder="Ask the agent…"
         busy={busy}
-        agents={agents}
-        agentId={agentId}
-        defaultAgent={defaultAgent}
-        onAgent={setPicked}
-        onOpenAgents={openAgents}
         models={models}
         model={model}
         onModel={setModel}

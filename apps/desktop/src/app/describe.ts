@@ -48,7 +48,7 @@ export function indexHealth(status: EngineStatus | null): IndexHealth {
           };
     case "indexing":
       if (status.reindexing) {
-        return { tone: "busy", label: "Reindexing", detail: "Re-reading your images with the new OCR engine. Search keeps working meanwhile." };
+        return reindexHealth(status);
       }
       return {
         tone: "busy",
@@ -66,7 +66,7 @@ export function indexHealth(status: EngineStatus | null): IndexHealth {
       };
     case "starting":
       if (status.reindexing) {
-        return { tone: "busy", label: "Reindexing", detail: "Re-reading your images with the new OCR engine. Search keeps working meanwhile." };
+        return reindexHealth(status);
       }
       return {
         tone: "busy",
@@ -87,6 +87,18 @@ export function indexHealth(status: EngineStatus | null): IndexHealth {
         detail: "The engine reported an unrecognised index state.",
       };
   }
+}
+
+function reindexHealth(status: EngineStatus): IndexHealth {
+  const pending = status.ocrPending ?? 0;
+  return {
+    tone: "busy",
+    label: "Reindexing",
+    detail:
+      "Re-reading your images with the new OCR engine" +
+      (pending > 0 ? " (" + formatNumber(pending) + " left)" : "") +
+      ". Search keeps working meanwhile.",
+  };
 }
 
 export function stateLabel(state: string): string {

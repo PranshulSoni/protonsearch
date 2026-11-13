@@ -459,6 +459,9 @@ pub struct EngineStatus {
     #[serde(default)]
     pub reindexing: bool,
     pub ocr_documents: u64,
+    /// Images still queued in the running OCR pass; 0 when idle.
+    #[serde(default)]
+    pub ocr_pending: u64,
     #[serde(default)]
     pub roots: Vec<RootStatus>,
     #[serde(default)]
@@ -625,47 +628,12 @@ impl Default for PrivacySettings {
     }
 }
 
-/// Which optional agent runtime executes workflows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum AgentRuntime {
-    /// Pi coding-agent CLI (https://pi.dev), spawned on demand as a subprocess.
-    #[default]
-    Pi,
-    /// Legacy embedded Pydantic AI sidecar (kept as an optional fallback).
-    Pydantic,
-    /// Claude Code CLI (`claude -p`).
-    Claude,
-    /// Codex CLI (`codex exec`).
-    Codex,
-    /// OpenCode CLI (`opencode run`).
-    #[serde(rename = "opencode")]
-    OpenCode,
-    /// Gemini CLI (`gemini -p`).
-    Gemini,
-}
-
-impl AgentRuntime {
-    /// Settings id: "pi", "pydantic", "claude", "codex", "opencode" or "gemini".
-    pub fn id(self) -> &'static str {
-        match self {
-            AgentRuntime::Pi => "pi",
-            AgentRuntime::Pydantic => "pydantic",
-            AgentRuntime::Claude => "claude",
-            AgentRuntime::Codex => "codex",
-            AgentRuntime::OpenCode => "opencode",
-            AgentRuntime::Gemini => "gemini",
-        }
-    }
-}
-
+/// Agent runs use Pi (https://pi.dev). Settings saved by older builds may still
+/// carry `runtime` and `cliModels`; serde ignores them, so every run uses Pi.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentSettings {
     pub enabled: bool,
-    /// The default agent: Pi, or one of the CLI runtimes.
-    #[serde(default)]
-    pub runtime: AgentRuntime,
     /// Optional explicit path to the pi launcher (pi.cmd / pi executable).
     #[serde(default)]
     pub pi_path: Option<String>,
@@ -683,9 +651,6 @@ pub struct AgentSettings {
     pub provider: Option<String>,
     #[serde(default)]
     pub model: Option<String>,
-    /// Default model per CLI runtime, keyed by [`AgentRuntime::id`]. Pi uses `model`.
-    #[serde(default)]
-    pub cli_models: std::collections::BTreeMap<String, String>,
     #[serde(default)]
     pub sidecar_path: Option<String>,
 }
@@ -694,14 +659,12 @@ impl Default for AgentSettings {
     fn default() -> Self {
         Self {
             enabled: false,
-            runtime: AgentRuntime::Pi,
             pi_path: None,
             allow_writes: false,
             workspace: None,
             thinking: None,
             provider: None,
             model: None,
-            cli_models: Default::default(),
             sidecar_path: None,
         }
     }
@@ -1610,7 +1573,7 @@ mod tests {
             "launchAtLogin": false,
             "indexing": {"roots": [], "excludedPaths": [], "contentEnabled": false, "ocrEnabled": false, "respectPowerState": true, "paused": false},
             "privacy": {"activityHistory": true, "clipboardHistory": false, "browserHistory": false, "gitIndexing": false, "telemetry": false},
-            "agent": {"enabled": false, "runtime": "pi", "piPath": null, "allowWrites": false, "workspace": null, "thinking": null, "provider": null, "model": null, "sidecarPath": null},
+            "agent": {"enabled": false, "runtime": "codex", "cliModels": {"codex": "gpt-5"}, "piPath": null, "allowWrites": false, "workspace": null, "thinking": null, "provider": null, "model": null, "sidecarPath": null},
             "semantic": {"enabled": false, "model": null},
             "onboardingComplete": true,
             "legacyMigrated": true,

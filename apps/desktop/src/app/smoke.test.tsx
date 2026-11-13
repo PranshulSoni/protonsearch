@@ -153,7 +153,7 @@ describe("desktop app shell smoke", () => {
     expect(container.textContent).not.toContain("acceptance");
   });
 
-  it("lists every agent runtime with its install state", async () => {
+  it("shows Pi and its providers, and no other agent", async () => {
     window.localStorage.clear();
     await act(async () => {
       root.render(<App view="main" />);
@@ -164,15 +164,13 @@ describe("desktop app shell smoke", () => {
     });
     await flush(8);
     const text = container.textContent ?? "";
-    expect(text).toContain("Agents");
-    expect(text).toContain("Pi");
-    expect(text).toContain("Claude Code");
-    expect(text).toContain("Codex");
-    expect(text).toContain("OpenCode");
-    expect(text).toContain("Gemini CLI");
-    expect(text).toContain("Installed · 1.5.0");
-    expect(text).toContain("Not installed");
+    expect(text).toContain("Pi agent");
+    expect(text).toContain("OpenAI-compatible endpoint");
+    expect(text).toContain("Key set in the environment");
+    expect(text).not.toContain("Claude Code");
+    expect(text).not.toContain("Gemini CLI");
     expect(container.querySelector("#workflows-agents")).not.toBeNull();
+    expect(container.querySelector("#workflows-providers")).not.toBeNull();
   });
 
   it("keeps the first focusable element a skip link and the route h1 focusable", async () => {

@@ -592,7 +592,6 @@ export default function IslandView() {
         return (
           <MemoAgentsCard
             status={bootstrap.agentStatus}
-            defaultAgent={bootstrap.settings?.agent.runtime ?? "pi"}
             tasks={bootstrap.agentTasks}
             onPause={pauseAgent}
             onResume={resumeAgent}

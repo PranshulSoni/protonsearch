@@ -137,6 +137,13 @@ describe("indexHealth", () => {
     expect(indexHealth(makeStatus({ state: "error" }))).toMatchObject({ tone: "error", label: "Index error" });
   });
 
+  it("shows an OCR engine reindex from the first status, with images left", () => {
+    expect(indexHealth(makeStatus({ state: "starting", reindexing: true }))).toMatchObject({ label: "Reindexing" });
+    const health = indexHealth(makeStatus({ state: "indexing", reindexing: true, ocrPending: 12 }));
+    expect(health).toMatchObject({ tone: "busy", label: "Reindexing" });
+    expect(health.detail).toContain("12 left");
+  });
+
   it("uses the first engine warning without inventing one", () => {
     const health = indexHealth(
       makeStatus({ warnings: ["C:\\private\\bad.pdf: extraction failed"] }),

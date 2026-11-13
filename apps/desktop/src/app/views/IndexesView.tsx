@@ -534,7 +534,7 @@ export default function IndexesView({ focusSource }: { focusSource?: string | nu
               <p className="muted">
                 Existing results stay searchable, but new files are not being picked up.
               </p>
-            ) : status.state === "starting" ? (
+            ) : status.state === "starting" && !status.reindexing ? (
               <p className="muted">The local engine is warming up.</p>
             ) : null}
             <dl className="metric-list">

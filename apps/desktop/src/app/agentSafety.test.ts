@@ -26,8 +26,4 @@ describe("Pi agent security copy and write gate", () => {
     expect(source).not.toContain("pendingConfirm");
     expect(source).not.toContain("Allow and run");
   });
-
-  it("offers the default-agent switch only for installed agents", () => {
-    expect(source).toContain("disabled={!found || isDefault}");
-  });
 });

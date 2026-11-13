@@ -21,6 +21,8 @@ function stubMatchMedia(query: string) {
 }
 
 beforeEach(() => {
+  // Fresh bridge mock per test: its settings live in module state.
+  vi.resetModules();
   window.history.replaceState({}, "", "/?view=main&onboard=1");
   window.localStorage.clear();
   Object.defineProperty(window, "matchMedia", {
@@ -47,77 +49,125 @@ async function flush(times = 8) {
   }
 }
 
-describe("onboarding smoke", () => {
-  it("explains OCR engines during setup and only enables the installed engine", async () => {
-    const { default: App } = await import("../App");
-    await act(async () => root.render(<App view="main" />));
-    await flush(8);
-    const primary = () => container.querySelector<HTMLButtonElement>(".setup-bottom .btn-primary");
-    for (let index = 0; index < 2; index += 1) {
-      await act(async () => primary()?.click());
-      await flush(2);
-    }
-    const firstLocation = container.querySelector<HTMLInputElement>(".choices input[type=checkbox]");
-    expect(firstLocation).not.toBeNull();
-    await act(async () => firstLocation?.click());
-    await flush(2);
-    await act(async () => primary()?.click());
-    await flush(2);
-    expect(container.querySelector("#onboarding-step-eyebrow")?.textContent).toContain("04 of 07");
-    const selector = container.querySelector<HTMLSelectElement>("#ocr-engine");
-    expect(selector?.value).toBe("windows");
-    expect(selector?.querySelector<HTMLOptionElement>('option[value="pp_ocr_v6"]')?.disabled).toBe(true);
-    expect(container.textContent).toContain("Built into Windows 10 and 11. Nothing to download.");
-    expect(container.textContent).toContain("Open-source engine that uses your installed Tesseract.");
+async function renderApp() {
+  const { default: App } = await import("../App");
+  await act(async () => root.render(<App view="main" />));
+  await flush(10);
+}
+
+const title = () => container.querySelector("h1")?.textContent;
+
+function primary(): HTMLButtonElement {
+  const button = container.querySelector<HTMLButtonElement>(".onboard-nav .btn-primary");
+  if (!button) throw new Error("primary button missing");
+  return button;
+}
+
+function button(text: string): HTMLButtonElement | undefined {
+  return [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+    (element) => element.textContent?.trim() === text,
+  );
+}
+
+async function click(element: HTMLElement | null | undefined) {
+  if (!element) throw new Error("element missing");
+  await act(async () => element.click());
+  await flush(6);
+}
+
+async function press(init: KeyboardEventInit) {
+  const target = document.activeElement ?? document.body;
+  await act(async () => {
+    target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init }));
   });
+  await flush(6);
+}
 
-  it("runs the seven-step flow, keeps progress local and completes through the bridge", async () => {
-    const { default: App } = await import("../App");
-    await act(async () => {
-      root.render(<App view="main" />);
+async function type(input: HTMLInputElement, value: string) {
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  await act(async () => {
+    setValue?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+const caps = (scope: string) =>
+  [...container.querySelectorAll(scope + " .kbd")].map((element) => element.textContent);
+
+describe("onboarding smoke", () => {
+  it("walks the six steps, saving each choice, and opens the launcher", async () => {
+    await renderApp();
+    expect(container.querySelector('.onboard-progress [aria-current="step"]')?.textContent).toBe("Welcome");
+    expect(title()).toBe("Welcome to ProtonSearch");
+    expect(document.activeElement).toBe(primary());
+
+    // Name: focused on arrival, Back returns to the welcome step.
+    await click(primary());
+    expect(title()).toBe("What should we call you?");
+    await click(button("Back"));
+    expect(title()).toBe("Welcome to ProtonSearch");
+    await click(primary());
+    const name = container.querySelector<HTMLInputElement>(".onboard-input");
+    expect(document.activeElement).toBe(name);
+    await type(name!, "Alex");
+    await click(primary());
+
+    // OCR: the shared engine selector, or no OCR at all.
+    expect(title()).toBe("Read text in images?");
+    expect(container.querySelector<HTMLSelectElement>("#ocr-engine")?.value).toBe("windows");
+    await click(button("No OCR"));
+    expect(container.querySelector("[data-testid='ocr-engine-options']")).toBeNull();
+    await click(button("Use OCR"));
+    expect(container.querySelector("[data-testid='ocr-engine-options']")).not.toBeNull();
+    await click(primary());
+
+    // Appearance: the preview pill follows the choices before they are saved.
+    expect(title()).toBe("Choose a look");
+    const pill = () => container.querySelector<HTMLElement>(".onboard-pill");
+    expect(pill()?.classList.contains("is-glass")).toBe(false);
+    await click(container.querySelector<HTMLElement>('[role="switch"][aria-label="Liquid glass"]'));
+    await click(button("Dark"));
+    expect(pill()?.classList.contains("is-glass")).toBe(true);
+    expect(pill()?.style.getPropertyValue("--glass")).toBe("0.6");
+    expect(container.querySelector(".onboard-preview")?.getAttribute("data-look")).toBe("dark");
+    await click(primary());
+    expect(JSON.parse(window.localStorage.getItem("protonsearch.islandLook") ?? "{}")).toMatchObject({
+      liquidGlass: true,
+      theme: "dark",
     });
-    await flush(10);
 
-    expect(container.querySelector(".onboarding")).not.toBeNull();
-    expect(container.querySelector("#onboarding-step-eyebrow")?.textContent).toContain("01 of 07");
-    expect(container.querySelector(".legacy-note")).not.toBeNull();
+    // Shortcut: Esc cancels recording; Alt+Shift+Space is recorded by physical key.
+    expect(title()).toBe("Set your shortcut");
+    expect(container.textContent).not.toMatch(/at least one/i);
+    expect(document.activeElement).toBe(button("Change"));
+    expect(caps(".onboard-shortcut")).toEqual(["Alt", "Space"]);
+    await click(button("Change"));
+    expect(button("Listening…")).toBeDefined();
+    await press({ key: "Escape", code: "Escape" });
+    expect(button("Change")).toBeDefined();
+    expect(caps(".onboard-shortcut")).toEqual(["Alt", "Space"]);
+    await click(button("Change"));
+    await press({ key: " ", code: "Space", altKey: true, shiftKey: true });
+    expect(caps(".onboard-shortcut")).toEqual(["Alt", "Shift", "Space"]);
+    await click(primary());
 
-    const primary = () => {
-      const button = container.querySelector<HTMLButtonElement>(".setup-bottom .btn-primary");
-      if (!button) throw new Error("primary button missing");
-      return button;
-    };
+    // Done: the saved combo as caps, then the launcher.
+    expect(title()).toBe("You're all set");
+    expect(caps(".onboard-lead")).toEqual(["Alt", "Shift", "Space"]);
+    expect(primary().textContent).toBe("Open launcher");
+    await click(primary());
+    await flush(12);
+    expect(container.querySelector(".onboard")).toBeNull();
+    expect(container.querySelector(".app-shell")).not.toBeNull();
+    // Home greets with the saved name instead of the Windows user name.
+    expect(container.querySelector(".page-head")?.textContent).toContain("Alex");
+  }, 15_000);
 
-    await act(async () => primary().click());
-    await flush(2);
-    expect(container.querySelector("h1")?.textContent).toBe("What should we call you?");
-
-    // Back returns to the welcome step.
-    const back = container.querySelector<HTMLButtonElement>(".setup-bottom-left .btn-ghost");
-    expect(back).not.toBeNull();
-    await act(async () => back?.click());
-    await flush(2);
-    expect(container.querySelector("h1")?.textContent).toBe("Find anything, without the friction.");
-
-    // Persisted draft: resume state is written before completion.
-    await act(async () => primary().click());
-    await flush(2);
-    const name = container.querySelector<HTMLInputElement>("#onboarding-name");
-    expect(name).not.toBeNull();
-    await act(async () => {
-      if (name) {
-        name.value = "Alex";
-        name.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-    });
-    await flush(2);
-
-    // Skip setup completes without roots and hands back to the app shell.
-    const skip = container.querySelector<HTMLButtonElement>(".setup-bottom .linkbtn");
-    expect(skip?.textContent).toContain("Skip setup");
-    await act(async () => skip?.click());
+  it("skip setup hands back to the app shell", async () => {
+    await renderApp();
+    await click(button("Skip setup"));
     await flush(12);
     expect(container.querySelector(".app-shell")).not.toBeNull();
-    expect(container.querySelector(".onboarding")).toBeNull();
+    expect(container.querySelector(".onboard")).toBeNull();
   });
 });

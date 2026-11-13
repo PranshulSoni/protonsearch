@@ -1,9 +1,0 @@
-# Machine-local virtualenvs (recreate with the native Python 3.14 interpreter).
-.venv/
-.venv2/
-.venv-nanobot/
-.venv-slim/
-# Local install logs / measurement artifacts.
-.nanobot-install.log
-__pycache__/
-*.pyc

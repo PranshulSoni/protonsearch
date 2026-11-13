@@ -99,13 +99,48 @@ pub fn recognize_indra(model_dir: &Path, image: DynamicImage) -> anyhow::Result<
     let mut guard = CACHED_INDRA.lock().map_err(|e| anyhow::anyhow!("mutex poisoned: {e}"))?;
     if let Some((cached_dir, pipeline)) = guard.as_ref() {
         if cached_dir == model_dir {
-            return pipeline.recognize(image);
+            return pipeline.recognize(image).map(|text| strip_markup(&text));
         }
     }
     let pipeline = OnnxOcr::indra(model_dir)?;
-    let result = pipeline.recognize(image);
+    let result = pipeline.recognize(image).map(|text| strip_markup(&text));
     *guard = Some((model_dir.to_path_buf(), pipeline));
     result
+}
+
+/// Indra wraps its text in layout markup (`<table><tr><td>`, `## `); only the words are indexed.
+fn strip_markup(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '<' && chars.peek().is_some_and(|c| c.is_ascii_alphabetic() || *c == '/') {
+            for c in chars.by_ref() {
+                if c == '>' {
+                    break;
+                }
+            }
+            out.push(' ');
+        } else {
+            out.push(ch);
+        }
+    }
+    out.lines()
+        .map(|line| line.trim_start_matches('#').split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("
+")
+}
+
+#[cfg(test)]
+mod markup_tests {
+    #[test]
+    fn indra_markup_is_stripped_but_plain_text_is_kept() {
+        let text = "## Invoice
+<table><tr><td>Total</td><td>a < b</td></tr></table>";
+        assert_eq!(super::strip_markup(text), "Invoice
+Total a < b");
+    }
 }
 
 fn require_file(path: &Path) -> anyhow::Result<()> {

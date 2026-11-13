@@ -1,4 +1,4 @@
-// Agentic workflows page: the agent runtimes (AgentsSection) and the native
+// Agentic workflows page: Pi and its providers (AgentsSection) and the native
 // commands. A destructive command asks for a second press here, using the same
 // server-side confirmation the launcher uses.
 

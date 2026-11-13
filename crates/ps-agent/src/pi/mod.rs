@@ -23,6 +23,7 @@
 //! process can reach on the filesystem. See docs/agent/PI_INTEGRATION.md.
 
 pub mod install;
+pub mod providers;
 pub mod status;
 mod args;
 mod client;
@@ -32,8 +33,6 @@ mod models;
 mod probe;
 mod process;
 pub use process::connect_pi;
-pub(crate) use process::pi_command;
-pub(crate) use probe::{run_child_capture, run_child_capture_with_input};
 mod redact;
 
 use std::path::Path;
